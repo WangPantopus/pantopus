@@ -81,7 +81,6 @@ fun RecurringSetupScreen(
                 )
             is RecurringLoadState.Loaded ->
                 RecurringBody(
-                    eventTypeName = l.eventTypeName,
                     config = config,
                     occurrences = occurrences,
                     submit = submit,
@@ -127,7 +126,6 @@ private fun TopBar(onBack: () -> Unit) {
 
 @Composable
 fun RecurringBody(
-    eventTypeName: String,
     config: RecurringConfig,
     occurrences: List<RecurrenceOccurrence>,
     submit: RecurringSubmitState,
@@ -153,7 +151,6 @@ fun RecurringBody(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(Spacing.s4),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            SeriesHeader(eventTypeName = eventTypeName, count = config.count)
             Text(
                 text = "Book the whole series in one go. We'll find the same time each week and flag any that's taken.",
                 style = PantopusTextStyle.caption,
@@ -171,7 +168,14 @@ fun RecurringBody(
             )
             if (occurrences.isNotEmpty()) {
                 SeriesStrip(occurrences = occurrences)
-                Text(text = "ALL ${occurrences.size} SESSIONS", style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
+                val failedCount = occurrences.count { it.status == OccurrenceStatus.Failed }
+                val openCount = occurrences.size - failedCount
+                val overlineText =
+                    when {
+                        failedCount == 0 -> "ALL ${occurrences.size} OPEN"
+                        else -> "$openCount OPEN · $failedCount NEEDS A NEW TIME"
+                    }
+                Text(text = overlineText, style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
                 occurrences.forEach { OccurrenceRow(it) }
                 SummaryChip(count = occurrences.size, weekdayShort = weekdayShort, timeLabel = timeLabel, rangeLabel = rangeLabel)
             }
@@ -188,30 +192,6 @@ fun RecurringBody(
                 isLoading = submit is RecurringSubmitState.Saving,
                 isEnabled = occurrences.isNotEmpty(),
             )
-        }
-    }
-}
-
-@Composable
-private fun SeriesHeader(
-    eventTypeName: String,
-    count: Int,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-        Box(
-            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.md)).background(ACCENT_BG),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 17.dp, tint = ACCENT)
-        }
-        Column {
-            Text(
-                text = "$count-session series",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
-            )
-            Text(text = eventTypeName, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
         }
     }
 }
@@ -468,16 +448,23 @@ private fun OccurrenceRow(occ: RecurrenceOccurrence) {
                 color = if (failed) PantopusColors.warning else PantopusColors.appTextSecondary,
             )
         }
-        Text(
-            text = if (failed) "FULL" else "OPEN",
-            style = PantopusTextStyle.overline,
-            color = if (failed) PantopusColors.appTextMuted else PantopusColors.success,
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(Radii.pill))
-                    .background(if (failed) PantopusColors.appSurfaceSunken else PantopusColors.successBg)
-                    .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-        )
+        if (failed) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(text = "PICK ANOTHER", style = PantopusTextStyle.overline, color = ACCENT)
+                PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 13.dp, tint = ACCENT)
+            }
+        } else {
+            Text(
+                text = "OPEN",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.success,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.successBg)
+                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+            )
+        }
     }
 }
 

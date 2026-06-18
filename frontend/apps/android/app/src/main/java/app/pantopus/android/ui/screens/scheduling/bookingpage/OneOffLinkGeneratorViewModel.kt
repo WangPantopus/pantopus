@@ -65,7 +65,8 @@ data class OneOffConfig(
 
 data class OneOffResult(
     val url: String,
-    val metaLabel: String,
+    val expiryLabel: String,
+    val singleUse: Boolean,
 )
 
 sealed interface OneOffUiState {
@@ -174,8 +175,11 @@ class OneOffLinkGeneratorViewModel
 
         private fun OneOffLinkResponse.toResult(): OneOffResult {
             val expiryLabel = expiresAt?.let { "Expires ${shortDate(it)}" } ?: "No expiry"
-            val meta = if (singleUse) "$expiryLabel · single use" else "$expiryLabel · multi-use"
-            return OneOffResult(url = BookingLinkUrls.shareableFromPath(path), metaLabel = meta)
+            return OneOffResult(
+                url = BookingLinkUrls.shareableFromPath(path),
+                expiryLabel = expiryLabel,
+                singleUse = singleUse,
+            )
         }
 
         private fun EventTypeDto.toOption(): EventTypeOption =
@@ -187,7 +191,10 @@ class OneOffLinkGeneratorViewModel
                 locationMode = locationMode,
             )
 
-        private fun buildSlot(index: Int, durationMin: Int): ProposedSlot {
+        private fun buildSlot(
+            index: Int,
+            durationMin: Int,
+        ): ProposedSlot {
             val start =
                 ZonedDateTime
                     .now(ZoneId.systemDefault())

@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.CreditCard
@@ -171,6 +172,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
@@ -198,6 +200,7 @@ import androidx.compose.material.icons.filled.Support
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Timer
@@ -615,6 +618,15 @@ enum class PantopusIcon(
     SearchX("search-x"),
     PauseCircle("pause-circle"),
     BellPlus("bell-plus"),
+
+    // Scheduling payments/setup glyphs: `percent` (tax / refund-after-cutoff),
+    // `type` (statement descriptor), plus the `Calendarly` brand mark used by
+    // the "open in app" handoff interstitial.
+    Percent("percent"),
+    Type("type"),
+    Calendarly("calendarly"),
+    QrCode("qr-code"),
+    Ticket("ticket"),
     ;
 
     companion object {
@@ -841,6 +853,11 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.TestTube -> IconSource.Material(Icons.Filled.Science)
         PantopusIcon.Factory -> IconSource.Material(Icons.Filled.Factory)
         PantopusIcon.BadgePercent -> IconSource.Material(Icons.Filled.Percent)
+        PantopusIcon.Percent -> IconSource.Material(Icons.Filled.Percent)
+        PantopusIcon.Type -> IconSource.Material(Icons.Filled.TextFields)
+        PantopusIcon.Calendarly -> IconSource.Material(Icons.Filled.CalendarMonth)
+        PantopusIcon.QrCode -> IconSource.Material(Icons.Filled.QrCode2)
+        PantopusIcon.Ticket -> IconSource.Material(Icons.Filled.ConfirmationNumber)
         PantopusIcon.Vote -> IconSource.Material(Icons.Filled.HowToVote)
         PantopusIcon.LifeBuoy -> IconSource.Material(Icons.Filled.Support)
         PantopusIcon.HardHat -> IconSource.Material(Icons.Filled.Engineering)

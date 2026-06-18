@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.scheduling.hub
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -283,19 +284,28 @@ private fun HubLoadedBody(
         state.isPaused -> HubPausedBanner(onResume = onResume)
         else -> HubPauseRow(pillar = state.pillar, isAccepting = true, onToggle = onToggle)
     }
-    if (state.isPaused) {
-        Spacer(Modifier.height(Spacing.s2))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            PantopusIconImage(icon = PantopusIcon.Info, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
-            Text("Existing bookings stay on your calendar while paused.", color = PantopusColors.appTextSecondary, fontSize = 12.sp)
-        }
-    }
     if (state.agenda.isNotEmpty()) {
         HubSectionHeader(
             title = "Today & upcoming",
             actionLabel = if (state.canEdit) "See all bookings" else null,
             onAction = if (state.canEdit) onSeeAllBookings else null,
         )
+        if (state.isPaused) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .padding(horizontal = Spacing.s3, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Info, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted)
+                Text("Existing bookings stay on your calendar while paused.", color = PantopusColors.appTextSecondary, fontSize = 12.sp)
+            }
+        }
         state.agenda.forEach { section ->
             HubAgendaDateHeader(header = section.header, sub = section.sub)
             section.rows.forEach { row ->

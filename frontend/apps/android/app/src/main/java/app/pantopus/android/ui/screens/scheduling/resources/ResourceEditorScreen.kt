@@ -203,8 +203,8 @@ private fun EditorBody(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        // Details
-        SectionCard(overline = "Details") {
+        // Name + type
+        SectionCard {
             PantopusTextField(
                 label = "Name",
                 value = form.name,

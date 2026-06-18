@@ -178,6 +178,7 @@ internal fun WizardTimezoneChip(
                 Modifier
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(pillar.accentBg)
+                    .border(1.dp, pillar.accent.copy(alpha = 0.25f), RoundedCornerShape(Radii.pill))
                     .padding(horizontal = Spacing.s3, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -242,9 +243,24 @@ internal fun WizardHoursGrid(
                         modifier = Modifier.weight(1f),
                     )
                     if (on) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(Radii.md))
+                                    .background(PantopusColors.appSurface)
+                                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 2.dp),
+                        ) {
                             PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 13.dp, tint = pillar.accent)
                             Text("9:00 AM – 5:00 PM", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
+                            PantopusIconImage(
+                                icon = PantopusIcon.ChevronRight,
+                                contentDescription = null,
+                                size = 13.dp,
+                                tint = PantopusColors.appTextMuted,
+                            )
                         }
                     } else {
                         Text("Unavailable", color = PantopusColors.appTextMuted, fontWeight = FontWeight.Medium, fontSize = 12.sp)

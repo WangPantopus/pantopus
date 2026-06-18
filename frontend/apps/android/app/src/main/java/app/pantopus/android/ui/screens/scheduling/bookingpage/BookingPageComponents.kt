@@ -172,7 +172,14 @@ internal fun BLToggle(
     enabled: Boolean = true,
     onToggle: (() -> Unit)? = null,
 ) {
-    val track = if (!enabled) PantopusColors.appSurfaceSunken else if (on) PantopusColors.primary600 else PantopusColors.appBorderStrong
+    val track =
+        if (!enabled) {
+            PantopusColors.appSurfaceSunken
+        } else if (on) {
+            PantopusColors.primary600
+        } else {
+            PantopusColors.appBorderStrong
+        }
     Box(
         modifier =
             modifier
@@ -352,7 +359,10 @@ internal fun StatusChip(status: PageStatus) {
 // ─── Amber inline warning note ──────────────────────────────────────────────
 
 @Composable
-internal fun WarningNote(text: String, modifier: Modifier = Modifier) {
+internal fun WarningNote(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier =
             modifier
@@ -499,7 +509,10 @@ internal fun BLSaveBar(
 // ─── Dark "Saved" toast ─────────────────────────────────────────────────────
 
 @Composable
-internal fun BLSavedToast(message: String, modifier: Modifier = Modifier) {
+internal fun BLSavedToast(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier =
             modifier
@@ -511,6 +524,28 @@ internal fun BLSavedToast(message: String, modifier: Modifier = Modifier) {
     ) {
         PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 15.dp, tint = PantopusColors.success)
         Text(message, color = PantopusColors.appTextInverse, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
+    }
+}
+
+// ─── Green "Link copied" success toast ──────────────────────────────────────
+
+@Composable
+internal fun CopiedToast(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.successBg)
+                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(Radii.pill))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 15.dp, tint = PantopusColors.success)
+        Text(message, color = PantopusColors.success, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
     }
 }
 
@@ -535,7 +570,10 @@ internal fun BLAvatar(
 // ─── Mono URL row used by share/result cards ────────────────────────────────
 
 @Composable
-internal fun MonoUrlText(url: String, modifier: Modifier = Modifier) {
+internal fun MonoUrlText(
+    url: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         url,
         color = PantopusColors.appText,

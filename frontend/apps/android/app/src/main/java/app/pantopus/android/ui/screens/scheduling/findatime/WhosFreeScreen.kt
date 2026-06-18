@@ -133,7 +133,10 @@ private fun Head(
     view: GridView,
     onSetView: (GridView) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = Spacing.s4, vertical = Spacing.s3), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
         FtSegmented(
             options = listOf("Day", "Week"),
             selectedIndex = if (view == GridView.Day) 0 else 1,
@@ -198,9 +201,18 @@ private fun LoadedGrid(
         if (tapped != null) {
             TappedActionCard(tapped = tapped, onFindTimeHere = onFindTimeHere, onAddEvent = onAddEvent, onDismiss = onDismissTapped)
         } else {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 PantopusIconImage(icon = PantopusIcon.Plus, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
-                Text(text = "Tap a free block to plan something", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(start = Spacing.s1))
+                Text(
+                    text = "Tap a free block to plan something",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(start = Spacing.s1),
+                )
             }
         }
 
@@ -227,7 +239,10 @@ private fun FilterChips(
     selected: String,
     onSelect: (String) -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
         filters.forEach { chip ->
             val on = chip.id == selected
             Box(
@@ -235,11 +250,16 @@ private fun FilterChips(
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(if (on) HomeAccentBg else PantopusColors.appSurface)
-                        .border(1.dp, if (on) HomeAccent else PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                        .border(1.dp, if (on) Color.Transparent else PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
                         .clickable(onClickLabel = chip.label) { onSelect(chip.id) }
                         .padding(horizontal = Spacing.s3, vertical = Spacing.s1),
             ) {
-                Text(text = chip.label, style = PantopusTextStyle.caption, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, color = if (on) HomeAccentDark else PantopusColors.appTextStrong)
+                Text(
+                    text = chip.label,
+                    style = PantopusTextStyle.caption,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (on) HomeAccentDark else PantopusColors.appTextStrong,
+                )
             }
         }
     }
@@ -287,11 +307,12 @@ private fun HeatGridView(
                     HeatCell(
                         state = cell,
                         modifier = Modifier.weight(1f).padding(start = 3.dp),
-                        onClick = if (cell == CellState.Free) {
-                            { onTapFree(row.member.name.substringBefore(" "), columns.getOrNull(i)?.label ?: "") }
-                        } else {
-                            null
-                        },
+                        onClick =
+                            if (cell == CellState.Free) {
+                                { onTapFree(row.member.name.substringBefore(" "), columns.getOrNull(i)?.label ?: "") }
+                            } else {
+                                null
+                            },
                     )
                 }
             }
@@ -324,7 +345,13 @@ private fun HeatCell(
             CellState.Free ->
                 Box(modifier = Modifier.padding(3.dp).size(5.dp).clip(CircleShape).background(HomeAccent))
             CellState.Unknown ->
-                Text(text = "?", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.appTextMuted, modifier = Modifier.align(Alignment.Center))
+                Text(
+                    text = "?",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextMuted,
+                    modifier = Modifier.align(Alignment.Center),
+                )
             CellState.Busy -> Unit
         }
     }
@@ -345,7 +372,12 @@ private fun Legend() {
         items.forEach { (cell, label) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HeatCell(state = cell, modifier = Modifier.size(13.dp))
-                Text(text = label, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(start = Spacing.s1))
+                Text(
+                    text = label,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.padding(start = Spacing.s1),
+                )
             }
         }
     }
@@ -379,7 +411,10 @@ private fun TappedActionCard(
                 color = PantopusColors.appText,
                 modifier = Modifier.weight(1f),
             )
-            Box(modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClickLabel = "Dismiss", onClick = onDismiss), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClickLabel = "Dismiss", onClick = onDismiss),
+                contentAlignment = Alignment.Center,
+            ) {
                 PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Dismiss", size = 14.dp, tint = PantopusColors.appTextMuted)
             }
         }
@@ -394,7 +429,12 @@ private fun TappedActionCard(
 private fun ComposingGrid() {
     Column(modifier = Modifier.fillMaxSize().padding(Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Building this week's availability", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(
+                text = "Building this week's availability",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
         }
         Column(
             modifier =

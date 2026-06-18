@@ -288,7 +288,10 @@ private fun HeaderCard(loaded: VisitDetailUiState.Loaded) {
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                listOf(PantopusColors.home, PantopusColors.homeDark),
+                                listOf(
+                                    PantopusColors.categoryUnboxing,
+                                    PantopusColors.categoryUnboxingDark,
+                                ),
                             ),
                         ),
                 contentAlignment = Alignment.Center,
@@ -310,7 +313,12 @@ private fun HeaderCard(loaded: VisitDetailUiState.Loaded) {
                     fontWeight = FontWeight.Bold,
                     color = PantopusColors.appText,
                 )
-                RuleChipView(icon = loaded.kind.icon, text = loaded.kind.label, home = true)
+                RuleChipView(
+                    icon = loaded.kind.icon,
+                    text = loaded.kind.label,
+                    foreground = PantopusColors.categoryUnboxingDark,
+                    background = PantopusColors.categoryUnboxingBg,
+                )
             }
         }
         Row(
@@ -391,7 +399,7 @@ private data class BannerSpec(
 
 @Composable
 private fun HostsCard(loaded: VisitDetailUiState.Loaded) {
-    SectionCard(overline = "Host members") {
+    SectionCard(overline = "Host members", overlineColor = PantopusColors.appTextSecondary) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -439,12 +447,16 @@ private fun AccessCard(note: String) {
                     tint = PantopusColors.appText,
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
                     "ENTRY NOTE",
-                    fontSize = 11.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextSecondary,
+                    letterSpacing = 0.6.sp,
+                    color = PantopusColors.appTextMuted,
                 )
                 Text(
                     note,
@@ -453,6 +465,12 @@ private fun AccessCard(note: String) {
                     color = PantopusColors.appText,
                 )
             }
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextMuted,
+            )
         }
     }
 }

@@ -278,7 +278,7 @@ private fun WorkflowRow(
                     PantopusIconImage(icon = channel.icon, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
                     Text(text = actionLabel, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary, maxLines = 1)
                 }
-                AutoStatusChip(active = active, modifier = Modifier.padding(top = 3.dp))
+                AutoStatusChip(active = active, modifier = Modifier.padding(top = 5.dp))
             }
         }
         if (!gated) {

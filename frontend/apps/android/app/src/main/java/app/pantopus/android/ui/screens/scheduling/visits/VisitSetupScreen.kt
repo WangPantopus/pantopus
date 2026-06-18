@@ -195,7 +195,7 @@ private fun VisitSetupBody(
     ) {
         Explainer()
 
-        SectionCard(overline = "Details") {
+        SectionCard {
             PantopusTextField(
                 label = "Title",
                 value = form.title,
@@ -353,9 +353,9 @@ private fun Explainer() {
             tint = PantopusColors.info,
         )
         Text(
-            "Pick a time and who needs to be home. The visit lands on the family calendar and marks those members busy.",
+            "Slots come from when your chosen hosts are personally free.",
             fontSize = 11.5.sp,
-            color = PantopusColors.appText,
+            color = PantopusColors.primary800,
         )
     }
 }

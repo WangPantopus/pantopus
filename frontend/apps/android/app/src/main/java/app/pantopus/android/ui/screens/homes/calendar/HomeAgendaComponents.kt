@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
@@ -309,7 +311,18 @@ fun HomeAgendaRowCard(
                     item.bookingStatus?.let { SchedulingStatusBadge(status = it) }
                 }
                 item.location?.let { loc ->
-                    Text(text = loc, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary, maxLines = 1)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.MapPin,
+                            contentDescription = null,
+                            size = 10.dp,
+                            tint = PantopusColors.appTextSecondary,
+                        )
+                        Text(text = loc, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary, maxLines = 1)
+                    }
                 }
             }
         }
@@ -334,7 +347,7 @@ fun CategoryChipMini(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(category.foreground))
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(category.dotColor))
         Text(text = category.label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
     }
 }
@@ -407,7 +420,7 @@ fun FilterChipRow(
                         ).clickable { onSelect(chip) }
                         .padding(horizontal = 13.dp, vertical = 6.dp)
                         .testTag("homeCalendar_filter_$label")
-                        .semantics { selected = active },
+                        .semantics { this.selected = active },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(

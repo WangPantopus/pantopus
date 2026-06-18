@@ -43,8 +43,10 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -449,12 +451,14 @@ private fun EventTypesEmptyTemplates(
             fontSize = 15.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(Spacing.s2))
         Text(
             "An event type is something people can book — a call, a meeting, a visit. Start from a template or build your own.",
             fontSize = 12.sp,
             color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = Spacing.s2),
         )
         Spacer(Modifier.height(Spacing.s4))
@@ -469,14 +473,38 @@ private fun EventTypesEmptyTemplates(
             "START FROM A TEMPLATE",
             fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.06.em,
             color = PantopusColors.appTextMuted,
         )
         Spacer(Modifier.height(Spacing.s2))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             listOf(15, 30, 60).forEach { mins ->
-                EtQuickChip(label = "$mins min", onClick = { onTemplate(mins) })
+                TemplateChip(label = "$mins min", onClick = { onTemplate(mins) })
             }
         }
+    }
+}
+
+// Empty-state template chip — clock leading icon (design `event-types-frames.jsx`
+// FrameEmpty), distinct from the editor's `+`-leading EtQuickChip.
+@Composable
+private fun TemplateChip(
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 13.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 12.dp, tint = PantopusColors.primary600)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
     }
 }
 
@@ -532,9 +560,15 @@ private fun CalmEmpty(
             PantopusIconImage(icon = icon, contentDescription = null, size = 26.dp, tint = PantopusColors.appTextMuted)
         }
         Spacer(Modifier.height(Spacing.s4))
-        Text(headline, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+        Text(headline, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, textAlign = TextAlign.Center)
         Spacer(Modifier.height(Spacing.s2))
-        Text(subcopy, fontSize = 12.sp, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(horizontal = Spacing.s2))
+        Text(
+            subcopy,
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = Spacing.s2),
+        )
         if (action != null) {
             Spacer(Modifier.height(Spacing.s4))
             action()

@@ -153,7 +153,7 @@ fun PersonalHeaderPill(modifier: Modifier = Modifier) {
     Row(
         modifier =
             modifier
-                .padding(horizontal = Spacing.s3, top = Spacing.s2)
+                .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s2)
                 .clip(RoundedCornerShape(Radii.pill))
                 .background(PantopusColors.personalBg)
                 .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
@@ -667,7 +667,7 @@ fun A3SaveBar(
             modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s3, top = Spacing.s2, bottom = Spacing.s4),
+                .padding(start = Spacing.s3, end = Spacing.s3, top = Spacing.s2, bottom = Spacing.s4),
     ) {
         RowDivider(modifier = Modifier.padding(bottom = Spacing.s2))
         if (saving) {

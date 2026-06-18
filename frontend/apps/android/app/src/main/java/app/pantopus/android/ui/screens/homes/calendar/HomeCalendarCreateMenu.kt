@@ -55,7 +55,7 @@ fun HomeCreateMenuContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.s2, bottom = Spacing.s4),
+        modifier = modifier.fillMaxWidth().padding(start = Spacing.s2, end = Spacing.s2, bottom = Spacing.s4),
     ) {
         Text(
             text = "Create",

@@ -233,7 +233,10 @@ private fun PublicHeader(header: PreviewHeader) {
 }
 
 @Composable
-private fun EventTypeCard(et: PublicEventTypeView, selected: Boolean) {
+private fun EventTypeCard(
+    et: PublicEventTypeView,
+    selected: Boolean,
+) {
     val duration = et.defaultDuration ?: et.durations.firstOrNull() ?: 30
     Row(
         modifier =
@@ -318,10 +321,18 @@ private fun InertPickTimeCta() {
             Modifier
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s4, top = Spacing.s2, bottom = Spacing.s4),
+                .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s2, bottom = Spacing.s4),
     ) {
+        // Spec: sticky footer carries a 1px top hairline separating it from scrolled content.
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
         Box(
-            modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(Radii.lg)).background(PantopusColors.primary600),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.s2)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.primary600),
             contentAlignment = Alignment.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {

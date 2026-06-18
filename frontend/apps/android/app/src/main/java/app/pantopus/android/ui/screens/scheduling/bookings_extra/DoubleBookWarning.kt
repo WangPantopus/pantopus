@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
@@ -9,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -119,13 +128,37 @@ internal fun DoubleBookWarning(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextMuted, modifier = Modifier.padding(end = Spacing.s2))
-                    Text(text = "Can't book — member unavailable", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextMuted)
+                    PantopusIconImage(
+                        icon = PantopusIcon.Lock,
+                        contentDescription = null,
+                        size = 15.dp,
+                        tint = PantopusColors.appTextMuted,
+                        modifier = Modifier.padding(end = Spacing.s2),
+                    )
+                    Text(
+                        text = "Can't book — member unavailable",
+                        style = PantopusTextStyle.small,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextMuted,
+                    )
                 }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s2), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     GhostButton(title = "Cancel", onClick = onCancel, modifier = Modifier.weight(1f))
-                    Box(modifier = Modifier.weight(1f).clickable(onClick = onPickAnotherMember), contentAlignment = Alignment.Center) {
-                        Text(text = "Pick another member", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary600, textAlign = TextAlign.Center)
+                    Box(
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp).clickable(onClick = onPickAnotherMember),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Pick another member",
+                            style = PantopusTextStyle.small,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.primary600,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             } else {
@@ -158,7 +191,7 @@ private fun ConflictCard(
             modifier = Modifier.size(34.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.warningBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.Hammer, contentDescription = null, size = 17.dp, tint = PantopusColors.warning)
+            PantopusIconImage(icon = PantopusIcon.Wrench, contentDescription = null, size = 17.dp, tint = PantopusColors.warning)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(text = event.title, style = PantopusTextStyle.body, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)

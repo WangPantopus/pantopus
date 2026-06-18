@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -94,7 +96,12 @@ private fun ConfirmedSummary(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HostAvatar(pillar = pillar, initials = ConfirmUtils.initials(args.hostName), diameter = 30.dp)
                 Column(modifier = Modifier.padding(start = Spacing.s2)) {
-                    Text(text = args.eventType.name ?: "Booking", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+                    Text(
+                        text = args.eventType.name ?: "Booking",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                    )
                     Text(text = "with ${args.hostName}", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
                 }
             }
@@ -106,7 +113,12 @@ private fun ConfirmedSummary(
         SummaryDetailRow(icon = PantopusIcon.Video, divider = false) {
             Text(text = location.label, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
             Text(
-                text = if (pending) "Join link is sent once the host confirms." else (location.sub ?: "Join link is in your email and calendar invite."),
+                text =
+                    if (pending) {
+                        "Join link is sent once the host confirms."
+                    } else {
+                        location.sub ?: "Join link is in your email and calendar invite."
+                    },
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
             )
@@ -128,7 +140,13 @@ private fun ReceiptCapsule(paid: PaidConfirmInfo) {
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PantopusIconImage(icon = PantopusIcon.BadgeCheck, contentDescription = null, size = 16.dp, tint = PantopusColors.success, modifier = Modifier.padding(end = Spacing.s2))
+            PantopusIconImage(
+                icon = PantopusIcon.BadgeCheck,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.success,
+                modifier = Modifier.padding(end = Spacing.s2),
+            )
             Text(
                 text = if (deposit) "Deposit received" else "Payment received",
                 style = PantopusTextStyle.caption,
@@ -152,7 +170,13 @@ private fun ReceiptCapsule(paid: PaidConfirmInfo) {
         }
         HorizontalDivider(color = PantopusColors.successLight, modifier = Modifier.padding(vertical = Spacing.s1))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PantopusIconImage(icon = PantopusIcon.MailCheck, contentDescription = null, size = 13.dp, tint = PantopusColors.success, modifier = Modifier.padding(end = Spacing.s2))
+            PantopusIconImage(
+                icon = PantopusIcon.MailCheck,
+                contentDescription = null,
+                size = 13.dp,
+                tint = PantopusColors.success,
+                modifier = Modifier.padding(end = Spacing.s2),
+            )
             Text(text = "Receipt emailed.", style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
         }
     }
@@ -165,7 +189,13 @@ private fun ManageNote(
     enabled: Boolean,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        PantopusIconImage(icon = PantopusIcon.CalendarClock, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextMuted, modifier = Modifier.padding(end = Spacing.s2))
+        PantopusIconImage(
+            icon = PantopusIcon.CalendarClock,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appTextMuted,
+            modifier = Modifier.padding(end = Spacing.s2),
+        )
         Row {
             Text(text = "Need to change it? ", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             Text(
@@ -199,8 +229,17 @@ private fun AccountNudge() {
             PantopusIconImage(icon = PantopusIcon.UserPlus, contentDescription = null, size = 16.dp, tint = PantopusColors.primary600)
         }
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
-            Text(text = "Create an account to manage your bookings", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-            Text(text = "Reschedule, cancel, and rebook in one place.", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            Text(
+                text = "Create an account to manage your bookings",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Reschedule, cancel, and rebook in one place.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
         }
         PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 15.dp, tint = PantopusColors.primary600)
     }
@@ -211,7 +250,15 @@ private fun AccountNudge() {
 @Composable
 private fun ApprovalTimeline() {
     val steps = listOf("Submitted" to TimelineState.Done, "Awaiting host" to TimelineState.Current, "Confirmed" to TimelineState.Pending)
-    Row(
+    // Spec fill: 66.66% when all done, 33.33% when current step index > 0, else 0%.
+    val currentIdx = steps.indexOfFirst { it.second == TimelineState.Current }
+    val fillFraction =
+        when {
+            steps.all { it.second == TimelineState.Done } -> 0.6666f
+            currentIdx > 0 -> 0.3333f
+            else -> 0f
+        }
+    Box(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -219,30 +266,90 @@ private fun ApprovalTimeline() {
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .padding(vertical = Spacing.s4, horizontal = Spacing.s2),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
     ) {
-        steps.forEach { (label, state) ->
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                val (bg, border, icon, tint) =
-                    when (state) {
-                        TimelineState.Done -> TimelineDot(PantopusColors.success, PantopusColors.success, PantopusIcon.Check, PantopusColors.appTextInverse)
-                        TimelineState.Current -> TimelineDot(PantopusColors.info, PantopusColors.info, null, PantopusColors.appTextInverse)
-                        TimelineState.Pending -> TimelineDot(PantopusColors.appSurface, PantopusColors.appBorderStrong, null, PantopusColors.appTextMuted)
-                    }
+        // Connector track (spans 16.66%..83.33% = 66.66% wide, centered on the dot row)
+        // plus a left-anchored INFO progress fill, vertically centered on the 28dp dots
+        // (top inset 14dp = half the dot). zIndex 0/1: drawn before the dots so they sit on top.
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.6666f)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 13.dp)
+                    .height(2.dp)
+                    .background(PantopusColors.appBorder),
+        ) {
+            if (fillFraction > 0f) {
+                // Fill is a sub-segment of the track: fillFraction of the full width / 0.6666 track width.
                 Box(
-                    modifier = Modifier.size(28.dp).clip(RoundedCornerShape(Radii.pill)).background(bg).border(1.5.dp, border, RoundedCornerShape(Radii.pill)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (icon != null) PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = tint)
-                    else if (state == TimelineState.Current) Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appTextInverse))
-                }
-                Text(
-                    text = label,
-                    style = PantopusTextStyle.caption,
-                    fontWeight = if (state == TimelineState.Pending) FontWeight.Normal else FontWeight.Bold,
-                    color = if (state == TimelineState.Pending) PantopusColors.appTextSecondary else PantopusColors.appText,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(fillFraction / 0.6666f)
+                            .fillMaxHeight()
+                            .background(PantopusColors.info),
                 )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            steps.forEach { (label, state) ->
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    val (bg, border, icon, tint) =
+                        when (state) {
+                            TimelineState.Done ->
+                                TimelineDot(
+                                    PantopusColors.success,
+                                    PantopusColors.success,
+                                    PantopusIcon.Check,
+                                    PantopusColors.appTextInverse,
+                                )
+                            TimelineState.Current ->
+                                TimelineDot(
+                                    PantopusColors.info,
+                                    PantopusColors.info,
+                                    null,
+                                    PantopusColors.appTextInverse,
+                                )
+                            TimelineState.Pending ->
+                                TimelineDot(
+                                    PantopusColors.appSurface,
+                                    PantopusColors.appBorderStrong,
+                                    null,
+                                    PantopusColors.appTextMuted,
+                                )
+                        }
+                    Box(
+                        modifier =
+                            Modifier.size(
+                                28.dp,
+                            ).clip(RoundedCornerShape(Radii.pill)).background(bg).border(1.5.dp, border, RoundedCornerShape(Radii.pill)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (icon != null) {
+                            PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = tint)
+                        } else if (state == TimelineState.Current) {
+                            Box(
+                                modifier =
+                                    Modifier.size(
+                                        8.dp,
+                                    ).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appTextInverse),
+                            )
+                        }
+                    }
+                    Text(
+                        text = label,
+                        style = PantopusTextStyle.caption,
+                        fontWeight = if (state == TimelineState.Pending) FontWeight.Normal else FontWeight.Bold,
+                        color = if (state == TimelineState.Pending) PantopusColors.appTextSecondary else PantopusColors.appText,
+                    )
+                }
             }
         }
     }
@@ -261,8 +368,19 @@ private fun ApprovalEtaPill() {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 12.dp, tint = PantopusColors.info, modifier = Modifier.padding(end = Spacing.s1))
-        Text(text = "Hosts usually reply within a day", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.info)
+        PantopusIconImage(
+            icon = PantopusIcon.Clock,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.info,
+            modifier = Modifier.padding(end = Spacing.s1),
+        )
+        Text(
+            text = "Hosts usually reply within a day",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.info,
+        )
     }
 }
 

@@ -4,6 +4,7 @@
 package app.pantopus.android.ui.screens.scheduling.business
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -176,7 +178,7 @@ private fun MemberRow(
 ) {
     Column(modifier = Modifier.clickable(onClick = onClick).testTag("team.member.${row.id}")) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
+            modifier = Modifier.fillMaxWidth().alpha(if (row.bookable) 1f else 0.55f).padding(vertical = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
@@ -224,6 +226,7 @@ private fun CoverageCard(coverage: TeamBookingAvailabilityViewModel.CoverageUi) 
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),

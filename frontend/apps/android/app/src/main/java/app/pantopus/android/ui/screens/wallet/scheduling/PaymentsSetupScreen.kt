@@ -208,9 +208,9 @@ private fun StatusHero(model: PaymentsModel) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
                 .padding(13.dp)
                 .testTag("scheduling.paymentsSetup.hero"),
         verticalArrangement = Arrangement.spacedBy(11.dp),
@@ -297,14 +297,20 @@ private fun NoteBanner(
     icon: PantopusIcon,
     text: String,
 ) {
-    val (bg, fg) =
+    val (bg, fg, borderColor) =
         if (tone == NoteTone.Warning) {
-            PantopusColors.warningBg to PantopusColors.warning
+            Triple(PantopusColors.warningBg, PantopusColors.warning, PantopusColors.warningLight)
         } else {
-            PantopusColors.errorBg to PantopusColors.error
+            Triple(PantopusColors.errorBg, PantopusColors.error, PantopusColors.errorLight)
         }
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.md)).background(bg).padding(horizontal = 11.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(bg)
+                .border(1.dp, borderColor, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = 11.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -330,9 +336,9 @@ private fun AccountCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
+                    .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
         ) {
             PaymentRow(
                 icon = PantopusIcon.DollarSign,
@@ -378,9 +384,9 @@ private fun TaxCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
+                    .clip(RoundedCornerShape(Radii.xl))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)),
         ) {
             PaymentRow(
                 icon = PantopusIcon.Percent,

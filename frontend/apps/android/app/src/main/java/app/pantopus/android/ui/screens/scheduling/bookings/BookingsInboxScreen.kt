@@ -487,7 +487,7 @@ private fun SectionHeader(
             color = PantopusColors.appTextSecondary,
         )
         if (dot) {
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(PantopusColors.warning))
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(PantopusColors.primary600))
         }
     }
 }

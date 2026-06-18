@@ -278,7 +278,9 @@ private fun DetailTopBar(
         }
         Spacer(Modifier.weight(1f))
         if (data != null) {
-            StatusChip(text = data.statusLabel, variant = data.statusVariant)
+            val statusLabel =
+                if (data.status == BookingStatus.Pending) "Pending approval" else data.statusLabel
+            StatusChip(text = statusLabel, variant = data.statusVariant)
         }
         if (data != null && data.isActive) {
             Box {
@@ -381,7 +383,7 @@ private fun DetailContent(data: BookingDetailData) {
                     icon = PantopusIcon.UserMinus,
                     tint = PantopusColors.error,
                     bg = PantopusColors.errorBg,
-                    text = "Marked no-show — the invitee didn't attend",
+                    text = "Marked no-show · the invitee didn't attend",
                 )
             data.rescheduled ->
                 Banner(
