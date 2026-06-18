@@ -190,6 +190,10 @@ private struct CreditCard: View {
                 .frame(maxWidth: .infinity).frame(height: 42)
                 .background(Theme.Color.personal)
                 .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                // Design `Book with a credit` CTA carries a sky-tinted shadow
+                // (`0 6px 16px rgba(2,132,199,0.22)`); buyer chrome is always
+                // personal-sky regardless of the package owner.
+                .pantopusShadow(SchedulingOwner.personal.theme.ctaShadow)
             }
             .buttonStyle(.plain)
         }

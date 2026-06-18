@@ -35,7 +35,10 @@ struct NoAvailabilityView: View {
             loading
         case let .noTimes(monthName):
             DiscoveryEmptyCard(
-                icon: .calendarX,
+                // Spec frame 3 (no-times-in-range) uses the neutral `calendar-search`
+                // glyph; `calendar-x` is reserved for the composed-empty frame and
+                // reads as alarm styling the design explicitly forbids here.
+                icon: .calendarSearch,
                 headline: "No open times in \(monthName)",
                 caption: "Availability changes often. Try a later month.",
                 primaryTitle: "See \(viewModel.nextMonthName)",

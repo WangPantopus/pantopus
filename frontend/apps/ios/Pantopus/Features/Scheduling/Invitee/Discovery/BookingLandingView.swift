@@ -97,7 +97,7 @@ struct BookingLandingView: View {
                 shareButton
             }
             Text(page.title ?? "Booking")
-                .pantopusTextStyle(.h3)
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .padding(.top, Spacing.s2)
             if let tagline = page.tagline, !tagline.isEmpty {
