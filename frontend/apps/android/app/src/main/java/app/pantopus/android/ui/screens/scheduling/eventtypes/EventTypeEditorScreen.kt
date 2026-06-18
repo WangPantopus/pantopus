@@ -121,7 +121,8 @@ private fun EditorContent(
     val form = state.form
     val accent = state.pillar.accent
     FormShell(
-        title = if (state.isCreate) "New event type" else "Event type",
+        // Design TopBar title stays "Event type" in all frames (create + edit).
+        title = "Event type",
         isValid = form.isValid,
         isDirty = state.isCreate || state.isDirty,
         onClose = onBack,
@@ -244,9 +245,6 @@ private fun EditorContent(
                         fontSize = 11.sp,
                         color = PantopusColors.appTextSecondary,
                     )
-                    EtLinkRow(icon = PantopusIcon.Users, label = "Manage hosts", value = "Set who can take bookings", onClick = {
-                        onNavigate(viewModel.manageHostsRoute())
-                    }, last = true)
                 }
                 if (state.paidEnabled) {
                     PricingCard(state = state, viewModel = viewModel, onNavigate = onNavigate)
@@ -406,6 +404,16 @@ private fun PricingCard(
                         )
                     }
                 }
+                // Collect = Full amount vs Deposit (design PricingCard segmented).
+                Column {
+                    EtFieldLabel(text = "Collect")
+                    EtSegmented(
+                        options = listOf("Full amount", "Deposit"),
+                        selected = if (form.collectDeposit) "Deposit" else "Full amount",
+                        onSelect = { viewModel.onCollectMode(it == "Deposit") },
+                        small = true,
+                    )
+                }
             } else {
                 StripeConnectCard(onConnect = { onNavigate(viewModel.paymentsRoute()) })
             }
@@ -415,18 +423,24 @@ private fun PricingCard(
 
 @Composable
 private fun StripeConnectCard(onConnect: () -> Unit) {
+    // Design StripeCard is violet-tinted: stripeBg #f5f4ff fill, #e0ddff border,
+    // and a #635bff Stripe-purple icon tile. Parsed at runtime so no Color(0x…).
+    val stripeBg = Color("#f5f4ff".toColorInt())
+    val stripeBorder = Color("#e0ddff".toColorInt())
+    val stripePurple = Color("#635bff".toColorInt())
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.primary50)
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .background(stripeBg)
+                .border(1.dp, stripeBorder, RoundedCornerShape(Radii.md))
+                .padding(horizontal = Spacing.s3, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Box(
-                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.primary600),
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(stripePurple),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(

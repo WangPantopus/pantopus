@@ -147,9 +147,29 @@ class IntakeQuestionsViewModel
             render()
         }
 
+        /** Red "Delete" action inside the edit group — drops the question being edited. */
+        fun deleteEditing() {
+            val e = editing ?: return
+            if (!e.isNew) questions = questions.filterNot { it.localId == e.draft.localId }
+            editing = null
+            render()
+        }
+
         fun deleteQuestion(localId: String) {
             questions = questions.filterNot { it.localId == localId }
             if (editing?.draft?.localId == localId) editing = null
+            render()
+        }
+
+        /** Drag-to-reorder: move the question at [from] to [to] within the custom list. */
+        fun moveQuestion(
+            from: Int,
+            to: Int,
+        ) {
+            if (from == to || from !in questions.indices || to !in questions.indices) return
+            val mutable = questions.toMutableList()
+            mutable.add(to, mutable.removeAt(from))
+            questions = mutable
             render()
         }
 

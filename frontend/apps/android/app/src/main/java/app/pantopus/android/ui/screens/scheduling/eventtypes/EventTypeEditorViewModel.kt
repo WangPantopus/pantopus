@@ -186,10 +186,17 @@ class EventTypeEditorViewModel
         fun onPrice(dollars: String) =
             update {
                 val cents = dollars.filter { c -> c.isDigit() }.toIntOrNull()?.times(100) ?: 0
-                it.copy(priceCents = cents)
+                // Keep the deposit at half the new price while Deposit mode is on.
+                it.copy(priceCents = cents, depositCents = if (it.collectDeposit) cents / 2 else it.depositCents)
             }
 
         fun onCurrency(code: String) = update { it.copy(currency = code) }
+
+        // Collect = Full amount (deposit cleared) vs Deposit (default half the price).
+        fun onCollectMode(deposit: Boolean) =
+            update {
+                if (deposit) it.copy(depositCents = (it.priceCents / 2).coerceAtLeast(1)) else it.copy(depositCents = null)
+            }
 
         fun toggleAdvanced() {
             advancedOpen = !advancedOpen
@@ -334,6 +341,7 @@ class EventTypeEditorViewModel
                 dailyCap = dailyCap,
                 priceCents = if (chargeEnabled && flags.paidSchedulingEnabled) priceCents else null,
                 currency = if (chargeEnabled && flags.paidSchedulingEnabled) currency else null,
+                depositCents = if (chargeEnabled && flags.paidSchedulingEnabled) depositCents else null,
                 ownerType = owner.ownerType,
                 ownerId = owner.ownerId,
             )
@@ -358,6 +366,7 @@ class EventTypeEditorViewModel
                 maxHorizonDays = maxHorizonDays,
                 dailyCap = dailyCap,
                 priceCents = if (flags.paidSchedulingEnabled) (if (chargeEnabled) priceCents else 0) else null,
+                depositCents = if (flags.paidSchedulingEnabled) (if (chargeEnabled) depositCents ?: 0 else 0) else null,
                 isActive = isActive,
             )
 
