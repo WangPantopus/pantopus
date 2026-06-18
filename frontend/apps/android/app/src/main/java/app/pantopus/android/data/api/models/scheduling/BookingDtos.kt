@@ -20,6 +20,16 @@ data class BookingDto(
     @Json(name = "owner_type") val ownerType: String? = null,
     @Json(name = "owner_id") val ownerId: String? = null,
     @Json(name = "event_type_id") val eventTypeId: String? = null,
+    /**
+     * Resource bookings are `Booking` rows with `event_type_id = null` and
+     * `resource_id` set. The `GET …/scheduling/bookings` host list selects `*`
+     * and therefore returns `resource_id`, so A12 (home resources) can scope a
+     * resource's bookings client-side. Always `null` for ordinary event-type
+     * bookings, so this is additive for every other stream. The `/events`
+     * union (home.js) deliberately omits `resource_id`, which is why the
+     * resource surfaces read the host bookings list instead of the union.
+     */
+    @Json(name = "resource_id") val resourceId: String? = null,
     val status: String? = null,
     @Json(name = "start_at") val startAt: String? = null,
     @Json(name = "end_at") val endAt: String? = null,
