@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.invitee.discovery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +30,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.pantopus.android.ui.components.GhostButton
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -58,7 +59,9 @@ fun NoAvailabilityState(
     modifier: Modifier = Modifier,
     primaryIcon: PantopusIcon? = null,
     secondaryLabel: String? = null,
+    secondaryIcon: PantopusIcon? = null,
     onSecondary: (() -> Unit)? = null,
+    countChip: String? = null,
 ) {
     Column(
         modifier =
@@ -79,10 +82,15 @@ fun NoAvailabilityState(
         }
         Text(
             text = title,
+            // Spec empty-card title is 15sp/700 with 20sp leading — one notch below
+            // the 16sp body token, clamped to ~230dp so two-line titles wrap as designed.
             style = PantopusTextStyle.body,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = BODY_MAX),
         )
         Text(
             text = body,
@@ -97,7 +105,72 @@ fun NoAvailabilityState(
         ) {
             AccentFilledButton(label = primaryLabel, accent = accent, icon = primaryIcon, onClick = onPrimary)
             if (secondaryLabel != null && onSecondary != null) {
-                GhostButton(title = secondaryLabel, onClick = onSecondary)
+                EmptyCardSecondaryButton(
+                    label = secondaryLabel,
+                    icon = secondaryIcon,
+                    countChip = countChip,
+                    onClick = onSecondary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The empty-card secondary action — a bordered ghost button with an optional
+ * leading icon and a trailing count chip (the spec's "Get notified" / "Join
+ * waitlist · 3 waiting" treatment). Built locally rather than reusing
+ * [GhostButton] so the icon + chip slots match the design exactly.
+ */
+@Composable
+private fun EmptyCardSecondaryButton(
+    label: String,
+    icon: PantopusIcon?,
+    countChip: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.s3),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appText,
+            )
+        }
+        Text(
+            text = label,
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            modifier = Modifier.padding(start = if (icon != null) Spacing.s2 else 0.dp),
+        )
+        if (countChip != null) {
+            Row(
+                modifier =
+                    Modifier
+                        .padding(start = Spacing.s2)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(horizontal = Spacing.s2, vertical = 2.dp),
+            ) {
+                Text(
+                    text = countChip,
+                    style = PantopusTextStyle.overline,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
     }
@@ -130,21 +203,24 @@ fun DayFullyBookedNotice(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.CalendarX,
+                // calendar-x is reserved for the composed-empty frame; the day-full
+                // notice carries the calm "looking for the next open time" glyph.
+                icon = PantopusIcon.CalendarClock,
                 contentDescription = null,
                 size = 20.dp,
                 tint = PantopusColors.appTextSecondary,
             )
         }
         Text(
-            text = "No times left this day",
+            text = "No open times this day",
             style = PantopusTextStyle.small,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Every slot on this day is booked.",
+            // Calm, expected outcome — no alarm styling (spec voice).
+            text = "Try another highlighted day, or jump to the next open time.",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
@@ -43,12 +44,24 @@ private val AVATAR_SIZE = 64.dp
 private val CARD_OVERLAP = (-34).dp
 private val AVATAR_LIFT = (-36).dp
 
-/** The two gradient stops for a pillar's banner / avatar (token-only). */
-private fun gradientStops(pillar: SchedulingPillar): List<Color> =
+/** The two gradient stops for a pillar's **avatar** disc (token-only). */
+private fun avatarStops(pillar: SchedulingPillar): List<Color> =
     when (pillar) {
         SchedulingPillar.Personal -> listOf(PantopusColors.primary400, PantopusColors.primary800)
         SchedulingPillar.Home -> listOf(PantopusColors.home, PantopusColors.homeDark)
         SchedulingPillar.Business -> listOf(PantopusColors.business, PantopusColors.businessDark)
+    }
+
+/**
+ * The three gradient stops for a pillar's hero **banner** (spec ramp:
+ * light 0% → accent 58% → dark 100%), so the banner reads richer than a flat
+ * two-stop fade.
+ */
+private fun bannerStops(pillar: SchedulingPillar): List<Color> =
+    when (pillar) {
+        SchedulingPillar.Personal -> listOf(PantopusColors.primary300, PantopusColors.primary600, PantopusColors.primary800)
+        SchedulingPillar.Home -> listOf(PantopusColors.homeBg, PantopusColors.home, PantopusColors.homeDark)
+        SchedulingPillar.Business -> listOf(PantopusColors.businessBg, PantopusColors.business, PantopusColors.businessDark)
     }
 
 /** The pillar-tinted hero banner the header card overlaps. */
@@ -62,7 +75,7 @@ fun PillarBanner(
             modifier
                 .fillMaxWidth()
                 .height(BANNER_HEIGHT)
-                .background(Brush.linearGradient(gradientStops(pillar))),
+                .background(Brush.linearGradient(bannerStops(pillar))),
     )
 }
 
@@ -110,7 +123,7 @@ fun HostAvatar(
                     .background(PantopusColors.appSurface)
                     .padding(3.dp)
                     .clip(CircleShape)
-                    .background(Brush.linearGradient(gradientStops(pillar))),
+                    .background(Brush.linearGradient(avatarStops(pillar))),
             contentAlignment = Alignment.Center,
         ) {
             Text(text = initials, style = PantopusTextStyle.h3, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
@@ -166,7 +179,9 @@ fun LandingHeaderCard(
         }
         Text(
             text = hostName,
+            // Spec host name is 18sp/700 — one notch below the 20sp h3 token.
             style = PantopusTextStyle.h3,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             modifier = Modifier.padding(top = Spacing.s2),
@@ -355,21 +370,55 @@ private fun InfoCard(
     }
 }
 
-/** "View {name}'s profile" + "Powered by Pantopus" footer. */
+/** "View {name}'s profile" link + "Powered by Pantopus" footer. */
 @Composable
-fun LandingFooter(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = Spacing.s5),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+fun LandingFooter(
+    modifier: Modifier = Modifier,
+    profileName: String? = null,
+    onViewProfile: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(top = Spacing.s5, bottom = Spacing.s6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        PantopusIconImage(icon = PantopusIcon.CalendarClock, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
-        Text(
-            text = "Powered by Pantopus",
-            style = PantopusTextStyle.overline,
-            color = PantopusColors.appTextMuted,
-            modifier = Modifier.padding(start = Spacing.s1),
-        )
+        if (!profileName.isNullOrBlank()) {
+            Row(
+                modifier =
+                    Modifier
+                        .then(if (onViewProfile != null) Modifier.clickable(onClick = onViewProfile) else Modifier)
+                        .padding(Spacing.s1),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                Text(
+                    text = "View $profileName's profile",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.primary600,
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ArrowUpRight,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            PantopusIconImage(
+                icon = PantopusIcon.CalendarClock,
+                contentDescription = null,
+                size = 12.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+            Text(
+                text = "Powered by Pantopus",
+                style = PantopusTextStyle.overline,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.padding(start = Spacing.s1),
+            )
+        }
     }
 }
 

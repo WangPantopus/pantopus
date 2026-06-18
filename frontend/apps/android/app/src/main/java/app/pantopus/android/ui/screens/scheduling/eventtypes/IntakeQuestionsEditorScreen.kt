@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.scheduling.eventtypes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -125,6 +128,13 @@ private fun IntakeContent(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
+            // Pillar-accent overline ("Personal · Intro call") above the title,
+            // per design Sheet header. The FormShell already prints the subtitle;
+            // the overline carries the pillar identity the design specs.
+            EtSectionOverline(
+                text = "${state.pillar.label} · ${state.eventName}",
+                accent = state.pillar.accent,
+            )
             Text(
                 "Ask people a few things when they book. Name and email are always asked.",
                 fontSize = 11.sp,
@@ -140,20 +150,33 @@ private fun IntakeContent(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.08.em,
                 color = PantopusColors.appTextMuted,
-                modifier = Modifier.padding(top = Spacing.s2),
+                modifier = Modifier.padding(top = 14.dp, bottom = Spacing.s1),
             )
             if (state.questions.isEmpty() && state.editing == null) {
                 Text("You haven't added any yet.", fontSize = 11.sp, color = PantopusColors.appTextSecondary)
             }
-            state.questions.forEach { q ->
-                if (state.editing?.draft?.localId == q.localId && !state.editing.isNew) {
-                    EditGroup(editing = state.editing, viewModel = viewModel)
-                } else {
-                    QuestionRow(
-                        draft = q,
-                        onEdit = { viewModel.editQuestion(q.localId) },
-                        onDelete = { viewModel.deleteQuestion(q.localId) },
-                    )
+            // Custom questions are flat rows inside ONE card, separated by 1px
+            // dividers (design ListBlock) — not per-row cards. The inline edit
+            // group replaces the row it's editing.
+            if (state.questions.isNotEmpty() || state.editing?.isNew == false) {
+                EtCard {
+                    val editingExistingId = state.editing?.takeIf { !it.isNew }?.draft?.localId
+                    state.questions.forEachIndexed { index, q ->
+                        val last = index == state.questions.lastIndex
+                        if (editingExistingId == q.localId) {
+                            EditGroup(editing = state.editing!!, viewModel = viewModel)
+                        } else {
+                            QuestionRow(
+                                draft = q,
+                                index = index,
+                                count = state.questions.size,
+                                last = last,
+                                onEdit = { viewModel.editQuestion(q.localId) },
+                                onDelete = { viewModel.deleteQuestion(q.localId) },
+                                onMove = viewModel::moveQuestion,
+                            )
+                        }
+                    }
                 }
             }
             if (state.editing?.isNew == true) {
@@ -203,41 +226,79 @@ private fun LockedRow(
     }
 }
 
+// Flat custom-question row inside the single ListBlock card — label + type/
+// required caption, trailing trash-2, and a grip-vertical drag handle wired to
+// vertical-drag reorder. Separated from the next row by a 1px divider.
 @Composable
 private fun QuestionRow(
     draft: QuestionDraft,
+    index: Int,
+    count: Int,
+    last: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onMove: (Int, Int) -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .clickable(onClick = onEdit)
-                .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(draft.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-                modifier = Modifier.padding(top = 3.dp),
+    val rowHeightPx = with(LocalDensity.current) { 56.dp.toPx() }
+    var dragAccum by remember(index, count) { mutableStateOf(0f) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onEdit)
+                    .padding(vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(draft.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    modifier = Modifier.padding(top = 3.dp),
+                ) {
+                    Text(draft.type.typeCaption, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+                    if (draft.required) RequiredPill()
+                }
+            }
+            Box(
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).clickable(onClick = onDelete),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(draft.type.typeCaption, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
-                if (draft.required) RequiredPill()
+                PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = "Delete", size = 15.dp, tint = PantopusColors.appTextMuted)
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .size(30.dp)
+                        .pointerInput(index, count) {
+                            detectVerticalDragGestures(
+                                onDragEnd = { dragAccum = 0f },
+                                onDragCancel = { dragAccum = 0f },
+                            ) { change, dragAmount ->
+                                change.consume()
+                                dragAccum += dragAmount
+                                if (dragAccum <= -rowHeightPx && index > 0) {
+                                    onMove(index, index - 1)
+                                    dragAccum = 0f
+                                } else if (dragAccum >= rowHeightPx && index < count - 1) {
+                                    onMove(index, index + 1)
+                                    dragAccum = 0f
+                                }
+                            }
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.GripVertical,
+                    contentDescription = "Drag to reorder",
+                    size = ICON_16,
+                    tint = PantopusColors.appTextMuted,
+                )
             }
         }
-        Box(
-            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).clickable(onClick = onDelete),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = "Delete", size = 15.dp, tint = PantopusColors.appTextMuted)
-        }
+        if (!last) HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
     }
 }
 
@@ -279,6 +340,12 @@ private fun EditGroup(
                 EtFieldLabel(text = "Options")
                 draft.options.forEachIndexed { index, option ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.GripVertical,
+                            contentDescription = null,
+                            size = 14.dp,
+                            tint = PantopusColors.appTextMuted,
+                        )
                         EtTextField(value = option, onValueChange = {
                             viewModel.onEditOption(index, it)
                         }, placeholder = "Option ${index + 1}", modifier = Modifier.weight(1f))
@@ -333,13 +400,18 @@ private fun EditGroup(
                 enabled = draft.canSave,
                 modifier = Modifier.weight(1f),
             )
-            Box(
+            // Design EditGroup secondary action is a red trash-2 "Delete".
+            Row(
                 modifier =
-                    Modifier.clip(
-                        RoundedCornerShape(Radii.md),
-                    ).clickable(onClick = viewModel::cancelEditing).padding(horizontal = Spacing.s2, vertical = 10.dp),
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.md))
+                        .clickable(onClick = viewModel::deleteEditing)
+                        .padding(horizontal = 6.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
-                Text("Cancel", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextSecondary)
+                PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = null, size = 15.dp, tint = PantopusColors.error)
+                Text("Delete", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.error)
             }
         }
     }
