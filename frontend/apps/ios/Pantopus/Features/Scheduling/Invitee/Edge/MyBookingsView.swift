@@ -126,32 +126,97 @@ struct MyBookingsView: View {
     private func bookingRow(_ booking: BookingDTO) -> some View {
         let isPast = viewModel.segment == .past
         let tz = booking.inviteeTimezone ?? SchedulingTime.deviceTimeZoneIdentifier
-        return HStack(spacing: 11) {
-            EdgePillarAvatar(name: booking.inviteeName, ownerType: booking.ownerType, size: 42)
-            VStack(alignment: .leading, spacing: 2) {
-                // Design primary line is the event-type name. The lean
-                // /my-bookings payload omits it, so we fall back to the
-                // pillar label as the title (event name is deferredBackend).
-                Text(titleLabel(booking.ownerType))
-                    .font(.system(size: 13.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
-                    .tracking(-0.1)
-                    .lineLimit(1)
-                // Design secondary line is "with {host} · {when}". The host
-                // name is deferredBackend, so we render the {when} alone.
-                Text(EdgeFormat.dayTime(booking.startAt, tz: tz) ?? "Time to be confirmed")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .lineLimit(1)
+        let isBalanceDue = isBalanceDueStatus(booking.status)
+        let showBookAgain = isPast
+        let showPayAffordance = isBalanceDue
+
+        return VStack(spacing: 0) {
+            // Main row content
+            HStack(spacing: 11) {
+                EdgePillarAvatar(name: booking.inviteeName, ownerType: booking.ownerType, size: 42)
+                VStack(alignment: .leading, spacing: 2) {
+                    // Design primary line is the event-type name. The lean
+                    // /my-bookings payload omits it, so we fall back to the
+                    // pillar label as the title (event name is deferredBackend).
+                    Text(titleLabel(booking.ownerType))
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .tracking(-0.1)
+                        .lineLimit(1)
+                    // Design secondary line is "with {host} · {when}". The host
+                    // name is deferredBackend, so we render the {when} alone.
+                    Text(EdgeFormat.dayTime(booking.startAt, tz: tz) ?? "Time to be confirmed")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s2)
+                VStack(alignment: .trailing, spacing: 6) {
+                    statusPill(for: booking.status)
+                    if !showBookAgain && !showPayAffordance {
+                        Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                    }
+                }
             }
-            Spacer(minLength: Spacing.s2)
-            VStack(alignment: .trailing, spacing: 6) {
-                SchedulingStatusPill(status: booking.status)
-                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            .padding(.horizontal, 13)
+            .padding(.vertical, Spacing.s3)
+
+            // Past rows: Book again footer (design: my-bookings-frames.jsx:184-189)
+            if showBookAgain {
+                Rectangle()
+                    .fill(Theme.Color.appBorder)
+                    .frame(height: 1)
+                HStack {
+                    Spacer()
+                    Button {
+                        // deferredBackend: re-book requires event-type id from lean payload
+                    } label: {
+                        HStack(spacing: 5) {
+                            Icon(.rotateCcw, size: 12, strokeWidth: 2.3, color: Theme.Color.primary600)
+                            Text("Book again")
+                                .font(.system(size: 11.5, weight: .bold))
+                                .foregroundStyle(Theme.Color.primary600)
+                                .tracking(-0.05)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scheduling.myBookings.bookAgain.\(booking.id)")
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, Spacing.s2)
+            }
+
+            // Needs-attention rows: Pay footer for balance-due bookings
+            // (design: my-bookings-frames.jsx:191-196)
+            // Balance amount is deferredBackend (not in lean payload); footer
+            // structure ships as designed, amount placeholder shown.
+            if showPayAffordance {
+                Rectangle()
+                    .fill(Theme.Color.appBorder)
+                    .frame(height: 1)
+                HStack {
+                    Text("Balance due at confirm")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.warning)
+                    Spacer()
+                    Button {
+                        // deferredBackend: payment amount not in lean payload
+                    } label: {
+                        Text("Pay")
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextInverse)
+                            .padding(.horizontal, 14)
+                            .frame(height: 28)
+                            .background(Theme.Color.primary600)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scheduling.myBookings.pay.\(booking.id)")
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, Spacing.s2)
             }
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(
@@ -162,6 +227,52 @@ struct MyBookingsView: View {
         .edgeShadow(.sm)
         .opacity(isPast ? 0.66 : 1)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Status pill with a local "Approve pending" label for the pending-approval
+    /// state. All other statuses delegate to the shared pill which maps pending →
+    /// INFO-blue (my-bookings-frames.jsx:157 — INFO_BG/#F0F9FF, INFO/#0369A1).
+    @ViewBuilder
+    private func statusPill(for status: String) -> some View {
+        let key = status.lowercased().replacingOccurrences(of: "-", with: "_")
+        if key == "pending_approval" || key == "approve_pending" {
+            // Design frame 5: "Approve pending" INFO-blue pill (same tone as
+            // the shared pending pill; only the label differs).
+            HStack(spacing: 3) {
+                Icon(.clock, size: 9, strokeWidth: 2.2, color: Theme.Color.info)
+                Text("Approve pending")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.Color.info)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 3)
+            .background(Theme.Color.infoBg)
+            .overlay(Capsule().strokeBorder(Theme.Color.infoLight, lineWidth: 1))
+            .clipShape(Capsule())
+        } else if key == "balance_due" {
+            // Design frame 5: "Balance due" WARN-amber pill.
+            HStack(spacing: 3) {
+                Icon(.alertCircle, size: 9, strokeWidth: 2.2, color: Theme.Color.warning)
+                Text("Balance due")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 3)
+            .background(Theme.Color.warningBg)
+            .overlay(Capsule().strokeBorder(Theme.Color.warningLight, lineWidth: 1))
+            .clipShape(Capsule())
+        } else {
+            SchedulingStatusPill(status: status)
+        }
+    }
+
+    /// Whether a booking status signals a balance-due state.
+    private func isBalanceDueStatus(_ status: String) -> Bool {
+        let key = status.lowercased().replacingOccurrences(of: "-", with: "_")
+        return key == "balance_due"
     }
 
     /// Design primary-line fallback: the host pillar as a title until the

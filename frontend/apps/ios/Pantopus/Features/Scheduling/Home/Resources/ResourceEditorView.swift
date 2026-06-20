@@ -51,17 +51,17 @@ struct ResourceEditorView: View {
         } message: {
             Text(viewModel.saveError ?? "")
         }
-        .confirmationDialog(
-            "Delete \(viewModel.name)?",
-            isPresented: $viewModel.showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                Task { if await viewModel.confirmDelete() { dismiss() } }
+        // F10 Frame 5 (FrameDelete): centered Dialog overlay with trash-2 icon,
+        // title, body, and two stacked full-width 44dp buttons (Delete / Keep).
+        // Replaces the previous native bottom action sheet (.confirmationDialog).
+        .overlay {
+            if viewModel.showDeleteConfirm {
+                ResourceDeleteDialog(
+                    resourceName: viewModel.name,
+                    isPresented: $viewModel.showDeleteConfirm,
+                    onDelete: { Task { if await viewModel.confirmDelete() { dismiss() } } }
+                )
             }
-            Button("Keep", role: .cancel) {}
-        } message: {
-            Text("Existing bookings stay on the calendar. New bookings will be turned off.")
         }
     }
 
@@ -418,6 +418,94 @@ private struct ResourceSavingSpinner: View {
             )
             .onAppear { spinning = true }
             .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Delete dialog (F10 Frame 5)
+
+/// Centered dialog overlay matching the design's FrameDelete:
+/// trash-2 icon, title, body, and two stacked full-width 44dp buttons —
+/// red "Delete" on top, bordered "Keep" below. Shown as a scrim overlay
+/// rather than a native bottom action sheet, per the design spec.
+struct ResourceDeleteDialog: View {
+    let resourceName: String
+    @Binding var isPresented: Bool
+    let onDelete: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Scrim
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { isPresented = false }
+
+            // Dialog card
+            VStack(spacing: Spacing.s0) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Theme.Color.errorBg)
+                        .frame(width: 48, height: 48)
+                    Icon(.trash2, size: 20, color: Theme.Color.error)
+                }
+                .padding(.bottom, Spacing.s3)
+
+                // Title
+                Text("Delete \(resourceName.isEmpty ? "resource" : resourceName)?")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, Spacing.s1)
+
+                // Body
+                Text("Existing bookings stay on the calendar. New bookings will be turned off.")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, Spacing.s4)
+
+                // Stacked full-width buttons — Delete (red, 44pt) / Keep (bordered, 44pt)
+                VStack(spacing: Spacing.s2) {
+                    Button {
+                        isPresented = false
+                        onDelete()
+                    } label: {
+                        Text("Delete")
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextInverse)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Theme.Color.error)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scheduling.resourceEditor.deleteConfirm")
+
+                    Button {
+                        isPresented = false
+                    } label: {
+                        Text("Keep")
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Theme.Color.appSurface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                    .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("scheduling.resourceEditor.keepConfirm")
+                }
+            }
+            .padding(Spacing.s5)
+            .frame(maxWidth: 320)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+            .shadow(color: Color.black.opacity(0.12), radius: 24, y: 8)
+            .padding(.horizontal, Spacing.s5)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

@@ -128,11 +128,14 @@ public struct SlotTakenSheet: View {
         case .alternatives:
             VStack(spacing: Spacing.s4) {
                 VStack(spacing: Spacing.s2) {
-                    ForEach(alternatives, id: \.self) { alt in
+                    // The first (nearest) alternative always carries the
+                    // "Soonest" badge — slot-taken-frames.jsx:133-135.
+                    ForEach(Array(alternatives.enumerated()), id: \.element) { index, alt in
                         SchedulingSlotRow(
                             time: timeLabel(for: alt),
                             detail: dayLabel(for: alt),
-                            accent: accent
+                            accent: accent,
+                            isSoonest: index == 0
                         ) {
                             onSelect(alt)
                         }

@@ -38,6 +38,11 @@ final class DiscoverySlotPickerViewModel {
     /// All slots fetched for the visible month range.
     private(set) var rangeSlots: [SlotDTO] = []
 
+    /// Set when a race condition takes a previously selected slot (Frame 6).
+    /// The slot-picker toast "That time was just taken" is shown while this is non-nil.
+    /// Cleared whenever the user selects a new slot or changes the date.
+    private(set) var takenSlotStart: String?
+
     private var didLoad = false
     /// Bumped on every fetch; stale completions (overlapping nav taps) are dropped.
     private var fetchGeneration = 0
@@ -93,6 +98,9 @@ final class DiscoverySlotPickerViewModel {
     var dstHint: String? {
         DiscoveryCalendar.dstHint(monthAnchor: monthAnchor, tz: timezoneId)
     }
+
+    /// `true` while a slot-taken race condition is active (Frame 6 toast is visible).
+    var slotJustTaken: Bool { takenSlotStart != nil }
 
     var slotPickerState: SlotPicker.LoadState {
         switch phase {
@@ -190,10 +198,12 @@ final class DiscoverySlotPickerViewModel {
     func selectDate(_ date: Date) {
         selectedDate = date
         selectedSlotStart = nil
+        takenSlotStart = nil
     }
 
     func selectSlot(_ slot: SlotDTO) {
         selectedSlotStart = slot.start
+        takenSlotStart = nil
         // FOUNDATION GAP: `.inviteeIntakeForm` (frozen I0b route) carries no
         // `oneOffToken`, so one-off-link bookings (oneOffToken != nil) cannot
         // commit via POST /book/o/:token in I6. Latent today — no in-app path
@@ -205,6 +215,15 @@ final class DiscoverySlotPickerViewModel {
             start: slot.start,
             tz: timezoneId
         ))
+    }
+
+    /// Called by the parent navigator when the intake form returns a 409 conflict
+    /// (the slot was booked by someone else between pick and confirm). Marks the
+    /// slot as just-taken so the picker shows the Frame 6 WARN toast and the
+    /// taken row treatment. The booker stays on the picker to pick another time.
+    func markSlotTaken(_ slotStart: String) {
+        takenSlotStart = slotStart
+        selectedSlotStart = nil
     }
 
     func changeMonth(_ delta: Int) async {
@@ -287,6 +306,16 @@ final class DiscoverySlotPickerViewModel {
 
 #if DEBUG
 extension DiscoverySlotPickerViewModel {
+    /// Fixture-seeded slot-just-taken state for Frame 6 `#Preview`.
+    static func previewSlotTaken() -> DiscoverySlotPickerViewModel {
+        let vm = previewLoaded()
+        // Simulate the race condition: the first slot (9 AM) was just snatched.
+        if let takenStart = vm.rangeSlots.first?.start {
+            vm.takenSlotStart = takenStart
+        }
+        return vm
+    }
+
     /// Fixture-seeded loaded state (today populated) for `#Preview` / screenshots.
     static func previewLoaded() -> DiscoverySlotPickerViewModel {
         let tz = "America/Los_Angeles"

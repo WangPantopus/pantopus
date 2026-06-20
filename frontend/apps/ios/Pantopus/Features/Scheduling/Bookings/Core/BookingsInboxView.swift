@@ -325,7 +325,11 @@ extension BookingsInboxView {
             }
             .padding(.horizontal, Spacing.s4)
             .frame(height: 46)
-            .background(viewModel.accent)
+            // Design (bookings-inbox-frames.jsx:222): FAB background is fixed
+            // PRIMARY (#0284c7) regardless of the active owner pillar — not
+            // accent-polymorphic. Use the stable operational token so a
+            // Home/Business host's FAB stays primary blue, not green/violet.
+            .background(SchedulingIdentityTheme.operationalPrimary)
             .clipShape(Capsule())
             .pantopusShadow(.primary)
         }

@@ -19,8 +19,22 @@
 
 import SwiftUI
 
+// MARK: - Overflow-button anchor preference key
+
+/// Carries each row's overflow-button frame (in the root coordinate space) so
+/// the floating popover card can be positioned next to the tapped button.
+private struct OverflowAnchorKey: PreferenceKey {
+    typealias Value = [String: Anchor<CGRect>]
+    static let defaultValue: Value = [:]
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 struct EventTypeListView: View {
     @State private var viewModel: EventTypeListViewModel
+    /// Resolved CGRect of the tapped overflow button (coordinate space: root VStack).
+    @State private var menuAnchorRect: CGRect = .zero
 
     init(viewModel: EventTypeListViewModel) {
         _viewModel = State(wrappedValue: viewModel)
@@ -38,13 +52,31 @@ struct EventTypeListView: View {
         .task { await viewModel.load() }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.eventTypes.list")
-        .confirmationDialog(
-            viewModel.menuTarget?.name ?? "Event type",
-            isPresented: menuPresented,
-            titleVisibility: .visible,
-            presenting: viewModel.menuTarget
-        ) { eventType in
-            menuButtons(for: eventType)
+        // Resolve overflow-button anchors whenever the preference changes.
+        .overlayPreferenceValue(OverflowAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: viewModel.menuTarget) { _, target in
+                        guard let target, let anchor = anchors[target.id] else { return }
+                        menuAnchorRect = proxy[anchor]
+                    }
+                // Custom floating popover (design `OverflowMenu`).
+                if let target = viewModel.menuTarget {
+                    EventTypeOverflowMenu(
+                        eventType: target,
+                        anchor: menuAnchorRect,
+                        containerSize: proxy.size,
+                        onCopyLink:  { viewModel.copyLink(target) },
+                        onDuplicate: { Task { await viewModel.duplicate(target) } },
+                        onShare:     { viewModel.share(target) },
+                        onToggle:    { Task { await viewModel.toggleHidden(target) } },
+                        onDelete:    { viewModel.deleteTarget = target },
+                        onDismiss:   { viewModel.menuTarget = nil }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topTrailing)))
+                    .animation(.easeOut(duration: 0.15), value: viewModel.menuTarget != nil)
+                }
+            }
         }
         .alert(
             "Delete event type?",
@@ -214,25 +246,6 @@ struct EventTypeListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: Overflow menu
-
-    // Design `OverflowMenu` order: Copy booking link · Duplicate · Share ·
-    // Hide · Delete (Delete destructive; native dialog can't sky-tint the
-    // first item).
-    @ViewBuilder
-    private func menuButtons(for eventType: EventTypeDTO) -> some View {
-        Button("Copy booking link") { viewModel.copyLink(eventType) }
-        Button("Duplicate") { Task { await viewModel.duplicate(eventType) } }
-        Button("Share") { viewModel.share(eventType) }
-        if eventType.isActive == false {
-            Button("Make active") { Task { await viewModel.toggleHidden(eventType) } }
-        } else {
-            Button("Hide") { Task { await viewModel.toggleHidden(eventType) } }
-        }
-        Button("Delete", role: .destructive) { viewModel.deleteTarget = eventType }
-        Button("Cancel", role: .cancel) {}
-    }
-
     // MARK: Copied toast
 
     @ViewBuilder
@@ -255,10 +268,6 @@ struct EventTypeListView: View {
     }
 
     // MARK: Optional → Bool bindings
-
-    private var menuPresented: Binding<Bool> {
-        Binding(get: { viewModel.menuTarget != nil }, set: { if !$0 { viewModel.menuTarget = nil } })
-    }
 
     private var deletePresented: Binding<Bool> {
         Binding(get: { viewModel.deleteTarget != nil }, set: { if !$0 { viewModel.deleteTarget = nil } })
@@ -357,6 +366,9 @@ private struct EventTypeRowCard: View {
             Button(action: onMenu) {
                 Icon(.ellipsisVertical, size: 17, color: Theme.Color.appTextSecondary)
                     .frame(width: 26, height: 26)
+                    // Report this button's frame so the floating popover can
+                    // position itself right-anchored below the tapped button.
+                    .anchorPreference(key: OverflowAnchorKey.self, value: .bounds) { [eventType.id: $0] }
             }
             .accessibilityLabel("More")
         }
@@ -521,6 +533,130 @@ private struct CalmEmptyState: View {
         .padding(.horizontal, Spacing.s8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("scheduling.eventTypes.empty")
+    }
+}
+
+// MARK: - Custom overflow popover (design `OverflowMenu`)
+
+/// Floating card anchored right-aligned below the tapped overflow button.
+/// Matches the design spec: 184pt wide, radius 12, deep shadow, 4pt padding,
+/// icon+label rows (9/10pt), first-item blue50/blue700 highlight, danger
+/// separator for Delete.
+private struct EventTypeOverflowMenu: View {
+    let eventType: EventTypeDTO
+    /// Frame of the tapped overflow button in the root coordinate space.
+    let anchor: CGRect
+    let containerSize: CGSize
+    let onCopyLink: () -> Void
+    let onDuplicate: () -> Void
+    let onShare: () -> Void
+    let onToggle: () -> Void
+    let onDelete: () -> Void
+    let onDismiss: () -> Void
+
+    private let menuWidth: CGFloat = 184
+
+    private struct MenuItem {
+        let icon: PantopusIcon
+        let label: String
+        let isDanger: Bool
+        let isSeparated: Bool
+        let action: () -> Void
+    }
+
+    private var items: [MenuItem] {
+        let toggleLabel = eventType.isActive == false ? "Make active" : "Hide"
+        let toggleIcon: PantopusIcon = eventType.isActive == false ? .eye : .eyeOff
+        return [
+            MenuItem(icon: .link,  label: "Copy booking link", isDanger: false, isSeparated: false, action: onCopyLink),
+            MenuItem(icon: .copy,  label: "Duplicate",         isDanger: false, isSeparated: false, action: onDuplicate),
+            MenuItem(icon: .share2, label: "Share",            isDanger: false, isSeparated: false, action: onShare),
+            MenuItem(icon: toggleIcon, label: toggleLabel,     isDanger: false, isSeparated: false, action: onToggle),
+            MenuItem(icon: .trash2, label: "Delete",           isDanger: true,  isSeparated: true,  action: onDelete),
+        ]
+    }
+
+    /// Top-left origin of the card in the container coordinate space.
+    private var cardOrigin: CGPoint {
+        // Right-align card to the overflow button's trailing edge.
+        let x = min(anchor.maxX - menuWidth, containerSize.width - menuWidth - 8)
+        // Position below the button; clamp so the card stays on screen.
+        let belowButton = anchor.maxY + 6
+        let aboveButton = anchor.minY - cardHeight - 6
+        let y = belowButton + cardHeight > containerSize.height - 8
+            ? aboveButton
+            : belowButton
+        return CGPoint(x: max(8, x), y: max(8, y))
+    }
+
+    /// Estimated card height (4pt padding top+bottom + rows).
+    private var cardHeight: CGFloat {
+        let rowH: CGFloat = 35       // 9pt + 10pt padding + icon height ~15
+        let separatorH: CGFloat = 7  // 1pt border + marginTop 3 + padding 3
+        return 4 + CGFloat(items.count) * rowH + separatorH + 4
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            // Dismiss scrim — transparent, catches taps outside the card.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onDismiss)
+                .ignoresSafeArea()
+
+            // Menu card.
+            menuCard
+                .frame(width: menuWidth)
+                .position(x: cardOrigin.x + menuWidth / 2,
+                          y: cardOrigin.y + cardHeight / 2)
+                .accessibilityIdentifier("scheduling.eventTypes.overflowMenu.\(eventType.id)")
+        }
+    }
+
+    private var menuCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                menuRow(item: item, isFirst: index == 0)
+            }
+        }
+        .padding(4)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12).stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        // Design shadow: 0 16px 40px rgba(17,24,39,0.22) — #111827 = appText token
+        .shadow(color: Theme.Color.appText.opacity(0.22), radius: 20, x: 0, y: 8)
+    }
+
+    @ViewBuilder
+    private func menuRow(item: MenuItem, isFirst: Bool) -> some View {
+        if item.isSeparated {
+            // Delete row — preceded by a border separator (design: borderTop + marginTop 3).
+            Divider()
+                .padding(.horizontal, 0)
+                .padding(.top, 3)
+        }
+        Button {
+            onDismiss()
+            item.action()
+        } label: {
+            HStack(spacing: 10) {
+                Icon(item.icon, size: 15, strokeWidth: 2,
+                     color: item.isDanger ? Theme.Color.error : (isFirst ? Theme.Color.primary600 : Theme.Color.appTextSecondary))
+                Text(item.label)
+                    .font(.system(size: 12.5, weight: isFirst ? .bold : .medium))
+                    .foregroundStyle(item.isDanger ? Theme.Color.error : (isFirst ? Theme.Color.primary700 : Theme.Color.appText))
+                    .tracking(-0.1)
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(isFirst ? Theme.Color.primary50 : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
     }
 }
 

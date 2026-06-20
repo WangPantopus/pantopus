@@ -16,6 +16,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// A single renderable invoice line item parsed from the untyped `line_items`.
 struct InvoiceLineItem: Identifiable, Hashable {
@@ -54,6 +55,38 @@ enum InvoiceParsing {
     private static func firstInt(_ dict: [String: JSONValue], _ keys: [String]) -> Int? {
         for key in keys { if let value = dict[key]?.numberValue { return Int(value) } }
         return nil
+    }
+}
+
+// MARK: - Invoice status chip
+
+/// Tone-coloured uppercase pill for invoice status used in the list row trailing
+/// slot (`invoiceslist-frames.jsx` STATUS map, line 57-58) and the detail top-bar
+/// (`invoicedetail-frames.jsx` PILL, line 159).
+/// Tones: paid=green, sent/draft=sky-blue, overdue/partial=amber,
+///        refunded=business-violet, void/unknown=neutral.
+struct InvoiceStatusChip: View {
+    let status: String
+
+    var tone: PkgChip.Tone {
+        switch status.lowercased() {
+        case "paid": .success
+        case "sent", "draft": .sky
+        case "overdue", "partial": .warning
+        case "refunded": .business
+        default: .neutral
+        }
+    }
+
+    var chipLabel: String {
+        switch status.lowercased() {
+        case "partial": "Deposit paid"
+        default: status.prefix(1).uppercased() + status.dropFirst()
+        }
+    }
+
+    var body: some View {
+        PkgChip(text: chipLabel, tone: tone, uppercased: true)
     }
 }
 

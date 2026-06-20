@@ -97,7 +97,9 @@ final class PollResponseViewModel {
     // MARK: - Derived
 
     var isClosed: Bool { phase == .closed }
-    var allAnswered: Bool { !options.isEmpty && options.allSatisfy { selections[$0.id] != nil } }
+    /// Design gate (Frame 2): Submit is enabled once **at least one** slot has a
+    /// vote — not all slots. Android's `any { it.vote != null }` matches this intent.
+    var allAnswered: Bool { !options.isEmpty && options.contains { selections[$0.id] != nil } }
     var answeredCount: Int { options.filter { selections[$0.id] != nil }.count }
 
     /// Any proposed slot clashes with the member's personal calendar — drives the
@@ -169,6 +171,7 @@ final class PollResponseViewModel {
     // MARK: - Submit
 
     func submit() async {
+        // `allAnswered` now means "at least one slot voted" (design gate).
         guard allAnswered, !isSubmitting, !isClosed else { return }
         isSubmitting = true
         actionError = nil

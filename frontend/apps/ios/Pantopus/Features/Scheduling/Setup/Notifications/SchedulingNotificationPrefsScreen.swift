@@ -159,24 +159,32 @@ struct SchedulingNotificationPrefsScreen: View {
     // MARK: Banners
 
     private var pauseBanner: some View {
-        VStack(spacing: Spacing.s0) {
-            HStack(spacing: Spacing.s3) {
-                ZStack {
-                    Circle().fill(Theme.Color.warningLight)
-                    Icon(.bellOff, size: 16, color: Theme.Color.warning)
-                }
-                .frame(width: 32, height: 32)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Notifications paused").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.warning)
-                    Text("Emergency alerts still come through").font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
-                }
-                Spacer(minLength: Spacing.s2)
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                Circle().fill(Theme.Color.warningLight)
+                Icon(.bellOff, size: 16, color: Theme.Color.warning)
             }
-            .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
-            .background(Theme.Color.warningBg)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
+            .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Notifications paused").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.warning)
+                Text("Emergency alerts still come through").font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
+            }
+            Spacer(minLength: Spacing.s2)
+            Button { model.resume() } label: {
+                Text("Resume")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .padding(.horizontal, 11).padding(.vertical, 5)
+                    .background(Theme.Color.appSurface)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Theme.Color.warningLight, lineWidth: 1))
+            }
+            .accessibilityIdentifier("pauseBannerResume")
         }
+        .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
+        .background(Theme.Color.warningBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
         .padding(.horizontal, Spacing.s3).padding(.top, Spacing.s3)
     }
 

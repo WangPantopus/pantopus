@@ -74,10 +74,13 @@ final class BookingFollowUpViewModel {
     private var trimmedMessage: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedNote: String { privateNote.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// True when nothing is composed except the private note — the CTA becomes a
-    /// calm ghost "Save note only".
+    /// True when there is no outcome selected and no message typed — the CTA
+    /// becomes the calm ghost "Save note only". Matches Frame 1 (blank open)
+    /// and also covers the case where the user has typed a private note but
+    /// has not composed a send message yet. The ghost CTA dismisses the sheet
+    /// and keeps any private note on-device (no network call needed).
     var isSaveNoteOnly: Bool {
-        trimmedMessage.isEmpty && outcome == nil && !trimmedNote.isEmpty
+        trimmedMessage.isEmpty && outcome == nil
     }
 
     var canSubmit: Bool {

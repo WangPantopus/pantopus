@@ -78,28 +78,33 @@ struct AvailabilityScheduleListView: View {
         switch viewModel.displayPhase {
         case .loading:
             VStack(spacing: Spacing.s0) {
+                AvailabilityHeaderPill()
                 helperHeader
                 loadingList
             }
         case let .loaded(rows):
             VStack(spacing: Spacing.s0) {
+                AvailabilityHeaderPill()
                 helperHeader
                 loadedList(rows)
             }
         case .empty:
-            // Spec omits the helper line on the empty frame.
-            EmptyState(
-                icon: .calendarClock,
-                headline: "You don't have a schedule yet",
-                subcopy: "Set the hours you're open to bookings. Your home and business pages build from this.",
-                cta: EmptyState.CTA(title: "Add working hours") {
-                    await viewModel.createDefaultSchedule()
-                },
-                tint: Theme.Color.personalBg,
-                accent: Theme.Color.primary600
-            )
+            // Design omits the helper line on the empty frame but keeps the HeaderPill.
+            VStack(spacing: Spacing.s0) {
+                AvailabilityHeaderPill()
+                EmptyState(
+                    icon: .calendarClock,
+                    headline: "You don't have a schedule yet",
+                    subcopy: "Set the hours you're open to bookings. Your home and business pages build from this.",
+                    cta: EmptyState.CTA(title: "Add working hours") {
+                        await viewModel.createDefaultSchedule()
+                    },
+                    tint: Theme.Color.personalBg,
+                    accent: Theme.Color.primary600
+                )
+            }
         case let .error(message):
-            // Spec omits the helper line on the error frame.
+            // Error is a non-happy state not present in design frames; no HeaderPill.
             ErrorState(headline: "Couldn't load your availability", message: message) {
                 await viewModel.load()
             }

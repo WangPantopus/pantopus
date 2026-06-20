@@ -18,6 +18,7 @@ public struct SchedulingSlotRow: View {
     private let accent: Color
     private let isSelected: Bool
     private let isDisabled: Bool
+    private let isSoonest: Bool
     private let action: () -> Void
 
     public init(
@@ -26,6 +27,7 @@ public struct SchedulingSlotRow: View {
         accent: Color = Theme.Color.primary600,
         isSelected: Bool = false,
         isDisabled: Bool = false,
+        isSoonest: Bool = false,
         action: @escaping () -> Void
     ) {
         self.time = time
@@ -33,6 +35,7 @@ public struct SchedulingSlotRow: View {
         self.accent = accent
         self.isSelected = isSelected
         self.isDisabled = isDisabled
+        self.isSoonest = isSoonest
         self.action = action
     }
 
@@ -41,11 +44,16 @@ public struct SchedulingSlotRow: View {
             HStack(spacing: Spacing.s3) {
                 Icon(.clock, size: 14, color: isSelected ? accent : Theme.Color.appTextSecondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(time)
-                        .pantopusTextStyle(.small)
-                        .fontWeight(.bold)
-                        .monospacedDigit()
-                        .foregroundStyle(isSelected ? accent : Theme.Color.appText)
+                    HStack(spacing: Spacing.s1 + 1) {
+                        Text(time)
+                            .pantopusTextStyle(.small)
+                            .fontWeight(.bold)
+                            .monospacedDigit()
+                            .foregroundStyle(isSelected ? accent : Theme.Color.appText)
+                        if isSoonest {
+                            soonestBadge
+                        }
+                    }
                     if let detail {
                         Text(detail)
                             .pantopusTextStyle(.caption)
@@ -73,8 +81,30 @@ public struct SchedulingSlotRow: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .accessibilityLabel(detail.map { "\(time), \($0)" } ?? time)
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// The design's uppercase "Soonest" chip on the first alternative — the
+    /// nearest open time. blue50 fill / blue100 hairline / blue700 ink
+    /// (slot-taken-frames.jsx:133-135). Operational info-blue, not the pillar
+    /// accent, so it reads identically across pillars.
+    private var soonestBadge: some View {
+        Text("Soonest")
+            .font(.system(size: 8, weight: .bold))
+            .textCase(.uppercase)
+            .tracking(0.3)
+            .foregroundStyle(Theme.Color.primary700)
+            .padding(.horizontal, Spacing.s1)
+            .padding(.vertical, 1)
+            .background(Theme.Color.primary50)
+            .overlay(Capsule().strokeBorder(Theme.Color.primary100, lineWidth: 1))
+            .clipShape(Capsule())
+    }
+
+    private var accessibilityLabel: String {
+        let base = detail.map { "\(time), \($0)" } ?? time
+        return isSoonest ? "\(base), soonest" : base
     }
 }
 

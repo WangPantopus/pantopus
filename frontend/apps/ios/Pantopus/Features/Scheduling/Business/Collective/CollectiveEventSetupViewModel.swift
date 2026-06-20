@@ -47,6 +47,11 @@ final class CollectiveEventSetupViewModel {
     private(set) var picks: [Pick] = []
     private(set) var isSaving = false
     private(set) var saveError: String?
+    // Frame 3: no-overlap warning. Set true when the checked members share no
+    // free windows. Full intersection detection is deferred (needs a
+    // team-availability probe). Set externally by the scheduler once
+    // availability data is available.
+    var noOverlap: Bool = false
 
     var checkedCount: Int { picks.filter(\.checked).count }
 

@@ -60,7 +60,10 @@ struct InviteeConfirmedView: View {
                 if viewModel.isPending { timelineCard; etaPill }
                 BookingSummaryCard(summary: viewModel.summary, hostPrefix: true, showPillar: false)
                 if viewModel.showsReceipt { receiptCapsule }
-                CalendarClusterView(accent: viewModel.accent) { showAddToCalendar = true }
+                // Design FramePending omits CalendarCluster — only show it once the booking is confirmed.
+                if !viewModel.isPending {
+                    CalendarClusterView(accent: viewModel.accent) { showAddToCalendar = true }
+                }
                 manageNote
             }
             .padding(.horizontal, Spacing.s4)

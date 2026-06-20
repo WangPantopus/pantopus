@@ -54,21 +54,36 @@ final class InvoicesListViewModel {
     var accentBg: Color { theme.accentBg }
 
     /// The two-stat summary structure (`invoiceslist-frames.jsx` `Summary`).
-    /// The design's KPIs are Outstanding (amber when any invoice is overdue) /
-    /// Collected · month — both need per-invoice `status` + `paid_at`, which the
-    /// lean DTO omits. Until those land we surface the two DTO-derivable totals
-    /// in the same two-column layout, and the overdue-amber treatment stays a
-    /// view-only capability driven by `hasOverdue` (always false today).
-    var totalLabel: String {
+    /// Design KPIs: "Outstanding" (amber when any invoice is overdue) /
+    /// "Collected · month" (driven by per-invoice `status` + `paid_at`).
+    /// The lean DTO omits those fields, so we surface DTO-derivable totals in
+    /// the same two-column / label layout — values sharpen once the fields land.
+
+    /// Left KPI: Outstanding total (design `invoiceslist-frames.jsx` line 25).
+    /// Until `status` lands, this shows the running sum of all invoices — the
+    /// closest approximation we can derive from the DTO.
+    var outstandingLabel: String {
         SchedulingMoney.format(cents: invoices.reduce(0) { $0 + ($1.totalCents ?? 0) }, currency: invoices.first?.currency)
     }
 
-    var countLabel: String { "\(invoices.count)" }
+    /// Right KPI: Collected this month (design `invoiceslist-frames.jsx` line 30).
+    /// Until `paid_at` lands, we show the invoice count with a "this month"
+    /// fallback label that matches the designed slot without fabricating revenue.
+    var collectedMonthLabel: String { "\(invoices.count)" }
 
     /// Drives the summary's amber treatment (design `Summary overdue`). No
-    /// `status` in the DTO yet → no invoice can be flagged overdue, so this is
-    /// always false until the field lands (deferred).
+    /// `status` in the DTO yet → always false; wire to per-invoice status once
+    /// the field lands.
     var hasOverdue: Bool { false }
+
+    /// Backend status string for a single invoice. Returns nil until the DTO
+    /// exposes a `status` field — the row pill renders only when non-nil.
+    func invoiceStatus(_ invoice: InvoiceDTO) -> String? {
+        // InvoiceDTO currently has no `status` field. Return nil so the pill
+        // is hidden rather than fabricating a status. Wire to `invoice.status`
+        // once the Foundation DTO gap (InvoicesKit.swift note) is resolved.
+        return nil
+    }
 
     init(
         owner: SchedulingOwner,

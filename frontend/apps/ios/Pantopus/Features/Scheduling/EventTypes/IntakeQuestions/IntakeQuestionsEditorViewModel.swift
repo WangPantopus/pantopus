@@ -35,7 +35,7 @@ enum QuestionFieldType: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var needsOptions: Bool { self == .select || self == .multiselect }
+    var needsOptions: Bool { self == .select || self == .multiselect || self == .checkbox }
 
     static func from(_ raw: String?) -> QuestionFieldType {
         QuestionFieldType(rawValue: raw ?? "text") ?? .text

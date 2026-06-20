@@ -297,7 +297,7 @@ struct AddToCalendarSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         }
         .buttonStyle(.plain)
-        .pantopusShadow(.primary)
+        .pantopusShadow(.primaryDeep)
     }
 
     // MARK: - Card scaffolding
@@ -531,7 +531,7 @@ struct AddToCalendarSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             }
             .buttonStyle(.plain)
-            .pantopusShadow(.primary)
+            .pantopusShadow(.primaryDeep)
             .padding(.horizontal, Spacing.s4)
             .padding(.top, Spacing.s3)
             .padding(.bottom, 18)

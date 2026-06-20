@@ -19,12 +19,28 @@ public struct SlotPicker: View {
     public enum LoadState: Equatable, Sendable {
         /// Slots for the selected day are loading — shimmer rows.
         case loading
+        /// Collective (team-intersect) availability is being composed — an
+        /// avatar-cluster caption + skeleton rows + the "times come from each
+        /// member" explainer pill (design Frame 2). For Business / multi-member
+        /// pillars only; the plain `.loading` skeleton stays for solo owners.
+        case composing
         /// Slots are loaded (use `slots`).
         case loaded
         /// The selected day has no open times.
         case dayFull
-        /// Nothing is open in the visible month/range.
+        /// Nothing is open in the visible MONTH/range — but later months may
+        /// have times (design Frame 3: "No open times in {month}", primary
+        /// "See {next month}", secondary "Get notified").
         case noAvailability
+        /// Nothing is open ANYWHERE right now (design Frame 4): a distinct
+        /// terminal-feeling empty — "Notify me" primary + "Join waitlist"
+        /// secondary with a waiting-count chip. Separate from `.noAvailability`.
+        case noAvailabilityAnywhere
+        /// Collective-intersect produced an empty window for the selected day —
+        /// every required member's calendars don't overlap (design Frame 5): a
+        /// pillar-soft *framed* card (not dashed) with a member free/busy
+        /// cluster, "Try next month" primary + "Notify me" secondary.
+        case composedEmpty
     }
 
     private let state: LoadState
@@ -40,9 +56,12 @@ public struct SlotPicker: View {
     private let onSelectDate: (Date) -> Void
     private let onSelectSlot: (SlotDTO) -> Void
     private let onChangeMonth: (Int) -> Void
+    private let members: [SchedulingMemberFreeBusy]
+    private let waitlistCount: Int?
     private let onTapTimeZone: () -> Void
     private let onJumpNextAvailable: (() -> Void)?
     private let onNotifyMe: (() -> Void)?
+    private let onJoinWaitlist: (() -> Void)?
 
     public init(
         state: LoadState,
@@ -55,12 +74,15 @@ public struct SlotPicker: View {
         availableDays: Set<Date>? = nil,
         selectedSlotStart: String? = nil,
         dstHint: String? = nil,
+        members: [SchedulingMemberFreeBusy] = [],
+        waitlistCount: Int? = nil,
         onSelectDate: @escaping (Date) -> Void,
         onSelectSlot: @escaping (SlotDTO) -> Void,
         onChangeMonth: @escaping (Int) -> Void,
         onTapTimeZone: @escaping () -> Void,
         onJumpNextAvailable: (() -> Void)? = nil,
-        onNotifyMe: (() -> Void)? = nil
+        onNotifyMe: (() -> Void)? = nil,
+        onJoinWaitlist: (() -> Void)? = nil
     ) {
         self.state = state
         self.slots = slots
@@ -72,12 +94,15 @@ public struct SlotPicker: View {
         self.availableDays = availableDays
         self.selectedSlotStart = selectedSlotStart
         self.dstHint = dstHint
+        self.members = members
+        self.waitlistCount = waitlistCount
         self.onSelectDate = onSelectDate
         self.onSelectSlot = onSelectSlot
         self.onChangeMonth = onChangeMonth
         self.onTapTimeZone = onTapTimeZone
         self.onJumpNextAvailable = onJumpNextAvailable
         self.onNotifyMe = onNotifyMe
+        self.onJoinWaitlist = onJoinWaitlist
     }
 
     private var calendar: Calendar {
@@ -103,7 +128,10 @@ public struct SlotPicker: View {
                 onJumpNextAvailable: onJumpNextAvailable
             )
             Divider().background(Theme.Color.appBorderSubtle)
-            if state != .noAvailability {
+            // Frames 3 & 4 (no-times-in-range / anywhere) drop the day heading —
+            // they speak to the whole month/everywhere, not a single day. The
+            // composing / composed-empty frames keep it (a day IS selected).
+            if state != .noAvailability && state != .noAvailabilityAnywhere {
                 Text(dayHeading)
                     .pantopusTextStyle(.small)
                     .fontWeight(.bold)
@@ -176,13 +204,59 @@ public struct SlotPicker: View {
                 ForEach(0..<6, id: \.self) { _ in SchedulingSlotRowSkeleton() }
             }
             .accessibilityLabel("Loading times")
+        case .composing:
+            composingColumn
         case .loaded:
             loadedSlots
         case .dayFull:
             dayFullCard
         case .noAvailability:
             noAvailabilityCard
+        case .noAvailabilityAnywhere:
+            noAvailabilityAnywhereCard
+        case .composedEmpty:
+            composedEmptyCard
         }
+    }
+
+    /// Frame 2 — collective-intersect in progress: a member avatar-cluster
+    /// caption, four skeleton rows, then the "times come from each member's
+    /// availability" explainer pill in the pillar-soft tint.
+    private var composingColumn: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(spacing: Spacing.s2 + 1) {
+                SchedulingAvatarCluster(members: members, accent: accent)
+                Text("Finding times that work for everyone")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            VStack(spacing: Spacing.s2) {
+                ForEach(0..<4, id: \.self) { _ in SchedulingSlotRowSkeleton() }
+            }
+            composedExplainerPill
+        }
+        .accessibilityLabel("Finding times that work for everyone")
+    }
+
+    /// "Times come from each member's availability." explainer pill — pillar
+    /// soft fill, accent ring, calendar-range glyph (design Frame 2).
+    private var composedExplainerPill: some View {
+        HStack(spacing: Spacing.s2 + 1) {
+            Icon(.calendarRange, size: 15, color: accent)
+            Text("Times come from each member's availability.")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2 + 1)
+        .background(accent.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(accent.opacity(0.2), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
     private var loadedSlots: some View {
@@ -253,6 +327,7 @@ public struct SlotPicker: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
+    /// Frame 3 — no times in the visible month, but later months may have some.
     private var noAvailabilityCard: some View {
         SlotPickerEmptyCard(
             // Spec frame 3 (no-times-in-range) uses lucide `calendar-search`.
@@ -260,11 +335,50 @@ public struct SlotPicker: View {
             // `magnifyingglass` SF symbol in Icons.swift (out of this task's
             // file scope); the calendar-glyph intent is recorded as deferred.
             icon: .calendarSearch,
+            framed: false,
             title: "No open times in \(monthName)",
             message: "Availability changes often. Try a later month.",
             accent: accent,
             primary: onJumpNextAvailable.map { (label: "See \(nextMonthName)", icon: PantopusIcon.arrowRight, action: $0) },
             secondary: onNotifyMe.map { (label: "Get notified when times open", icon: PantopusIcon.bell, chip: nil, action: $0) }
+        )
+    }
+
+    /// Frame 4 — nothing is open anywhere right now: "Notify me" is the PRIMARY
+    /// action (distinct from Frame 3's "See {next month}"), with "Join waitlist"
+    /// and a waiting-count chip as the secondary.
+    private var noAvailabilityAnywhereCard: some View {
+        SlotPickerEmptyCard(
+            icon: .calendarClock,
+            framed: false,
+            title: "No times are open right now",
+            message: "We'll let you know the moment something frees up.",
+            accent: accent,
+            primary: onNotifyMe.map { (label: "Notify me", icon: PantopusIcon.bell, action: $0) },
+            secondary: onJoinWaitlist.map {
+                (
+                    label: "Join waitlist",
+                    icon: PantopusIcon.usersRound,
+                    chip: waitlistCount.map { "\($0) waiting" },
+                    action: $0
+                )
+            }
+        )
+    }
+
+    /// Frame 5 — collective-intersect produced an empty window: a *framed*
+    /// (pillar-soft fill, accent ring, NOT dashed) card with a member free/busy
+    /// cluster. `calendar-x` is reserved for THIS composed-empty frame only.
+    private var composedEmptyCard: some View {
+        SlotPickerEmptyCard(
+            icon: .calendarX,
+            framed: true,
+            title: "Everyone's calendars don't overlap in this window",
+            message: "These times need every required member free at once. Try widening the range.",
+            accent: accent,
+            primary: onJumpNextAvailable.map { (label: "Try next month", icon: PantopusIcon.arrowRight, action: $0) },
+            secondary: onNotifyMe.map { (label: "Notify me", icon: PantopusIcon.bell, chip: nil, action: $0) },
+            members: members
         )
     }
 
@@ -491,17 +605,31 @@ private struct SlotPickerCalendar: View {
 /// the no-times-in-range, no-times-anywhere, and composed-empty frames.
 private struct SlotPickerEmptyCard: View {
     let icon: PantopusIcon
+    /// `framed` = the design's Frame-5 "composed-empty" treatment: a pillar-soft
+    /// fill + a solid accent-tinted ring (NOT the default dashed neutral border)
+    /// and an accent-tinted icon halo. Default cards stay dashed + neutral.
+    var framed: Bool = false
     let title: String
     let message: String
     let accent: Color
     let primary: (label: String, icon: PantopusIcon, action: () -> Void)?
     let secondary: (label: String, icon: PantopusIcon, chip: String?, action: () -> Void)?
+    /// Required-member free/busy cluster, rendered between the body and the CTAs
+    /// for the composed-empty frame. Empty = not shown.
+    var members: [SchedulingMemberFreeBusy] = []
 
     var body: some View {
         VStack(spacing: Spacing.s3) {
             ZStack {
-                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 50, height: 50)
-                Icon(icon, size: 23, strokeWidth: 1.85, color: Theme.Color.appTextSecondary)
+                Circle()
+                    .fill(framed ? accent.opacity(0.12) : Theme.Color.appSurfaceSunken)
+                    .frame(width: 50, height: 50)
+                Icon(
+                    icon,
+                    size: 23,
+                    strokeWidth: 1.85,
+                    color: framed ? accent : Theme.Color.appTextSecondary
+                )
             }
             Text(title)
                 .font(.system(size: 15, weight: .bold))
@@ -518,6 +646,9 @@ private struct SlotPickerEmptyCard: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 225)
                 .fixedSize(horizontal: false, vertical: true)
+            if !members.isEmpty {
+                SchedulingMemberFreeBusyCluster(members: members)
+            }
             VStack(spacing: Spacing.s2) {
                 if let primary {
                     Button(action: primary.action) {
@@ -569,12 +700,110 @@ private struct SlotPickerEmptyCard: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Spacing.s5)
         .padding(.vertical, Spacing.s6)
-        .background(Theme.Color.appSurface)
+        // Frame 5 (framed): pillar-soft fill. Default: plain surface.
+        .background(framed ? accent.opacity(0.06) : Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .strokeBorder(Theme.Color.appBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .strokeBorder(
+                    // Frame 5 draws a SOLID accent-tinted 1px ring; the default
+                    // empty cards keep the calm dashed neutral border.
+                    framed ? accent.opacity(0.25) : Theme.Color.appBorderStrong,
+                    style: framed
+                        ? StrokeStyle(lineWidth: 1)
+                        : StrokeStyle(lineWidth: 1, dash: [4, 4])
+                )
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+    }
+}
+
+// MARK: - Member free/busy primitives (collective intersect)
+
+/// One required member's identity + whether they're free in the proposed window.
+/// Caller supplies the initials + free flag from the find-a-time projection —
+/// never fabricated. An empty `[SchedulingMemberFreeBusy]` simply hides the
+/// cluster (the composing / composed-empty frames still render their copy).
+public struct SchedulingMemberFreeBusy: Identifiable, Hashable, Sendable {
+    public let id: String
+    /// 1–2 letter initials shown in the avatar disc (e.g. "AR").
+    public let initials: String
+    /// `true` = free in the window (green dot + "Free"); `false` = busy.
+    public let isFree: Bool
+
+    public init(id: String, initials: String, isFree: Bool) {
+        self.id = id
+        self.initials = initials
+        self.isFree = isFree
+    }
+}
+
+/// Overlapping avatar discs for the composing caption (design `AvatarCluster`).
+/// Renders up to four initials-discs; falls back to a single accent disc when
+/// no members are supplied so the caption never reads as a lone line of text.
+private struct SchedulingAvatarCluster: View {
+    let members: [SchedulingMemberFreeBusy]
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: -8) {
+            if members.isEmpty {
+                avatar(initials: nil)
+                avatar(initials: nil)
+                avatar(initials: nil)
+            } else {
+                ForEach(members.prefix(4)) { member in
+                    avatar(initials: member.initials)
+                }
+            }
+        }
+    }
+
+    private func avatar(initials: String?) -> some View {
+        ZStack {
+            Circle().fill(accent.opacity(0.16))
+            Circle().strokeBorder(Theme.Color.appSurface, lineWidth: 1.5)
+            if let initials {
+                Text(initials)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(accent)
+            } else {
+                Icon(.user, size: 11, color: accent)
+            }
+        }
+        .frame(width: 26, height: 26)
+    }
+}
+
+/// Required-member free/busy dot cluster for the composed-empty frame — each
+/// member shows an initials disc + a green "Free" / grey "Busy" status dot.
+private struct SchedulingMemberFreeBusyCluster: View {
+    let members: [SchedulingMemberFreeBusy]
+
+    var body: some View {
+        HStack(spacing: Spacing.s4) {
+            ForEach(members.prefix(4)) { member in
+                VStack(spacing: Spacing.s1) {
+                    ZStack {
+                        Circle().fill(Theme.Color.appSurfaceSunken)
+                        Text(member.initials)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                    }
+                    .frame(width: 30, height: 30)
+                    HStack(spacing: 3) {
+                        Circle()
+                            .fill(member.isFree ? Theme.Color.success : Theme.Color.appTextMuted)
+                            .frame(width: 5, height: 5)
+                        Text(member.isFree ? "Free" : "Busy")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(member.isFree ? Theme.Color.success : Theme.Color.appTextSecondary)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(member.initials), \(member.isFree ? "free" : "busy")")
+            }
+        }
+        .padding(.vertical, Spacing.s1)
     }
 }
 
@@ -613,6 +842,79 @@ private struct SlotPickerEmptyCard: View {
             accent: Theme.Color.home,
             monthAnchor: Date(),
             selectedDate: Date(),
+            onSelectDate: { _ in },
+            onSelectSlot: { _ in },
+            onChangeMonth: { _ in },
+            onTapTimeZone: {},
+            onJumpNextAvailable: {},
+            onNotifyMe: {}
+        )
+        .padding()
+    }
+    .background(Theme.Color.appBg)
+}
+
+private let previewMembers: [SchedulingMemberFreeBusy] = [
+    SchedulingMemberFreeBusy(id: "1", initials: "AR", isFree: true),
+    SchedulingMemberFreeBusy(id: "2", initials: "JL", isFree: false),
+    SchedulingMemberFreeBusy(id: "3", initials: "MK", isFree: true)
+]
+
+#Preview("Composing (team intersect)") {
+    ScrollView {
+        SlotPicker(
+            state: .composing,
+            slots: [],
+            timeZoneIdentifier: "America/Los_Angeles",
+            timeZoneLabel: "Pacific Time",
+            accent: Theme.Color.business,
+            monthAnchor: Date(),
+            selectedDate: Date(),
+            members: previewMembers,
+            onSelectDate: { _ in },
+            onSelectSlot: { _ in },
+            onChangeMonth: { _ in },
+            onTapTimeZone: {}
+        )
+        .padding()
+    }
+    .background(Theme.Color.appBg)
+}
+
+#Preview("No times anywhere") {
+    ScrollView {
+        SlotPicker(
+            state: .noAvailabilityAnywhere,
+            slots: [],
+            timeZoneIdentifier: "America/Los_Angeles",
+            timeZoneLabel: "Pacific Time",
+            accent: Theme.Color.primary600,
+            monthAnchor: Date(),
+            selectedDate: Date(),
+            waitlistCount: 3,
+            onSelectDate: { _ in },
+            onSelectSlot: { _ in },
+            onChangeMonth: { _ in },
+            onTapTimeZone: {},
+            onNotifyMe: {},
+            onJoinWaitlist: {}
+        )
+        .padding()
+    }
+    .background(Theme.Color.appBg)
+}
+
+#Preview("Composed empty (home intersect)") {
+    ScrollView {
+        SlotPicker(
+            state: .composedEmpty,
+            slots: [],
+            timeZoneIdentifier: "America/Los_Angeles",
+            timeZoneLabel: "Pacific Time",
+            accent: Theme.Color.home,
+            monthAnchor: Date(),
+            selectedDate: Date(),
+            members: previewMembers,
             onSelectDate: { _ in },
             onSelectSlot: { _ in },
             onChangeMonth: { _ in },

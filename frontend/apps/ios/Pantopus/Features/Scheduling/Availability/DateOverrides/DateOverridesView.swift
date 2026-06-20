@@ -102,18 +102,20 @@ struct DateOverridesView: View {
         }
     }
 
-    // MARK: Calendar
+    // MARK: Calendar (custom month grid — matches design date-overrides-frames.jsx lines 90–133)
+
+    /// Weekday column headers — Sunday-first, single-character.
+    private static let weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]
 
     private var calendarCard: some View {
-        DatePicker(
-            "Pick a date",
-            selection: $viewModel.selectedDate,
-            displayedComponents: .date
-        )
-        .datePickerStyle(.graphical)
-        .tint(Theme.Color.primary600)
-        .labelsHidden()
-        .padding(Spacing.s3)
+        VStack(spacing: Spacing.s0) {
+            monthNavHeader
+            weekdayHeader
+            dayGrid
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s3 + 2)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
@@ -122,6 +124,156 @@ struct DateOverridesView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         .pantopusShadow(.sm)
         .accessibilityIdentifier("scheduling.dateOverrides.calendar")
+    }
+
+    // "July 2026" label + chevron-left / chevron-right navigation.
+    private var monthNavHeader: some View {
+        HStack {
+            Text(Self.monthTitle(viewModel.displayedMonth))
+                .font(.system(size: 13.5, weight: .bold))
+                .kerning(-0.2)
+                .foregroundStyle(Theme.Color.appText)
+            Spacer()
+            HStack(spacing: Spacing.s1) {
+                Button {
+                    viewModel.stepMonth(-1)
+                } label: {
+                    Icon(.chevronLeft, size: 17, color: Theme.Color.appTextSecondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Previous month")
+                Button {
+                    viewModel.stepMonth(1)
+                } label: {
+                    Icon(.chevronRight, size: 17, color: Theme.Color.appTextSecondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Next month")
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.bottom, Spacing.s2 + 2)
+    }
+
+    // Single-character S/M/T/W/T/F/S row.
+    private var weekdayHeader: some View {
+        HStack(spacing: 1) {
+            ForEach(Array(Self.weekdayLabels.enumerated()), id: \.offset) { _, label in
+                Text(label)
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 2)
+            }
+        }
+        .padding(.bottom, Spacing.s1)
+    }
+
+    // 7-column day grid with tap-to-select, selected-day circle, and override dots.
+    private var dayGrid: some View {
+        let cells = Self.calendarCells(for: viewModel.displayedMonth)
+        let overrideDates = Set(viewModel.overrides.map(\.date))
+        let todayKey = OverrideFormatting.ymdKey(Date())
+        let cal = Calendar.current
+        let selectedKey = OverrideFormatting.ymdKey(viewModel.selectedDate)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: 7),
+            spacing: 1
+        ) {
+            ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+                if let day = cell {
+                    let dayKey = Self.ymdKey(day: day, month: viewModel.displayedMonth, calendar: cal)
+                    let isSelected = dayKey == selectedKey
+                    let hasOverride = overrideDates.contains(dayKey)
+                    let isToday = dayKey == todayKey
+                    dayCellView(
+                        day: day,
+                        isSelected: isSelected,
+                        hasOverride: hasOverride,
+                        isToday: isToday,
+                        dayKey: dayKey
+                    )
+                } else {
+                    Color.clear
+                        .frame(height: 30)
+                }
+            }
+        }
+    }
+
+    // Individual day cell: 28pt circle background, day number, 4pt override dot.
+    private func dayCellView(
+        day: Int,
+        isSelected: Bool,
+        hasOverride: Bool,
+        isToday: Bool,
+        dayKey: String
+    ) -> some View {
+        Button {
+            viewModel.selectDay(day)
+        } label: {
+            ZStack(alignment: .bottom) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? Theme.Color.primary600 : Color.clear)
+                        .frame(width: 28, height: 28)
+                    Text("\(day)")
+                        .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                        .foregroundStyle(
+                            isSelected
+                                ? Theme.Color.appSurface
+                                : (isToday ? Theme.Color.primary600 : Theme.Color.appText)
+                        )
+                        .monospacedDigit()
+                }
+                if hasOverride && !isSelected {
+                    Circle()
+                        .fill(Theme.Color.primary600)
+                        .frame(width: 4, height: 4)
+                        .offset(y: 1)
+                }
+            }
+            .frame(height: 30)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Day \(day)\(hasOverride ? ", has override" : "")")
+    }
+
+    // MARK: Calendar helpers
+
+    /// "July 2026" from the first-of-month Date.
+    private static func monthTitle(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = .current
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: date)
+    }
+
+    /// Array of optional Int — nil for leading blank cells, then 1…daysInMonth.
+    private static func calendarCells(for month: Date) -> [Int?] {
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month], from: month)
+        guard let firstOfMonth = cal.date(from: comps),
+              let range = cal.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
+        // firstWeekday: Sunday=1…Saturday=7 — convert to 0-based column offset.
+        let startWeekday = (cal.component(.weekday, from: firstOfMonth) - 1 + 7) % 7
+        var cells: [Int?] = Array(repeating: nil, count: startWeekday)
+        cells.append(contentsOf: range.map { Optional($0) })
+        return cells
+    }
+
+    /// Builds a YYYY-MM-DD key for a given day number within the displayed month.
+    private static func ymdKey(day: Int, month: Date, calendar: Calendar) -> String {
+        var comps = calendar.dateComponents([.year, .month], from: month)
+        comps.day = day
+        guard let date = calendar.date(from: comps) else { return "" }
+        return OverrideFormatting.ymdKey(date, calendar: calendar)
     }
 
     // MARK: Composer (PickerBlock)

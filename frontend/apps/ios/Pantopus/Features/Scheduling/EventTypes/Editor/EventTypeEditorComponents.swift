@@ -393,6 +393,40 @@ struct IconToggleRow: View {
     }
 }
 
+/// Overlapping avatar discs for the Assignment-card collective mode — mirrors
+/// the design's `MemberAvatars` row (event-editor-frames.jsx line 129).
+/// Renders `totalCount` discs using the pillar accent; discs beyond
+/// `requiredCount` are dimmed (opacity 0.35) to signal they're not required
+/// for the slot to open. Member data is not yet surfaced by the event-type DTO
+/// so this uses placeholder user-icon discs; real initials can be wired in when
+/// the DTO exposes a `members` array.
+struct CollectiveMemberAvatarStack: View {
+    /// Total number of seated team members on this event type.
+    let totalCount: Int
+    /// How many must be free for a slot to open (mirrors `requiredHosts`).
+    let requiredCount: Int
+    /// Pillar accent colour for the disc fill tint and icon stroke.
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: -10) {
+            ForEach(0..<max(1, min(totalCount, 6)), id: \.self) { index in
+                let isRequired = index < requiredCount
+                ZStack {
+                    Circle()
+                        .fill(accent.opacity(isRequired ? 0.18 : 0.07))
+                    Circle()
+                        .strokeBorder(Theme.Color.appSurface, lineWidth: 2)
+                    Icon(.user, size: 11, color: accent.opacity(isRequired ? 1.0 : 0.35))
+                }
+                .frame(width: 28, height: 28)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(requiredCount) of \(totalCount) hosts required")
+    }
+}
+
 /// Inline info / call-to-action card (Stripe connect, coming-soon notice).
 struct EventInfoCard: View {
     enum Tone { case info, warning }

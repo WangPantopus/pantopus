@@ -21,25 +21,59 @@ struct DiscoverySlotPickerView: View {
     }
 
     var body: some View {
-        content
-            .background(Theme.Color.appBg)
-            .navigationTitle("Pick a time")
-            .navigationBarTitleDisplayMode(.inline)
-            .task { await viewModel.load() }
-            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
-            .accessibilityIdentifier("scheduling.slotPicker")
-            .sheet(isPresented: $showTimezoneSheet) {
-                TimezoneSelectorSheet(
-                    selectedIdentifier: viewModel.timezoneId,
-                    accent: viewModel.accent,
-                    onSelect: { identifier in
-                        Task { await viewModel.changeTimezone(identifier) }
-                    },
-                    onDone: { showTimezoneSheet = false }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+        ZStack(alignment: .bottom) {
+            content
+            if viewModel.slotJustTaken {
+                slotTakenToast
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.78), value: viewModel.slotJustTaken)
             }
+        }
+        .background(Theme.Color.appBg)
+        .navigationTitle("Pick a time")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await viewModel.load() }
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .accessibilityIdentifier("scheduling.slotPicker")
+        .sheet(isPresented: $showTimezoneSheet) {
+            TimezoneSelectorSheet(
+                selectedIdentifier: viewModel.timezoneId,
+                accent: viewModel.accent,
+                onSelect: { identifier in
+                    Task { await viewModel.changeTimezone(identifier) }
+                },
+                onDone: { showTimezoneSheet = false }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Slot-just-taken toast (Frame 6)
+
+    /// Floating WARN toast shown when a race condition takes the selected slot.
+    /// Design Frame 6: amber fill + 1px amber border + triangle-alert icon +
+    /// "That time was just taken". Floats above the home indicator at the bottom.
+    private var slotTakenToast: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.triangleAlert, size: 15, strokeWidth: 2.2, color: Theme.Color.warning)
+            Text("That time was just taken")
+                .font(.system(size: 12.5, weight: .bold))
+                .foregroundStyle(Theme.Color.warning)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .shadow(color: Theme.Color.warning.opacity(0.18), radius: 8, y: 4)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.bottom, Spacing.s5)
+        .accessibilityLabel("That time was just taken. Please select another.")
     }
 
     @ViewBuilder
@@ -159,6 +193,12 @@ struct DiscoverySlotPickerView: View {
 #Preview("Slot picker") {
     NavigationStack {
         DiscoverySlotPickerView(viewModel: .previewLoaded())
+    }
+}
+
+#Preview("Slot picker · Slot just taken") {
+    NavigationStack {
+        DiscoverySlotPickerView(viewModel: .previewSlotTaken())
     }
 }
 #endif

@@ -70,6 +70,12 @@ struct PackageEditorView: View {
                     .padding(.horizontal, Spacing.s1)
             }
             detailsCard
+            // Frame 4: when active buyers hold credits, warn and lock
+            // sessions/eligibility tiles — createpackage-frames.jsx:162-163.
+            if model.isLocked {
+                PkgNote(tone: .warning, icon: .lock,
+                        text: "\(model.activeBuyerCount) \(model.activeBuyerCount == 1 ? "person owns" : "people own") credits — you can't change sessions or eligibility while credits are active.")
+            }
             redeemCard
             sessionsCard
             priceCard
@@ -113,12 +119,14 @@ struct PackageEditorView: View {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     EventTile(
                         title: "All services", duration: "Any event", icon: .layers,
-                        selected: model.selectedEventTypeId == nil, accent: model.accent, accentBg: model.theme.accentBg
+                        selected: model.selectedEventTypeId == nil, accent: model.accent, accentBg: model.theme.accentBg,
+                        locked: model.isLocked
                     ) { model.selectEventType(nil) }
                     ForEach(model.eventTypes) { type in
                         EventTile(
                             title: type.name, duration: model.tileDuration(type), icon: .calendar,
-                            selected: model.selectedEventTypeId == type.id, accent: model.accent, accentBg: model.theme.accentBg
+                            selected: model.selectedEventTypeId == type.id, accent: model.accent, accentBg: model.theme.accentBg,
+                            locked: model.isLocked
                         ) { model.selectEventType(type.id) }
                     }
                 }
@@ -131,7 +139,7 @@ struct PackageEditorView: View {
             HStack {
                 Text("Number of sessions").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appText)
                 Spacer()
-                PkgStepper(value: $model.sessionsCount)
+                PkgStepper(value: $model.sessionsCount, disabled: model.isLocked)
             }
         }
     }
@@ -256,10 +264,13 @@ private struct EventTile: View {
     let selected: Bool
     let accent: Color
     let accentBg: Color
+    /// When true, the tile is dimmed and non-interactive (Frame 4: active buyers
+    /// lock sessions + eligibility — createpackage-frames.jsx:16, 163).
+    var locked = false
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: locked ? {} : action) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Icon(icon, size: 15, color: selected ? accent : Theme.Color.appTextSecondary)
@@ -281,8 +292,10 @@ private struct EventTile: View {
                     .stroke(selected ? accent : Theme.Color.appBorder, lineWidth: selected ? 1.5 : 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .opacity(locked ? 0.6 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(locked)
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }

@@ -61,6 +61,7 @@ struct BookingLimitsView: View {
             noticeRow
             windowRow
             dailyCapRow
+            weeklyCapRow
             perPersonRow
             startTimesRow
         }
@@ -126,6 +127,21 @@ struct BookingLimitsView: View {
         )
     }
 
+    // NOTE: backend has no weekly_cap field — row is rendered per the design
+    // as a disabled placeholder until the backend exposes the field.
+    private var weeklyCapRow: some View {
+        stepperRow(
+            "Max per week",
+            caption: "Most bookings you'll take in a week.",
+            value: "–",
+            unit: nil,
+            identifier: "scheduling.bookingLimits.weeklyCapStepper",
+            disabled: true,
+            onMinus: {},
+            onPlus: {}
+        )
+    }
+
     private var perPersonRow: some View {
         stepperRow(
             "Per-person limit",
@@ -160,6 +176,8 @@ struct BookingLimitsView: View {
 
     /// One rule card: label (semibold) + bordered stepper on one line, caption
     /// (or error) below. Mirrors the design's `StepperRow` / `RowCard`.
+    /// Pass `disabled: true` for placeholder rows whose backend field is not
+    /// yet available (e.g. "Max per week" awaiting weekly_cap support).
     private func stepperRow(
         _ label: String,
         caption: String,
@@ -167,6 +185,7 @@ struct BookingLimitsView: View {
         unit: String?,
         identifier: String,
         error: String? = nil,
+        disabled: Bool = false,
         onMinus: @escaping () -> Void,
         onPlus: @escaping () -> Void
     ) -> some View {
@@ -174,7 +193,7 @@ struct BookingLimitsView: View {
             HStack(spacing: Spacing.s3) {
                 Text(label)
                     .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
+                    .foregroundStyle(disabled ? Theme.Color.appTextSecondary : Theme.Color.appText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 AvailabilityStepper(
                     value: value,
@@ -184,6 +203,8 @@ struct BookingLimitsView: View {
                     onPlus: onPlus
                 )
                 .accessibilityIdentifier(identifier)
+                .disabled(disabled)
+                .opacity(disabled ? 0.4 : 1)
             }
             if let error {
                 HStack(alignment: .top, spacing: Spacing.s1) {
@@ -199,6 +220,7 @@ struct BookingLimitsView: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
+        .opacity(disabled ? 0.7 : 1)
     }
 
     private func rowCard(@ViewBuilder content: () -> some View) -> some View {
@@ -220,7 +242,7 @@ struct BookingLimitsView: View {
     private var loadingSkeleton: some View {
         ScrollView {
             VStack(spacing: Spacing.s5) {
-                ForEach(0..<5, id: \.self) { _ in
+                ForEach(0..<6, id: \.self) { _ in
                     Shimmer(height: 64, cornerRadius: Radii.lg)
                         .padding(.horizontal, Spacing.s4)
                 }

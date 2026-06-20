@@ -34,12 +34,27 @@ struct VisitDetailView: View {
         .navigationTitle("Visit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Design: Edit button is active (home-green) in non-terminal states
+            // (confirmed), muted (gray) in terminal states (done / completed).
+            // The full 9-state lifecycle (offered/reserved/link states) is a v1
+            // deferral — see F14 finding 2 and 3.
             ToolbarItem(placement: .topBarTrailing) {
-                if case .loaded = viewModel.state, viewModel.lifecycle == .confirmed {
-                    Button("Edit") { viewModel.beginEdit() }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.home)
-                        .accessibilityIdentifier("scheduling.visitDetail.edit")
+                if case .loaded = viewModel.state {
+                    switch viewModel.lifecycle {
+                    case .confirmed:
+                        Button("Edit") { viewModel.beginEdit() }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.home)
+                            .accessibilityIdentifier("scheduling.visitDetail.edit")
+                    case .done:
+                        // Terminal state: Edit button present but muted per design
+                        // (design frames Completed/Cancelled/No-show all show muted Edit).
+                        Button("Edit") { viewModel.beginEdit() }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextMuted)
+                            .disabled(true)
+                            .accessibilityIdentifier("scheduling.visitDetail.edit")
+                    }
                 }
             }
         }

@@ -31,6 +31,8 @@ final class MessageTemplateEditorViewModel {
     var channel: WorkflowChannel = .email
     var subject = ""
     var body = ""
+    /// Mirrors the backend `is_active` field. Defaults `true` for new templates.
+    var isActive = true
 
     // MARK: UI state
 
@@ -40,6 +42,9 @@ final class MessageTemplateEditorViewModel {
     private(set) var isSaving = false
     var saveError: String?
     private(set) var didAttemptSave = false
+    var showDeleteConfirm = false
+    private(set) var isDeleting = false
+    var deleteError: String?
 
     var isNew: Bool { templateId == nil }
     var navTitle: String { isNew ? "New template" : "Edit template" }
@@ -93,6 +98,7 @@ final class MessageTemplateEditorViewModel {
             channel = WorkflowChannel(wire: template.channel)
             subject = template.subject ?? ""
             body = template.body
+            isActive = template.isActive ?? true
             phase = .loaded
         } catch let error as SchedulingError {
             phase = .error(error.userMessage ?? "Couldn't load this template.")
@@ -132,7 +138,8 @@ final class MessageTemplateEditorViewModel {
                         name: name,
                         channel: channel.rawValue,
                         subject: subjectValue,
-                        body: body
+                        body: body,
+                        isActive: isActive
                     )),
                     as: MessageTemplateResponse.self
                 )
@@ -142,7 +149,8 @@ final class MessageTemplateEditorViewModel {
                         name: name,
                         body: body,
                         channel: channel.rawValue,
-                        subject: subjectValue
+                        subject: subjectValue,
+                        isActive: isActive
                     )),
                     as: MessageTemplateResponse.self
                 )
@@ -153,6 +161,29 @@ final class MessageTemplateEditorViewModel {
             return false
         } catch {
             saveError = "Couldn't save this template. Try again."
+            return false
+        }
+    }
+
+    // MARK: Delete
+
+    /// Deletes the current template. Returns `true` on success so the view can dismiss.
+    func delete() async -> Bool {
+        guard let templateId, !isDeleting else { return false }
+        isDeleting = true
+        deleteError = nil
+        defer { isDeleting = false }
+        do {
+            _ = try await client.request(
+                SchedulingEndpoints.deleteMessageTemplate(owner: owner, id: templateId),
+                as: SchedulingOkResponse.self
+            )
+            return true
+        } catch let error as SchedulingError {
+            deleteError = error.userMessage ?? "Couldn't delete this template. Try again."
+            return false
+        } catch {
+            deleteError = "Couldn't delete this template. Try again."
             return false
         }
     }

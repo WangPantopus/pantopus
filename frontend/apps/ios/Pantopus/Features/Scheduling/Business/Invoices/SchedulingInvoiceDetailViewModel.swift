@@ -100,6 +100,45 @@ final class SchedulingInvoiceDetailViewModel {
 
     var shareText: String { "\(reference) · \(totalLabel)" }
 
+    /// Best-available invoice status for the top-bar pill and dock CTA set.
+    /// The DTO carries no `status` field; we derive the lifecycle state from
+    /// the data that does exist:
+    ///   • After a successful in-session `send()` → "sent"
+    ///   • Otherwise → "draft" (the safest pre-send state)
+    /// Wire directly to `invoice.status` once the DTO gap is resolved.
+    var invoiceStatusString: String {
+        didSend ? "sent" : "draft"
+    }
+
+    /// Dock CTA configuration per invoice status (`invoicedetail-frames.jsx`
+    /// lines 196–202). Seven variants:
+    ///   draft   → Send only
+    ///   sent    → Mark paid + Resend + Overflow
+    ///   paid    → Share + Download PDF
+    ///   partial → Mark paid + Send balance
+    ///   overdue → Mark paid + Resend + Overflow
+    ///   void    → Share only
+    ///   refunded→ Share + Download PDF
+    /// Until the DTO exposes `status`, this is driven by `invoiceStatusString`
+    /// (draft → Send; sent → Mark paid + Resend + Overflow).
+    enum DockConfig {
+        case sendOnly
+        case markPaidResendOverflow
+        case shareDownload
+        case markPaidSendBalance
+        case shareOnly
+    }
+
+    var dockConfig: DockConfig {
+        switch invoiceStatusString {
+        case "sent", "overdue": .markPaidResendOverflow
+        case "paid", "refunded": .shareDownload
+        case "partial": .markPaidSendBalance
+        case "void": .shareOnly
+        default: .sendOnly          // draft (and any unknown)
+        }
+    }
+
     init(
         owner: SchedulingOwner,
         invoiceId: String,
@@ -132,6 +171,19 @@ final class SchedulingInvoiceDetailViewModel {
     func refresh() async { await load() }
 
     // MARK: Actions
+
+    /// Mark the invoice as paid (dock CTA for sent/overdue/partial states).
+    /// Deferred — no backend endpoint exposed yet; placeholder keeps the dock
+    /// CTA set structurally faithful to the design.
+    func markPaid() {}
+
+    /// Download a PDF receipt (dock CTA for paid/refunded states).
+    /// Deferred — no PDF endpoint exposed yet; placeholder for design parity.
+    func downloadPDF() {}
+
+    /// Show the overflow menu (dock CTA for sent/overdue states — Void, etc.).
+    /// Deferred — no actions sheet built yet; placeholder for design parity.
+    func showOverflow() {}
 
     /// Send the invoice to its recipient (in-app notification; does not mutate
     /// invoice state server-side).

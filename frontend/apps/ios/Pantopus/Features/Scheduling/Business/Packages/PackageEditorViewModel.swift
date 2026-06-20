@@ -24,6 +24,15 @@ import SwiftUI
 final class PackageEditorViewModel {
     enum Phase: Equatable { case loading, ready, error(String), comingSoon }
 
+    /// True when the package has been sold to at least one buyer who still holds
+    /// active credits — sessions count and eligible event-type tiles are locked.
+    /// Derived from `sold_count` on the owner-packages response (a proxy for
+    /// active buyers; no dedicated `has_active_buyers` field exists in the contract
+    /// — flagged for a backend follow-up to expose active-credit count separately).
+    private(set) var hasActiveBuyers = false
+    /// Number shown in the locked-state warning note ("N people own credits").
+    private(set) var activeBuyerCount = 0
+
     /// Expiry window for purchased credits (design's `Segmented`). View-only
     /// for now — the packages table has no `expiry` column, so the selection is
     /// not sent on save (see the backend note). Persistence is deferred.
@@ -71,6 +80,9 @@ final class PackageEditorViewModel {
     private var snapshot = Snapshot()
 
     var isEditing: Bool { packageId != nil }
+    /// Sessions count and redeems-against tiles are locked when the owner has
+    /// buyers holding active credits — matches Frame 4 of createpackage-frames.jsx.
+    var isLocked: Bool { isEditing && hasActiveBuyers }
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
     var accentBg: Color { theme.accentBg }
@@ -132,6 +144,11 @@ final class PackageEditorViewModel {
         }
         selectedEventTypeId = package.eventTypeId
         isActive = package.isActive ?? true
+        // `sold_count` proxies active-buyer presence. A dedicated
+        // `has_active_buyers` / active-credit count is a backend follow-up.
+        let count = package.soldCount ?? 0
+        hasActiveBuyers = count > 0
+        activeBuyerCount = count
     }
 
     // MARK: Actions

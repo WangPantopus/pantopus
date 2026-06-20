@@ -146,11 +146,29 @@ struct PaymentFailedView: View {
                 .overlay(Capsule().stroke(Theme.Color.successLight, lineWidth: 1))
                 .clipShape(Capsule())
             }
-            HStack(spacing: Spacing.s2) {
-                ProgressView().controlSize(.small)
-                Text("Confirming your booking")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+            // Design (payment-failed-frames.jsx:303-310): a 70%-wide track
+            // with a 62%-fill success bar, then a pulsing dot + "Confirming" label.
+            VStack(spacing: Spacing.s2) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Theme.Color.appSurfaceSunken)
+                            .frame(width: geo.size.width * 0.70, height: 5)
+                        Capsule()
+                            .fill(Theme.Color.success)
+                            .frame(width: geo.size.width * 0.70 * 0.62, height: 5)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .frame(height: 5)
+                HStack(spacing: Spacing.s1) {
+                    Circle()
+                        .fill(Theme.Color.success)
+                        .frame(width: 6, height: 6)
+                    Text("Confirming your booking")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
             Spacer(minLength: 0)
             HStack(spacing: Spacing.s1) {
