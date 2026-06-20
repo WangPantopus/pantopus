@@ -88,7 +88,7 @@ export function Card({
 
 export function Overline({ children }: { children: ReactNode }) {
   return (
-    <div className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-app-home">
+    <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-app-home">
       {children}
     </div>
   );

@@ -105,6 +105,13 @@ export function validateIntake(
   if (!email) errors.email = "Enter your email address";
   else if (!isValidEmail(email)) errors.email = "Enter a valid email address";
 
+  // Phone is always required per design spec (intake-booking-frames.jsx:274).
+  if (!values.phone.trim()) {
+    errors.phone = "Enter your phone number";
+  } else if (values.phone.replace(/[^\d]/g, "").length < 7) {
+    errors.phone = "Enter a valid phone number";
+  }
+
   questions.forEach((q, i) => {
     const key = questionKey(q, i);
     if (q.required && answerIsEmpty(values.answers[key])) {

@@ -75,16 +75,14 @@ export default function PollResponse({
 }) {
   const closed = poll.status === "closed";
   const [votes, setVotes] = useState<VoteState>({});
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [nowClosed, setNowClosed] = useState(closed);
   const [error, setError] = useState<string | null>(null);
 
   const answeredCount = Object.keys(votes).length;
-  const emailValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
-  const canSubmit = answeredCount > 0 && emailValid && !submitting;
+  // Design gates submit solely on at least one vote cast (no email required).
+  const canSubmit = answeredCount > 0 && !submitting;
 
   const finalized = useMemo(() => {
     if (!poll.finalized_start_at) return null;
@@ -98,8 +96,8 @@ export default function PollResponse({
     setError(null);
     try {
       await api.publicBooking.votePoll(pollId, {
-        name: name.trim() || null,
-        email: email.trim(),
+        name: null,
+        email: null,
         votes: Object.entries(votes).map(([option_id, value]) => ({
           option_id,
           value,
@@ -231,35 +229,6 @@ export default function PollResponse({
             </div>
           );
         })}
-      </div>
-
-      {/* Voter identity */}
-      <div className="rounded-2xl border border-app-border bg-app-surface p-3.5">
-        <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-app-text-muted">
-          Your details
-        </p>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <label className="block text-[11px] font-semibold text-app-text-secondary">
-            Name (optional)
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-home"
-            />
-          </label>
-          <label className="block text-[11px] font-semibold text-app-text-secondary">
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-home"
-            />
-          </label>
-        </div>
       </div>
 
       {error && (

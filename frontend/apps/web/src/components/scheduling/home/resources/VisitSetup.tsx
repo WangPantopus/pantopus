@@ -10,8 +10,10 @@ import { useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Check,
+  ChevronRight,
   HardHat,
   Info,
+  KeyRound,
   Loader2,
   Package,
   UserRound,
@@ -165,7 +167,7 @@ export default function VisitSetup({
 
       <div className="flex-1 space-y-3 overflow-auto p-3.5">
         <Banner tone="info" icon={Info}>
-          The people who must be home are marked busy on the household calendar.
+          Slots come from when your chosen hosts are personally free.
         </Banner>
 
         {formError && (
@@ -278,6 +280,17 @@ export default function VisitSetup({
             placeholder="Entry note for the visitor — e.g. front door code on arrival"
             rows={2}
           />
+          {/* Link an access code — secondary affordance matching iOS/Android */}
+          <button
+            type="button"
+            className="mt-2.5 flex w-full items-center gap-2.5 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2.5 text-left transition hover:bg-app-surface"
+          >
+            <KeyRound className="h-4 w-4 shrink-0 text-app-text-secondary" />
+            <span className="flex-1 text-[13px] font-semibold text-app-text-secondary">
+              Link an access code
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" />
+          </button>
         </Section>
       </div>
     </div>

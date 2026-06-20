@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
+  ChevronRight,
   Clock,
   Eye,
   Lock,
@@ -110,8 +111,8 @@ function StepRow({
         !last && "border-b border-app-border-subtle",
       )}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
-        <Icon className="h-4 w-4" aria-hidden />
+      <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
+        <Icon className="h-[15px] w-[15px]" aria-hidden />
       </span>
       <div className="flex-1 text-sm font-semibold text-app-text">{label}</div>
       <div className="flex shrink-0 items-center gap-1.5">
@@ -167,8 +168,8 @@ function CustomRows({
         onChange={(refundPctAfter) => onChange({ ...value, refundPctAfter })}
       />
       <div className="flex items-center gap-3 border-b border-app-border-subtle px-4 py-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
-          <Lock className="h-4 w-4" aria-hidden />
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
+          <Lock className="h-[15px] w-[15px]" aria-hidden />
         </span>
         <div className="flex-1 text-sm font-semibold text-app-text">
           Deposit is non-refundable
@@ -199,9 +200,19 @@ function CustomRows({
           />
         </button>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
-          <UserX className="h-4 w-4" aria-hidden />
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            ...value,
+            noShow:
+              value.noShow === "charge_full" ? "no_charge" : "charge_full",
+          })
+        }
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-app-hover"
+      >
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-strong">
+          <UserX className="h-[15px] w-[15px]" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-app-text">
@@ -211,20 +222,8 @@ function CustomRows({
             {value.noShow === "charge_full" ? "Charge full price" : "No charge"}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            onChange({
-              ...value,
-              noShow:
-                value.noShow === "charge_full" ? "no_charge" : "charge_full",
-            })
-          }
-          className="shrink-0 rounded-full border border-app-border px-3 py-1 text-xs font-bold text-app-text-strong transition hover:bg-app-hover"
-        >
-          {value.noShow === "charge_full" ? "Charge full" : "No charge"}
-        </button>
-      </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden />
+      </button>
     </Card>
   );
 }

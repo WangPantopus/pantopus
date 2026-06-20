@@ -22,9 +22,13 @@ import HomeAgenda from "./HomeAgenda";
 export default function PermissionGate({
   homeId,
   currentUserId,
+  accessRequested,
+  onRequestAccess,
 }: {
   homeId: string;
   currentUserId: string | null;
+  accessRequested?: boolean;
+  onRequestAccess?: () => void;
 }) {
   const router = useRouter();
   const { access, loading, can } = useHomePermissions();
@@ -66,6 +70,8 @@ export default function PermissionGate({
         homeId={homeId}
         canEdit={false}
         currentUserId={currentUserId}
+        accessRequested={accessRequested}
+        onRequestAccess={onRequestAccess}
       />
     );
   }

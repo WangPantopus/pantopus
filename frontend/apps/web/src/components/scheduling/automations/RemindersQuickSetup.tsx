@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { Bell, Check, CheckCircle2, Circle, Mail, Plus, X } from "lucide-react";
+import { Bell, BellOff, Check, CheckCircle2, Circle, Mail, Plus, X } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
   NotificationPreferences,
@@ -51,6 +51,24 @@ export default function RemindersQuickSetup() {
   const [phase, setPhase] = useState<"loading" | "error" | "ready">("loading");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Push-permission gate (Frame 4): read browser Notification.permission.
+  // 'denied' means user has blocked push; 'default' means not yet asked.
+  // 'granted' = no banner. Undefined when API is not available (SSR/non-browser).
+  const [pushOff, setPushOff] = useState(false);
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      setPushOff(Notification.permission === "denied");
+    }
+  }, []);
+
+  const requestPush = () => {
+    if (typeof Notification === "undefined") return;
+    void Notification.requestPermission().then((perm) => {
+      setPushOff(perm === "denied");
+    });
+  };
 
   const [adding, setAdding] = useState(false);
   const [customValue, setCustomValue] = useState("");
@@ -170,6 +188,26 @@ export default function RemindersQuickSetup() {
         Pick the lead-times that attach to every event you own. We pre-picked
         the two most people keep — change them anytime.
       </p>
+
+      {/* Frame 4 — push-permission gated banner */}
+      {pushOff && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-app-warning-light bg-app-warning-bg px-3 py-3">
+          <BellOff
+            className="h-4 w-4 shrink-0 text-app-warning"
+            aria-hidden
+          />
+          <span className="flex-1 text-[11.5px] font-semibold leading-[15px] text-app-warning">
+            Push is off in your browser settings. Email still works.
+          </span>
+          <button
+            type="button"
+            onClick={requestPush}
+            className="shrink-0 text-[11.5px] font-bold text-app-info"
+          >
+            Enable
+          </button>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-app-border bg-app-surface">
         <div className="divide-y divide-app-border-subtle">

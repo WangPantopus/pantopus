@@ -81,61 +81,6 @@ export default function RosterSeats({
         </div>
       </div>
 
-      {/* Host controls */}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {onMessageAll && (
-          <button
-            type="button"
-            onClick={onMessageAll}
-            disabled={seated.length === 0}
-            className={clsx(
-              "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
-              tk.bg,
-              tk.textOn,
-            )}
-          >
-            <Megaphone className="h-4 w-4" aria-hidden />
-            Message all
-          </button>
-        )}
-        {onAddAttendee && (
-          <button
-            type="button"
-            onClick={onAddAttendee}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border bg-app-surface px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-hover"
-          >
-            <UserPlus className="h-4 w-4" aria-hidden />
-            Add attendee
-          </button>
-        )}
-        {onAdjustCapacity && (
-          <div className="ml-auto flex items-center gap-2 rounded-lg border border-app-border bg-app-surface px-3 py-1.5">
-            <span className="text-xs font-semibold text-app-text-secondary">
-              Capacity
-            </span>
-            <button
-              type="button"
-              aria-label="Decrease capacity"
-              onClick={() => onAdjustCapacity(Math.max(1, capacity.total - 1))}
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-app-border text-app-text-secondary hover:bg-app-hover"
-            >
-              <Minus className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            <span className="min-w-[1.5rem] text-center text-sm font-bold tabular-nums text-app-text">
-              {capacity.total}
-            </span>
-            <button
-              type="button"
-              aria-label="Increase capacity"
-              onClick={() => onAdjustCapacity(capacity.total + 1)}
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-app-border text-app-text-secondary hover:bg-app-hover"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Seated */}
       <div>
         <SectionOverline className="mb-2">
@@ -219,6 +164,73 @@ export default function RosterSeats({
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {/* Host controls — at bottom per design order (CapacityHeader → Seated → Waitlist → HostControls) */}
+      {(onAddAttendee || onAdjustCapacity || onMessageAll) && (
+        <div className="flex flex-col gap-2">
+          {onMessageAll && (
+            <button
+              type="button"
+              onClick={onMessageAll}
+              disabled={seated.length === 0}
+              className={clsx(
+                "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+                tk.bg,
+                tk.textOn,
+              )}
+            >
+              <Megaphone className="h-4 w-4" aria-hidden />
+              Message all
+            </button>
+          )}
+          {onAddAttendee && (
+            <button
+              type="button"
+              onClick={onAddAttendee}
+              className="flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-3.5 py-3 text-left transition hover:bg-app-hover"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                <UserPlus className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="flex-1 text-sm font-semibold text-app-text">
+                Add or invite attendee
+              </span>
+              <svg className="h-4 w-4 text-app-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          )}
+          {onAdjustCapacity && (
+            <div className="flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-3.5 py-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-app-surface-sunken text-app-text-secondary">
+                <Users className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="flex-1 text-sm font-semibold text-app-text">
+                Capacity
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Decrease capacity"
+                  onClick={() => onAdjustCapacity(Math.max(1, capacity.total - 1))}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-app-border text-app-text-secondary hover:bg-app-hover"
+                >
+                  <Minus className="h-3.5 w-3.5" aria-hidden />
+                </button>
+                <span className="min-w-[1.5rem] text-center text-sm font-bold tabular-nums text-app-text">
+                  {capacity.total}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Increase capacity"
+                  onClick={() => onAdjustCapacity(capacity.total + 1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-app-border text-app-text-secondary hover:bg-app-hover"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

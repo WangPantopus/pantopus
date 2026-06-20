@@ -6,13 +6,13 @@
 // share targets. Functional chrome stays sky; the pillar chip marks the owner.
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Briefcase,
   CalendarClock,
   CalendarPlus,
   Check,
   CircleAlert,
+  ClipboardList,
   Copy,
   Link as LinkIcon,
   Mail,
@@ -87,6 +87,7 @@ export default function OneOffGenerator() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [expiresMin, setExpiresMin] = useState<string>(String(7 * 24 * 60));
   const [singleUse, setSingleUse] = useState(true);
+  const [askIntake, setAskIntake] = useState(false);
   const [offerTimes, setOfferTimes] = useState(false);
   const [slots, setSlots] = useState<OfferedSlot[]>([]);
 
@@ -379,6 +380,31 @@ export default function OneOffGenerator() {
         </div>
       </section>
 
+      {genError && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-app-error/40 bg-app-error-bg p-3">
+          <CircleAlert
+            className="mt-0.5 h-4 w-4 shrink-0 text-app-error"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-app-error">
+              Couldn&apos;t create the link. Try again.
+            </p>
+            <p className="mt-0.5 text-xs text-app-error/90">
+              Your settings are saved — nothing was lost.
+            </p>
+            <button
+              type="button"
+              onClick={generate}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-app-error"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
       <section>
         <SectionLabel>Availability</SectionLabel>
         <Card className="p-0">
@@ -483,50 +509,33 @@ export default function OneOffGenerator() {
             </div>
             <Toggle on={singleUse} onChange={setSingleUse} label="Single use" />
           </div>
-          <Link
-            href="/app/scheduling/event-types"
-            className="flex items-center gap-3 p-3 hover:bg-app-hover"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
-              <CalendarClock className="h-4 w-4" aria-hidden />
+          <div className="flex items-center gap-3 p-3">
+            <span
+              className={clsx(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                askIntake
+                  ? "bg-primary-50 text-primary-600"
+                  : "bg-app-surface-sunken text-app-text-muted",
+              )}
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-app-text-strong">
-                Intake questions
+                Ask intake questions
               </p>
               <p className="mt-0.5 text-xs text-app-text-secondary">
-                Uses this service&apos;s questions.
+                Collect details before they book.
               </p>
             </div>
-            <span className="text-xs font-semibold text-primary-600">Edit</span>
-          </Link>
+            <Toggle
+              on={askIntake}
+              onChange={setAskIntake}
+              label="Ask intake questions"
+            />
+          </div>
         </Card>
       </section>
-
-      {genError && (
-        <div className="flex items-start gap-2.5 rounded-2xl border border-app-error/40 bg-app-error-bg p-3">
-          <CircleAlert
-            className="mt-0.5 h-4 w-4 shrink-0 text-app-error"
-            aria-hidden
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-app-error">
-              Couldn&apos;t create the link. Try again.
-            </p>
-            <p className="mt-0.5 text-xs text-app-error/90">
-              Your settings are saved — nothing was lost.
-            </p>
-            <button
-              type="button"
-              onClick={generate}
-              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-app-error"
-            >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-              Try again
-            </button>
-          </div>
-        </div>
-      )}
 
       <button
         type="button"

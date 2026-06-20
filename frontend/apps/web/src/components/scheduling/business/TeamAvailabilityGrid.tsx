@@ -105,7 +105,7 @@ function MemberRow({
               </Chip>
             ) : (
               <Chip tone="neutral" icon={Building2}>
-                Inactive seat
+                Business hours
               </Chip>
             )}
           </span>

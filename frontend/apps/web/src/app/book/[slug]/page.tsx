@@ -111,6 +111,7 @@ export default async function PublicBookingLandingPage({
         pageUrl={buildBookingPageUrl(slug)}
         appUrl={buildBookingPageAppUrl(slug)}
         fallbackUrl={fallbackUrl}
+        showAppBanner={!isPaused && eventTypes.length > 1}
       />
 
       {isPaused ? (
@@ -130,7 +131,7 @@ export default async function PublicBookingLandingPage({
         <EventTypeMenu slug={slug} eventTypes={eventTypes} pillar={pillar} />
       )}
 
-      <PublicBookingFooter />
+      <PublicBookingFooter name={name} />
     </div>
   );
 }

@@ -30,6 +30,12 @@ interface BookerProfileHeaderProps {
   appUrl: string;
   /** Store download fallback (resolved from the request UA). */
   fallbackUrl: string | null;
+  /**
+   * Whether to show the open-in-app banner. Design restricts it to multi-type
+   * landing pages only (FrameMulti) — single, paused, empty, loading, and error
+   * frames all omit it.
+   */
+  showAppBanner?: boolean;
 }
 
 export default function BookerProfileHeader({
@@ -39,6 +45,7 @@ export default function BookerProfileHeader({
   pageUrl,
   appUrl,
   fallbackUrl,
+  showAppBanner = false,
 }: BookerProfileHeaderProps) {
   const tk = pillarTokens(pillar);
   const [shareOpen, setShareOpen] = useState(false);
@@ -118,7 +125,7 @@ export default function BookerProfileHeader({
         </div>
       </div>
 
-      {appBannerOpen && (
+      {showAppBanner && appBannerOpen && (
         <div className="mx-4 mt-3 flex items-center gap-2.5 rounded-2xl border border-app-info-light bg-app-info-bg px-3 py-2.5">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-app-surface text-app-info">
             <Smartphone className="h-4 w-4" aria-hidden />

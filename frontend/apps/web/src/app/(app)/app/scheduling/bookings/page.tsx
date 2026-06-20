@@ -14,6 +14,7 @@ import {
   Inbox as InboxIcon,
   Link2,
   Search,
+  UserCheck,
   X,
 } from "lucide-react";
 import clsx from "clsx";
@@ -26,6 +27,7 @@ import { decodeError } from "@/components/scheduling/decodeError";
 import {
   pillarForOwner,
   pillarTokens,
+  PRIMARY_BLUE_CLS,
   type Pillar,
 } from "@/components/scheduling/pillarTokens";
 import BookingRow, {
@@ -239,7 +241,14 @@ export default function BookingsInboxPage() {
         : []
       : groupBookings(displayRows, (r) => r.booking.start_at, tz, past);
 
-  const tabOptions = TABS.map((t) => ({
+  // hidePending: design Frame 8 hides the Pending segment when the owner has
+  // only auto-confirm event types. TODO: derive from event-type config once
+  // the API exposes an auto_confirm flag per owner. For now always false.
+  const hidePending = false;
+
+  const tabOptions = TABS.filter(
+    (t) => !(hidePending && t.key === "pending"),
+  ).map((t) => ({
     key: t.key,
     label: t.label,
     badge: t.key === "pending" ? pendingCount : undefined,
@@ -301,6 +310,19 @@ export default function BookingsInboxPage() {
           </div>
         )}
 
+        {/* MemberBanner — shown when viewer is a member (Frame 9).
+            TODO: wire isMember from API owner role once backend provides it.
+            Currently no viewer_role field exists on SchedulingOwnerRef.
+            Scaffold is present so it renders immediately once field is added. */}
+        {false /* isMember */ && (
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-app-info-light bg-app-info-bg px-3 py-2.5">
+            <UserCheck className="h-4 w-4 shrink-0 text-app-info" aria-hidden />
+            <span className="text-[11px] font-semibold leading-[15px] text-app-text-secondary">
+              You&apos;re seeing bookings assigned to you
+            </span>
+          </div>
+        )}
+
         <div className="mt-3">
           <SegmentedTabs
             options={tabOptions}
@@ -358,13 +380,14 @@ export default function BookingsInboxPage() {
         </div>
       )}
 
-      {/* Share-link FAB */}
+      {/* Share-link FAB — fixed PRIMARY blue regardless of active scope */}
       <button
         type="button"
         onClick={() => setShareOpen(true)}
         className={clsx(
           "fixed bottom-6 right-6 z-30 inline-flex h-12 items-center gap-2 rounded-full px-5 text-sm font-bold shadow-lg transition",
-          tk ? clsx(tk.bg, tk.textOn) : "bg-primary-600 text-white",
+          PRIMARY_BLUE_CLS.bg,
+          PRIMARY_BLUE_CLS.textOn,
         )}
       >
         <Link2 className="h-4 w-4" strokeWidth={2.4} aria-hidden />

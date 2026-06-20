@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { Bell, Lock, Plus, Workflow as WorkflowIcon } from "lucide-react";
+import { Bell, CloudOff, Lock, Plus, Workflow as WorkflowIcon } from "lucide-react";
 import * as api from "@pantopus/api";
 import type { EventType, Workflow } from "@pantopus/types";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
@@ -20,7 +20,6 @@ import {
 import { decodeError } from "@/components/scheduling/decodeError";
 import { toast } from "@/components/ui/toast-store";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
-import ErrorState from "@/components/ui/ErrorState";
 import {
   Card,
   Chip,
@@ -222,14 +221,11 @@ export default function WorkflowList() {
         )}
 
         {phase === "error" && (
-          <ErrorState
-            message="Couldn't load workflows."
-            onRetry={() => void load()}
-          />
+          <WorkflowsErrorCard onRetry={() => void load()} />
         )}
 
         {phase === "ready" && gated && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl border border-app-warning-bg bg-app-warning-bg px-3 py-2.5">
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-app-warning-light bg-app-warning-bg px-3 py-2.5">
             <Lock className="h-4 w-4 shrink-0 text-app-warning" aria-hidden />
             <span className="text-[12px] font-semibold text-app-warning">
               Only admins can edit these workflows.
@@ -264,6 +260,30 @@ export default function WorkflowList() {
           </Card>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * H2 Frame 4 — error card: bordered white card, cloud-off icon halo,
+ * correct headline, filled-sky "Try again" button (no icon, no border).
+ */
+function WorkflowsErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-[22px] text-center shadow-sm">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-app-surface-sunken text-app-text-secondary">
+        <CloudOff className="h-[23px] w-[23px]" aria-hidden />
+      </span>
+      <p className="text-[13.5px] font-bold text-app-text">
+        Couldn&rsquo;t load workflows
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="h-[38px] rounded-[10px] bg-app-info px-[18px] text-[12.5px] font-bold text-white transition hover:opacity-90"
+      >
+        Try again
+      </button>
     </div>
   );
 }

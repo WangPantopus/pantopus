@@ -17,7 +17,9 @@ import { confirmStore } from "@/components/ui/confirm-store";
 import { ownerFromQuery } from "@/components/scheduling/bookings/owners";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
-import WaitlistManager from "@/components/scheduling/bookings-extras/WaitlistManager";
+import WaitlistManager, {
+  type WaitlistCapacity,
+} from "@/components/scheduling/bookings-extras/WaitlistManager";
 import WaitlistJoinSheet from "@/components/scheduling/bookings-extras/WaitlistJoinSheet";
 import {
   FilterChip,
@@ -100,6 +102,23 @@ export default function WaitlistPage() {
   }, [selectedId, loadWaitlist]);
 
   const selected = eventTypes.find((e) => e.id === selectedId) ?? null;
+
+  // Derive capacity for the WaitlistManager header card.
+  const waitingCount = waitlist.filter((w) => w.status === "waiting").length;
+  const seatCap = selected?.seat_cap ?? 0;
+  // Filled = all waitlist entries that are NOT in "waiting" status (promoted/confirmed).
+  // Without a booking count in scope, use seat_cap - waiting as an approximation.
+  const filledCount = Math.max(0, seatCap - waitingCount);
+  const wlCapacity: WaitlistCapacity | null =
+    seatCap > 0
+      ? {
+          filled: filledCount,
+          total: seatCap,
+          pct: seatCap > 0 ? Math.min(100, Math.round((filledCount / seatCap) * 100)) : 0,
+          full: filledCount >= seatCap,
+          waiting: waitingCount,
+        }
+      : null;
 
   const promote = async (entry: WaitlistEntry) => {
     const ok = await confirmStore.open({
@@ -225,6 +244,7 @@ export default function WaitlistPage() {
               waitlist={waitlist}
               promotingId={promotingId}
               onPromote={promote}
+              capacity={wlCapacity}
             />
           )}
         </>

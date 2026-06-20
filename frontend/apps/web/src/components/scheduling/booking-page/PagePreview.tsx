@@ -7,6 +7,7 @@
 // the live public flow (book/[slug]) belongs to W5/W6/W7.
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -22,6 +23,7 @@ import {
   Phone,
   RefreshCw,
   Video,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
@@ -57,6 +59,7 @@ function modeMeta(et: PublicEventType): { icon: LucideIcon; label: string } {
 export default function PagePreview() {
   const owner = useSchedulingOwner();
   const pillar = pillarForOwner(owner.ownerType);
+  const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [slug, setSlug] = useState<string>("");
@@ -137,7 +140,10 @@ export default function PagePreview() {
         )}
       </div>
 
-      <PreviewFrame showCta={phase === "ready" && !paused && !hidden}>
+      <PreviewFrame
+        showCta={phase === "ready" && !paused && !hidden}
+        onDismiss={() => router.back()}
+      >
         {phase === "loading" && <PreviewSkeleton />}
 
         {phase === "draft" && (
@@ -205,20 +211,33 @@ export default function PagePreview() {
 function PreviewFrame({
   children,
   showCta,
+  onDismiss,
 }: {
   children: React.ReactNode;
   showCta: boolean;
+  onDismiss?: () => void;
 }) {
   return (
     <div className="mx-auto w-full max-w-[360px]">
       <div className="overflow-hidden rounded-[28px] border border-app-border bg-app shadow-xl">
-        {/* dark preview bar */}
-        <div className="bg-app-text-strong px-4 py-3">
+        {/* dark preview bar — bg-app-text = #111827 (fg1) per design */}
+        <div className="bg-app-text px-4 py-3">
           <div className="flex items-center gap-2 text-app-text-inverse">
-            <Eye className="h-4 w-4" aria-hidden />
-            <span className="text-sm font-semibold">
+            <Eye className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="flex-1 text-sm font-semibold">
               Previewing your booking page
             </span>
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                aria-label="Exit preview"
+                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full"
+                style={{ background: "rgba(255,255,255,0.12)" }}
+              >
+                <X className="h-[15px] w-[15px]" strokeWidth={2.4} aria-hidden />
+              </button>
+            )}
           </div>
         </div>
         {/* preview-only caption */}
@@ -308,6 +327,7 @@ function EventTypeCard({
   selected?: boolean;
 }) {
   const { icon: Icon, label } = modeMeta(et);
+  const ModeIcon = Icon;
   return (
     <div
       className={clsx(
@@ -337,6 +357,7 @@ function EventTypeCard({
             {et.default_duration} min
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-700">
+            <ModeIcon className="h-2.5 w-2.5" aria-hidden />
             {label}
           </span>
         </div>

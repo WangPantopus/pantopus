@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CalendarDays } from "lucide-react";
+import { ArrowLeft, CalendarDays, CloudOff, RotateCw } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
   BookingAttendee,
@@ -17,7 +17,6 @@ import type {
   WaitlistEntry,
 } from "@pantopus/types";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
-import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
 import {
   ownerFromQuery,
@@ -171,7 +170,27 @@ export default function RosterPage() {
       )}
 
       {phase === "error" && (
-        <ErrorState message="We couldn't load the roster." onRetry={load} />
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-app-error-bg text-app-error">
+            <CloudOff className="h-8 w-8" strokeWidth={1.8} aria-hidden />
+          </span>
+          <div>
+            <h3 className="text-base font-bold text-app-text">
+              Couldn&apos;t load the roster
+            </h3>
+            <p className="mt-1.5 max-w-xs text-sm text-app-text-secondary">
+              Check your connection and try again.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            className="inline-flex items-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-hover"
+          >
+            <RotateCw className="h-4 w-4" aria-hidden />
+            Try again
+          </button>
+        </div>
       )}
 
       {phase === "ready" && !isGroup && (
@@ -206,6 +225,15 @@ export default function RosterPage() {
           onPromote={promote}
           onMessageAll={() => setNudgeOpen(true)}
           onAdjustCapacity={adjustCapacity}
+          onAddAttendee={() => {
+            // Navigate to the manual booking wizard pre-scoped to this event type.
+            // The manual booking wizard (E12) handles the full invite flow.
+            router.push(
+              `/app/scheduling/manual?et=${detail.booking.event_type_id ?? ""}&${
+                ownerQueryString(owner).replace(/^\?/, "")
+              }`,
+            );
+          }}
         />
       )}
 

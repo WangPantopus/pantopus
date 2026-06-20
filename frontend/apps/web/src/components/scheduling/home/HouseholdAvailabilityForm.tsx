@@ -30,13 +30,11 @@ import { decodeError } from "@/components/scheduling/decodeError";
 type ToggleKey =
   | "home_share_free_busy"
   | "home_round_robin"
-  | "home_quiet_hours"
   | "home_auto_decline";
 
 const DEFAULTS: Record<ToggleKey, boolean> = {
   home_share_free_busy: true,
   home_round_robin: true,
-  home_quiet_hours: false,
   home_auto_decline: false,
 };
 
@@ -181,29 +179,31 @@ export default function HouseholdAvailabilityForm({
         </>
       )}
 
-      {/* source deep-link */}
-      <div>
-        <SectionLabel>Source</SectionLabel>
-        <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <button
-            onClick={() => router.push("/app/scheduling/availability")}
-            className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-app-info-light bg-app-info-bg text-app-info">
-              <Calendar className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-semibold text-app-text">
-                Edit my full availability in Personal
+      {/* source deep-link — only shown when personal availability is set up */}
+      {!notSetUp && (
+        <div>
+          <SectionLabel>Source</SectionLabel>
+          <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <button
+              onClick={() => router.push("/app/scheduling/availability")}
+              className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-app-info-light bg-app-info-bg text-app-info">
+                <Calendar className="h-4 w-4" />
               </div>
-              <div className="mt-0.5 text-[10.5px] leading-[14px] text-app-text-secondary">
-                Your source of truth — changes apply everywhere
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-app-text">
+                  Edit my full availability in Personal
+                </div>
+                <div className="mt-0.5 text-[10.5px] leading-[14px] text-app-text-secondary">
+                  Your source of truth — changes apply everywhere
+                </div>
               </div>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" />
-          </button>
+              <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* exposure toggles */}
       <div>
@@ -228,14 +228,13 @@ export default function HouseholdAvailabilityForm({
             saving={savingKey === "home_round_robin"}
             onToggle={() => onToggle("home_round_robin")}
           />
-          <ToggleRow
-            icon={<Moon className="h-4 w-4" />}
-            label="Mute reminders during household quiet hours"
-            on={valueOf("home_quiet_hours")}
-            disabled={notSetUp}
-            saving={savingKey === "home_quiet_hours"}
-            onToggle={() => onToggle("home_quiet_hours")}
-          />
+          {!notSetUp && (
+            <DisclosureRow
+              icon={<Moon className="h-4 w-4" />}
+              label="Household quiet hours"
+              value="Weeknights 9 PM"
+            />
+          )}
           <ToggleRow
             icon={<CalendarX className="h-4 w-4" />}
             label="Auto-decline conflicting invites"
@@ -331,6 +330,41 @@ function ToggleRow({
           />
         </button>
       )}
+    </div>
+  );
+}
+
+/** DisclosureRow — navigation row with icon, label, value text, and chevron.
+ *  Design: availability-settings-frames.jsx DisclosureRow (lines 52-60). */
+function DisclosureRow({
+  icon,
+  label,
+  value,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 border-t border-app-border px-3.5 py-3 ${
+        disabled ? "opacity-50" : "cursor-pointer"
+      }`}
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1 text-[12.5px] font-semibold text-app-text">
+        {label}
+      </div>
+      {value && (
+        <span className="text-[11.5px] font-medium text-app-text-secondary">
+          {value}
+        </span>
+      )}
+      <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" />
     </div>
   );
 }

@@ -1,18 +1,18 @@
 "use client";
 
-// W17 · H9 — Insights Dashboard. The reporting home: period-scoped KPIs +
-// booking-volume trend + top event types, plus a live snapshot (upcoming /
-// pending / next booking) and quick links into the detail reports. Read-only;
-// every number derives from GET /bookings/summary, GET /bookings (range), the
-// event-type list, and GET /bookings/insights/no-shows.
+// W17 · H9 — Insights Dashboard. The reporting home: period-scoped KPIs
+// (aligned to iOS/Android: This month / Upcoming / Completion / No-show) +
+// booking-volume trend + top event types + quick links into the detail reports.
+// Read-only; every number derives from GET /bookings/summary, GET /bookings
+// (range), the event-type list, and GET /bookings/insights/no-shows.
 
 import { useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BarChart3,
   CalendarClock,
-  CheckCircle2,
-  Inbox,
+  Share2,
   TrendingUp,
   UserX,
   Users,
@@ -39,7 +39,6 @@ import {
 import { bookingListParams, bookingRange, insightsDays } from "./filters";
 import {
   formatCount,
-  formatDateTimeShort,
   formatRangeLabel,
   formatRate,
 } from "./format";
@@ -125,17 +124,25 @@ export default function InsightsDashboard() {
   const noShowRate = data.noShow?.noShowRate ?? summaryRange.noShowRate;
   const noShowCount = data.noShow?.noShowCount ?? summaryRange.noShow;
 
-  const liveTotal =
-    (data.summary.upcomingCount ?? 0) + (data.summary.pendingCount ?? 0);
+  const upcomingCount = data.summary.upcomingCount ?? 0;
+  const liveTotal = upcomingCount + (data.summary.pendingCount ?? 0);
 
   if (summaryRange.total === 0 && liveTotal === 0) {
     return (
       <EmptyReport
-        icon={TrendingUp}
-        title="No data for this period yet"
-        body="Once you start taking bookings, your volume, outcomes and no-show trends will show up here."
+        icon={BarChart3}
+        title="Not enough data yet"
+        body="Insights appear once you have a few bookings. Share your link to get started."
         pillar={pillar}
-      />
+      >
+        <Link
+          href="/app/scheduling/booking-page"
+          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text-strong shadow-sm hover:bg-app-hover"
+        >
+          <Share2 className="h-4 w-4" aria-hidden />
+          Share your booking link
+        </Link>
+      </EmptyReport>
     );
   }
 
@@ -151,77 +158,33 @@ export default function InsightsDashboard() {
         : undefined,
   }));
 
-  const next = data.summary.nextBooking;
-
   return (
     <div className="space-y-4">
+      {/* KPIs matching iOS/Android: This month · Upcoming · Completion · No-show */}
       <KpiGrid>
         <KpiTile
-          value={formatCount(summaryRange.total)}
-          label="Bookings"
-          hint="in this period"
+          value={formatCount(data.summary.totalThisMonth)}
+          label="This month"
+          hint="bookings"
         />
         <KpiTile
-          value={formatCount(summaryRange.completed)}
-          label="Completed"
-          hint={`${formatRate(summaryRange.completionRate)} completion`}
+          value={formatCount(upcomingCount)}
+          label="Upcoming"
+          hint="confirmed"
+        />
+        <KpiTile
+          value={formatRate(summaryRange.completionRate)}
+          label="Completion"
+          hint={`${formatCount(summaryRange.completed)} completed`}
           tone="success"
         />
         <KpiTile
-          value={formatCount(summaryRange.cancelled)}
-          label="Cancelled"
-          hint={`${formatRate(summaryRange.cancellationRate)} of bookings`}
-          tone="warning"
-        />
-        <KpiTile
           value={formatRate(noShowRate)}
-          label="No-show rate"
+          label="No-show"
           hint={`${formatCount(noShowCount)} no-shows`}
           tone="error"
         />
       </KpiGrid>
-
-      {/* Live snapshot */}
-      <Card title="Right now" icon={Inbox} accentClass={tk.text}>
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-          <div>
-            <p className="text-[22px] font-bold tabular-nums text-app-text">
-              {formatCount(data.summary.upcomingCount ?? 0)}
-            </p>
-            <p className="text-[12px] font-semibold text-app-text-secondary">
-              Upcoming
-            </p>
-          </div>
-          <div>
-            <p className="text-[22px] font-bold tabular-nums text-app-text">
-              {formatCount(data.summary.pendingCount ?? 0)}
-            </p>
-            <p className="text-[12px] font-semibold text-app-text-secondary">
-              Pending
-            </p>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-app-text-muted">
-              Next booking
-            </p>
-            {next?.start_at ? (
-              <p className="truncate text-[13.5px] font-semibold text-app-text">
-                {formatDateTimeShort(next.start_at, filters.tz)}
-                {next.invitee_name ? (
-                  <span className="text-app-text-secondary">
-                    {" · "}
-                    {next.invitee_name}
-                  </span>
-                ) : null}
-              </p>
-            ) : (
-              <p className="text-[13.5px] text-app-text-muted">
-                Nothing scheduled
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
 
       {/* Volume trend */}
       <Card
@@ -272,7 +235,7 @@ export default function InsightsDashboard() {
         )}
       </Card>
 
-      {/* Report links */}
+      {/* Report links — mirror iOS/Android: no-show always + team for business only */}
       <div className="grid gap-3 sm:grid-cols-2">
         <Link
           href={`${INSIGHTS}/no-shows${suffix}`}
@@ -283,7 +246,7 @@ export default function InsightsDashboard() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-app-text">
-              No-shows & cancellations
+              No-show & cancellation report
             </span>
             <span className="block text-xs text-app-text-secondary">
               {formatRate(noShowRate)} no-show ·{" "}
@@ -296,7 +259,7 @@ export default function InsightsDashboard() {
           />
         </Link>
 
-        {isBusinessOwner(owner) ? (
+        {isBusinessOwner(owner) && (
           <Link
             href={`${INSIGHTS}/team${suffix}`}
             className="group flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm hover:bg-app-hover"
@@ -309,28 +272,7 @@ export default function InsightsDashboard() {
                 Team performance
               </span>
               <span className="block text-xs text-app-text-secondary">
-                Bookings, revenue & no-shows by member
-              </span>
-            </span>
-            <ArrowRight
-              className="h-4 w-4 shrink-0 text-app-text-muted group-hover:text-app-text"
-              aria-hidden
-            />
-          </Link>
-        ) : (
-          <Link
-            href={`${INSIGHTS}/event-types${suffix}`}
-            className="group flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm hover:bg-app-hover"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-info-bg text-app-info">
-              <CheckCircle2 className="h-5 w-5" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-app-text">
-                Per-event-type performance
-              </span>
-              <span className="block text-xs text-app-text-secondary">
-                Volume, completion & no-show by type
+                Bookings &amp; no-shows by member
               </span>
             </span>
             <ArrowRight

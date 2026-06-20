@@ -5,8 +5,8 @@
 // supplies the chrome (a BottomSheet for the calendar FAB, or a page shell for
 // the /events/new route). Create → POST, edit → partial PUT.
 
-import { useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Check, Loader2, WifiOff } from "lucide-react";
 import type { HomeCalendarUnionEvent } from "@pantopus/types";
 import { confirmStore } from "@/components/ui/confirm-store";
 import { decodeError, fieldErrors } from "@/components/scheduling/decodeError";
@@ -80,6 +80,19 @@ export default function AddEditEventForm({
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   // Snapshot of the initial values, captured once, to detect unsaved edits.
   const initialRef = useRef({
@@ -234,7 +247,29 @@ export default function AddEditEventForm({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-auto p-3.5">
+      {/* body wrapper — relative so the saving overlay can be absolutely positioned */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* dimmed content when saving */}
+        <div
+          className={`h-full overflow-auto transition-opacity ${
+            saving ? "pointer-events-none opacity-[0.45]" : "opacity-100"
+          }`}
+        >
+          <div className="space-y-3 p-3.5">
+        {!isOnline && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <div className="text-[12px] font-bold text-amber-800">
+                You&apos;re offline
+              </div>
+              <div className="mt-0.5 text-[11.5px] leading-[15px] text-amber-700">
+                This event saves when you reconnect.
+              </div>
+            </div>
+          </div>
+        )}
+
         {formError && (
           <div className="flex items-start gap-2 rounded-xl border border-app-error/30 bg-app-error-bg px-3 py-2.5 text-[12px] text-app-error">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -435,7 +470,21 @@ export default function AddEditEventForm({
             className="w-full resize-none rounded-lg border border-app-border bg-app-surface px-3 py-2 text-[13px] text-app-text outline-none placeholder:text-app-text-muted focus:ring-2 focus:ring-app-home/40"
           />
         </Section>
-      </div>
+          </div>{/* end space-y-3 */}
+        </div>{/* end dimmed-content wrapper */}
+
+        {/* saving overlay — centered card over dimmed content */}
+        {saving && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2.5 rounded-2xl bg-white/90 px-6 py-[18px] shadow-[0_8px_24px_rgba(0,0,0,0.1)]">
+              <Loader2 className="h-[26px] w-[26px] animate-spin text-app-home" />
+              <span className="text-[12.5px] font-semibold text-app-text-secondary">
+                Saving event
+              </span>
+            </div>
+          </div>
+        )}
+      </div>{/* end relative body wrapper */}
     </div>
   );
 }

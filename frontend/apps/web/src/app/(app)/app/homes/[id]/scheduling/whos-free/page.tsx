@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Clock,
   EyeOff,
+  Plus,
 } from "lucide-react";
 import clsx from "clsx";
 import * as api from "@pantopus/api";
@@ -158,18 +159,30 @@ export default function WhosFreePage() {
         >
           <ArrowLeft className="h-4 w-4" aria-hidden /> Calendar
         </button>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-app-home">
-              Calendarly · Household
-            </p>
-            <h1 className="mt-0.5 text-2xl font-bold text-app-text">
-              Who&apos;s free
-            </h1>
-            <p className="mt-1 text-sm text-app-text-secondary">
-              Composed from each member&apos;s personal availability.
-            </p>
-          </div>
+        <p className="text-xs font-bold uppercase tracking-wider text-app-home">
+          Calendarly · Household
+        </p>
+        {/* Title row mirrors design TopBar: title + trailing "Add" action */}
+        <div className="mt-0.5 flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-app-text">Who&apos;s free</h1>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/app/homes/${homeId}/scheduling/events/new?date=${encodeURIComponent(todayKey(tz))}`,
+              )
+            }
+            disabled={loading}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-bold text-app-home hover:bg-app-home-bg disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Add
+          </button>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-3">
+          <p className="text-sm text-app-text-secondary">
+            Composed from each member&apos;s personal availability.
+          </p>
           <button
             type="button"
             onClick={() => setTzOpen(true)}

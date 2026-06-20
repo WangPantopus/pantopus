@@ -16,8 +16,12 @@ import {
   CalendarClock,
   Check,
   ChevronLeft,
+  Link2,
   MessageCircle,
   MoreVertical,
+  RotateCcw,
+  Send,
+  TriangleAlert,
   UserCheck,
   UserX,
   X,
@@ -33,7 +37,7 @@ import { toast } from "@/components/ui/toast-store";
 import { confirmStore } from "@/components/ui/confirm-store";
 import { webFeatureFlags } from "@/lib/featureFlags";
 import { decodeError } from "@/components/scheduling/decodeError";
-import { pillarTokens } from "@/components/scheduling/pillarTokens";
+import { PRIMARY_BLUE_CLS } from "@/components/scheduling/pillarTokens";
 import BookingStatusPill from "@/components/scheduling/BookingStatusPill";
 import BookingDetailView from "@/components/scheduling/bookings/BookingDetailView";
 import ApproveDeclineSheet from "@/components/scheduling/bookings/ApproveDeclineSheet";
@@ -281,6 +285,28 @@ export default function BookingDetailPage() {
             ownerLabel={PILLAR_LABEL[pillar]}
           />
 
+          {/* Conflict banner — shown above dock when hasConflict is true.
+              TODO: wire hasConflict from API once backend provides conflict detection.
+              The scaffold is here so it renders immediately when wired. */}
+          {false /* detail.hasConflict */ && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <TriangleAlert
+                className="h-[17px] w-[17px] shrink-0 text-amber-600"
+                aria-hidden
+              />
+              <span className="flex-1 text-[11.5px] font-semibold leading-[15px] text-amber-700">
+                This overlaps another booking
+              </span>
+              <button
+                type="button"
+                className="text-[11.5px] font-bold text-amber-700"
+                onClick={() => {}}
+              >
+                View
+              </button>
+            </div>
+          )}
+
           {/* Sticky action dock */}
           <Dock>
             {booking.status === "pending" && (
@@ -345,11 +371,47 @@ export default function BookingDetailPage() {
                 </>
               )}
 
-            {booking.status === "completed" && messageHref && (
-              <DockLink tone="primary" pillar={pillar} href={messageHref}>
-                <MessageCircle className="h-4 w-4" aria-hidden />
-                Message invitee
-              </DockLink>
+            {/* Frame 3: completed → Rebook (ghost) + Follow up (primary) */}
+            {booking.status === "completed" && (
+              <>
+                <DockButton tone="ghost" onClick={() => {}}>
+                  <RotateCcw className="h-4 w-4" aria-hidden />
+                  Rebook
+                </DockButton>
+                <DockButton tone="primary" pillar={pillar} onClick={() => {}}>
+                  <Send className="h-4 w-4" aria-hidden />
+                  Follow up
+                </DockButton>
+              </>
+            )}
+
+            {/* Frame 5: no_show → Message (ghost) + Send rebook link (primary) */}
+            {booking.status === "no_show" && (
+              <>
+                {messageHref ? (
+                  <DockLink tone="ghost" href={messageHref}>
+                    <MessageCircle className="h-4 w-4" aria-hidden />
+                    Message
+                  </DockLink>
+                ) : (
+                  <DockButton tone="ghost" onClick={() => {}}>
+                    <MessageCircle className="h-4 w-4" aria-hidden />
+                    Message
+                  </DockButton>
+                )}
+                <DockButton tone="primary" pillar={pillar} onClick={() => {}}>
+                  <Link2 className="h-4 w-4" aria-hidden />
+                  Send rebook link
+                </DockButton>
+              </>
+            )}
+
+            {/* Frame 4: cancelled → Rebook this time (primary) */}
+            {booking.status === "cancelled" && (
+              <DockButton tone="primary" pillar={pillar} onClick={() => {}}>
+                <RotateCcw className="h-4 w-4" aria-hidden />
+                Rebook this time
+              </DockButton>
             )}
           </Dock>
 
@@ -392,7 +454,7 @@ export default function BookingDetailPage() {
 
 function Dock({ children }: { children: React.ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-20 mt-6 flex gap-2.5 border-t border-app-border bg-app-surface/95 py-3 backdrop-blur">
+    <div className="sticky bottom-0 z-20 mt-6 flex gap-2.5 border-t border-app-border bg-app-surface/95 py-3 backdrop-blur-md">
       {children}
     </div>
   );
@@ -400,10 +462,12 @@ function Dock({ children }: { children: React.ReactNode }) {
 
 type DockTone = "primary" | "ghost" | "ghost-danger";
 
-function dockClass(tone: DockTone, pillar?: "personal" | "home" | "business") {
+// Design spec: BtnPrimary always uses PRIMARY = E.blue600 (#0284c7),
+// never the owner-pillar accent. pillar param is accepted but not used
+// for the primary tone — kept for call-site compatibility.
+function dockClass(tone: DockTone, _pillar?: "personal" | "home" | "business") {
   if (tone === "primary") {
-    const tk = pillarTokens(pillar ?? "personal");
-    return clsx(tk.bg, tk.textOn);
+    return clsx(PRIMARY_BLUE_CLS.bg, PRIMARY_BLUE_CLS.textOn);
   }
   if (tone === "ghost-danger") {
     return "border border-app-error-light bg-app-surface text-app-error hover:bg-app-error-bg";

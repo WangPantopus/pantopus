@@ -2,8 +2,9 @@
 
 // F9 — Bookable Home Resources · List. Same ListOfRows recipe as Bills /
 // Maintenance / Pets. owner_type=home. Loaded / empty (templates) / loading /
-// error states. Each row shows an at-a-glance free/booked status derived from
-// the home bookings list (read-only — we never create booking rows).
+// error / offline states. Each row shows an at-a-glance free/booked status
+// derived from the home bookings list (read-only — we never create booking
+// rows).
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -12,6 +13,7 @@ import {
   PackageOpen,
   Plus,
   RotateCw,
+  WifiOff,
 } from "lucide-react";
 import { scheduling } from "@pantopus/api";
 import type { Booking, Resource, ResourceType } from "@pantopus/types";
@@ -25,6 +27,23 @@ type ResourceBookingRow = Booking & { resource_id?: string | null };
 export interface ResourcePrefill {
   type: ResourceType;
   name: string;
+}
+
+/** Lightweight online/offline detection — navigator.onLine + 'offline'/'online' events. */
+function useIsOnline(): boolean {
+  const [online, setOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  useEffect(() => {
+    const set = () => setOnline(navigator.onLine);
+    window.addEventListener("online", set);
+    window.addEventListener("offline", set);
+    return () => {
+      window.removeEventListener("online", set);
+      window.removeEventListener("offline", set);
+    };
+  }, []);
+  return online;
 }
 
 const TEMPLATES: {
@@ -49,6 +68,7 @@ export default function ResourceList({
   onAddResource: (prefill?: ResourcePrefill) => void;
 }) {
   const owner = useSchedulingOwner();
+  const isOnline = useIsOnline();
   const [resources, setResources] = useState<Resource[] | null>(null);
   const [bookings, setBookings] = useState<ResourceBookingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,9 +195,20 @@ export default function ResourceList({
     );
   }
 
-  // ─── Loaded ───────────────────────────────────────────────
+  // ─── Loaded (with optional offline banner + row dimming) ─────
   return (
     <div className="flex flex-col gap-2.5">
+      {!isOnline && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-app-warning/30 bg-app-warning-bg px-3 py-2.5">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-app-warning" />
+          <div className="min-w-0 text-[12px] leading-[17px] text-app-warning">
+            <div className="font-bold">You&apos;re offline</div>
+            <div className="opacity-90">
+              Showing cached resources. Availability may be out of date.
+            </div>
+          </div>
+        </div>
+      )}
       {resources.map((r) => {
         const meta = resourceTypeMeta(r.resource_type);
         const status = resourceLiveStatus(bookingsFor(r.id));
@@ -185,7 +216,7 @@ export default function ResourceList({
         return (
           <Card
             key={r.id}
-            className="!p-3"
+            className={`!p-3 ${!isOnline ? "opacity-[0.55]" : ""}`}
             onClick={() => onOpenResource(r.id)}
           >
             <div className="flex items-center gap-3">

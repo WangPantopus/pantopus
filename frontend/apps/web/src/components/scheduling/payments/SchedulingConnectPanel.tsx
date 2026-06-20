@@ -238,10 +238,18 @@ export default function SchedulingConnectPanel({
 
   if (state === "not_applicable") {
     return (
-      <InlineNote tone="info" icon={Info}>
-        Payments are managed per person. Switch to a personal or business space
-        to connect Stripe and take booking payments.
-      </InlineNote>
+      <div className="flex flex-col items-center px-6 py-16 text-center">
+        <span className="mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-violet-100 text-violet-700">
+          <Info className="h-8 w-8" aria-hidden />
+        </span>
+        <h2 className="text-base font-bold text-app-text">
+          Payments are per-person
+        </h2>
+        <p className="mt-2 max-w-xs text-sm leading-snug text-app-text-secondary">
+          Payments are managed per person. Switch to a personal or business
+          space to connect Stripe and take booking payments.
+        </p>
+      </div>
     );
   }
 

@@ -300,6 +300,7 @@ export default function BookingsSearchPage() {
           setFilters({
             q: "",
             status: "all",
+            scope: "all",
             eventTypeId: null,
             date: "all",
             from: null,

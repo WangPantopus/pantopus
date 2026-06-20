@@ -35,9 +35,8 @@ export function creditOwnerType(credit: MyPackageCredit): SchedulingOwnerType {
   return credit.BookingPackage?.owner_type ?? "business";
 }
 
-/** "3 of 5 left" / "All used". */
+/** "3 of 5 left" / "0 of N left". The 'All used' chip is rendered separately. */
 export function creditCountLabel(progress: CreditProgress): string {
-  if (progress.state === "used") return "All used";
   return `${progress.left} of ${progress.total} left`;
 }
 

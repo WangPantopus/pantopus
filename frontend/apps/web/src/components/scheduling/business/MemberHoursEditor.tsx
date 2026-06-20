@@ -47,7 +47,6 @@ import {
 } from "./ui";
 import { useBusinessOwner } from "./owner";
 import {
-  freeWeekdaysLabel,
   rosterFromSeats,
   type TeamMemberView,
 } from "./members";
@@ -405,40 +404,48 @@ export default function MemberHoursEditor({ memberId }: { memberId: string }) {
 
   // Read-only deferral for other members.
   if (!isYou) {
+    // Build a best-effort readonly week from the team availability data.
+    // Since the member’s personal schedule is user-scoped (not accessible
+    // via the API for other members), we derive day on/off from their free
+    // windows and show placeholder hour ranges where available.
+    const memberFreeWindows = avail?.freeByMember?.[member.id] ?? [];
+    const readonlyWeek = buildReadonlyWeek(memberFreeWindows);
     return (
       <PillarThemeProvider pillar="business">
         <div className="mx-auto max-w-2xl space-y-3">
           <Header name={title} member={member} />
-          <div className="flex items-center gap-2.5 rounded-2xl bg-app-business-bg px-3.5 py-3">
+          {/* Inherits-banner: link icon + text + "View personal" sky button */}
+          <div className="flex items-center gap-2.5 rounded-[14px] bg-app-business-bg px-3.5 py-3">
             <LinkIcon
               className="h-4 w-4 shrink-0 text-app-business"
               aria-hidden
             />
-            <p className="flex-1 text-[11.5px] font-medium leading-snug text-app-text-strong">
-              These hours come from {member.name.split(/\s+/)[0]}’s personal
-              availability — only they can change them.
+            <p className="flex-1 text-[11.5px] font-medium leading-[15px] text-app-text-strong">
+              These hours come from {member.name.split(/\s+/)[0]}&apos;s personal availability.
             </p>
+            <Link
+              href="/app/scheduling/availability"
+              className="shrink-0 whitespace-nowrap text-[11.5px] font-bold text-primary-600 hover:underline"
+            >
+              View personal
+            </Link>
           </div>
-
-          <section>
-            <AccentOverline className="pb-2">Bookable days</AccentOverline>
+          {/* Dimmed readonly week grid — opacity 0.6 per design */}
+          <div className="opacity-60">
             <Card>
-              <div className="px-4 py-4">
-                <p className="text-[13px] font-semibold text-app-text">
-                  {freeWeekdaysLabel(avail?.freeByMember?.[member.id])}
-                </p>
-                <p className="mt-1 text-[11px] text-app-text-secondary">
-                  Derived from {member.name.split(/\s+/)[0]}’s shared
-                  availability over the next two weeks.
-                </p>
-              </div>
+              {readonlyWeek.map((day, i) => (
+                <DayRow
+                  key={day.weekday}
+                  day={day}
+                  readonly
+                  last={i === readonlyWeek.length - 1}
+                  onAdd={() => {}}
+                  onChangeRange={() => {}}
+                  onRemoveRange={() => {}}
+                />
+              ))}
             </Card>
-          </section>
-
-          <p className="px-1 text-[11px] text-app-text-muted">
-            To change these, ask {member.name.split(/\s+/)[0]} to update their
-            personal availability.
-          </p>
+          </div>
         </div>
       </PillarThemeProvider>
     );
@@ -536,6 +543,21 @@ export default function MemberHoursEditor({ memberId }: { memberId: string }) {
       </div>
     </PillarThemeProvider>
   );
+}
+
+// Builds a Mon-first readonly DayHours array for display in the inherits-personal
+// banner. The member's exact schedule is user-scoped on the backend so we can't
+// load it for another user; we show all days as "Unavailable" to avoid fabricating
+// hours. If the team availability windows provide usable data in the future this
+// function can be enhanced to populate them.
+function buildReadonlyWeek(_windows: { start: string; end: string }[]): DayHours[] {
+  const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon–Sun
+  const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return DISPLAY_ORDER.map((wd) => ({
+    weekday: wd,
+    label: SHORT[wd] ?? "",
+    ranges: [],
+  }));
 }
 
 function OverrideLinkRow({

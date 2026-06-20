@@ -17,6 +17,7 @@ import {
   Inbox,
   LayoutGrid,
   Settings,
+  Share2,
   Users,
   Wand2,
 } from "lucide-react";
@@ -33,7 +34,6 @@ import { decodeError } from "@/components/scheduling/decodeError";
 import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
 import { confirmStore } from "@/components/ui/confirm-store";
-import SchedulingSummaryCard from "./SchedulingSummaryCard";
 import BookingLinkCard from "./BookingLinkCard";
 import AcceptingBookingsCard from "./AcceptingBookingsCard";
 import AgendaSection from "./AgendaSection";
@@ -224,7 +224,7 @@ export default function SchedulingHub() {
 
   return (
     <PillarThemeProvider pillar={pillar}>
-      <div className="space-y-5">
+      <div className="relative space-y-5 pb-24">
         {Header}
 
         {showUnavailable ? (
@@ -251,11 +251,6 @@ export default function SchedulingHub() {
           />
         ) : (
           <>
-            <SchedulingSummaryCard
-              owner={owner!}
-              pillar={pillar}
-              onShare={() => router.push(`${BASE}/booking-page`)}
-            />
             <BookingLinkCard
               page={page}
               pillar={pillar}
@@ -277,10 +272,47 @@ export default function SchedulingHub() {
               paused={page.is_paused}
             />
             <ManageRows items={manageItems} />
+            {/* pinned footer CTA — matches design FooterCTA; pb-28 on wrapper accounts for this */}
+            <HubFooterCTA
+              pillar={pillar}
+              paused={page.is_paused}
+              onShare={() => router.push(`${BASE}/booking-page`)}
+              onResume={() => handleTogglePause(false)}
+            />
           </>
         )}
       </div>
     </PillarThemeProvider>
+  );
+}
+
+/** A1 design FooterCTA — pillar-accented, pinned to bottom of the hub scroll area. */
+function HubFooterCTA({
+  pillar,
+  paused,
+  onShare,
+  onResume,
+}: {
+  pillar: Pillar;
+  paused: boolean;
+  onShare: () => void;
+  onResume: () => void;
+}) {
+  const tk = pillarTokens(pillar);
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-app-border bg-white/90 px-4 pb-6 pt-3 backdrop-blur-md">
+      <button
+        type="button"
+        onClick={paused ? onResume : onShare}
+        className={clsx(
+          "flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14.5px] font-bold text-white shadow-lg",
+          tk.bg,
+        )}
+      >
+        <Share2 className="h-[17px] w-[17px]" strokeWidth={2.2} aria-hidden />
+        {paused ? "Resume bookings" : "Share booking link"}
+      </button>
+    </div>
   );
 }
 

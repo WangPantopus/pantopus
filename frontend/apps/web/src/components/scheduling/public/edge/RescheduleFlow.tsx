@@ -11,12 +11,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
-  ArrowDown,
-  Calendar,
   CalendarClock,
   CalendarCheck,
   MessageCircle,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import clsx from "clsx";
 import type {
@@ -34,6 +33,7 @@ import {
   decodeError,
   asSlotConflict,
   pillarForOwner,
+  pillarTokens,
   type Pillar,
 } from "@/components/scheduling";
 import OpenInAppButton from "@/components/public-share/OpenInAppButton";
@@ -191,48 +191,8 @@ export default function RescheduleFlow({ token }: { token: string }) {
 
   const policy = deriveReschedulePolicy(actions);
 
-  // Policy-blocked → note card + fallbacks.
-  if (policy.kind !== "open") {
-    const copy = reschedulePolicyCopy(policy, tz);
-    return (
-      <FlowShell>
-        <BookingSummaryCard
-          booking={booking}
-          eventType={eventType}
-          page={page}
-          tz={tz}
-          pillar={pillar}
-        />
-        {copy && (
-          <PolicyCard
-            tone={copy.tone}
-            icon={copy.icon}
-            title={copy.title}
-            body={copy.body}
-            still={copy.still}
-          />
-        )}
-        <div className="space-y-2.5">
-          <Link
-            href={buildBookingManagePath(token)}
-            className="block w-full rounded-xl border border-app-border bg-app-surface px-4 py-3 text-center text-sm font-bold text-app-text hover:bg-app-hover"
-          >
-            Keep my booking
-          </Link>
-          <OpenInAppButton
-            appUrl={buildBookingManageAppUrl(token)}
-            className={clsx(
-              "flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold",
-              "border-app-personal/40 bg-app-surface text-app-personal hover:bg-app-hover",
-            )}
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden />
-            Message host in the app
-          </OpenInAppButton>
-        </div>
-      </FlowShell>
-    );
-  }
+  const currentBookedFor = formatRange(booking.start_at, booking.end_at, tz);
+  const hostLabel = host ?? "the host";
 
   const submit = async () => {
     if (!picked) return;
@@ -256,8 +216,72 @@ export default function RescheduleFlow({ token }: { token: string }) {
     }
   };
 
+  // Policy-blocked (Frame 8): WARN banner + disabled-picker overlay + sticky
+  // "Message host" footer. The picker IS rendered (disabled/muted) per design —
+  // it is NOT replaced by a PolicyCard alone; that's the reschedule-cutoff
+  // visual spec from slot-picker-frames.jsx FrameCutoff.
+  const isCutoff = policy.kind !== "open";
+
   return (
     <FlowShell>
+      {/* Frame 8: WARN banner when cutoff */}
+      {isCutoff && (
+        <div
+          className="flex items-start gap-2.5 rounded-xl border px-3 py-3"
+          style={{ background: "#FFFBEB", borderColor: "#FDE68A" }}
+        >
+          <Lock
+            className="mt-0.5 h-[15px] w-[15px] shrink-0"
+            style={{ color: "#B45309" }}
+            aria-hidden
+          />
+          <div>
+            <p
+              className="text-[12px] font-bold leading-[16px]"
+              style={{ color: "#92400E" }}
+            >
+              This booking can't be moved anymore
+            </p>
+            <p
+              className="mt-0.5 text-[11px] leading-[15px]"
+              style={{ color: "#B45309" }}
+            >
+              It's past the reschedule cutoff. Message{" "}
+              {host ? host : "the host"} if you need to change it.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Frame 7: INFO banner when in reschedule mode (open policy) */}
+      {!isCutoff && (
+        <div
+          className="flex items-start gap-2.5 rounded-xl border px-3 py-3"
+          style={{ background: "#F0F9FF", borderColor: "#BAE6FD" }}
+        >
+          <CalendarClock
+            className="mt-0.5 h-[15px] w-[15px] shrink-0"
+            style={{ color: "#0369A1" }}
+            aria-hidden
+          />
+          <div>
+            <p
+              className="text-[12px] font-bold leading-[16px]"
+              style={{ color: "#0C4A6E" }}
+            >
+              Currently booked for {currentBookedFor}
+            </p>
+            <p
+              className="mt-0.5 text-[11px] leading-[15px]"
+              style={{ color: "#0369A1" }}
+            >
+              Pick a new time below — your old slot is released once you
+              confirm.
+            </p>
+          </div>
+        </div>
+      )}
+
       <BookingSummaryCard
         booking={booking}
         eventType={eventType}
@@ -265,48 +289,6 @@ export default function RescheduleFlow({ token }: { token: string }) {
         tz={tz}
         pillar={pillar}
       />
-
-      {/* current → new */}
-      <div>
-        <div className="flex items-center gap-2 rounded-xl bg-app-surface-sunken px-3 py-2.5">
-          <Calendar
-            className="h-4 w-4 shrink-0 text-app-text-muted"
-            aria-hidden
-          />
-          <span className="text-[13px] text-app-text-muted line-through">
-            {formatRange(booking.start_at, booking.end_at, tz)}
-          </span>
-        </div>
-        <div className="flex justify-center py-1">
-          <ArrowDown className="h-4 w-4 text-app-text-muted" aria-hidden />
-        </div>
-        <div
-          className={clsx(
-            "flex items-center gap-2 rounded-xl border px-3 py-2.5",
-            picked
-              ? "border-app-personal bg-app-personal-bg"
-              : "border-dashed border-app-border-strong bg-app-surface",
-          )}
-        >
-          <CalendarClock
-            className={clsx(
-              "h-4 w-4 shrink-0",
-              picked ? "text-app-personal" : "text-app-text-muted",
-            )}
-            aria-hidden
-          />
-          <span
-            className={clsx(
-              "text-[13px] font-semibold",
-              picked ? "text-app-text" : "text-app-text-muted",
-            )}
-          >
-            {picked
-              ? formatRange(picked.start, picked.end, tz)
-              : "Pick a new time"}
-          </span>
-        </div>
-      </div>
 
       {conflict && (
         <ConflictView
@@ -327,27 +309,57 @@ export default function RescheduleFlow({ token }: { token: string }) {
         </div>
       )}
 
-      <SlotPicker
-        manageToken={token}
-        pillar={pillar}
-        tz={tz}
-        onTzChange={setTz}
-        onPick={(slot) => {
-          setConflict(null);
-          setPicked(slot);
-        }}
-        selected={picked?.start ?? null}
-      />
-
-      <button
-        type="button"
-        onClick={submit}
-        disabled={!picked || submitting}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-app-personal px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+      {/* Frame 8: disabled / muted picker overlay (pointer-events:none, opacity 55) */}
+      {/* Frame 7 / open: normal interactive picker */}
+      <div
+        className={clsx(isCutoff && "pointer-events-none opacity-55")}
+        aria-hidden={isCutoff}
       >
-        <CalendarCheck className="h-4 w-4" aria-hidden />
-        {submitting ? "Saving…" : "Confirm new time"}
-      </button>
+        <SlotPicker
+          manageToken={token}
+          pillar={pillar}
+          tz={tz}
+          onTzChange={isCutoff ? undefined : setTz}
+          onPick={(slot) => {
+            setConflict(null);
+            setPicked(slot);
+          }}
+          selected={picked?.start ?? null}
+          disabled={isCutoff}
+        />
+      </div>
+
+      {/* Frame 7: confirm CTA (shown only when policy is open) */}
+      {!isCutoff && (
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!picked || submitting}
+          className={clsx(
+            "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50",
+            pillarTokens(pillar).bg,
+            pillarTokens(pillar).textOn,
+          )}
+        >
+          <CalendarCheck className="h-4 w-4" aria-hidden />
+          {submitting ? "Saving…" : "Confirm new time"}
+        </button>
+      )}
+
+      {/* Frame 8: sticky "Message host" footer when cutoff */}
+      {isCutoff && (
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-app-border bg-app-surface/97 px-4 py-3 pb-5 backdrop-blur">
+          <div className="mx-auto max-w-md">
+            <OpenInAppButton
+              appUrl={buildBookingManageAppUrl(token)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-3 text-[13.5px] font-bold text-app-text hover:bg-app-hover"
+            >
+              <MessageCircle className="h-[15px] w-[15px]" aria-hidden />
+              Message {hostLabel}
+            </OpenInAppButton>
+          </div>
+        </div>
+      )}
     </FlowShell>
   );
 }

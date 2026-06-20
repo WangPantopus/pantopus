@@ -8,9 +8,9 @@
 // list (there is no list-blocks endpoint).
 
 import { useState } from "react";
-import { Calendar, Clock, Lock, Repeat, Sun } from "lucide-react";
+import { Calendar, ChevronDown, Clock, Lock, Repeat, Sun } from "lucide-react";
 import { Card, FieldLabel, ToggleRow } from "./primitives";
-import { todayISO } from "./format";
+import { todayISO, formatDateLabel, to12h } from "./format";
 
 export interface BlockPayload {
   title?: string;
@@ -74,8 +74,18 @@ export default function BlockOffForm({
     });
   };
 
-  const fieldButton =
-    "w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-[13px] text-app-text outline-none focus:border-app-personal disabled:opacity-70";
+  // FieldButton — design: icon + value text + chevron-down in a bordered button.
+  // Native inputs are overlaid absolutely so their click opens the platform picker.
+  const fieldBtnBase =
+    "relative flex w-full items-center gap-2 rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-left shadow-sm transition focus-within:border-app-personal";
+
+  const dateLabel = date
+    ? formatDateLabel(date)
+    : "Pick a date";
+  const startLabel = start ? to12h(start) : "Start time";
+  const endLabel = end ? to12h(end) : "End time";
+  const repeatLabel =
+    REPEAT_OPTIONS.find((o) => o.value === repeat)?.label ?? "Does not repeat";
 
   return (
     <div className="space-y-3">
@@ -90,28 +100,32 @@ export default function BlockOffForm({
               placeholder="Dentist"
               aria-label="Reason"
               onChange={(e) => setReason(e.target.value)}
-              className={fieldButton}
+              className="w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-[13px] text-app-text outline-none focus:border-app-personal disabled:opacity-70"
             />
             <p className="mt-1.5 text-[11px] text-app-text-secondary">
               Optional · only you can see this.
             </p>
           </div>
 
+          {/* Date — FieldButton style */}
           <div>
             <FieldLabel>Date</FieldLabel>
-            <div className="relative">
-              <Calendar
-                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-app-personal"
-                aria-hidden
-              />
+            <div className={fieldBtnBase}>
+              <Calendar className="h-4 w-4 shrink-0 text-app-personal" aria-hidden />
+              <span className="flex-1 text-[13px] font-semibold text-app-text">
+                {dateLabel}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
+              {/* Native date input overlaid for platform picker access */}
               <input
                 type="date"
                 value={date}
                 disabled={disabled}
                 min={todayISO()}
                 onChange={(e) => setDate(e.target.value)}
-                className={`${fieldButton} pl-9`}
                 aria-label="Date"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                tabIndex={-1}
               />
             </div>
           </div>
@@ -128,37 +142,43 @@ export default function BlockOffForm({
 
           {!allDay && (
             <div className="flex gap-2.5">
+              {/* Starts — FieldButton style */}
               <div className="flex-1">
                 <FieldLabel>Starts</FieldLabel>
-                <div className="relative">
-                  <Clock
-                    className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-app-personal"
-                    aria-hidden
-                  />
+                <div className={fieldBtnBase}>
+                  <Clock className="h-4 w-4 shrink-0 text-app-personal" aria-hidden />
+                  <span className="flex-1 text-[13px] font-semibold tabular-nums text-app-text">
+                    {startLabel}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
                   <input
                     type="time"
                     value={start}
                     disabled={disabled}
                     onChange={(e) => setStart(e.target.value)}
-                    className={`${fieldButton} pl-9 tabular-nums`}
                     aria-label="Start time"
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    tabIndex={-1}
                   />
                 </div>
               </div>
+              {/* Ends — FieldButton style */}
               <div className="flex-1">
                 <FieldLabel>Ends</FieldLabel>
-                <div className="relative">
-                  <Clock
-                    className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-app-personal"
-                    aria-hidden
-                  />
+                <div className={fieldBtnBase}>
+                  <Clock className="h-4 w-4 shrink-0 text-app-personal" aria-hidden />
+                  <span className="flex-1 text-[13px] font-semibold tabular-nums text-app-text">
+                    {endLabel}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
                   <input
                     type="time"
                     value={end}
                     disabled={disabled}
                     onChange={(e) => setEnd(e.target.value)}
-                    className={`${fieldButton} pl-9 tabular-nums`}
                     aria-label="End time"
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    tabIndex={-1}
                   />
                 </div>
               </div>
@@ -167,19 +187,21 @@ export default function BlockOffForm({
         </div>
       </Card>
 
+      {/* Repeats — FieldButton style with native <select> overlaid */}
       <Card>
         <FieldLabel>Repeats</FieldLabel>
-        <div className="relative">
-          <Repeat
-            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-app-personal"
-            aria-hidden
-          />
+        <div className={fieldBtnBase}>
+          <Repeat className="h-4 w-4 shrink-0 text-app-personal" aria-hidden />
+          <span className="flex-1 text-[13px] font-semibold text-app-text">
+            {repeatLabel}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
           <select
             value={repeat}
             disabled={disabled}
             onChange={(e) => setRepeat(e.target.value)}
-            className={`${fieldButton} cursor-pointer appearance-none pl-9`}
             aria-label="Repeats"
+            className="absolute inset-0 cursor-pointer appearance-none opacity-0"
           >
             {REPEAT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>

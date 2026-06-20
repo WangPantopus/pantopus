@@ -7,6 +7,23 @@ import type { SchedulingOwnerType } from "@pantopus/types";
 
 export type Pillar = "personal" | "home" | "business";
 
+/**
+ * Fixed PRIMARY blue (#0284c7). Use for host-side OPERATIONAL action buttons —
+ * Approve, the bookings-management primary dock, the inbox FAB — and for
+ * functional chrome (sheet "Done", links). These stay blue regardless of the
+ * owner's pillar. For invitee-facing accents that follow the booking owner's
+ * pillar, use pillarTokens(...) / usePillarTokens() instead.
+ */
+export const PRIMARY_BLUE = "#0284c7";
+export const PRIMARY_BLUE_CLS = {
+  text: "text-app-info",
+  bg: "bg-app-info",
+  bgSoft: "bg-app-info-bg",
+  border: "border-app-info",
+  ring: "ring-app-info",
+  textOn: "text-white",
+} as const;
+
 export function pillarForOwner(ownerType?: SchedulingOwnerType | null): Pillar {
   if (ownerType === "home") return "home";
   if (ownerType === "business") return "business";
@@ -27,6 +44,8 @@ export interface PillarTokens {
   ring: string;
   /** Text color to sit on the solid accent. */
   textOn: string;
+  /** Raw accent hex (#0284c7 / #16a34a / #7c3aed) for inline styles / SVG. */
+  hex: string;
 }
 
 const MAP: Record<Pillar, PillarTokens> = {
@@ -38,6 +57,7 @@ const MAP: Record<Pillar, PillarTokens> = {
     border: "border-app-personal",
     ring: "ring-app-personal",
     textOn: "text-white",
+    hex: "#0284c7",
   },
   home: {
     pillar: "home",
@@ -47,6 +67,7 @@ const MAP: Record<Pillar, PillarTokens> = {
     border: "border-app-home",
     ring: "ring-app-home",
     textOn: "text-white",
+    hex: "#16a34a",
   },
   business: {
     pillar: "business",
@@ -56,6 +77,7 @@ const MAP: Record<Pillar, PillarTokens> = {
     border: "border-app-business",
     ring: "ring-app-business",
     textOn: "text-white",
+    hex: "#7c3aed",
   },
 };
 

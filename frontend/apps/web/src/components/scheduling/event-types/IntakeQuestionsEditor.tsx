@@ -86,6 +86,8 @@ export default function IntakeQuestionsEditor({
   owner: SchedulingOwnerRef;
   initialQuestions: IntakeQuestion[];
   onSaved?: (questions: IntakeQuestion[]) => void;
+  /** "sheet" = hosted in a BottomSheet (no bottom save CTA shown — "Save question" in EditGroup commits);
+   *  "page" = standalone page (explicit "Save questions" CTA is shown). */
   variant?: "sheet" | "page";
 }) {
   const [drafts, setDrafts] = useState<Draft[]>(() =>
@@ -200,6 +202,11 @@ export default function IntakeQuestionsEditor({
                   remove(q.key);
                 } else {
                   setEditingKey(null);
+                  // In sheet mode, "Save question" is the sole commit CTA —
+                  // persist immediately so the sheet "Done" header can close cleanly.
+                  if (variant === "sheet") {
+                    void save();
+                  }
                 }
               }}
               onDelete={() => remove(q.key)}
@@ -228,16 +235,19 @@ export default function IntakeQuestionsEditor({
         Add a question
       </button>
 
-      <div className={clsx(variant === "sheet" ? "mt-4" : "mt-6")}>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-app-border bg-app-surface text-sm font-bold text-primary-700 transition hover:bg-app-hover disabled:opacity-60"
-        >
-          {saving ? "Saving…" : "Save questions"}
-        </button>
-      </div>
+      {/* Page variant: explicit save CTA (sheet variant uses the sheet header Done action). */}
+      {variant === "page" && (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save questions"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -361,6 +371,7 @@ function EditGroup({
 }: {
   draft: Draft;
   onChange: (p: Partial<Draft>) => void;
+  /** Called when user clicks "Save question" — collapses the inline editor. */
   onDone: () => void;
   onDelete: () => void;
 }) {
@@ -471,7 +482,7 @@ function EditGroup({
           onClick={onDone}
           className="h-10 flex-1 rounded-lg bg-primary-600 text-[13px] font-bold text-white transition hover:bg-primary-700"
         >
-          Done
+          Save question
         </button>
         <button
           type="button"

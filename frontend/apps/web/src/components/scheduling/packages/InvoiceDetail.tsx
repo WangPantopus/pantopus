@@ -19,9 +19,11 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
   List,
   Send,
+  Share2,
 } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
@@ -110,6 +112,23 @@ export default function InvoiceDetail({
   const status = invoice ? invoiceStatus(invoice) : null;
   const canSend =
     status === "draft" || status === "sent" || status === "overdue";
+  // Design: paid → Share + Download PDF; void → Share; refunded → Share + Download PDF.
+  const canShare = status === "paid" || status === "void" || status === "refunded";
+  const canDownload = status === "paid" || status === "refunded";
+
+  const handleShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Invoice", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Invoice link copied.");
+      }
+    } catch {
+      /* dismissed */
+    }
+  };
 
   return (
     <PaidFeatureGate feature="Invoices">
@@ -158,6 +177,27 @@ export default function InvoiceDetail({
                     : status === "draft"
                       ? "Send"
                       : "Resend"}
+                </button>
+              )}
+              {canShare && (
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-app-border bg-app-surface text-[13.5px] font-bold text-app-text transition hover:bg-app-hover"
+                >
+                  <Share2 className="h-4 w-4" aria-hidden />
+                  Share
+                </button>
+              )}
+              {canDownload && (
+                <button
+                  type="button"
+                  disabled
+                  title="PDF download coming soon"
+                  className="flex h-12 flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-primary-600 text-[13.5px] font-bold text-white opacity-50 shadow-sm"
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Download PDF
                 </button>
               )}
             </div>
@@ -226,27 +266,36 @@ function Body({
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-app-border bg-app-surface">
-            <div className="grid grid-cols-[1fr_2rem_4rem] gap-2 border-b border-app-border bg-app-surface-raised px-3 py-2 text-[8.5px] font-bold uppercase tracking-[0.08em] text-app-text-muted">
+            <div className="grid grid-cols-[1fr_1.5rem_3.5rem_4rem] gap-2 border-b border-app-border bg-app-surface-raised px-3 py-2 text-[8.5px] font-bold uppercase tracking-[0.08em] text-app-text-muted">
               <span>Item</span>
               <span className="text-center">Qty</span>
+              <span className="text-right">Unit</span>
               <span className="text-right">Total</span>
             </div>
-            {items.map((it, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[1fr_2rem_4rem] items-center gap-2 border-b border-app-border px-3 py-2.5 text-[11.5px] last:border-b-0"
-              >
-                <span className="truncate font-medium text-app-text">
-                  {str(it.description) ?? "Item"}
-                </span>
-                <span className="text-center text-app-text-muted tabular-nums">
-                  {it.quantity ?? 1}
-                </span>
-                <span className="text-right font-semibold tabular-nums text-app-text">
-                  {formatCents(lineItemAmountCents(it), currency)}
-                </span>
-              </div>
-            ))}
+            {items.map((it, i) => {
+              const qty = Number(it.quantity ?? 1) || 1;
+              const total = lineItemAmountCents(it);
+              const unit = qty > 0 ? Math.round(total / qty) : total;
+              return (
+                <div
+                  key={i}
+                  className="grid grid-cols-[1fr_1.5rem_3.5rem_4rem] items-center gap-2 border-b border-app-border px-3 py-2.5 text-[11.5px] last:border-b-0"
+                >
+                  <span className="truncate font-medium text-app-text">
+                    {str(it.description) ?? "Item"}
+                  </span>
+                  <span className="text-center text-app-text-muted tabular-nums">
+                    {qty}
+                  </span>
+                  <span className="text-right text-app-text-muted tabular-nums">
+                    {formatCents(unit, currency)}
+                  </span>
+                  <span className="text-right font-semibold tabular-nums text-app-text">
+                    {formatCents(total, currency)}
+                  </span>
+                </div>
+              );
+            })}
             <div className="bg-app-surface-raised px-3 py-2.5">
               <Row
                 label="Subtotal"

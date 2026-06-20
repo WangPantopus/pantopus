@@ -132,25 +132,25 @@ export default function AddToCalendar({
       <Row
         icon={Calendar}
         label="Apple Calendar"
-        sub="Open in Calendar"
+        sub="Save to your iPhone"
         href={ics}
       />
       <Row
         icon={CalendarDays}
         label="Google Calendar"
-        sub="Add to Google"
+        sub="Opens in your browser"
         href={googleUrl(event)}
       />
       <Row
         icon={CalendarDays}
         label="Outlook"
-        sub="Add to Outlook"
+        sub="Opens in your browser"
         href={outlookUrl(event)}
       />
       <Row
         icon={Download}
-        label="Download .ics"
-        sub="For any calendar app"
+        label="Download .ics file"
+        sub="Works with any calendar app"
         href={ics}
         download
       />

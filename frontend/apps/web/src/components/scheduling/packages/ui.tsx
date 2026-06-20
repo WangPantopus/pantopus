@@ -213,6 +213,88 @@ export function TextField({
   );
 }
 
+// ─── Multiline text field ────────────────────────────────────────────────
+
+export function TextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  error,
+  rows = 3,
+}: {
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  error?: string;
+  rows?: number;
+}) {
+  const id = useId();
+  return (
+    <div>
+      {label && <FieldLabel htmlFor={id}>{label}</FieldLabel>}
+      <textarea
+        id={id}
+        rows={rows}
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        onChange={(e) => onChange(e.target.value)}
+        className={clsx(
+          inputBase,
+          "resize-none",
+          error
+            ? "border-app-error focus:border-app-error focus:ring-app-error/15"
+            : "border-app-border focus:border-primary-600 focus:ring-primary-600/15",
+        )}
+      />
+      <FieldError>{error}</FieldError>
+    </div>
+  );
+}
+
+// ─── Segmented control ───────────────────────────────────────────────────
+
+export function SegmentedControl({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: ReadonlyArray<string>;
+  value: string;
+  onChange?: (v: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-1 rounded-[10px] bg-app-surface-sunken p-1">
+      {options.map((o) => {
+        const on = o === value;
+        return (
+          <button
+            key={o}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange?.(o)}
+            className={clsx(
+              "h-8 flex-1 rounded-md text-xs transition",
+              on
+                ? "bg-app-surface font-bold text-app-text shadow-sm"
+                : "font-semibold text-app-text-secondary hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60",
+            )}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Stepper ────────────────────────────────────────────────────────────
 
 export function Stepper({

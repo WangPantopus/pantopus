@@ -1,12 +1,18 @@
 "use client";
 
-// Searchable timezone bottom sheet. Opens from the slot picker's tz chip.
-// Pinned "Detected" device-zone row + a Common list; each row shows the GMT
-// offset and current local time. Selected checkmark uses the pillar accent.
-// Changing the zone re-times the slots beneath (caller refetches on onSelect).
+// Searchable timezone sheet. Opens from the slot picker's tz chip. Structure
+// mirrors the design (timezone-selector-frames.jsx):
+//   • "Detected" section label → single-item ListCard for the device zone
+//   • "Common" section label → ListCard with all zones
+//   • each ZoneRow: leftmost 18px check slot (pillar accent), name + Detected
+//     pill chip, then right-aligned GMT offset + local time
+//   • search collapses to a single "Results" card; no-match → dashed empty card
+//   • manual override → info banner ("You changed this…" + Reset to detected)
+// Functional chrome (Done, links) uses fixed sky #0284c7; the selected check
+// uses the host's pillar accent.
 
-import { useMemo, useState } from "react";
-import { Check, RotateCcw, Search, SearchX } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Check, Info, RotateCcw, Search, SearchX } from "lucide-react";
 import clsx from "clsx";
 import BottomSheet from "@/components/ui/BottomSheet";
 import { pillarTokens, type Pillar } from "./pillarTokens";
@@ -87,6 +93,77 @@ interface TimezoneSelectorProps {
   pillar?: Pillar;
 }
 
+function ZoneRow({
+  tz,
+  selected,
+  detected,
+  accentClass,
+  onPick,
+}: {
+  tz: string;
+  selected: boolean;
+  detected: boolean;
+  accentClass: string;
+  onPick: (tz: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(tz)}
+      aria-pressed={selected}
+      aria-label={`${zoneLabel(tz)}${selected ? ", selected" : ""}${
+        detected ? ", detected from your device" : ""
+      }`}
+      className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-app-hover"
+    >
+      {/* leftmost 18px check slot */}
+      <span className="flex w-[18px] shrink-0 justify-center">
+        {selected && (
+          <Check
+            className={clsx("h-[18px] w-[18px]", accentClass)}
+            strokeWidth={2.6}
+            aria-hidden
+          />
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="truncate text-sm font-semibold text-app-text">
+          {zoneLabel(tz)}
+        </span>
+        {detected && (
+          <span className="shrink-0 rounded-full bg-app-info-bg px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-app-info">
+            Detected
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-xs font-semibold tabular-nums text-app-text-strong">
+          {offsetLabel(tz)}
+        </span>
+        <span className="block text-[10px] tabular-nums text-app-text-muted">
+          {localTime(tz)}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-1 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-app-text-secondary first:pt-0">
+      {children}
+    </div>
+  );
+}
+
+function ListCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-sm divide-y divide-app-border-subtle">
+      {children}
+    </div>
+  );
+}
+
 export default function TimezoneSelector({
   open,
   onClose,
@@ -98,17 +175,22 @@ export default function TimezoneSelector({
   const detected = useMemo(detectTimezone, []);
   const tk = pillarTokens(pillar);
 
-  const zones = useMemo(
-    () => Array.from(new Set([detected, ...COMMON_ZONES])),
+  const commonOnly = useMemo(
+    () => COMMON_ZONES.filter((z) => z !== detected),
     [detected],
   );
   const q = query.trim().toLowerCase();
-  const filtered = q
-    ? zones.filter(
-        (z) =>
-          z.toLowerCase().includes(q) || zoneLabel(z).toLowerCase().includes(q),
-      )
-    : zones;
+  const matchesQuery = (z: string) =>
+    z.toLowerCase().includes(q) || zoneLabel(z).toLowerCase().includes(q);
+  const searchResults = useMemo(
+    () =>
+      q
+        ? Array.from(new Set([detected, ...COMMON_ZONES])).filter(matchesQuery)
+        : [],
+    [q, detected],
+  );
+
+  const isOverridden = Boolean(value && value !== detected);
 
   const handlePick = (tz: string) => {
     onSelect(tz);
@@ -116,81 +198,122 @@ export default function TimezoneSelector({
   };
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Time zone">
-      <div className="space-y-3">
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title="Time zone"
+      footer={
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm font-bold text-app-info hover:underline"
+          >
+            Done
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-2">
+        {/* Search field */}
         <div className="relative">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-secondary"
             aria-hidden
           />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search a city or zone"
+            placeholder="Search city or time zone"
             aria-label="Search time zones"
-            className="w-full rounded-lg border border-app-border bg-app-surface py-2 pl-9 pr-3 text-sm text-app-text placeholder:text-app-text-muted focus:border-app-personal focus:outline-none focus:ring-1 focus:ring-app-personal"
+            className="w-full rounded-lg border border-app-border bg-app-surface-sunken py-2 pl-9 pr-3 text-sm text-app-text placeholder:text-app-text-muted focus:border-app-info focus:bg-app-surface focus:outline-none focus:ring-1 focus:ring-app-info"
           />
         </div>
 
-        {value && value !== detected && (
-          <button
-            type="button"
-            onClick={() => handlePick(detected)}
-            className="flex items-center gap-2 text-xs font-medium text-app-personal hover:underline"
-          >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-            Reset to detected ({zoneLabel(detected)})
-          </button>
+        {/* Manual-override info banner */}
+        {isOverridden && !q && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-app-info-light bg-app-info-bg px-3 py-2.5">
+            <Info
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-app-info"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold leading-snug text-app-info">
+                You changed this from your detected zone.
+              </p>
+              <button
+                type="button"
+                onClick={() => handlePick(detected)}
+                className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-app-info hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" strokeWidth={2.4} aria-hidden />
+                Reset to detected
+              </button>
+            </div>
+          </div>
         )}
 
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-app-border bg-app-surface py-10 text-center">
-            <SearchX className="h-6 w-6 text-app-text-muted" aria-hidden />
-            <p className="text-sm font-medium text-app-text">
-              No time zones match “{query}”
-            </p>
-            <p className="text-xs text-app-text-muted">Try a city name.</p>
-          </div>
+        {q ? (
+          searchResults.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-app-border-strong bg-app-surface px-6 py-8 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-app-surface-sunken">
+                <SearchX
+                  className="h-6 w-6 text-app-text-secondary"
+                  strokeWidth={1.85}
+                  aria-hidden
+                />
+              </span>
+              <p className="text-sm font-semibold text-app-text">
+                No time zones match “{query}”
+              </p>
+              <p className="max-w-[190px] text-xs text-app-text-secondary">
+                Try a city name.
+              </p>
+            </div>
+          ) : (
+            <>
+              <SectionLabel>Results</SectionLabel>
+              <ListCard>
+                {searchResults.map((tz) => (
+                  <ZoneRow
+                    key={tz}
+                    tz={tz}
+                    selected={tz === value}
+                    detected={tz === detected}
+                    accentClass={tk.text}
+                    onPick={handlePick}
+                  />
+                ))}
+              </ListCard>
+            </>
+          )
         ) : (
-          <ul className="max-h-[50vh] overflow-y-auto rounded-xl border border-app-border divide-y divide-app-border-subtle">
-            {filtered.map((tz) => {
-              const selected = tz === value;
-              const isDetected = tz === detected;
-              return (
-                <li key={tz}>
-                  <button
-                    type="button"
-                    onClick={() => handlePick(tz)}
-                    aria-pressed={selected}
-                    className="flex w-full items-center justify-between gap-3 bg-app-surface px-3 py-3 text-left hover:bg-app-hover"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-app-text">
-                        {zoneLabel(tz)}
-                        {isDetected && (
-                          <span className="ml-2 text-xs font-normal text-app-text-muted">
-                            Detected
-                          </span>
-                        )}
-                      </span>
-                      <span className="block truncate text-xs text-app-text-muted">
-                        {[offsetLabel(tz), localTime(tz)]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                    {selected && (
-                      <Check
-                        className={clsx("h-4 w-4 shrink-0", tk.text)}
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="max-h-[50vh] space-y-0 overflow-y-auto">
+            <SectionLabel>Detected</SectionLabel>
+            <ListCard>
+              <ZoneRow
+                tz={detected}
+                selected={detected === value}
+                detected
+                accentClass={tk.text}
+                onPick={handlePick}
+              />
+            </ListCard>
+            <SectionLabel>Common</SectionLabel>
+            <ListCard>
+              {commonOnly.map((tz) => (
+                <ZoneRow
+                  key={tz}
+                  tz={tz}
+                  selected={tz === value}
+                  detected={false}
+                  accentClass={tk.text}
+                  onPick={handlePick}
+                />
+              ))}
+            </ListCard>
+          </div>
         )}
       </div>
     </BottomSheet>

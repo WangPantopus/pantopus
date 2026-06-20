@@ -17,9 +17,13 @@ export type StatusFacet =
 
 export type DateFacet = "all" | "today" | "week" | "month" | "custom";
 
+export type OwnerScopeFacet = "all" | "personal" | "home" | "business";
+
 export interface BookingFilters {
   q: string;
   status: StatusFacet;
+  /** Owner context (pillar scope) facet — maps to owner_type query param. */
+  scope: OwnerScopeFacet;
   eventTypeId: string | null;
   date: DateFacet;
   /** Custom range (YYYY-MM-DD), only used when date === "custom". */
@@ -30,6 +34,7 @@ export interface BookingFilters {
 export const DEFAULT_FILTERS: BookingFilters = {
   q: "",
   status: "all",
+  scope: "all",
   eventTypeId: null,
   date: "all",
   from: null,
@@ -130,6 +135,7 @@ export function countActiveFilters(filters: BookingFilters): number {
   let n = 0;
   if (filters.q.trim()) n++;
   if (filters.status !== "all") n++;
+  if (filters.scope !== "all") n++;
   if (filters.eventTypeId) n++;
   if (filters.date !== "all") n++;
   return n;
@@ -144,6 +150,7 @@ export function serializeFilters(filters: BookingFilters): string {
   const sp = new URLSearchParams();
   if (filters.q.trim()) sp.set("q", filters.q.trim());
   if (filters.status !== "all") sp.set("status", filters.status);
+  if (filters.scope !== "all") sp.set("scope", filters.scope);
   if (filters.eventTypeId) sp.set("event_type", filters.eventTypeId);
   if (filters.date !== "all") sp.set("date", filters.date);
   if (filters.date === "custom") {
@@ -161,6 +168,12 @@ const STATUS_SET: ReadonlySet<string> = new Set([
   "cancelled",
   "no_show",
 ]);
+const SCOPE_SET: ReadonlySet<string> = new Set([
+  "all",
+  "personal",
+  "home",
+  "business",
+]);
 const DATE_SET: ReadonlySet<string> = new Set([
   "all",
   "today",
@@ -176,10 +189,12 @@ export function parseFilters(
   const sp =
     query instanceof URLSearchParams ? query : new URLSearchParams(query ?? "");
   const status = sp.get("status");
+  const scope = sp.get("scope");
   const date = sp.get("date");
   return {
     q: sp.get("q") ?? "",
     status: (status && STATUS_SET.has(status) ? status : "all") as StatusFacet,
+    scope: (scope && SCOPE_SET.has(scope) ? scope : "all") as OwnerScopeFacet,
     eventTypeId: sp.get("event_type") || null,
     date: (date && DATE_SET.has(date) ? date : "all") as DateFacet,
     from: sp.get("from") || null,

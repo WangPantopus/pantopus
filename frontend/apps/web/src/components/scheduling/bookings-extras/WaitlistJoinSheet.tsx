@@ -12,10 +12,13 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import type { Pillar } from "@/components/scheduling/pillarTokens";
 import { pillarTokens } from "@/components/scheduling/pillarTokens";
 import { Field, InlineError, TextInput } from "./ui";
+import { fmtDate } from "./format";
 
 export interface WaitlistJoinResult {
   position?: number | null;
   alreadyJoined?: boolean;
+  /** ISO date string when the invitee joined (if already on waitlist). */
+  joinedAt?: string | null;
 }
 
 export default function WaitlistJoinSheet({
@@ -72,17 +75,23 @@ export default function WaitlistJoinSheet({
   // Joined / already-on-waitlist confirmation
   if (result) {
     const already = result.alreadyJoined;
+    // Build the subtitle: for "already" state include join date if available.
+    const alreadySubtitle = result.joinedAt
+      ? `You joined this waitlist on ${fmtDate(result.joinedAt)}. We’ll text you the moment a seat opens.`
+      : "We’ll text you the moment a spot opens.";
     return (
       <BottomSheet
         open={open}
         onClose={onClose}
         footer={
+          // Design (Frame 2): "Leave waitlist" ghost CTA (no backend endpoint —
+          // rendered as designed but pressing it closes the sheet).
           <button
             type="button"
             onClick={onClose}
             className="w-full rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text-strong transition hover:bg-app-hover"
           >
-            Done
+            Leave waitlist
           </button>
         }
       >
@@ -91,22 +100,24 @@ export default function WaitlistJoinSheet({
             className={
               already
                 ? `flex items-center justify-center rounded-full ${tk.bgSoft} ${tk.text}`
-                : "flex items-center justify-center rounded-full bg-app-success-bg text-app-success"
+                : "flex items-center justify-center rounded-full bg-app-success-bg ring-1 ring-app-success/30 text-app-success"
             }
-            style={{ width: 72, height: 72 }}
+            style={{ width: 74, height: 74 }}
           >
             {already ? (
-              <Clock className="h-8 w-8" aria-hidden />
+              <Clock className="h-8 w-8" strokeWidth={1.8} aria-hidden />
             ) : (
               <Check className="h-9 w-9" strokeWidth={2.6} aria-hidden />
             )}
           </span>
           <div>
-            <p className="text-base font-bold text-app-text">
+            <p className="text-lg font-bold text-app-text">
               {already ? "You’re already waiting" : "You’re on the waitlist"}
             </p>
-            <p className="mx-auto mt-1.5 max-w-xs text-sm text-app-text-secondary">
-              We’ll text you the moment a spot opens.
+            <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-app-text-secondary">
+              {already
+                ? alreadySubtitle
+                : "We’ll text you the moment a spot opens."}
             </p>
           </div>
           {typeof result.position === "number" && result.position > 0 && (

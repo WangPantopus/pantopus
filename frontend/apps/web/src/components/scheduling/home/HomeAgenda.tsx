@@ -24,6 +24,7 @@ import {
   Clock,
   Users,
   UserCheck,
+  WifiOff,
   X,
 } from "lucide-react";
 import * as api from "@pantopus/api";
@@ -63,10 +64,16 @@ export default function HomeAgenda({
   homeId,
   canEdit,
   currentUserId,
+  accessRequested,
+  onRequestAccess,
 }: {
   homeId: string;
   canEdit: boolean;
   currentUserId: string | null;
+  /** Controlled from the parent page so the pill renders in the top bar. When
+   *  provided the internal localStorage state is overridden. */
+  accessRequested?: boolean;
+  onRequestAccess?: () => void;
 }) {
   const router = useRouter();
 
@@ -85,17 +92,36 @@ export default function HomeAgenda({
   const [selectedKey, setSelectedKey] = useState<string>(dayKey(new Date()));
   const [filter, setFilter] = useState<Filter>("all");
 
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  const [accessRequested, setAccessRequested] = useState(false);
+  const [accessRequestedInternal, setAccessRequestedInternal] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setAccessRequested(
+      setAccessRequestedInternal(
         window.localStorage.getItem(ACCESS_KEY(homeId)) === "1",
       );
     }
   }, [homeId]);
+
+  // Use controlled prop if provided (parent page renders the pill in the top bar),
+  // otherwise fall back to internal localStorage state.
+  const accessRequestedEffective =
+    accessRequested !== undefined ? accessRequested : accessRequestedInternal;
 
   const load = useCallback(async () => {
     const from = startOfWeek(weekAnchor);
@@ -175,8 +201,12 @@ export default function HomeAgenda({
   const filterActive = filter !== "all";
 
   const requestAccess = () => {
+    if (onRequestAccess) {
+      onRequestAccess();
+      return;
+    }
     window.localStorage.setItem(ACCESS_KEY(homeId), "1");
-    setAccessRequested(true);
+    setAccessRequestedInternal(true);
     toast.success("We asked an admin to give you scheduling access");
   };
 
@@ -210,25 +240,44 @@ export default function HomeAgenda({
   // ─── render ────────────────────────────────────────────────
   return (
     <div className="relative">
-      {/* gated hint bar (F15) */}
+      {/* gated hint bar (F15) — eye icon + text only; access pill is in the
+          page top bar when accessRequested/onRequestAccess props are provided */}
       {!canEdit && (
         <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-app-info-light bg-app-info-bg px-3 py-2.5">
           <Eye className="h-4 w-4 shrink-0 text-app-info" />
           <span className="flex-1 text-[11.5px] font-medium leading-[15px] text-app-info">
             You can view the schedule. Ask an admin to make changes.
           </span>
-          {accessRequested ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-app-surface-sunken px-2.5 py-1 text-[11px] font-bold text-app-text-muted">
-              <Clock className="h-3 w-3" /> Request sent
-            </span>
-          ) : (
-            <button
-              onClick={requestAccess}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-app-home/30 bg-app-home-bg px-2.5 py-1 text-[11px] font-bold text-app-home"
-            >
-              <ShieldPlus className="h-3 w-3" /> Ask to manage
-            </button>
+          {/* Inline pill fallback — only shown when parent does NOT control the pill */}
+          {onRequestAccess === undefined && (
+            accessRequestedEffective ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-app-surface-sunken px-2.5 py-1 text-[11px] font-bold text-app-text-muted">
+                <Clock className="h-3 w-3" /> Request sent
+              </span>
+            ) : (
+              <button
+                onClick={requestAccess}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-app-home/30 bg-app-home-bg px-2.5 py-1 text-[11px] font-bold text-app-home"
+              >
+                <ShieldPlus className="h-3 w-3" /> Ask to manage
+              </button>
+            )
           )}
+        </div>
+      )}
+
+      {/* offline banner */}
+      {!isOnline && (
+        <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <div className="text-[12px] font-bold text-amber-800">
+              You&apos;re offline
+            </div>
+            <div className="mt-0.5 text-[11.5px] leading-[15px] text-amber-700">
+              Showing the last synced schedule. Changes save when you reconnect.
+            </div>
+          </div>
         </div>
       )}
 
@@ -374,12 +423,16 @@ export default function HomeAgenda({
                   {g.heading}
                 </div>
                 {g.events.map((e) => (
-                  <UnionEventRow
+                  <div
                     key={e.id}
-                    event={e}
-                    members={resolveMembers(e.assigned_to, membersById)}
-                    onClick={() => openEvent(e)}
-                  />
+                    className={isOnline ? undefined : "opacity-50"}
+                  >
+                    <UnionEventRow
+                      event={e}
+                      members={resolveMembers(e.assigned_to, membersById)}
+                      onClick={() => openEvent(e)}
+                    />
+                  </div>
                 ))}
               </div>
             ))}
@@ -387,8 +440,8 @@ export default function HomeAgenda({
         )}
       </div>
 
-      {/* FAB (only when editable) */}
-      {canEdit && !loading && (
+      {/* FAB (only when editable and online) */}
+      {canEdit && !loading && isOnline && (
         <button
           aria-label="Create"
           onClick={() => setCreateMenuOpen(true)}

@@ -53,7 +53,33 @@ export default function OpenInAppHandoff({
 }) {
   const [dismissed, setDismissed] = useState(false);
   const tk = pillarTokens(pillar);
-  if (dismissed) return null;
+
+  // Frame 5 (FrameStayWeb): after dismiss the banner collapses to a minimized
+  // strip — 20px PantopusMark + 'Continuing on the web' label + 'Open in app'
+  // ghost CTA. Never fully removed so the user can re-open the app at any time.
+  if (dismissed) {
+    return (
+      <div
+        className={clsx(
+          "flex items-center gap-2.5 border-b border-app-border bg-app-surface-sunken px-3 py-2",
+          className,
+        )}
+      >
+        <PantopusMark pillar={pillar} />
+        <span className="flex-1 text-[11px] font-semibold text-app-text-muted">
+          Continuing on the web
+        </span>
+        <OpenInAppButton
+          appUrl={appUrl}
+          linkHref={linkHref}
+          fallbackUrl={fallbackUrl}
+          className="shrink-0 bg-transparent text-[11px] font-bold text-app-personal hover:underline"
+        >
+          Open in app
+        </OpenInAppButton>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -195,17 +195,6 @@ export default function TemplateEditor({ id }: { id: string }) {
         </p>
       </header>
 
-      <Field label="Name" htmlFor="tpl-name" error={errors.name}>
-        <TextInput
-          id="tpl-name"
-          value={form.name}
-          invalid={Boolean(errors.name)}
-          maxLength={200}
-          placeholder="e.g. Thank-you note"
-          onChange={(e) => patch({ name: e.target.value })}
-        />
-      </Field>
-
       <Field label="Channel">
         <Segmented
           pillar={pillar}
@@ -217,6 +206,22 @@ export default function TemplateEditor({ id }: { id: string }) {
             icon: c.icon,
             locked: c.locked,
           }))}
+        />
+      </Field>
+
+      <Field
+        label="Name · optional"
+        htmlFor="tpl-name"
+        error={errors.name}
+        hint="Leave blank to auto-name from the channel."
+      >
+        <TextInput
+          id="tpl-name"
+          value={form.name}
+          invalid={Boolean(errors.name)}
+          maxLength={200}
+          placeholder="e.g. Thank-you note"
+          onChange={(e) => patch({ name: e.target.value })}
         />
       </Field>
 
@@ -286,6 +291,27 @@ export default function TemplateEditor({ id }: { id: string }) {
               : "border-app-border focus:border-app-personal focus:ring-app-personal/30",
           )}
         />
+        {/* Character counter: monospaced, shown always for SMS, shown when near limit for other channels */}
+        {(form.channel === "sms" || form.body.length > 4000) && (
+          <p
+            className={clsx(
+              "mt-1 text-right font-mono text-[11.5px]",
+              form.channel === "sms" && form.body.length > 160
+                ? "text-app-error"
+                : "text-app-text-muted",
+            )}
+          >
+            {form.channel === "sms"
+              ? `${form.body.length} / 160`
+              : `${form.body.length} / 5000`}
+          </p>
+        )}
+        {/* SMS over-limit warning: this will send as more than one SMS */}
+        {form.channel === "sms" && form.body.length > 160 && (
+          <p className="mt-1 text-[11.5px] font-medium text-app-warning">
+            This will send as more than one SMS.
+          </p>
+        )}
       </Field>
 
       {showPreview && (

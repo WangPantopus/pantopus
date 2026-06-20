@@ -13,6 +13,7 @@ import {
   Bell,
   BellRing,
   CalendarX,
+  Check,
   Clock,
   CreditCard,
   Globe,
@@ -51,6 +52,7 @@ import {
   Chevron,
   Chip,
   ChipChevron,
+  ConnectPill,
   MonoFooter,
   Row,
   Segmented,
@@ -380,15 +382,33 @@ export default function BookingSettings() {
               <AccentOverline pillar={pillar} className="pb-2 pt-4">
                 Payments
               </AccentOverline>
-              <Card helper="Required only for paid event types.">
-                <Row
-                  icon={CreditCard}
-                  label="Payments & payouts"
-                  sub="Take payment at booking"
-                  href={`${BASE}/payments`}
-                  right={<Chevron />}
-                />
-              </Card>
+              {/* stripeConnected: no backend field available yet — renders ConnectPill (fresh state) per design placeholder */}
+              {(() => {
+                const stripeConnected = !!(page as unknown as Record<string, unknown>)["payments_connected"];
+                return (
+                  <Card helper="Required only for paid event types.">
+                    <Row
+                      icon={CreditCard}
+                      label="Payments & payouts"
+                      sub={stripeConnected ? "Stripe · ••••" : "Take payment at booking"}
+                      href={stripeConnected ? `${BASE}/payments` : undefined}
+                      onClick={stripeConnected ? undefined : () => router.push(`${BASE}/payments`)}
+                      right={
+                        stripeConnected ? (
+                          <ChipChevron>
+                            <Chip tone="success" icon={Check}>Connected</Chip>
+                          </ChipChevron>
+                        ) : (
+                          <ConnectPill
+                            pillar={pillar}
+                            onClick={() => router.push(`${BASE}/payments`)}
+                          />
+                        )
+                      }
+                    />
+                  </Card>
+                );
+              })()}
             </section>
 
             <section>

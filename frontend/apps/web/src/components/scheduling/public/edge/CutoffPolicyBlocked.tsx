@@ -31,21 +31,24 @@ const TONES: Record<
     card: "bg-app-warning-bg border-app-warning-light",
     iconWrap: "bg-app-surface border-app-warning-light",
     icon: "text-app-warning",
-    title: "text-app-text-strong",
+    // Design: title color = t.dk = WARN_DK = #92400E
+    title: "text-[#92400E]",
     body: "text-app-warning",
   },
   success: {
     card: "bg-app-success-bg border-app-success-light",
     iconWrap: "bg-app-surface border-app-success-light",
     icon: "text-app-success",
-    title: "text-app-text-strong",
+    // Design: title color = t.dk = SUCCESS_DK = #047857
+    title: "text-[#047857]",
     body: "text-app-success",
   },
   error: {
     card: "bg-app-error-bg border-app-error-light",
     iconWrap: "bg-app-surface border-app-error-light",
     icon: "text-app-error",
-    title: "text-app-text-strong",
+    // Design: title color = t.dk = ERR_DK = #991B1B
+    title: "text-[#991B1B]",
     body: "text-app-error",
   },
 };

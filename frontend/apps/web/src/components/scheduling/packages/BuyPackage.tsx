@@ -12,7 +12,7 @@
 // public single-package read exists) — display only; the charged amount is the
 // server-created PaymentIntent, so it can't be tampered from the client.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import {
@@ -22,6 +22,7 @@ import {
   Lock,
   LogIn,
   RotateCcw,
+  Ticket,
   TicketCheck,
 } from "lucide-react";
 import {
@@ -85,6 +86,34 @@ export default function BuyPackage(props: BuyPackageProps) {
   const [grantedSessions, setGrantedSessions] = useState(sessionsCount);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pre-purchase credit detection: inline upsell if credits already exist.
+  const [existingCredits, setExistingCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.scheduling
+      .getMyPackages(ownerRef)
+      .then((res) => {
+        if (!alive) return;
+        const credits = (res.credits ?? []).filter(
+          (c) => c.package_id === packageId && Number(c.remaining_sessions) > 0,
+        );
+        if (credits.length > 0) {
+          setExistingCredits(
+            credits.reduce(
+              (sum, c) => sum + Math.max(0, Number(c.remaining_sessions) || 0),
+              0,
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        /* best-effort; gate stays hidden if unavailable */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [ownerRef, packageId]);
 
   const perSession = perSessionLabel(priceCents, sessionsCount, currency);
   const totalLabel = formatCents(priceCents, currency);
@@ -172,32 +201,6 @@ export default function BuyPackage(props: BuyPackageProps) {
     );
   }
 
-  if (phase === "owned") {
-    return (
-      <Shell pillar={pillar}>
-        <div className="flex flex-col items-center py-8 text-center">
-          <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-app-info-bg text-app-info">
-            <TicketCheck className="h-7 w-7" aria-hidden />
-          </span>
-          <h1 className="text-lg font-bold text-app-text">
-            You already own this package
-          </h1>
-          <p className="mt-1.5 max-w-xs text-sm text-app-text-secondary">
-            You still have credits left on{" "}
-            <span className="font-semibold text-app-text">{name}</span>. Use
-            them before buying more.
-          </p>
-          <Link
-            href="/app/scheduling/my-packages"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700"
-          >
-            View my credits
-          </Link>
-        </div>
-      </Shell>
-    );
-  }
-
   if (phase === "checkout" && clientSecret) {
     return (
       <Shell pillar={pillar}>
@@ -219,6 +222,10 @@ export default function BuyPackage(props: BuyPackageProps) {
   }
 
   // ── Summary ──────────────────────────────────────────────────
+  // When ALREADY_OWNED is returned post-click, treat same as inline upsell.
+  const displayedCredits =
+    phase === "owned" ? (existingCredits ?? 1) : existingCredits;
+
   const free = priceCents <= 0;
   return (
     <Shell pillar={pillar}>
@@ -227,6 +234,28 @@ export default function BuyPackage(props: BuyPackageProps) {
       </p>
 
       <OwnerCard name={ownerName} subtitle={ownerSubtitle} pillar={pillar} />
+
+      {displayedCredits != null && displayedCredits > 0 && (
+        <div className="flex flex-col gap-2.5 rounded-xl border border-app-info-light bg-app-info-bg p-3">
+          <div className="flex items-start gap-2.5">
+            <Ticket
+              className="mt-0.5 h-4 w-4 shrink-0 text-app-info"
+              aria-hidden
+            />
+            <span className="text-[11.5px] font-semibold leading-4 text-app-text-secondary">
+              You already have {displayedCredits}{" "}
+              {displayedCredits === 1 ? "credit" : "credits"} left on this
+              package.
+            </span>
+          </div>
+          <Link
+            href="/app/scheduling/my-packages"
+            className="flex h-9 w-full items-center justify-center rounded-[9px] border border-app-border-strong bg-app-surface text-[12.5px] font-bold text-app-text transition hover:bg-app-hover"
+          >
+            Use a credit instead
+          </Link>
+        </div>
+      )}
 
       <SummaryCard
         name={name}
@@ -249,6 +278,9 @@ export default function BuyPackage(props: BuyPackageProps) {
             </p>
             <p className="mt-0.5 text-[11px] leading-4 text-app-text-secondary">
               {eligibleLabel}
+            </p>
+            <p className="mt-1 text-[10.5px] text-app-text-muted">
+              Credits expire 1 year after purchase
             </p>
           </div>
         </div>

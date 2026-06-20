@@ -1,9 +1,11 @@
 "use client";
 
-// W17 · H12 — Team Performance (business-only). Per-member bookings, revenue,
-// no-show rate and average duration from GET /bookings/insights/team. For
-// non-business owners (or a BUSINESS_ONLY response) we show a friendly notice
-// instead of an error. Read-only.
+// W17 · H12 — Team Performance (business-only). Per-member bookings and
+// no-show rate from GET /bookings/insights/team. Aligned to iOS/Android:
+// two-option sort (Bookings / No-show rate), metric strip showing bookings +
+// no-show rate per member. No KPI aggregate tiles (absent on native).
+// Round-robin balance card deferred — API does not return balance data.
+// For non-business owners (or a BUSINESS_ONLY response) we show a notice.
 
 import { useMemo, useState } from "react";
 import { Building2, Users } from "lucide-react";
@@ -14,29 +16,23 @@ import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { useReport } from "./useReport";
 import { useInsightsFilters } from "./useInsightsFilters";
 import { insightsDays } from "./filters";
-import {
-  formatCount,
-  formatDurationMin,
-  formatMoneyCents,
-  formatRate,
-} from "./format";
+import { formatCount, formatRate } from "./format";
 import { isBusinessOnly, isBusinessOwner } from "./gating";
 import {
   Avatar,
   Card,
   EmptyReport,
   InlineRetry,
-  KpiGrid,
-  KpiTile,
   NoticeCard,
   ReportSkeleton,
 } from "./ui";
 
-type SortKey = "bookings" | "revenue" | "no_show";
+// Two-option sort, mirroring iOS/Android (bookings / no-show only — revenue
+// sort removed since it diverged from native without a design spec).
+type SortKey = "bookings" | "no_show";
 
 const SORTS: ReadonlyArray<{ id: SortKey; label: string }> = [
   { id: "bookings", label: "Bookings" },
-  { id: "revenue", label: "Revenue" },
   { id: "no_show", label: "No-show rate" },
 ];
 
@@ -56,9 +52,7 @@ export default function TeamPerformance() {
 
   const members = useMemo(() => {
     const list = data?.teamMembers ? [...data.teamMembers] : [];
-    if (sort === "revenue") list.sort((a, b) => b.revenue - a.revenue);
-    else if (sort === "no_show")
-      list.sort((a, b) => b.noShowRate - a.noShowRate);
+    if (sort === "no_show") list.sort((a, b) => b.noShowRate - a.noShowRate);
     else list.sort((a, b) => b.bookingsCount - a.bookingsCount);
     return list;
   }, [data, sort]);
@@ -73,7 +67,7 @@ export default function TeamPerformance() {
       />
     );
 
-  if (phase === "loading") return <ReportSkeleton kpis={3} />;
+  if (phase === "loading") return <ReportSkeleton kpis={0} />;
   if (phase === "error") {
     if (error && isBusinessOnly(error))
       return (
@@ -113,22 +107,6 @@ export default function TeamPerformance() {
 
   return (
     <div className="space-y-4">
-      <KpiGrid cols={3}>
-        <KpiTile
-          value={formatCount(data.totalBookings)}
-          label="Total bookings"
-        />
-        <KpiTile
-          value={formatMoneyCents(data.totalRevenue)}
-          label="Total revenue"
-          tone="success"
-        />
-        <KpiTile
-          value={formatMoneyCents(data.avgBookingValue)}
-          label="Avg booking value"
-        />
-      </KpiGrid>
-
       <Card
         title="By member"
         icon={Users}
@@ -170,8 +148,9 @@ export default function TeamPerformance() {
                       {m.name || "Unknown"}
                     </span>
                     <span className="block text-xs text-app-text-muted">
-                      {formatMoneyCents(m.revenue)} · {formatRate(m.noShowRate)}{" "}
-                      no-show · {formatDurationMin(m.avgDuration)} avg
+                      {formatCount(m.bookingsCount)}{" "}
+                      {m.bookingsCount === 1 ? "booking" : "bookings"} ·{" "}
+                      {formatRate(m.noShowRate)} no-show
                     </span>
                   </span>
                   <span className="shrink-0 text-right">

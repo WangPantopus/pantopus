@@ -11,7 +11,21 @@
 // carries a pillar ring, the selected day is a filled pillar circle.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Globe } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  CalendarClock,
+  CalendarSearch,
+  CalendarX,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Clock,
+  ChevronRight as ChevronRightSm,
+  CheckCircle2,
+  Info,
+  TriangleAlert,
+} from "lucide-react";
 import clsx from "clsx";
 import type { BookingSlot } from "@pantopus/types";
 import { publicBooking } from "@pantopus/api";
@@ -59,6 +73,36 @@ interface SlotPickerProps {
   pillar?: Pillar;
   /** Disable picking (e.g. past the reschedule cutoff). */
   disabled?: boolean;
+  /**
+   * DST/timezone hint copy to show between the timezone chip and calendar.
+   * When set, renders an INFO banner (design Frame 5).
+   * Typically "Clocks change this weekend — times are adjusted."
+   */
+  dstHint?: string | null;
+  /**
+   * Set of slot-start ISO strings that were taken by a race-condition (Frame 6).
+   * Slots in this set render with strikethrough + "Just taken" WARN pill badge.
+   * A floating WARN toast is shown when this set is non-empty.
+   */
+  takenSlots?: Set<string>;
+  /**
+   * Frame 2 — collective-intersect is in progress (Business/Home pillar, multi-member).
+   * Shows an avatar-cluster row, skeleton rows, and a ComposedPill instead of
+   * the plain loading skeleton.
+   */
+  composing?: boolean;
+  /**
+   * Frame 5 — composed-empty (Home intersect): slots were found for the month
+   * but none for this day because member calendars don't overlap.
+   * Shows a framed EmptyCard with calendar-x icon and member free/busy dots.
+   * Pass the member list via this prop; falls back to a generic card if omitted.
+   */
+  composedEmpty?: boolean;
+  /**
+   * Optional member list for the Frame 5 composed-empty card.
+   * Each entry has initials, gradient, and free/busy status.
+   */
+  composedMembers?: Array<{ initials: string; grad: string; free: boolean }>;
   className?: string;
 }
 
@@ -134,12 +178,106 @@ const FOCUS_RING: Record<Pillar, string> = {
 const FOCUS_BASE =
   "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1";
 
+// Design (slot-picker-frames.jsx SlotRow): full-width row button —
+//   Clock icon (left) + time text + optional host hint sub-label (flex-1) +
+//   chevron-right (default) or check-circle-2 (selected) on the right.
+//   When the slot is in takenSlots: strikethrough time + "Just taken" WARN pill.
+function SlotRow({
+  slot,
+  isSel,
+  isTaken,
+  disabled,
+  onPick,
+  tk,
+  pillar,
+}: {
+  slot: BookingSlot;
+  isSel: boolean;
+  isTaken: boolean;
+  disabled?: boolean;
+  onPick: (s: BookingSlot) => void;
+  tk: ReturnType<typeof pillarTokens>;
+  pillar: Pillar;
+}) {
+  const { label } = slotParts(slot);
+  const isDisabled = disabled || isTaken;
+  return (
+    <button
+      key={`${slot.start}-${slot.end}`}
+      type="button"
+      disabled={isDisabled}
+      onClick={() => !isTaken && onPick(slot)}
+      aria-pressed={isSel}
+      aria-label={
+        isTaken
+          ? `${label}, just taken`
+          : isSel
+            ? `${label}, selected`
+            : `${label}, available`
+      }
+      className={clsx(
+        "flex w-full items-center gap-2.5 rounded-xl border px-3 py-[11px] text-left transition-colors",
+        FOCUS_BASE,
+        FOCUS_RING[pillar],
+        isDisabled && !isSel && "cursor-not-allowed opacity-55",
+        isTaken && "opacity-55",
+        isSel
+          ? clsx(tk.bgSoft, tk.border)
+          : "border-app-border bg-app-surface hover:bg-app-hover",
+      )}
+    >
+      <Clock
+        className={clsx(
+          "h-3.5 w-3.5 shrink-0",
+          isSel ? tk.text : "text-app-text-muted",
+        )}
+        aria-hidden
+      />
+      <span
+        className={clsx(
+          "flex-1 text-[13.5px] font-bold tabular-nums leading-none",
+          isTaken
+            ? "text-app-text-muted line-through"
+            : isSel
+              ? tk.text
+              : "text-app-text",
+        )}
+      >
+        {label}
+      </span>
+      {isTaken ? (
+        <span
+          className="rounded-full border px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
+          style={{
+            color: "#B45309",
+            background: "#FFFBEB",
+            borderColor: "#FDE68A",
+          }}
+        >
+          Just taken
+        </span>
+      ) : isSel ? (
+        <CheckCircle2
+          className={clsx("h-[18px] w-[18px] shrink-0", tk.text)}
+          aria-hidden
+        />
+      ) : (
+        <ChevronRightSm
+          className="h-[17px] w-[17px] shrink-0 text-app-text-muted"
+          aria-hidden
+        />
+      )}
+    </button>
+  );
+}
+
 function SlotGroup({
   title,
   slots,
   onPick,
   selected,
   disabled,
+  takenSlots,
   tk,
   pillar,
 }: {
@@ -148,38 +286,31 @@ function SlotGroup({
   onPick: (s: BookingSlot) => void;
   selected?: string | null;
   disabled?: boolean;
+  takenSlots?: Set<string>;
   tk: ReturnType<typeof pillarTokens>;
   pillar: Pillar;
 }) {
   if (slots.length === 0) return null;
   return (
     <div role="group" aria-label={`${title} times`}>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-app-text-muted">
         {title}
       </p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="flex flex-col gap-2">
         {slots.map((slot) => {
           const isSel = selected === slot.start;
+          const isTaken = !!(takenSlots?.has(slot.start));
           return (
-            <button
+            <SlotRow
               key={`${slot.start}-${slot.end}`}
-              type="button"
+              slot={slot}
+              isSel={isSel}
+              isTaken={isTaken}
               disabled={disabled}
-              onClick={() => onPick(slot)}
-              aria-pressed={isSel}
-              aria-label={slotAriaLabel(slot)}
-              className={clsx(
-                "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
-                FOCUS_BASE,
-                FOCUS_RING[pillar],
-                disabled && "cursor-not-allowed opacity-50",
-                isSel
-                  ? clsx(tk.bg, tk.textOn, "border-transparent")
-                  : "border-app-border bg-app-surface text-app-text hover:bg-app-hover",
-              )}
-            >
-              {slotParts(slot).label}
-            </button>
+              onPick={onPick}
+              tk={tk}
+              pillar={pillar}
+            />
           );
         })}
       </div>
@@ -198,6 +329,11 @@ export default function SlotPicker({
   selected,
   pillar = "personal",
   disabled = false,
+  dstHint,
+  takenSlots,
+  composing = false,
+  composedEmpty = false,
+  composedMembers,
   className,
 }: SlotPickerProps) {
   const tk = pillarTokens(pillar);
@@ -320,6 +456,8 @@ export default function SlotPicker({
     else goMonth(1);
   };
 
+  const hasTakenSlots = !!(takenSlots?.size);
+
   return (
     <div className={clsx("space-y-5", className)}>
       {/* Timezone chip */}
@@ -338,6 +476,29 @@ export default function SlotPicker({
         <Globe className="h-3.5 w-3.5 text-app-text-muted" aria-hidden />
         {zoneLabel(tz)}
       </button>
+
+      {/* DST / timezone hint banner (Frame 5) — shown when dstHint is set. */}
+      {dstHint && (
+        <div
+          className="flex items-start gap-2 rounded-xl border px-3 py-2.5"
+          style={{
+            background: "#F0F9FF",
+            borderColor: "#BAE6FD",
+          }}
+        >
+          <Info
+            className="mt-0.5 h-3.5 w-3.5 shrink-0"
+            style={{ color: "#0369A1" }}
+            aria-hidden
+          />
+          <span
+            className="text-[11px] font-medium leading-[15px]"
+            style={{ color: "#0369A1" }}
+          >
+            {dstHint}
+          </span>
+        </div>
+      )}
 
       {/* Month header */}
       <div className="flex items-center justify-between">
@@ -429,37 +590,199 @@ export default function SlotPicker({
             message={error}
             onRetry={() => setReloadKey((k) => k + 1)}
           />
+        ) : loading && composing ? (
+          /* Frame 2 — Composing: collective-intersect in progress */
+          <div
+            className="space-y-3"
+            aria-label="Finding times for all members"
+            aria-busy="true"
+          >
+            {/* Avatar cluster + caption row */}
+            <div className="flex items-center gap-2.5 px-0.5">
+              <div className="flex">
+                {(
+                  composedMembers ?? [
+                    { initials: "A", grad: "linear-gradient(135deg,#a78bfa,#6d28d9)", free: true },
+                    { initials: "B", grad: "linear-gradient(135deg,#38bdf8,#0369a1)", free: true },
+                    { initials: "C", grad: "linear-gradient(135deg,#fdba74,#ea580c)", free: false },
+                  ]
+                ).map((m, i) => (
+                  <div
+                    key={i}
+                    style={{ background: m.grad, marginLeft: i === 0 ? 0 : -8 }}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white text-[8px] font-bold text-white"
+                  >
+                    {m.initials}
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs font-semibold text-app-text-secondary">
+                Finding times that work for everyone
+              </span>
+            </div>
+            {/* Skeleton slot rows */}
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface px-3 py-[11px]"
+                >
+                  <div className="h-3.5 w-3.5 shrink-0 animate-pulse rounded bg-app-surface-muted" />
+                  <div className="h-3 w-16 animate-pulse rounded bg-app-surface-muted" />
+                  <div className="flex-1" />
+                  <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-app-surface-muted" />
+                </div>
+              ))}
+            </div>
+            {/* ComposedPill — accent-tinted pill explaining composed availability */}
+            <div
+              className={clsx(
+                "flex items-center gap-2 rounded-xl border px-3 py-2.5",
+                tk.bgSoft,
+              )}
+              style={{ borderColor: `${tk.hex ?? "#0284c7"}33` }}
+            >
+              <CalendarClock
+                className={clsx("h-[15px] w-[15px] shrink-0", tk.text)}
+                aria-hidden
+              />
+              <span className="flex-1 text-[11.5px] font-medium leading-[15px] text-app-text-secondary">
+                Times come from each member's availability.
+              </span>
+            </div>
+          </div>
         ) : loading ? (
+          /* Frame 1 — Plain loading skeleton */
           <div
             className="space-y-2"
             aria-label="Loading times"
             aria-busy="true"
           >
             <div className="h-3 w-20 animate-pulse rounded bg-app-surface-muted" />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-10 animate-pulse rounded-lg bg-app-surface-muted"
+                  className="h-11 animate-pulse rounded-xl bg-app-surface-muted"
                 />
               ))}
             </div>
           </div>
         ) : !monthHasSlots ? (
-          <div className="rounded-xl border border-app-border bg-app-surface px-4 py-8 text-center">
-            <p className="text-sm font-medium text-app-text">
+          /* Frame 3 — No times in range: full EmptyCard with icon halo, body, CTAs */
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-app-border-strong bg-app-surface px-[18px] pb-[18px] pt-6 text-center">
+            {/* Icon halo */}
+            <div className="mb-2.5 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-app-surface-muted">
+              <CalendarSearch
+                className="h-[23px] w-[23px] text-app-text-muted"
+                strokeWidth={1.85}
+                aria-hidden
+              />
+            </div>
+            <p className="text-[15px] font-bold leading-5 tracking-tight text-app-text-strong">
               No open times in {MONTH_NAMES[cursor.month]}
             </p>
-            <button
-              type="button"
-              onClick={() => goMonth(1)}
-              className={clsx(
-                "mt-2 text-sm font-medium hover:underline",
-                tk.text,
-              )}
+            <p className="mt-2 max-w-[225px] text-[12px] leading-[17px] text-app-text-muted">
+              Availability changes often. Try a later month.
+            </p>
+            <div className="mt-3 flex w-full flex-col gap-2">
+              {/* Primary CTA — filled accent */}
+              <button
+                type="button"
+                onClick={() => goMonth(1)}
+                className={clsx(
+                  "inline-flex h-[42px] w-full items-center justify-center gap-[7px] rounded-[11px] border-none text-[13px] font-bold tracking-tight",
+                  tk.bg,
+                  tk.textOn,
+                )}
+              >
+                <ArrowRight className="h-[15px] w-[15px]" aria-hidden />
+                See {MONTH_NAMES[(cursor.month + 1) % 12]}
+              </button>
+              {/* Secondary CTA — ghost */}
+              <button
+                type="button"
+                className="inline-flex h-10 w-full items-center justify-center gap-[7px] rounded-[11px] border border-app-border bg-app-surface text-[12.5px] font-bold tracking-tight text-app-text"
+              >
+                <Bell className="h-[14px] w-[14px]" aria-hidden />
+                Get notified when times open
+              </button>
+            </div>
+          </div>
+        ) : daySlots.length === 0 && composedEmpty ? (
+          /* Frame 5 — Composed empty (Home intersect): member calendars don't overlap */
+          <div
+            className={clsx(
+              "flex flex-col items-center rounded-xl px-[18px] pb-[18px] pt-6 text-center",
+              tk.bgSoft,
+            )}
+            style={{ border: `1px solid ${tk.hex ?? "#16a34a"}33` }}
+          >
+            {/* Icon halo (white bg + accent border on framed variant) */}
+            <div
+              className="mb-2.5 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-white"
+              style={{ border: `1px solid ${tk.hex ?? "#16a34a"}33` }}
             >
-              See {MONTH_NAMES[(cursor.month + 1) % 12]}
-            </button>
+              <CalendarX
+                className={clsx("h-[23px] w-[23px]", tk.text)}
+                strokeWidth={1.85}
+                aria-hidden
+              />
+            </div>
+            <p className="max-w-[230px] text-[15px] font-bold leading-5 tracking-tight text-app-text-strong">
+              Everyone&apos;s calendars don&apos;t overlap in this window
+            </p>
+            <p className="mt-2 max-w-[225px] text-[12px] leading-[17px] text-app-text-muted">
+              These times need every required member free at once. Try widening the range.
+            </p>
+            {/* Member free/busy cluster — only shown when composedMembers is provided */}
+            {composedMembers && composedMembers.length > 0 && (
+              <div className="mt-3 flex w-full items-center justify-center gap-3.5 pb-0.5 pt-2.5">
+                {composedMembers.map((m, i) => (
+                  <div key={i} className="flex flex-col items-center gap-1.5">
+                    <div className="relative">
+                      <div
+                        style={{ background: m.grad }}
+                        className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
+                      >
+                        {m.initials}
+                      </div>
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 h-[11px] w-[11px] rounded-full border-2 border-white"
+                        style={{ background: m.free ? "#16A34A" : "#D1D5DB" }}
+                      />
+                    </div>
+                    <span
+                      className="text-[9px] font-semibold"
+                      style={{ color: m.free ? "#15803d" : undefined }}
+                    >
+                      {m.free ? "Free" : "Busy"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => goMonth(1)}
+                className={clsx(
+                  "inline-flex h-[42px] w-full items-center justify-center gap-[7px] rounded-[11px] border-none text-[13px] font-bold tracking-tight",
+                  tk.bg,
+                  tk.textOn,
+                )}
+              >
+                <ArrowRight className="h-[15px] w-[15px]" aria-hidden />
+                Try next month
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-10 w-full items-center justify-center gap-[7px] rounded-[11px] border border-app-border bg-app-surface text-[12.5px] font-bold tracking-tight text-app-text"
+              >
+                <Bell className="h-[14px] w-[14px]" aria-hidden />
+                Notify me
+              </button>
+            </div>
           </div>
         ) : daySlots.length === 0 ? (
           <div className="rounded-xl border border-app-border bg-app-surface px-4 py-8 text-center">
@@ -485,6 +808,7 @@ export default function SlotPicker({
               onPick={onPick}
               selected={selected}
               disabled={disabled}
+              takenSlots={takenSlots}
               tk={tk}
               pillar={pillar}
             />
@@ -494,6 +818,7 @@ export default function SlotPicker({
               onPick={onPick}
               selected={selected}
               disabled={disabled}
+              takenSlots={takenSlots}
               tk={tk}
               pillar={pillar}
             />
@@ -508,6 +833,35 @@ export default function SlotPicker({
         onSelect={handleTz}
         pillar={pillar}
       />
+
+      {/* Slot-just-taken floating WARN toast (Frame 6) */}
+      {hasTakenSlots && (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-6"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <div
+            className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 shadow-lg"
+            style={{
+              background: "#FFFBEB",
+              borderColor: "#FDE68A",
+            }}
+          >
+            <TriangleAlert
+              className="h-[15px] w-[15px] shrink-0"
+              style={{ color: "#B45309" }}
+              aria-hidden
+            />
+            <span
+              className="text-[12.5px] font-bold"
+              style={{ color: "#B45309" }}
+            >
+              That time was just taken
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

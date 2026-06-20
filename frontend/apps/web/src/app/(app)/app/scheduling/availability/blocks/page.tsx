@@ -94,7 +94,11 @@ export default function BlockOffPage() {
       >
         <ChevronLeft className="h-4 w-4" aria-hidden /> Availability
       </button>
-      <h1 className="mt-2 text-2xl font-bold text-app-text">Block off time</h1>
+      {/* Pillar overline — 'Personal · Availability' per block-time-frames.jsx:73 */}
+      <div className="mt-3 text-[9.5px] font-bold uppercase tracking-[0.08em] text-app-personal">
+        Personal · Availability
+      </div>
+      <h1 className="mt-1 text-2xl font-bold text-app-text">Block off time</h1>
       <p className="mt-0.5 max-w-md text-sm text-app-text-secondary">
         Drop a one-off or recurring busy hold so the engine stops offering that
         window. It&apos;s private to you.

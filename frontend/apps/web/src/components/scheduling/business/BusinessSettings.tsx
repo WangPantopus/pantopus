@@ -9,14 +9,12 @@
 // persist to notification-preferences. Business violet accents; sky controls.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import clsx from "clsx";
 import {
   AlertTriangle,
   Bell,
   CalendarCheck,
-  CalendarClock,
   CalendarRange,
-  ChevronRight,
+  ChevronLeft,
   Clock,
   CreditCard,
   GitCommitHorizontal,
@@ -27,13 +25,13 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import * as api from "@pantopus/api";
 import type {
   BookingPage,
   NotificationPreferences,
   PaymentsStatus,
 } from "@pantopus/types";
-import { webFeatureFlags } from "@/lib/featureFlags";
 import { PillarThemeProvider } from "@/components/scheduling/PillarThemeProvider";
 import TimezoneSelector, {
   zoneLabel,
@@ -53,12 +51,9 @@ import {
   Segmented,
   SettingRow,
   Skeleton,
-  Stepper,
   Toggle,
 } from "./ui";
 import { useBusinessOwner } from "./owner";
-import { rosterFromSeats, type TeamMemberView } from "./members";
-import AssignmentSection from "./AssignmentSection";
 import {
   type ConfirmationMode,
   type SchedulingDefaults,
@@ -67,7 +62,6 @@ import {
   bufferLabel,
   cancellationLabel,
   confirmationNote,
-  durationLabel,
   horizonLabel,
   minNoticeLabel,
   notifyMember,
@@ -76,52 +70,7 @@ import {
   readDefaults,
 } from "./settings";
 
-const NOTICE_OPTIONS = [60, 120, 240, 720, 1440, 2880];
-
-function ExpandRow({
-  icon,
-  label,
-  value,
-  open,
-  onToggle,
-  children,
-}: {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border-b border-app-border last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-app-hover"
-      >
-        <IconDisc icon={icon} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-medium text-app-text">
-            {label}
-          </p>
-          <p className="mt-0.5 truncate text-xs text-app-text-secondary">
-            {value}
-          </p>
-        </div>
-        <ChevronRight
-          className={clsx(
-            "h-4 w-4 shrink-0 text-app-text-muted transition-transform",
-            open && "rotate-90",
-          )}
-          aria-hidden
-        />
-      </button>
-      {open && <div className="bg-app-surface-muted px-4 py-3">{children}</div>}
-    </div>
-  );
-}
+const MANAGE_ROLES = new Set(["owner", "admin", "manager"]);
 
 export default function BusinessSettings() {
   const biz = useBusinessOwner();
@@ -130,15 +79,11 @@ export default function BusinessSettings() {
   const [page, setPage] = useState<BookingPage | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [payments, setPayments] = useState<PaymentsStatus | null>(null);
-  const [roster, setRoster] = useState<TeamMemberView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [tzOpen, setTzOpen] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [draft, setDraft] = useState<SchedulingDefaults | null>(null);
-
-  const paid = webFeatureFlags.schedulingPaid;
 
   const load = useCallback(async () => {
     if (!owner?.ownerId) {
@@ -157,23 +102,17 @@ export default function BusinessSettings() {
       setPage(pageRes.page);
       setPrefs(prefsRes.prefs ?? {});
       setDraft(readDefaults(pageRes.page));
-      // Roster + payments are non-blocking enrichments.
-      api.businessSeats
-        .getBusinessSeats(owner.ownerId)
-        .then((r) => setRoster(rosterFromSeats(r.seats)))
-        .catch(() => setRoster([]));
-      if (paid) {
-        api.scheduling
-          .getPaymentsStatus(owner)
-          .then(setPayments)
-          .catch(() => setPayments(null));
-      }
+      // Payments is a non-blocking enrichment.
+      api.scheduling
+        .getPaymentsStatus(owner)
+        .then(setPayments)
+        .catch(() => setPayments(null));
     } catch (err) {
       setError(decodeError(err).message);
     } finally {
       setLoading(false);
     }
-  }, [owner, paid]);
+  }, [owner]);
 
   useEffect(() => {
     void load();
@@ -305,6 +244,13 @@ export default function BusinessSettings() {
 
   const approve = draft.confirmation === "approve";
 
+  // Permission-gated state: non-admin members see a read-only view with dimmed
+  // sections and a lock note at the bottom (design FrameGated).
+  const gatedRole = biz.active?.role?.toLowerCase() ?? "";
+  const gated = gatedRole
+    ? ![...MANAGE_ROLES].some((r) => gatedRole.includes(r))
+    : false; // owner default — not gated
+
   return (
     <PillarThemeProvider pillar="business">
       <div className="mx-auto max-w-2xl">
@@ -319,29 +265,8 @@ export default function BusinessSettings() {
         </p>
 
         <div className="space-y-1">
-          {/* Team */}
-          <Group title="Team">
-            <SettingRow
-              icon={CalendarClock}
-              label="Team booking availability"
-              sub="Who’s bookable and their hours"
-              href="/app/scheduling/business/team-availability"
-              iconTone="business"
-            />
-            <SettingRow
-              icon={Users}
-              label="Members & seats"
-              sub={`${roster.length || "—"} on the team`}
-              href="/app/scheduling/business/team-availability"
-              last
-            />
-          </Group>
-
-          {/* Assignment (mounts G1/G2) */}
-          <AssignmentSection owner={owner} roster={roster} />
-
           {/* Confirmation */}
-          <section>
+          <section style={{ opacity: gated ? 0.55 : 1 }}>
             <AccentOverline className="pb-2 pt-4">Confirmation</AccentOverline>
             <Card>
               <div className="px-4 py-3.5">
@@ -353,218 +278,124 @@ export default function BusinessSettings() {
                 </div>
                 <Segmented<ConfirmationMode>
                   value={draft.confirmation}
-                  onChange={(id) => editDefaults({ confirmation: id })}
+                  onChange={gated ? undefined : (id) => editDefaults({ confirmation: id })}
                   options={[
                     { id: "auto", label: "Auto-confirm" },
                     { id: "approve", label: "Approve each request" },
                   ]}
+                  disabled={gated}
                 />
                 <p className="mt-2 px-0.5 text-[11px] leading-tight text-app-text-secondary">
                   {confirmationNote(draft.confirmation)}
                 </p>
               </div>
               {approve && (
-                <ExpandRow
+                <SettingRow
                   icon={Hourglass}
                   label="Approval window"
-                  value={approvalWindowLabel(draft.approvalWindowHours)}
-                  open={expanded === "approval"}
-                  onToggle={() =>
-                    setExpanded(expanded === "approval" ? null : "approval")
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-app-text-secondary">
-                      Hours to respond
-                    </span>
-                    <Stepper
-                      value={draft.approvalWindowHours}
-                      onChange={(n) => editDefaults({ approvalWindowHours: n })}
-                      min={1}
-                      max={168}
-                      suffix="h"
-                      accent
-                      ariaLabel="Approval window hours"
-                    />
-                  </div>
-                </ExpandRow>
+                  sub={approvalWindowLabel(draft.approvalWindowHours)}
+                  href={gated ? undefined : "/app/scheduling/business/settings/approval-window"}
+                  last
+                  trailing={gated ? null : <Chevron />}
+                />
               )}
             </Card>
           </section>
 
-          {/* Scheduling */}
-          <section>
-            <AccentOverline className="pb-2 pt-4">Scheduling</AccentOverline>
-            <Card>
-              <ExpandRow
+          {/* Scheduling — navigate rows, no inline expand */}
+          <div style={{ opacity: gated ? 0.7 : 1 }}>
+            <Group title="Scheduling">
+              <SettingRow
                 icon={Clock}
                 label="Minimum notice"
-                value={minNoticeLabel(draft.minNoticeMin)}
-                open={expanded === "notice"}
-                onToggle={() =>
-                  setExpanded(expanded === "notice" ? null : "notice")
-                }
-              >
-                <div className="flex flex-wrap gap-2">
-                  {NOTICE_OPTIONS.map((m) => {
-                    const on = draft.minNoticeMin === m;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => editDefaults({ minNoticeMin: m })}
-                        className={clsx(
-                          "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                          on
-                            ? "border-app-business bg-app-business-bg text-app-business"
-                            : "border-app-border bg-app-surface text-app-text-secondary hover:bg-app-hover",
-                        )}
-                      >
-                        {durationLabel(m)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </ExpandRow>
-              <ExpandRow
+                sub={minNoticeLabel(draft.minNoticeMin)}
+                href={gated ? undefined : "/app/scheduling/business/settings/minimum-notice"}
+                trailing={gated ? null : <Chevron />}
+              />
+              <SettingRow
                 icon={CalendarRange}
                 label="Booking horizon"
-                value={horizonLabel(draft.maxHorizonDays)}
-                open={expanded === "horizon"}
-                onToggle={() =>
-                  setExpanded(expanded === "horizon" ? null : "horizon")
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-app-text-secondary">
-                    Days bookable in advance
-                  </span>
-                  <Stepper
-                    value={draft.maxHorizonDays}
-                    onChange={(n) => editDefaults({ maxHorizonDays: n })}
-                    min={1}
-                    max={365}
-                    step={5}
-                    accent
-                    ariaLabel="Booking horizon days"
-                  />
-                </div>
-              </ExpandRow>
-              <ExpandRow
+                sub={horizonLabel(draft.maxHorizonDays)}
+                href={gated ? undefined : "/app/scheduling/business/settings/booking-horizon"}
+                trailing={gated ? null : <Chevron />}
+              />
+              <SettingRow
                 icon={GitCommitHorizontal}
                 label="Buffers"
-                value={bufferLabel(draft.bufferBeforeMin, draft.bufferAfterMin)}
-                open={expanded === "buffers"}
-                onToggle={() =>
-                  setExpanded(expanded === "buffers" ? null : "buffers")
-                }
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-app-text-secondary">
-                      Before each booking
-                    </span>
-                    <Stepper
-                      value={draft.bufferBeforeMin}
-                      onChange={(n) => editDefaults({ bufferBeforeMin: n })}
-                      min={0}
-                      max={120}
-                      step={5}
-                      suffix="m"
-                      accent
-                      ariaLabel="Buffer before minutes"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-app-text-secondary">
-                      After each booking
-                    </span>
-                    <Stepper
-                      value={draft.bufferAfterMin}
-                      onChange={(n) => editDefaults({ bufferAfterMin: n })}
-                      min={0}
-                      max={120}
-                      step={5}
-                      suffix="m"
-                      accent
-                      ariaLabel="Buffer after minutes"
-                    />
-                  </div>
-                </div>
-              </ExpandRow>
+                sub={bufferLabel(draft.bufferBeforeMin, draft.bufferAfterMin)}
+                href={gated ? undefined : "/app/scheduling/business/settings/buffers"}
+                trailing={gated ? null : <Chevron />}
+              />
               <SettingRow
                 icon={Globe}
                 label="Time zone"
                 sub={page.timezone ? zoneLabel(page.timezone) : "Not set"}
-                onClick={() => setTzOpen(true)}
+                onClick={gated ? undefined : () => setTzOpen(true)}
                 last
-                trailing={
-                  <div className="flex items-center gap-1.5">
-                    {page.timezone && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-app-business-bg text-app-business">
-                        <Lock className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                    )}
-                    <Chevron />
-                  </div>
-                }
+                trailing={gated ? null : <Chevron />}
               />
-            </Card>
-          </section>
+            </Group>
+          </div>
 
-          {/* Policy */}
-          <section>
-            <AccentOverline className="pb-2 pt-4">Policy</AccentOverline>
-            <Card>
-              <SettingRow
-                icon={Shield}
-                label="Cancellation & no-show policy"
-                sub={cancellationLabel(page.cancellation_policy) ?? undefined}
-                href="/app/scheduling/payments/policy"
-                last
-                trailing={
-                  cancellationLabel(page.cancellation_policy) ? (
-                    <Chevron />
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <Chip tone="warning">Set up</Chip>
+          {/* Policy — hidden when gated */}
+          {!gated && (
+            <section>
+              <AccentOverline className="pb-2 pt-4">Policy</AccentOverline>
+              <Card>
+                <SettingRow
+                  icon={Shield}
+                  label="Cancellation & no-show policy"
+                  sub={cancellationLabel(page.cancellation_policy) ?? undefined}
+                  href="/app/scheduling/payments/policy"
+                  last
+                  trailing={
+                    cancellationLabel(page.cancellation_policy) ? (
                       <Chevron />
-                    </div>
-                  )
-                }
-              />
-            </Card>
-          </section>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <Chip tone="warning">Set up</Chip>
+                        <Chevron />
+                      </div>
+                    )
+                  }
+                />
+              </Card>
+            </section>
+          )}
 
           {/* Notifications */}
-          <Group title="Notifications">
-            <SettingRow
-              icon={Bell}
-              label="Notify the owner"
-              trailing={
-                <Toggle
-                  on={notifyOwner(prefs)}
-                  onChange={(v) => void patchPrefs({ notifyOwner: v })}
-                  label="Notify the owner"
-                />
-              }
-            />
-            <SettingRow
-              icon={UserCheck}
-              label="Notify the assigned member"
-              last
-              trailing={
-                <Toggle
-                  on={notifyMember(prefs)}
-                  onChange={(v) => void patchPrefs({ notifyMember: v })}
-                  label="Notify the assigned member"
-                />
-              }
-            />
-          </Group>
+          <div style={{ opacity: gated ? 0.7 : 1 }}>
+            <Group title="Notifications">
+              <SettingRow
+                icon={Bell}
+                label="Notify the owner"
+                trailing={
+                  <Toggle
+                    on={notifyOwner(prefs)}
+                    onChange={gated ? undefined : (v) => void patchPrefs({ notifyOwner: v })}
+                    disabled={gated}
+                    label="Notify the owner"
+                  />
+                }
+              />
+              <SettingRow
+                icon={UserCheck}
+                label="Notify the assigned member"
+                last
+                trailing={
+                  <Toggle
+                    on={notifyMember(prefs)}
+                    onChange={gated ? undefined : (v) => void patchPrefs({ notifyMember: v })}
+                    disabled={gated}
+                    label="Notify the assigned member"
+                  />
+                }
+              />
+            </Group>
+          </div>
 
-          {/* Payments (paid flag) */}
-          {paid && (
+          {/* Payments — shown unconditionally per design; hidden when gated */}
+          {!gated && (
             <section>
               <AccentOverline className="pb-2 pt-4">Payments</AccentOverline>
               <Card>
@@ -609,6 +440,16 @@ export default function BusinessSettings() {
               )}
             </section>
           )}
+
+          {/* Lock note — only admins can change booking settings */}
+          {gated && (
+            <div className="flex items-center gap-1.5 px-1 py-0.5 text-app-text-muted">
+              <Lock className="h-3 w-3" aria-hidden />
+              <span className="text-[11px] font-medium">
+                Only admins can change booking settings.
+              </span>
+            </div>
+          )}
         </div>
 
         <p className="mt-6 px-1 font-mono text-[11px] text-app-text-muted">
@@ -641,11 +482,20 @@ function Header({
 }) {
   return (
     <div className="mb-3 flex items-start justify-between gap-3">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-app-business">
-          Business
-        </p>
-        <h1 className="text-xl font-bold text-app-text">Booking settings</h1>
+      <div className="flex items-center gap-2">
+        <Link
+          href="/app/scheduling/business"
+          aria-label="Back"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-app-text-secondary transition-colors hover:bg-app-hover"
+        >
+          <ChevronLeft className="h-5 w-5" aria-hidden />
+        </Link>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-app-business">
+            Business
+          </p>
+          <h1 className="text-xl font-bold text-app-text">Booking settings</h1>
+        </div>
       </div>
       <BusinessSwitcher
         options={options}

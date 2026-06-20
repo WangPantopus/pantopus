@@ -53,8 +53,8 @@ export const DEFAULT_CUSTOM: CustomPolicy = {
 
 /** Allowed cutoff steps (hours) for the custom stepper. */
 export const CUTOFF_STEPS = [0, 1, 2, 6, 12, 24, 48, 72, 168];
-/** Allowed refund-after-cutoff steps (percent). */
-export const REFUND_STEPS = [0, 25, 50, 75, 100];
+/** Allowed refund-after-cutoff steps (percent). 5 % granularity matching native (iOS/Android). */
+export const REFUND_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
 
 export function cutoffLabel(hours: number): string {
   if (hours <= 0) return "Anytime";

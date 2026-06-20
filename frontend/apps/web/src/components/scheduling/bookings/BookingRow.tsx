@@ -11,7 +11,7 @@ import { Check, MoreVertical, X } from "lucide-react";
 import type { Booking } from "@pantopus/types";
 import BookingStatusPill from "@/components/scheduling/BookingStatusPill";
 import {
-  pillarTokens,
+  PRIMARY_BLUE_CLS,
   type Pillar,
 } from "@/components/scheduling/pillarTokens";
 import { Avatar, AssignedChip, OwnerGlyph } from "./primitives";
@@ -45,7 +45,6 @@ export default function BookingRow({
   onDecline?: () => void;
 }) {
   const { booking, pillar, ownerLabel, eventName, assignedLabel } = row;
-  const tk = pillarTokens(pillar);
   const showActions = quickActions && !!onApprove && !!onDecline;
 
   return (
@@ -110,8 +109,8 @@ export default function BookingRow({
             onClick={onApprove}
             className={clsx(
               "inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition disabled:opacity-60",
-              tk.bg,
-              tk.textOn,
+              PRIMARY_BLUE_CLS.bg,
+              PRIMARY_BLUE_CLS.textOn,
             )}
           >
             <Check className="h-3.5 w-3.5" aria-hidden />

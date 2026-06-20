@@ -53,18 +53,13 @@ export default function TerminalState({
           </p>
         )}
         {children && <div className="mt-6">{children}</div>}
+        {/* Dock: design order — Get the app (filled primary) first, Back to Pantopus (ghost) below */}
         <div className="mt-10 flex flex-col items-center gap-3">
-          <Link
-            href="/"
-            className="text-sm font-medium text-app-text-secondary hover:text-app-text"
-          >
-            Back to Pantopus
-          </Link>
           {IOS_APP_STORE_URL && (
             <a
               href={IOS_APP_STORE_URL}
               className={clsx(
-                "rounded-lg px-4 py-2 text-sm font-semibold",
+                "inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold",
                 tk.bg,
                 tk.textOn,
               )}
@@ -72,6 +67,12 @@ export default function TerminalState({
               Get the app
             </a>
           )}
+          <Link
+            href="/"
+            className="text-sm font-medium text-app-text-secondary hover:text-app-text"
+          >
+            Back to Pantopus
+          </Link>
         </div>
       </div>
     </main>

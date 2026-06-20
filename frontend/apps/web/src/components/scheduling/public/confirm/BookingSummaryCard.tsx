@@ -196,14 +196,18 @@ export default function BookingSummaryCard({
           <button
             type="button"
             onClick={onChangeTz}
-            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-app-personal-bg px-2.5 py-1 text-[10.5px] font-semibold text-app-personal hover:opacity-90"
+            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold hover:opacity-90"
+            style={{ background: "var(--color-primary-100)", color: "var(--color-primary-700)" }}
           >
             <Globe className="h-3 w-3" aria-hidden />
             {tzChipLabel(tz, startISO)}
-            <span className={clsx("font-bold", tk.text)}>Change</span>
+            <span className="font-bold">Change</span>
           </button>
         ) : (
-          <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-app-personal-bg px-2.5 py-1 text-[10.5px] font-semibold text-app-personal">
+          <span
+            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold"
+            style={{ background: "var(--color-primary-100)", color: "var(--color-primary-700)" }}
+          >
             <Globe className="h-3 w-3" aria-hidden />
             {tzChipLabel(tz, startISO)}
           </span>
