@@ -71,7 +71,9 @@ internal fun WaitlistJoinSheet(
         containerColor = PantopusColors.appSurface,
         modifier = Modifier.testTag(WAITLIST_JOIN_TAG),
     ) {
-        if (state.didJoin) {
+        if (state.alreadyJoined) {
+            AlreadyJoinedState(accent = accent, onDone = onDismiss)
+        } else if (state.didJoin) {
             JoinedConfirmation(accent = accent, onDone = onDismiss)
         } else {
             Column(
@@ -107,14 +109,14 @@ internal fun WaitlistJoinSheet(
                         accent = accent,
                     )
                 }
-                LabeledField("Email") {
+                LabeledField("Mobile") {
                     ExtrasInputField(
                         value = state.email,
                         onValueChange = onEmail,
-                        placeholder = "For an alert when a spot opens",
-                        leadingIcon = PantopusIcon.Mail,
+                        placeholder = "For a text when a spot opens",
+                        leadingIcon = PantopusIcon.Phone,
                         accent = accent,
-                        keyboardType = KeyboardType.Email,
+                        keyboardType = KeyboardType.Phone,
                     )
                 }
                 LabeledField("Preferred time") {
@@ -185,6 +187,52 @@ private fun TimezoneChip(label: String) {
     }
 }
 
+/**
+ * E13 Frame 3 — FrameAlready. Shown when the invitee's contact is already on the
+ * waitlist (409 from the join API). Design: clock icon on accentBg disc,
+ * 'You're already waiting' title, 'Leave waitlist' ghost CTA.
+ * Join date is omitted: the 409 response carries no waitlist entry data.
+ */
+@Composable
+private fun AlreadyJoinedState(
+    accent: Color,
+    onDone: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(74.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = ACCENT_DISC_ALPHA))
+                    .border(1.dp, accent.copy(alpha = ACCENT_RING_ALPHA), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = PantopusIcon.Clock, contentDescription = null, size = 34.dp, tint = accent)
+        }
+        Text(
+            text = "You're already waiting",
+            style = ExtrasType.header.copy(fontSize = 17.5.sp),
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "We'll text you the moment a spot opens.",
+            style = ExtrasType.body13,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+        )
+        GhostButton(title = "Leave waitlist", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4))
+    }
+}
+
+private const val ACCENT_DISC_ALPHA = 0.12f
+private const val ACCENT_RING_ALPHA = 0.25f
+
 @Composable
 private fun JoinedConfirmation(
     accent: Color,
@@ -218,6 +266,10 @@ private fun JoinedConfirmation(
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
         )
-        GhostButton(title = "Done", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4))
+        // Design (waitlist-frames.jsx:154) specifies 'Leave waitlist' ghost CTA.
+        // No backend leave-waitlist endpoint exists yet; the button dismisses the
+        // sheet. When the leave endpoint ships, wire onDone to a dedicated onLeave
+        // callback that calls DELETE /waitlist/:id.
+        GhostButton(title = "Leave waitlist", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4))
     }
 }

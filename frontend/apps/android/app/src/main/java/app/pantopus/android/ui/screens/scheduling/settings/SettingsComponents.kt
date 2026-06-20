@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -152,6 +153,7 @@ internal fun SettingsRow(
 internal fun SettingsTzRight(
     accent: Color,
     locked: Boolean,
+    accentBg: Color = PantopusColors.primary50,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(
@@ -159,7 +161,7 @@ internal fun SettingsTzRight(
                 Modifier
                     .size(30.dp)
                     .clip(RoundedCornerShape(Radii.md))
-                    .background(if (locked) PantopusColors.primary50 else PantopusColors.appSurfaceSunken)
+                    .background(if (locked) accentBg else PantopusColors.appSurfaceSunken)
                     .border(
                         1.dp,
                         if (locked) accent.copy(alpha = 0.2f) else PantopusColors.appBorder,
@@ -225,6 +227,40 @@ internal fun SettingsConnectPill(
     ) {
         Text("Connect", color = PantopusColors.appTextInverse, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
     }
+}
+
+/**
+ * Green "Saved" chip shown in the trailing of a row just after a successful
+ * write — mirrors the design's SavedChip and iOS's .savedChip state.
+ */
+@Composable
+internal fun SettingsSavedChip() {
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.successLight).padding(horizontal = 9.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.success)
+        Text("Saved", color = PantopusColors.success, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+    }
+}
+
+/**
+ * Inline shimmer placeholder — replaces a row's trailing/sublabel region
+ * while a write is in-flight, matching the design's Shimmer component.
+ */
+@Composable
+internal fun SettingsRowShimmer(
+    width: Dp = 84.dp,
+    height: Dp = 14.dp,
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(7.dp))
+            .background(PantopusColors.appSurfaceSunken),
+    )
 }
 
 @Composable

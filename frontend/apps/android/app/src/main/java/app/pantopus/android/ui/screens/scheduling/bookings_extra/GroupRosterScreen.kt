@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
@@ -138,7 +139,7 @@ fun GroupRosterScreen(
             if (loaded != null) {
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.openNudge() },
-                    containerColor = loaded.data.pillar.accent,
+                    containerColor = SchedulingPillar.operationalPrimary,
                     contentColor = PantopusColors.appTextInverse,
                     modifier = Modifier.testTag(ROSTER_MESSAGE_ALL_TAG),
                     icon = {
@@ -178,6 +179,7 @@ fun GroupRosterScreen(
             onNoteChange = viewModel::setNoShowNote,
             onConfirm = viewModel::confirmNoShow,
             onDismiss = viewModel::dismissNoShow,
+            accent = loaded?.data?.pillar?.accent ?: PantopusColors.primary600,
         )
     }
     nudge?.let { sheet ->

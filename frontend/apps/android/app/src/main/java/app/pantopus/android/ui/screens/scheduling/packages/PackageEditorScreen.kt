@@ -198,9 +198,23 @@ private fun EditorCards(
                 placeholder = "What's included",
             )
         }
+        // Locked-state warning (design Frame 4 — has active buyers)
+        if (state.locked) {
+            PkgNote(
+                tone = PkgNoteTone.Warning,
+                icon = PantopusIcon.Lock,
+                text = "Buyers own credits — you can't change sessions or eligibility while credits are active.",
+            )
+        }
         // Redeems against
         PkgCard(overline = "Redeems against") {
-            RedeemTiles(state.eventTypes, form.selectedEventTypeId, state.pillar, onSelectEventType)
+            RedeemTiles(
+                state.eventTypes,
+                form.selectedEventTypeId,
+                state.pillar,
+                onSelectEventType,
+                locked = state.locked,
+            )
         }
         // Sessions
         PkgCard(overline = "Sessions") {
@@ -212,7 +226,11 @@ private fun EditorCards(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                PkgStepper(value = form.sessionsCount, onValueChange = onSessions)
+                PkgStepper(
+                    value = form.sessionsCount,
+                    onValueChange = onSessions,
+                    enabled = !state.locked,
+                )
             }
         }
         // Price
@@ -289,6 +307,7 @@ private fun RedeemTiles(
     selectedId: String?,
     pillar: SchedulingPillar,
     onSelect: (String?) -> Unit,
+    locked: Boolean = false,
 ) {
     if (eventTypes.isEmpty()) {
         Text(
@@ -316,7 +335,8 @@ private fun RedeemTiles(
                         selected = if (isAll) selectedId == null else selectedId == option.id,
                         accent = pillar.accent,
                         accentBg = pillar.accentBg,
-                        onClick = { onSelect(if (isAll) null else option.id) },
+                        onClick = { if (!locked) onSelect(if (isAll) null else option.id) },
+                        enabled = !locked,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -336,6 +356,7 @@ private fun EventTile(
     accentBg: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Column(
         modifier =
@@ -347,7 +368,7 @@ private fun EventTile(
                     if (selected) accent else PantopusColors.appBorder,
                     RoundedCornerShape(Radii.lg),
                 )
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = 11.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {

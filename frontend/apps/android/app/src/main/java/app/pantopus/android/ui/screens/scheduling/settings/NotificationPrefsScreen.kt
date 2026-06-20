@@ -27,7 +27,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -70,6 +69,8 @@ private fun NotifBody(
     vm: NotificationPrefsViewModel,
     onOpenSettings: () -> Unit,
 ) {
+    val accent = data.pillar.accent
+    val accentBg = data.pillar.accentBg
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = Spacing.s6)) {
         if (data.paused) NotifPauseBanner()
         if (data.pushOff) NotifPushOffNotice(onOpenSettings = onOpenSettings)
@@ -78,6 +79,8 @@ private fun NotifBody(
             label = "Notify me",
             helper = "Only you see these. Pick the channel for each event.",
             disabled = data.paused,
+            accent = accent,
+            accentBg = accentBg,
         ) {
             data.notifyMe.forEachIndexed { index, row ->
                 NotifMatrixRow(
@@ -86,10 +89,16 @@ private fun NotifBody(
                     paused = data.paused,
                     pushOff = data.pushOff,
                     showDivider = true,
+                    accent = accent,
                     onToggle = { vm.toggleNotifyMe(row.key) },
                 )
                 if (index == data.notifyMe.lastIndex) {
-                    ReminderLeadTime(selected = data.reminderMinutes, paused = data.paused, onToggle = vm::toggleReminder)
+                    ReminderLeadTime(
+                        selected = data.reminderMinutes,
+                        paused = data.paused,
+                        accent = accent,
+                        onToggle = vm::toggleReminder,
+                    )
                 }
             }
         }
@@ -98,6 +107,8 @@ private fun NotifBody(
             label = "Notify attendees",
             helper = "Attendees always get a confirmation — you choose the rest.",
             disabled = data.paused,
+            accent = accent,
+            accentBg = accentBg,
         ) {
             data.notifyAttendees.forEachIndexed { index, row ->
                 NotifMatrixRow(
@@ -106,6 +117,7 @@ private fun NotifBody(
                     paused = data.paused,
                     pushOff = data.pushOff,
                     showDivider = index < data.notifyAttendees.lastIndex,
+                    accent = accent,
                     onToggle = { vm.toggleNotifyAttendees(row.key) },
                 )
             }
@@ -130,6 +142,6 @@ private fun NotifError(
         Spacer(Modifier.height(Spacing.s2))
         Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
         Spacer(Modifier.height(Spacing.s4))
-        TextButton(onClick = onRetry) { Text("Try again", color = SchedulingPillar.Personal.accent) }
+        TextButton(onClick = onRetry) { Text("Try again", color = PantopusColors.primary600) }
     }
 }

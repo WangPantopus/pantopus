@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -57,6 +58,9 @@ fun ApproveDeclineSheet(
     onSelectReason: (String) -> Unit,
     onSetNote: (String) -> Unit,
     onDecline: () -> Unit,
+    /** Invoked when the user taps "Propose another time" in decline mode.
+     *  Null hides the link (e.g. when reschedule is not available). */
+    onProposeTime: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     ModalBottomSheet(
@@ -83,6 +87,13 @@ fun ApproveDeclineSheet(
             Spacer(Modifier.height(Spacing.s3))
             SlotLine(state.slotLabel, state.pillar.accent)
 
+            // Design FrameConflict: amber conflict banner between SlotLine and the
+            // note/reason area (approve-decline-frames.jsx:113-120, :198-209).
+            if (state.hasConflict) {
+                Spacer(Modifier.height(Spacing.s3))
+                SheetConflictBanner()
+            }
+
             if (state.declineExpanded) {
                 Spacer(Modifier.height(Spacing.s4))
                 ReasonChips(
@@ -90,6 +101,12 @@ fun ApproveDeclineSheet(
                     selected = state.selectedReason,
                     onSelect = onSelectReason,
                 )
+                // Design FrameDeclineExpanded: "Propose another time" link below chips
+                // (approve-decline-frames.jsx:153-155) — calendar-plus icon, PRIMARY blue.
+                onProposeTime?.let { propose ->
+                    Spacer(Modifier.height(Spacing.s3))
+                    ProposeTimeLink(onClick = propose)
+                }
             } else if (state.intakeCount > 0) {
                 Spacer(Modifier.height(Spacing.s2))
                 IntakePreview(state.intakeCount)
@@ -117,9 +134,11 @@ fun ApproveDeclineSheet(
                     modifier = Modifier.testTag("approveDeclineConfirmDecline"),
                 )
             } else {
+                // Design: Approve CTA is always PRIMARY blue (#0284c7), not the pillar
+                // accent (approve-decline-frames.jsx:20, :126 — background:PRIMARY).
                 PillarFilledButton(
                     label = "Approve",
-                    accent = state.pillar.accent,
+                    accent = SchedulingPillar.operationalPrimary,
                     leadingIcon = PantopusIcon.Check,
                     loading = state.approving,
                     enabled = !state.submitting,
@@ -220,6 +239,12 @@ private fun SlotLine(
     }
 }
 
+/**
+ * Design: IntakePreview is a button element with a chevron-down icon
+ * (approve-decline-frames.jsx:96-101). Tapping opens the detail screen's
+ * intake card; the handler is a no-op affordance here until a dedicated
+ * expand route lands.
+ */
 @Composable
 private fun IntakePreview(count: Int) {
     Row(
@@ -229,6 +254,7 @@ private fun IntakePreview(count: Int) {
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClickLabel = "View intake answers") {}
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
@@ -247,6 +273,85 @@ private fun IntakePreview(count: Int) {
             modifier = Modifier.weight(1f),
         )
         Text(text = "$count answers", fontSize = 11.sp, color = PantopusColors.appTextMuted)
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronDown,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.appTextMuted,
+        )
+    }
+}
+
+/**
+ * Design FrameConflict: amber conflict banner inside the approve/decline sheet,
+ * rendered between SlotLine and the note/reason area when [ApproveDeclineSheetState.hasConflict]
+ * is true. Mirrors the amber ConflictBanner on the detail screen but lives inside
+ * the modal (approve-decline-frames.jsx:113-120).
+ */
+@Composable
+private fun SheetConflictBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.TriangleAlert,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "This slot overlaps a confirmed booking",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.warning,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "View",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+            modifier = Modifier.clickable(onClickLabel = "View conflict") {},
+        )
+    }
+}
+
+/**
+ * Design FrameDeclineExpanded: "Propose another time" text+icon link below the
+ * reason chips (approve-decline-frames.jsx:153-155). Calendar-plus icon, PRIMARY blue.
+ */
+@Composable
+private fun ProposeTimeLink(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .clickable(onClickLabel = "Propose another time", onClick = onClick)
+                .padding(vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CalendarPlus,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "Propose another time",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary600,
+        )
     }
 }
 

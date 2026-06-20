@@ -128,7 +128,7 @@ fun VisitSetupScreen(
                             enabled = canSave,
                         ) {
                             Text(
-                                "Schedule",
+                                "Next",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (canSave) PantopusColors.home else PantopusColors.appTextMuted,

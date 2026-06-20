@@ -34,7 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -289,7 +292,7 @@ private fun EligibleRow(state: BuyPackageUiState.Ready) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.BadgeCheck,
+            icon = PantopusIcon.TicketCheck,
             contentDescription = null,
             size = 16.dp,
             tint = state.pillar.accent,
@@ -379,7 +382,18 @@ private fun GuestEmailCard() {
             Text(text = "you@email.com", color = PantopusColors.appTextMuted, fontSize = 12.5.sp)
         }
         Text(
-            text = "We'll send your receipt and credits here. Sign in",
+            text =
+                buildAnnotatedString {
+                    append("We'll send your receipt and credits here. ")
+                    withStyle(
+                        SpanStyle(
+                            color = PantopusColors.primary600,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    ) {
+                        append("Sign in")
+                    }
+                },
             color = PantopusColors.appTextSecondary,
             fontSize = 10.5.sp,
         )
@@ -414,7 +428,7 @@ private fun UpsellBanner(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             PantopusIconImage(
-                icon = PantopusIcon.Tag,
+                icon = PantopusIcon.Ticket,
                 contentDescription = null,
                 size = 16.dp,
                 tint = PantopusColors.info,

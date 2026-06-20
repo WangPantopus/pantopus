@@ -69,8 +69,8 @@ fun WaitlistScreen(
                 is WaitlistUiState.Error -> SchedulingExtrasError(headline = "Couldn't load the waitlist", onRetry = viewModel::load)
                 is WaitlistUiState.Empty ->
                     EmptyState(
-                        icon = PantopusIcon.Users,
-                        headline = "No event types yet",
+                        icon = PantopusIcon.Clock,
+                        headline = "No waitlists yet",
                         subcopy = "Create a bookable event type to start collecting a waitlist.",
                     )
                 is WaitlistUiState.Loaded ->

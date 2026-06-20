@@ -6,9 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.EventTypeDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +56,8 @@ class WaitlistViewModel
     @Inject
     constructor(
         private val repo: SchedulingRepository,
+        private val homes: HomesRepository,
+        private val auth: AuthRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<WaitlistUiState>(WaitlistUiState.Loading)
         val state: StateFlow<WaitlistUiState> = _state.asStateFlow()
@@ -60,7 +65,12 @@ class WaitlistViewModel
         private val _toast = MutableStateFlow<String?>(null)
         val toast: StateFlow<String?> = _toast.asStateFlow()
 
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        // Owner is resolved lazily at first load using BookingsExtrasOwner.resolve()
+        // to derive the real Personal/Home/Business context from auth/homes, instead
+        // of hardcoding Personal. The arg-less route has no nav-arg owner so we
+        // probe in pillar order (Personal → Home → Business) and pick the first that
+        // returns active event types.
+        private var owner: SchedulingOwner = SchedulingOwner.Personal
         private var options: List<EventTypeOption> = emptyList()
         private var eventTypesById: Map<String, EventTypeDto> = emptyMap()
         private var selectedId: String? = null
@@ -78,6 +88,11 @@ class WaitlistViewModel
         fun load() {
             viewModelScope.launch {
                 _state.value = WaitlistUiState.Loading
+                // Resolve the real owner (Personal → Home → Business) by probing
+                // each pillar in order and picking the first that has active event
+                // types. This replaces the prior hardcoded Personal owner so that
+                // Business and Home hosts see their pillar accent correctly.
+                owner = resolveOwner()
                 when (val r = repo.getEventTypes(owner)) {
                     is NetworkResult.Failure -> _state.value = WaitlistUiState.Error("Couldn't load your event types.")
                     is NetworkResult.Success -> {
@@ -93,6 +108,19 @@ class WaitlistViewModel
                     }
                 }
             }
+        }
+
+        /** Probe Personal/Home/Business in order; return the first resolvable owner. */
+        private suspend fun resolveOwner(): SchedulingOwner {
+            for (pillar in listOf(SchedulingPillar.Personal, SchedulingPillar.Home, SchedulingPillar.Business)) {
+                val candidate = BookingsExtrasOwner.resolve(pillar, homes, auth) ?: continue
+                val r = repo.getEventTypes(candidate)
+                if (r is NetworkResult.Success && r.data.eventTypes.any { it.isActive != false }) {
+                    return candidate
+                }
+            }
+            // Fallback: return Personal (no event types found — Empty state will show)
+            return SchedulingOwner.Personal
         }
 
         fun refresh() {
@@ -133,7 +161,7 @@ class WaitlistViewModel
                         WaitlistData(
                             options = options,
                             selectedId = id,
-                            pillar = SchedulingPillar.Personal,
+                            pillar = owner.pillar(),
                             seatTotal = eventTypesById[id]?.seatCap ?: 1,
                             entries = rows,
                         ),

@@ -212,6 +212,25 @@ fun BookingDetailScreen(
             onSelectReason = viewModel::selectReason,
             onSetNote = viewModel::setNote,
             onDecline = viewModel::declineConfirm,
+            // Design FrameDeclineExpanded: "Propose another time" link (approve-decline-frames.jsx:153-155).
+            // Dismiss the approve/decline sheet then open the reschedule flow.
+            onProposeTime = data?.let { d ->
+                if (d.canReschedule) {
+                    {
+                        viewModel.dismissApproveDecline()
+                        rescheduleViewModel.open(
+                            d.owner,
+                            d.pillar,
+                            d.startUtc,
+                            d.endUtc,
+                            d.canReassign,
+                            reassignOnly = false,
+                        )
+                    }
+                } else {
+                    null
+                }
+            },
         )
     }
 
@@ -789,8 +808,9 @@ private fun ConflictBanner() {
             size = 17.dp,
             tint = PantopusColors.warning,
         )
+        // Design: "This slot overlaps a confirmed booking" (approve-decline-frames.jsx:117).
         Text(
-            text = "This overlaps another booking",
+            text = "This slot overlaps a confirmed booking",
             fontSize = 11.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.warning,

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +46,8 @@ import app.pantopus.android.ui.theme.Spacing
 // Screen chrome
 // ─────────────────────────────────────────────────────────────────────────────
 
-private val TOP_BAR_HEIGHT = 52.dp
+// Design: SchedTopBar height 46px, title 15sp — matches SchedulingTopBarSize.Compact.
+private val TOP_BAR_HEIGHT = 46.dp
 private val ICON_BUTTON_SIZE = 40.dp
 
 /**
@@ -59,46 +62,50 @@ fun AvailabilityTopBar(
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .height(TOP_BAR_HEIGHT)
-                .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s2),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+    // Design: SchedTopBar height=46dp, title 15sp/600, 1px bottom border.
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
             modifier =
                 Modifier
-                    .size(ICON_BUTTON_SIZE)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack),
-            contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .height(TOP_BAR_HEIGHT)
+                    .background(PantopusColors.appSurface)
+                    .padding(horizontal = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            PantopusIconImage(
-                icon = PantopusIcon.ChevronLeft,
-                contentDescription = "Back",
-                size = 22.dp,
-                tint = PantopusColors.appText,
+            Box(
+                modifier =
+                    Modifier
+                        .size(ICON_BUTTON_SIZE)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronLeft,
+                    contentDescription = "Back",
+                    size = 22.dp,
+                    tint = PantopusColors.appText,
+                )
+            }
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                color = PantopusColors.appText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            Box(
+                modifier = Modifier.size(ICON_BUTTON_SIZE),
+                contentAlignment = Alignment.Center,
+            ) {
+                trailing?.invoke()
+            }
         }
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            color = PantopusColors.appText,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Box(
-            modifier = Modifier.size(ICON_BUTTON_SIZE),
-            contentAlignment = Alignment.Center,
-        ) {
-            trailing?.invoke()
-        }
+        HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
     }
 }
 

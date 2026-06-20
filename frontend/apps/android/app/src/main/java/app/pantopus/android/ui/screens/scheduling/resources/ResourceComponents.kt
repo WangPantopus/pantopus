@@ -486,7 +486,7 @@ fun CounterRow(
                     ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepButton(icon = PantopusIcon.ChevronDown, label = "Decrease $label") {
+            StepButton(icon = PantopusIcon.Minus, label = "Decrease $label") {
                 onValueChange((value - step).coerceAtLeast(range.first))
             }
             Text(
@@ -497,7 +497,7 @@ fun CounterRow(
                 modifier = Modifier.width(64.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            StepButton(icon = PantopusIcon.ChevronUp, label = "Increase $label") {
+            StepButton(icon = PantopusIcon.Plus, label = "Increase $label") {
                 onValueChange((value + step).coerceAtMost(range.last))
             }
         }

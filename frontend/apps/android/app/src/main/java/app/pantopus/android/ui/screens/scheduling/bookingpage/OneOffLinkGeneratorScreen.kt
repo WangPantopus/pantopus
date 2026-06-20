@@ -138,6 +138,8 @@ private fun ConfigBody(
             SectionLabel("Event type")
             EventTypePicker(cfg, viewModel::selectEventType, viewModel::setDuration)
 
+            cfg.error?.let { ErrorNote(it, onRetry = viewModel::generate) }
+
             SectionLabel("Availability")
             OfferTimesCard(cfg, viewModel::toggleOfferTimes, viewModel::addProposedSlot, viewModel::removeSlot)
 
@@ -146,8 +148,6 @@ private fun ConfigBody(
 
             SectionLabel("Options")
             OptionsCard(cfg, viewModel::toggleSingleUse, viewModel::toggleAskIntake)
-
-            cfg.error?.let { ErrorNote(it, onRetry = viewModel::generate) }
         }
         GenerateBar(creating = cfg.creating, onGenerate = viewModel::generate)
     }

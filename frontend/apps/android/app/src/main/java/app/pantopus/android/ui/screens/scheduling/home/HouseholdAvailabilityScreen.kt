@@ -142,6 +142,7 @@ private fun ReadyBody(
 
         ExposureSection(
             data = data,
+            onNavigate = onNavigate,
             onSetExposure = onSetExposure,
         )
 
@@ -352,6 +353,7 @@ private fun NotSetUpBlock(onNavigate: (String) -> Unit) {
 @Composable
 private fun ExposureSection(
     data: ReadyData,
+    onNavigate: (String) -> Unit,
     onSetExposure: (Exposure, Boolean) -> Unit,
 ) {
     var confirmHideShare by remember { mutableStateOf(false) }
@@ -388,9 +390,14 @@ private fun ExposureSection(
             )
             if (data.personalIsSetUp) {
                 DisclosureRow(
-                    icon = PantopusIcon.Sunset,
+                    icon = PantopusIcon.Moon,
                     title = "Household quiet hours",
                     value = data.quietHoursLabel,
+                    // Route TBD: quiet-hours editor screen not yet registered.
+                    // Wired as tappable per design (cursor:pointer) — navigate
+                    // target will be a dedicated "scheduling/home/quiet-hours"
+                    // route once that screen is built.
+                    onClick = { onNavigate("scheduling/home/quiet-hours") },
                 )
             }
             ToggleRow(
@@ -497,6 +504,7 @@ private fun DisclosureRow(
     icon: PantopusIcon,
     title: String,
     value: String,
+    onClick: () -> Unit,
 ) {
     Column {
         HorizontalDivider(color = PantopusColors.appBorder)
@@ -504,6 +512,7 @@ private fun DisclosureRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .clickable(onClick = onClick)
                     .padding(horizontal = Spacing.s3, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),

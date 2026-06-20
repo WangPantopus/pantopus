@@ -39,6 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.ui.components.ErrorState
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SlotTimeList
 import app.pantopus.android.ui.screens.scheduling._shared.slotTimeLabel
 import app.pantopus.android.ui.theme.PantopusColors
@@ -198,6 +199,8 @@ private fun SlotPickerLoaded(
             SlotRegion(state = state, accent = accent, onSelectSlot = onSelectSlot, onSeeNextAvailable = onSeeNextAvailable)
             // bottom spacer so the docked Continue bar never covers the last row
             if (state.selectedSlotStart != null) Box(modifier = Modifier.size(72.dp))
+            // extra spacer when a taken-toast is visible (Frame 6)
+            if (state.takenSlotStart != null && state.selectedSlotStart == null) Box(modifier = Modifier.size(60.dp))
         }
         if (state.selectedSlotStart != null) {
             ContinueBar(
@@ -208,10 +211,14 @@ private fun SlotPickerLoaded(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
+        // Frame 6: floating WARN toast when a slot was taken by a race condition.
+        if (state.takenSlotStart != null && state.selectedSlotStart == null) {
+            SlotTakenToast(modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = Spacing.s4).padding(bottom = Spacing.s5))
+        }
     }
 }
 
-/** Summary header: event-type tile + the timezone chip. */
+/** Summary header: event-type tile + timezone chip + optional DST hint banner (Frame 5). */
 @Composable
 private fun SummaryHeader(
     state: SlotPickerUiState.Content,
@@ -246,6 +253,10 @@ private fun SummaryHeader(
             }
         }
         TimezoneChip(label = state.tzLabel, onClick = onTimezoneClick)
+        // Frame 5 (DST hint): INFO banner when clocks change within the visible month.
+        if (state.dstHint != null) {
+            DstHintBanner(message = state.dstHint)
+        }
     }
 }
 
@@ -424,7 +435,17 @@ private fun NavChevron(
     }
 }
 
-/** The slot area: skeleton (loading) / paused-or-empty card (C8) / day-full / the time list. */
+/**
+ * The slot area: composing interim / skeleton / empty cards / day-full / time list.
+ *
+ * Frame 2 (Composing): member-avatar cluster + skeleton rows + ComposedPill — shown while a
+ * Business/Home collective-intersect fetch runs.
+ * Frame 3 (No-times-in-range): dashed EmptyCard with "See {nextMonth}" primary.
+ * Frame 4 (No-times-anywhere): same EmptyCard but "Notify me" primary + "Join waitlist"
+ * secondary with a count chip.
+ * Frame 5 (ComposedEmpty): framed EmptyCard with pillar-soft bg + member free/busy cluster.
+ * Frame 6 (Slot just taken): taken slot strikethrough via disabledStarts; toast handled above.
+ */
 @Composable
 private fun SlotRegion(
     state: SlotPickerUiState.Content,
@@ -435,14 +456,29 @@ private fun SlotRegion(
     when {
         state.slotsLoading -> {
             state.selectedDayHeading?.let { DayHeading(it) }
-            DiscoverySkeletonSlots(count = 6)
+            // Frame 2: composing state for collective (Home/Business) intersect.
+            if (state.isComposing) {
+                ComposingCaption()
+                DiscoverySkeletonSlots(count = 4)
+                ComposedPillBanner(pillar = state.pillar)
+            } else {
+                DiscoverySkeletonSlots(count = 6)
+            }
+        }
+        // Frame 5: composed-empty — Home/Business intersect, no overlap in window.
+        state.isComposedEmpty -> {
+            state.selectedDayHeading?.let { DayHeading(it) }
+            ComposedEmptyCard(pillar = state.pillar, accent = accent, onNextMonth = onSeeNextAvailable)
         }
         !state.monthHasAvailability ->
+            // Frame 3: "No open times in {month}" — calendar shows no available days.
+            // The design (Frame 3) primary = "See {nextMonth}", secondary = "Get notified
+            // when times open" with a bell icon. Frame 4 ("Notify me" primary + "Join
+            // waitlist" secondary) requires a fully-blocked-host signal not yet in the API
+            // response; deferred — Frame 3 is the safe fallback for any empty month.
             NoAvailabilityState(
-                // Spec frame 3 (no-times-in-range) reaches for a calendar-search glyph;
-                // calendar-x is reserved for the composed-empty frame. The icon set has
-                // no calendar-search, so calendar-clock carries the "looking for times"
-                // intent here (and matches the no-times-anywhere frame).
+                // Spec frame 3 reaches for a calendar-search glyph; the icon set has no
+                // calendar-search — calendar-clock carries the "looking for times" intent.
                 icon = PantopusIcon.CalendarClock,
                 title = "No open times in ${state.monthLabel.substringBefore(' ')}",
                 body = "Availability changes often. Try a later month.",
@@ -450,6 +486,10 @@ private fun SlotRegion(
                 primaryIcon = PantopusIcon.ArrowRight,
                 onPrimary = onSeeNextAvailable,
                 accent = accent,
+                // Frame 3 secondary CTA (design: "Get notified when times open", bell icon).
+                secondaryLabel = "Get notified when times open",
+                secondaryIcon = PantopusIcon.Bell,
+                onSecondary = { /* notify-me subscription — no API yet; no-op placeholder */ },
             )
         state.selectedDay == null ->
             NoAvailabilityState(
@@ -467,11 +507,13 @@ private fun SlotRegion(
         }
         else -> {
             state.selectedDayHeading?.let { DayHeading(it) }
+            // Frame 6: pass the taken slot as disabled so SlotTimeList renders strikethrough.
             SlotTimeList(
                 slots = state.daySlots,
                 selectedStart = state.selectedSlotStart,
                 onSelect = onSelectSlot,
                 accent = accent,
+                disabledStarts = setOfNotNull(state.takenSlotStart),
             )
         }
     }
@@ -558,5 +600,329 @@ private fun PickerTopBar(onBack: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         Box(modifier = Modifier.size(34.dp))
+    }
+}
+
+// ─── Frame 2: Composing interim (collective-intersect) ────────────────────
+
+private val AVATAR_SIZE = 24.dp
+private val AVATAR_OVERLAP = 8.dp
+
+/**
+ * Frame 2 avatar-cluster caption: "Finding times that work for everyone" shown
+ * while a Business/Home collective-intersect fetch is computing. Mirrors the
+ * design's AvatarCluster row above the skeleton rows.
+ */
+@Composable
+private fun ComposingCaption(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.padding(horizontal = Spacing.s1, vertical = Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Three overlapping avatar initials (AR / JL / MK design placeholders). Implemented
+        // as a Row with negative start-padding on the 2nd and 3rd avatars to create the
+        // desired stacked-overlap effect without requiring absolute positioning.
+        Row {
+            listOf(
+                Pair("AR", PantopusColors.business),
+                Pair("JL", PantopusColors.personal),
+                Pair("MK", PantopusColors.warning),
+            ).forEachIndexed { i, (initials, color) ->
+                Box(
+                    modifier =
+                        Modifier
+                            .then(if (i > 0) Modifier.padding(start = -(AVATAR_OVERLAP)) else Modifier)
+                            .size(AVATAR_SIZE)
+                            .border(1.5.dp, PantopusColors.appSurface, CircleShape)
+                            .clip(CircleShape)
+                            .background(color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = initials,
+                        style = PantopusTextStyle.overline,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appTextInverse,
+                        fontSize = (AVATAR_SIZE.value * 0.36f).sp,
+                    )
+                }
+            }
+        }
+        Text(
+            text = "Finding times that work for everyone",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.padding(start = Spacing.s2),
+        )
+    }
+}
+
+/**
+ * Frame 2 ComposedPill: pillar-tinted explainer below the skeleton rows —
+ * "Times come from each member's availability" with a calendar-range icon.
+ */
+@Composable
+private fun ComposedPillBanner(
+    pillar: SchedulingPillar,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(pillar.accentBg)
+                .border(1.dp, pillar.accentRing, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        // Design: calendar-range icon. PantopusIcon.Calendar (DateRange) is the closest
+        // available glyph — calendar-range is not yet in the icon set.
+        PantopusIconImage(
+            icon = PantopusIcon.Calendar,
+            contentDescription = null,
+            size = 15.dp,
+            tint = pillar.accent,
+        )
+        Text(
+            text = "Times come from each member's availability.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+// ─── Frame 5: DST hint banner ─────────────────────────────────────────────
+
+/**
+ * Frame 5: INFO banner shown between the timezone chip and the calendar when a
+ * DST change is imminent in the visible month. The ViewModel populates [dstHint]
+ * in [SlotPickerUiState.Content] when it detects a zone offset change within the
+ * window; the message is passed straight through.
+ */
+@Composable
+private fun DstHintBanner(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.infoBg)
+                .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Info,
+            contentDescription = null,
+            size = 13.dp,
+            tint = PantopusColors.info,
+            modifier = Modifier.padding(top = 1.dp),
+        )
+        Text(
+            text = message,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.info,
+        )
+    }
+}
+
+// ─── Frame 5 (C-slotstates): ComposedEmpty card ───────────────────────────
+
+/**
+ * Frame 5 (ComposedEmpty): shown when a Home/Business collective-intersect
+ * produces no overlapping free windows on the selected day. Uses a "framed"
+ * card style — pillar-soft background + 1dp solid accent-tinted border — and
+ * includes a member free/busy dot-cluster row, unlike the plain dashed EmptyCard.
+ */
+@Composable
+private fun ComposedEmptyCard(
+    pillar: SchedulingPillar,
+    accent: Color,
+    onNextMonth: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(pillar.accentBg)
+                .border(1.dp, pillar.accentRing, RoundedCornerShape(Radii.xl))
+                .padding(horizontal = Spacing.s5, vertical = Spacing.s6),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        // Icon halo — white background + accent-tinted border (framed variant).
+        Box(
+            modifier =
+                Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, pillar.accentRing, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            // calendar-x is the designed icon for the composed-empty frame exclusively.
+            PantopusIconImage(icon = PantopusIcon.CalendarX, contentDescription = null, size = 23.dp, tint = accent)
+        }
+        Text(
+            text = "Everyone's calendars don't overlap in this window",
+            style = PantopusTextStyle.body,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = Spacing.s2),
+        )
+        Text(
+            text = "These times need every required member free at once. Try widening the range.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+        )
+        // Required-member free/busy dot cluster (design: AR/JL/MK placeholders).
+        MemberFreeBusyRow(pillar = pillar)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            AccentFilledButton(
+                label = "Try next month",
+                accent = accent,
+                icon = PantopusIcon.ArrowRight,
+                onClick = onNextMonth,
+            )
+            NoAvailabilitySecondaryButton(
+                label = "Notify me",
+                icon = PantopusIcon.Bell,
+                onClick = { /* notify-me — no API yet; no-op placeholder */ },
+            )
+        }
+    }
+}
+
+/** Three avatar initials in a row with a free (green) / busy (neutral) dot indicator. */
+@Composable
+private fun MemberFreeBusyRow(
+    pillar: SchedulingPillar,
+    modifier: Modifier = Modifier,
+) {
+    val members = listOf(
+        Triple("AR", PantopusColors.business, true),
+        Triple("JL", PantopusColors.personal, false),
+        Triple("MK", PantopusColors.warning, true),
+    )
+    Row(
+        modifier = modifier.padding(vertical = Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        members.forEach { (initials, color, free) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Box {
+                    Box(
+                        modifier = Modifier.size(34.dp).clip(CircleShape).background(color).border(2.dp, PantopusColors.appSurface, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = initials,
+                            style = PantopusTextStyle.overline,
+                            fontWeight = FontWeight.Bold,
+                            color = PantopusColors.appTextInverse,
+                        )
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(11.dp)
+                                .clip(CircleShape)
+                                .background(if (free) PantopusColors.home else PantopusColors.appBorderStrong)
+                                .border(2.dp, PantopusColors.appSurface, CircleShape)
+                                .align(Alignment.BottomEnd),
+                    )
+                }
+                Text(
+                    text = if (free) "Free" else "Busy",
+                    style = PantopusTextStyle.overline,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (free) PantopusColors.homeDark else PantopusColors.appTextMuted,
+                    fontSize = 9.sp,
+                )
+            }
+        }
+    }
+}
+
+/** Secondary ghost button reused from the NoAvailabilityState inline pattern. */
+@Composable
+private fun NoAvailabilitySecondaryButton(
+    label: String,
+    icon: PantopusIcon,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.s3),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 14.dp, tint = PantopusColors.appText)
+        Text(
+            text = label,
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            modifier = Modifier.padding(start = Spacing.s2),
+        )
+    }
+}
+
+// ─── Frame 6: Slot-just-taken toast ───────────────────────────────────────
+
+/**
+ * Frame 6: floating WARN toast shown at the bottom of the screen when a slot
+ * was taken by a race condition between the user selecting it and the booking
+ * POST. The slot row is rendered with [TextDecoration.LineThrough] via
+ * [SlotTimeList]'s disabledStarts param; this toast adds the contextual label.
+ */
+@Composable
+private fun SlotTakenToast(modifier: Modifier = Modifier) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.TriangleAlert,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "That time was just taken",
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.warning,
+        )
     }
 }

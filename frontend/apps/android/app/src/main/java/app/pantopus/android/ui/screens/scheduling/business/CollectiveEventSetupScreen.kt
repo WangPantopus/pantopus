@@ -64,6 +64,13 @@ fun CollectiveEventSetupScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         BizTopBar(title = "Collective booking", onBack = onBack)
+        // Pinned subhead — mirrors biz-kit.jsx SheetFrame flexShrink:0 header (above scroll area).
+        Text(
+            text = "Every required member must be free at the same time.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+        )
         when (val s = state) {
             CollectiveEventSetupViewModel.UiState.Loading ->
                 SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth(), rows = 4)
@@ -91,12 +98,6 @@ private fun CollectiveBody(
                     .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Text(
-                text = "Every required member must be free at the same time.",
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-                modifier = Modifier.padding(horizontal = Spacing.s1),
-            )
             MasterToggleCard(on = content.requireMultiple, onToggle = viewModel::setRequireMultiple)
             if (content.requireMultiple) {
                 CountCard(
@@ -107,6 +108,14 @@ private fun CollectiveBody(
                     onPlus = viewModel::incrementRequired,
                 )
                 ModeTiles(selected = content.selectionMode, onSelect = viewModel::selectMode)
+                // Frame 3: no-overlap warning between ModeTiles and Members (design: collective-frames.jsx:133).
+                if (content.noOverlap) {
+                    BizNote(
+                        text = "The selected members share no free windows — no slots will be available.",
+                        tone = BizNoteTone.Warning,
+                        icon = PantopusIcon.AlertTriangle,
+                    )
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     BizOverline("Members")
                     BizCard {

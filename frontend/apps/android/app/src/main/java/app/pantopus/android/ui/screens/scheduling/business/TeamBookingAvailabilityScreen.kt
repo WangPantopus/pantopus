@@ -39,7 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -88,7 +88,16 @@ fun TeamBookingAvailabilityScreen(
             )
             when (val s = state) {
                 TeamBookingAvailabilityViewModel.UiState.Loading ->
-                    SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth(), rows = 4)
+                    TeamAvailSkeleton(modifier = Modifier.fillMaxWidth())
+                TeamBookingAvailabilityViewModel.UiState.Empty ->
+                    EmptyState(
+                        icon = PantopusIcon.UsersRound,
+                        headline = "No team members yet",
+                        subcopy = "Add members to your business to manage their booking availability.",
+                        modifier = Modifier.fillMaxSize(),
+                        tint = PantopusColors.businessBg,
+                        accent = bizAccent,
+                    )
                 TeamBookingAvailabilityViewModel.UiState.BusinessOnly ->
                     EmptyState(
                         icon = PantopusIcon.Building2,
@@ -248,6 +257,49 @@ private fun CoverageCard(coverage: TeamBookingAvailabilityViewModel.CoverageUi) 
             fontWeight = FontWeight.Medium,
             color = PantopusColors.appTextStrong,
         )
+    }
+}
+
+/**
+ * Loading skeleton mirroring `teamavail-frames.jsx` Frame 2 ShimRow geometry:
+ * 36dp avatar circle + two text-line shimmers + 84×16 chip-pill shimmer + 46×28
+ * toggle shimmer — four elements per row, 4 rows inside a BizCard.
+ */
+@Composable
+private fun TeamAvailSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appBg)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        // Explainer note shimmer
+        Shimmer(width = 260.dp, height = 12.dp, cornerRadius = Radii.xs)
+        BizCard {
+            repeat(4) { i ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+                ) {
+                    // Avatar circle
+                    Shimmer(width = ROW_ICON, height = ROW_ICON, cornerRadius = ROW_ICON / 2)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        // Name line
+                        Shimmer(width = 120.dp, height = 11.dp, cornerRadius = Radii.xs)
+                        // Summary line
+                        Shimmer(width = 100.dp, height = 10.dp, cornerRadius = Radii.xs)
+                        // Chip shimmer (84×16, pill radius — mirrors teamavail-frames.jsx:81-88)
+                        Shimmer(width = 84.dp, height = 16.dp, cornerRadius = 9999.dp)
+                    }
+                    // Toggle pill shimmer (46×28)
+                    Shimmer(width = 46.dp, height = 28.dp, cornerRadius = 9999.dp)
+                }
+                if (i != 3) BizRowDivider()
+            }
+        }
     }
 }
 

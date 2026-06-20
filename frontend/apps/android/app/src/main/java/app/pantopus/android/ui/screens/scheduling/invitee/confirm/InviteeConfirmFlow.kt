@@ -263,6 +263,7 @@ private fun ConfirmFooter(
     onPrimary: () -> Unit,
     onAddToCalendar: () -> Unit,
     onDone: () -> Unit,
+    onMessageHost: () -> Unit = {},
 ) {
     // Spec sticky dock: an elevated translucent bar with a top hairline. Compose
     // has no backdrop blur < API 31, so we approximate with a raised surface +
@@ -279,23 +280,46 @@ private fun ConfirmFooter(
         HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(bottom = Spacing.s1))
         when (state.step) {
             ConfirmStep.Confirmed -> {
-                FilledCta(
-                    label = "Add to calendar",
-                    icon = PantopusIcon.CalendarPlus,
-                    accent = pillar.accent,
-                    enabled = true,
-                    onClick = onAddToCalendar,
-                )
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(38.dp).clickableLabel("Done", onDone),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Done",
-                        style = PantopusTextStyle.small,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PantopusColors.appTextStrong,
+                val isPending = state.confirmed?.requiresApproval == true
+                if (isPending) {
+                    // FramePending dock: primary = 'Done' (check icon), secondary = 'Message host'
+                    FilledCta(
+                        label = "Done",
+                        icon = PantopusIcon.Check,
+                        accent = pillar.accent,
+                        enabled = true,
+                        onClick = onDone,
                     )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(38.dp).clickableLabel("Message host", onMessageHost),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Message host",
+                            style = PantopusTextStyle.small,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appTextStrong,
+                        )
+                    }
+                } else {
+                    FilledCta(
+                        label = "Add to calendar",
+                        icon = PantopusIcon.CalendarPlus,
+                        accent = pillar.accent,
+                        enabled = true,
+                        onClick = onAddToCalendar,
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(38.dp).clickableLabel("Done", onDone),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Done",
+                            style = PantopusTextStyle.small,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appTextStrong,
+                        )
+                    }
                 }
             }
             else -> {

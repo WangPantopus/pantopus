@@ -121,14 +121,14 @@ private fun RoundRobinBody(
             RuleCard(
                 name = "Balanced",
                 desc = "Spread bookings by weight",
-                icon = PantopusIcon.Gauge,
+                icon = PantopusIcon.Scale,
                 selected = content.rule == RoundRobinAssignmentViewModel.Rule.Balanced,
                 onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Balanced) },
             )
             RuleCard(
                 name = "Priority order",
                 desc = "Fill the top of the list first",
-                icon = PantopusIcon.List,
+                icon = PantopusIcon.ListOrdered,
                 selected = content.rule == RoundRobinAssignmentViewModel.Rule.Priority,
                 onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Priority) },
             )
@@ -284,15 +284,14 @@ private fun RoundRobinMemberRow(
                 when (rule) {
                     RoundRobinAssignmentViewModel.Rule.Balanced ->
                         WeightStepper(weight = pick.weight, onMinus = onWeightMinus, onPlus = onWeightPlus)
-                    RoundRobinAssignmentViewModel.Rule.Priority,
-                    RoundRobinAssignmentViewModel.Rule.Strict,
-                    ->
+                    RoundRobinAssignmentViewModel.Rule.Priority ->
                         PantopusIconImage(
                             icon = PantopusIcon.GripVertical,
                             contentDescription = "Reorder",
                             size = 20.dp,
                             tint = PantopusColors.appTextMuted,
                         )
+                    RoundRobinAssignmentViewModel.Rule.Strict -> Unit
                 }
             }
         }

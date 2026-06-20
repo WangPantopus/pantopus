@@ -11,6 +11,7 @@
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -184,6 +185,7 @@ private fun ConflictCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .clickable(onClickLabel = "View the conflict", onClick = onClick)
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,

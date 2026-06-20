@@ -33,6 +33,13 @@ sealed interface ResourceListUiState {
 
     data class Loaded(
         val rows: List<ResourceRowUi>,
+        /**
+         * True when the list was served from cache with no network — the
+         * screen renders the amber offline banner and dims all rows to 0.55.
+         * The VM leaves this `false` until a ConnectivityManager observer
+         * is wired; the field is ready so the screen can consume it.
+         */
+        val isOffline: Boolean = false,
     ) : ResourceListUiState
 
     data object Empty : ResourceListUiState

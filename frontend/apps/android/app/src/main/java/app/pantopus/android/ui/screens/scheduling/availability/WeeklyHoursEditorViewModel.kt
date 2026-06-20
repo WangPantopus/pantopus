@@ -51,9 +51,14 @@ data class WeeklyHoursForm(
     val lockTimezone: Boolean,
     val days: List<DayHoursUi>,
     val saving: Boolean = false,
+    /** True when schedule has never had rules and the user hasn't dirtied it yet
+     *  (mirrors iOS WeeklyHoursEditorViewModel.isUnset = allOff && !isDirty). */
+    val isDirty: Boolean = false,
 ) {
     val allDaysOff: Boolean get() = days.none { it.enabled }
     val hasNoRules: Boolean get() = days.all { it.blocks.isEmpty() }
+    /** Design Frame 4: show the "Set hours" / composition-gap hero state. */
+    val isUnset: Boolean get() = allDaysOff && !isDirty
 }
 
 @Immutable
@@ -134,7 +139,8 @@ class WeeklyHoursEditorViewModel
 
         private inline fun mutateForm(transform: (WeeklyHoursForm) -> WeeklyHoursForm) {
             val current = (_state.value as? WeeklyHoursUiState.Content)?.form ?: return
-            _state.value = WeeklyHoursUiState.Content(transform(current))
+            // Mark dirty on every user edit so isUnset clears after first interaction.
+            _state.value = WeeklyHoursUiState.Content(transform(current).copy(isDirty = true))
         }
 
         private fun mutateDay(

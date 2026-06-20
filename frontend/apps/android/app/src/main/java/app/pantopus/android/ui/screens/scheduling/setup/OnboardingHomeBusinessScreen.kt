@@ -93,13 +93,15 @@ private fun HomeStep(
             OnboardingMemberList(selected = state.selectedMembers, pillar = pillar, onToggle = vm::toggleMember)
         }
         2 -> {
+            val memberCount = state.selectedMembers.size
+            val memberWord = if (memberCount == 1) "member is" else "$memberCount members are"
             OnboardingHeadline(
                 title = "How should times combine?",
                 sub =
                     if (state.combineMode == "round_robin") {
                         "Whoever's free gets the booking. Pick a rule for who hosts when more than one person is open."
                     } else {
-                        "Three members are scheduled. Choose how their availability turns into one set of bookable times."
+                        "${memberWord.replaceFirstChar { it.uppercaseChar() }} scheduled. Choose how their availability turns into one set of bookable times."
                     },
             )
             OnboardingModePicker(mode = state.combineMode, pillar = pillar, onSelect = vm::setCombineMode)
@@ -142,7 +144,6 @@ private fun BusinessStep(
                 serviceType = state.serviceType,
                 duration = state.duration,
                 priceText = state.priceText,
-                paidEnabled = vm.paidEnabled,
                 pillar = pillar,
                 onSelect = vm::setServiceType,
                 onDuration = vm::setDuration,

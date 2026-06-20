@@ -114,7 +114,7 @@ internal fun CapacityHeaderCard(
         }
         if (showStats) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                StatCell(value = confirmed, label = "Confirmed", valueColor = PantopusColors.appText, modifier = Modifier.weight(1f))
+                StatCell(value = confirmed, label = "Confirmed", valueColor = PantopusColors.homeDark, modifier = Modifier.weight(1f))
                 StatCell(value = pending, label = "Pending", valueColor = PantopusColors.warning, modifier = Modifier.weight(1f))
                 StatCell(
                     value = waiting,

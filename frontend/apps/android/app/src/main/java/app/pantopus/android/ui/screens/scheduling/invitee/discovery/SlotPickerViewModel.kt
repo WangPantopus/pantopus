@@ -59,6 +59,7 @@ class SlotPickerViewModel
         private var monthSlots: List<SlotDto> = emptyList()
         private var fetchJob: Job? = null
         private var started = false
+        private var takenSlotStart: String? = null
 
         fun start(pickerArgs: SlotPickerArgs) {
             if (started && this::args.isInitialized && args == pickerArgs) return
@@ -83,6 +84,25 @@ class SlotPickerViewModel
 
         fun selectSlot(slot: SlotDto) {
             selectedSlotStart = slot.start
+            takenSlotStart = null  // selecting a new slot dismisses any prior taken-badge
+            emitContent(slotsLoading = false)
+        }
+
+        /**
+         * Frame 6: called when the 409 conflict response indicates the just-tapped
+         * slot was taken by a race condition. Marks the slot with a "Just taken"
+         * WARN badge + bottom toast, and clears the pending selection so the user
+         * must pick again.
+         */
+        fun notifySlotTaken(startUtc: String) {
+            takenSlotStart = startUtc
+            selectedSlotStart = null
+            emitContent(slotsLoading = false)
+        }
+
+        /** Clears the taken-slot badge (e.g. user navigated away or picked another slot). */
+        fun clearTakenSlot() {
+            takenSlotStart = null
             emitContent(slotsLoading = false)
         }
 
@@ -217,6 +237,7 @@ class SlotPickerViewModel
                     nextMonthLabel = visibleMonth.plusMonths(1).month.getDisplayName(TextStyle.FULL, Locale.US),
                     canGoPreviousMonth = canGoPrevious(),
                     slotsLoading = slotsLoading,
+                    takenSlotStart = takenSlotStart,
                 )
         }
 
@@ -303,6 +324,31 @@ sealed interface SlotPickerUiState {
         val nextMonthLabel: String,
         val canGoPreviousMonth: Boolean,
         val slotsLoading: Boolean,
+        /**
+         * Frame 2 (Composing): true while a collective-intersect fetch is in
+         * progress and the Business/Home pillar composes member availability.
+         * Renders the avatar-cluster caption + ComposedPill above the skeleton.
+         */
+        val isComposing: Boolean = false,
+        /**
+         * Frame 5 (ComposedEmpty): true when this is a Home/Business collective
+         * booking and the intersection of member calendars yields no overlap in
+         * the selected window. Renders a framed EmptyCard with the member
+         * free/busy cluster.
+         */
+        val isComposedEmpty: Boolean = false,
+        /**
+         * Frame 5 (DST hint): non-null when a DST transition falls within the
+         * current visible month and the user should be informed that shown times
+         * are adjusted. Displayed as an INFO banner below the timezone chip.
+         */
+        val dstHint: String? = null,
+        /**
+         * Frame 6 (Slot just taken): the UTC start string of a slot that was
+         * selected but taken by a race condition. Renders a strikethrough +
+         * "Just taken" WARN pill on that slot row and a floating bottom toast.
+         */
+        val takenSlotStart: String? = null,
     ) : SlotPickerUiState
 
     data class Error(

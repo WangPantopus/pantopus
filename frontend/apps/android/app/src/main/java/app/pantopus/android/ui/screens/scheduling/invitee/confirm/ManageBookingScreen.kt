@@ -239,12 +239,19 @@ fun ManageBookingContent(
             CalendarCluster(accent = pillar.accent, onAddTo = { onAddToCalendar() }, onDownloadIcs = onAddToCalendar)
         }
 
-        if ((data.status == ManageStatus.Confirmed || data.status == ManageStatus.Pending) && !data.cancellationPolicy.isNullOrBlank()) {
+        // Design FramePast (manage-booking-frames.jsx:286): PolicyCard shown with
+        // "Booked a follow-up? Manage it from the new confirmation email." for past bookings.
+        // Confirmed/Pending also show the standard cancellation policy card.
+        val policyText = when (data.status) {
+            ManageStatus.Past -> "Booked a follow-up? Manage it from the new confirmation email."
+            else -> data.cancellationPolicy
+        }
+        if (!policyText.isNullOrBlank()) {
             PolicyCard(
-                policy = data.cancellationPolicy,
+                policy = policyText,
                 hostName = data.hostName,
                 accent = pillar.accent,
-                showContact = data.pageSlug != null,
+                showContact = data.status != ManageStatus.Past && data.pageSlug != null,
                 onContactHost = onBookAgain,
             )
         }

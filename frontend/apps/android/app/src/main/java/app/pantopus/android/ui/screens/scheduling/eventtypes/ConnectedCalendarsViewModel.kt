@@ -49,8 +49,15 @@ class ConnectedCalendarsViewModel
                 when (val r = repo.getConnectedCalendars()) {
                     is NetworkResult.Success -> _state.value = ConnectedCalendarsUiState.Loaded(r.data.calendars)
                     is NetworkResult.Failure -> {
-                        // A bare failure still shows the calm coming-soon surface — read is non-critical.
-                        _state.value = ConnectedCalendarsUiState.Loaded(emptyList())
+                        // Network failure surfaces the Error state with retry so the user can
+                        // recover. Previously this fell through to Loaded(emptyList()) which made
+                        // the Error branch in the screen unreachable on real network failures.
+                        val msg =
+                            when (val decoded = errors.decode(r.error)) {
+                                is SchedulingError.Generic -> decoded.message
+                                else -> "Couldn't load your calendars."
+                            }
+                        _state.value = ConnectedCalendarsUiState.Error(msg)
                     }
                 }
             }

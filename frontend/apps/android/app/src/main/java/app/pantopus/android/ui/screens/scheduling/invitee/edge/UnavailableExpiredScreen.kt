@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -50,9 +51,19 @@ const val UNAVAILABLE_EXPIRED_TAG = "schedulingUnavailableExpired"
  * Cancelled. ONE status-driven terminal screen (per the design), built on the
  * Foundation [PausedExpiredUnavailableState]. The icon/headline/body switch on
  * [state]; status-specific affordances (access code, the host's paused note,
- * "book again") render in the inline extra slot, and the contextual primary CTA
- * (notify me / request a new link / book again / see times) carries the pillar
- * accent. Never separate screens per state.
+ * "book again") render in the inline extra slot.
+ *
+ * Dock (design terminal-state-frames.jsx:111–128): optional dockExtra secondary
+ * CTA → filled "Get the app" button (pillar color, h=46, smartphone icon) →
+ * ghost "Back to Pantopus". The "Get the app" button is unconditional.
+ *
+ * NOTE: [PausedExpiredUnavailableState] renders secondaryAction (ghost) ABOVE
+ * primaryAction (filled), which is the inverse of the design's filled-above-ghost
+ * order. The order inversion is a _shared bug; the dock buttons are wired correctly
+ * here and the inversion is tracked separately.
+ *
+ * @param onGetApp optional lambda for "Get the app" — opens the Play Store. When
+ *   null the button is still shown as a no-op placeholder per the design spec.
  */
 @Composable
 fun UnavailableExpiredScreen(
@@ -71,7 +82,14 @@ fun UnavailableExpiredScreen(
     onBookAgain: (() -> Unit)? = null,
     onSeeTimes: (() -> Unit)? = null,
     onSubmitAccessCode: ((String) -> Unit)? = null,
+    onGetApp: (() -> Unit)? = null,
 ) {
+    // Status-specific secondary dockExtra CTA (Notify me / Request new link etc.)
+    // Per the design these appear as bordered buttons ABOVE the "Get the app" filled
+    // button. We pass them as the extra body slot since the shared component's dock
+    // only has two slots.
+    val dockExtra = dockExtraFor(state, pillar, onNotifyMe, onRequestNewLink, onSeeTimes)
+
     PausedExpiredUnavailableState(
         state = state,
         modifier = modifier.testTag(UNAVAILABLE_EXPIRED_TAG),
@@ -87,12 +105,50 @@ fun UnavailableExpiredScreen(
                 reopensLabel = reopensLabel,
                 onSubmitAccessCode = onSubmitAccessCode,
                 onBookAgain = onBookAgain,
+                dockExtra = dockExtra,
             )
         },
-        primaryAction = primaryActionFor(state, pillar, onNotifyMe, onRequestNewLink, onBookAgain, onSeeTimes),
+        // Design: "Get the app" is the unconditional filled CTA in the dock.
+        // Passed as primaryAction → PillarPrimaryButton (filled, pillar color, h=46).
+        primaryAction = TerminalAction(
+            label = "Get the app",
+            onClick = onGetApp ?: {},
+            icon = PantopusIcon.Smartphone,
+        ),
+        // "Back to Pantopus" ghost CTA.
         secondaryAction = TerminalAction(label = "Back to Pantopus", onClick = onBack),
     )
 }
+
+/**
+ * The optional secondary CTA that appears in the dock above "Get the app"
+ * (design: `dockExtra`). Status-specific: Notify me, Request new link, etc.
+ * When null, only the unconditional buttons are shown.
+ */
+private fun dockExtraFor(
+    state: SchedulingTerminalState,
+    @Suppress("UNUSED_PARAMETER") pillar: SchedulingPillar,
+    onNotifyMe: (() -> Unit)?,
+    onRequestNewLink: (() -> Unit)?,
+    onSeeTimes: (() -> Unit)?,
+): DockExtra? =
+    when (state) {
+        SchedulingTerminalState.Paused ->
+            onNotifyMe?.let { DockExtra(PantopusIcon.Bell, "Notify me when it reopens", it) }
+        SchedulingTerminalState.FullyBooked ->
+            onNotifyMe?.let { DockExtra(PantopusIcon.Bell, "Notify me when times open", it) }
+                ?: onSeeTimes?.let { DockExtra(PantopusIcon.Calendar, "See available times", it) }
+        SchedulingTerminalState.Expired ->
+            onRequestNewLink?.let { DockExtra(PantopusIcon.Mail, "Request a new link", it) }
+        else -> null
+    }
+
+/** Secondary bordered dockExtra button spec for a terminal-state dock. */
+private data class DockExtra(
+    val icon: PantopusIcon,
+    val label: String,
+    val onClick: () -> Unit,
+)
 
 /** Convenience overload: decode straight from a [SchedulingError]. */
 @Composable
@@ -105,6 +161,7 @@ fun UnavailableExpiredScreen(
     onNotifyMe: (() -> Unit)? = null,
     onRequestNewLink: (() -> Unit)? = null,
     onSubmitAccessCode: ((String) -> Unit)? = null,
+    onGetApp: (() -> Unit)? = null,
 ) {
     UnavailableExpiredScreen(
         state = error.toTerminalState() ?: fallback,
@@ -114,29 +171,12 @@ fun UnavailableExpiredScreen(
         onNotifyMe = onNotifyMe,
         onRequestNewLink = onRequestNewLink,
         onSubmitAccessCode = onSubmitAccessCode,
+        onGetApp = onGetApp,
     )
 }
 
-private fun primaryActionFor(
-    state: SchedulingTerminalState,
-    @Suppress("UNUSED_PARAMETER") pillar: SchedulingPillar,
-    onNotifyMe: (() -> Unit)?,
-    onRequestNewLink: (() -> Unit)?,
-    onBookAgain: (() -> Unit)?,
-    onSeeTimes: (() -> Unit)?,
-): TerminalAction? =
-    when (state) {
-        SchedulingTerminalState.Paused ->
-            onNotifyMe?.let { TerminalAction(label = "Notify me when it reopens", onClick = it, icon = PantopusIcon.Bell) }
-        SchedulingTerminalState.FullyBooked ->
-            onNotifyMe?.let { TerminalAction(label = "Notify me when times open", onClick = it, icon = PantopusIcon.Bell) }
-                ?: onSeeTimes?.let { TerminalAction(label = "See available times", onClick = it, icon = PantopusIcon.Calendar) }
-        SchedulingTerminalState.Expired ->
-            onRequestNewLink?.let { TerminalAction(label = "Request a new link", onClick = it, icon = PantopusIcon.Mail) }
-        SchedulingTerminalState.Cancelled ->
-            onBookAgain?.let { TerminalAction(label = "Book again", onClick = it, icon = PantopusIcon.ArrowsRepeat) }
-        else -> null
-    }
+// primaryActionFor is superseded by dockExtraFor above; "Get the app" is now the
+// unconditional primaryAction on every terminal status.
 
 @Composable
 private fun TerminalExtra(
@@ -147,25 +187,68 @@ private fun TerminalExtra(
     reopensLabel: String?,
     onSubmitAccessCode: ((String) -> Unit)?,
     onBookAgain: (() -> Unit)?,
+    dockExtra: DockExtra? = null,
 ) {
-    when (state) {
-        SchedulingTerminalState.Secret -> if (onSubmitAccessCode != null) AccessCodeField(pillar = pillar, onSubmit = onSubmitAccessCode)
-        SchedulingTerminalState.Paused ->
-            if (pausedNote != null) {
-                PausedNoteCard(hostName = hostName, note = pausedNote, reopensLabel = reopensLabel)
-            }
-        SchedulingTerminalState.Cancelled ->
-            if (onBookAgain != null) {
-                Row(
-                    modifier = Modifier.clickable(onClick = onBookAgain).padding(Spacing.s1),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-                ) {
-                    PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 14.dp, tint = pillar.accent)
-                    Text(text = "Book again", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = pillar.accent)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        when (state) {
+            SchedulingTerminalState.Secret -> if (onSubmitAccessCode != null) AccessCodeField(pillar = pillar, onSubmit = onSubmitAccessCode)
+            SchedulingTerminalState.Paused ->
+                if (pausedNote != null) {
+                    PausedNoteCard(hostName = hostName, note = pausedNote, reopensLabel = reopensLabel)
                 }
-            }
-        else -> Unit
+            SchedulingTerminalState.Cancelled ->
+                if (onBookAgain != null) {
+                    Row(
+                        modifier = Modifier.clickable(onClick = onBookAgain).padding(Spacing.s1),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 14.dp, tint = pillar.accent)
+                        Text(text = "Book again", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = pillar.accent)
+                    }
+                }
+            else -> Unit
+        }
+        // Design dockExtra: a secondary bordered button above "Get the app".
+        // Surfaced inline in the body extra slot (bordered, not ghost) since the
+        // shared dock's two slots are used for "Get the app" + "Back to Pantopus".
+        if (dockExtra != null) {
+            DockExtraButton(extra = dockExtra)
+        }
+    }
+}
+
+/** The design `SecondaryButton` dockExtra (bordered, surface bg) for status-specific CTAs. */
+@Composable
+private fun DockExtraButton(extra: DockExtra) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = extra.onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = extra.icon,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.appText,
+            modifier = Modifier.padding(end = Spacing.s2),
+        )
+        Text(
+            text = extra.label,
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
     }
 }
 

@@ -66,6 +66,8 @@ class CollectiveEventSetupViewModel
                 val seatsPerAppointment: Int,
                 val picks: List<PickUi>,
                 val saving: Boolean,
+                /** True when the selected members share no free windows (deferred live probe; always false until implemented). */
+                val noOverlap: Boolean = false,
             ) : UiState {
                 val checkedCount: Int get() = picks.count { it.checked }
             }

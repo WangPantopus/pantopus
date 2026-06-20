@@ -12,7 +12,6 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
-import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
@@ -88,11 +87,8 @@ class OnboardingHomeBusinessViewModel
         private val homes: HomesRepository,
         private val auth: AuthRepository,
         private val errors: SchedulingErrorDecoder,
-        featureFlags: SchedulingFeatureFlags,
     ) : ViewModel(),
         WizardModel {
-        val paidEnabled: Boolean = featureFlags.paidSchedulingEnabled
-
         private val _state = MutableStateFlow(OnboardingUiState())
         val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
 
@@ -355,7 +351,7 @@ class OnboardingHomeBusinessViewModel
                     locationMode = "in_person",
                     assignmentMode = "one_on_one",
                     requiresApproval = s.confirmMode == "approve",
-                    priceCents = if (paidEnabled) s.priceText.toIntOrNull()?.times(CENTS_PER_DOLLAR) else null,
+                    priceCents = s.priceText.toIntOrNull()?.times(CENTS_PER_DOLLAR),
                 )
             }
 

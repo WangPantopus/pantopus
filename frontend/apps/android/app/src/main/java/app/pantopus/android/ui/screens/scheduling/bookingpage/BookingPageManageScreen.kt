@@ -80,18 +80,13 @@ fun BookingPageManageScreen(
         }
     }
 
-    val pillar = SchedulingPillar.Personal
+    val pillar = viewModel.pillar
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            val loaded = state as? BookingPageManageUiState.Loaded
             BLTopBar(
                 title = "Booking link",
                 onBack = onBack,
-                onSave = viewModel::save,
-                saving = saving,
-                saveEnabled = viewModel.canSave(),
-                saveLabel = if (loaded?.form?.status == PageStatus.Draft) "Save draft" else "Save",
             )
             when (val s = state) {
                 BookingPageManageUiState.Loading ->

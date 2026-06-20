@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -77,7 +81,12 @@ fun WeeklyHoursEditorScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
-        AvailabilityTopBar(title = "Edit schedule", onBack = onBack)
+        // Design: title is "Set hours" when isUnset (Frame 4), "Edit schedule" otherwise.
+        val topBarTitle = when (val s = state) {
+            is WeeklyHoursUiState.Content -> if (s.form.isUnset) "Set hours" else "Edit schedule"
+            else -> "Edit schedule"
+        }
+        AvailabilityTopBar(title = topBarTitle, onBack = onBack)
         when (val s = state) {
             WeeklyHoursUiState.Loading ->
                 SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth().weight(1f), rows = 4)
@@ -97,41 +106,54 @@ fun WeeklyHoursEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.s3),
                 ) {
                     PersonalHeaderPill()
-                    if (form.allDaysOff) {
-                        A3WarningCard(
-                            title = "No hours set",
-                            body = "People can't book you until you add at least one block.",
-                            action = {
-                                A3SecondaryButton(
-                                    label = "Use 9–5, Mon–Fri",
-                                    icon = PantopusIcon.WandSparkles,
-                                    onClick = viewModel::useQuickDefault,
-                                )
-                            },
+                    if (form.isUnset) {
+                        // Design Frame 4: empty/unset hero — CompositionGapCard then EmptyHero.
+                        A3InfoCard(
+                            title = "Start with your hours",
+                            body = "Your family and business pages build on these hours, so set them first.",
+                            icon = PantopusIcon.Layers,
+                        )
+                        UnsetEmptyHero(onQuickDefault = viewModel::useQuickDefault)
+                        LinksCard(
+                            onOverrides = { onNavigate(viewModel.overridesRoute()) },
+                            onLimits = { onNavigate(viewModel.bookingLimitsRoute()) },
+                        )
+                    } else {
+                        if (form.allDaysOff) {
+                            A3WarningCard(
+                                title = "No hours set",
+                                body = "People can't book you until you add at least one block.",
+                                action = {
+                                    A3SecondaryButton(
+                                        label = "Use 9–5, Mon–Fri",
+                                        icon = PantopusIcon.WandSparkles,
+                                        onClick = viewModel::useQuickDefault,
+                                    )
+                                },
+                            )
+                        }
+                        NameCard(name = form.name, enabled = !form.saving, onNameChange = viewModel::setName)
+                        TimezoneCard(
+                            label = form.timezoneLabel,
+                            locked = form.lockTimezone,
+                            enabled = !form.saving,
+                            onPick = { showTz = true },
+                            onToggleLock = viewModel::toggleLockTimezone,
+                        )
+                        WeekGridCard(
+                            days = form.days,
+                            enabled = !form.saving,
+                            onToggleDay = viewModel::toggleDay,
+                            onEditBlock = { weekday, index, block -> editing = EditingBlock(weekday, index, block.start, block.end) },
+                            onRemoveBlock = viewModel::removeBlock,
+                            onAddBlock = viewModel::addBlock,
+                            onCopy = { copyFrom = it },
+                        )
+                        LinksCard(
+                            onOverrides = { onNavigate(viewModel.overridesRoute()) },
+                            onLimits = { onNavigate(viewModel.bookingLimitsRoute()) },
                         )
                     }
-                    NameCard(name = form.name, enabled = !form.saving, onNameChange = viewModel::setName)
-                    TimezoneCard(
-                        label = form.timezoneLabel,
-                        locked = form.lockTimezone,
-                        enabled = !form.saving,
-                        onPick = { showTz = true },
-                        onToggleLock = viewModel::toggleLockTimezone,
-                    )
-                    WeekGridCard(
-                        days = form.days,
-                        enabled = !form.saving,
-                        onToggleDay = viewModel::toggleDay,
-                        onEditBlock = { weekday, index, block -> editing = EditingBlock(weekday, index, block.start, block.end) },
-                        onRemoveBlock = viewModel::removeBlock,
-                        onAddBlock = viewModel::addBlock,
-                        onCopy = { copyFrom = it },
-                    )
-                    LinksCard(
-                        onOverrides = { onNavigate(viewModel.overridesRoute()) },
-                        onLimits = { onNavigate(viewModel.bookingLimitsRoute()) },
-                        onBlockOff = { onNavigate(viewModel.blockOffRoute()) },
-                    )
                 }
                 A3SaveBar(label = "Save schedule", saving = form.saving, onSave = viewModel::save)
             }
@@ -302,23 +324,74 @@ private fun DayRow(
 private fun LinksCard(
     onOverrides: () -> Unit,
     onLimits: () -> Unit,
-    onBlockOff: () -> Unit,
 ) {
+    // Design: exactly two link rows — "Date overrides & holidays" (value "None set")
+    // and "Booking limits & notice rules" (value "Defaults"). No "Block off time" row.
     A3Card {
         A3LinkRow(
             icon = PantopusIcon.CalendarX,
             label = "Date overrides & holidays",
-            value = "Set days off & custom hours",
+            value = "None set",
             onClick = onOverrides,
             showDivider = true,
         )
         A3LinkRow(
             icon = PantopusIcon.SlidersHorizontal,
             label = "Booking limits & notice rules",
-            value = "Notice, caps & start times",
+            value = "Defaults",
             onClick = onLimits,
-            showDivider = true,
         )
-        A3LinkRow(icon = PantopusIcon.Clock, label = "Block off time", value = "Add a one-off busy hold", onClick = onBlockOff)
+    }
+}
+
+/**
+ * Design Frame 4 — empty-hero card: calendar-clock icon, "Set your hours" headline,
+ * subcopy, and the "Use 9–5, Mon–Fri" quick-default button.
+ */
+@Composable
+private fun UnsetEmptyHero(onQuickDefault: () -> Unit) {
+    A3Card {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(PantopusColors.primary50),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.CalendarClock,
+                    contentDescription = null,
+                    size = 26.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Set your hours",
+                color = PantopusColors.appText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Tell people the days and times you're open to bookings. You can fine-tune any day after.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 12.5.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.s2),
+            )
+            Spacer(Modifier.height(16.dp))
+            A3SecondaryButton(
+                label = "Use 9–5, Mon–Fri",
+                icon = PantopusIcon.WandSparkles,
+                onClick = onQuickDefault,
+            )
+        }
     }
 }

@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.TimezoneOption
 import app.pantopus.android.ui.screens.scheduling._shared.TimezonePickerSheet
@@ -86,7 +86,7 @@ fun MemberWorkingHoursScreen(
         BizTopBar(title = title, onBack = onBack)
         when (val s = state) {
             MemberWorkingHoursViewModel.UiState.Loading ->
-                SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth(), rows = 5)
+                MemberHoursSkeleton(modifier = Modifier.fillMaxWidth())
             is MemberWorkingHoursViewModel.UiState.Error ->
                 ErrorState(message = s.message, modifier = Modifier.fillMaxSize(), onRetry = viewModel::refresh)
             is MemberWorkingHoursViewModel.UiState.Content ->
@@ -185,6 +185,44 @@ private fun MemberHoursBody(
             detectedId = ZoneId.systemDefault().id,
             accent = bizAccent,
         )
+    }
+}
+
+/**
+ * Loading skeleton matching `memberhours-frames.jsx` FrameLoading geometry:
+ * live TzChip is not shimmed (design shows the live chip above the card);
+ * then a BizCard with 7 rows, each: 30dp-wide day-label shimmer (h=11) +
+ * 60%-width pill shimmer (h=22, r=9999) + 26×26 circle shimmer.
+ */
+@Composable
+private fun MemberHoursSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appBg)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        // TzChip placeholder shimmer (pill-shaped, matches chip geometry)
+        Shimmer(width = 110.dp, height = 28.dp, cornerRadius = 9999.dp)
+        BizCard {
+            repeat(7) { i ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    // Day-label shimmer (Sk w=30 h=11)
+                    Shimmer(width = DAY_LABEL_W, height = 11.dp, cornerRadius = Radii.xs)
+                    // Pill-width range shimmer (Sk w~'60%' h=22 r=9999)
+                    Shimmer(width = 140.dp, height = 22.dp, cornerRadius = 9999.dp)
+                    // Circle add-button shimmer (26×26)
+                    Shimmer(width = ADD_BTN, height = ADD_BTN, cornerRadius = 9999.dp)
+                }
+                if (i != 6) BizRowDivider()
+            }
+        }
     }
 }
 

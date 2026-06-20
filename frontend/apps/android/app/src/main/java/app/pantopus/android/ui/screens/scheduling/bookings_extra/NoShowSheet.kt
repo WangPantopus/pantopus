@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +68,7 @@ internal fun NoShowSheet(
     onNoteChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    accent: Color = PantopusColors.primary600,
 ) {
     Dialog(onDismissRequest = { if (!state.submitting) onDismiss() }) {
         Column(
@@ -80,11 +82,10 @@ internal fun NoShowSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            ExtrasIconDisc(icon = PantopusIcon.UserMinus, tint = PantopusColors.error, background = PantopusColors.errorBg)
+            ExtrasIconDisc(icon = PantopusIcon.UserX, tint = PantopusColors.error, background = PantopusColors.errorBg)
             Text(
                 text = if (state.isGroup) "Who didn't show?" else "Mark as no-show?",
-                style = PantopusTextStyle.h3,
-                fontWeight = FontWeight.Bold,
+                style = ExtrasType.header,
                 color = PantopusColors.appText,
                 textAlign = TextAlign.Center,
             )
@@ -95,7 +96,7 @@ internal fun NoShowSheet(
                     } else {
                         "This closes the booking. You can still message the invitee or send a rebook link afterward."
                     },
-                style = PantopusTextStyle.small,
+                style = if (state.isGroup) ExtrasType.body125 else ExtrasType.body13,
                 color = PantopusColors.appTextSecondary,
                 textAlign = TextAlign.Center,
             )
@@ -107,6 +108,7 @@ internal fun NoShowSheet(
                             target = target,
                             selected = target.bookingId in state.selectedIds,
                             onClick = { onToggle(target.bookingId) },
+                            accent = accent,
                         )
                     }
                 }
@@ -139,6 +141,7 @@ private fun NoShowAttendeeRow(
     target: NoShowTarget,
     selected: Boolean,
     onClick: () -> Unit,
+    accent: Color = PantopusColors.primary600,
 ) {
     val border = if (selected) PantopusColors.error else PantopusColors.appBorder
     Row(
@@ -154,7 +157,7 @@ private fun NoShowAttendeeRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        InitialsAvatar(name = target.name, diameter = 34.dp)
+        InitialsAvatar(name = target.name, diameter = 34.dp, accent = accent)
         Text(
             text = target.name,
             style = PantopusTextStyle.body,

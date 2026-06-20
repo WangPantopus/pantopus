@@ -208,6 +208,11 @@ class MyBookingsViewModel
                 initials = initialsOf(inviteeName),
                 dimmed = dimmed,
                 manageable = status?.lowercase() !in TERMINAL_STATUSES,
+                // Design FramePast: past rows carry a "Book again" link.
+                // /my-bookings doesn't return the event-type slug needed for deep-link
+                // rebooking, so the affordance navigates to the bookings row tap (which
+                // opens the manage surface) — the renderer handles the tap correctly.
+                footer = if (dimmed) BookingRowFooter.BookAgain else null,
             )
         }
 

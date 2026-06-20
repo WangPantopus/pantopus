@@ -75,6 +75,12 @@ sealed interface PackageEditorUiState {
         val saving: Boolean,
         val isDirty: Boolean,
         val pillar: SchedulingPillar,
+        /**
+         * True when the package has active credit holders (sold_count > 0).
+         * Sessions and Redeems-against tiles are read-only in this state (design
+         * Frame 4 — "has active buyers" locked state).
+         */
+        val locked: Boolean = false,
     ) : PackageEditorUiState {
         val isValid: Boolean get() = form.isValid
     }
@@ -125,6 +131,8 @@ class PackageEditorViewModel
         private var eventTypes: List<EventTypeOption> = emptyList()
         private var saving = false
         private var started = false
+        /** True when the package has sold credits (sessions/eligibility locked). */
+        private var hasActiveBuyers = false
 
         fun start() {
             if (started) return
@@ -164,6 +172,7 @@ class PackageEditorViewModel
                                     )
                                 return@launch
                             }
+                            hasActiveBuyers = (pkg.soldCount ?: 0) > 0
                             form = seed(pkg)
                         }
                         is NetworkResult.Failure -> {
@@ -277,6 +286,7 @@ class PackageEditorViewModel
                     saving = saving,
                     isDirty = form.key() != snapshot.key(),
                     pillar = owner.pillar(),
+                    locked = hasActiveBuyers,
                 )
         }
 

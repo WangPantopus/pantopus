@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling.packages.PkgComingSoon
 import app.pantopus.android.ui.screens.scheduling.packages.PkgDock
 import app.pantopus.android.ui.screens.scheduling.packages.PkgGhostButton
@@ -79,7 +81,18 @@ fun InvoiceDetailScreen(
             ).testTag("scheduling.invoiceDetail"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PkgTopBar(title = "Invoice", onBack = onBack)
+            // Trailing pill: show invoice status when loaded and DTO has a status value.
+            // Deferred: invoiceStatus is always null until InvoiceDto gains a `status` field.
+            val loadedStatus = (state as? InvoiceDetailUiState.Loaded)?.invoiceStatus
+            PkgTopBar(
+                title = "Invoice",
+                onBack = onBack,
+                trailing = {
+                    if (loadedStatus != null) {
+                        SchedulingStatusPill(status = loadedStatus)
+                    }
+                },
+            )
             InvoiceDetailContent(
                 state = state,
                 sending = sending,
@@ -208,6 +221,19 @@ private fun LoadedBody(
             } else {
                 ItemsTable(state, modifier = Modifier.padding(top = Spacing.s2))
             }
+            // Timeline section — design invoicedetail-frames.jsx:166
+            // Created event derives from created_at (available in DTO).
+            // Sent/Paid/Deposit/Refunded/Voided events deferred until DTO exposes
+            // `status` / `paid_at`.
+            SectionHeader(
+                title = "Timeline",
+                icon = PantopusIcon.Activity,
+                modifier = Modifier.padding(top = Spacing.s4),
+            )
+            InvoiceTimeline(
+                events = state.timelineEvents,
+                modifier = Modifier.padding(top = Spacing.s2),
+            )
             // Payment terms
             SectionHeader(
                 title = "Payment terms",
@@ -284,6 +310,87 @@ private fun IdentityCard(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
+        }
+    }
+}
+
+/**
+ * Invoice lifecycle timeline (invoicedetail-frames.jsx lines 109–126). Each event has
+ * a dot + connecting rail + label/time row. Shows at minimum the "Created" event;
+ * additional events (Sent, Paid, etc.) are added when the DTO gains `status`/`paid_at`.
+ */
+@Composable
+private fun InvoiceTimeline(
+    events: List<InvoiceTimelineEvent>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = 13.dp, vertical = 12.dp),
+    ) {
+        events.forEachIndexed { index, event ->
+            val isLast = index == events.lastIndex
+            Row(
+                modifier = Modifier.padding(bottom = if (isLast) 0.dp else 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // Dot column — dot + connecting rail below (except for last event)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(13.dp)
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(
+                                    if (event.isDone) PantopusColors.success else PantopusColors.appBorder,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (event.isDone) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.Check,
+                                contentDescription = null,
+                                size = 8.dp,
+                                tint = PantopusColors.appTextInverse,
+                            )
+                        }
+                    }
+                    if (!isLast) {
+                        Spacer(
+                            modifier =
+                                Modifier
+                                    .width(1.5.dp)
+                                    .height(12.dp)
+                                    .background(PantopusColors.appBorder),
+                        )
+                    }
+                }
+                // Label + time row
+                Row(
+                    modifier = Modifier.weight(1f).padding(top = 0.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = event.label,
+                        color = PantopusColors.appText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = event.timeLabel,
+                        color = PantopusColors.appTextMuted,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            }
         }
     }
 }

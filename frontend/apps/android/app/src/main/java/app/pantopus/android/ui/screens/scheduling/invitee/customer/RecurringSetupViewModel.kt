@@ -81,6 +81,30 @@ class RecurringSetupViewModel
 
         fun setRepeat(repeat: RecurrenceRepeat) = update { it.copy(repeat = repeat) }
 
+        /** Advance from configure step → Frame 4 review state. */
+        fun review() {
+            val occs = _occurrences.value
+            if (occs.isEmpty()) return
+            _submit.value = RecurringSubmitState.Reviewing(reviewOccurrences = occs)
+        }
+
+        /** Remove one occurrence from the Frame 4 recap before confirming. */
+        fun removeOccurrence(occ: RecurrenceOccurrence) {
+            val reviewing = _submit.value as? RecurringSubmitState.Reviewing ?: return
+            val updated = reviewing.reviewOccurrences.filter { it != occ }
+            if (updated.isEmpty()) {
+                // Removing all items goes back to configure
+                _submit.value = RecurringSubmitState.Idle
+            } else {
+                _submit.value = RecurringSubmitState.Reviewing(reviewOccurrences = updated)
+            }
+        }
+
+        /** Go back from Frame 4 review to the configure step. */
+        fun backFromReview() {
+            _submit.value = RecurringSubmitState.Idle
+        }
+
         fun setWeekday(index: Int) = update { it.copy(weekdayIndex = index) }
 
         fun setCount(count: Int) = update { it.copy(count = count.coerceIn(MIN_SESSIONS, MAX_SESSIONS)) }
@@ -106,13 +130,10 @@ class RecurringSetupViewModel
         private fun generate(cfg: RecurringConfig): List<RecurrenceOccurrence> {
             val time = LocalTime.of(cfg.startMinutes / 60, cfg.startMinutes % 60)
             val today = LocalDate.now(zone)
-            val firstDate =
-                when (cfg.repeat) {
-                    RecurrenceRepeat.Weekly -> today.with(TemporalAdjusters.nextOrSame(dayOfWeek(cfg.weekdayIndex)))
-                    RecurrenceRepeat.Daily -> today.plusDays(1)
-                }
+            // Design only specifies Weekly cadence (recurring-frames.jsx RepeatsSelect).
+            val firstDate = today.with(TemporalAdjusters.nextOrSame(dayOfWeek(cfg.weekdayIndex)))
             return (0 until cfg.count).map { i ->
-                val date = if (cfg.repeat == RecurrenceRepeat.Weekly) firstDate.plusWeeks(i.toLong()) else firstDate.plusDays(i.toLong())
+                val date = firstDate.plusWeeks(i.toLong())
                 val start = date.atTime(time).atZone(zone)
                 RecurrenceOccurrence(
                     startUtc = start.toInstant().toString(),
@@ -124,7 +145,10 @@ class RecurringSetupViewModel
 
         fun confirm() {
             val loaded = _load.value as? RecurringLoadState.Loaded ?: return
-            val sessions = _occurrences.value.map { it.startUtc }
+            // Confirm uses the review-state occurrences (may differ after removes),
+            // falling back to the full generated list when called from outside review.
+            val reviewOccs = (_submit.value as? RecurringSubmitState.Reviewing)?.reviewOccurrences
+            val sessions = (reviewOccs ?: _occurrences.value).map { it.startUtc }
             if (sessions.isEmpty()) return
             _submit.value = RecurringSubmitState.Saving
             viewModelScope.launch {

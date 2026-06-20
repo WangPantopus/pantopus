@@ -402,7 +402,7 @@ fun PkgSegmented(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
+                .clip(RoundedCornerShape(9.dp))
                 .background(PantopusColors.appSurfaceSunken)
                 .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),

@@ -35,6 +35,10 @@ data class BookingLimitsForm(
     val minNoticeHours: Int,
     val bookUpToDays: Int,
     val maxPerDay: Int,
+    // TODO(backend): wire to weekly_cap once the API exposes it.
+    //  Design shows a "Max per week" StepperRow (booking-limits-frames.jsx:151,173,201).
+    //  Rendered as a UI-only placeholder (disabled) until the field exists.
+    val maxPerWeek: Int = 20,
     val perPerson: Int,
     val startInterval: StartInterval,
     val saving: Boolean = false,

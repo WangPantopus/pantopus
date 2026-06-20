@@ -57,7 +57,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.screens.scheduling.resources.CounterRow
@@ -310,12 +312,7 @@ private fun HeaderCard(loaded: VisitDetailUiState.Loaded) {
                 )
             }
             if (loaded.lifecycle == VisitLifecycle.Done) {
-                RuleChipView(
-                    icon = PantopusIcon.Check,
-                    text = "Completed",
-                    foreground = PantopusColors.success,
-                    background = PantopusColors.successBg,
-                )
+                SchedulingStatusPill(status = SchedulingPillStatus.Completed)
             }
         }
         Row(

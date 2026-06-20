@@ -142,7 +142,7 @@ private fun StepRail(
             val done = index < currentIndex
             val current = index == currentIndex
             Box(
-                modifier = Modifier.size(24.dp).clip(CircleShape).background(if (done || current) accent else PantopusColors.appSurfaceSunken),
+                modifier = Modifier.size(22.dp).clip(CircleShape).background(if (done || current) accent else PantopusColors.appSurfaceSunken),
                 contentAlignment = Alignment.Center,
             ) {
                 if (done) {
@@ -318,9 +318,9 @@ private fun DetailsStep(
         ExtrasInputField(value = state.inviteeName, onValueChange = onName, placeholder = "Full name", leadingIcon = PantopusIcon.User, accent = accent)
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             ExtrasOverline("Invite by")
-            ExtrasChipFlow {
-                ExtrasPillChip(label = "Phone · recommended", selected = state.contactMode == ContactMode.Phone, onClick = { onContactMode(ContactMode.Phone) }, accent = accent)
-                ExtrasPillChip(label = "Email", selected = state.contactMode == ContactMode.Email, onClick = { onContactMode(ContactMode.Email) }, accent = accent)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                InviteByRow(icon = PantopusIcon.Phone, label = "Phone", subtitle = "Recommended", selected = state.contactMode == ContactMode.Phone, onClick = { onContactMode(ContactMode.Phone) }, accent = accent)
+                InviteByRow(icon = PantopusIcon.Mail, label = "Email", selected = state.contactMode == ContactMode.Email, onClick = { onContactMode(ContactMode.Email) }, accent = accent)
             }
             if (state.contactMode == ContactMode.Phone) {
                 ExtrasInputField(value = state.inviteePhone, onValueChange = onPhone, placeholder = "Mobile number", leadingIcon = PantopusIcon.Phone, accent = accent, keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
@@ -385,6 +385,52 @@ private fun CreatedStep(
         Text(text = "We've added it and notified your invitee.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(top = Spacing.s1, bottom = Spacing.s5))
         PrimaryButton(title = "View booking", onClick = onViewBooking, modifier = Modifier.fillMaxWidth())
         GhostButton(title = "Book another", onClick = onBookAnother, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2))
+    }
+}
+
+/**
+ * E12 Invite-by card row — a full-width bordered card with an icon tile, a label,
+ * an optional subtitle, and a trailing check-circle when selected. Matches the
+ * design's onbehalf-frames.jsx lines 222–231 card-row pattern (replaces the prior
+ * pill-chip selector).
+ */
+@Composable
+private fun InviteByRow(
+    icon: PantopusIcon,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(if (selected) accent.copy(alpha = TILE_BG_ALPHA) else PantopusColors.appSurface)
+                .border(if (selected) 1.5.dp else 1.dp, if (selected) accent else PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onClick)
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(Radii.md)).background(if (selected) accent.copy(alpha = TILE_ICON_ALPHA) else PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = if (selected) accent else PantopusColors.appTextStrong)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, style = PantopusTextStyle.body, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+            if (subtitle != null) {
+                Text(text = subtitle, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            }
+        }
+        if (selected) {
+            PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 20.dp, tint = accent)
+        }
     }
 }
 

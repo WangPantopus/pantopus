@@ -217,6 +217,56 @@ private fun ResolvedBody(state: OpenInAppUiState.Resolved) {
             }
         }
     }
+    // Frame 3 design IdentityLine: inline capsule (sunken bg, border) showing
+    // the invitee mini-avatar and "Continuing as <name> · times in <tz>".
+    // The Resolved state carries no invitee profile, so we render the designed
+    // placeholder label with a generic avatar disc.
+    IdentityLine()
+}
+
+/**
+ * The design `IdentityLine` pill (Frame 3 / deeplink-handoff-frames.jsx:122–128):
+ * an inline-flex capsule (appSurfaceSunken bg + border) with a small
+ * invitee avatar disc and "Continuing as … · times in …" text. The Resolved
+ * state carries no invitee profile from the ViewModel, so we render the
+ * designed placeholder copy as specified — NEVER fabricating data.
+ */
+@Composable
+private fun IdentityLine() {
+    Row(
+        modifier =
+            Modifier
+                .padding(top = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        // Mini invitee avatar disc (purple gradient per design frame — fixed chrome).
+        Box(
+            modifier =
+                Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(SchedulingPillar.Personal.avatarBrush()),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.User,
+                contentDescription = null,
+                size = 10.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = "Continuing as you · times in local",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
 }
 
 /**
@@ -328,7 +378,10 @@ private fun BoxScope.DockColumn(content: @Composable () -> Unit) {
 
 /**
  * The design `PantopusMark`: a sky-gradient rounded-square (≈0.28·size radius)
- * carrying the concentric-ring brand glyph (mirrors iOS `PantopusMark`).
+ * carrying the concentric-ring brand glyph (mirrors iOS `PantopusMark` hand-drawn
+ * at DeepLinkHandoffView.swift:229–242, and deeplink-handoff-frames.jsx:64–65).
+ * Uses [PantopusIcon.Concentric] which maps to RadioButtonChecked — the closest
+ * available ring-with-dot approximation of the three-concentric-ring SVG.
  */
 @Composable
 private fun BrandMark(size: Dp) {
@@ -341,7 +394,7 @@ private fun BrandMark(size: Dp) {
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.Calendarly,
+            icon = PantopusIcon.Concentric,
             contentDescription = "Pantopus",
             size = size * 0.6f,
             tint = PantopusColors.appTextInverse,

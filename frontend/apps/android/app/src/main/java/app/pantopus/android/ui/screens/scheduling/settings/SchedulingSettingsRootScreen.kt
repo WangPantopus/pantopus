@@ -3,8 +3,10 @@
 package app.pantopus.android.ui.screens.scheduling.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -112,7 +113,9 @@ private fun SettingsBody(
                 SettingsNewBookingsBlock(accent = PantopusColors.business)
             }
         }
-        SettingsGroup(title = "Automation", helper = "Reminders go out automatically before each booking.") {
+        val accent = data.pillar.accent
+        val accentBg = data.pillar.accentBg
+        SettingsGroup(title = "Automation", accent = accent, helper = "Reminders go out automatically before each booking.") {
             SettingsRow(
                 label = "Default reminders",
                 sublabel = if (data.isFresh) null else (data.remindersValue ?: "1 day · 1 hr"),
@@ -148,26 +151,50 @@ private fun SettingsBody(
                 onClick = { onNavigate(vm.notificationsRoute()) },
             )
         }
-        SettingsGroup(title = "Scheduling defaults") {
+        SettingsGroup(title = "Scheduling defaults", accent = accent) {
+            val tzSaving = data.savingRow == "timezone"
             SettingsRow(
                 label = "Default timezone",
-                sublabel = data.timezoneValue,
+                sublabel = if (tzSaving) null else data.timezoneValue,
                 onClick = { onNavigate(vm.availabilityRoute()) },
-                trailing = { SettingsTzRight(accent = PantopusColors.primary600, locked = !data.isFresh) },
+                trailing = {
+                    if (tzSaving) {
+                        SettingsRowShimmer(width = 70.dp)
+                    } else {
+                        SettingsTzRight(accent = accent, locked = !data.isFresh, accentBg = accentBg)
+                    }
+                },
             )
             SettingsRow(label = "Default availability", sublabel = "Mon–Fri, 9–5", onClick = { onNavigate(vm.availabilityRoute()) })
+            val cancelSaving = data.savingRow == "cancellation"
+            val cancelSaved = data.justSavedRow == "cancellation"
             SettingsRow(
                 label = "Cancellation policy",
-                sublabel = if (data.isFresh) null else "24-hour notice",
+                sublabel = when {
+                    cancelSaving -> null
+                    data.isFresh -> null
+                    else -> "24-hour notice"
+                },
                 showDivider = false,
                 onClick = { onNavigate(vm.cancellationPolicyRoute()) },
                 trailing = {
-                    if (data.isFresh) SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus) else SettingsChevron()
+                    when {
+                        cancelSaving -> SettingsRowShimmer(width = 84.dp)
+                        cancelSaved -> Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                        ) {
+                            SettingsSavedChip()
+                            SettingsChevron()
+                        }
+                        data.isFresh -> SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus)
+                        else -> SettingsChevron()
+                    }
                 },
             )
         }
         if (data.paidEnabled) {
-            SettingsGroup(title = "Payments", helper = "Required only for paid event types.") {
+            SettingsGroup(title = "Payments", accent = accent, helper = "Required only for paid event types.") {
                 SettingsRow(
                     label = "Payments & payouts",
                     sublabel = if (data.paymentsConnected) "Stripe · connected" else "Take payment at booking",
@@ -177,7 +204,7 @@ private fun SettingsBody(
                         if (data.paymentsConnected) {
                             SettingsChip("Connected", SettingsChipTone.Success, PantopusIcon.Check)
                         } else {
-                            SettingsConnectPill(accent = PantopusColors.primary600, onClick = { onNavigate(vm.paymentsRoute()) })
+                            SettingsConnectPill(accent = accent, onClick = { onNavigate(vm.paymentsRoute()) })
                         }
                     },
                 )
@@ -207,7 +234,7 @@ private fun SettingsError(
         Spacer(Modifier.height(Spacing.s2))
         Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
         Spacer(Modifier.height(Spacing.s4))
-        TextButton(onClick = onRetry) { Text("Try again", color = SchedulingPillar.Personal.accent) }
+        TextButton(onClick = onRetry) { Text("Try again", color = PantopusColors.primary600) }
     }
 }
 

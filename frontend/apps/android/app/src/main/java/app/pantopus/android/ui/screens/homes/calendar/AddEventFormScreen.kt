@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.HorizontalDivider
@@ -178,6 +179,42 @@ fun AddEventFormBody(
             RequestRsvpGroup(state = state, onToggle = onSetRequestRsvp)
             NotesGroup(state = state, onUpdate = onUpdateField)
             Box(modifier = Modifier.height(Spacing.s5))
+        }
+
+        // FrameSaving (add-event-frames.jsx:111-131): content dims to 0.45 opacity;
+        // a floating white card (90% opaque) with a spinner + "Saving event" label
+        // is centered over the dimmed content. Mirrors iOS `SavingOverlay`.
+        if (state.isSaving) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(PantopusColors.appBg.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .shadow(elevation = 8.dp, shape = RoundedCornerShape(Radii.xl), clip = false)
+                            .clip(RoundedCornerShape(Radii.xl))
+                            .background(PantopusColors.appSurface.copy(alpha = 0.9f))
+                            .padding(horizontal = Spacing.s6, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+                ) {
+                    CircularProgressIndicator(
+                        color = PantopusColors.home,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(26.dp),
+                    )
+                    Text(
+                        text = "Saving event",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextStrong,
+                    )
+                }
+            }
         }
 
         state.toast?.let { toast ->

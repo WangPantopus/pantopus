@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
@@ -46,14 +47,30 @@ import app.pantopus.android.ui.theme.pantopusShadow
 /** Leading control for [SchedulingTopBar]. */
 enum class SchedulingTopBarLeading { None, Back, Close }
 
-private val TOP_BAR_HEIGHT = 56.dp
 private val TOP_BAR_HIT = 36.dp
 private val TOP_BAR_ICON = 22.dp
 
 /**
- * The canonical 56dp scheduling top bar: optional leading chevron/close in a
- * 36dp hit target, a centered 16sp / 600 title, an optional trailing icon, an
- * app-surface background and a 1dp bottom hairline. Mirrors iOS `SetupTopBar`.
+ * The two designed top-bar heights. [Standard] (56dp / 16sp) is the canonical
+ * setup/detail/wizard bar; [Compact] (46dp / 15sp) is the availability /
+ * calendar bar with a tighter chrome and 20dp glyphs, per the shared handoff.
+ */
+enum class SchedulingTopBarSize(
+    internal val height: Dp,
+    internal val titleSp: Int,
+    internal val iconSize: Dp,
+) {
+    Standard(56.dp, 16, TOP_BAR_ICON),
+    Compact(46.dp, 15, 20.dp),
+}
+
+/**
+ * The canonical scheduling top bar: optional leading chevron/close in a 36dp
+ * hit target, a centered 16sp / 600 (or 15sp in [SchedulingTopBarSize.Compact])
+ * title, an optional trailing icon, an app-surface background and a 1dp bottom
+ * hairline. Mirrors iOS `SetupTopBar`. Pass [SchedulingTopBarSize.Compact] for
+ * the 46dp availability/calendar bar. Tab-ROOT screens pass
+ * [SchedulingTopBarLeading.None] (no back chevron).
  * testTags mirror iOS: schedulingTopBarBack / schedulingTopBarClose /
  * schedulingTopBarTrailing.
  */
@@ -66,6 +83,7 @@ fun SchedulingTopBar(
     trailingIcon: PantopusIcon? = null,
     onTrailing: (() -> Unit)? = null,
     applyStatusBarInset: Boolean = false,
+    size: SchedulingTopBarSize = SchedulingTopBarSize.Standard,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
@@ -79,7 +97,7 @@ fun SchedulingTopBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(TOP_BAR_HEIGHT)
+                    .height(size.height)
                     .padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -103,7 +121,7 @@ fun SchedulingTopBar(
                         PantopusIconImage(
                             icon = if (isBack) PantopusIcon.ChevronLeft else PantopusIcon.X,
                             contentDescription = if (isBack) "Back" else "Close",
-                            size = TOP_BAR_ICON,
+                            size = size.iconSize,
                             tint = PantopusColors.appText,
                         )
                     }
@@ -113,7 +131,7 @@ fun SchedulingTopBar(
             Text(
                 text = title,
                 color = PantopusColors.appText,
-                fontSize = 16.sp,
+                fontSize = size.titleSp.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -142,7 +160,7 @@ fun SchedulingTopBar(
                             PantopusIconImage(
                                 icon = trailingIcon,
                                 contentDescription = null,
-                                size = TOP_BAR_ICON,
+                                size = size.iconSize,
                                 tint = PantopusColors.appText,
                             )
                         }

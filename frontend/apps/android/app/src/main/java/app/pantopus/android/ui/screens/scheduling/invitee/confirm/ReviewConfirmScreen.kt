@@ -75,7 +75,7 @@ fun ReviewConfirmBody(
         if (paidEnabled) {
             Column {
                 ConfirmOverline("Price")
-                PriceBreakdown(et)
+                PriceBreakdown(et = et, accent = pillar.accent)
             }
         }
 
@@ -207,7 +207,7 @@ private fun ReviewSummaryCard(
 }
 
 @Composable
-private fun PriceBreakdown(et: PublicEventTypeView) {
+private fun PriceBreakdown(et: PublicEventTypeView, accent: androidx.compose.ui.graphics.Color) {
     val mode = ConfirmUtils.priceMode(et.priceCents, et.depositCents)
     val currency = et.currency
     Column(
@@ -228,6 +228,7 @@ private fun PriceBreakdown(et: PublicEventTypeView) {
                 TotalRow(
                     label = "Due now",
                     value = ConfirmUtils.formatCents(ConfirmUtils.dueNowCents(et.priceCents, et.depositCents), currency),
+                    accent = accent,
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "Balance at your visit", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
@@ -239,7 +240,7 @@ private fun PriceBreakdown(et: PublicEventTypeView) {
                     )
                 }
             }
-            else -> TotalRow(label = "Total", value = ConfirmUtils.formatCents(et.priceCents ?: 0, currency))
+            else -> TotalRow(label = "Total", value = ConfirmUtils.formatCents(et.priceCents ?: 0, currency), accent = accent)
         }
     }
 }
@@ -265,6 +266,7 @@ private fun LineRow(
 private fun TotalRow(
     label: String,
     value: String,
+    accent: androidx.compose.ui.graphics.Color,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -272,7 +274,8 @@ private fun TotalRow(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(text = label, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-        Text(text = value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = PantopusColors.primary600)
+        // Use pillar accent so Home/Business hosts show correct green/violet instead of sky blue.
+        Text(text = value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = accent)
     }
 }
 

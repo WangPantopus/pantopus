@@ -291,7 +291,7 @@ private fun CustomRows(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            RowIconTile(PantopusIcon.UserMinus)
+            RowIconTile(PantopusIcon.UserX)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "No-show handling",
@@ -384,7 +384,7 @@ private fun PolicyStepper(
         StepperButton(icon = PantopusIcon.Minus, enabled = canDecrement, onClick = onDecrement)
         Text(
             text = value,
-            color = PantopusColors.appText,
+            color = PILLAR.accent,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.widthIn(min = 28.dp),
