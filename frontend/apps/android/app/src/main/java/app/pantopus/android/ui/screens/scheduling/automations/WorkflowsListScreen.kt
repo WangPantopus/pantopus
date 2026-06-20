@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.scheduling.WorkflowDto
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -278,7 +280,10 @@ private fun WorkflowRow(
                     PantopusIconImage(icon = channel.icon, contentDescription = null, size = 12.dp, tint = PantopusColors.appTextMuted)
                     Text(text = actionLabel, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary, maxLines = 1)
                 }
-                AutoStatusChip(active = active, modifier = Modifier.padding(top = 5.dp))
+                SchedulingStatusPill(
+                    status = if (active) SchedulingPillStatus.Active else SchedulingPillStatus.Paused,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
             }
         }
         if (!gated) {

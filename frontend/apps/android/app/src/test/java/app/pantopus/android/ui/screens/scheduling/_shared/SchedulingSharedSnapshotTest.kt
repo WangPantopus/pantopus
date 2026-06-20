@@ -7,13 +7,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusTheme
 import org.junit.Rule
 import org.junit.Test
@@ -90,6 +94,65 @@ class SchedulingSharedSnapshotTest {
                         selectedDay = 17,
                         onSelectDay = {},
                         today = 13,
+                    )
+                }
+            }
+        }
+    }
+
+    // ── SchedulingTopBar (56dp canonical bar) ────────────────────────────────
+
+    @Test
+    fun top_bar_back_and_overflow() {
+        paparazzi.snapshot {
+            Frame {
+                Column {
+                    SchedulingTopBar(
+                        title = "Booking detail",
+                        leading = SchedulingTopBarLeading.Back,
+                        onLeading = {},
+                        trailingIcon = PantopusIcon.MoreHorizontal,
+                        onTrailing = {},
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun top_bar_close_and_save_action() {
+        paparazzi.snapshot {
+            Frame {
+                Column {
+                    SchedulingTopBar(
+                        title = "Edit resource",
+                        leading = SchedulingTopBarLeading.Close,
+                        onLeading = {},
+                        trailing = {
+                            Text(
+                                text = "Save",
+                                color = PantopusColors.home,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(end = 4.dp),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun top_bar_with_status_bar_inset() {
+        paparazzi.snapshot {
+            Frame {
+                Column {
+                    SchedulingTopBar(
+                        title = "Schedule a visit",
+                        leading = SchedulingTopBarLeading.Close,
+                        onLeading = {},
+                        applyStatusBarInset = true,
                     )
                 }
             }

@@ -29,10 +29,26 @@ enum PollResponseChoice: String, Sendable, Hashable, CaseIterable {
 }
 
 /// A proposed poll option (candidate slot).
+///
+/// `conflict` carries the design's conflicts-detected affordance (F6 Frame 3):
+/// when the member's personal calendar clashes at this slot, the row shows a red
+/// "Conflicts: …" pill plus a "From your personal calendar" caption. The public
+/// poll read does not yet expose per-member busy windows, so the view-model
+/// leaves this `nil` today; the rendering is wired so the frame lights up the
+/// moment that data lands.
 struct PollOptionRow: Identifiable, Hashable, Sendable {
     let id: String
     let startAt: String?
     let endAt: String?
+    /// Personal-calendar conflict title for this slot, if any (e.g. "Dentist").
+    var conflict: String?
+
+    init(id: String, startAt: String?, endAt: String?, conflict: String? = nil) {
+        self.id = id
+        self.startAt = startAt
+        self.endAt = endAt
+        self.conflict = conflict
+    }
 }
 
 @Observable
@@ -83,6 +99,11 @@ final class PollResponseViewModel {
     var isClosed: Bool { phase == .closed }
     var allAnswered: Bool { !options.isEmpty && options.allSatisfy { selections[$0.id] != nil } }
     var answeredCount: Int { options.filter { selections[$0.id] != nil }.count }
+
+    /// Any proposed slot clashes with the member's personal calendar — drives the
+    /// design's info pre-fill banner (F6 Frame 3). Backend does not yet supply
+    /// per-member busy windows, so this is `false` until that data lands.
+    var hasConflicts: Bool { options.contains { $0.conflict != nil } }
 
     var subtitle: String {
         var parts: [String] = []

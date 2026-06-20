@@ -74,8 +74,8 @@ final class InvoicesViewModelTests: XCTestCase {
 
     // MARK: Detail
 
-    private func detailVM(_ routes: [String: [SequencedURLProtocol.Response]]) -> InvoiceDetailViewModel {
-        InvoiceDetailViewModel(owner: .business(id: "biz1"), invoiceId: "inv1", push: { _ in }, client: session(routes))
+    private func detailVM(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingInvoiceDetailViewModel {
+        SchedulingInvoiceDetailViewModel(owner: .business(id: "biz1"), invoiceId: "inv1", push: { _ in }, client: session(routes))
     }
 
     private let detail = #"""

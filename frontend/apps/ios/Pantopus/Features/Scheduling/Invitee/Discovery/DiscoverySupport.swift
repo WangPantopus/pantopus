@@ -120,7 +120,10 @@ enum DiscoveryLocation {
         case "video", "google_meet", "zoom", "meet", "teams": .video
         case "in_person", "in-person", "inperson": .mapPin
         case "phone", "phone_call": .phone
-        default: .calendar
+        // Spec EventTypeRow leading tiles use mode-specific glyphs; the default
+        // (video) event uses 'video', so unknown/empty modes fall back to video
+        // (matching the design + Android) rather than a bare calendar glyph.
+        default: .video
         }
     }
 }

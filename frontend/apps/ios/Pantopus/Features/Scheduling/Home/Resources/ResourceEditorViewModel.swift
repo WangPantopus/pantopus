@@ -51,7 +51,7 @@ final class ResourceEditorViewModel {
     /// this stays empty until a roster source is wired, so the picker renders
     /// the rows + checks only once members are present and otherwise falls
     /// back to the "coming soon" caption.
-    private(set) var members: [HomeMember] = []
+    private(set) var members: [ResourceHomeMember] = []
     /// Member ids granted access in the "Specific" picker (drives the row check).
     var selectedMemberIds: Set<String> = []
 

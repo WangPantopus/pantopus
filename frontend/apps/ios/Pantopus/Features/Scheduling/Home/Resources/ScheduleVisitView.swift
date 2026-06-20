@@ -63,11 +63,14 @@ struct ScheduleVisitView: View {
     private var explainer: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.info, size: 15, color: Theme.Color.info)
-            Text("Pick a time and who needs to be home. The visit lands on the family calendar and marks those members busy.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextStrong)
+            // Spec explainer copy (visit-setup-frames `VisitExplainer`).
+            Text("Slots come from when your chosen hosts are personally free.")
+                .font(.system(size: 11.5, weight: .medium))
+                .lineSpacing(2)
+                .foregroundStyle(Theme.Color.primary800)
         }
         .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.infoBg)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
@@ -77,8 +80,12 @@ struct ScheduleVisitView: View {
         .padding(.horizontal, Spacing.s4)
     }
 
+    // Sections render via the local `SectionCard` (Home-green overline,
+    // matching the spec's `Section` overline color H.accent700 and Android),
+    // not the shared `FormFieldGroup` (gray overline). Horizontally inset to
+    // align with the FormShell's section gutter.
     private var detailsGroup: some View {
-        FormFieldGroup("Details") {
+        SectionCard {
             TextField("e.g. Plumber visit", text: $viewModel.title)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
@@ -99,10 +106,11 @@ struct ScheduleVisitView: View {
                 Spacer()
             }
         }
+        .padding(.horizontal, Spacing.s4)
     }
 
     private var hostsGroup: some View {
-        FormFieldGroup("Who must be home") {
+        SectionCard(overline: "Who must be home") {
             if viewModel.members.isEmpty {
                 Text("No household members found.")
                     .pantopusTextStyle(.small)
@@ -111,7 +119,7 @@ struct ScheduleVisitView: View {
                 ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
                     Button { viewModel.toggleHost(member.id) } label: {
                         HStack(spacing: Spacing.s2) {
-                            HomeMemberAvatar(member: member, size: 32)
+                            ResourceHomeMemberAvatar(member: member, size: 32)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(member.name)
                                     .font(.system(size: 13, weight: .semibold))
@@ -134,10 +142,11 @@ struct ScheduleVisitView: View {
                 fieldError(error)
             }
         }
+        .padding(.horizontal, Spacing.s4)
     }
 
     private var whenGroup: some View {
-        FormFieldGroup("When") {
+        SectionCard(overline: "When") {
             DatePicker("Date", selection: $viewModel.date, displayedComponents: .date)
                 .tint(Theme.Color.home)
             Divider().background(Theme.Color.appBorderSubtle)
@@ -146,10 +155,11 @@ struct ScheduleVisitView: View {
             Divider().background(Theme.Color.appBorderSubtle)
             CounterRow(label: "Visit length", value: $viewModel.durationHours, unit: "hr", range: 1...12)
         }
+        .padding(.horizontal, Spacing.s4)
     }
 
     private var accessGroup: some View {
-        FormFieldGroup("Access") {
+        SectionCard(overline: "Access") {
             TextField("Entry note for the visitor", text: $viewModel.entryNote)
                 .font(Theme.Font.body)
                 .foregroundStyle(Theme.Color.appText)
@@ -157,7 +167,37 @@ struct ScheduleVisitView: View {
             Text("Optional — e.g. \u{201C}Front door code 4827\u{201D}.")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
+            // Spec AccessNote secondary affordance — view-only (the access-code
+            // directory has no v1 backend), mirroring Android's `LinkAccessCodeRow`.
+            linkAccessCodeRow
         }
+        .padding(.horizontal, Spacing.s4)
+    }
+
+    private var linkAccessCodeRow: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.keyRound, size: 15, color: Theme.Color.appTextStrong)
+                .frame(width: 30, height: 30)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            Text("Link an access code")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Spacer(minLength: Spacing.s2)
+            Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .contentShape(Rectangle())
+        .accessibilityLabel("Link an access code")
+        .accessibilityIdentifier("scheduling.scheduleVisit.linkAccessCode")
     }
 
     private var loadingBody: some View {

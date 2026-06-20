@@ -56,13 +56,27 @@ struct BookingLimitsView: View {
             onClose: { dismiss() },
             onCommit: { Task { if await viewModel.save() { dismiss() } } }
         ) {
+            sheetOverline
             helper
-            noticeGroup
-            windowGroup
-            dailyCapGroup
-            perPersonGroup
-            startTimesGroup
+            noticeRow
+            windowRow
+            dailyCapRow
+            perPersonRow
+            startTimesRow
         }
+    }
+
+    // Left-aligned sky overline beneath the top bar — FormShell only offers a
+    // centered title, so the design's "PERSONAL · WORKING HOURS" overline
+    // rides above the cards as a leading label.
+    private var sheetOverline: some View {
+        Text("PERSONAL · WORKING HOURS")
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(Theme.Color.personal)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("scheduling.bookingLimits.overline")
     }
 
     private var helper: some View {
@@ -73,50 +87,62 @@ struct BookingLimitsView: View {
             .padding(.horizontal, Spacing.s4)
     }
 
-    private var noticeGroup: some View {
-        ruleCard("Minimum notice", caption: "Can't be booked inside this window.") {
-            Stepper(value: $viewModel.minNoticeHours, in: 0...168) {
-                valueLabel("\(viewModel.minNoticeHours) \(viewModel.minNoticeHours == 1 ? "hour" : "hours")")
-            }
-            .accessibilityIdentifier("scheduling.bookingLimits.minNoticeStepper")
-        }
+    private var noticeRow: some View {
+        stepperRow(
+            "Minimum notice",
+            caption: "Can't be booked inside this window.",
+            value: "\(viewModel.minNoticeHours)",
+            unit: viewModel.minNoticeHours == 1 ? "hour" : "hours",
+            identifier: "scheduling.bookingLimits.minNoticeStepper",
+            onMinus: { viewModel.minNoticeHours = max(0, viewModel.minNoticeHours - 1) },
+            onPlus: { viewModel.minNoticeHours = min(168, viewModel.minNoticeHours + 1) }
+        )
     }
 
-    private var windowGroup: some View {
-        ruleCard(
+    private var windowRow: some View {
+        stepperRow(
             "Book up to",
             caption: "How far ahead people can book.",
+            value: "\(viewModel.horizonDays)",
+            unit: "days",
+            identifier: "scheduling.bookingLimits.horizonStepper",
             error: viewModel.windowConflict
                 ? "Your booking window is shorter than your minimum notice, so no times will show."
-                : nil
-        ) {
-            Stepper(value: $viewModel.horizonDays, in: 1...730) {
-                valueLabel("\(viewModel.horizonDays) days")
-            }
-            .accessibilityIdentifier("scheduling.bookingLimits.horizonStepper")
-        }
+                : nil,
+            onMinus: { viewModel.horizonDays = max(1, viewModel.horizonDays - 1) },
+            onPlus: { viewModel.horizonDays = min(730, viewModel.horizonDays + 1) }
+        )
     }
 
-    private var dailyCapGroup: some View {
-        ruleCard("Max per day", caption: "Most bookings you'll take in a day.") {
-            Stepper(value: $viewModel.dailyCap, in: 1...50) {
-                valueLabel("\(viewModel.dailyCap)")
-            }
-            .accessibilityIdentifier("scheduling.bookingLimits.dailyCapStepper")
-        }
+    private var dailyCapRow: some View {
+        stepperRow(
+            "Max per day",
+            caption: "Most bookings you'll take in a day.",
+            value: "\(viewModel.dailyCap)",
+            unit: nil,
+            identifier: "scheduling.bookingLimits.dailyCapStepper",
+            onMinus: { viewModel.dailyCap = max(1, viewModel.dailyCap - 1) },
+            onPlus: { viewModel.dailyCap = min(50, viewModel.dailyCap + 1) }
+        )
     }
 
-    private var perPersonGroup: some View {
-        ruleCard("Per-person limit", caption: "How many one person can hold at once.") {
-            Stepper(value: $viewModel.perBookerCap, in: 1...20) {
-                valueLabel("\(viewModel.perBookerCap) \(viewModel.perBookerCap == 1 ? "booking" : "bookings")")
-            }
-            .accessibilityIdentifier("scheduling.bookingLimits.perPersonStepper")
-        }
+    private var perPersonRow: some View {
+        stepperRow(
+            "Per-person limit",
+            caption: "How many one person can hold at once.",
+            value: "\(viewModel.perBookerCap)",
+            unit: viewModel.perBookerCap == 1 ? "booking" : "bookings",
+            identifier: "scheduling.bookingLimits.perPersonStepper",
+            onMinus: { viewModel.perBookerCap = max(1, viewModel.perBookerCap - 1) },
+            onPlus: { viewModel.perBookerCap = min(20, viewModel.perBookerCap + 1) }
+        )
     }
 
-    private var startTimesGroup: some View {
-        ruleCard("Start times", caption: "Where bookings can start within the hour.") {
+    private var startTimesRow: some View {
+        rowCard {
+            Text("Start times")
+                .font(.system(size: 13.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
             Picker("Start times", selection: $viewModel.slotInterval) {
                 ForEach(SlotInterval.allCases) { interval in
                     Text(interval.label).tag(interval)
@@ -124,38 +150,71 @@ struct BookingLimitsView: View {
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("scheduling.bookingLimits.slotInterval")
+            Text("Where bookings can start within the hour.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
         }
     }
 
     // MARK: Building blocks
 
-    private func ruleCard(
+    /// One rule card: label (semibold) + bordered stepper on one line, caption
+    /// (or error) below. Mirrors the design's `StepperRow` / `RowCard`.
+    private func stepperRow(
         _ label: String,
         caption: String,
+        value: String,
+        unit: String?,
+        identifier: String,
         error: String? = nil,
-        @ViewBuilder control: () -> some View
+        onMinus: @escaping () -> Void,
+        onPlus: @escaping () -> Void
     ) -> some View {
-        FormFieldGroup(label) {
-            control()
+        rowCard {
+            HStack(spacing: Spacing.s3) {
+                Text(label)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                AvailabilityStepper(
+                    value: value,
+                    unit: unit,
+                    error: error != nil,
+                    onMinus: onMinus,
+                    onPlus: onPlus
+                )
+                .accessibilityIdentifier(identifier)
+            }
             if let error {
                 HStack(alignment: .top, spacing: Spacing.s1) {
                     Icon(.circleAlert, size: 12, strokeWidth: 2, color: Theme.Color.error)
                     Text(error)
-                        .pantopusTextStyle(.caption)
+                        .font(.system(size: 10.5))
+                        .lineSpacing(2)
                         .foregroundStyle(Theme.Color.error)
                 }
             } else {
                 Text(caption)
-                    .pantopusTextStyle(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }
 
-    private func valueLabel(_ value: String) -> some View {
-        Text(value)
-            .pantopusTextStyle(.body)
-            .foregroundStyle(Theme.Color.appText)
+    private func rowCard(@ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            content()
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Spacing.s4)
     }
 
     private var loadingSkeleton: some View {

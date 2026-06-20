@@ -42,13 +42,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SlotTimeList
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -87,8 +91,8 @@ fun ManageBookingScreen(
         ManageTopBar(onBack = onBack)
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
-                is ManageBookingUiState.Loading -> SchedulingLoadingSkeleton(rows = 3)
-                is ManageBookingUiState.Expired -> ManageExpired(onBack = onBack)
+                is ManageBookingUiState.Loading -> ManageLoadingSkeleton()
+                is ManageBookingUiState.Expired -> ManageExpired(onBack = onBack, onContactHost = onBack)
                 is ManageBookingUiState.Error -> ErrorState(message = s.message, onRetry = viewModel::refresh)
                 is ManageBookingUiState.Loaded ->
                     ManageBookingContent(
@@ -163,18 +167,16 @@ fun ManageBookingContent(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        StatusBadge(status = data.status)
+        SchedulingStatusPill(status = data.status.toPillStatus())
         ManageSummaryCard(data = data, pillar = pillar, dimmed = dimmed, struck = data.status == ManageStatus.Cancelled)
 
         when (data.status) {
             ManageStatus.Cancelled ->
-                ConfirmBanner(
-                    tone = BannerTone.Error,
-                    icon = PantopusIcon.XCircle,
+                CancelledBanner(
                     title = data.cancelledOnLabel?.let { "This booking was cancelled on $it" } ?: "This booking was cancelled",
-                    body = "The slot was released. Nothing further is owed.",
-                    actionLabel = data.pageSlug?.let { "Book again" },
-                    onAction = if (data.pageSlug != null) onBookAgain else null,
+                    accent = pillar.accent,
+                    showBookAgain = data.pageSlug != null,
+                    onBookAgain = onBookAgain,
                 )
             ManageStatus.Past ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
@@ -185,7 +187,8 @@ fun ManageBookingContent(
                         tint = PantopusColors.appTextSecondary,
                     )
                     Text(
-                        text = "This booking has already happened.",
+                        // Spec copy: "This call has already happened."
+                        text = "This call has already happened.",
                         style = PantopusTextStyle.caption,
                         color = PantopusColors.appTextSecondary,
                     )
@@ -237,7 +240,62 @@ fun ManageBookingContent(
         }
 
         if ((data.status == ManageStatus.Confirmed || data.status == ManageStatus.Pending) && !data.cancellationPolicy.isNullOrBlank()) {
-            PolicyCard(policy = data.cancellationPolicy, hostName = data.hostName)
+            PolicyCard(
+                policy = data.cancellationPolicy,
+                hostName = data.hostName,
+                accent = pillar.accent,
+                showContact = data.pageSlug != null,
+                onContactHost = onBookAgain,
+            )
+        }
+    }
+}
+
+/**
+ * The already-cancelled banner with a pillar-accent "Book again" affordance
+ * (rotate-ccw glyph), mirroring the spec FrameCancelled + iOS cancelledBanner.
+ */
+@Composable
+private fun CancelledBanner(
+    title: String,
+    accent: Color,
+    showBookAgain: Boolean,
+    onBookAgain: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.errorBg)
+                .border(1.dp, PantopusColors.errorLight, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.XCircle,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.error,
+            modifier = Modifier.padding(end = Spacing.s2),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Text(text = title, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = PantopusColors.error)
+            Text(
+                text = "The slot was released. Nothing further is owed.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+            )
+            if (showBookAgain) {
+                Row(
+                    modifier = Modifier.clickable(onClick = onBookAgain).padding(top = Spacing.s1),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    PantopusIconImage(icon = PantopusIcon.RefreshCw, contentDescription = null, size = 13.dp, tint = accent)
+                    Text(text = "Book again", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = accent)
+                }
+            }
         }
     }
 }
@@ -307,63 +365,14 @@ private fun ManageSummaryCard(
     }
 }
 
-@Composable
-private fun StatusBadge(status: ManageStatus) {
-    val (label, icon, bg, border, fg) =
-        when (status) {
-            ManageStatus.Confirmed ->
-                StatusStyle(
-                    "Confirmed",
-                    PantopusIcon.CheckCircle,
-                    PantopusColors.successBg,
-                    PantopusColors.successLight,
-                    PantopusColors.success,
-                )
-            ManageStatus.Pending ->
-                StatusStyle(
-                    "Pending",
-                    PantopusIcon.Hourglass,
-                    PantopusColors.infoBg,
-                    PantopusColors.infoLight,
-                    PantopusColors.info,
-                )
-            ManageStatus.Past ->
-                StatusStyle(
-                    "Past",
-                    PantopusIcon.History,
-                    PantopusColors.appSurfaceSunken,
-                    PantopusColors.appBorder,
-                    PantopusColors.appTextSecondary,
-                )
-            ManageStatus.Cancelled ->
-                StatusStyle(
-                    "Cancelled",
-                    PantopusIcon.XCircle,
-                    PantopusColors.errorBg,
-                    PantopusColors.errorLight,
-                    PantopusColors.error,
-                )
-        }
-    Row(
-        modifier =
-            Modifier.clip(
-                RoundedCornerShape(Radii.pill),
-            ).background(bg).border(1.dp, border, RoundedCornerShape(Radii.pill)).padding(horizontal = Spacing.s3, vertical = Spacing.s1),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = fg)
-        Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = fg)
+/** Maps the local D4 booking status onto the shared scheduling pill vocabulary. */
+private fun ManageStatus.toPillStatus(): SchedulingPillStatus =
+    when (this) {
+        ManageStatus.Confirmed -> SchedulingPillStatus.Confirmed
+        ManageStatus.Pending -> SchedulingPillStatus.Pending
+        ManageStatus.Past -> SchedulingPillStatus.Past
+        ManageStatus.Cancelled -> SchedulingPillStatus.Cancelled
     }
-}
-
-private data class StatusStyle(
-    val label: String,
-    val icon: PantopusIcon,
-    val bg: Color,
-    val border: Color,
-    val fg: Color,
-)
 
 private enum class ActionTone { Neutral, Error }
 
@@ -426,7 +435,8 @@ private fun ActionRow(
         }
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s2)) {
             Text(text = label, style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = labelColor)
-            Text(text = sub, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            // Spec action sub-label is 10.5px.
+            Text(text = sub, fontSize = 10.5f.sp, color = PantopusColors.appTextSecondary)
         }
         if (enabled) {
             PantopusIconImage(
@@ -443,6 +453,9 @@ private fun ActionRow(
 private fun PolicyCard(
     policy: String,
     hostName: String,
+    accent: Color,
+    showContact: Boolean,
+    onContactHost: () -> Unit,
 ) {
     Column(
         modifier =
@@ -461,13 +474,34 @@ private fun PolicyCard(
                 tint = PantopusColors.appTextSecondary,
                 modifier = Modifier.padding(end = Spacing.s2),
             )
-            Text(text = policy, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Text(text = policy, style = PantopusTextStyle.caption, color = PantopusColors.appTextStrong)
+                // Spec PolicyCard: a pillar-accent "Contact <host>" mail button below the body.
+                if (showContact) {
+                    Row(
+                        modifier = Modifier.clickable(onClick = onContactHost),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        PantopusIconImage(icon = PantopusIcon.Mail, contentDescription = null, size = 12.dp, tint = accent)
+                        Text(
+                            text = "Contact ${ConfirmUtils.firstName(hostName)}",
+                            style = PantopusTextStyle.caption,
+                            fontWeight = FontWeight.Bold,
+                            color = accent,
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ManageExpired(onBack: () -> Unit) {
+private fun ManageExpired(
+    onBack: () -> Unit,
+    onContactHost: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.s6),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -477,18 +511,79 @@ private fun ManageExpired(onBack: () -> Unit) {
         Text(
             text = "This link has expired",
             style = PantopusTextStyle.h3,
+            // Spec headline is 20/700 bold.
+            fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = Spacing.s4),
         )
         Text(
-            text = "For your security, manage links expire after a while. Check your latest confirmation email for a fresh link.",
+            // Spec copy: "Request a fresh one and we'll email it to you."
+            text = "For your security, manage links expire after a while. Request a fresh one and we'll email it to you.",
             style = PantopusTextStyle.small,
             color = PantopusColors.appTextStrong,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = Spacing.s2, bottom = Spacing.s5),
         )
-        app.pantopus.android.ui.components.PrimaryButton(title = "Go back", onClick = onBack, modifier = Modifier.fillMaxWidth())
+        // Spec token-expired footer: primary "Request a new link" (mail) + ghost "Contact host".
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClickLabel = "Request a new link", onClick = onContactHost),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Mail,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextInverse,
+                modifier = Modifier.padding(end = Spacing.s1),
+            )
+            Text(text = "Request a new link", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
+        }
+        Box(
+            modifier = Modifier.fillMaxWidth().height(38.dp).padding(top = Spacing.s2).clickable(onClickLabel = "Contact host", onClick = onContactHost),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = "Contact host", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
+        }
+    }
+}
+
+/**
+ * Hand-rolled loading skeleton mirroring the spec FrameLoading geometry: a badge
+ * pill, the summary card (avatar + two lines, when-line + tz chip, location line),
+ * the "Manage" overline bar, and two 56dp action tiles. Mirrors iOS loadingSkeleton.
+ */
+@Composable
+private fun ManageLoadingSkeleton() {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Shimmer(width = 96.dp, height = 24.dp, cornerRadius = Radii.pill)
+        ConfirmCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Shimmer(width = 30.dp, height = 30.dp, cornerRadius = Radii.pill)
+                Column(modifier = Modifier.padding(start = Spacing.s2), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                    Shimmer(width = 120.dp, height = 11.dp)
+                    Shimmer(width = 80.dp, height = 9.dp)
+                }
+            }
+            HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(vertical = Spacing.s2))
+            Shimmer(width = 160.dp, height = 11.dp)
+            Shimmer(width = 120.dp, height = 22.dp, cornerRadius = Radii.pill, modifier = Modifier.padding(top = Spacing.s2))
+            HorizontalDivider(color = PantopusColors.appBorder, modifier = Modifier.padding(vertical = Spacing.s2))
+            Shimmer(width = 140.dp, height = 11.dp)
+        }
+        Shimmer(width = 70.dp, height = 11.dp)
+        Shimmer(width = 320.dp, height = 56.dp, cornerRadius = Radii.lg)
+        Shimmer(width = 320.dp, height = 56.dp, cornerRadius = Radii.lg)
     }
 }
 

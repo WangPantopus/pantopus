@@ -73,6 +73,7 @@ final class PackageEditorViewModel {
     var isEditing: Bool { packageId != nil }
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && sessionsCount >= 1 }
 
@@ -205,7 +206,7 @@ final class PackageEditorViewModel {
         var isActive = true
 
         init() {}
-        init(_ vm: PackageEditorViewModel) {
+        @MainActor init(_ vm: PackageEditorViewModel) {
             name = vm.name
             sessionsCount = vm.sessionsCount
             priceText = vm.priceText

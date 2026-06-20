@@ -4,6 +4,11 @@ package app.pantopus.android.ui.screens.scheduling.invitee.edge
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -31,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.GhostButton
@@ -77,7 +84,7 @@ fun OpenInAppInterstitialScreen(
         state = state,
         onContinueInApp = onNavigate,
         onStayOnWeb = openWeb,
-        onBack = onBack,
+        onRetry = viewModel::retry,
     )
 }
 
@@ -86,8 +93,9 @@ fun OpenInAppContent(
     state: OpenInAppUiState,
     onContinueInApp: (String) -> Unit,
     onStayOnWeb: (String?) -> Unit,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onBack: () -> Unit = {},
+    onRetry: () -> Unit = onBack,
 ) {
     Box(modifier = modifier.fillMaxSize().background(PantopusColors.appBg).testTag(OPEN_IN_APP_TAG)) {
         Column(
@@ -101,7 +109,7 @@ fun OpenInAppContent(
                 is OpenInAppUiState.Failed -> FailedBody()
             }
         }
-        Dock(state = state, onContinueInApp = onContinueInApp, onStayOnWeb = onStayOnWeb, onBack = onBack)
+        Dock(state = state, onContinueInApp = onContinueInApp, onStayOnWeb = onStayOnWeb, onRetry = onRetry)
     }
 }
 
@@ -128,10 +136,26 @@ private fun ResolvingBody() {
         }
     }
     Row(modifier = Modifier.padding(top = Spacing.s5), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(SchedulingPillar.Personal.accent))
+        // Spec dlPulse: the 7px resolving dot fades in/out on a ~1.4s loop.
+        val transition = rememberInfiniteTransition(label = "dlPulse")
+        val pulseAlpha by transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.3f,
+            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+            label = "dlPulseAlpha",
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(7.dp)
+                    .alpha(pulseAlpha)
+                    .clip(CircleShape)
+                    .background(SchedulingPillar.Personal.accent),
+        )
         Text(
             text = "Opening your booking",
-            style = PantopusTextStyle.small,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appTextSecondary,
             modifier = Modifier.padding(start = Spacing.s2),
         )
@@ -140,22 +164,20 @@ private fun ResolvingBody() {
 
 @Composable
 private fun ResolvedBody(state: OpenInAppUiState.Resolved) {
-    Box(
-        modifier = Modifier.size(64.dp).clip(CircleShape).background(SchedulingPillar.Personal.accentBg),
-        contentAlignment = Alignment.Center,
-    ) {
-        PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 28.dp, tint = SchedulingPillar.Personal.accent)
-    }
+    HostAvatar(name = state.title, size = 64.dp)
     Text(
         text = "Pick up where you left off",
-        style = PantopusTextStyle.h3,
+        fontSize = 19.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.Bold,
         color = PantopusColors.appText,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s5),
     )
     Text(
         text = "Your timezone and details come with you.",
-        style = PantopusTextStyle.small,
+        fontSize = 12.5f.sp,
+        lineHeight = 18.sp,
         color = PantopusColors.appTextSecondary,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s2).widthIn(max = 240.dp),
@@ -165,9 +187,9 @@ private fun ResolvedBody(state: OpenInAppUiState.Resolved) {
             Modifier
                 .padding(top = Spacing.s5)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.xl))
+                .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
@@ -184,10 +206,57 @@ private fun ResolvedBody(state: OpenInAppUiState.Resolved) {
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = state.title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
+            Text(
+                text = state.title,
+                fontSize = 13.5f.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
             state.subtitle?.let {
                 Text(text = it, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
             }
+        }
+    }
+}
+
+/**
+ * The design `HostAvatar`: a 64px sky-gradient circle showing the host initials
+ * with a small primary user badge bottom-right (mirrors iOS `EdgePillarAvatar`).
+ */
+@Composable
+private fun HostAvatar(
+    name: String,
+    size: Dp,
+) {
+    Box(contentAlignment = Alignment.BottomEnd) {
+        Box(
+            modifier = Modifier.size(size).clip(CircleShape).background(SchedulingPillar.Personal.avatarBrush()),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = edgeInitials(name),
+                color = PantopusColors.appTextInverse,
+                fontSize = (size.value * 0.34f).sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(size * 0.34f)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurface)
+                    .padding(2.dp)
+                    .clip(CircleShape)
+                    .background(SchedulingPillar.Personal.accent),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.User,
+                contentDescription = null,
+                size = size * 0.16f,
+                tint = PantopusColors.appTextInverse,
+            )
         }
     }
 }
@@ -202,14 +271,17 @@ private fun FailedBody() {
     }
     Text(
         text = "We couldn't open this in the app",
-        style = PantopusTextStyle.h3,
+        fontSize = 19.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.Bold,
         color = PantopusColors.appText,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s5),
     )
     Text(
         text = "No problem — you can keep going on the web. Your booking is right where you left it.",
-        style = PantopusTextStyle.small,
+        fontSize = 12.5f.sp,
+        lineHeight = 18.sp,
         color = PantopusColors.appTextSecondary,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = Spacing.s2).widthIn(max = 244.dp),
@@ -221,7 +293,7 @@ private fun BoxScope.Dock(
     state: OpenInAppUiState,
     onContinueInApp: (String) -> Unit,
     onStayOnWeb: (String?) -> Unit,
-    onBack: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     when (state) {
         is OpenInAppUiState.Resolving -> Unit
@@ -233,7 +305,8 @@ private fun BoxScope.Dock(
         is OpenInAppUiState.Failed ->
             DockColumn {
                 PrimaryButton(title = "Continue on the web", onClick = { onStayOnWeb(state.webUrl) })
-                GhostButton(title = "Go back", onClick = onBack)
+                // Spec frame 4 secondary action re-runs the resolve, not a nav-back.
+                GhostButton(title = "Try the app again", onClick = onRetry)
             }
     }
 }
@@ -253,10 +326,18 @@ private fun BoxScope.DockColumn(content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * The design `PantopusMark`: a sky-gradient rounded-square (≈0.28·size radius)
+ * carrying the concentric-ring brand glyph (mirrors iOS `PantopusMark`).
+ */
 @Composable
 private fun BrandMark(size: Dp) {
     Box(
-        modifier = Modifier.size(size).clip(RoundedCornerShape(Radii.lg)).background(SchedulingPillar.Personal.accent),
+        modifier =
+            Modifier
+                .size(size)
+                .clip(RoundedCornerShape(size * 0.28f))
+                .background(SchedulingPillar.Personal.avatarBrush()),
         contentAlignment = Alignment.Center,
     ) {
         PantopusIconImage(

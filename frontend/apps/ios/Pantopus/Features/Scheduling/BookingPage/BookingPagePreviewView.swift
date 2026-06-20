@@ -134,7 +134,7 @@ private struct PublicHeader: View {
 
     var body: some View {
         VStack(spacing: Spacing.s1) {
-            BookingAvatar(name: page.title ?? "Host", imageURLString: page.avatarURL, size: 64, accent: accent)
+            BookingPageAvatar(name: page.title ?? "Host", imageURLString: page.avatarURL, size: 64, accent: accent)
                 .padding(.bottom, Spacing.s1)
             // JSX PublicHeader name: fontSize 18 / weight 700 (not h3=20).
             Text(page.title ?? "Host")

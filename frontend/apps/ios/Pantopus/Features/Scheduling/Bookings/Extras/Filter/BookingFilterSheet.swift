@@ -122,7 +122,7 @@ struct BookingFilterSheet: View {
 
     private var statusSection: some View {
         facetSection("Status") {
-            ForEach(BookingStatusFilter.allCases) { status in
+            ForEach(BookingFilterStatus.allCases) { status in
                 let colors = chipColors(viewModel.statusTint(status))
                 ExtrasPillChip(
                     title: status.label,

@@ -186,7 +186,7 @@ struct AvailableHours: Sendable, Equatable {
 
 /// Lightweight household member used for avatars + the who-is-home / for-whom
 /// pickers. Projected from the shared `OccupantDTO` roster.
-struct HomeMember: Identifiable, Sendable, Hashable {
+struct ResourceHomeMember: Identifiable, Sendable, Hashable {
     let id: String
     let name: String
     let avatarURL: URL?
@@ -217,11 +217,11 @@ struct HomeMember: Identifiable, Sendable, Hashable {
     }
 
     /// Project the active-occupant roster into bookable members.
-    static func from(occupants: [OccupantDTO]) -> [HomeMember] {
+    static func from(occupants: [OccupantDTO]) -> [ResourceHomeMember] {
         occupants
             .filter { $0.isActive }
             .map { occupant in
-                HomeMember(
+                ResourceHomeMember(
                     id: occupant.userId,
                     name: occupant.displayName ?? occupant.username ?? "Member",
                     avatarURL: occupant.avatarUrl.flatMap(URL.init(string:))

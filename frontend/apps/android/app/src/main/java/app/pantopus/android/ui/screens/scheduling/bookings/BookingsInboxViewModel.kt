@@ -315,7 +315,6 @@ class BookingsInboxViewModel
             quickApprove: Boolean = false,
         ): BookingRowUi {
             val status = BookingStatus.fromRaw(status)
-            val chip = bookingStatusChip(status)
             val name = inviteeName?.takeIf { it.isNotBlank() } ?: "Guest"
             return BookingRowUi(
                 id = id,
@@ -325,8 +324,7 @@ class BookingsInboxViewModel
                 inviteeName = name,
                 eventName = eventTypeId?.let { nameMap[it] } ?: "Booking",
                 whenLabel = rowWhenLabel(startAt),
-                statusLabel = chip.label,
-                statusVariant = chip.variant,
+                pillStatus = status.toPillStatus(),
                 showOwnerGlyph = true,
                 assigned = ctx.pillar == SchedulingPillar.Business && !hostUserId.isNullOrBlank(),
                 unread = status == BookingStatus.Pending,

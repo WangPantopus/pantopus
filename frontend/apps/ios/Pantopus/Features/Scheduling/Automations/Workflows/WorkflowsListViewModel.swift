@@ -45,6 +45,7 @@ final class WorkflowsListViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     private var globalWorkflows: [WorkflowDTO] { workflows.filter { ($0.eventTypeId ?? "").isEmpty } }
     private var scopedWorkflows: [WorkflowDTO] { workflows.filter { !($0.eventTypeId ?? "").isEmpty } }

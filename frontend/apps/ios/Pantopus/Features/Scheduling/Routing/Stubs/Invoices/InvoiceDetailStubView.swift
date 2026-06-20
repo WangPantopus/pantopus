@@ -39,7 +39,7 @@ struct InvoiceDetailStubView: View {
     }
 
     var body: some View {
-        InvoiceDetailView(owner: viewModel.owner, invoiceId: viewModel.invoiceId, push: viewModel.push)
+        SchedulingInvoiceDetailView(owner: viewModel.owner, invoiceId: viewModel.invoiceId, push: viewModel.push)
     }
 }
 

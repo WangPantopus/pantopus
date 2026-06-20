@@ -23,8 +23,12 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 
-/** One heat cell's availability. */
-enum class CellState { Free, Busy, Unknown }
+/**
+ * One heat cell's availability tier. The design's five tiers:
+ * free (overlap dot) · busy · tentative (amber) · off-hours (muted+hatch) ·
+ * unknown (member hasn't shared — hatched "?").
+ */
+enum class CellState { Free, Busy, Tentative, OffHours, Unknown }
 
 /** Day-of-week (time-of-day buckets) vs Week (per-day) grid. */
 enum class GridView { Day, Week }

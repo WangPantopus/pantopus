@@ -3,16 +3,36 @@
 package app.pantopus.android.ui.screens.scheduling.setup
 
 import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
-import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.SubcopyBlock
-import app.pantopus.android.ui.screens.shared.wizard.blocks.SuccessHeroBlock
+import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.Spacing
 
 @Composable
 fun OnboardingHomeBusinessScreen(
@@ -45,7 +65,6 @@ fun OnboardingHomeBusinessScreen(
             return@WizardShell
         }
         if (state.stepIndex == 1) {
-            OnboardingFlowSwitch(flow = state.flow, onSelect = viewModel::selectFlow)
             SetupPillarChip(pillar = pillar, label = if (state.flow == OnboardingFlow.Home) "Home" else "Business")
         }
         val steps =
@@ -67,20 +86,21 @@ private fun HomeStep(
 ) {
     when (state.stepIndex) {
         1 -> {
-            HeadlineBlock("Choose who's scheduled")
-            SubcopyBlock(
-                "Pick the household members people can book. Family scheduling uses everyone's own hours — no one sets times twice.",
+            OnboardingHeadline(
+                title = "Choose who's scheduled",
+                sub = "Pick the household members people can book. Family scheduling uses everyone's own hours — no one sets times twice.",
             )
             OnboardingMemberList(selected = state.selectedMembers, pillar = pillar, onToggle = vm::toggleMember)
         }
         2 -> {
-            HeadlineBlock("How should times combine?")
-            SubcopyBlock(
-                if (state.combineMode == "round_robin") {
-                    "Whoever's free gets the booking. Pick a rule for who hosts when more than one person is open."
-                } else {
-                    "Three members are scheduled. Choose how their availability turns into one set of bookable times."
-                },
+            OnboardingHeadline(
+                title = "How should times combine?",
+                sub =
+                    if (state.combineMode == "round_robin") {
+                        "Whoever's free gets the booking. Pick a rule for who hosts when more than one person is open."
+                    } else {
+                        "Three members are scheduled. Choose how their availability turns into one set of bookable times."
+                    },
             )
             OnboardingModePicker(mode = state.combineMode, pillar = pillar, onSelect = vm::setCombineMode)
             if (state.combineMode == "round_robin") {
@@ -99,8 +119,10 @@ private fun BusinessStep(
 ) {
     when (state.stepIndex) {
         1 -> {
-            HeadlineBlock("Claim your business link")
-            SubcopyBlock("This is where clients book you. Pick something short — your business name usually works best.")
+            OnboardingHeadline(
+                title = "Claim your business link",
+                sub = "This is where clients book you. Pick something short — your business name usually works best.",
+            )
             SlugClaimField(
                 overline = "Your business link",
                 slug = state.slug,
@@ -112,8 +134,10 @@ private fun BusinessStep(
             )
         }
         2 -> {
-            HeadlineBlock("Add your first service")
-            SubcopyBlock("Clients pick a service when they book. Start with one — you can add more from settings.")
+            OnboardingHeadline(
+                title = "Add your first service",
+                sub = "Clients pick a service when they book. Start with one — you can add more from settings.",
+            )
             OnboardingServicePicker(
                 serviceType = state.serviceType,
                 duration = state.duration,
@@ -126,14 +150,18 @@ private fun BusinessStep(
             )
         }
         3 -> {
-            HeadlineBlock("Seat your team")
-            SubcopyBlock("Seated teammates can take bookings. Front-desk roles manage the calendar without being booked.")
+            OnboardingHeadline(
+                title = "Seat your team",
+                sub = "Seated teammates can take bookings. Front-desk roles manage the calendar without being booked.",
+            )
             OnboardingTeamList(seated = state.seatedTeam, pillar = pillar, onToggle = vm::toggleSeat)
             ComposedAvailabilityCard(message = composedMessage(state.flow), timezoneId = state.timezoneId, pillar = pillar)
         }
         4 -> {
-            HeadlineBlock("Auto-confirm or approve?")
-            SubcopyBlock("Decide what happens when a client picks a time. You can change this any time.")
+            OnboardingHeadline(
+                title = "Auto-confirm or approve?",
+                sub = "Decide what happens when a client picks a time. You can change this any time.",
+            )
             OnboardingConfirmMode(mode = state.confirmMode, pillar = pillar, onSelect = vm::setConfirmMode)
             if (state.confirmMode == "approve") OnboardingApproveExplainer(pillar = pillar)
         }
@@ -143,7 +171,8 @@ private fun BusinessStep(
 @Composable
 private fun OnboardingSuccess(state: OnboardingUiState) {
     val isHome = state.flow == OnboardingFlow.Home
-    SuccessHeroBlock(
+    OnboardingSuccessHero(
+        pillar = state.pillar,
         headline = if (isHome) "Your family link is live" else "Your business is taking bookings",
         subcopy =
             if (isHome) {
@@ -159,4 +188,98 @@ private fun OnboardingSuccess(state: OnboardingUiState) {
             },
     )
     WizardSuccessLinkCard(link = state.shareLink, pillar = state.pillar, onCopy = {})
+}
+
+/**
+ * Step headline + supporting sub, matching the design's `Headline` block
+ * (`onboarding-shell.jsx`): 22sp/700/-0.3 title with a tight 6dp gap above a
+ * 13.5sp/19sp secondary sub. The shared `HeadlineBlock`/`SubcopyBlock` drift
+ * (24sp h2 + 16sp body with a 20dp shell gap), so onboarding renders locally.
+ */
+@Composable
+private fun OnboardingHeadline(
+    title: String,
+    sub: String,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = title,
+            color = PantopusColors.appText,
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            letterSpacing = (-0.3).sp,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = sub,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 13.5.sp,
+            lineHeight = 19.sp,
+        )
+    }
+}
+
+/**
+ * A18 success hero, pillar-tinted, matching `SuccessHero` in
+ * `onboarding-shell.jsx`: a 96dp halo in the pillar's soft tint with an inner
+ * pillar-accent disc + white check, a 22sp/700 title, and a 13.5sp/19sp sub.
+ * The shared `SuccessHeroBlock` always paints a neutral green success circle,
+ * so onboarding renders the pillar-correct hero locally.
+ */
+@Composable
+private fun OnboardingSuccessHero(
+    pillar: SchedulingPillar,
+    headline: String,
+    subcopy: String,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = Spacing.s5),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+    ) {
+        Box(
+            modifier = Modifier.size(96.dp).clip(CircleShape).background(pillar.accentBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.size(60.dp).clip(CircleShape).background(pillar.accent),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Check,
+                    contentDescription = null,
+                    size = 32.dp,
+                    strokeWidth = 3f,
+                    tint = PantopusColors.appTextInverse,
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = headline,
+                color = PantopusColors.appText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+                lineHeight = 28.sp,
+                letterSpacing = (-0.3).sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = subcopy,
+                color = PantopusColors.appTextSecondary,
+                fontSize = 13.5.sp,
+                lineHeight = 19.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
 }

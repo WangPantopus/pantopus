@@ -287,7 +287,9 @@ private fun MonthCalendarCard(
         ) {
             Text(
                 text = monthLabel,
+                // Spec month label is 13.5px/700 — trim from the 14sp small token.
                 style = PantopusTextStyle.small,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appText,
                 modifier = Modifier.weight(1f).padding(start = Spacing.s1),
@@ -437,7 +439,11 @@ private fun SlotRegion(
         }
         !state.monthHasAvailability ->
             NoAvailabilityState(
-                icon = PantopusIcon.CalendarX,
+                // Spec frame 3 (no-times-in-range) reaches for a calendar-search glyph;
+                // calendar-x is reserved for the composed-empty frame. The icon set has
+                // no calendar-search, so calendar-clock carries the "looking for times"
+                // intent here (and matches the no-times-anywhere frame).
+                icon = PantopusIcon.CalendarClock,
                 title = "No open times in ${state.monthLabel.substringBefore(' ')}",
                 body = "Availability changes often. Try a later month.",
                 primaryLabel = "See ${state.nextMonthLabel}",
@@ -475,7 +481,9 @@ private fun SlotRegion(
 private fun DayHeading(text: String) {
     Text(
         text = text,
+        // Spec day heading is 13px/700 — a touch under the 14sp small token.
         style = PantopusTextStyle.small,
+        fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         color = PantopusColors.appText,
         modifier = Modifier.padding(horizontal = Spacing.s1),

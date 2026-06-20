@@ -11,16 +11,22 @@ import SwiftUI
 
 struct BlockOffTimeView: View {
     @State private var viewModel: BlockOffTimeViewModel
+    @State private var activePicker: BlockPicker?
     @Environment(\.dismiss) private var dismiss
 
     init(viewModel: BlockOffTimeViewModel) {
         _viewModel = State(wrappedValue: viewModel)
     }
 
+    /// View-local target for a date / start / end picker sheet.
+    private enum BlockPicker: String, Identifiable {
+        case date, start, end
+        var id: String { rawValue }
+    }
+
     var body: some View {
         FormShell(
             title: "Block off time",
-            subtitle: "Personal · Availability",
             leading: .close,
             rightActionLabel: "Save",
             isValid: viewModel.isValid,
@@ -29,16 +35,26 @@ struct BlockOffTimeView: View {
             onClose: { dismiss() },
             onCommit: { Task { if await viewModel.save() { dismiss() } } }
         ) {
-            reasonGroup
-            whenGroup
+            sheetOverline
+            detailsCard
             if let conflict = viewModel.conflict {
                 conflictCard(conflict)
             }
-            repeatsGroup
-            footnote
+            repeatsCard
+            if viewModel.isSaving {
+                savingBar
+            } else {
+                AvailabilityLockFootnote(
+                    text: "This time won't be offered for booking. It's private to you."
+                )
+                .padding(.horizontal, Spacing.s4)
+            }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.blockOffTime")
+        .sheet(item: $activePicker) { picker in
+            pickerSheet(picker)
+        }
         .alert("Couldn't save", isPresented: saveErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -46,23 +62,42 @@ struct BlockOffTimeView: View {
         }
     }
 
-    private var reasonGroup: some View {
-        FormFieldGroup("Reason") {
-            TextField("Dentist", text: $viewModel.reason)
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appText)
-                .accessibilityIdentifier("scheduling.blockOff.reasonField")
-            Text("Optional · only you can see this.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-        }
+    // Left-aligned sky overline beneath the centered top-bar title.
+    private var sheetOverline: some View {
+        Text("PERSONAL · AVAILABILITY")
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(Theme.Color.personal)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("scheduling.blockOff.overline")
     }
 
-    private var whenGroup: some View {
-        FormFieldGroup("When") {
-            DatePicker("Date", selection: $viewModel.date, displayedComponents: .date)
-                .tint(Theme.Color.primary600)
-            Divider().background(Theme.Color.appBorderSubtle)
+    // Reason + Date + All-day + time range live together in one borderless
+    // white card (no section overline), per the design's `DetailsCard`.
+    private var detailsCard: some View {
+        AvailabilityCard {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                AvailabilityFieldLabel(text: "Reason")
+                TextField("Dentist", text: $viewModel.reason)
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.appText)
+                    .disabled(viewModel.isSaving)
+                    .accessibilityIdentifier("scheduling.blockOff.reasonField")
+                Text("Optional · only you can see this.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                AvailabilityFieldLabel(text: "Date")
+                AvailabilityFieldButton(
+                    icon: .calendar,
+                    value: Self.dateLabel(viewModel.date),
+                    accessibilityLabel: "Date, \(Self.dateLabel(viewModel.date))",
+                    disabled: viewModel.isSaving
+                ) { activePicker = .date }
+                .accessibilityIdentifier("scheduling.blockOff.dateField")
+            }
             Toggle(isOn: $viewModel.allDay) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("All day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
@@ -72,16 +107,29 @@ struct BlockOffTimeView: View {
                 }
             }
             .tint(Theme.Color.primary600)
+            .disabled(viewModel.isSaving)
             if !viewModel.allDay {
                 HStack(spacing: Spacing.s2) {
-                    DatePicker("Start", selection: startBinding, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .accessibilityLabel("Start time")
-                    Text("–").foregroundStyle(Theme.Color.appTextMuted)
-                    DatePicker("End", selection: endBinding, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .accessibilityLabel("End time")
-                    Spacer()
+                    VStack(alignment: .leading, spacing: Spacing.s1) {
+                        AvailabilityFieldLabel(text: "Starts")
+                        AvailabilityFieldButton(
+                            icon: .clock,
+                            value: viewModel.startTime.display,
+                            accessibilityLabel: "Starts at \(viewModel.startTime.display)",
+                            disabled: viewModel.isSaving
+                        ) { activePicker = .start }
+                        .accessibilityIdentifier("scheduling.blockOff.startField")
+                    }
+                    VStack(alignment: .leading, spacing: Spacing.s1) {
+                        AvailabilityFieldLabel(text: "Ends")
+                        AvailabilityFieldButton(
+                            icon: .clock,
+                            value: viewModel.endTime.display,
+                            accessibilityLabel: "Ends at \(viewModel.endTime.display)",
+                            disabled: viewModel.isSaving
+                        ) { activePicker = .end }
+                        .accessibilityIdentifier("scheduling.blockOff.endField")
+                    }
                 }
                 if !viewModel.isValid {
                     Text("End must be after start.")
@@ -92,32 +140,78 @@ struct BlockOffTimeView: View {
         }
     }
 
-    private var repeatsGroup: some View {
-        FormFieldGroup("Repeats") {
-            Picker("Repeats", selection: $viewModel.repeats) {
-                ForEach(BlockRepeat.allCases) { option in
-                    Text(option.label).tag(option)
+    private var repeatsCard: some View {
+        AvailabilityCard {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                AvailabilityFieldLabel(text: "Repeats")
+                Menu {
+                    ForEach(BlockRepeat.allCases) { option in
+                        Button(option.label) { viewModel.repeats = option }
+                    }
+                } label: {
+                    repeatsFieldButtonLabel
                 }
-            }
-            .pickerStyle(.segmented)
-            if let caption = viewModel.repeats.caption {
-                Text(caption)
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                .disabled(viewModel.isSaving)
+                .accessibilityIdentifier("scheduling.blockOff.repeatsField")
+                if let caption = viewModel.repeats.caption {
+                    Text(caption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
             }
         }
     }
 
-    private var footnote: some View {
-        HStack(alignment: .top, spacing: Spacing.s1) {
-            Icon(.lock, size: 12, strokeWidth: 2, color: Theme.Color.appTextMuted)
-                .padding(.top, 1)
-            Text("This time won't be offered for booking. It's private to you.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+    // Mirrors AvailabilityFieldButton's chrome but wraps a Menu label.
+    private var repeatsFieldButtonLabel: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.arrowsRepeat, size: 15, color: Theme.Color.primary600)
+            Text(viewModel.repeats.label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Icon(.chevronDown, size: 15, color: Theme.Color.appTextMuted)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 10)
+        .background(viewModel.isSaving ? Theme.Color.appSurfaceRaised : Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .contentShape(Rectangle())
+        .opacity(viewModel.isSaving ? 0.7 : 1)
+    }
+
+    // Saving frame: a shimmer "Saving…" bar replaces the lock footnote.
+    private var savingBar: some View {
+        ZStack {
+            Shimmer(height: 24, cornerRadius: Radii.md)
+            Text("Saving…")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
         .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("scheduling.blockOff.savingBar")
+    }
+
+    @ViewBuilder
+    private func pickerSheet(_ picker: BlockPicker) -> some View {
+        switch picker {
+        case .date:
+            BlockDatePickerSheet(date: $viewModel.date) { activePicker = nil }
+        case .start:
+            BlockTimePickerSheet(title: "Start time", time: $viewModel.startTime) { activePicker = nil }
+        case .end:
+            BlockTimePickerSheet(title: "End time", time: $viewModel.endTime) { activePicker = nil }
+        }
+    }
+
+    private static func dateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter.string(from: date)
     }
 
     // ─── Conflict warning card (chip-led, semantic) ──────────────
@@ -167,21 +261,66 @@ struct BlockOffTimeView: View {
         .accessibilityIdentifier("scheduling.blockOff.conflictWarning")
     }
 
-    private var startBinding: Binding<Date> {
-        Binding(
-            get: { viewModel.startTime.referenceDate() },
-            set: { viewModel.startTime = TimeOfDay(from: $0) }
-        )
-    }
-
-    private var endBinding: Binding<Date> {
-        Binding(
-            get: { viewModel.endTime.referenceDate() },
-            set: { viewModel.endTime = TimeOfDay(from: $0) }
-        )
-    }
-
     private var saveErrorPresented: Binding<Bool> {
         Binding(get: { viewModel.saveError != nil }, set: { if !$0 { viewModel.saveError = nil } })
+    }
+}
+
+/// Date picker sheet opened from the block-off "Date" field button.
+private struct BlockDatePickerSheet: View {
+    @Binding var date: Date
+    let onDone: () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.s4) {
+            Text("Date")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.top, Spacing.s4)
+            DatePicker("Date", selection: $date, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .tint(Theme.Color.primary600)
+                .labelsHidden()
+                .padding(.horizontal, Spacing.s4)
+            PrimaryButton(title: "Done") { await MainActor.run { onDone() } }
+                .padding(.horizontal, Spacing.s4)
+            Spacer(minLength: 0)
+        }
+        .background(Theme.Color.appBg)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// Time picker sheet opened from the block-off "Starts" / "Ends" field buttons.
+private struct BlockTimePickerSheet: View {
+    let title: String
+    @Binding var time: TimeOfDay
+    let onDone: () -> Void
+
+    private var dateBinding: Binding<Date> {
+        Binding(
+            get: { time.referenceDate() },
+            set: { time = TimeOfDay(from: $0) }
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: Spacing.s4) {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.top, Spacing.s4)
+            DatePicker(title, selection: dateBinding, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .accessibilityLabel(title)
+            PrimaryButton(title: "Done") { await MainActor.run { onDone() } }
+                .padding(.horizontal, Spacing.s4)
+            Spacer(minLength: 0)
+        }
+        .background(Theme.Color.appBg)
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.visible)
     }
 }

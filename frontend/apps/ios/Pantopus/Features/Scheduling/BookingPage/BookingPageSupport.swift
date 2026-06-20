@@ -102,7 +102,7 @@ enum BookingLinkActions {
 /// Round avatar matching the design's solid gradient disc with white initials
 /// and a soft shadow (remote image when available). Reused by C1's header and
 /// C2's public preview.
-struct BookingAvatar: View {
+struct BookingPageAvatar: View {
     let name: String
     var imageURLString: String?
     var size: CGFloat = 48

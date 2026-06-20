@@ -77,7 +77,7 @@ class CancelRefundViewModelTest {
     }
 
     @Test
-    fun `cancel succeeds and commits`() =
+    fun `cancel succeeds into the confirmation frame then commits on done`() =
         runTest(dispatcher) {
             coEvery {
                 repo.cancelBooking(
@@ -91,6 +91,12 @@ class CancelRefundViewModelTest {
             vm.selectReason("Changed plans")
             vm.confirm()
             advanceUntilIdle()
+            // Design frame 5: a successful cancel re-renders to the read-only
+            // confirmation (sheet stays up) rather than dismissing immediately.
+            assertTrue(vm.state.value?.succeeded == true)
+            assertEquals(false, vm.committed.value)
+            // The terminal "Done" closes the sheet and commits the detail refetch.
+            vm.done()
             assertNull(vm.state.value)
             assertTrue(vm.committed.value)
         }

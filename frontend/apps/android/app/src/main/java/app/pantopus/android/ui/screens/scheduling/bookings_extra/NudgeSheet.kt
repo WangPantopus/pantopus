@@ -19,10 +19,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
@@ -34,11 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
@@ -80,6 +82,8 @@ data class NudgeSheetState(
     val error: String? = null,
     val templates: List<NudgeTemplate> = emptyList(),
     val templatePickerOpen: Boolean = false,
+    val didSend: Boolean = false,
+    val sentCount: Int = 0,
 ) {
     val over: Boolean get() = message.length > MESSAGE_LIMIT
     val recipientCount: Int get() = counts.count(audience)
@@ -119,13 +123,17 @@ internal fun NudgeSheet(
         containerColor = PantopusColors.appSurface,
         modifier = Modifier.testTag(NUDGE_TAG),
     ) {
+        if (state.didSend) {
+            NudgeSuccess(sentCount = state.sentCount)
+            return@ModalBottomSheet
+        }
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s2),
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(text = "Message attendees", style = PantopusTextStyle.h3, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-                Text(text = state.subtitle, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+                Text(text = "Message attendees", style = ExtrasType.header, color = PantopusColors.appText)
+                Text(text = state.subtitle, style = ExtrasType.body125, color = PantopusColors.appTextSecondary)
             }
 
             Box {
@@ -184,7 +192,7 @@ internal fun NudgeSheet(
                         )
                         Text(
                             text = "No one to message in this group",
-                            style = PantopusTextStyle.caption,
+                            style = ExtrasType.detail11,
                             fontWeight = FontWeight.SemiBold,
                             color = PantopusColors.appTextSecondary,
                         )
@@ -210,14 +218,77 @@ internal fun NudgeSheet(
             }
 
             state.error?.let { ExtrasInlineError(message = it) }
+        }
 
-            PrimaryButton(
-                title = if (state.recipientCount > 0) "Send to ${state.recipientCount}" else "Send",
+        // Sticky CTA footer: top hairline over the surface, a leading send glyph,
+        // and the count-echoing label (JSX `<send/> Send to 12`).
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.appSurface),
+        ) {
+            HorizontalDivider(color = PantopusColors.appBorder)
+            ExtrasIconLabelButton(
+                icon = PantopusIcon.Send,
+                label = if (state.recipientCount > 0) "Send to ${state.recipientCount}" else "Send",
                 onClick = onSend,
-                modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s4),
-                isLoading = state.sending,
-                isEnabled = state.canSend,
+                modifier = Modifier.fillMaxWidth().padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s2, bottom = Spacing.s4),
+                accent = accent,
+                enabled = state.canSend,
+                loading = state.sending,
             )
         }
     }
 }
+
+/**
+ * JSX frame 3 (Sent): a centered 72dp success disc with a heavy check, an
+ * "Update sent" title, and a dark pinned bottom count toast. Mirrors iOS
+ * `SendNudgeSheet.successOverlay`.
+ */
+@Composable
+private fun NudgeSuccess(sentCount: Int) {
+    Box(modifier = Modifier.fillMaxWidth().height(NUDGE_SUCCESS_HEIGHT)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s6),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4, Alignment.CenterVertically),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.successBg)
+                        .border(1.dp, PantopusColors.successLight, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 34.dp, tint = PantopusColors.success)
+            }
+            Text(text = "Update sent", style = ExtrasType.header, color = PantopusColors.appText)
+        }
+        Row(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s5)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appText)
+                    .padding(horizontal = Spacing.s3 + 2.dp, vertical = Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.CheckCircle, contentDescription = null, size = 18.dp, tint = PantopusColors.successLight)
+            Text(
+                text = "Update sent to $sentCount ${if (sentCount == 1) "attendee" else "attendees"}",
+                style = ExtrasType.body125,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+private val NUDGE_SUCCESS_HEIGHT = 360.dp

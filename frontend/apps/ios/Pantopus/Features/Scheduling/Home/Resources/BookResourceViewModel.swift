@@ -44,8 +44,8 @@ final class BookResourceViewModel {
     var selectedDay = Calendar.current.startOfDay(for: Date())
     private(set) var selectionStart: Int?
     private(set) var selectionCount = 0
-    var forWhom: HomeMember?
-    private(set) var members: [HomeMember] = []
+    var forWhom: ResourceHomeMember?
+    private(set) var members: [ResourceHomeMember] = []
     /// Optional free-text note captured on the "Notes" section. NOTE: the
     /// `POST …/resources/:rid/book` route and `BookResourceRequest` DTO do not
     /// yet carry a note field, so this is captured view-only and not transmitted
@@ -121,12 +121,12 @@ final class BookResourceViewModel {
         }
     }
 
-    private func fetchMembers() async -> [HomeMember] {
+    private func fetchMembers() async -> [ResourceHomeMember] {
         do {
             let response: OccupantsResponse = try await client.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
-            return HomeMember.from(occupants: response.occupants)
+            return ResourceHomeMember.from(occupants: response.occupants)
         } catch {
             return []
         }

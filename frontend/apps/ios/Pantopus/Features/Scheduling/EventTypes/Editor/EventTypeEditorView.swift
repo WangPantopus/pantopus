@@ -66,23 +66,25 @@ struct EventTypeEditorView: View {
             onCommit: { Task { if await viewModel.save() { dismiss() } } },
             content: {
                 Group {
-                    identityPill
-                    basicsGroup
-                    durationGroup
-                    locationGroup
-                    if viewModel.isEditing {
-                        availabilityGroup
+                    Group {
+                        identityPill
+                        basicsGroup
+                        durationGroup
+                        locationGroup
+                        if viewModel.isEditing {
+                            availabilityGroup
+                        }
                     }
+                    if viewModel.showsAssignment { assignmentGroup }
+                    if viewModel.isEditing {
+                        advancedGroup
+                        visibilityGroup
+                    }
+                    pricingGroup
+                    if viewModel.isEditing { moreGroup }
                 }
-                if viewModel.showsAssignment { assignmentGroup }
-                if viewModel.isEditing {
-                    advancedGroup
-                    visibilityGroup
-                }
-                pricingGroup
-                if viewModel.isEditing { moreGroup }
-            }
-            .disabled(viewModel.isSaving),
+                .disabled(viewModel.isSaving)
+            },
             stickyBottom: {
                 AnyView(
                     EventTypeSaveBar(
@@ -119,6 +121,10 @@ struct EventTypeEditorView: View {
 
     // MARK: Basics
 
+    // Design `BasicsCard` — Name, Description (multiline), Colour. The booking
+    // link slug is auto-derived from the name (the design omits a slug field),
+    // so the only slug affordance is its auto-derivation; a SLUG_TAKEN error
+    // surfaces under the name (resolve by renaming).
     private var basicsGroup: some View {
         PillarFieldGroup("Basics", accent: accent) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -131,22 +137,9 @@ struct EventTypeEditorView: View {
                 .accessibilityIdentifier("scheduling.eventType.nameField")
                 if let nameError = viewModel.nameError {
                     fieldError(nameError)
+                } else if let slugError = viewModel.slugError {
+                    fieldError(slugError)
                 }
-            }
-            Divider().background(Theme.Color.appBorderSubtle)
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                TextField("Booking link", text: Binding(
-                    get: { viewModel.slug },
-                    set: { viewModel.updateSlug($0) }
-                ))
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("scheduling.eventType.slugField")
-                Text(viewModel.slugError ?? "pantopus.com/book/…/\(viewModel.slug)")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(viewModel.slugError == nil ? Theme.Color.appTextMuted : Theme.Color.error)
             }
             Divider().background(Theme.Color.appBorderSubtle)
             TextField("Description (optional)", text: $viewModel.detailDescription, axis: .vertical)
@@ -185,19 +178,16 @@ struct EventTypeEditorView: View {
         }
     }
 
+    // Design `DurationCard` single mode — a "Length" label over a wrap row that
+    // holds the compact bordered stepper inline with the 15/45/60 quick chips.
     private var singleDuration: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("Length")
                 .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            LabeledStepper(
-                title: EventTypeFormat.duration(viewModel.durations.first ?? 30),
-                value: singleDurationBinding,
-                range: 5...480,
-                step: 5
-            ) { _ in "" }
-                .accessibilityIdentifier("scheduling.eventType.singleDuration")
             HStack(spacing: Spacing.s2) {
+                CompactDurationStepper(value: singleDurationBinding)
+                    .accessibilityIdentifier("scheduling.eventType.singleDuration")
                 ForEach([15, 45, 60], id: \.self) { minutes in
                     QuickDurationChip(minutes: minutes) {
                         viewModel.setSingleDuration(minutes)
@@ -415,6 +405,19 @@ struct EventTypeEditorView: View {
                         .frame(maxWidth: 130)
                         .accessibilityIdentifier("scheduling.eventType.currency")
                     }
+                }
+                // Design `PricingCard` "Collect" segmented — Full amount / Deposit.
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    Text("Collect")
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Picker("Collect", selection: $viewModel.collectMode) {
+                        ForEach(CollectMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("scheduling.eventType.collect")
                 }
             }
         }

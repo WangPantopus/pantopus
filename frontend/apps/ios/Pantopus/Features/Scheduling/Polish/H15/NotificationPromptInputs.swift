@@ -85,7 +85,7 @@ struct PhoneEntryField: View {
             TextField("Phone number", text: $phone)
                 .keyboardType(.phonePad)
                 .textContentType(.telephoneNumber)
-                .pantopusTextStyle(.body)
+                .font(Theme.Font.role(.body))
                 .padding(.horizontal, Spacing.s3)
                 .frame(minHeight: 44)
                 .frame(maxWidth: .infinity, alignment: .leading)

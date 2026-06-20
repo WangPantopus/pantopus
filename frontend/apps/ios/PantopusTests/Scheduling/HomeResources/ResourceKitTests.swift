@@ -57,23 +57,23 @@ final class ResourceKitTests: XCTestCase {
         XCTAssertNil(AvailableHours(json: nil))
     }
 
-    // MARK: HomeMember projection
+    // MARK: ResourceHomeMember projection
 
     func testHomeMemberFromOccupantsFiltersInactive() {
         let occupants = [
             OccupantDTO(id: "o1", userId: "u1", role: "member", isActive: true, displayName: "Dad"),
             OccupantDTO(id: "o2", userId: "u2", role: "member", isActive: false, displayName: "Ghost"),
         ]
-        let members = HomeMember.from(occupants: occupants)
+        let members = ResourceHomeMember.from(occupants: occupants)
         XCTAssertEqual(members.count, 1)
         XCTAssertEqual(members.first?.name, "Dad")
         XCTAssertEqual(members.first?.initials, "D")
     }
 
     func testHomeMemberToneIsStable() {
-        let member = HomeMember(id: "abc123", name: "Maria Kowalski")
+        let member = ResourceHomeMember(id: "abc123", name: "Maria Kowalski")
         XCTAssertEqual(member.initials, "MK")
-        XCTAssertEqual(member.tone, HomeMember(id: "abc123", name: "Maria Kowalski").tone)
+        XCTAssertEqual(member.tone, ResourceHomeMember(id: "abc123", name: "Maria Kowalski").tone)
     }
 
     // MARK: ResourceBooking decode (resource_id present)

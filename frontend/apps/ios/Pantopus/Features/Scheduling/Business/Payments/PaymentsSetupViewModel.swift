@@ -21,6 +21,7 @@
 
 import Foundation
 import Observation
+import SwiftUI
 
 @Observable
 @MainActor
@@ -53,6 +54,7 @@ final class PaymentsSetupViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     /// Homes don't take payments directly; the endpoint echoes `applicable:false`.
     var isApplicable: Bool {

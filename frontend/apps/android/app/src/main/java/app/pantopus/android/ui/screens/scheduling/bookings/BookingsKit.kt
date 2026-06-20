@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.data.scheduling.SchedulingOwner
-import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
@@ -81,17 +81,15 @@ enum class BookingStatus(val raw: String) {
     }
 }
 
-/** Chip label + tint for a booking status (Cancelled & Declined read as "Cancelled"). */
-data class BookingStatusChip(val label: String, val variant: StatusChipVariant)
-
-fun bookingStatusChip(status: BookingStatus): BookingStatusChip =
-    when (status) {
-        BookingStatus.Confirmed -> BookingStatusChip("Confirmed", StatusChipVariant.Success)
-        BookingStatus.Pending -> BookingStatusChip("Pending", StatusChipVariant.Warning)
-        BookingStatus.Cancelled -> BookingStatusChip("Cancelled", StatusChipVariant.Neutral)
-        BookingStatus.Declined -> BookingStatusChip("Cancelled", StatusChipVariant.Neutral)
-        BookingStatus.Completed -> BookingStatusChip("Completed", StatusChipVariant.Neutral)
-        BookingStatus.NoShow -> BookingStatusChip("No-show", StatusChipVariant.ErrorVariant)
+/** Map a booking lifecycle status onto the shared [SchedulingPillStatus] the status pill renders. */
+fun BookingStatus.toPillStatus(): SchedulingPillStatus =
+    when (this) {
+        BookingStatus.Confirmed -> SchedulingPillStatus.Confirmed
+        BookingStatus.Pending -> SchedulingPillStatus.Pending
+        BookingStatus.Cancelled -> SchedulingPillStatus.Cancelled
+        BookingStatus.Declined -> SchedulingPillStatus.Declined
+        BookingStatus.Completed -> SchedulingPillStatus.Completed
+        BookingStatus.NoShow -> SchedulingPillStatus.NoShow
     }
 
 // ─── Owner / pillar ───────────────────────────────────────────────────────────
@@ -176,6 +174,17 @@ fun rangeLabel(
     val endTime = end?.format(TIME_FMT)
     val time = if (endTime != null) "$startTime–$endTime" else startTime
     return "${start.format(DATE_FMT)} · $time · ${tzAbbrev()}"
+}
+
+private val STAMP_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.US)
+
+/** Timeline-node stamp: "Jun 12 · 9:04 AM" (null when the source is blank). */
+fun shortStamp(utc: String?): String? = parseUtc(utc)?.format(STAMP_FMT)
+
+/** Whether the booking's end time is in the past (drives "Met"/follow-up timeline + docks). */
+fun eventEnded(endUtc: String?): Boolean {
+    val end = parseUtc(endUtc) ?: return false
+    return end.toInstant().isBefore(Instant.now())
 }
 
 /** Compact slot range used inside the sheets: "Tue, Oct 22 · 2:00–2:30 PM". */

@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.ui.screens.scheduling._shared.PausedExpiredUnavailableState
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
@@ -161,7 +162,7 @@ private fun TerminalExtra(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
                 ) {
                     PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 14.dp, tint = pillar.accent)
-                    Text(text = "Book again", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = pillar.accent)
+                    Text(text = "Book again", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = pillar.accent)
                 }
             }
         else -> Unit
@@ -237,15 +238,16 @@ private fun PausedNoteCard(
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            // Spec PausedCard shows host initials on a blue-gradient disc (not a User glyph).
             Box(
-                modifier = Modifier.size(24.dp).clip(CircleShape).background(SchedulingPillar.Personal.accentBg),
+                modifier = Modifier.size(24.dp).clip(CircleShape).background(SchedulingPillar.Personal.avatarBrush()),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.User,
-                    contentDescription = null,
-                    size = 12.dp,
-                    tint = SchedulingPillar.Personal.accent,
+                Text(
+                    text = edgeInitials(hostName),
+                    color = PantopusColors.appTextInverse,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
             Text(

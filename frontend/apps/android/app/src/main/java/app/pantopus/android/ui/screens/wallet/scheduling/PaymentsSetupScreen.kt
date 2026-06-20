@@ -44,17 +44,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.OwnerPillarHeader
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingMiniToggle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling.payments.PaymentsComingSoon
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -65,6 +68,11 @@ import kotlinx.coroutines.delay
 
 private val PILLAR = SchedulingPillar.Business
 private const val TOAST_MS = 2500L
+
+// Stripe's brand indigo (#635bff) — a fixed external brand color the Pantopus
+// palette does not carry, so it is parsed at runtime per the tokens-only rule
+// (no raw 0x literal). Matches spec StripeBadge bg `C.stripe` and iOS stripeBrand.
+private val StripeBrand = Color("#635bff".toColorInt())
 
 @Composable
 fun PaymentsSetupScreen(
@@ -108,7 +116,7 @@ fun PaymentsSetupScreen(
                 .background(PantopusColors.appBg)
                 .testTag("scheduling.paymentsSetup"),
     ) {
-        OwnerPillarHeader(title = "Payments", pillar = PILLAR, onBack = onBack)
+        SchedulingTopBar(title = "Payments", onLeading = onBack)
         Box(modifier = Modifier.weight(1f)) {
             when (val s = state) {
                 PaymentsSetupUiState.Loading ->
@@ -217,7 +225,7 @@ private fun StatusHero(model: PaymentsModel) {
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(11.dp), verticalAlignment = Alignment.Top) {
             Box(
-                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(PILLAR.accent),
+                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(StripeBrand),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("S", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
@@ -251,7 +259,7 @@ private fun ReadyPill(
 ) {
     val (bg, fg, icon) =
         when (state) {
-            PaymentsSetupViewModel.PillState.On -> Triple(PantopusColors.successLight, PantopusColors.success, PantopusIcon.Check)
+            PaymentsSetupViewModel.PillState.On -> Triple(PantopusColors.successBg, PantopusColors.success, PantopusIcon.Check)
             PaymentsSetupViewModel.PillState.Off ->
                 Triple(PantopusColors.appSurfaceSunken, PantopusColors.appTextMuted, PantopusIcon.Minus)
             PaymentsSetupViewModel.PillState.Warn -> Triple(PantopusColors.warningBg, PantopusColors.warning, PantopusIcon.Clock)
@@ -277,7 +285,7 @@ private fun StatusChip(setup: PaymentsSetupViewModel.Setup) {
             PaymentsSetupViewModel.Setup.Restricted ->
                 ChipSpec("Restricted", PantopusColors.errorBg, PantopusColors.error, null)
             PaymentsSetupViewModel.Setup.Ready ->
-                ChipSpec("Connected", PantopusColors.successLight, PantopusColors.success, PantopusIcon.Check)
+                ChipSpec("Connected", PantopusColors.successBg, PantopusColors.success, PantopusIcon.Check)
         }
     Row(
         modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(bg).padding(horizontal = 8.dp, vertical = 3.dp),
@@ -343,14 +351,17 @@ private fun AccountCard(
             PaymentRow(
                 icon = PantopusIcon.DollarSign,
                 label = "Default currency",
-                value = if (connected) "USD" else null,
+                sub = if (connected) "USD" else null,
+                trailing = if (connected) RowTrailing.Chevron else RowTrailing.Dash,
                 onClick = if (connected) onOpenDashboard else null,
                 divider = true,
             )
             PaymentRow(
                 icon = PantopusIcon.Type,
                 label = "Statement descriptor",
-                value = if (connected) "Managed on Stripe" else null,
+                sub = if (connected) "Managed on Stripe" else null,
+                subAsMonoChip = connected,
+                trailing = if (connected) RowTrailing.Chevron else RowTrailing.Dash,
                 onClick = if (connected) onOpenDashboard else null,
                 divider = connected || model.setup != PaymentsSetupViewModel.Setup.Ready,
             )
@@ -358,8 +369,8 @@ private fun AccountCard(
                 PaymentRow(
                     icon = PantopusIcon.Wallet,
                     label = "Payouts",
-                    value = null,
-                    showChevron = true,
+                    sub = "Managed on Stripe",
+                    trailing = RowTrailing.Chevron,
                     onClick = onOpenDashboard,
                     divider = model.setup != PaymentsSetupViewModel.Setup.Ready,
                 )
@@ -391,14 +402,16 @@ private fun TaxCard(
             PaymentRow(
                 icon = PantopusIcon.Percent,
                 label = "Collect tax",
-                value = if (connected) "Stripe Tax" else null,
-                onClick = if (connected) onOpenDashboard else null,
+                sub = null,
+                trailing = if (connected) RowTrailing.Toggle(on = true) else RowTrailing.Dash,
+                onClick = null,
                 divider = true,
             )
             PaymentRow(
                 icon = PantopusIcon.FileText,
                 label = "Tax rate · Stripe Tax",
-                value = if (connected) "automatic" else null,
+                sub = if (connected) "automatic" else null,
+                trailing = if (connected) RowTrailing.Chevron else RowTrailing.Dash,
                 onClick = if (connected) onOpenDashboard else null,
                 divider = false,
             )
@@ -406,14 +419,27 @@ private fun TaxCard(
     }
 }
 
+/** How the trailing slot of a [PaymentRow] renders. */
+private sealed interface RowTrailing {
+    /** Right chevron (connected, tappable rows). */
+    data object Chevron : RowTrailing
+
+    /** Em-dash placeholder (gated / not connected). */
+    data object Dash : RowTrailing
+
+    /** A pillar-tinted on-toggle (Collect tax, connected). */
+    data class Toggle(val on: Boolean) : RowTrailing
+}
+
 @Composable
 private fun PaymentRow(
     icon: PantopusIcon,
     label: String,
-    value: String?,
+    sub: String?,
+    trailing: RowTrailing,
     divider: Boolean,
     modifier: Modifier = Modifier,
-    showChevron: Boolean = false,
+    subAsMonoChip: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -431,21 +457,62 @@ private fun PaymentRow(
         ) {
             PantopusIconImage(icon, null, size = 16.dp, tint = PantopusColors.appTextStrong)
         }
-        Text(label, color = PantopusColors.appText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        when {
-            value != null -> {
-                Text(value, color = PantopusColors.appTextSecondary, fontSize = 13.sp)
-                if (onClick != null) {
-                    Spacer(Modifier.width(Spacing.s1))
-                    PantopusIconImage(PantopusIcon.ChevronRight, null, size = 16.dp, tint = PantopusColors.appTextMuted)
+        // Label over an optional left-aligned sub line (or mono Receipt chip).
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, color = PantopusColors.appText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            if (sub != null) {
+                if (subAsMonoChip) {
+                    ReceiptChip(value = sub, modifier = Modifier.padding(top = 3.dp))
+                } else {
+                    Text(
+                        sub,
+                        color = PantopusColors.appTextSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
                 }
             }
-            showChevron -> PantopusIconImage(PantopusIcon.ChevronRight, null, size = 16.dp, tint = PantopusColors.appTextMuted)
-            else -> Text("—", color = PantopusColors.appTextMuted, fontSize = 13.sp)
+        }
+        when (trailing) {
+            RowTrailing.Chevron ->
+                PantopusIconImage(PantopusIcon.ChevronRight, null, size = 16.dp, tint = PantopusColors.appTextMuted)
+            RowTrailing.Dash -> Text("—", color = PantopusColors.appTextMuted, fontSize = 13.sp)
+            is RowTrailing.Toggle -> SchedulingMiniToggle(isOn = trailing.on, accent = PILLAR.accent)
         }
     }
     if (divider) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(start = 12.dp).background(PantopusColors.appBorderSubtle))
+    }
+}
+
+/**
+ * Spec `Receipt` chip: a sunken monospace pill with a receipt glyph used as the
+ * statement-descriptor sub line. The descriptor value is managed on Stripe and
+ * not exposed by the status DTO, so the literal demo value ("MARLOW CO") is not
+ * surfaced; this renders the structural mono chip around the available copy.
+ */
+@Composable
+private fun ReceiptChip(
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(PantopusIcon.Receipt, null, size = 10.dp, tint = PantopusColors.appTextStrong)
+        Text(
+            value,
+            color = PantopusColors.appTextStrong,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+        )
     }
 }
 

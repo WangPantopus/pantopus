@@ -314,7 +314,7 @@ private struct BookingMgmtHeaderCard: View {
         BookingCard {
             CardOverline(text: "Page header", accent: viewModel.theme.accent)
             HStack(spacing: Spacing.s3) {
-                BookingAvatar(
+                BookingPageAvatar(
                     name: viewModel.titleText.isEmpty ? "You" : viewModel.titleText,
                     size: 48,
                     accent: viewModel.theme.accent

@@ -57,6 +57,7 @@ final class BusinessSchedulingSettingsViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     /// Admin gating — only show the read-only lock when we positively know the
     /// caller lacks `team.manage`. Unknown/owner ⇒ editable.

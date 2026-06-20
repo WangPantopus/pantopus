@@ -31,7 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -39,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,12 +47,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,6 +60,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.ConflictAlternativesSheet
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -95,30 +95,11 @@ fun BookResourceScreen(
         containerColor = PantopusColors.appBg,
         topBar = {
             if (!isSuccess) {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            title,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PantopusColors.appText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            PantopusIconImage(
-                                icon = PantopusIcon.ChevronLeft,
-                                contentDescription = "Back",
-                                tint = PantopusColors.appText,
-                            )
-                        }
-                    },
-                    colors =
-                        TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = PantopusColors.appSurface,
-                        ),
+                SchedulingTopBar(
+                    title = title,
+                    leading = SchedulingTopBarLeading.Back,
+                    onLeading = onBack,
+                    applyStatusBarInset = true,
                 )
             }
         },
@@ -170,7 +151,23 @@ private fun BookForm(
     form: BookResourceUiState.Form,
     viewModel: BookResourceViewModel,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        BookFormContent(form = form, viewModel = viewModel, isDimmed = form.isSubmitting)
+        if (form.isSubmitting) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                SavingOverlay(label = "Booking the charger")
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookFormContent(
+    form: BookResourceUiState.Form,
+    viewModel: BookResourceViewModel,
+    isDimmed: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxSize().alpha(if (isDimmed) 0.45f else 1f)) {
         Column(
             modifier =
                 Modifier
@@ -222,6 +219,9 @@ private fun BookForm(
             }
             SectionCard(overline = "For whom") {
                 ForWhomPicker(form.members, form.forWhom, onPick = viewModel::pickMember)
+            }
+            SectionCard(overline = "Notes") {
+                NoteField(value = form.note, onValueChange = viewModel::setNote)
             }
         }
         Column {
@@ -429,6 +429,42 @@ private fun ForWhomPicker(
     }
 }
 
+/** Multiline optional note field (F12 Notes section). */
+@Composable
+private fun NoteField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle =
+            androidx.compose.ui.text.TextStyle(
+                fontSize = 13.sp,
+                color = PantopusColors.appText,
+            ),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(PantopusColors.home),
+        minLines = 2,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .padding(Spacing.s3),
+        decorationBox = { inner ->
+            if (value.isEmpty()) {
+                Text(
+                    "Add a note (optional)",
+                    fontSize = 13.sp,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+            inner()
+        },
+    )
+}
+
 @Composable
 private fun BookSuccess(
     success: BookResourceUiState.Success,
@@ -452,7 +488,7 @@ private fun BookSuccess(
                 PantopusIconImage(
                     icon = if (success.approval) PantopusIcon.Clock else PantopusIcon.Check,
                     contentDescription = null,
-                    size = 26.dp,
+                    size = 28.dp,
                     strokeWidth = 2.6f,
                     tint = PantopusColors.appTextInverse,
                 )
@@ -471,6 +507,9 @@ private fun BookSuccess(
             color = PantopusColors.appTextSecondary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
+        if (success.note.isNotBlank()) {
+            SuccessNotePill(text = success.note)
+        }
         HomePrimaryButton(
             title = "Back to calendar",
             icon = PantopusIcon.Home,

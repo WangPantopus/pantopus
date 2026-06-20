@@ -125,6 +125,16 @@ final class ConnectedCalendarsViewModel {
         }
     }
 
+    /// Whether the OS/provider declined calendar access (design frame 6 —
+    /// permission denied). Maps the backend `status` string; only renders the
+    /// lock banner + Open Settings row if the backend ever returns it.
+    func isDenied(_ calendar: ConnectedCalendarDTO) -> Bool {
+        switch calendar.status?.lowercased() {
+        case "denied", "permission_denied", "forbidden", "access_denied": true
+        default: false
+        }
+    }
+
     /// Disconnecting a linked account is not yet wired to a backend route, so
     /// surface the same honest "coming soon" notice rather than a dead button.
     func disconnect(_ calendar: ConnectedCalendarDTO) {

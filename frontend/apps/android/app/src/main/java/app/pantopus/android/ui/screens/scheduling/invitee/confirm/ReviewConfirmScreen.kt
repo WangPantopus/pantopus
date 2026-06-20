@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,10 +49,17 @@ fun ReviewConfirmBody(
     answersExpanded: Boolean,
     onToggleAnswers: () -> Unit,
     modifier: Modifier = Modifier,
+    onRefundPolicy: () -> Unit = {},
 ) {
     val et = args.eventType
     val answers = answeredPairs(state.values, questions)
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+    // Spec frame 6: while confirming the whole form dims to 0.85 and is disabled
+    // (the shimmer CTA lives in the footer). Mirrors iOS .opacity(0.85)/.disabled.
+    val confirmingAlpha = if (state.submitting) 0.85f else 1f
+    Column(
+        modifier = modifier.fillMaxWidth().alpha(confirmingAlpha),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
         ReviewSummaryCard(
             args = args,
             pillar = pillar,
@@ -71,7 +79,7 @@ fun ReviewConfirmBody(
             }
         }
 
-        RefundLine(args = args)
+        RefundLine(args = args, accent = pillar.accent, onRefundPolicy = onRefundPolicy)
 
         PaidGate(enabled = paidEnabled) {
             Column(modifier = Modifier.padding(top = Spacing.s1)) {
@@ -269,15 +277,31 @@ private fun TotalRow(
 }
 
 @Composable
-private fun RefundLine(args: InviteeConfirmArgs) {
+private fun RefundLine(
+    args: InviteeConfirmArgs,
+    accent: androidx.compose.ui.graphics.Color,
+    onRefundPolicy: () -> Unit,
+) {
+    // Spec RefundLink: a shield-check + summary sentence + a primary-accent
+    // "Refund policy" link that opens the cancellation-policy detail.
+    val summary =
+        args.cancellationPolicy?.takeIf { it.isNotBlank() } ?: "Free cancellation up to 24h before."
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         PantopusIconImage(icon = PantopusIcon.ShieldCheck, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextMuted)
-        Text(
-            text = args.cancellationPolicy?.takeIf { it.isNotBlank() } ?: "You can manage or cancel this booking anytime from your email.",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            modifier = Modifier.weight(1f),
-        )
+        Row(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "$summary ",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "Refund policy",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                modifier = Modifier.clickable(onClick = onRefundPolicy),
+            )
+        }
     }
 }
 

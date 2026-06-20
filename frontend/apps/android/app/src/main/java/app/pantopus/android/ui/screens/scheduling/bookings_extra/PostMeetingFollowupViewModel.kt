@@ -32,6 +32,7 @@ data class FollowUpUiState(
     val loading: Boolean = true,
     val loadError: String? = null,
     val inviteeName: String = "there",
+    val headerSubtitle: String = "",
     val pillar: SchedulingPillar = SchedulingPillar.Personal,
     val outcome: FollowUpOutcome? = null,
     val message: String = "",
@@ -83,10 +84,20 @@ class PostMeetingFollowupViewModel
                         val booking = r.data.booking
                         owner = BookingsExtrasOwner.fromBooking(booking)
                         eventTypeId = booking.eventTypeId
+                        val invitee = booking.inviteeName?.takeIf { n -> n.isNotBlank() } ?: "there"
+                        // Header subtitle "Event · Invitee · Jun 9" from loaded
+                        // booking data (event-type name + invitee + start day).
+                        val subtitle =
+                            listOfNotNull(
+                                r.data.eventType?.name?.takeIf { n -> n.isNotBlank() },
+                                booking.inviteeName?.takeIf { n -> n.isNotBlank() },
+                                BookingsExtrasFormatting.shortDay(booking.startAt).takeIf { d -> d.isNotBlank() },
+                            ).joinToString(" · ")
                         _state.update {
                             it.copy(
                                 loading = false,
-                                inviteeName = booking.inviteeName?.takeIf { n -> n.isNotBlank() } ?: "there",
+                                inviteeName = invitee,
+                                headerSubtitle = subtitle,
                                 pillar = owner.pillar(),
                                 canAppendRebookLink = booking.eventTypeId != null,
                             )

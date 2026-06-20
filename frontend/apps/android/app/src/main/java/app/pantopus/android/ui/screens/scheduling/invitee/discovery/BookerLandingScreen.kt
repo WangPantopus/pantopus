@@ -168,23 +168,40 @@ private fun LandingLoaded(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            OpenInAppBanner(onOpen = onOpenInApp)
-            SectionOverline(text = "Book a time", modifier = Modifier.padding(top = Spacing.s2))
+            // The open-in-app nudge only belongs on the multi-type default frame —
+            // never on the single / paused / empty variants (mirrors the spec).
+            val isEventList = !state.isPaused && state.eventTypes.isNotEmpty()
+            if (isEventList && state.eventTypes.size > 1) {
+                OpenInAppBanner(onOpen = onOpenInApp)
+            }
             when {
                 state.isPaused -> LandingPausedCard(hostName = state.hostName)
                 state.eventTypes.isEmpty() -> LandingEmptyCard(hostName = state.hostName)
-                else ->
+                else -> {
+                    // The section label sits with the list only — the paused/empty
+                    // cards in the spec stand alone with no overline above them.
+                    SectionOverline(text = "Book a time", modifier = Modifier.padding(top = Spacing.s2))
                     state.eventTypes.forEach { row ->
                         EventTypeRow(row = row, onClick = { onPickEventType(row) })
                     }
-            }
-            if (!state.isPaused && state.eventTypes.size == 1) {
-                SingleTypeNote()
+                    if (state.eventTypes.size == 1) {
+                        SingleTypeNote()
+                    }
+                }
             }
         }
-        LandingFooter()
+        LandingFooter(
+            // The spec footer surfaces a "View {name}'s profile" link. A5 has no
+            // host-profile route (the stream stops at slot selection), so the link
+            // renders for parity but stays non-navigating until that route lands.
+            profileName = state.hostName.firstName(),
+            onViewProfile = null,
+        )
     }
 }
+
+/** The first whitespace-delimited token of a host's display name ("Maria Kessler" → "Maria"). */
+private fun String.firstName(): String = trim().substringBefore(' ').ifBlank { trim() }
 
 /** The "going straight to pick a time" note shown for a single-type page. */
 @Composable

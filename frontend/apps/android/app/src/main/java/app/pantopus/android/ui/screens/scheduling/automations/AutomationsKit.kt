@@ -299,19 +299,6 @@ fun AutoChip(
     }
 }
 
-/** Workflow status pill (Active = success, Paused = neutral). */
-@Composable
-fun AutoStatusChip(
-    active: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    if (active) {
-        AutoChip(text = "Active", tone = AutoTone.Success, modifier = modifier)
-    } else {
-        AutoChip(text = "Paused", tone = AutoTone.Neutral, modifier = modifier)
-    }
-}
-
 /** Push / Email selectable channel chip (reminder rows + action picker). */
 @Composable
 fun AutoChannelChip(

@@ -14,6 +14,7 @@
 package app.pantopus.android.ui.screens.scheduling.visits
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -29,14 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +58,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.screens.scheduling.resources.CounterRow
 import app.pantopus.android.ui.screens.scheduling.resources.HomeMemberAvatar
 import app.pantopus.android.ui.screens.scheduling.resources.HomeMemberStack
@@ -108,25 +109,12 @@ fun VisitDetailScreen(
         modifier = Modifier.fillMaxSize().testTag(VISIT_DETAIL_TAG),
         containerColor = PantopusColors.appBg,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "Visit",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.appText,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = PantopusColors.appText,
-                        )
-                    }
-                },
-                actions = {
+            SchedulingTopBar(
+                title = "Visit",
+                leading = SchedulingTopBarLeading.Back,
+                onLeading = onBack,
+                applyStatusBarInset = true,
+                trailing = {
                     if (loaded != null && loaded.lifecycle == VisitLifecycle.Confirmed) {
                         TextButton(
                             onClick = viewModel::beginEdit,
@@ -141,10 +129,6 @@ fun VisitDetailScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = PantopusColors.appSurface,
-                    ),
             )
         },
     ) { padding ->
@@ -222,7 +206,12 @@ private fun VisitLoaded(
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             HeaderCard(loaded)
-            LifecycleBanner(loaded.lifecycle)
+            // Confirmed shows the "On the home calendar" banner; Done has no
+            // banner (the terminal chip + timeline carry the state) — matches spec.
+            if (loaded.lifecycle == VisitLifecycle.Confirmed) {
+                LifecycleBanner(loaded.lifecycle)
+            }
+            StatusTimeline(loaded.lifecycle)
             HostsCard(loaded)
             loaded.entryNote?.let { AccessCard(it) }
         }
@@ -320,6 +309,14 @@ private fun HeaderCard(loaded: VisitDetailUiState.Loaded) {
                     background = PantopusColors.categoryUnboxingBg,
                 )
             }
+            if (loaded.lifecycle == VisitLifecycle.Done) {
+                RuleChipView(
+                    icon = PantopusIcon.Check,
+                    text = "Completed",
+                    foreground = PantopusColors.success,
+                    background = PantopusColors.successBg,
+                )
+            }
         }
         Row(
             modifier =
@@ -396,6 +393,92 @@ private data class BannerSpec(
     val bg: Color,
     val fg: Color,
 )
+
+/**
+ * 4-step status timeline (Offered → Reserved → Confirmed → Done). For a concrete
+ * v1 visit, Confirmed maps to step 2 and Done to step 3; earlier steps render as
+ * completed (check), the active step gets a home-accent ring, later steps stay
+ * grey/numbered. (The offer/reserve lifecycle has no v1 backend.)
+ */
+@Composable
+private fun StatusTimeline(lifecycle: VisitLifecycle) {
+    val steps = listOf("Offered", "Reserved", "Confirmed", "Done")
+    val current = if (lifecycle == VisitLifecycle.Done) 3 else 2
+    SectionCard(overline = "Status") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            steps.forEachIndexed { index, step ->
+                val done = index < current
+                val active = index == current
+                Column(
+                    modifier = Modifier.size(width = 46.dp, height = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .then(
+                                    if (active) {
+                                        Modifier.border(2.dp, PantopusColors.homeBg, CircleShape)
+                                    } else {
+                                        Modifier
+                                    },
+                                ).background(
+                                    if (done || active) PantopusColors.home else PantopusColors.appSurfaceSunken,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (done) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.Check,
+                                contentDescription = null,
+                                size = 11.dp,
+                                strokeWidth = 3f,
+                                tint = PantopusColors.appTextInverse,
+                            )
+                        } else {
+                            Text(
+                                "${index + 1}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                            )
+                        }
+                    }
+                    Text(
+                        step,
+                        fontSize = 9.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color =
+                            when {
+                                active -> PantopusColors.homeDark
+                                done -> PantopusColors.appText
+                                else -> PantopusColors.appTextMuted
+                            },
+                    )
+                }
+                if (index < steps.size - 1) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .padding(top = 10.dp)
+                                .height(2.dp)
+                                .clip(RoundedCornerShape(Radii.xs))
+                                .background(
+                                    if (index < current) PantopusColors.home else PantopusColors.appBorder,
+                                ),
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HostsCard(loaded: VisitDetailUiState.Loaded) {

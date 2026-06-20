@@ -41,7 +41,14 @@ data class EditorForm(
     val chargeEnabled: Boolean = false,
     val priceCents: Int = 0,
     val currency: String = "USD",
+    // Collect = Full amount vs Deposit (design PricingCard "Collect" segmented).
+    // A non-null deposit (carried from the DTO's `deposit_cents`) means the
+    // booker pays a deposit up front rather than the full price.
+    val depositCents: Int? = null,
 ) {
+    /** Whether the "Deposit" Collect mode is selected (vs "Full amount"). */
+    val collectDeposit: Boolean get() = depositCents != null && depositCents > 0
+
     val nameValid: Boolean get() = name.trim().isNotEmpty() && slugify(name).matches(SLUG_REGEX)
     val durationValid: Boolean
         get() = defaultDuration in DURATION_MIN..DURATION_MAX && durations.isNotEmpty() && defaultDuration in durations
@@ -76,6 +83,7 @@ internal fun EventTypeDto.toForm(): EditorForm {
         chargeEnabled = (priceCents ?: 0) > 0,
         priceCents = priceCents ?: 0,
         currency = currency ?: "USD",
+        depositCents = depositCents,
     )
 }
 

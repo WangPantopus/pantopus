@@ -226,11 +226,11 @@ struct ResourceDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 
-    @ViewBuilder private func avatar(_ member: HomeMember?, fallback: String, size: CGFloat = 30) -> some View {
+    @ViewBuilder private func avatar(_ member: ResourceHomeMember?, fallback: String, size: CGFloat = 30) -> some View {
         if let member {
-            HomeMemberAvatar(member: member, size: size)
+            ResourceHomeMemberAvatar(member: member, size: size)
         } else {
-            HomeMemberAvatar(member: HomeMember(id: fallback, name: fallback), size: size)
+            ResourceHomeMemberAvatar(member: ResourceHomeMember(id: fallback, name: fallback), size: size)
         }
     }
 

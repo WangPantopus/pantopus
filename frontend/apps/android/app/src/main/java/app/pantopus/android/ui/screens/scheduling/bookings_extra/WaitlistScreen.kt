@@ -3,45 +3,31 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
-import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
-import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.PantopusTextStyle
-import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 const val WAITLIST_TAG = "scheduling.waitlist"
@@ -69,21 +55,18 @@ fun WaitlistScreen(
         containerColor = PantopusColors.appBg,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Waitlist", style = PantopusTextStyle.h3, fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        PantopusIconImage(icon = PantopusIcon.ChevronLeft, contentDescription = "Back", size = 22.dp, tint = PantopusColors.appText)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = PantopusColors.appSurface),
+            SchedulingTopBar(
+                title = "Waitlist",
+                leading = SchedulingTopBarLeading.Back,
+                onLeading = onBack,
+                applyStatusBarInset = true,
             )
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val s = state) {
                 is WaitlistUiState.Loading -> SchedulingLoadingSkeleton(rows = 4)
-                is WaitlistUiState.Error -> ErrorState(message = s.message, onRetry = viewModel::load)
+                is WaitlistUiState.Error -> SchedulingExtrasError(headline = "Couldn't load the waitlist", onRetry = viewModel::load)
                 is WaitlistUiState.Empty ->
                     EmptyState(
                         icon = PantopusIcon.Users,
@@ -128,43 +111,47 @@ internal fun WaitlistContent(
             }
         }
 
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.xl))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                    .padding(Spacing.s4),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${data.entries.size} ${if (data.entries.size == 1) "person" else "people"} waiting",
-                    style = PantopusTextStyle.body,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                )
-                Text(text = "${data.seatTotal} ${if (data.seatTotal == 1) "seat" else "seats"} per session", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
-            }
-            PantopusIconImage(icon = PantopusIcon.Users, contentDescription = null, size = 20.dp, tint = data.pillar.accent)
-        }
+        // Design capacity strip — the identity-tinted fill bar over
+        // "filled of total seats filled · K waiting" (stat strip hidden for the
+        // single-slot view). The host waitlist endpoint returns only the waiting
+        // queue, not the seated count, so `filled`/`isFull` are VM-derived when
+        // available (full ⇒ grayscale bar + disabled promote per frame 5).
+        CapacityHeaderCard(
+            filled = data.filled,
+            total = data.seatTotal,
+            waiting = data.entries.size,
+            accent = data.pillar.accent,
+            showStats = false,
+        )
 
         if (data.entries.isEmpty()) {
             EmptyState(
                 icon = PantopusIcon.Clock,
                 headline = "No one's waiting",
                 subcopy = "When this event fills up, people can join the waitlist and you'll promote them here.",
+                tint = data.pillar.accent.copy(alpha = WAITLIST_DISC_ALPHA),
+                accent = data.pillar.accent,
             )
         } else {
-            ExtrasOverline("Waitlist · ${data.entries.size}")
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            val sectionLabel =
+                if (data.isFull) {
+                    "All seats filled"
+                } else {
+                    "${data.seatsOpen} seat${if (data.seatsOpen == 1) "" else "s"} open · promote available"
+                }
+            ExtrasOverline(sectionLabel)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2 + 1.dp)) {
                 data.entries.forEach { person ->
-                    RosterRow(person = person) {
-                        PromoteSeatButton(enabled = true, accent = data.pillar.accent, onClick = { onPromote(person.id) })
-                    }
+                    WaitlistRosterRow(
+                        person = person,
+                        promoteEnabled = !data.isFull,
+                        accent = data.pillar.accent,
+                        onPromote = { onPromote(person.id) },
+                    )
                 }
             }
         }
     }
 }
+
+private const val WAITLIST_DISC_ALPHA = 0.12f

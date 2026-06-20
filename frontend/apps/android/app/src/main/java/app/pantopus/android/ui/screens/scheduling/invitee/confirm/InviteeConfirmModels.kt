@@ -33,6 +33,16 @@ sealed interface AnswerValue {
     data class Flag(val value: Boolean) : AnswerValue
 }
 
+/**
+ * Optional signed-in invitee identity used to prefill D1 ("Booking as …").
+ * Mirrors iOS `InviteePrefill`; supplied by the slot-picker hand-off when a
+ * booker is signed in. Absent for the anonymous public path (the common case).
+ */
+data class InviteePrefill(
+    val name: String,
+    val email: String,
+)
+
 /** The controlled intake form state. */
 data class IntakeValues(
     val firstName: String = "",
@@ -43,6 +53,11 @@ data class IntakeValues(
     val answers: Map<String, AnswerValue> = emptyMap(),
     /** Optional guest emails (sent inside `answers.guest_emails`). */
     val guests: List<String> = emptyList(),
+    /**
+     * True while a signed-in identity is prefilled — collapses the editable
+     * name/email fields into the "Booking as" chip. Cleared by "Not you?".
+     */
+    val isPrefilled: Boolean = false,
 )
 
 /** The step the single-destination commit flow is on. */
@@ -67,6 +82,8 @@ data class InviteeConfirmArgs(
     val startAtUtc: String,
     val endAtUtc: String? = null,
     val tz: String,
+    /** Signed-in invitee identity to prefill D1, when one is known. */
+    val prefill: InviteePrefill? = null,
 )
 
 /** The terminal D3 payload, set once the booking is created. */
@@ -86,6 +103,10 @@ data class PaidConfirmInfo(
     val amountPaidCents: Int,
     val balanceCents: Int,
     val currency: String?,
+    /** The monospace transaction/timestamp line shown above the divider. */
+    val txnLine: String? = null,
+    /** True while the receipt email is still in flight (FrameEmailSending). */
+    val processing: Boolean = false,
 )
 
 /**
@@ -108,6 +129,12 @@ data class ConfirmFlowState(
     val clientSecret: String? = null,
     val manageToken: String? = null,
     val confirmed: ConfirmedData? = null,
+    /**
+     * True when the entered email resolves to an existing account — surfaces the
+     * D1 "You have an account" info banner. No public lookup endpoint exists yet,
+     * so this stays false today (deferred backend signal).
+     */
+    val existingAccount: Boolean = false,
 ) {
     val holdExpired: Boolean get() = holdSecondsLeft <= 0
 

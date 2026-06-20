@@ -38,6 +38,34 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
 
     private(set) var state: ListOfRowsState = .loading
 
+    // MARK: Bespoke display projection
+    //
+    // The design renders each schedule as its own standalone white card (16pt
+    // radius, 36pt icon tile, vertical-ellipsis kebab) with a 10pt gap and a
+    // boxed info note in the single-schedule frame — geometry the shared
+    // ListOfRowsView `.card` shell can't express (it merges rows into one
+    // grouped card with hairline dividers). The bespoke view consumes this
+    // projection; `state` above is retained for the data-source protocol.
+
+    /// Render phase for the bespoke schedule-list view.
+    enum DisplayPhase: Equatable {
+        case loading
+        case loaded(rows: [ScheduleRowDisplay])
+        case empty
+        case error(message: String)
+    }
+
+    /// One schedule row's display fields.
+    struct ScheduleRowDisplay: Identifiable, Equatable {
+        let id: String
+        let name: String
+        let summary: String
+        let timezone: String
+        let isDefault: Bool
+    }
+
+    private(set) var displayPhase: DisplayPhase = .loading
+
     // MARK: Local UI state (driven from the View)
 
     /// Schedule whose overflow menu is open.
@@ -85,16 +113,22 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
     func loadMoreIfNeeded() async {}
 
     private func fetch(showLoading: Bool) async {
-        if showLoading { state = .loading }
+        if showLoading {
+            state = .loading
+            displayPhase = .loading
+        }
         do {
             let response: AvailabilityResponse = try await client.request(SchedulingEndpoints.getAvailability())
             schedules = response.schedules
             rules = response.rules
             rebuild()
         } catch let error as SchedulingError {
-            state = .error(message: error.userMessage ?? "Couldn't load your availability.")
+            let message = error.userMessage ?? "Couldn't load your availability."
+            state = .error(message: message)
+            displayPhase = .error(message: message)
         } catch {
             state = .error(message: "Couldn't load your availability.")
+            displayPhase = .error(message: "Couldn't load your availability.")
         }
     }
 
@@ -236,8 +270,19 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                 ctaTitle: "Add working hours",
                 onCTA: { [weak self] in Task { @MainActor in await self?.createDefaultSchedule() } }
             ))
+            displayPhase = .empty
             return
         }
+        displayPhase = .loaded(rows: schedules.map { schedule in
+            let scheduleRules = rules.filter { $0.scheduleId == schedule.id }
+            return ScheduleRowDisplay(
+                id: schedule.id,
+                name: schedule.name ?? "Schedule",
+                summary: AvailabilitySummary.summarize(rules: scheduleRules),
+                timezone: Self.timezoneAbbreviation(schedule.timezone),
+                isDefault: schedule.isDefault == true
+            )
+        })
         let rows = schedules.map { schedule -> RowModel in
             let scheduleRules = rules.filter { $0.scheduleId == schedule.id }
             let summary = AvailabilitySummary.summarize(rules: scheduleRules)
@@ -278,6 +323,19 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
     }
 
     private func openMenu(_ schedule: AvailabilityScheduleDTO) {
+        menuTarget = schedule
+    }
+
+    // MARK: Id-based entrypoints for the bespoke list view
+
+    /// Open the weekly-hours editor for a schedule id.
+    func openEditor(id: String) {
+        push(.weeklyHoursEditor(scheduleId: id))
+    }
+
+    /// Open the overflow menu for a schedule id.
+    func openMenu(id: String) {
+        guard let schedule = schedules.first(where: { $0.id == id }) else { return }
         menuTarget = schedule
     }
 

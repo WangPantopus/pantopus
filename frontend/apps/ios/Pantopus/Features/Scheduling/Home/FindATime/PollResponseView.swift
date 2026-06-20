@@ -90,6 +90,11 @@ struct PollResponseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s3) {
                     organizerHeader
+                    // Design Frame 3 pre-fills a "Can't" where the member is busy
+                    // and explains it with an info-tone banner above the slots.
+                    if viewModel.hasConflicts {
+                        conflictPrefillBanner
+                    }
                     FindATimeOverline(text: "Mark which times work", color: Theme.Color.appTextSecondary)
                     ForEach(viewModel.options) { option in
                         pollSlot(option)
@@ -101,17 +106,78 @@ struct PollResponseView: View {
         .safeAreaInset(edge: .bottom) { submitBar }
     }
 
+    // Design info Banner (poll-response-frames `Banner tone="info"`): infoBg
+    // wash, info-tone glyph + body. Shown when any slot conflicts with the
+    // member's personal calendar.
+    private var conflictPrefillBanner: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.info, size: 15, color: Theme.Color.info)
+            Text("We pre-filled a \"Can't\" where you're already busy. Change any you can still make.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.infoBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.info.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    // Design PollSlot: pad 11px/13px, a 9px gap between the label row and the
+    // vote control, and an optional conflict pill + personal-calendar caption.
+    // Hand-rolled rather than `FindATimeCard` so the tighter rhythm holds.
     private func pollSlot(_ option: PollOptionRow) -> some View {
-        FindATimeCard {
-            Text(viewModel.dayTimeLabel(for: option))
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .center, spacing: Spacing.s2) {
+                Text(viewModel.dayTimeLabel(for: option))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let conflict = option.conflict {
+                    conflictPill(conflict)
+                }
+            }
             voteControl(option)
+            if option.conflict != nil {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.calendar, size: 11, color: Theme.Color.appTextMuted)
+                    Text("From your personal calendar")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
         }
         // Design dims the whole proposed-slot group (label + control) to 0.55
         // with pointer-events off when the proposal is closed.
         .opacity(viewModel.isClosed ? 0.55 : 1)
         .allowsHitTesting(!viewModel.isClosed)
+    }
+
+    // Design conflict pill: errorBg wash, alert-triangle glyph + "Conflicts: …".
+    private func conflictPill(_ title: String) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.alertTriangle, size: 10, color: Theme.Color.error)
+            Text("Conflicts: \(title)")
+        }
+        .font(.system(size: 9.5, weight: .bold))
+        .foregroundStyle(Theme.Color.error)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Theme.Color.errorBg)
+        .clipShape(Capsule())
     }
 
     private func voteControl(_ option: PollOptionRow) -> some View {
@@ -123,7 +189,9 @@ struct PollResponseView: View {
         }
         .padding(3)
         .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        // Design track radius is 9; nearest token is Radii.md (8) — tighter than
+        // the prior Radii.lg (12).
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
 
     private func voteSegment(

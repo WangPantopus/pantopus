@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -94,35 +95,6 @@ internal fun HubAvatar(
         Text(text = initials, color = fg, fontWeight = FontWeight.Bold, fontSize = 9.sp)
     }
 }
-
-@Composable
-internal fun HubStatusPill(status: String) {
-    val style =
-        when (status) {
-            "pending" -> StatusStyle(PantopusColors.warningBg, PantopusColors.warning, PantopusIcon.Clock, "Needs approval")
-            "cancelled" -> StatusStyle(PantopusColors.errorBg, PantopusColors.error, PantopusIcon.X, "Cancelled")
-            "declined" -> StatusStyle(PantopusColors.errorBg, PantopusColors.error, PantopusIcon.X, "Declined")
-            "no_show" -> StatusStyle(PantopusColors.warningBg, PantopusColors.warning, PantopusIcon.AlertCircle, "No-show")
-            "completed" -> StatusStyle(PantopusColors.successBg, PantopusColors.success, PantopusIcon.Check, "Completed")
-            else -> StatusStyle(PantopusColors.successBg, PantopusColors.success, PantopusIcon.Check, "Confirmed")
-        }
-    val bg = style.bg
-    val fg = style.fg
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
-                .padding(horizontal = Spacing.s2, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        PantopusIconImage(icon = style.icon, contentDescription = null, size = 10.dp, tint = fg)
-        Text(text = style.label, color = fg, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-    }
-}
-
-private data class StatusStyle(val bg: Color, val fg: Color, val icon: PantopusIcon, val label: String)
 
 @Composable
 internal fun HubComposedNote(
@@ -565,7 +537,7 @@ internal fun HubBookingRowCard(row: HubBookingRowUi) {
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    HubStatusPill(status = row.status)
+                    SchedulingStatusPill(status = row.status)
                 }
             }
         }

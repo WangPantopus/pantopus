@@ -29,7 +29,11 @@ sealed interface GroupRosterUiState {
 
     data class Loaded(val data: RosterData) : GroupRosterUiState
 
-    data class Empty(val onShareLink: () -> Unit) : GroupRosterUiState
+    data class Empty(
+        val onShareLink: () -> Unit,
+        val seatTotal: Int = 0,
+        val pillar: SchedulingPillar = SchedulingPillar.Personal,
+    ) : GroupRosterUiState
 
     data class Error(val message: String) : GroupRosterUiState
 }
@@ -177,7 +181,12 @@ class GroupRosterViewModel
                 }
 
             if (seatedRows.isEmpty() && waitlistRows.isEmpty()) {
-                _state.value = GroupRosterUiState.Empty(onShareLink = { _navRequest.value = SchedulingRoutes.BOOKING_PAGE_MANAGE })
+                _state.value =
+                    GroupRosterUiState.Empty(
+                        onShareLink = { _navRequest.value = SchedulingRoutes.BOOKING_PAGE_MANAGE },
+                        seatTotal = seatTotal,
+                        pillar = owner.pillar(),
+                    )
                 return
             }
 
@@ -360,8 +369,9 @@ class GroupRosterViewModel
                 if (failure) {
                     _nudge.value = current.copy(sending = false, error = "Couldn't send to everyone — try again.")
                 } else {
-                    _nudge.value = null
-                    _toast.value = "Update sent to ${ids.size} ${if (ids.size == 1) "attendee" else "attendees"}."
+                    // Surface the design's in-sheet success scene (disc + "Update
+                    // sent" + dark count toast); the sheet auto-dismisses after.
+                    _nudge.value = current.copy(sending = false, didSend = true, sentCount = ids.size)
                 }
             }
         }

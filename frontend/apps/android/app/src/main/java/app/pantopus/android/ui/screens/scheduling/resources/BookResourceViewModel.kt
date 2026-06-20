@@ -57,6 +57,7 @@ sealed interface BookResourceUiState {
         val hours: List<Int>,
         val cells: Map<Int, BookCellState>,
         val statusLine: BookStatusLine?,
+        val note: String,
         val canSubmit: Boolean,
         val isSubmitting: Boolean,
     ) : BookResourceUiState
@@ -65,6 +66,8 @@ sealed interface BookResourceUiState {
         val approval: Boolean,
         val title: String,
         val body: String,
+        /** Home-green note pill text under the body (F12 confirmed / approval frames). */
+        val note: String,
     ) : BookResourceUiState
 }
 
@@ -113,6 +116,7 @@ class BookResourceViewModel
         private var selectionStart: Int? = null
         private var selectionCount: Int = 0
         private var forWhom: HomeMember? = null
+        private var note: String = ""
         private var isSubmitting = false
         private var started = false
 
@@ -207,6 +211,11 @@ class BookResourceViewModel
         // ── Day navigation ──────────────────────────────────────────────────
         fun pickMember(member: HomeMember) {
             forWhom = member
+            rebuildForm()
+        }
+
+        fun setNote(value: String) {
+            note = value
             rebuildForm()
         }
 
@@ -375,6 +384,7 @@ class BookResourceViewModel
                     hours = hours,
                     cells = hours.associateWith { cellState(it, taken, off) },
                     statusLine = statusLine(taken),
+                    note = note,
                     canSubmit = canSubmit(taken),
                     isSubmitting = isSubmitting,
                 )
@@ -409,20 +419,19 @@ class BookResourceViewModel
                     is NetworkResult.Success -> {
                         val approval = result.data.booking.status == "pending"
                         val range = selectionRangeLabel()
+                        val slotLabel = "$resourceName · ${ResourceTime.dayStripLabel(selectedDay)} · $range"
                         _state.value =
                             BookResourceUiState.Success(
                                 approval = approval,
                                 title = if (approval) "Request sent to an admin" else "Booked",
                                 body =
                                     if (approval) {
-                                        "We'll notify you when your booking is approved.\n$resourceName · ${ResourceTime.dayStripLabel(
-                                            selectedDay,
-                                        )} · $range"
+                                        "We'll notify you when your booking is approved."
                                     } else {
-                                        "$resourceName · ${ResourceTime.dayStripLabel(
-                                            selectedDay,
-                                        )} · $range"
+                                        slotLabel
                                     },
+                                // Approval: echo the slot in the pill. Confirmed: calendar note.
+                                note = if (approval) slotLabel else "Added to the home calendar",
                             )
                     }
                     is NetworkResult.Failure -> {

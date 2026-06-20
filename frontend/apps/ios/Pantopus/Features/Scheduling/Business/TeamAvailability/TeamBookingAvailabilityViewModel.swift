@@ -85,6 +85,7 @@ final class TeamBookingAvailabilityViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     var canManage: Bool {
         guard let access else { return true }

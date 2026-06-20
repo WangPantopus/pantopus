@@ -27,7 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
@@ -35,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -42,7 +48,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling.invitee.edge.RescheduleCancelPolicyScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -59,6 +67,10 @@ object MyBookingsTags {
 }
 
 private const val TOAST_MS = 2200L
+
+// Spec segmented control radii (Segmented, my-bookings-frames.jsx lines 70-78).
+private val SEGMENT_CONTAINER_RADIUS = 10.dp
+private val SEGMENT_BUTTON_RADIUS = 7.dp
 
 @Composable
 fun MyBookingsScreen(
@@ -159,8 +171,10 @@ private fun TopBar(onBack: () -> Unit) {
             PantopusIconImage(icon = PantopusIcon.ChevronLeft, contentDescription = "Back", size = 20.dp, tint = PantopusColors.appText)
         }
         Text(
+            // Spec top-bar title is 15px/600 — render at 15sp SemiBold, not h3 (20sp).
             text = "My bookings",
-            style = PantopusTextStyle.h3,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Center,
@@ -181,9 +195,11 @@ private fun SegmentedTabs(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                .clip(RoundedCornerShape(Radii.md))
+                // Spec: container radius 10, 3px inner padding, 3px gap between segments.
+                .clip(RoundedCornerShape(SEGMENT_CONTAINER_RADIUS))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(Spacing.s0),
+                .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         MyBookingsTab.entries.forEach { entry ->
             val selected = entry == tab
@@ -191,8 +207,7 @@ private fun SegmentedTabs(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(Spacing.s0)
-                        .clip(RoundedCornerShape(Radii.sm))
+                        .clip(RoundedCornerShape(SEGMENT_BUTTON_RADIUS))
                         .background(if (selected) PantopusColors.appSurface else Color.Transparent)
                         .clickable { onTab(entry) }
                         .padding(vertical = Spacing.s2)
@@ -248,8 +263,11 @@ private fun GroupOverline(group: MyBookingGroup) {
             PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 12.dp, tint = PantopusColors.warning)
         }
         Text(
+            // Spec overline: 10px/700, 0.08em tracking, uppercase.
             text = group.overline.uppercase(),
-            style = PantopusTextStyle.overline,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.08.em,
             color = if (group.attention) PantopusColors.warning else PantopusColors.appTextSecondary,
         )
     }
@@ -260,7 +278,8 @@ private fun BookingRow(
     row: MyBookingRow,
     onClick: () -> Unit,
 ) {
-    Row(
+    val hasFooter = row.footer != null
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -270,43 +289,150 @@ private fun BookingRow(
                 .clickable(onClick = onClick)
                 .padding(Spacing.s3)
                 .testTag(MyBookingsTags.ROW_PREFIX + row.id),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(if (hasFooter) Spacing.s2 else Spacing.s0),
     ) {
-        HostAvatar(pillar = row.pillar, dimmed = row.dimmed)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = row.title,
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.Bold,
-                color = if (row.dimmed) PantopusColors.appTextSecondary else PantopusColors.appText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            HostAvatar(pillar = row.pillar, initials = row.initials, dimmed = row.dimmed)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = row.title,
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.Bold,
+                    color = if (row.dimmed) PantopusColors.appTextSecondary else PantopusColors.appText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = row.subtitle,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                StatusPill(kind = row.pill)
+                // The chevron only shows when there's no footer affordance (spec).
+                if (!hasFooter) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.ChevronRight,
+                        contentDescription = null,
+                        size = 16.dp,
+                        tint = PantopusColors.appTextMuted,
+                    )
+                }
+            }
+        }
+        when (val footer = row.footer) {
+            is BookingRowFooter.BookAgain -> BookAgainFooter(onClick = onClick)
+            is BookingRowFooter.Pay -> PayFooter(balance = footer.balance, onPay = onClick)
+            null -> Unit
+        }
+    }
+}
+
+/** A 1dp top-border divider above a row footer (spec: borderTop + 9px paddingTop). */
+private fun Modifier.footerDivider(): Modifier =
+    drawBehind {
+        drawLine(
+            color = PantopusColors.appBorder,
+            start = Offset(0f, 0f),
+            end = Offset(size.width, 0f),
+            strokeWidth = 1f,
+        )
+    }.padding(top = Spacing.s2)
+
+/** Past-row "Book again" link with a top-border divider (spec FramePast). */
+@Composable
+private fun BookAgainFooter(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().footerDivider(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            // Spec uses rotate-ccw; the icon set ships RefreshCw as the closest "again" glyph.
+            PantopusIconImage(
+                icon = PantopusIcon.RefreshCw,
+                contentDescription = null,
+                size = 12.dp,
+                tint = PantopusColors.primary600,
             )
             Text(
-                text = row.subtitle,
-                style = PantopusTextStyle.caption,
-                color = PantopusColors.appTextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = "Book again",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary600,
             )
         }
-        StatusPill(kind = row.pill)
-        PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
+    }
+}
+
+/** Action-needed "Pay {balance}" affordance + "{balance} due at confirm" caption (spec FrameActionNeeded). */
+@Composable
+private fun PayFooter(
+    balance: String,
+    onPay: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().footerDivider(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$balance due at confirm",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.warning,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.primary600)
+                    .clickable(onClick = onPay)
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Pay $balance",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
     }
 }
 
 @Composable
 private fun HostAvatar(
     pillar: SchedulingPillar,
+    initials: String,
     dimmed: Boolean,
 ) {
-    Box(contentAlignment = Alignment.BottomEnd) {
+    Box(contentAlignment = Alignment.BottomEnd, modifier = Modifier.alpha(if (dimmed) 0.7f else 1f)) {
+        // Spec HostAvatar: 135° pillar gradient disc + white initials + bordered identity dot.
         Box(
-            modifier = Modifier.size(42.dp).clip(CircleShape).background(if (dimmed) PantopusColors.appSurfaceSunken else pillar.accentBg),
+            modifier = Modifier.size(42.dp).clip(CircleShape).background(pillarGradient(pillar)),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.User, contentDescription = null, size = 18.dp, tint = pillar.accent)
+            Text(
+                text = initials,
+                color = PantopusColors.appTextInverse,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
         Box(
             modifier =
@@ -321,41 +447,79 @@ private fun HostAvatar(
     }
 }
 
+/** 135° pillar gradient for the host avatar disc, mirroring iOS EdgePillarAvatar. */
+private fun pillarGradient(pillar: SchedulingPillar): Brush =
+    when (pillar) {
+        SchedulingPillar.Personal ->
+            Brush.linearGradient(listOf(PantopusColors.primary400, PantopusColors.primary700))
+        SchedulingPillar.Home ->
+            Brush.linearGradient(listOf(PantopusColors.home, PantopusColors.homeDark))
+        SchedulingPillar.Business ->
+            Brush.linearGradient(listOf(PantopusColors.business, PantopusColors.businessDark))
+    }
+
 @Composable
 private fun StatusPill(kind: BookingPillKind) {
-    val (bg, fg, border, label) =
-        when (kind) {
-            BookingPillKind.Confirmed ->
-                PillStyle(
-                    PantopusColors.successBg,
-                    PantopusColors.success,
-                    PantopusColors.successLight,
-                    "Confirmed",
-                )
-            BookingPillKind.Pending -> PillStyle(PantopusColors.infoBg, PantopusColors.info, PantopusColors.infoLight, "Pending")
-            BookingPillKind.Past ->
-                PillStyle(
-                    PantopusColors.appSurfaceSunken,
-                    PantopusColors.appTextSecondary,
-                    PantopusColors.appBorder,
-                    "Past",
-                )
-            BookingPillKind.Cancelled -> PillStyle(PantopusColors.errorBg, PantopusColors.error, PantopusColors.errorLight, "Cancelled")
-        }
-    Text(
-        text = label,
-        style = PantopusTextStyle.overline,
-        color = fg,
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-    )
+    when (kind) {
+        BookingPillKind.Confirmed -> SchedulingStatusPill(status = SchedulingPillStatus.Confirmed)
+        // Booker-side spec colours pending INFO blue (#F0F9FF/#0369A1), not the shared
+        // pill's host-side amber — render it locally with the info tone to match the spec.
+        BookingPillKind.Pending ->
+            LocalStatusPill(
+                label = "Pending",
+                fg = PantopusColors.info,
+                bg = PantopusColors.infoBg,
+                border = PantopusColors.infoLight,
+                tag = "pending",
+            )
+        BookingPillKind.Past -> SchedulingStatusPill(status = SchedulingPillStatus.Past)
+        BookingPillKind.Cancelled -> SchedulingStatusPill(status = SchedulingPillStatus.Cancelled)
+        // "Balance due" / "Approve pending" are my-bookings-specific labels not in the
+        // shared enum's grammar, so they use a local pill that mirrors the shared pill's
+        // geometry (10sp/700, 8×3 padding, tinted fill + hairline border, capsule).
+        BookingPillKind.Balance ->
+            LocalStatusPill(
+                label = "Balance due",
+                fg = PantopusColors.warning,
+                bg = PantopusColors.warningBg,
+                border = PantopusColors.warningLight,
+                tag = "balance",
+            )
+        BookingPillKind.Approve ->
+            LocalStatusPill(
+                label = "Approve pending",
+                fg = PantopusColors.info,
+                bg = PantopusColors.infoBg,
+                border = PantopusColors.infoLight,
+                tag = "approve",
+            )
+    }
 }
 
-private data class PillStyle(val bg: Color, val fg: Color, val border: Color, val label: String)
+/** A my-bookings-local status pill matching the shared SchedulingStatusPill geometry. */
+@Composable
+private fun LocalStatusPill(
+    label: String,
+    fg: Color,
+    bg: Color,
+    border: Color,
+    tag: String,
+) {
+    val shape = RoundedCornerShape(Radii.pill)
+    Text(
+        text = label,
+        color = fg,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        modifier =
+            Modifier
+                .testTag("scheduling.statusPill.$tag")
+                .background(bg, shape)
+                .border(1.dp, border, shape)
+                .padding(horizontal = Spacing.s2, vertical = 3.dp),
+    )
+}
 
 @Composable
 private fun EmptyBody() {
@@ -363,35 +527,57 @@ private fun EmptyBody() {
         icon = PantopusIcon.Calendar,
         headline = "You haven't booked anything yet",
         subcopy = "Bookings you make show up here — everything in one place.",
+        // Mirrors iOS: the spec's primary CTA ships view-only until the
+        // discovery destination is wired into the scheduling routes.
+        ctaTitle = "Find something to book",
+        onCta = {},
         modifier = Modifier.fillMaxSize(),
     )
 }
 
 @Composable
 private fun LoadingSkeleton() {
+    // Spec loading frame groups 2+2 skeleton rows under two shimmer overline bars.
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.s4, vertical = Spacing.s4),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        repeat(4) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radii.xl))
-                        .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                        .padding(Spacing.s3),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-            ) {
-                Shimmer(width = 42.dp, height = 42.dp, cornerRadius = Radii.pill)
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                    Shimmer(width = 140.dp, height = 11.dp, cornerRadius = Radii.xs)
-                    Shimmer(width = 180.dp, height = 9.dp, cornerRadius = Radii.xs)
-                }
-            }
+        SkeletonGroup(overlineWidth = 80.dp)
+        SkeletonGroup(overlineWidth = 64.dp)
+    }
+}
+
+@Composable
+private fun SkeletonGroup(overlineWidth: androidx.compose.ui.unit.Dp) {
+    Shimmer(
+        width = overlineWidth,
+        height = 9.dp,
+        cornerRadius = Radii.xs,
+        modifier = Modifier.padding(top = Spacing.s3, bottom = Spacing.s2),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        repeat(2) { SkeletonRow() }
+    }
+}
+
+@Composable
+private fun SkeletonRow() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Shimmer(width = 42.dp, height = 42.dp, cornerRadius = Radii.pill)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Shimmer(width = 140.dp, height = 11.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 180.dp, height = 9.dp, cornerRadius = Radii.xs)
         }
+        Shimmer(width = 54.dp, height = 16.dp, cornerRadius = Radii.pill)
     }
 }
 

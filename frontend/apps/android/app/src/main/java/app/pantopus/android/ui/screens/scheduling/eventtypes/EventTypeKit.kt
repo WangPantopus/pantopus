@@ -232,7 +232,7 @@ fun EtSegmented(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(if (small) 28.dp else 30.dp)
+                        .height(if (small) 28.dp else 32.dp)
                         .clip(RoundedCornerShape(7.dp))
                         .background(if (on) PantopusColors.appSurface else Color.Transparent)
                         .clickable(enabled = enabled) { onSelect(option) },

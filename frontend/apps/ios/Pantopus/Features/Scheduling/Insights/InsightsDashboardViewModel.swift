@@ -46,6 +46,7 @@ final class InsightsDashboardViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
     var isBusiness: Bool { if case .business = owner { return true } else { return false } }
 
     init(

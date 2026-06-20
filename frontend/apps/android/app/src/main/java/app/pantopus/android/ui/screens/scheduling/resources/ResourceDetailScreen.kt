@@ -28,13 +28,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,14 +40,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -79,27 +77,12 @@ fun ResourceDetailScreen(
         modifier = Modifier.fillMaxSize().testTag(RESOURCE_DETAIL_TAG),
         containerColor = PantopusColors.appBg,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PantopusColors.appText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = PantopusColors.appText,
-                        )
-                    }
-                },
-                actions = {
+            SchedulingTopBar(
+                title = title,
+                leading = SchedulingTopBarLeading.Back,
+                onLeading = onBack,
+                applyStatusBarInset = true,
+                trailing = {
                     if (loaded != null) {
                         TextButton(
                             onClick = {
@@ -116,16 +99,12 @@ fun ResourceDetailScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = PantopusColors.appSurface,
-                    ),
             )
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (val s = state) {
-                ResourceDetailUiState.Loading -> SchedulingLoadingSkeleton(rows = 4)
+                ResourceDetailUiState.Loading -> DetailSkeleton()
                 is ResourceDetailUiState.Error ->
                     ErrorState(
                         headline = "Couldn't load this resource",
@@ -173,10 +152,13 @@ private fun DetailLoaded(
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             HeaderCard(loaded)
+            if (loaded.isFullyBooked) {
+                FullyBookedBanner(loaded.fullyBookedThroughLabel, loaded.nextOpeningLabel)
+            }
             if (loaded.approvals.isNotEmpty()) {
                 ApprovalQueueCard(loaded.approvals, onApprove, onDecline)
             }
-            ResourceOverlineLabel(text = "Upcoming bookings")
+            ResourceOverlineLabel(text = loaded.bookingsLabel)
             if (loaded.sections.isEmpty()) {
                 SectionCard {
                     Row(
@@ -210,7 +192,55 @@ private fun DetailLoaded(
             }
         }
         StickyFooter {
-            HomePrimaryButton(title = "Book this", icon = PantopusIcon.Plus, onClick = onBookThis)
+            if (loaded.isFullyBooked) {
+                HomePrimaryButton(
+                    title = "Book next opening · ${loaded.nextOpeningLabel}",
+                    icon = PantopusIcon.CalendarClock,
+                    onClick = onBookThis,
+                )
+            } else {
+                HomePrimaryButton(title = "Book this", icon = PantopusIcon.Plus, onClick = onBookThis)
+            }
+        }
+    }
+}
+
+/** Amber "Fully booked through …" banner (F11 frame 3). */
+@Composable
+private fun FullyBookedBanner(
+    throughLabel: String?,
+    nextOpeningLabel: String?,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .padding(Spacing.s3),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CalendarX,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.warning,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                throughLabel ?: "Fully booked",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.warmAmber,
+            )
+            nextOpeningLabel?.let {
+                Text(
+                    "Next opening is $it. You can still book that.",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appText,
+                )
+            }
         }
     }
 }
@@ -257,9 +287,17 @@ private fun HeaderCard(loaded: ResourceDetailUiState.Loaded) {
                 verticalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 loaded.ruleChips.forEach {
-                    RuleChipView(icon = it.icon, text = it.text, home = true)
+                    RuleChipView(
+                        icon = it.icon,
+                        text = it.text,
+                        foreground = PantopusColors.homeDark,
+                        background = PantopusColors.homeBg,
+                    )
                 }
             }
+        }
+        if (loaded.pendingApprovalCount > 0) {
+            PendingApprovalBadge(count = loaded.pendingApprovalCount, onClick = {})
         }
     }
 }
@@ -270,7 +308,7 @@ private fun ApprovalQueueCard(
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
 ) {
-    SectionCard(overline = "Approval queue · ${approvals.size}", overlineColor = PantopusColors.warning) {
+    SectionCard(overline = "Approval queue · ${approvals.size}", overlineColor = PantopusColors.warmAmber) {
         approvals.forEachIndexed { index, approval ->
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 Row(
@@ -327,7 +365,7 @@ private fun BookingRow(row: ResourceBookingRow) {
         Box(
             modifier =
                 Modifier
-                    .size(6.dp)
+                    .size(5.dp)
                     .clip(CircleShape)
                     .background(
                         if (row.isPending) PantopusColors.warning else PantopusColors.success,
@@ -343,6 +381,54 @@ private fun BookingRow(row: ResourceBookingRow) {
             Text("For: ${row.who}", fontSize = 11.sp, color = PantopusColors.appTextSecondary)
         }
         MemberOrInitials(row.member, row.who, size = 26.dp)
+    }
+}
+
+/** Header-card + booking-row skeleton mirroring the loaded geometry (F11 frame 2). */
+@Composable
+private fun DetailSkeleton() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        SectionCard {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Shimmer(width = 46.dp, height = 46.dp, cornerRadius = Radii.lg)
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    Shimmer(width = 120.dp, height = 14.dp)
+                    Shimmer(width = 52.dp, height = 14.dp, cornerRadius = Radii.sm)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Shimmer(width = 60.dp, height = 20.dp, cornerRadius = Radii.sm)
+                Shimmer(width = 70.dp, height = 20.dp, cornerRadius = Radii.sm)
+                Shimmer(width = 64.dp, height = 20.dp, cornerRadius = Radii.sm)
+            }
+        }
+        Shimmer(width = 120.dp, height = 11.dp)
+        repeat(3) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .padding(Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Shimmer(width = 5.dp, height = 5.dp, cornerRadius = Radii.pill)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                    Shimmer(width = 130.dp, height = 12.dp)
+                    Shimmer(width = 70.dp, height = 9.dp)
+                }
+                Shimmer(width = 26.dp, height = 26.dp, cornerRadius = Radii.pill)
+            }
+        }
     }
 }
 

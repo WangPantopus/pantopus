@@ -41,6 +41,7 @@ final class PerEventTypePerformanceViewModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
     var accent: Color { theme.accent }
+    var accentBg: Color { theme.accentBg }
 
     init(
         owner: SchedulingOwner,
