@@ -123,18 +123,37 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
 /// A pill rendering a booking/page/link status with a semantic chip + glyph.
 public struct SchedulingStatusPill: View {
     private let status: SchedulingPillStatus
+    private let labelOverride: String?
 
     public init(_ status: SchedulingPillStatus) {
         self.status = status
+        labelOverride = nil
     }
 
-    /// Render directly from a backend status string.
+    /// Render directly from a backend status string. An unrecognized wire value
+    /// keeps a humanized form of the raw string ("in_review" → "In review")
+    /// instead of a generic "Status", mirroring the per-screen chips this pill
+    /// replaced (which echoed the raw value rather than dropping it).
     public init(status raw: String) {
-        status = SchedulingPillStatus(backend: raw)
+        let mapped = SchedulingPillStatus(backend: raw)
+        status = mapped
+        labelOverride = mapped == .unknown ? Self.humanize(raw) : nil
+    }
+
+    private var label: String { labelOverride ?? status.label }
+
+    /// "in_review" / "in-review" → "In review"; blank → nil (falls back to "Status").
+    private static func humanize(_ raw: String) -> String? {
+        let cleaned = raw
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        guard let first = cleaned.first else { return nil }
+        return first.uppercased() + cleaned.dropFirst()
     }
 
     public var body: some View {
-        Text(status.label)
+        Text(label)
             .font(.system(size: 10, weight: .bold))
             .foregroundStyle(status.tone.foreground)
             .lineLimit(1)
@@ -144,7 +163,7 @@ public struct SchedulingStatusPill: View {
             .overlay(Capsule().strokeBorder(status.tone.border, lineWidth: 1))
             .clipShape(Capsule())
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(status.label)
+            .accessibilityLabel(label)
             .accessibilityIdentifier("scheduling.statusPill.\(status.rawValue)")
     }
 }

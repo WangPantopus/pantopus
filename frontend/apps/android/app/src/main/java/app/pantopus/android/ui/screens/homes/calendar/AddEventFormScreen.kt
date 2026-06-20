@@ -543,8 +543,13 @@ private fun AttendeesGroup(
     onToggle: (String) -> Unit,
 ) {
     EventSection(overline = "Assign to") {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Assign to", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong, modifier = Modifier.weight(1f))
+        // The "Assign to" label lives on the section overline above — this row
+        // just carries the selected-count, right-aligned.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
                 text = "${state.selectedAttendeeIds.size} selected",
                 fontSize = 10.5.sp,

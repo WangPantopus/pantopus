@@ -39,6 +39,7 @@ enum class SchedulingPillStatus(val backend: String, val label: String) {
     Completed("completed", "Completed"),
     Past("past", "Past"),
     Active("active", "Active"),
+    Live("live", "Live"),
     Paused("paused", "Paused"),
     Draft("draft", "Draft"),
     Secret("secret", "Private"),
@@ -51,7 +52,7 @@ enum class SchedulingPillStatus(val backend: String, val label: String) {
     internal val tone: PillTone
         get() =
             when (this) {
-                Confirmed, Active -> PillTone.Success
+                Confirmed, Active, Live -> PillTone.Success
                 Pending, Draft -> PillTone.Warning
                 Declined, NoShow -> PillTone.Error
                 Cancelled, Completed, Past, Paused, Secret,
@@ -70,7 +71,7 @@ enum class SchedulingPillStatus(val backend: String, val label: String) {
                 "no_show" to NoShow, "noshow" to NoShow,
                 "completed" to Completed, "done" to Completed,
                 "past" to Past,
-                "active" to Active, "live" to Active, "published" to Active,
+                "active" to Active, "live" to Live, "published" to Active,
                 "paused" to Paused,
                 "draft" to Draft,
                 "secret" to Secret, "private" to Secret, "hidden" to Secret,
@@ -123,27 +124,56 @@ internal enum class PillTone {
 fun SchedulingStatusPill(
     status: SchedulingPillStatus,
     modifier: Modifier = Modifier,
+) = StatusPillChip(label = status.label, tone = status.tone, backend = status.backend, modifier = modifier)
+
+/**
+ * Convenience overload: render directly from a backend status string. An
+ * unrecognized wire value keeps a humanized form of the raw string
+ * ("in_review" → "In review") instead of the generic "Status", mirroring the
+ * per-screen chips this pill replaced (which echoed the raw value rather than
+ * dropping it).
+ */
+@Composable
+fun SchedulingStatusPill(
+    status: String,
+    modifier: Modifier = Modifier,
 ) {
-    val tone = status.tone
+    val mapped = SchedulingPillStatus.fromBackend(status)
+    if (mapped != SchedulingPillStatus.Unknown) {
+        SchedulingStatusPill(mapped, modifier)
+    } else {
+        StatusPillChip(
+            label = humanizeStatus(status) ?: SchedulingPillStatus.Unknown.label,
+            tone = SchedulingPillStatus.Unknown.tone,
+            backend = status.lowercase().replace('-', '_').ifBlank { "unknown" },
+            modifier = modifier,
+        )
+    }
+}
+
+/** "in_review" / "in-review" → "In review"; blank → null (falls back to "Status"). */
+private fun humanizeStatus(raw: String): String? =
+    raw.replace('_', ' ').replace('-', ' ').trim().ifBlank { null }?.replaceFirstChar { it.uppercase() }
+
+@Composable
+private fun StatusPillChip(
+    label: String,
+    tone: PillTone,
+    backend: String,
+    modifier: Modifier = Modifier,
+) {
     val shape = RoundedCornerShape(Radii.pill)
     Text(
-        text = status.label,
+        text = label,
         color = tone.fg,
         fontSize = 10.sp,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         modifier =
             modifier
-                .testTag("scheduling.statusPill.${status.backend}")
+                .testTag("scheduling.statusPill.$backend")
                 .background(tone.bg, shape)
                 .border(1.dp, tone.border, shape)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
     )
 }
-
-/** Convenience overload: render directly from a backend status string. */
-@Composable
-fun SchedulingStatusPill(
-    status: String,
-    modifier: Modifier = Modifier,
-) = SchedulingStatusPill(SchedulingPillStatus.fromBackend(status), modifier)

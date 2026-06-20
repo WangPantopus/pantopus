@@ -28,8 +28,11 @@ struct SchedulingHubScreen: View {
             SetupTopBar(
                 title: "Scheduling",
                 leading: .none,
-                trailingIcon: model.canEdit ? .moreHorizontal : .info,
-                onTrailing: { model.openSettings() }
+                // Settings are owner-only — a non-editor gets no trailing action
+                // rather than an `.info` glyph that silently opens owner settings.
+                trailingIcon: model.canEdit ? .moreHorizontal : nil,
+                trailingLabel: "Scheduling settings",
+                onTrailing: model.canEdit ? { model.openSettings() } : nil
             )
             SetupIdentityPills(active: model.owner) { choice in
                 Task { await model.selectPillar(choice) }

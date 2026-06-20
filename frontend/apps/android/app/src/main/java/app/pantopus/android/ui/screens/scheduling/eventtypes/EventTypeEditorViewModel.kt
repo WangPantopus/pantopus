@@ -282,9 +282,6 @@ class EventTypeEditorViewModel
 
         fun paymentsRoute(): String = SchedulingRoutes.PAYMENTS_SETUP
 
-        fun manageHostsRoute(): String =
-            if (isCreate) SchedulingRoutes.TEAM_BOOKING_AVAILABILITY else SchedulingRoutes.collectiveEventSetup(eventTypeId)
-
         // ─── Render ──────────────────────────────────────────────────────────────
 
         private fun render() {

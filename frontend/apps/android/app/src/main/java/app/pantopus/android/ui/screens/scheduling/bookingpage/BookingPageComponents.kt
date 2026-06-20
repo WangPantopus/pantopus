@@ -342,12 +342,12 @@ internal fun BLSegmented(
 /**
  * Maps the local [PageStatus] (Draft / Live / Paused) onto the canonical
  * [SchedulingPillStatus] so booking-page status renders through the shared
- * [SchedulingStatusPill] primitive. `Live` is the page's "active/published"
- * state, so it maps to [SchedulingPillStatus.Active].
+ * [SchedulingStatusPill] primitive. The design (and iOS `BookingPageSupport`)
+ * label the live page **"Live"**, so it maps to [SchedulingPillStatus.Live].
  */
 internal fun PageStatus.toPillStatus(): SchedulingPillStatus =
     when (this) {
-        PageStatus.Live -> SchedulingPillStatus.Active
+        PageStatus.Live -> SchedulingPillStatus.Live
         PageStatus.Paused -> SchedulingPillStatus.Paused
         PageStatus.Draft -> SchedulingPillStatus.Draft
     }
