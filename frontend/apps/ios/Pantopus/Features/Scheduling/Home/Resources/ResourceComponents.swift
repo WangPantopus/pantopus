@@ -247,10 +247,13 @@ struct SectionCard<Content: View>: View {
             if overline != nil || trailing != nil {
                 HStack {
                     if let overline {
+                        // Design spec: Section overlines use H.accent700 (darker home
+                        // green), not H.accent (home-600). `homeDark` is the closest
+                        // token — see F12 nit finding.
                         Text(overline.uppercased())
                             .font(.system(size: 10, weight: .semibold))
                             .tracking(0.6)
-                            .foregroundStyle(Theme.Color.home)
+                            .foregroundStyle(Theme.Color.homeDark)
                             .accessibilityAddTraits(.isHeader)
                     }
                     Spacer()

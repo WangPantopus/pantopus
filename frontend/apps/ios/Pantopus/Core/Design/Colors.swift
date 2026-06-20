@@ -41,6 +41,11 @@ public extension Theme.Color {
 
     /// Success base — `#059669`.
     static let success = SwiftUI.Color("Semantic/Success", bundle: Theme.bundle)
+    /// Success dark — `#047857`. Emerald-700; the darker confirmed-stat value
+    /// shade specified in roster-frames.jsx (SUCCESS_DK). Use for high-emphasis
+    /// success numerals (e.g. Confirmed seat count) where the lighter #059669
+    /// reads too lightly against a sunken-surface stat cell.
+    static let successDk = SwiftUI.Color("Semantic/SuccessDk", bundle: Theme.bundle)
     /// Success light tint — `#D1FAE5`.
     static let successLight = SwiftUI.Color("Semantic/SuccessLight", bundle: Theme.bundle)
     /// Success background — `#F0FDF4`.

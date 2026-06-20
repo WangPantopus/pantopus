@@ -25,6 +25,20 @@ final class ManualBookingViewModel: WizardModel {
     enum LoadPhase: Equatable { case loading, loaded, error(String) }
     enum ContactMode: Equatable { case email, phone }
 
+    /// Whether the name typed in the invitee search field resolved to a
+    /// verified Pantopus directory member or is an unregistered contact.
+    /// Defaults to `.unregistered` (the invite-by flow). A future directory
+    /// search API should set this to `.verified(neighborLabel:)` when the
+    /// query returns a confirmed match — at that point the view will show the
+    /// accent card instead of the "Invite by" selector.
+    enum InviteeResolutionState: Equatable {
+        /// Name resolved to a verified Pantopus user. `neighborLabel` is
+        /// the design's "Verified neighbor · Riverside" subtitle line.
+        case verified(neighborLabel: String)
+        /// Name not found on Pantopus — show the info banner + invite flow.
+        case unregistered
+    }
+
     let owner: SchedulingOwner
     let push: @MainActor (SchedulingRoute) -> Void
     let tz = SchedulingTime.deviceTimeZoneIdentifier
@@ -55,6 +69,9 @@ final class ManualBookingViewModel: WizardModel {
 
     // Step 3 — details
     var inviteeName = ""
+    /// Resolution state for the invitee search — drives whether the verified
+    /// card (Frame 3) or the info banner + invite-by flow (Frame 4) is shown.
+    var inviteeResolution: InviteeResolutionState = .unregistered
     var contactMode: ContactMode = .email
     var inviteeEmail = ""
     var inviteePhone = ""
@@ -398,6 +415,7 @@ final class ManualBookingViewModel: WizardModel {
         slots = []
         availabilityPhase = .loading
         inviteeName = ""
+        inviteeResolution = .unregistered
         inviteeEmail = ""
         inviteePhone = ""
         note = ""

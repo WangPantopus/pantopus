@@ -17,6 +17,7 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
     case never
     case daily
     case weekly
+    case monthly
 
     var id: String {
         rawValue
@@ -27,6 +28,7 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
         case .never: "Does not repeat"
         case .daily: "Daily"
         case .weekly: "Weekly"
+        case .monthly: "Monthly"
         }
     }
 
@@ -36,6 +38,7 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
         case .never: nil
         case .daily: "FREQ=DAILY"
         case .weekly: "FREQ=WEEKLY"
+        case .monthly: "FREQ=MONTHLY"
         }
     }
 
@@ -47,6 +50,7 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
         case .never: nil
         case .daily: "Repeats every day · Ends never. Tap to add an end date."
         case .weekly: "Repeats every week · Ends never. Tap to add an end date."
+        case .monthly: "Repeats every month · Ends never. Tap to add an end date."
         }
     }
 }

@@ -251,43 +251,135 @@ struct ManualBookingView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Step 3 — Details
+    // MARK: Step 3 — Details (two design branches)
 
+    /// Step 3 renders two branches driven by `InviteeResolutionState`:
+    ///
+    /// • **Frame 3 — verified** (`onbehalf-frames.jsx` lines 192–205): accent
+    ///   card with avatar initials, name, "Verified neighbor · …" subtitle, a
+    ///   `badge-check` glyph badge, and trailing `check-circle-2`. Followed by
+    ///   an optional note field.
+    ///
+    /// • **Frame 4 — unregistered** (lines 210–234): blue info banner
+    ///   ("Not on Pantopus yet — invite them to book"), then the "Invite by"
+    ///   card-row selector (Phone / Email) and the matching contact field.
+    ///
+    /// The directory search that populates `inviteeResolution` is deferred
+    /// (no invitee-directory API yet); the VM defaults to `.unregistered`.
     @ViewBuilder private var detailsStep: some View {
         @Bindable var viewModel = viewModel
         stepTitle("Who's it for?")
         searchField($viewModel.inviteeName)
 
-        ExtrasOverline(text: "Invite by")
-        VStack(spacing: Spacing.s2 + 1) {
-            inviteByRow(
-                icon: .phone,
-                title: "Phone",
-                subtitle: "Recommended",
-                isSelected: viewModel.contactMode == .phone
-            ) {
-                viewModel.contactMode = .phone
+        switch viewModel.inviteeResolution {
+        case let .verified(neighborLabel):
+            verifiedInviteeCard(name: viewModel.inviteeName, neighborLabel: neighborLabel)
+            labeledField(
+                label: "Note for the invitee",
+                icon: .messageSquare,
+                placeholder: "Add a note (optional)",
+                text: $viewModel.note
+            )
+        case .unregistered:
+            notOnPantopusBanner
+            ExtrasOverline(text: "Invite by")
+            VStack(spacing: Spacing.s2 + 1) {
+                inviteByRow(
+                    icon: .phone,
+                    title: "Phone",
+                    subtitle: "Recommended",
+                    isSelected: viewModel.contactMode == .phone
+                ) {
+                    viewModel.contactMode = .phone
+                }
+                inviteByRow(
+                    icon: .mail,
+                    title: "Email",
+                    subtitle: nil,
+                    isSelected: viewModel.contactMode == .email
+                ) {
+                    viewModel.contactMode = .email
+                }
             }
-            inviteByRow(
-                icon: .mail,
-                title: "Email",
-                subtitle: nil,
-                isSelected: viewModel.contactMode == .email
-            ) {
-                viewModel.contactMode = .email
+            if viewModel.contactMode == .email {
+                labeledField(label: "Email", icon: .mail, placeholder: "invitee@email.com", text: $viewModel.inviteeEmail, isEmail: true)
+            } else {
+                labeledField(label: "Phone number", icon: .phone, placeholder: "Phone number", text: $viewModel.inviteePhone)
             }
         }
-        if viewModel.contactMode == .email {
-            labeledField(label: "Email", icon: .mail, placeholder: "invitee@email.com", text: $viewModel.inviteeEmail, isEmail: true)
-        } else {
-            labeledField(label: "Phone number", icon: .phone, placeholder: "Phone number", text: $viewModel.inviteePhone)
+    }
+
+    /// Frame 3 — verified invitee card (onbehalf-frames.jsx lines 192–201).
+    /// Avatar with initials in an identity-gradient circle, a `badge-check`
+    /// glyph badge at bottom-right, name + "Verified neighbor · {label}"
+    /// subtitle, and a trailing check-circle. The card uses the pillar accent
+    /// border and background.
+    private func verifiedInviteeCard(name: String, neighborLabel: String) -> some View {
+        HStack(spacing: Spacing.s3) {
+            // Avatar with badge-check overlay
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(theme.accent)
+                    .frame(width: 38, height: 38)
+                    .overlay {
+                        Text(initials(from: name))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.Color.appTextInverse)
+                    }
+                ZStack {
+                    Circle()
+                        .fill(Theme.Color.appSurface)
+                        .frame(width: 15, height: 15)
+                    Icon(.badgeCheck, size: 14, color: theme.accent)
+                }
+                .offset(x: 2, y: 2)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Verified neighbor · \(neighborLabel)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Icon(.checkCircle, size: 19, color: theme.accent)
         }
-        labeledField(label: "Note for the invitee", icon: .messageSquare, placeholder: "Add a note (optional)", text: $viewModel.note)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s3 - 1)
+        .background(theme.accentBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg + 2, style: .continuous)
+                .strokeBorder(theme.accent, lineWidth: 1.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg + 2, style: .continuous))
+        .accessibilityIdentifier("manualBooking.verifiedInviteeCard")
+    }
+
+    /// Frame 4 — "Not on Pantopus yet" info banner (onbehalf-frames.jsx
+    /// lines 217–220). Blue50 background, Blue200 border, Blue600 user-plus
+    /// glyph. Maps to `Theme.Color.primary50 / primary200 / primary600`.
+    private var notOnPantopusBanner: some View {
+        HStack(alignment: .center, spacing: Spacing.s2) {
+            Icon(.userPlus, size: 16, color: Theme.Color.primary600)
+            Text("Not on Pantopus yet — invite them to book")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2 + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.primary50)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.primary200, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("manualBooking.notOnPantopusBanner")
     }
 
     /// Design step-3 invitee search field — `search` glyph on a sunken fill.
-    /// (The verified-invitee result card + not-on-Pantopus invite banner from
-    /// the design depend on an invitee directory the model lacks; deferred.)
     private func searchField(_ text: Binding<String>) -> some View {
         HStack(spacing: Spacing.s2 + 1) {
             Icon(.search, size: 16, color: Theme.Color.appTextMuted)
@@ -594,5 +686,18 @@ struct ManualBookingView: View {
         let weekday = formatter.string(from: date)
         formatter.dateFormat = "d"
         return (weekday, formatter.string(from: date))
+    }
+
+    /// Derives up-to-2 uppercase initials from a display name — matching the
+    /// design's avatar initials on the verified invitee card (Frame 3).
+    private func initials(from name: String) -> String {
+        let parts = name.trimmingCharacters(in: .whitespaces)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+        switch parts.count {
+        case 0: return "?"
+        case 1: return String(parts[0].prefix(2)).uppercased()
+        default: return (String(parts[0].prefix(1)) + String(parts[1].prefix(1))).uppercased()
+        }
     }
 }

@@ -422,7 +422,7 @@ struct WhosFreeView: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.s3)
-        .frame(width: 200)
+        .frame(width: 134)  // Design whos-free-frames.jsx:42 specifies width:134
     }
 
     // MARK: Loading

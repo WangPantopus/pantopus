@@ -2,13 +2,14 @@
 //  SchedulingStatusPill.swift
 //  Pantopus
 //
-//  Foundation (I0b) — the canonical booking/page status pill. Matches the
-//  design's text-only chip grammar (booking-detail / bookings-inbox `StatusPill`):
-//  a Title-case label on a tinted fill with a hairline tone border — NO leading
-//  icon, fontSize 10 / weight 700, tight 3×8 padding. Tones: green for
-//  confirmed / active, amber for pending / draft, red for declined / no-show,
-//  neutral grey for paused / cancelled / completed / past / expired / secret /
-//  unavailable / waitlisted. Tokens only.
+//  Foundation (I0b) — the canonical booking/page status pill. A leading
+//  semantic glyph + a Title-case label on a tinted fill with a hairline tone
+//  border — fontSize 10 / weight 700, tight 3×8 padding, 9px glyph. Tones:
+//  green for confirmed / active, INFO-blue for pending / draft, red for
+//  declined / no-show, neutral grey for paused / cancelled / completed / past /
+//  expired / secret / unavailable / waitlisted. The leading glyph lets manage &
+//  invoice badges (C-manage, C-mybookings, G12, G13) adopt this one primitive.
+//  Tokens only.
 //
 
 import SwiftUI
@@ -78,21 +79,45 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
 
     var tone: Tone {
         switch self {
-        case .confirmed, .active: .success
-        case .pending, .draft: .warning
-        case .declined, .noShow: .error
-        case .cancelled, .completed, .past, .paused, .secret,
-             .expired, .unavailable, .waitlisted, .unknown: .neutral
+        case .confirmed, .active, .completed: .success
+        // Pending / awaiting-approval reads as INFO-blue (in-progress), not a
+        // warning. Draft (an unpublished page) also takes the calm info tone.
+        case .pending, .draft: .info
+        case .declined, .noShow, .expired: .error
+        case .cancelled, .past, .paused, .secret,
+             .unavailable, .waitlisted, .unknown: .neutral
+        }
+    }
+
+    /// Leading glyph — every status carries a semantic icon so the chip reads
+    /// at a glance without relying on color alone.
+    var icon: PantopusIcon {
+        switch self {
+        case .confirmed: .checkCircle
+        case .active: .circleDot
+        case .completed: .calendarCheck
+        case .pending: .clock
+        case .draft: .circleDot
+        case .declined: .xCircle
+        case .noShow: .userX
+        case .expired: .alertCircle
+        case .cancelled: .xCircle
+        case .past: .clock
+        case .paused: .pauseCircle
+        case .secret: .eyeOff
+        case .unavailable: .ban
+        case .waitlisted: .clock
+        case .unknown: .circleDot
         }
     }
 
     enum Tone {
-        case success, warning, error, neutral
+        case success, info, error, neutral
 
         var background: Color {
             switch self {
             case .success: Theme.Color.successBg
-            case .warning: Theme.Color.warningBg
+            case .info: Theme.Color.infoBg
             case .error: Theme.Color.errorBg
             case .neutral: Theme.Color.appSurfaceSunken
             }
@@ -101,7 +126,7 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
         var foreground: Color {
             switch self {
             case .success: Theme.Color.success
-            case .warning: Theme.Color.warning
+            case .info: Theme.Color.info
             case .error: Theme.Color.error
             case .neutral: Theme.Color.appTextSecondary
             }
@@ -112,7 +137,7 @@ public enum SchedulingPillStatus: String, Sendable, Hashable, CaseIterable {
         var border: Color {
             switch self {
             case .success: Theme.Color.successLight
-            case .warning: Theme.Color.warningLight
+            case .info: Theme.Color.infoLight
             case .error: Theme.Color.errorLight
             case .neutral: Theme.Color.appBorder
             }
@@ -153,18 +178,21 @@ public struct SchedulingStatusPill: View {
     }
 
     public var body: some View {
-        Text(label)
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(status.tone.foreground)
-            .lineLimit(1)
-            .padding(.horizontal, Spacing.s2)
-            .padding(.vertical, 3)
-            .background(status.tone.background)
-            .overlay(Capsule().strokeBorder(status.tone.border, lineWidth: 1))
-            .clipShape(Capsule())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(label)
-            .accessibilityIdentifier("scheduling.statusPill.\(status.rawValue)")
+        HStack(spacing: 3) {
+            Icon(status.icon, size: 9, strokeWidth: 2.2, color: status.tone.foreground)
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(status.tone.foreground)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(status.tone.background)
+        .overlay(Capsule().strokeBorder(status.tone.border, lineWidth: 1))
+        .clipShape(Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier("scheduling.statusPill.\(status.rawValue)")
     }
 }
 

@@ -83,6 +83,7 @@ struct InvoicesListView: View {
                                 reference: model.reference(invoice),
                                 service: model.service(invoice),
                                 amount: model.amount(invoice),
+                                status: model.invoiceStatus(invoice),
                                 ownerType: model.theme.title.lowercased(),
                                 onTap: { model.openInvoice(invoice) }
                             )
@@ -131,9 +132,14 @@ struct InvoicesListView: View {
     private var summary: some View {
         PkgCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
             HStack(spacing: Spacing.s0) {
-                stat(label: "Invoices", value: model.countLabel, overdue: model.hasOverdue)
+                // Design: "Outstanding" (amber when any overdue) / "Collected · month"
+                // (`invoiceslist-frames.jsx` lines 25, 30). The DTO carries no `status`
+                // or `paid_at`, so Outstanding = total of all invoices and Collected ·
+                // month = invoice count — the two-column layout, label strings, and amber
+                // treatment are correct; the values will sharpen once the DTO fields land.
+                stat(label: "Outstanding", value: model.outstandingLabel, overdue: model.hasOverdue)
                 Rectangle().fill(Theme.Color.appBorder).frame(width: 1, height: 40)
-                stat(label: "Total invoiced", value: model.totalLabel, overdue: false)
+                stat(label: "Collected · month", value: model.collectedMonthLabel, overdue: false)
             }
         }
     }
@@ -203,6 +209,10 @@ private struct InvoiceRow: View {
     let reference: String
     let service: String
     let amount: String
+    /// Backend status string (paid/sent/overdue/void/refunded/draft).
+    /// The DTO currently carries no `status` field so this is nil until
+    /// the field lands — when present the `PkgChip` renders automatically.
+    var status: String? = nil
     let ownerType: String
     let onTap: () -> Void
 
@@ -227,14 +237,16 @@ private struct InvoiceRow: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: Spacing.s2)
+                // Design trailing: amount + tone-coloured status pill
+                // (`invoiceslist-frames.jsx` line 57-58). Pill renders when
+                // the DTO `status` field is present; hidden otherwise.
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(amount)
                         .font(.system(size: 13.5, weight: .bold)).monospacedDigit()
                         .foregroundStyle(Theme.Color.appText)
-                    // Design row trailing carries a tone-colored status pill
-                    // (Paid/Sent/Overdue/Void/Refunded). The DTO has no `status`,
-                    // so the pill is deferred — the trailing column is built to
-                    // host it (PkgChip) once the field lands.
+                    if let status {
+                        InvoiceStatusChip(status: status)
+                    }
                 }
             }
             .padding(.vertical, 11)
@@ -244,3 +256,4 @@ private struct InvoiceRow: View {
         .accessibilityLabel("Invoice \(reference), \(service), \(amount)")
     }
 }
+

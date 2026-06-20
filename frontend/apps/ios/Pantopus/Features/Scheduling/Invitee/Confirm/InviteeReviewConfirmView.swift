@@ -62,6 +62,10 @@ struct InviteeReviewConfirmView: View {
                     BookingSummaryCard(summary: viewModel.summary, showAnswers: true)
                     if viewModel.showsPaidSurfaces { priceSection }
                     refundLink
+                    // ApplyCreditRow: dashed-border tappable button (design Frames 1–5).
+                    // Backend doesn't expose credit/promo data yet; rendered as a
+                    // placeholder (no action) so the design structure is present.
+                    if viewModel.showsPaidSurfaces { applyCreditRow }
                     if viewModel.showsPaidSurfaces { paymentSection }
                     if viewModel.needsDetails { needDetailsNote }
                 }
@@ -107,7 +111,27 @@ struct InviteeReviewConfirmView: View {
             ConfirmOverline("Price")
             totalsBox
             if viewModel.isDeposit { depositNote }
+            // CreditChip: shown when a credit row (credit:true) is present in
+            // the totals (Frame 4 · Package credit applied). Backend doesn't yet
+            // expose credit data — chip renders when the ViewModel emits a credit
+            // row, so it's ready once that data flows.
+            if viewModel.hasCreditApplied { creditChip }
         }
+    }
+
+    /// "1 session credit applied" green pill (design Frame 4, below the totals box).
+    private var creditChip: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.ticketCheck, size: 13, strokeWidth: 2.2, color: Theme.Color.success)
+            Text("1 session credit applied")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.success)
+        }
+        .padding(.horizontal, Spacing.s2 + 2)
+        .padding(.vertical, 5)
+        .background(Theme.Color.successBg)
+        .overlay(Capsule().strokeBorder(Theme.Color.successLight, lineWidth: 1))
+        .clipShape(Capsule())
     }
 
     private var totalsBox: some View {
@@ -189,6 +213,34 @@ struct InviteeReviewConfirmView: View {
         .font(.system(size: 11))
         .foregroundStyle(Theme.Color.appTextSecondary)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// "Apply package credit or promo code" dashed-border button (design Frames 1–4).
+    /// When a credit is already applied (Frame 4) the label switches to
+    /// "Credit applied · use a different one". Backend credit/promo endpoint is
+    /// not yet wired — button is present as the designed placeholder.
+    private var applyCreditRow: some View {
+        Button { } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.tag, size: 15, color: viewModel.accent)
+                Text(viewModel.hasCreditApplied ? "Credit applied · use a different one" : "Apply package credit or promo code")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Icon(.chevronRight, size: 15, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s2 + 2)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .foregroundStyle(Theme.Color.appBorderStrong)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scheduling.inviteeReviewConfirm.applyCredit")
     }
 
     private var refundLink: some View {

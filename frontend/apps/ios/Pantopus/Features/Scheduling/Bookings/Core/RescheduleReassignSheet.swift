@@ -101,9 +101,12 @@ struct RescheduleReassignSheet: View {
     private var slotSection: some View {
         tzChip
         switch viewModel.slotPickerState {
-        case .loading:
+        // Reschedule is single-owner, so the team-compose states (.composing /
+        // .composedEmpty) and the .noAvailabilityAnywhere terminal don't arise;
+        // map them onto the nearest single-owner rendering defensively.
+        case .loading, .composing:
             slotLoadingSkeleton
-        case .noAvailability:
+        case .noAvailability, .noAvailabilityAnywhere, .composedEmpty:
             dayStrip
             noAvailabilityCard
         case .dayFull, .loaded:

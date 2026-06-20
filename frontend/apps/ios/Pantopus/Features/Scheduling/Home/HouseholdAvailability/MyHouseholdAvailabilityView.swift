@@ -150,7 +150,7 @@ struct MyHouseholdAvailabilityView: View {
                             icon: .moon,
                             label: "Household quiet hours",
                             value: viewModel.quietHoursLabel
-                        )
+                        ) { viewModel.openQuietHours() }
                     }
                     HouseholdToggleRow(
                         icon: .calendarX,
@@ -361,25 +361,31 @@ private struct DisclosureRow: View {
     let icon: PantopusIcon
     let label: String
     let value: String
+    let onTap: @MainActor () -> Void
     var body: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-            HStack(spacing: Spacing.s3) {
-                Icon(icon, size: 16, color: Theme.Color.appTextStrong)
-                    .frame(width: 32, height: 32)
-                    .background(Theme.Color.appSurfaceSunken)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                Text(label)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Spacer(minLength: Spacing.s2)
-                Text(value)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            Button(action: onTap) {
+                HStack(spacing: Spacing.s3) {
+                    Icon(icon, size: 16, color: Theme.Color.appTextStrong)
+                        .frame(width: 32, height: 32)
+                        .background(Theme.Color.appSurfaceSunken)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    Text(label)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer(minLength: Spacing.s2)
+                    Text(value)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+                }
+                .contentShape(Rectangle())
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, 11)
             }
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, 11)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("householdAvailability_quietHours")
         }
     }
 }

@@ -29,7 +29,15 @@ struct SchedulingInvoiceDetailView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "Invoice", onBack: { dismiss() })
+            // Design: top-bar trailing = StatusPill showing invoice lifecycle
+            // (`invoicedetail-frames.jsx` line 159). Rendered from the best-
+            // available status (see `model.invoiceStatusString`).
+            PkgTopBar(title: "Invoice", onBack: { dismiss() }) {
+                if model.phase == .loaded {
+                    InvoiceStatusChip(status: model.invoiceStatusString)
+                        .padding(.trailing, Spacing.s2)
+                }
+            }
             content
         }
         .background(Theme.Color.appBg)
@@ -240,19 +248,68 @@ struct SchedulingInvoiceDetailView: View {
         }
     }
 
+    /// Status-driven dock (`invoicedetail-frames.jsx` lines 196–202).
+    /// Seven configurations mapped from `model.dockConfig`:
+    ///   draft        → Send only
+    ///   sent/overdue → Mark paid (ghost) + Resend (primary) + Overflow
+    ///   paid/refunded→ Share (ghost) + Download PDF (primary)
+    ///   partial      → Mark paid (ghost) + Send balance (primary)
+    ///   void         → Share only (ghost full-width)
     private var dock: some View {
-        PkgDock {
-            ShareLink(item: model.shareText) {
-                HStack(spacing: 7) {
-                    Icon(.share2, size: 15, color: Theme.Color.appText)
-                    Text("Share").font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
-                }
-                .frame(maxWidth: .infinity).frame(height: 46)
-                .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorderStrong, lineWidth: 1))
+        PkgDock { dockContent }
+    }
+
+    @ViewBuilder
+    private var dockContent: some View {
+        switch model.dockConfig {
+        case .sendOnly:
+            PkgPrimaryButton(label: "Send", icon: .send, loading: model.sending) {
+                Task { await model.send() }
             }
-            .accessibilityLabel("Share invoice")
-            PkgPrimaryButton(label: "Send", icon: .send, loading: model.sending) { Task { await model.send() } }
+
+        case .markPaidResendOverflow:
+            PkgGhostButton(label: "Mark paid", icon: .check) { model.markPaid() }
+            PkgPrimaryButton(label: "Resend", icon: .send, loading: model.sending) {
+                Task { await model.send() }
+            }
+            overflowButton
+
+        case .shareDownload:
+            shareGhostButton
+            PkgPrimaryButton(label: "Download PDF", icon: .download) { model.downloadPDF() }
+
+        case .markPaidSendBalance:
+            PkgGhostButton(label: "Mark paid", icon: .check) { model.markPaid() }
+            PkgPrimaryButton(label: "Send balance", icon: .send, loading: model.sending) {
+                Task { await model.send() }
+            }
+
+        case .shareOnly:
+            shareGhostButton
         }
+    }
+
+    private var shareGhostButton: some View {
+        ShareLink(item: model.shareText) {
+            HStack(spacing: 7) {
+                Icon(.share2, size: 15, color: Theme.Color.appText)
+                Text("Share").font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
+            }
+            .frame(maxWidth: .infinity).frame(height: 46)
+            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorderStrong, lineWidth: 1))
+        }
+        .accessibilityLabel("Share invoice")
+    }
+
+    private var overflowButton: some View {
+        Button { model.showOverflow() } label: {
+            Icon(.ellipsis, size: 18, color: Theme.Color.appTextStrong)
+                .frame(width: 46, height: 46)
+                .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorderStrong, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("More options")
+        .fixedSize()
     }
 
     private var sentToast: some View {

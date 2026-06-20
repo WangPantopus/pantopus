@@ -169,26 +169,33 @@ public struct TimezoneSelectorSheet: View {
     }
 
     private var overriddenBanner: some View {
-        HStack(spacing: Spacing.s2) {
+        // Design (timezone-selector-frames.jsx:316-335): info icon top-aligned,
+        // then a vertical block — the description line, and BELOW it the
+        // "Reset to detected" button (not beside it).
+        HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.info, size: 14, color: Theme.Color.primary700)
-            Text("You changed this from your detected zone.")
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.primary700)
-            Spacer(minLength: Spacing.s2)
-            Button { onSelect(detected) } label: {
-                HStack(spacing: Spacing.s1) {
-                    Icon(.rotateCcw, size: 12, strokeWidth: 2.4, color: accent)
-                    Text("Reset to detected")
-                        .pantopusTextStyle(.caption)
-                        .fontWeight(.bold)
-                        .foregroundStyle(accent)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: Spacing.s1 + 1) {
+                Text("You changed this from your detected zone.")
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.primary700)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { onSelect(detected) } label: {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.rotateCcw, size: 12, strokeWidth: 2.4, color: accent)
+                        Text("Reset to detected")
+                            .pantopusTextStyle(.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(accent)
+                    }
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s2)
+        .padding(.vertical, Spacing.s2 + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.infoBg)
         .overlay(

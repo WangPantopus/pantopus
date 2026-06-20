@@ -195,7 +195,44 @@ struct InviteeIntakeFormView: View {
                 keyboard: .emailAddress,
                 textContentType: .emailAddress
             )
+            // Frame 4: when the host app detects the typed email belongs to a
+            // Pantopus account, show a nudge to open in-app for prefill.
+            if viewModel.existingAccountDetected {
+                existingAccountBanner
+            }
         }
+    }
+
+    /// Info banner shown in Frame 4 (existing account detected, unauthenticated path).
+    /// Design: info-blue tinted surface, `info` icon top-aligned, text + "Open in app"
+    /// tappable link — rendered as a styled inline banner without a sheet.
+    private var existingAccountBanner: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.info, size: 15, strokeWidth: 2.1, color: Theme.Color.info)
+                .padding(.top, 1)
+            (
+                Text("You have an account. ")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.primary900)
+                + Text("Open in app")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(viewModel.accent)
+                + Text(" to use your saved details.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.primary900)
+            )
+            .lineSpacing(2)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2 + 2)
+        .background(Theme.Color.infoBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .strokeBorder(Theme.Color.infoLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("scheduling.inviteeIntakeForm.existingAccountBanner")
     }
 
     private var bookingAsChip: some View {

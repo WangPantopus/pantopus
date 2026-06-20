@@ -57,6 +57,29 @@ final class DateOverridesViewModel {
     var isRange = false
     var rangeEndDate = Date()
 
+    // Custom month calendar navigation — tracks which month is currently shown.
+    // Initialized in `init` to the first of the current month.
+    var displayedMonth: Date = Date()
+
+    /// Advance the displayed month by `delta` months (positive = forward).
+    func stepMonth(_ delta: Int) {
+        let cal = Calendar.current
+        if let next = cal.date(byAdding: .month, value: delta, to: displayedMonth) {
+            displayedMonth = next
+        }
+    }
+
+    /// When the user taps a day cell, snap `selectedDate` to that day and keep
+    /// the displayed month in sync (so selecting via tap doesn't lose context).
+    func selectDay(_ day: Int) {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month], from: displayedMonth)
+        comps.day = day
+        if let date = cal.date(from: comps) {
+            selectedDate = date
+        }
+    }
+
     private(set) var isSaving = false
     var errorMessage: String?
 
@@ -65,6 +88,11 @@ final class DateOverridesViewModel {
     init(scheduleId: String, client: SchedulingClient = .shared) {
         self.scheduleId = scheduleId
         self.client = client
+        // Snap displayedMonth to the first of the current month so the custom
+        // calendar grid opens on the right page.
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month], from: Date())
+        self.displayedMonth = cal.date(from: comps) ?? Date()
     }
 
     // MARK: Derived

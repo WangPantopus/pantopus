@@ -55,6 +55,13 @@ struct CollectiveEventSetupSheet: View {
                     countCard(label: "Required staff", sub: "How many must be free",
                               value: model.requiredStaff, onDec: { model.decrementRequired() }, onInc: { model.incrementRequired() })
                     tiles
+                    // Frame 3: no-overlap warning between Tiles and Members
+                    // (collective-frames.jsx:133). Rendered when checked members
+                    // share no free windows. Save remains enabled per design.
+                    if model.noOverlap {
+                        BizNote(tone: .warning, icon: .alertTriangle,
+                                text: "Selected members have no shared openings. Widen their hours or adjust the member selection.")
+                    }
                     membersSection
                     countCard(label: "Seats per appointment", sub: "Capacity for each slot",
                               value: model.seatsPerAppointment, onDec: { model.decrementSeats() }, onInc: { model.incrementSeats() })

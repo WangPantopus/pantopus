@@ -36,12 +36,16 @@ public struct HomeCalendarView: View {
                 Button {
                     viewModel.openWhosFree()
                 } label: {
-                    // Design mutes the "Who's free" action while offline.
-                    Icon(
-                        .users,
-                        size: 20,
-                        color: isOffline ? Theme.Color.appTextMuted : Theme.Color.homeDark
-                    )
+                    // Design specifies icon + "Who's free" label side-by-side
+                    // (home-calendar-frames.jsx:42 right={{ icon:'users', label:"Who's free" }}).
+                    // Both are muted when offline.
+                    let tint: Color = isOffline ? Theme.Color.appTextMuted : Theme.Color.homeDark
+                    HStack(spacing: 5) {
+                        Icon(.users, size: 17, color: tint)
+                        Text("Who's free")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(tint)
+                    }
                 }
                 .disabled(isOffline)
                 .accessibilityLabel("Who's free")

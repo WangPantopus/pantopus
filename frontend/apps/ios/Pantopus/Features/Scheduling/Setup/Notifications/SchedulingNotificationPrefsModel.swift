@@ -135,6 +135,23 @@ final class SchedulingNotificationPrefsModel {
         Task { await persistReminders() }
     }
 
+    /// Immediately resumes notifications (sets isPaused = false). Optimistic.
+    func resume() {
+        let previous = paused
+        paused = false
+        Task {
+            do {
+                let result: BookingPageResponse = try await client.request(
+                    SchedulingEndpoints.updateBookingPage(owner: owner, BookingPageUpdateRequest(isPaused: false))
+                )
+                paused = result.page.isPaused
+                page = result.page
+            } catch {
+                paused = previous
+            }
+        }
+    }
+
     // MARK: Persistence
 
     private func persistPrefs() async {

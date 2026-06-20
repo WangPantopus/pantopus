@@ -292,6 +292,15 @@ struct EventTypeEditorView: View {
                 value: $viewModel.requiredHosts,
                 range: 1...50
             ) { "\($0)" }
+            // Design `MemberAvatars` row (event-editor-frames.jsx:129) — overlapping
+            // avatar discs; all shown discs represent required hosts (total member
+            // count is not yet surfaced by the event-type DTO; real initials can be
+            // wired in once the API exposes a `members` array on the event type).
+            CollectiveMemberAvatarStack(
+                totalCount: viewModel.requiredHosts,
+                requiredCount: viewModel.requiredHosts,
+                accent: accent
+            )
         }
     }
 

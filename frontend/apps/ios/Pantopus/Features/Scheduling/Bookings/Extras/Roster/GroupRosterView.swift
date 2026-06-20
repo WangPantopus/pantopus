@@ -291,9 +291,9 @@ struct GroupRosterView: View {
             }
             .padding(.horizontal, Spacing.s5 - 2)
             .frame(height: 46)
-            .background(theme.accent)
+            .background(SchedulingIdentityTheme.operationalPrimary)
             .clipShape(Capsule())
-            .shadow(color: theme.accent.opacity(0.34), radius: 10, y: 8)
+            .shadow(color: SchedulingIdentityTheme.operationalPrimary.opacity(0.34), radius: 10, y: 8)
         }
         .buttonStyle(.plain)
         .padding(.trailing, Spacing.s4)

@@ -13,6 +13,10 @@ struct RoundRobinAssignmentSheet: View {
     @State private var model: RoundRobinAssignmentViewModel
     let onClose: () -> Void
 
+    // Drag-to-reorder state for Priority mode grip handles.
+    @State private var dragPickId: String?
+    @State private var dragOffset: CGFloat = 0
+
     init(owner: SchedulingOwner, eventTypeId: String, client: SchedulingClient = .shared, onClose: @escaping () -> Void) {
         _model = State(wrappedValue: RoundRobinAssignmentViewModel(owner: owner, eventTypeId: eventTypeId, client: client))
         self.onClose = onClose
@@ -165,13 +169,34 @@ struct RoundRobinAssignmentSheet: View {
                     onIncrement: { model.incrementWeight(pick.id) }
                 )
             case .priority:
-                Menu {
-                    Button("Move up") { model.moveUp(pick.id) }
-                    Button("Move down") { model.moveDown(pick.id) }
-                } label: {
-                    Icon(.gripVertical, size: 20, color: Theme.Color.appTextMuted)
-                }
-                .accessibilityLabel("Reorder \(pick.name)")
+                // Design (roundrobin-frames.jsx:127) shows a raw grip-vertical
+                // icon implying drag-to-reorder. We use a DragGesture on the
+                // handle; steps are computed from drag distance vs. row height.
+                // Accessibility fallback via accessibilityAction.
+                Icon(.gripVertical, size: 20, color: dragPickId == pick.id ? Theme.Color.business : Theme.Color.appTextMuted)
+                    .frame(width: 30, height: 44)  // generous hit area
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                            .onChanged { value in
+                                if dragPickId == nil { dragPickId = pick.id }
+                                dragOffset = value.translation.height
+                            }
+                            .onEnded { value in
+                                let rowHeight: CGFloat = 54
+                                let steps = Int((value.translation.height / rowHeight).rounded())
+                                if steps > 0 {
+                                    for _ in 0..<steps { model.moveDown(pick.id) }
+                                } else if steps < 0 {
+                                    for _ in 0..<(-steps) { model.moveUp(pick.id) }
+                                }
+                                dragPickId = nil
+                                dragOffset = 0
+                            }
+                    )
+                    .accessibilityLabel("Reorder \(pick.name)")
+                    .accessibilityAction(named: "Move up") { model.moveUp(pick.id) }
+                    .accessibilityAction(named: "Move down") { model.moveDown(pick.id) }
             case .strict:
                 EmptyView()
             }

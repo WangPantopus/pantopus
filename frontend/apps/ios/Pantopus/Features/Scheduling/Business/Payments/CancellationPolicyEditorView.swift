@@ -203,6 +203,7 @@ struct CancellationPolicyEditorView: View {
                 Text("What the invitee sees")
                     .font(.system(size: 9.5, weight: .bold))
                     .tracking(0.5)
+                    .textCase(.uppercase)
                     .foregroundStyle(model.accent)
             }
             Text(model.previewText)
@@ -329,9 +330,10 @@ private struct UnitStepper: View {
         Button(action: action) {
             ZStack {
                 Circle().stroke(Theme.Color.appBorder, lineWidth: 1)
-                Icon(icon, size: 12, color: enabled ? color : Theme.Color.appTextMuted)
+                // biz-kit.jsx Stepper small=true: h=22, ic=11
+                Icon(icon, size: 11, color: enabled ? color : Theme.Color.appTextMuted)
             }
-            .frame(width: 26, height: 26)
+            .frame(width: 22, height: 22)
             .background(Theme.Color.appSurface, in: Circle())
         }
         .buttonStyle(.plain)

@@ -8,6 +8,13 @@
 //  confirmation. Presented by the public booking flow (I5/I7) when full.
 //  Accent follows the host's pillar.
 //
+//  Frames implemented:
+//    Frame 1  FrameJoin      — join form (Mobile/phone field, SMS copy)
+//    Frame 2  FrameJoined    — joined confirmation (#N position badge when
+//                              available, "Leave waitlist" ghost CTA)
+//    Frame 3  FrameAlready   — already on waitlist (clock disc, join date,
+//                              position badge, "Leave waitlist" ghost CTA)
+//
 
 import SwiftUI
 
@@ -25,7 +32,9 @@ struct WaitlistJoinSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             ExtrasSheetGrabber()
-            if viewModel.didJoin {
+            if viewModel.alreadyJoined {
+                alreadyJoinedConfirmation
+            } else if viewModel.didJoin {
                 joinedConfirmation
             } else {
                 form
@@ -38,7 +47,7 @@ struct WaitlistJoinSheet: View {
         .accessibilityIdentifier("scheduling.waitlistJoin")
     }
 
-    // MARK: Form
+    // MARK: Form (Frame 1)
 
     private var form: some View {
         @Bindable var viewModel = viewModel
@@ -48,7 +57,7 @@ struct WaitlistJoinSheet: View {
                 Text(viewModel.windowLabel)
                     .font(.system(size: 16.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("Join the waitlist and we'll email you the moment a spot opens.")
+                Text("Join the waitlist and we'll text you the moment a spot opens.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineSpacing(2)
@@ -57,11 +66,11 @@ struct WaitlistJoinSheet: View {
 
                 field(label: "Your name", icon: .user, placeholder: "Full name", text: $viewModel.name)
                 field(
-                    label: "Email",
-                    icon: .mail,
-                    placeholder: "For a message when a spot opens",
-                    text: $viewModel.email,
-                    isEmail: true
+                    label: "Mobile",
+                    icon: .phone,
+                    placeholder: "For a text when a spot opens",
+                    text: $viewModel.phone,
+                    isPhone: true
                 )
                 field(label: "Preferred time", icon: nil, placeholder: "Any morning works (optional)", text: $viewModel.preferredTime)
 
@@ -107,7 +116,7 @@ struct WaitlistJoinSheet: View {
         icon: PantopusIcon?,
         placeholder: String,
         text: Binding<String>,
-        isEmail: Bool = false
+        isPhone: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 - 2) {
             ExtrasOverline(text: label)
@@ -116,9 +125,9 @@ struct WaitlistJoinSheet: View {
                 TextField(placeholder, text: text)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.Color.appText)
-                    .keyboardType(isEmail ? .emailAddress : .default)
-                    .textInputAutocapitalization(isEmail ? .never : .words)
-                    .autocorrectionDisabled(isEmail)
+                    .keyboardType(isPhone ? .phonePad : .default)
+                    .textInputAutocapitalization(isPhone ? .never : .words)
+                    .autocorrectionDisabled(isPhone)
             }
             .padding(.horizontal, Spacing.s3)
             .frame(height: 44)
@@ -145,7 +154,7 @@ struct WaitlistJoinSheet: View {
         }
     }
 
-    // MARK: Joined
+    // MARK: Joined confirmation (Frame 2)
 
     private var joinedConfirmation: some View {
         VStack(spacing: Spacing.s4) {
@@ -160,18 +169,95 @@ struct WaitlistJoinSheet: View {
                 Text("You're on the waitlist")
                     .font(.system(size: 17.5, weight: .bold))
                     .foregroundStyle(Theme.Color.appText)
-                Text("We'll email you the moment a spot opens.")
+                Text("We'll text you if a spot frees up.")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .multilineTextAlignment(.center)
             }
+            // Position badge — shown only when the backend returns a queue rank.
+            // Currently the join API never returns a position field (backend gap);
+            // the badge is designed (Frame 2: "#N in line" on accentBg) and will
+            // appear automatically once the backend populates it.
+            positionBadge(position: nil, accentBg: accent.opacity(0.12))
             Spacer()
-            ExtrasGhostButton(title: "Done") { onClose() }
+            // Design (Frame 2): "Leave waitlist" ghost CTA. There is no leave
+            // endpoint yet (backend gap); the button closes the sheet for now.
+            ExtrasGhostButton(title: "Leave waitlist") { onClose() }
                 .padding(.horizontal, Spacing.s4)
                 .padding(.bottom, Spacing.s5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, Spacing.s5)
+    }
+
+    // MARK: Already on waitlist (Frame 3)
+
+    private var alreadyJoinedConfirmation: some View {
+        VStack(spacing: Spacing.s4) {
+            Spacer(minLength: Spacing.s8)
+            // Clock disc on accentBg (pillar tint), per design Frame 3.
+            ZStack {
+                Circle()
+                    .fill(accent.opacity(0.12))
+                    .frame(width: 74, height: 74)
+                Icon(.clock, size: 32, color: accent)
+            }
+            .accessibilityHidden(true)
+            VStack(spacing: Spacing.s2) {
+                Text("You're already waiting")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text(alreadySubtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
+            // Position badge — same design token as Frame 2; backend gap applies.
+            positionBadge(position: nil, accentBg: accent.opacity(0.12))
+            Spacer()
+            // Design (Frame 3): "Leave waitlist" ghost CTA. No leave endpoint
+            // yet (backend gap); closes the sheet for now.
+            ExtrasGhostButton(title: "Leave waitlist") { onClose() }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, Spacing.s5)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, Spacing.s5)
+    }
+
+    /// Subtitle for Frame 3. Includes the formatted join date when available.
+    private var alreadySubtitle: String {
+        if let joinedAt = viewModel.joinedAt,
+           let formatted = BookingsExtrasFormatting.shortDay(
+               utcISO: joinedAt,
+               tz: SchedulingTime.deviceTimeZoneIdentifier
+           ) {
+            return "You joined this waitlist on \(formatted). We'll text you the moment a seat opens."
+        }
+        return "We'll text you the moment a seat opens."
+    }
+
+    // MARK: Shared sub-views
+
+    /// "#N in line" pill on pillar-tint background (Frames 2 + 3).
+    /// Nil position → returns EmptyView (backend gap: API never populates it).
+    @ViewBuilder
+    private func positionBadge(position: Int?, accentBg: Color) -> some View {
+        if let position {
+            HStack(spacing: Spacing.s2) {
+                Text("#\(position)")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(accent)
+                Text("in line")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(accentBg)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
     }
 }
 

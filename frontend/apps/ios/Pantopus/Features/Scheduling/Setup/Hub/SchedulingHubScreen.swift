@@ -4,9 +4,9 @@
 //
 //  A1 Scheduling Hub — the owner-polymorphic front door. Renders the top bar +
 //  identity pill switcher and the per-phase content: loading skeleton, empty /
-//  first-run, the loaded stack (summary card · composed note · booking-link
-//  card · pause row · agenda · Manage rows · pinned footer), and the error
-//  retry. Copy → pasteboard + transient toast; Share → activity sheet. Matches
+//  first-run, the loaded stack (composed note · booking-link card · pause row ·
+//  agenda · Manage rows · pinned footer), and the error retry. Copy →
+//  pasteboard + transient toast; Share → activity sheet. Matches
 //  `scheduling-hub-frames.jsx`.
 //
 
@@ -81,7 +81,6 @@ struct SchedulingHubScreen: View {
                     if !model.canEdit {
                         viewOnlyBanner
                     }
-                    summaryCard
                     if !model.owner.isPersonal {
                         HubComposedNote(owner: model.owner, members: composedMembers)
                             .padding(.top, 14)
@@ -110,23 +109,6 @@ struct SchedulingHubScreen: View {
                 HubFooterCTA(owner: model.owner, isPaused: model.isPaused, action: footerAction)
             }
         }
-    }
-
-    @ViewBuilder
-    private var summaryCard: some View {
-        let content: HubSummaryCard.Content = {
-            if model.summaryFailed { return .error }
-            if let summary = model.summary { return .data(summary) }
-            return .empty
-        }()
-        HubSummaryCard(
-            content: content,
-            owner: model.owner,
-            nameFor: { model.eventTypeName(for: $0) },
-            onShare: shareLink,
-            onRetry: { Task { await model.refresh() } },
-            onInsights: { model.openInsights() }
-        )
     }
 
     @ViewBuilder
@@ -306,7 +288,7 @@ private struct SchedulingHubSkeleton: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s0) {
-                HubSummaryCard(content: .loading, owner: owner, nameFor: { _ in nil }, onShare: {}, onRetry: {}, onInsights: {})
+                Shimmer(height: 252, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4).padding(.top, 14)
                 Shimmer(height: 60, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s3)
                 Shimmer(width: 130, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(.bottom, Spacing.s2)
                 VStack(spacing: Spacing.s2) {

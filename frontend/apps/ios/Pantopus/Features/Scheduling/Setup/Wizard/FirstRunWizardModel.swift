@@ -24,6 +24,10 @@ final class FirstRunWizardModel: WizardModel {
     private(set) var isFinished = false
     var pendingShareURL: URL?
 
+    // Resume state — true when the wizard was opened with steps 1–2 already
+    // complete (i.e. starting at step 3). The screen shows a ResumeBanner.
+    private(set) var isResuming = false
+
     // Step 1 — handle.
     var slug: String = "" {
         didSet { if slug != oldValue { onSlugEdited() } }
@@ -50,9 +54,18 @@ final class FirstRunWizardModel: WizardModel {
 
     var theme: SchedulingIdentityTheme { owner.theme }
 
-    init(owner: SchedulingOwner) {
+    /// - Parameters:
+    ///   - owner: The scheduling owner pillar (Personal / Home / Business).
+    ///   - resuming: Pass `true` when re-entering the wizard with steps 1–2
+    ///     already done (i.e. a booking page + slug exist). The wizard opens
+    ///     directly at step 3 and shows a resume banner. Defaults to `false`.
+    init(owner: SchedulingOwner, resuming: Bool = false) {
         self.owner = owner
         timezoneIdentifier = SchedulingTime.deviceTimeZoneIdentifier
+        if resuming {
+            step = .hours
+            isResuming = true
+        }
         // Seed a suggested slug from the device but leave check idle until edited.
     }
 

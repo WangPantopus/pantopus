@@ -229,11 +229,28 @@ struct EdgePillarAvatar: View {
 
     private var accent: Color { EdgeOwnerTheme.accent(forOwnerType: ownerType) }
 
+    /// Design gradient stops (my-bookings-frames.jsx:24-27):
+    /// personal: primary400 (#38bdf8) → primary700 (#0369a1)
+    /// home:     home (#16a34a, light stop) → homeDark (#15803d, dark stop)
+    /// business: business (#7c3aed, light stop) → businessDark (#5B21B6, dark stop)
+    /// Token-only; no hex literals.
+    private var gradientColors: [Color] {
+        let owner = EdgeOwnerTheme.owner(forOwnerType: ownerType)
+        switch owner {
+        case .personal:
+            return [Theme.Color.primary400, Theme.Color.primary700]
+        case .home:
+            return [Theme.Color.home, Theme.Color.homeDark]
+        case .business:
+            return [Theme.Color.business, Theme.Color.businessDark]
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ZStack {
                 LinearGradient(
-                    colors: [accent.opacity(0.8), accent],
+                    colors: gradientColors,
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )

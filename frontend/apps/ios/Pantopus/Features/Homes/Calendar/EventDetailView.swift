@@ -558,16 +558,20 @@ private struct EventHeader: View {
 private struct CategoryPill: View {
     let category: CalendarEventCategory
 
+    // Design `CatChip` (home-shell.jsx:153-159): a 7×7 colored dot (`c.c`)
+    // + label in N.fg2 on N.sunken background — no icon glyph.
     var body: some View {
-        HStack(spacing: Spacing.s1) {
-            Icon(category.icon, size: 10, color: category.foreground)
+        HStack(spacing: 5) {
+            Circle()
+                .fill(category.dotColor)
+                .frame(width: 7, height: 7)
             Text(category.label)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(category.foreground)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
         }
         .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, Spacing.s1)
-        .background(category.background)
+        .padding(.vertical, 3)
+        .background(Theme.Color.appSurfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
 }
@@ -609,19 +613,23 @@ private struct DetailGrid: View {
     let category: CalendarEventCategory
 
     // JSX `DetailGrid` (event-detail-frames.jsx:53-62): a single card padded
-    // 4px/13px, rows in the order Repeats · Reminder · Location · Type, each
-    // an icon-tile + overline-over-value `DetailRow`. The card draws no inner
-    // dividers — rows are simply stacked.
+    // 4px/13px, rows in the order Repeats · Reminder · Location · Type.
+    // JSX `DetailRow` (home-shell.jsx:411-421) draws
+    // `borderBottom: last ? 'none' : '1px solid N.border'` between all rows
+    // except the last. Build the visible row list at render time so dividers
+    // are inserted only between the rows that are actually shown.
     var body: some View {
-        VStack(spacing: Spacing.s1) {
-            if let recurrence = recurrenceLabel(event.recurrenceRule) {
-                DetailRow(icon: .arrowsRepeat, label: "Repeats", value: recurrence)
+        let rows = visibleRows
+        VStack(spacing: Spacing.s0) {
+            ForEach(rows.indices, id: \.self) { index in
+                let row = rows[index]
+                DetailRow(icon: row.icon, label: row.label, value: row.value)
+                if index < rows.count - 1 {
+                    Rectangle()
+                        .fill(Theme.Color.appBorder)
+                        .frame(height: 1)
+                }
             }
-            DetailRow(icon: .bell, label: "Reminder", value: reminderLabel)
-            if let location = event.locationNotes, !location.isEmpty {
-                DetailRow(icon: .mapPin, label: "Location", value: location)
-            }
-            DetailRow(icon: .tag, label: "Type", value: category.label)
         }
         .padding(.horizontal, Spacing.s3)
         .padding(.vertical, Spacing.s1)
@@ -632,6 +640,25 @@ private struct DetailGrid: View {
             RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
         )
+    }
+
+    private struct RowSpec {
+        let icon: PantopusIcon
+        let label: String
+        let value: String
+    }
+
+    private var visibleRows: [RowSpec] {
+        var rows: [RowSpec] = []
+        if let recurrence = recurrenceLabel(event.recurrenceRule) {
+            rows.append(RowSpec(icon: .arrowsRepeat, label: "Repeats", value: recurrence))
+        }
+        rows.append(RowSpec(icon: .bell, label: "Reminder", value: reminderLabel))
+        if let location = event.locationNotes, !location.isEmpty {
+            rows.append(RowSpec(icon: .mapPin, label: "Location", value: location))
+        }
+        rows.append(RowSpec(icon: .tag, label: "Type", value: category.label))
+        return rows
     }
 
     /// JSX reminder value = the per-offset list joined by " · ", longest lead

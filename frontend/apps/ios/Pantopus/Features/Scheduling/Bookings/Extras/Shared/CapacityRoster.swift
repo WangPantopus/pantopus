@@ -58,7 +58,7 @@ struct CapacityHeaderCard: View {
 
             if showStats {
                 HStack(spacing: Spacing.s2) {
-                    statCell("Confirmed", confirmed, Theme.Color.success)
+                    statCell("Confirmed", confirmed, Theme.Color.successDk)
                     statCell("Pending", pending, Theme.Color.warning)
                     statCell("Waitlisted", waiting, Theme.Color.appTextSecondary)
                 }

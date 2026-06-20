@@ -105,6 +105,11 @@ final class InviteeReviewConfirmViewModel {
         return [PriceRow(label: label, amount: ConfirmFormat.money(cents: event.priceCents ?? 0, currency: event.currency), strong: true)]
     }
 
+    /// Whether any credit row is present in `priceRows` — gates the `CreditChip`
+    /// (Frame 4) and the "Credit applied · use a different one" label on
+    /// `ApplyCreditRow`. Always `false` until the backend exposes credit data.
+    var hasCreditApplied: Bool { priceRows.contains { $0.credit } }
+
     /// The deposit amount rendered (bold) in the deposit note + due-now hero.
     var depositAmountLabel: String {
         ConfirmFormat.money(cents: eventType?.depositCents ?? 0, currency: eventType?.currency)

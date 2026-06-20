@@ -29,20 +29,45 @@ public struct SchedulingIdentityTheme: Sendable, Hashable {
         }
     }
 
-    /// Primary pillar accent (sky / green / violet).
+    /// Primary pillar accent (Personal sky #0284C7 / Home green #16A34A /
+    /// Business violet #7C3AED) — derived from the owner, never hardcoded.
     public var accent: Color {
         identity.accent
     }
 
     /// Lightest pillar tint — icon tiles, header gradients, selected slot fill.
+    /// Alias `accentBg`; `softBg` is the preferred name on new surfaces.
     public var accentBg: Color {
         identity.accentBg
+    }
+
+    /// Soft pillar background — the framed-card fill, identity chip pill, and
+    /// selected-state row tint. Same value as `accentBg`, named for the role.
+    public var softBg: Color {
+        identity.accentBg
+    }
+
+    /// 1px accent-tinted ring for soft cards / chips — the pillar accent at a
+    /// low alpha so a tinted card reads as "this pillar" without a hard border.
+    public var ring: Color {
+        accent.opacity(0.2)
     }
 
     /// Tinted shadow under the pillar's primary CTA.
     public var ctaShadow: PantopusShadow {
         identity.ctaShadow
     }
+
+    /// FIXED operational primary blue (#0284C7) for host-side operational
+    /// actions — Approve, the primary dock on bookings management, and other
+    /// transactional CTAs that must NOT take the pillar accent. Same blue as the
+    /// Personal pillar by design, but exposed as a stable, owner-independent
+    /// token so a Home/Business host's Approve button stays blue, not green/
+    /// violet. Consume `SchedulingIdentityTheme.operationalPrimary` directly.
+    public static let operationalPrimary: Color = Theme.Color.primary600
+
+    /// Tinted shadow for an operational (fixed-blue) primary CTA.
+    public static let operationalPrimaryShadow: PantopusShadow = .primary
 
     /// Pillar label.
     public var title: String {

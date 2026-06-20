@@ -9,9 +9,123 @@
 
 import SwiftUI
 
+// ─── Per-day checkbox copy popover ────────────────────────────────────────────
+//
+// Mirrors JSX CopyMenu (weekly-hours-frames.jsx:97-134): a 192pt floating
+// card with a header ("Copy to other days" + sourceDay subtitle), a scrollable
+// list of the 6 other weekdays each with an independent checkbox, and a "Copy
+// to N days" confirm button. Displayed as an overlay anchored to the copy icon
+// button, positioned above or below depending on available space.
+
+private struct DayCopyPopover: View {
+    let sourceDay: Int                   // weekday index of the row being copied
+    @Binding var checkedDays: Set<Int>   // independent per-day toggles
+    let onCopy: ([Int]) -> Void
+    let onDismiss: () -> Void
+
+    private var targets: [Int] {
+        Weekday.displayOrder.filter { $0 != sourceDay }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Copy to other days")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("\(Weekday.longName(sourceDay))'s hours")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 10)
+            .overlay(alignment: .bottom) {
+                Divider()
+            }
+
+            // Per-day checkbox list
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    ForEach(targets, id: \.self) { weekday in
+                        let isChecked = checkedDays.contains(weekday)
+                        Button {
+                            if isChecked {
+                                checkedDays.remove(weekday)
+                            } else {
+                                checkedDays.insert(weekday)
+                            }
+                        } label: {
+                            HStack(spacing: Spacing.s2) {
+                                // 17×17 checkbox tile
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(isChecked ? Theme.Color.primary600 : Theme.Color.appSurface)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                                .stroke(
+                                                    isChecked ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
+                                                    lineWidth: 1.5
+                                                )
+                                        )
+                                    if isChecked {
+                                        Icon(.check, size: 11, strokeWidth: 3, color: .white)
+                                    }
+                                }
+                                .frame(width: 17, height: 17)
+
+                                Text(Weekday.longName(weekday))
+                                    .font(.system(size: 12.5, weight: .medium))
+                                    .foregroundStyle(Theme.Color.appText)
+                            }
+                            .padding(.horizontal, Spacing.s3)
+                            .padding(.vertical, 7)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(Weekday.longName(weekday)), \(isChecked ? "checked" : "unchecked")")
+                    }
+                }
+            }
+            .frame(maxHeight: 168)
+
+            // Confirm button
+            Divider()
+            Button {
+                onCopy(Array(checkedDays).sorted())
+                onDismiss()
+            } label: {
+                Text("Copy to \(checkedDays.count) day\(checkedDays.count == 1 ? "" : "s")")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
+                    .background(Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(checkedDays.isEmpty)
+            .padding(Spacing.s2)
+        }
+        .frame(width: 192)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 15, x: 0, y: 8)
+        .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
+    }
+}
+
+// MARK: - WeekdayHoursRow
+
 /// A single weekday: leading on/off toggle, then (when on) its time ranges
 /// (each a labeled time-range button), an "Add a block" affordance, and a
-/// "Copy to…" menu.
+/// per-day checkbox "Copy to other days" popover.
 struct WeekdayHoursRow: View {
     let day: DayHours
     var disabled: Bool = false
@@ -20,6 +134,11 @@ struct WeekdayHoursRow: View {
     let onCopy: ([Int]) -> Void
     let onEditRange: (TimeRange) -> Void
     let onRemoveRange: (UUID) -> Void
+
+    /// Whether the per-day checkbox popover is visible.
+    @State private var showCopyPopover = false
+    /// Independent day-checkbox state: defaults to weekdays other than source.
+    @State private var copyChecked: Set<Int> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -37,7 +156,7 @@ struct WeekdayHoursRow: View {
                 Spacer(minLength: Spacing.s2)
 
                 if day.isEnabled {
-                    copyMenu
+                    copyIconButton
                 } else {
                     Text("Unavailable")
                         .font(.system(size: 12, weight: .medium))
@@ -72,19 +191,34 @@ struct WeekdayHoursRow: View {
         .opacity(disabled ? 0.7 : 1)
     }
 
-    /// Icon-only copy affordance (JSX renders a `copy` glyph that opens a
-    /// "copy to other days" popover). The native menu is the popover here.
-    private var copyMenu: some View {
-        Menu {
-            Button("Copy to all days") { onCopy(targets(in: Weekday.displayOrder)) }
-            Button("Copy to weekdays") { onCopy(targets(in: [1, 2, 3, 4, 5])) }
-            Button("Copy to weekend") { onCopy(targets(in: [6, 0])) }
+    /// Icon button that opens the per-day checkbox copy popover (JSX `copy` glyph).
+    /// Uses SwiftUI `.popover` for placement; falls back gracefully on iPhone
+    /// (`.popover` presents as a sheet on compact width, which is acceptable —
+    /// the checkbox list and confirm button remain intact).
+    private var copyIconButton: some View {
+        Button {
+            // Seed weekdays (excluding source) as default selection, matching
+            // JSX `checked` default (Mon-Fri minus the source day).
+            let weekdaySet = Set([1, 2, 3, 4, 5])
+            copyChecked = weekdaySet.subtracting([day.weekday])
+            showCopyPopover = true
         } label: {
             Icon(.copy, size: 15, color: Theme.Color.appTextMuted)
                 .frame(width: 30, height: 30)
                 .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(disabled)
         .accessibilityLabel("Copy \(Weekday.longName(day.weekday)) hours to other days")
+        .popover(isPresented: $showCopyPopover, arrowEdge: .top) {
+            DayCopyPopover(
+                sourceDay: day.weekday,
+                checkedDays: $copyChecked,
+                onCopy: { targets in onCopy(targets) },
+                onDismiss: { showCopyPopover = false }
+            )
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private var addBlockButton: some View {
@@ -98,10 +232,6 @@ struct WeekdayHoursRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add a time block to \(Weekday.longName(day.weekday))")
-    }
-
-    private func targets(in weekdays: [Int]) -> [Int] {
-        weekdays.filter { $0 != day.weekday }
     }
 }
 

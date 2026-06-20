@@ -111,6 +111,13 @@ final class MyHouseholdAvailabilityViewModel {
         push(.availabilityScheduleList)
     }
 
+    /// Navigate to the household quiet-hours editor. The destination route is a
+    /// v2 surface (not yet in SchedulingRoute), so this is a stub for now — the
+    /// row is tappable per design (cursor:'pointer') and will route when F8b ships.
+    func openQuietHours() {
+        // No-op until the quiet-hours editor route is added to SchedulingRoute.
+    }
+
     // MARK: - Exposure toggles
 
     func value(for exposure: Exposure) -> Bool {

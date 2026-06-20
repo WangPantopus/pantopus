@@ -109,12 +109,14 @@ struct BusinessSchedulingSettingsView: View {
 
                     if model.confirmationApprove {
                         BizRowDivider().padding(.top, Spacing.s1)
+                        // Design: trailing={gated?null:undefined} — informational
+                        // row; no chevron and no tap in either state.
                         BizSettingsRow(
                             icon: .hourglass,
                             label: "Approval window",
                             sub: "24h to respond",
-                            trailing: { gatedChevron },
-                            onTap: model.isGated ? nil : { model.openSchedulingDefaults() }
+                            trailing: { EmptyView() },
+                            onTap: nil
                         )
                     }
                 }
@@ -124,6 +126,11 @@ struct BusinessSchedulingSettingsView: View {
 
     // MARK: Scheduling
 
+    // Design G5: each row carries an independent chevron implying a per-row
+    // sub-screen (bizsettings-frames.jsx:55-64). Min-notice / horizon / buffers
+    // are per-SERVICE on the backend (no owner-level store), so all three route
+    // to the event-type list where the user edits them per service. No dedicated
+    // sub-screen routes exist for these fields (acknowledged cross-platform gap).
     private var schedulingGroup: some View {
         BizGroup(title: "Scheduling") {
             BizSettingsRow(icon: .clock, label: "Minimum notice", sub: model.minNoticeValue,

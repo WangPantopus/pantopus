@@ -61,6 +61,11 @@ final class InviteeIntakeFormViewModel {
     private(set) var isPrefilled = false
     private(set) var touched: Set<String> = []
 
+    /// Set by the host app layer when the typed email matches a known Pantopus
+    /// account (unauthenticated path, Frame 4). Surfaces a "You have an account —
+    /// open in app" info banner below the email field in `yourInfoSection`.
+    var existingAccountDetected = false
+
     // Slot hold countdown (client-side soft hold — backend 409s if truly taken).
     private(set) var holdRemaining = 300
     private(set) var holdExpired = false

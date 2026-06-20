@@ -49,6 +49,18 @@ struct MessageTemplateEditorView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        .confirmationDialog(
+            "Delete \"\(model.name.isEmpty ? "this template" : model.name)\"?",
+            isPresented: $model.showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete template", role: .destructive) {
+                Task { if await model.delete() { dismiss() } }
+            }
+            Button("Keep", role: .cancel) {}
+        } message: {
+            Text("This template will be permanently removed and can't be undone.")
+        }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.templates.editor")
     }
@@ -75,10 +87,17 @@ struct MessageTemplateEditorView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     channelSection
                     nameSection
+                    activeSection
                     if model.showsSubject { subjectSection }
                     messageSection
                     if let saveError = model.saveError {
                         AutoNote(tone: .error, icon: .alertTriangle, text: saveError)
+                    }
+                    if let deleteError = model.deleteError {
+                        AutoNote(tone: .error, icon: .alertTriangle, text: deleteError)
+                    }
+                    if !model.isNew {
+                        deleteTemplateButton
                     }
                     Color.clear.frame(height: Spacing.s4)
                 }
@@ -99,6 +118,44 @@ struct MessageTemplateEditorView: View {
 
     private func sectionHeader(_ text: String) -> some View {
         AutoOverline(text: text).padding(.horizontal, 2)
+    }
+
+    /// Active / Inactive toggle — mirrors web's `is_active` card control.
+    private var activeSection: some View {
+        AutoCard(padding: EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)) {
+            HStack(spacing: Spacing.s3) {
+                Icon(.zap, size: 16, strokeWidth: 1.8, color: model.isActive ? model.accent : Theme.Color.appTextMuted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Active").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.appText)
+                    Text(model.isActive ? "Workflows can use this template." : "Template is paused — no sends.")
+                        .font(.system(size: 12)).foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s2)
+                Toggle("", isOn: $model.isActive)
+                    .tint(model.accent)
+                    .labelsHidden()
+                    .accessibilityLabel("Template active")
+            }
+        }
+        .accessibilityIdentifier("templateEditor.activeToggle")
+    }
+
+    /// Destructive delete row — visible only when editing an existing template.
+    private var deleteTemplateButton: some View {
+        Button(role: .destructive) {
+            model.showDeleteConfirm = true
+        } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.trash2, size: 14, color: Theme.Color.error)
+                Text("Delete template")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.error)
+            }
+            .frame(maxWidth: .infinity, minHeight: 38)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, Spacing.s2)
+        .accessibilityIdentifier("templateEditor.delete")
     }
 
     private var channelSection: some View {
