@@ -106,8 +106,10 @@ class InvoicesListViewModelTest {
             val loaded = model.state.value as InvoicesListUiState.Loaded
             assertEquals(1, loaded.sections.size)
             assertEquals(2, loaded.sections.first().invoices.size)
-            assertEquals("$316.00", loaded.totalLabel)
-            assertEquals("2", loaded.countLabel)
+            // outstandingLabel = sum of all invoice totals (deferred: DTO has no status to exclude paid)
+            assertEquals("$316.00", loaded.outstandingLabel)
+            // collectedMonthLabel = $0.00 placeholder (deferred: DTO has no paid_at)
+            assertEquals("$0.00", loaded.collectedMonthLabel)
         }
 
     @Test

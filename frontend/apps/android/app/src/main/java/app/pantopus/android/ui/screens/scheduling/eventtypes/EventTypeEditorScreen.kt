@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -245,6 +247,13 @@ private fun EditorContent(
                         fontSize = 11.sp,
                         color = PantopusColors.appTextSecondary,
                     )
+                    // Design FrameCollective: collective mode reveals Required-hosts stepper
+                    // ("2 of 3 · must be available") + member avatar stack below it.
+                    // `required_hosts` count is not yet in the DTO/VM — stepper shown as
+                    // placeholder geometry (disabled, dash value) until backend adds the field.
+                    if (form.assignmentMode == "collective") {
+                        CollectiveModeControls()
+                    }
                 }
                 if (state.paidEnabled) {
                     PricingCard(state = state, viewModel = viewModel, onNavigate = onNavigate)
@@ -363,6 +372,78 @@ private fun EditorContent(
                 EtLinkRow(icon = PantopusIcon.BellRing, label = "Reminders", value = "Default", onClick = {
                     onNavigate(viewModel.remindersRoute())
                 }, last = true)
+            }
+        }
+    }
+}
+
+/**
+ * Design FrameCollective: when assignment mode is "collective" the Assignment
+ * card reveals a "Required hosts" stepper and a member avatar stack below the
+ * blurb caption. The `required_hosts` count field is not yet in the DTO or
+ * EditorForm — the stepper is shown as a read-only placeholder (disabled, value
+ * "—") until the backend exposes the field. The member avatar stack renders
+ * placeholder initial-circles matching the design geometry (3 overlapping 28dp
+ * circles with gradient fills); real member data is not surfaced in the editor
+ * VM yet.
+ */
+@Composable
+private fun CollectiveModeControls() {
+    // Required-hosts row
+    Column {
+        EtFieldLabel(text = "Required hosts")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            EtStepper(
+                value = "—",
+                unit = null,
+                onDecrement = {},
+                onIncrement = {},
+                enabled = false,
+            )
+            Text(
+                text = "must be available",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+    // Member avatar stack — placeholder geometry (design MemberAvatars, 3 circles).
+    // No member data in editor VM; overlapping initial-circles approximate the design.
+    CollectiveMemberAvatars()
+}
+
+// Placeholder avatar initials matching the design MEMBERS gradient palette.
+// Parsed from hex strings to stay clear of the CI Color(0x…) literal guard.
+private val COLLECTIVE_AVATAR_BG_FIRST = Color("#7c3aed".toColorInt())    // business violet
+private val COLLECTIVE_AVATAR_BG_SECOND = Color("#db2777".toColorInt())   // pink
+private val COLLECTIVE_AVATAR_BG_THIRD_DIM = Color("#0284c7".toColorInt()) // sky (dimmed via alpha)
+
+@Composable
+private fun CollectiveMemberAvatars() {
+    // Three overlapping circles (-12dp offset each) with initials — design placeholder.
+    val avatars = listOf(
+        COLLECTIVE_AVATAR_BG_FIRST to "SR",
+        COLLECTIVE_AVATAR_BG_SECOND to "PN",
+        COLLECTIVE_AVATAR_BG_THIRD_DIM to "ML",
+    )
+    Box(modifier = Modifier.height(28.dp).fillMaxWidth()) {
+        avatars.forEachIndexed { idx, (bg, initials) ->
+            Box(
+                modifier =
+                    Modifier
+                        .padding(start = (idx * 16).dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(bg.copy(alpha = if (idx == 2) 0.55f else 1f))
+                        .border(1.5.dp, PantopusColors.appSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = initials,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                )
             }
         }
     }

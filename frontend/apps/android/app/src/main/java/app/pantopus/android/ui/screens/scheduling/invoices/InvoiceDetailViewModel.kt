@@ -26,6 +26,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * A single event in the invoice lifecycle timeline (invoicedetail-frames.jsx Timeline).
+ * Derived from DTO fields available today; additional events (Sent, Paid, Refunded,
+ * Voided) require `status` / `paid_at` which the DTO currently lacks.
+ */
+data class InvoiceTimelineEvent(
+    val label: String,
+    val timeLabel: String,
+    val isDone: Boolean = true,
+)
+
 /** G13 Invoice Detail UI state. */
 sealed interface InvoiceDetailUiState {
     data object Loading : InvoiceDetailUiState
@@ -45,6 +56,19 @@ sealed interface InvoiceDetailUiState {
         val unitLabels: Map<Int, String>,
         val lineTotalLabels: Map<Int, String>,
         val pillar: SchedulingPillar,
+        /**
+         * Invoice lifecycle status for the top-bar trailing pill and dock CTA variants.
+         * Null until the DTO exposes a `status` field (deferred: InvoiceDto has no `status`).
+         * When available, drives both the top-bar StatusPill and the 7-variant dock layout.
+         */
+        val invoiceStatus: String?,
+        /**
+         * Lifecycle timeline events shown in the "Timeline" section.
+         * Always has at least the "Created" event (derived from `created_at`).
+         * Additional events (Sent, Paid, Deposit, Refunded, Voided) are deferred
+         * until the DTO exposes `status` / `paid_at`.
+         */
+        val timelineEvents: List<InvoiceTimelineEvent>,
     ) : InvoiceDetailUiState
 }
 
@@ -135,10 +159,11 @@ class InvoiceDetailViewModel
             val total = PackagesMoney.format(invoice.totalCents, invoice.currency)
             val reference = "INV-" + invoiceId.take(REF_PREFIX_LEN).uppercase()
             val lineItems = InvoiceParsing.lineItems(invoice.lineItems)
+            val issuedLabel = PackagesFormat.dayString(invoice.createdAt) ?: "—"
             shareText = "$reference · $total"
             return InvoiceDetailUiState.Loaded(
                 reference = reference,
-                issuedLabel = PackagesFormat.dayString(invoice.createdAt) ?: "—",
+                issuedLabel = issuedLabel,
                 totalLabel = total,
                 currencyCode = currency,
                 recipientLabel =
@@ -162,6 +187,17 @@ class InvoiceDetailViewModel
                         )
                     },
                 pillar = owner.pillar(),
+                // Deferred: DTO has no `status` field — null until backend adds it.
+                invoiceStatus = null,
+                // "Created" is always present (from created_at). Sent/Paid/Refunded/Voided
+                // events are deferred until the DTO exposes `status` / `paid_at`.
+                timelineEvents = listOf(
+                    InvoiceTimelineEvent(
+                        label = "Created",
+                        timeLabel = issuedLabel,
+                        isDone = true,
+                    ),
+                ),
             )
         }
 

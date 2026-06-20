@@ -326,7 +326,16 @@ class BookingsInboxViewModel
                 whenLabel = rowWhenLabel(startAt),
                 pillStatus = status.toPillStatus(),
                 showOwnerGlyph = true,
-                assigned = ctx.pillar == SchedulingPillar.Business && !hostUserId.isNullOrBlank(),
+                // hostDisplayName is not in the list DTO; use the userId prefix as a
+                // placeholder so AssignedChip at least shows something distinct from
+                // "Unassigned". Full name resolution deferred until the list endpoint
+                // exposes it.
+                assigneeName =
+                    if (ctx.pillar == SchedulingPillar.Business && !hostUserId.isNullOrBlank()) {
+                        hostUserId.take(8)
+                    } else {
+                        null
+                    },
                 unread = status == BookingStatus.Pending,
                 quickApprove = quickApprove && status == BookingStatus.Pending,
             )

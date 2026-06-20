@@ -10,6 +10,8 @@ import app.pantopus.android.data.api.models.scheduling.UpdateNotificationPrefsRe
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,8 @@ data class NotifPrefsData(
     val reminderMinutes: List<Int>,
     val paused: Boolean,
     val pushOff: Boolean,
+    /** Pillar accent for chips/header tint — defaults to Personal (current data contract is personal-only). */
+    val pillar: SchedulingPillar = SchedulingPillar.Personal,
 )
 
 @Immutable
@@ -54,6 +58,8 @@ class NotificationPrefsViewModel
     constructor(
         private val repo: SchedulingRepository,
     ) : ViewModel() {
+        /** Current owner — personal-only for now; here to drive pillar theming without VM refactor later. */
+        private val owner: SchedulingOwner = SchedulingOwner.Personal
         private val _state = MutableStateFlow<NotificationPrefsUiState>(NotificationPrefsUiState.Loading)
         val state: StateFlow<NotificationPrefsUiState> = _state.asStateFlow()
 
@@ -85,6 +91,7 @@ class NotificationPrefsViewModel
                             reminderMinutes = page?.reminderMinutes ?: emptyList(),
                             paused = page?.isPaused ?: false,
                             pushOff = pushOff,
+                            pillar = owner.pillar(),
                         ),
                     )
             }

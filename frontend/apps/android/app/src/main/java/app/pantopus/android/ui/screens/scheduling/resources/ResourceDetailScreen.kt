@@ -116,6 +116,7 @@ fun ResourceDetailScreen(
                         loaded = s,
                         onApprove = viewModel::approve,
                         onDecline = viewModel::decline,
+                        onApprovalBadge = viewModel::openApprovalQueue,
                         onBookThis = {
                             onNavigate(SchedulingRoutes.bookResource(viewModel.resourceId))
                         },
@@ -139,6 +140,7 @@ private fun DetailLoaded(
     loaded: ResourceDetailUiState.Loaded,
     onApprove: (String) -> Unit,
     onDecline: (String) -> Unit,
+    onApprovalBadge: () -> Unit,
     onBookThis: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -151,7 +153,7 @@ private fun DetailLoaded(
                     .padding(Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            HeaderCard(loaded)
+            HeaderCard(loaded, onApprovalBadge)
             if (loaded.isFullyBooked) {
                 FullyBookedBanner(loaded.fullyBookedThroughLabel, loaded.nextOpeningLabel)
             }
@@ -246,7 +248,7 @@ private fun FullyBookedBanner(
 }
 
 @Composable
-private fun HeaderCard(loaded: ResourceDetailUiState.Loaded) {
+private fun HeaderCard(loaded: ResourceDetailUiState.Loaded, onApprovalBadge: () -> Unit) {
     SectionCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -297,7 +299,7 @@ private fun HeaderCard(loaded: ResourceDetailUiState.Loaded) {
             }
         }
         if (loaded.pendingApprovalCount > 0) {
-            PendingApprovalBadge(count = loaded.pendingApprovalCount, onClick = {})
+            PendingApprovalBadge(count = loaded.pendingApprovalCount, onClick = onApprovalBadge)
         }
     }
 }

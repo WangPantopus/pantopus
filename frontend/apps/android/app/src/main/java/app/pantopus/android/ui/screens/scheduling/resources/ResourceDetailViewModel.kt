@@ -298,6 +298,16 @@ class ResourceDetailViewModel
         }
 
         // ── Navigation hooks (handled by the screen via the route id) ─────────
+
+        /**
+         * Named hook for the pending-approval badge tap. Currently a scroll-anchor
+         * intent (scroll to the approval queue card); body is intentionally empty
+         * until the scroll coordinator is wired — mirrors iOS ResourceDetailViewModel.openApprovalQueue().
+         */
+        fun openApprovalQueue() {
+            // TODO: coordinate scroll to ApprovalQueueCard
+        }
+
         fun clearActionError() {
             _actionError.value = null
         }

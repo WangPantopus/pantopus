@@ -53,6 +53,12 @@ enum class SchedulingTerminalState(
     Unavailable(PantopusIcon.CalendarX, "This page isn't available", "This booking page isn't available right now."),
     FullyBooked(PantopusIcon.CalendarX, "No times are open right now", "Every slot is taken for now — new times open up regularly."),
     Cancelled(PantopusIcon.XCircle, "This booking was cancelled", "The slot was released. Nothing further is owed."),
+
+    /** No connection — full-screen variant for public flows where the strip banner isn't enough. */
+    Offline(PantopusIcon.WifiOff, "You're offline", "Check your connection and try again — your details are saved."),
+
+    /** The host blocked this invitee (403 beyond a secret link), or the action isn't permitted. */
+    Blocked(PantopusIcon.Ban, "This isn't available to you", "You don't have access to this page. Ask the host for help."),
 }
 
 /** Map a decoded [SchedulingError] to its terminal state (null when it isn't terminal). */

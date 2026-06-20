@@ -39,23 +39,39 @@ enum class SchedulingPillar {
     Business,
     ;
 
-    /** Header/CTA/selected accent. */
+    /**
+     * Header/CTA/selected accent — Personal sky #0284C7, Home green #16A34A,
+     * Business violet #7C3AED (matches `--color-identity-*` in the token CSS).
+     */
     val accent: Color
         get() =
             when (this) {
-                Personal -> PantopusColors.primary600
+                Personal -> PantopusColors.personal
                 Home -> PantopusColors.home
                 Business -> PantopusColors.business
             }
 
-    /** Soft tint for chips/pill backgrounds. */
+    /**
+     * Soft tint for chips / selected-slot / header backgrounds — the design's
+     * `--color-identity-*-bg` (Personal #DBEAFE, Home #DCFCE7, Business
+     * #F3E8FF). Note Personal uses [PantopusColors.personalBg] (#DBEAFE), NOT
+     * `primary50` (#F0F9FF) — the design pillar bg is the deeper blue-100.
+     */
     val accentBg: Color
         get() =
             when (this) {
-                Personal -> PantopusColors.primary50
+                Personal -> PantopusColors.personalBg
                 Home -> PantopusColors.homeBg
                 Business -> PantopusColors.businessBg
             }
+
+    /**
+     * 1dp hairline ring tint for selected/accented cards & slot chips — a
+     * mid-tone derived from the accent (alpha-blended) so the ring reads as
+     * "this is the pillar accent" without the full-strength fill.
+     */
+    val accentRing: Color
+        get() = accent.copy(alpha = ACCENT_RING_ALPHA)
 
     /** Maps to the shared [WizardShell] identity so wizards retint to the pillar. */
     val wizardIdentity: WizardIdentity
@@ -65,6 +81,19 @@ enum class SchedulingPillar {
                 Home -> WizardIdentity.Home
                 Business -> WizardIdentity.Business
             }
+
+    companion object {
+        private const val ACCENT_RING_ALPHA = 0.35f
+
+        /**
+         * The FIXED operational primary blue (#0284C7) for host-side action
+         * chrome — Approve / primary dock / bookings-management FAB. These are
+         * NOT pillar-tinted: an approve button on a Business booking is still
+         * blue, never violet. Use [SchedulingPillar.accent] for invitee-facing
+         * / identity chrome; use this for operational CTAs.
+         */
+        val operationalPrimary: Color get() = PantopusColors.primary600
+    }
 }
 
 /** Resolve the pillar for an owner context. */

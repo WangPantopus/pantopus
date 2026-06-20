@@ -78,6 +78,9 @@ class TeamBookingAvailabilityViewModel
                 val assignable: List<EventTypePick>,
             ) : UiState
 
+            /** Zero members after a successful load — dedicated empty state (mirrors iOS .empty phase). */
+            data object Empty : UiState
+
             data object BusinessOnly : UiState
 
             data class Error(val message: String) : UiState
@@ -137,12 +140,16 @@ class TeamBookingAvailabilityViewModel
                                 )
                             }
                         _state.value =
-                            UiState.Content(
-                                rows = rows,
-                                coverage = coverage(window, freeByMember),
-                                gated = gated,
-                                assignable = eventTypes.map { EventTypePick(it.id, it.name, it.assignmentMode == MODE_COLLECTIVE) },
-                            )
+                            if (rows.isEmpty()) {
+                                UiState.Empty
+                            } else {
+                                UiState.Content(
+                                    rows = rows,
+                                    coverage = coverage(window, freeByMember),
+                                    gated = gated,
+                                    assignable = eventTypes.map { EventTypePick(it.id, it.name, it.assignmentMode == MODE_COLLECTIVE) },
+                                )
+                            }
                     }
                 }
             }

@@ -47,7 +47,10 @@ data class BookingRowUi(
     val whenLabel: String,
     val pillStatus: SchedulingPillStatus,
     val showOwnerGlyph: Boolean,
-    val assigned: Boolean,
+    /** Non-null when a host member is assigned; the value is the assignee display label
+     *  (e.g. "Priya", "Devon"). Null means no host member is assigned and the chip
+     *  is hidden (the design only shows AssignedChip when there is an assignee). */
+    val assigneeName: String?,
     val unread: Boolean,
     val quickApprove: Boolean,
 )
@@ -72,7 +75,17 @@ data class InboxEmpty(
 sealed interface BookingsInboxUiState {
     data object Loading : BookingsInboxUiState
 
-    data class Content(val sections: List<BookingSection>) : BookingsInboxUiState
+    data class Content(
+        val sections: List<BookingSection>,
+        /** True when the viewer is a team member seeing only bookings assigned to them.
+         *  Drives the MemberBanner (design Frame 9). Stays false until the backend
+         *  exposes a `is_member` field on the bookings list response. */
+        val isMember: Boolean = false,
+        /** True when the event type uses auto-confirm and the Pending tab should be
+         *  hidden (design Frame 8). Stays false until the event-type auto-confirm flag
+         *  is surfaced in the bookings list response. */
+        val hidePending: Boolean = false,
+    ) : BookingsInboxUiState
 
     data class Empty(val empty: InboxEmpty) : BookingsInboxUiState
 

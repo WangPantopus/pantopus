@@ -72,6 +72,7 @@ fun PaymentRetrySheet(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val holdRemaining by viewModel.holdRemaining.collectAsStateWithLifecycle()
 
     val paymentSheet =
         rememberPaymentSheet { result ->
@@ -118,10 +119,17 @@ fun PaymentRetrySheet(
             ) {
                 when (val s = state) {
                     is PaymentRetryUiState.Loading -> SchedulingLoadingSkeleton(rows = 2)
-                    is PaymentRetryUiState.Declined -> DeclinedBody(s, onRetry = retry, onPickAnotherTime = onPickAnotherTime)
+                    is PaymentRetryUiState.Declined ->
+                        DeclinedBody(
+                            s,
+                            holdLabel = viewModel.holdLabel(holdRemaining),
+                            onRetry = retry,
+                            onPickAnotherTime = onPickAnotherTime,
+                        )
                     is PaymentRetryUiState.Timeout ->
                         TimeoutBody(
                             s,
+                            holdLabel = viewModel.holdLabel(holdRemaining),
                             onRecheck = { viewModel.recheck(manageToken) },
                             onPickAnotherTime = onPickAnotherTime,
                         )
@@ -137,6 +145,7 @@ fun PaymentRetrySheet(
 @Composable
 private fun DeclinedBody(
     state: PaymentRetryUiState.Declined,
+    holdLabel: String,
     onRetry: () -> Unit,
     onPickAnotherTime: () -> Unit,
 ) {
@@ -146,7 +155,14 @@ private fun DeclinedBody(
         title = "Your payment didn't go through",
         body = "${state.message} Nothing was charged.",
     )
-    CenteredChip(tone = EdgeTone.Warn, icon = PantopusIcon.Timer, label = "Your time is still held")
+    // Design FrameDeclined: HoldChip shows time-anchored label with live countdown.
+    val chipLabel =
+        if (state.slotTime != null) {
+            "Holding your ${state.slotTime} time for $holdLabel"
+        } else {
+            "Your time is still held · $holdLabel"
+        }
+    CenteredChip(tone = EdgeTone.Warn, icon = PantopusIcon.Timer, label = chipLabel)
     // Spec frame 1 surfaces the declined saved card between the halo and the CTAs.
     // The owner-side payment block carries no brand/PAN, so we show a neutral
     // card row with a Declined pill rather than fabricate a masked number.
@@ -166,6 +182,7 @@ private fun DeclinedBody(
 @Composable
 private fun TimeoutBody(
     state: PaymentRetryUiState.Timeout,
+    holdLabel: String,
     onRecheck: () -> Unit,
     onPickAnotherTime: () -> Unit,
 ) {
@@ -175,6 +192,14 @@ private fun TimeoutBody(
         title = "We're not sure that went through",
         body = "The connection dropped before we heard back. We won't double-charge you — check again to see where it landed.",
     )
+    // Design FrameTimeout (payment-failed-frames.jsx:267): HoldChip between halo and InfoCalloutCard.
+    val chipLabel =
+        if (state.slotTime != null) {
+            "Holding your ${state.slotTime} time for $holdLabel"
+        } else {
+            "Your time is still held · $holdLabel"
+        }
+    CenteredChip(tone = EdgeTone.Warn, icon = PantopusIcon.Timer, label = chipLabel)
     InfoCalloutCard(text = "If the first try did go through, checking again won't charge you a second time.")
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         PrimaryButton(title = "Check again", onClick = onRecheck)

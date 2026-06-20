@@ -74,6 +74,10 @@ data class ApproveDeclineSheetState(
     val requesterSub: String,
     val slotLabel: String,
     val intakeCount: Int,
+    /** True when this booking's slot overlaps a confirmed booking.
+     *  Drives the amber ConflictBanner inside the sheet (design Frame 3 / FrameConflict).
+     *  Stays false until the booking payload exposes an overlap flag. */
+    val hasConflict: Boolean = false,
     val declineExpanded: Boolean = false,
     val selectedReason: String? = null,
     val note: String = "",

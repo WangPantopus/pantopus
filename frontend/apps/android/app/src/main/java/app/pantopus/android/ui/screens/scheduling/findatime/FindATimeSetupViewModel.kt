@@ -43,6 +43,12 @@ data class SetupForm(
     val windowPreset: WindowPreset,
     val explainerExpanded: Boolean,
     val today: LocalDate,
+    /**
+     * Set by F5 when the API returns zero slots (no time overlaps). Drives the
+     * no-overlap warning banner + quick-fix buttons in the setup form (F4 design
+     * FrameNoOverlap: amber banner + "Make … optional" / "Widen to two weeks").
+     */
+    val noOverlapMessage: String? = null,
 ) {
     val durationMin: Int
         get() =

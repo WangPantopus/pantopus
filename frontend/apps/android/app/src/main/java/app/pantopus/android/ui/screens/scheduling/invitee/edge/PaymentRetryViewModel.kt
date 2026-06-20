@@ -11,6 +11,8 @@ import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,10 +38,19 @@ class PaymentRetryViewModel
             data object Loading : PaymentRetryUiState
 
             /** Card declined / requires a new payment method — the slot is still held. */
-            data class Declined(val amountLabel: String, val message: String) : PaymentRetryUiState
+            data class Declined(
+                val amountLabel: String,
+                val message: String,
+                /** Formatted slot time for the hold chip, e.g. "2:00 PM". */
+                val slotTime: String? = null,
+            ) : PaymentRetryUiState
 
             /** Outcome unknown after a dropped connection — re-check, idempotent. */
-            data class Timeout(val amountLabel: String) : PaymentRetryUiState
+            data class Timeout(
+                val amountLabel: String,
+                /** Formatted slot time for the hold chip, e.g. "2:00 PM". */
+                val slotTime: String? = null,
+            ) : PaymentRetryUiState
 
             /** The held slot was released while waiting — pick again. */
             data object HoldExpired : PaymentRetryUiState
@@ -53,6 +64,15 @@ class PaymentRetryViewModel
         private val _state = MutableStateFlow<PaymentRetryUiState>(PaymentRetryUiState.Loading)
         val state: StateFlow<PaymentRetryUiState> = _state.asStateFlow()
 
+        /**
+         * Live hold countdown in seconds. Ticks down every second for Declined and
+         * Timeout states (mirrors iOS PaymentFailedViewModel.startHold). Starts at
+         * the default hold window; stops when the state leaves those two cases.
+         */
+        private val _holdRemaining = MutableStateFlow(HOLD_WINDOW_SECONDS)
+        val holdRemaining: StateFlow<Int> = _holdRemaining.asStateFlow()
+
+        private var holdJob: Job? = null
         private var loadedToken: String? = null
 
         fun start(manageToken: String) {
@@ -64,7 +84,11 @@ class PaymentRetryViewModel
         fun load(manageToken: String) {
             viewModelScope.launch {
                 _state.value = PaymentRetryUiState.Loading
-                _state.value = mapState(repo.publicGetManageBooking(manageToken))
+                val next = mapState(repo.publicGetManageBooking(manageToken))
+                _state.value = next
+                if (next is PaymentRetryUiState.Declined || next is PaymentRetryUiState.Timeout) {
+                    startHold()
+                }
             }
         }
 
@@ -78,13 +102,35 @@ class PaymentRetryViewModel
             when (outcome) {
                 is CheckoutOutcome.Paid -> load(manageToken) // re-read; webhook reconciles
                 is CheckoutOutcome.Canceled -> Unit // stay on the retry sheet
-                is CheckoutOutcome.Declined ->
+                is CheckoutOutcome.Declined -> {
+                    val slotTime = (_state.value as? PaymentRetryUiState.Declined)?.slotTime
+                        ?: (_state.value as? PaymentRetryUiState.Timeout)?.slotTime
                     _state.value =
                         PaymentRetryUiState.Declined(
                             amountLabel = (_state.value as? PaymentRetryUiState.Declined)?.amountLabel.orEmpty(),
                             message = outcome.message ?: "Your card was declined. Nothing was charged.",
+                            slotTime = slotTime,
                         )
+                    startHold()
+                }
             }
+        }
+
+        /**
+         * Starts the hold countdown timer (mirrors iOS startHold). Resets the
+         * remaining seconds to [HOLD_WINDOW_SECONDS] and ticks down every second.
+         * Cancels any previous timer before starting.
+         */
+        private fun startHold() {
+            holdJob?.cancel()
+            _holdRemaining.value = HOLD_WINDOW_SECONDS
+            holdJob =
+                viewModelScope.launch {
+                    while (_holdRemaining.value > 0) {
+                        delay(HOLD_TICK_MS)
+                        _holdRemaining.value = (_holdRemaining.value - 1).coerceAtLeast(0)
+                    }
+                }
         }
 
         private fun mapState(result: NetworkResult<ManageBookingResponse>): PaymentRetryUiState =
@@ -98,19 +144,44 @@ class PaymentRetryViewModel
             if (status in TERMINAL_STATUSES) return PaymentRetryUiState.HoldExpired
             val payment = data.payment
             val amountLabel = MoneyAndFlag.formatPrice(payment?.amountTotal, payment?.currency)
+            // Extract slot time for the hold chip ("2:00 PM") from the booking start.
+            val slotTime = formatSlotTime(data.booking.startAt)
             return when (payment?.paymentStatus?.lowercase()) {
                 "succeeded", "paid" -> PaymentRetryUiState.Succeeded(amountLabel, processing = false)
                 "processing" -> PaymentRetryUiState.Succeeded(amountLabel, processing = true)
-                "requires_action", null -> PaymentRetryUiState.Timeout(amountLabel)
+                "requires_action", null -> PaymentRetryUiState.Timeout(amountLabel, slotTime)
                 else ->
                     PaymentRetryUiState.Declined(
                         amountLabel = amountLabel,
                         message = "Your card was declined. Nothing was charged.",
+                        slotTime = slotTime,
                     )
             }
         }
 
+        /**
+         * Format a booking start instant (ISO) to a short time label for the hold
+         * chip, e.g. "2:00 PM". Returns null when the value is missing or unparseable.
+         */
+        private fun formatSlotTime(startTime: String?): String? {
+            if (startTime.isNullOrBlank()) return null
+            return runCatching {
+                val instant = java.time.OffsetDateTime.parse(startTime).toInstant()
+                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                zdt.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.US))
+            }.getOrNull()
+        }
+
+        /** Format [holdRemaining] seconds as "M:SS" for the chip label. */
+        fun holdLabel(remainingSeconds: Int): String {
+            val m = remainingSeconds / 60
+            val s = remainingSeconds % 60
+            return "$m:${s.toString().padStart(2, '0')}"
+        }
+
         private companion object {
             val TERMINAL_STATUSES = setOf("cancelled", "canceled", "declined", "expired", "no_show")
+            const val HOLD_WINDOW_SECONDS = 600 // 10-minute default hold window
+            const val HOLD_TICK_MS = 1_000L
         }
     }

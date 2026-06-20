@@ -33,10 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.pantopusShadow
 
 /** A5 — what the summary card should render. */
 @Immutable
@@ -67,19 +69,25 @@ fun SummaryCard(
         modifier =
             modifier
                 .fillMaxWidth()
+                .pantopusShadow(PantopusElevations.sm, RoundedCornerShape(16.dp))
                 .clip(RoundedCornerShape(16.dp))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(16.dp))
                 .padding(Spacing.s4),
     ) {
-        val showPeriod = content is SummaryCardContent.Data
-        SummaryHeader(pillar = pillar, showPeriod = showPeriod)
-        Spacer(Modifier.height(Spacing.s3 + 2.dp))
-        when (content) {
-            is SummaryCardContent.Data -> SummaryData(content.summary, pillar, onInsights)
-            SummaryCardContent.Empty -> SummaryEmpty(pillar, onShare)
-            SummaryCardContent.Error -> SummaryError(onRetry)
-            SummaryCardContent.Loading -> SummaryLoading()
+        // Loading replaces the entire card body with shimmer (including header area).
+        if (content is SummaryCardContent.Loading) {
+            SummaryLoading()
+        } else {
+            val showPeriod = content is SummaryCardContent.Data
+            SummaryHeader(pillar = pillar, showPeriod = showPeriod)
+            Spacer(Modifier.height(Spacing.s3 + 2.dp))
+            when (content) {
+                is SummaryCardContent.Data -> SummaryData(content.summary, pillar, onInsights)
+                SummaryCardContent.Empty -> SummaryEmpty(pillar, onShare)
+                SummaryCardContent.Error -> SummaryError(onRetry)
+                SummaryCardContent.Loading -> Unit // handled above
+            }
         }
     }
 }
@@ -321,6 +329,14 @@ private fun SummaryError(onRetry: () -> Unit) {
 
 @Composable
 private fun SummaryLoading() {
+    // Header row: overline label shimmer + period-toggle pill shimmer
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.width(88.dp).height(11.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurfaceSunken))
+        Spacer(Modifier.weight(1f))
+        Box(modifier = Modifier.width(120.dp).height(26.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appSurfaceSunken))
+    }
+    Spacer(Modifier.height(14.dp))
+    // Stat cells row
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp)) {
         repeat(4) {
             Column(modifier = Modifier.weight(1f)) {
@@ -341,7 +357,13 @@ private fun SummaryLoading() {
         }
     }
     Spacer(Modifier.height(Spacing.s4))
+    // Sparkline shimmer
     Box(modifier = Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken))
+    // "See insights" link shimmer
+    Spacer(Modifier.height(Spacing.s3))
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Box(modifier = Modifier.width(86.dp).height(12.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurfaceSunken))
+    }
 }
 
 private fun formatDelta(pct: Int): String = if (pct >= 0) "+$pct%" else "$pct%"

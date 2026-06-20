@@ -259,7 +259,7 @@ private fun PackageRow(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.Package,
+                icon = PantopusIcon.Layers,
                 contentDescription = null,
                 size = 19.dp,
                 tint = if (archived) PantopusColors.appTextSecondary else accent,
@@ -386,7 +386,7 @@ private fun EmptyActive(
     onCreate: () -> Unit,
 ) {
     EmptyState(
-        icon = PantopusIcon.Package,
+        icon = PantopusIcon.Layers,
         headline = "Sell a package of sessions",
         subcopy = "Bundle sessions so regulars can prepay and rebook fast.",
         ctaTitle = "Create a package",
@@ -427,7 +427,7 @@ private fun PayoutsGate(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.Package,
+                icon = PantopusIcon.Layers,
                 contentDescription = null,
                 size = 32.dp,
                 tint = pillar.accent,

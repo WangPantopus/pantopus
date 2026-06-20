@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,10 +71,13 @@ fun WhosFreeScreen(
 ) {
     LaunchedEffect(Unit) { viewModel.start() }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // F7 major fix: observe online/offline to mute Add and show offline banner.
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     var tapped by remember { mutableStateOf<TappedBlock?>(null) }
 
     WhosFreeContent(
         state = state,
+        isOnline = isOnline,
         onBack = onBack,
         onRetry = viewModel::load,
         onAdd = { viewModel.addEventRoute()?.let(onNavigate) },
@@ -108,9 +114,12 @@ fun WhosFreeContent(
     onFindTimeHere: () -> Unit,
     onAddEvent: () -> Unit,
     modifier: Modifier = Modifier,
+    // F7 major fix: mute Add when offline (design FrameOffline: Add muted).
+    isOnline: Boolean = true,
 ) {
     Column(modifier = modifier.fillMaxSize().background(PantopusColors.appBg).testTag(WHOS_FREE_TAG)) {
-        val canAdd = state is WhosFreeUiState.Loaded
+        // Add is enabled only when loaded AND online (design: muted when offline or loading).
+        val canAdd = state is WhosFreeUiState.Loaded && isOnline
         FtTopBar(title = "Who's free", onBack = onBack, trailingText = "Add", trailingEnabled = canAdd, onTrailing = onAdd)
         Head(view = (state as? WhosFreeUiState.Loaded)?.view ?: GridView.Day, onSetView = onSetView)
         when (state) {
@@ -119,6 +128,7 @@ fun WhosFreeContent(
             is WhosFreeUiState.Loaded ->
                 LoadedGrid(
                     state = state,
+                    isOnline = isOnline,
                     onSelectFilter = onSelectFilter,
                     onTryNext = onTryNext,
                     onTapFree = onTapFree,
@@ -170,11 +180,23 @@ private fun LoadedGrid(
     onDismissTapped: () -> Unit,
     onFindTimeHere: () -> Unit,
     onAddEvent: () -> Unit,
+    // F7 major fix: offline banner above FilterChips.
+    isOnline: Boolean = true,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
+        // F7 major fix: amber wifi-off offline banner at top of scroll body per FrameOffline.
+        if (!isOnline) {
+            FtBanner(
+                tone = FtBannerTone.Warning,
+                icon = PantopusIcon.WifiOff,
+                title = "You're offline",
+                body = "Showing last known availability. Connect to refresh.",
+            )
+        }
+
         FilterChips(filters = state.filters, selected = state.selectedFilter, onSelect = onSelectFilter)
 
         if (state.emptyAllBusy) {
@@ -186,26 +208,47 @@ private fun LoadedGrid(
             )
         }
 
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.xl))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                    .padding(Spacing.s3),
-        ) {
-            HeatGridView(
-                columns = state.grid.columns,
-                rows = state.visibleRows,
-                onTapFree = onTapFree,
-            )
-            Legend(hasUnknown = state.optedOutNames.isNotEmpty())
+        // F7 major fix (popover): Wrap the grid card in a Box so TappedActionCard
+        // can be overlaid as a Popup anchored near the top of the grid card,
+        // approximating the design's absolute-positioned popover (134dp wide).
+        // A true cell-anchored popover is not achievable without per-cell coordinates;
+        // this positions it at the top-end of the grid card — the closest Compose equivalent.
+        Box {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.xl))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                        .padding(Spacing.s3),
+            ) {
+                HeatGridView(
+                    columns = state.grid.columns,
+                    rows = state.visibleRows,
+                    onTapFree = onTapFree,
+                )
+                Legend(hasUnknown = state.optedOutNames.isNotEmpty())
+            }
+            // F7 major fix: show TappedActionCard as an overlaid popup anchored to
+            // the grid card (approximates design's absolute popover within the card).
+            if (tapped != null) {
+                Popup(
+                    onDismissRequest = onDismissTapped,
+                    properties = PopupProperties(focusable = true),
+                ) {
+                    TappedActionCard(
+                        tapped = tapped,
+                        onFindTimeHere = onFindTimeHere,
+                        onAddEvent = onAddEvent,
+                        onDismiss = onDismissTapped,
+                    )
+                }
+            }
         }
 
-        if (tapped != null) {
-            TappedActionCard(tapped = tapped, onFindTimeHere = onFindTimeHere, onAddEvent = onAddEvent, onDismiss = onDismissTapped)
-        } else {
+        // Hint row (only when nothing is tapped — dismiss is via popup now).
+        if (tapped == null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -423,6 +466,15 @@ private fun Legend(hasUnknown: Boolean) {
 
 // ─── Tapped action card / popover ─────────────────────────────────────────────
 
+/**
+ * F7 major fix: design shows this as an absolute-positioned popover (134dp wide)
+ * anchored near the tapped cell inside the grid card. The prior implementation
+ * rendered this as a full-width card below the grid in the scroll body (wrong).
+ * This is now rendered inside a Compose `Popup` (see `LoadedGrid`) so it floats
+ * over the grid. Width is capped at 160dp (≈134dp design + padding headroom).
+ * The design has no dismiss X button — removed; the popup's `focusable=true`
+ * and `onDismissRequest` handle back-press and touch-outside dismissal.
+ */
 @Composable
 private fun TappedActionCard(
     tapped: TappedBlock,
@@ -433,7 +485,7 @@ private fun TappedActionCard(
     Column(
         modifier =
             Modifier
-                .fillMaxWidth()
+                .widthIn(max = 160.dp)
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, HomeAccent, RoundedCornerShape(Radii.xl))
@@ -441,21 +493,12 @@ private fun TappedActionCard(
                 .testTag("whosFreePopover"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${tapped.memberName} · ${tapped.columnLabel} · free",
-                style = PantopusTextStyle.small,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClickLabel = "Dismiss", onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Dismiss", size = 14.dp, tint = PantopusColors.appTextMuted)
-            }
-        }
+        Text(
+            text = "${tapped.memberName} · ${tapped.columnLabel} · free",
+            style = PantopusTextStyle.caption,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
         FtPrimaryButton(label = "Find a time here", icon = PantopusIcon.Users, onClick = onFindTimeHere)
         FtSecondaryButton(label = "Add event", icon = PantopusIcon.CalendarPlus, onClick = onAddEvent)
     }

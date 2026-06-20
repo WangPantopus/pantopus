@@ -78,6 +78,8 @@ fun FindATimeSetupScreen(
         onAdjustCustom = viewModel::adjustCustomDuration,
         onWindow = viewModel::setWindow,
         onToggleExplainer = viewModel::toggleExplainer,
+        onMakeOptional = viewModel::makeSomeoneOptional,
+        onWidenWindow = viewModel::widenWindow,
     )
 }
 
@@ -94,6 +96,8 @@ fun FindATimeSetupContent(
     onAdjustCustom: (Int) -> Unit,
     onWindow: (WindowPreset) -> Unit,
     onToggleExplainer: () -> Unit,
+    onMakeOptional: () -> Unit = {},
+    onWidenWindow: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().background(PantopusColors.appBg).testTag(FIND_A_TIME_SETUP_TAG)) {
@@ -118,6 +122,8 @@ fun FindATimeSetupContent(
                     onAdjustCustom = onAdjustCustom,
                     onWindow = onWindow,
                     onToggleExplainer = onToggleExplainer,
+                    onMakeOptional = onMakeOptional,
+                    onWidenWindow = onWidenWindow,
                 )
         }
     }
@@ -133,6 +139,8 @@ private fun SetupFormBody(
     onAdjustCustom: (Int) -> Unit,
     onWindow: (WindowPreset) -> Unit,
     onToggleExplainer: () -> Unit,
+    onMakeOptional: () -> Unit = {},
+    onWidenWindow: () -> Unit = {},
 ) {
     // Round-robin rule is a display-only choice (mirrors iOS — not sent to the
     // backend), so it lives as screen-local UI state rather than on the VM form.
@@ -141,6 +149,16 @@ private fun SetupFormBody(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
+        // F4 FrameNoOverlap: amber warning banner when F5 found no overlapping time.
+        if (form.noOverlapMessage != null) {
+            FtBanner(
+                tone = FtBannerTone.Warning,
+                icon = PantopusIcon.AlertTriangle,
+                title = "No time works for all ${form.members.count { it.required }}",
+                body = form.noOverlapMessage,
+            )
+        }
+
         Explainer(expanded = form.explainerExpanded, onToggle = onToggleExplainer)
 
         FtCard {
@@ -164,6 +182,17 @@ private fun SetupFormBody(
             }
             if (!form.hasRequired) {
                 ValidationLine("Mark at least one member as required")
+            }
+            // No-overlap quick fix: "Make … optional" inline button (FrameNoOverlap).
+            if (form.noOverlapMessage != null) {
+                Box(modifier = Modifier.padding(top = Spacing.s2)) {
+                    FtSecondaryButton(
+                        label = "Make someone optional",
+                        icon = PantopusIcon.UserMinus,
+                        tint = HomeAccentDark,
+                        onClick = onMakeOptional,
+                    )
+                }
             }
         }
 
@@ -235,6 +264,17 @@ private fun SetupFormBody(
             }
             if (!form.rangeValid) {
                 ValidationLine("End date is before the start date")
+            }
+            // No-overlap quick fix: "Widen to two weeks" inline button (FrameNoOverlap).
+            if (form.noOverlapMessage != null) {
+                Box(modifier = Modifier.padding(top = Spacing.s2)) {
+                    FtSecondaryButton(
+                        label = "Widen to two weeks",
+                        icon = PantopusIcon.CalendarPlus,
+                        tint = HomeAccentDark,
+                        onClick = onWidenWindow,
+                    )
+                }
             }
         }
     }

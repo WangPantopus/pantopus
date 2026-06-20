@@ -69,6 +69,21 @@ enum class EdgeTone {
                 Success -> PantopusColors.success
             }
 
+    /**
+     * The darker shade of this tone (design `t.dk`): used for title/still text
+     * in PolicyNoteCard to separate the title layer (dark) from the body layer
+     * (fg). Since there are no numeric dark-variant tokens for warn/error/success,
+     * we approximate via appText for those and primary700 for info.
+     */
+    val dk: Color
+        get() =
+            when (this) {
+                Error -> PantopusColors.appText
+                Warn -> PantopusColors.appText
+                Info -> PantopusColors.primary700
+                Success -> PantopusColors.appText
+            }
+
     val bg: Color
         get() =
             when (this) {
@@ -281,7 +296,8 @@ fun PolicyNoteCard(
             PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = tone.fg)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = tone.fg)
+            // Design PolicyCard: title uses t.dk (darker shade), body uses t.fg (lighter).
+            Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = tone.dk)
             Text(text = body, style = PantopusTextStyle.caption, color = tone.fg)
             if (still != null) {
                 // Spec PolicyCard draws a 1px tone hairline above the "still" note.
@@ -307,7 +323,8 @@ fun PolicyNoteCard(
                         tint = tone.fg,
                         modifier = Modifier.padding(top = 2.dp),
                     )
-                    Text(text = still, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = tone.fg)
+                    // Design: "still" note uses t.dk (darker shade), fontWeight 600.
+                    Text(text = still, style = PantopusTextStyle.caption, fontWeight = FontWeight.SemiBold, color = tone.dk)
                 }
             }
         }

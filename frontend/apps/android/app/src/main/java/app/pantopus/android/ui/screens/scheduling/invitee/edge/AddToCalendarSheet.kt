@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +53,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 const val ADD_TO_CALENDAR_TAG = "schedulingAddToCalendar"
+
+/** A single on-device calendar the user can pick from (Frame 5 multi-calendar). */
+data class OnDeviceCalendar(
+    val id: Long,
+    val name: String,
+    val accountEmail: String?,
+    /** Dot-swatch color for the calendar row. */
+    val dotColor: Color,
+)
 
 /** The booking an [AddToCalendarSheet] writes to the calendar. */
 data class AddToCalendarEvent(
@@ -79,11 +90,15 @@ fun AddToCalendarSheet(
     sheetState: SheetState,
     modifier: Modifier = Modifier,
     @Suppress("UNUSED_PARAMETER") pillar: SchedulingPillar = SchedulingPillar.Personal,
+    /** On-device calendars discovered by the host; empty = fire INSERT directly. */
+    deviceCalendars: List<OnDeviceCalendar> = emptyList(),
     viewModel: AddToCalendarViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val icsState by viewModel.ics.collectAsStateWithLifecycle()
     var added by remember { mutableStateOf(false) }
+    // Frame 5: show picker only when device has 2+ calendars.
+    var showCalendarPicker by remember { mutableStateOf(false) }
 
     // When the .ics text arrives, write it to cache and open via FileProvider.
     LaunchedEffect(icsState) {
@@ -99,6 +114,23 @@ fun AddToCalendarSheet(
             context.startActivity(Intent.createChooser(view, "Add to calendar"))
         }
         viewModel.consume()
+    }
+
+    // Frame 5: multi-calendar picker level (second-level sheet).
+    if (showCalendarPicker) {
+        CalendarPickerLevel(
+            calendars = deviceCalendars,
+            sheetState = sheetState,
+            onDismiss = { showCalendarPicker = false },
+            onPick = { cal ->
+                showCalendarPicker = false
+                added =
+                    runCatching {
+                        context.startActivity(buildInsertIntent(event, calendarId = cal.id))
+                    }.isSuccess
+            },
+        )
+        return
     }
 
     ModalBottomSheet(
@@ -121,7 +153,12 @@ fun AddToCalendarSheet(
                 NativeAddButton(
                     added = added,
                     onClick = {
-                        added = runCatching { context.startActivity(buildInsertIntent(event)) }.isSuccess
+                        if (deviceCalendars.size > 1) {
+                            // Multiple calendars — show the picker level (Frame 5).
+                            showCalendarPicker = true
+                        } else {
+                            added = runCatching { context.startActivity(buildInsertIntent(event)) }.isSuccess
+                        }
                     },
                 )
             }
@@ -229,6 +266,159 @@ fun AddToCalendarSheet(
 private const val ADDED_DISMISS_MS = 1400L
 private val CARD_RADIUS = 14.dp
 private val DISC_RADIUS = 10.dp
+private val DOT_SIZE = 10.dp
+
+/**
+ * Frame 5 — Multi-calendar picker level (second-level sheet).
+ * Shown when [deviceCalendars] has 2+ entries. Design: "Choose a calendar"
+ * header (back chevron), subtitle, RowCard of on-device calendar rows with
+ * colored dot swatches, and a filled "Add to Personal" (first-selected) CTA.
+ */
+@Composable
+private fun CalendarPickerLevel(
+    calendars: List<OnDeviceCalendar>,
+    sheetState: SheetState,
+    onDismiss: () -> Unit,
+    onPick: (OnDeviceCalendar) -> Unit,
+) {
+    var selected by remember { mutableStateOf(calendars.firstOrNull()) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = PantopusColors.appSurface,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s6)) {
+            // Header row: back chevron + centered title.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s2, vertical = Spacing.s3),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .clickable(onClickLabel = "Back", onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.ChevronLeft,
+                        contentDescription = "Back",
+                        size = 20.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+                Text(
+                    text = "Choose a calendar",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Box(modifier = Modifier.size(34.dp))
+            }
+            Text(
+                text = "Where should we add it?",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s1),
+            )
+            Column(
+                modifier =
+                    Modifier
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .clip(RoundedCornerShape(CARD_RADIUS))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(CARD_RADIUS)),
+            ) {
+                calendars.forEachIndexed { index, cal ->
+                    if (index > 0) {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+                    }
+                    CalendarPickerRow(
+                        calendar = cal,
+                        selected = cal == selected,
+                        onClick = { selected = cal },
+                    )
+                }
+            }
+            Box(modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .clip(RoundedCornerShape(Radii.lg))
+                            .background(PantopusColors.primary600)
+                            .clickable(enabled = selected != null, onClick = { selected?.let(onPick) }),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.CalendarPlus,
+                        contentDescription = null,
+                        size = 16.dp,
+                        tint = PantopusColors.appTextInverse,
+                        modifier = Modifier.padding(end = Spacing.s2),
+                    )
+                    Text(
+                        text = "Add to ${selected?.name ?: "calendar"}",
+                        style = PantopusTextStyle.small,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appTextInverse,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarPickerRow(
+    calendar: OnDeviceCalendar,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(PantopusColors.appSurface)
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(DOT_SIZE)
+                    .clip(CircleShape)
+                    .background(calendar.dotColor),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = calendar.name,
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            calendar.accountEmail?.let {
+                Text(text = it, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+            }
+        }
+        if (selected) {
+            PantopusIconImage(
+                icon = PantopusIcon.CheckCircle,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.primary600,
+            )
+        }
+    }
+}
 
 @Composable
 private fun DoneBar(onClick: () -> Unit) {
@@ -371,7 +561,10 @@ private fun RowDivider() {
 
 // ─── Intent builders ────────────────────────────────────────────────────────
 
-private fun buildInsertIntent(event: AddToCalendarEvent): Intent {
+private fun buildInsertIntent(
+    event: AddToCalendarEvent,
+    calendarId: Long? = null,
+): Intent {
     val start = parseInstant(event.startUtc)?.toEpochMilli()
     val end = parseInstant(event.endUtc)?.toEpochMilli()
     return Intent(Intent.ACTION_INSERT).apply {
@@ -381,6 +574,7 @@ private fun buildInsertIntent(event: AddToCalendarEvent): Intent {
         event.description?.let { putExtra(CalendarContract.Events.DESCRIPTION, it) }
         start?.let { putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, it) }
         end?.let { putExtra(CalendarContract.EXTRA_EVENT_END_TIME, it) }
+        calendarId?.let { putExtra(CalendarContract.Events.CALENDAR_ID, it) }
     }
 }
 

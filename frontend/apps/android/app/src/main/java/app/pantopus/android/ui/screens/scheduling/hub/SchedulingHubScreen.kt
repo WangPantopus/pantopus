@@ -5,7 +5,6 @@ package app.pantopus.android.ui.screens.scheduling.hub
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -90,7 +89,7 @@ fun SchedulingHubScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HubTopBar(canEdit = canEdit, onBack = onBack)
+            HubTopBar(canEdit = canEdit)
             HubPillBand(pillar = pillar, onSelect = viewModel::selectPillar)
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 Column(
@@ -144,7 +143,6 @@ fun SchedulingHubScreen(
 @Composable
 private fun HubTopBar(
     canEdit: Boolean,
-    onBack: () -> Unit,
 ) {
     Column {
         Box(
@@ -155,18 +153,13 @@ private fun HubTopBar(
                     .background(PantopusColors.appSurface)
                     .padding(horizontal = Spacing.s3),
         ) {
+            // Hub is a tab-root destination — design shows an inert 36×36 spacer, no back button.
             Box(
                 modifier =
                     Modifier
                         .align(Alignment.CenterStart)
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .clickable(onClickLabel = "Back", onClick = onBack)
-                        .testTag("schedulingTopBarBack"),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(icon = PantopusIcon.ChevronLeft, contentDescription = "Back", size = 22.dp, tint = PantopusColors.appText)
-            }
+                        .size(36.dp),
+            )
             Text(
                 "Scheduling",
                 style = PantopusTextStyle.body,

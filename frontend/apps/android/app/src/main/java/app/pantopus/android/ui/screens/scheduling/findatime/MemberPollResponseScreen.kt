@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -86,11 +87,16 @@ fun MemberPollResponseContent(
             is PollResponseUiState.Loading -> PollSkeleton()
             is PollResponseUiState.Error -> ErrorState(message = state.message, onRetry = onRetry)
             is PollResponseUiState.Loaded ->
-                LoadedPoll(
-                    state = state,
-                    onVote = onVote,
-                    onSubmit = onSubmit,
-                )
+                // F6 blocker fix: show success state when submitted=true (previously ignored).
+                if (state.submitted) {
+                    PollSubmittedBody(onDone = onBack)
+                } else {
+                    LoadedPoll(
+                        state = state,
+                        onVote = onVote,
+                        onSubmit = onSubmit,
+                    )
+                }
             is PollResponseUiState.Closed -> ClosedPoll(state = state)
         }
     }
@@ -290,6 +296,64 @@ private fun VoteControl(
                     color = if (on) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
                 )
             }
+        }
+    }
+}
+
+/**
+ * F6 blocker fix — submitted/success state. Design Frame 2 (Answered) transitions
+ * to a full-screen confirmation: check-circle, "Response submitted" headline,
+ * body copy, and a "Done" CTA. Mirrors iOS PollResponseView submittedView.
+ */
+@Composable
+private fun PollSubmittedBody(onDone: () -> Unit) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Spacing.s6)
+                .testTag("pollResponseSubmitted"),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier.size(84.dp).clip(CircleShape).background(HomeAccentBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.size(52.dp).clip(CircleShape).background(HomeAccent),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.CheckCircle,
+                    contentDescription = null,
+                    size = 28.dp,
+                    tint = PantopusColors.appTextInverse,
+                )
+            }
+        }
+        Text(
+            text = "Response submitted",
+            style = PantopusTextStyle.h3,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = Spacing.s4),
+        )
+        Text(
+            text = "Thanks for weighing in. The organizer will pick the best time.",
+            style = PantopusTextStyle.small,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = Spacing.s2),
+        )
+        Box(modifier = Modifier.padding(top = Spacing.s4).fillMaxWidth()) {
+            FtPrimaryButton(
+                label = "Done",
+                icon = PantopusIcon.Check,
+                onClick = onDone,
+                modifier = Modifier.testTag("pollResponseDoneButton"),
+            )
         }
     }
 }

@@ -312,7 +312,7 @@ private fun WorkflowsEmpty(
 ) {
     if (scope == WorkflowsListViewModel.Scope.Global) {
         AutoInlineEmpty(
-            icon = PantopusIcon.Sparkles,
+            icon = PantopusIcon.Workflow,
             headline = "No follow-ups yet",
             subcopy = "Reminders are handled. Add a thank-you or a review request to run automatically.",
             accent = accent,
@@ -322,7 +322,7 @@ private fun WorkflowsEmpty(
         )
     } else {
         AutoInlineEmpty(
-            icon = PantopusIcon.Sparkles,
+            icon = PantopusIcon.Workflow,
             headline = "No event-type workflows",
             subcopy = "Workflows scoped to a single event type show up here. Add one from its editor.",
             accent = accent,

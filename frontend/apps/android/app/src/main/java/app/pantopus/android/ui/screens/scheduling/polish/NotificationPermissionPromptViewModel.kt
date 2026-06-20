@@ -8,8 +8,10 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.UpdateNotificationPrefsRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -80,9 +82,18 @@ class NotificationPermissionPromptViewModel
     constructor(
         private val repo: SchedulingRepository,
         authRepository: AuthRepository,
+        ownerRelay: NotificationPromptOwnerRelay,
     ) : ViewModel() {
-        /** Pillar of the routed entry (Personal); the CTA + code field take this accent. */
-        val pillar: SchedulingPillar = SchedulingPillar.Personal
+        /**
+         * Owner resolved from [NotificationPromptOwnerRelay] — set by the navigating
+         * surface immediately before `onNavigate(NOTIFICATION_PERMISSION_PROMPT)`. Falls
+         * back to [SchedulingOwner.Personal] on cold-start / deep-link where no relay
+         * value is present, preserving pre-fix behavior.
+         */
+        private val owner: SchedulingOwner = ownerRelay.consume() ?: SchedulingOwner.Personal
+
+        /** Pillar derived from the resolved owner — drives the accent on CTAs / code field. */
+        val pillar: SchedulingPillar = owner.pillar()
 
         private val _state =
             MutableStateFlow(

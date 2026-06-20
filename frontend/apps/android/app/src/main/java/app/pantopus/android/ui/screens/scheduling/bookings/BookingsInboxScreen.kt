@@ -124,6 +124,7 @@ fun BookingsInboxScreen(
                 PantopusColors.appBg,
             ).testTag(BookingsInboxTags.SCREEN),
     ) {
+        val activeAccent = activeAccent(scope, scopes)
         Column(modifier = Modifier.fillMaxSize()) {
             InboxTopBar(
                 searching = searching,
@@ -134,9 +135,17 @@ fun BookingsInboxScreen(
                 onFilter = { onNavigate(SchedulingRoutes.BOOKING_SEARCH) },
             )
             ScopePillRow(scopes = scopes, active = scope, onSelect = viewModel::selectScope)
+            // Design Frame 9: member-gated banner shown when viewer is a team member.
+            val isMember = (state as? BookingsInboxUiState.Content)?.isMember ?: false
+            if (isMember) {
+                MemberBanner()
+            }
+            val hidePending = (state as? BookingsInboxUiState.Content)?.hidePending ?: false
             InboxSegmented(
                 active = segment,
                 pendingBadge = pendingBadge,
+                accent = activeAccent,
+                hidePending = hidePending,
                 onSelect = viewModel::selectSegment,
             )
             HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
@@ -164,8 +173,10 @@ fun BookingsInboxScreen(
             }
         }
         if (state is BookingsInboxUiState.Content) {
+            // Design frame 222: FAB background is always PRIMARY (#0284c7), never
+            // the pillar accent — host operational CTA, not identity-tinted.
             ShareFab(
-                accent = activeAccent(scope, scopes),
+                accent = SchedulingPillar.operationalPrimary,
                 onClick = { onNavigate(viewModel.shareRoute()) },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.s4),
             )
@@ -376,8 +387,16 @@ private fun ScopePillRow(
 private fun InboxSegmented(
     active: BookingSegment,
     pendingBadge: Int,
+    accent: Color,
+    hidePending: Boolean,
     onSelect: (BookingSegment) -> Unit,
 ) {
+    val visibleSegments =
+        if (hidePending) {
+            BookingSegment.entries.filter { it != BookingSegment.Pending }
+        } else {
+            BookingSegment.entries
+        }
     Row(
         modifier =
             Modifier
@@ -389,7 +408,7 @@ private fun InboxSegmented(
                 .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        BookingSegment.entries.forEach { seg ->
+        visibleSegments.forEach { seg ->
             val on = seg == active
             Row(
                 modifier =
@@ -407,7 +426,7 @@ private fun InboxSegmented(
                     text = seg.label,
                     fontSize = 11.5.sp,
                     fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (on) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+                    color = if (on) accent else PantopusColors.appTextSecondary,
                 )
                 if (seg == BookingSegment.Pending && pendingBadge > 0) {
                     Spacer(Modifier.width(Spacing.s1))
@@ -551,7 +570,7 @@ private fun BookingRowCard(
                     color = PantopusColors.appTextMuted,
                     modifier = Modifier.padding(top = 1.dp),
                 )
-                if (row.showOwnerGlyph || row.assigned) {
+                if (row.showOwnerGlyph || row.assigneeName != null) {
                     Row(
                         modifier = Modifier.padding(top = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -563,7 +582,7 @@ private fun BookingRowCard(
                                 label = row.ownerLabel,
                             )
                         }
-                        if (row.assigned) AssignedChip()
+                        row.assigneeName?.let { AssignedChip(name = it) }
                     }
                 }
             }
@@ -583,9 +602,11 @@ private fun BookingRowCard(
                             1f,
                         ).testTag("${BookingsInboxTags.DECLINE_PREFIX}${row.id}"),
                 )
+                // Design: Approve button is always PRIMARY blue (#0284c7) for all pillars
+                // (bookings-inbox-frames.jsx:33, :206 — background:PRIMARY). Not accent-polymorphic.
                 PillarFilledButton(
                     label = "Approve",
-                    accent = row.pillar.accent,
+                    accent = SchedulingPillar.operationalPrimary,
                     leadingIcon = PantopusIcon.Check,
                     onClick = onApprove,
                     modifier =
@@ -618,8 +639,11 @@ private fun OwnerGlyph(
     }
 }
 
+/** Design: AssignedChip renders the assignee [name] (e.g. "Priya", "Devon").
+ *  When the list DTO provides only a hostUserId, [name] is a truncated form of it
+ *  until the endpoint exposes a display name. */
 @Composable
-private fun AssignedChip() {
+private fun AssignedChip(name: String) {
     Row(
         modifier =
             Modifier
@@ -636,10 +660,49 @@ private fun AssignedChip() {
             tint = PantopusColors.business,
         )
         Text(
-            text = "Assigned",
+            text = name,
             fontSize = 9.5.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.business,
+        )
+    }
+}
+
+// ─── Member banner ────────────────────────────────────────────────────────────
+
+/**
+ * Design Frame 9: shown between ScopePills and the Segmented control when the
+ * viewer is a team member (business scope) seeing only bookings assigned to them.
+ * Blue50 bg / blue200 border / user-check icon — matches bookings-inbox-frames.jsx:228-235.
+ */
+@Composable
+private fun MemberBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = Spacing.s3)
+                .padding(bottom = Spacing.s2)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.UserCheck,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = "You're seeing bookings assigned to you",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary700,
+            modifier = Modifier.weight(1f),
         )
     }
 }

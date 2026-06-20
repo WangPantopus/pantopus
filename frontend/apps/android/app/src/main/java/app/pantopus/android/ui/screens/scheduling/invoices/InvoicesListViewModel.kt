@@ -52,8 +52,16 @@ sealed interface InvoicesListUiState {
 
     data class Loaded(
         val sections: List<InvoiceDaySection>,
-        val totalLabel: String,
-        val countLabel: String,
+        /** Formatted outstanding (unpaid) amount — "Outstanding" KPI left column. */
+        val outstandingLabel: String,
+        /** Formatted collected-this-month amount — "Collected · month" KPI right column. */
+        val collectedMonthLabel: String,
+        /**
+         * True when at least one invoice is overdue — drives amber tint on the
+         * "Outstanding" label + value. Always false until the DTO gains a `status`
+         * field (deferred: InvoiceDto carries no `status` / `paid_at`).
+         */
+        val hasOverdue: Boolean,
         val pillar: SchedulingPillar,
     ) : InvoicesListUiState
 }
@@ -108,19 +116,28 @@ class InvoicesListViewModel
                         val invoices = result.data.invoices
                         _state.value =
                             when {
-                                invoices.isNotEmpty() ->
+                                invoices.isNotEmpty() -> {
+                                    // The DTO has no `status` or `paid_at` field, so we
+                                    // cannot compute the real outstanding vs collected split.
+                                    // Outstanding = sum of all invoice totals (deferred: should
+                                    // exclude paid invoices once DTO gains `status`).
+                                    // Collected · month = $0 placeholder (deferred: needs
+                                    // `paid_at` to filter to current calendar month).
+                                    val currency = invoices.firstOrNull()?.currency
                                     InvoicesListUiState.Loaded(
                                         sections = InvoiceGrouping.byDay(invoices),
-                                        totalLabel =
+                                        outstandingLabel =
                                             PackagesMoney.format(
-                                                invoices.sumOf {
-                                                    it.totalCents ?: 0
-                                                },
-                                                invoices.firstOrNull()?.currency,
+                                                invoices.sumOf { it.totalCents ?: 0 },
+                                                currency,
                                             ),
-                                        countLabel = invoices.size.toString(),
+                                        collectedMonthLabel =
+                                            PackagesMoney.format(0, currency),
+                                        // Deferred: always false until DTO has `status`
+                                        hasOverdue = false,
                                         pillar = owner.pillar(),
                                     )
+                                }
                                 applicable && !connected -> InvoicesListUiState.Gate
                                 else -> InvoicesListUiState.Empty
                             }

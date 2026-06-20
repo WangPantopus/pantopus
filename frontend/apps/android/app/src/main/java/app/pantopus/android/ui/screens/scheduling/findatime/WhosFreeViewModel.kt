@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.scheduling.SlotDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -79,9 +80,17 @@ class WhosFreeViewModel
         private val members: HomeMembersRepository,
         private val repo: SchedulingRepository,
         private val session: FindATimeSession,
+        private val networkMonitor: NetworkMonitor,
     ) : ViewModel() {
         private val _state = MutableStateFlow<WhosFreeUiState>(WhosFreeUiState.Loading)
         val state: StateFlow<WhosFreeUiState> = _state.asStateFlow()
+
+        /**
+         * F7 major fix: expose online/offline so the screen can mute Add (design
+         * FrameOffline: right={{ text:'Add', muted:true }}) and show the wifi-off
+         * banner above FilterChips.
+         */
+        val isOnline: StateFlow<Boolean> get() = networkMonitor.isOnline
 
         private val zone = FindATimeFormat.deviceZoneId()
         private var homeId: String? = null

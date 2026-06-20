@@ -45,18 +45,16 @@ import app.pantopus.android.ui.theme.Spacing
 
 internal enum class NotifChipState { On, Off, Disabled, Locked }
 
-private val ACCENT = PantopusColors.primary600
-private val ACCENT_BG = PantopusColors.primary50
-
 @Composable
 internal fun NotifChannelChip(
     letter: String,
     chipState: NotifChipState,
+    accent: androidx.compose.ui.graphics.Color,
 ) {
     val on = chipState == NotifChipState.On || chipState == NotifChipState.Locked
     val bg =
         when (chipState) {
-            NotifChipState.On, NotifChipState.Locked -> ACCENT
+            NotifChipState.On, NotifChipState.Locked -> accent
             NotifChipState.Off -> PantopusColors.appSurface
             NotifChipState.Disabled -> PantopusColors.appSurfaceSunken
         }
@@ -70,7 +68,7 @@ internal fun NotifChannelChip(
         if (chipState == NotifChipState.Off) {
             PantopusColors.appBorderStrong
         } else if (on) {
-            ACCENT
+            accent
         } else {
             PantopusColors.appBorder
         }
@@ -93,10 +91,10 @@ internal fun NotifChannelChip(
                         .size(11.dp)
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, ACCENT, RoundedCornerShape(Radii.pill)),
+                        .border(1.dp, accent, RoundedCornerShape(Radii.pill)),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 6.5.dp, tint = ACCENT)
+                PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 6.5.dp, tint = accent)
             }
         }
     }
@@ -107,6 +105,8 @@ internal fun NotifCategoryCard(
     label: String,
     helper: String,
     disabled: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
+    accentBg: androidx.compose.ui.graphics.Color,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3)) {
@@ -123,13 +123,13 @@ internal fun NotifCategoryCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(ACCENT_BG)
+                        .background(accentBg)
                         .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     label.uppercase(java.util.Locale.US),
-                    color = ACCENT,
+                    color = accent,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.5.sp,
                     letterSpacing = 0.06.em,
@@ -178,6 +178,7 @@ internal fun NotifMatrixRow(
     paused: Boolean,
     pushOff: Boolean,
     showDivider: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
     onToggle: () -> Unit,
 ) {
     val pState =
@@ -207,9 +208,9 @@ internal fun NotifMatrixRow(
             row.sub?.let { Text(it, color = PantopusColors.appTextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            NotifChannelChip("P", pState)
-            NotifChannelChip("E", eState)
-            NotifChannelChip("S", NotifChipState.Disabled)
+            NotifChannelChip("P", pState, accent = accent)
+            NotifChannelChip("E", eState, accent = accent)
+            NotifChannelChip("S", NotifChipState.Disabled, accent = accent)
         }
     }
     if (showDivider) {
@@ -221,6 +222,7 @@ internal fun NotifMatrixRow(
 internal fun ReminderLeadTime(
     selected: List<Int>,
     paused: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
     onToggle: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -235,8 +237,8 @@ internal fun ReminderLeadTime(
                     modifier =
                         Modifier
                             .clip(RoundedCornerShape(Radii.pill))
-                            .background(if (active) ACCENT else PantopusColors.appSurface)
-                            .border(1.dp, if (active) ACCENT else PantopusColors.appBorderStrong, RoundedCornerShape(Radii.pill))
+                            .background(if (active) accent else PantopusColors.appSurface)
+                            .border(1.dp, if (active) accent else PantopusColors.appBorderStrong, RoundedCornerShape(Radii.pill))
                             .then(if (paused) Modifier.alpha(0.5f) else Modifier.clickable { onToggle(minutes) })
                             .padding(horizontal = 13.dp, vertical = 7.dp)
                             .testTag("reminderChip_$minutes"),

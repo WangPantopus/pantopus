@@ -51,7 +51,11 @@ data class SlotRowUi(
 
 /** F5 Find a Time — Suggested Slots. */
 sealed interface SuggestedSlotsUiState {
-    data object Loading : SuggestedSlotsUiState
+    /**
+     * Computing state. [composingSubtitle] is populated once criteria are
+     * resolved ("Composing Mom, Dad and Ava" — design frame 1 / nit fix).
+     */
+    data class Loading(val composingSubtitle: String? = null) : SuggestedSlotsUiState
 
     data class Loaded(
         val header: SlotsHeader,
@@ -90,7 +94,7 @@ class SuggestedSlotsViewModel
         private val errors: SchedulingErrorDecoder,
         private val session: FindATimeSession,
     ) : ViewModel() {
-        private val _state = MutableStateFlow<SuggestedSlotsUiState>(SuggestedSlotsUiState.Loading)
+        private val _state = MutableStateFlow<SuggestedSlotsUiState>(SuggestedSlotsUiState.Loading())
         val state: StateFlow<SuggestedSlotsUiState> = _state.asStateFlow()
 
         private var criteria: FindATimeCriteria? = null
@@ -104,7 +108,7 @@ class SuggestedSlotsViewModel
         }
 
         fun load() {
-            _state.value = SuggestedSlotsUiState.Loading
+            _state.value = SuggestedSlotsUiState.Loading()
             viewModelScope.launch {
                 val resolved = criteria ?: session.criteria ?: resolveDefault()
                 if (resolved == null) {
@@ -112,7 +116,19 @@ class SuggestedSlotsViewModel
                     return@launch
                 }
                 criteria = resolved
+                // F5 nit fix: populate composing subtitle with member names per design frame 1.
+                _state.value = SuggestedSlotsUiState.Loading(composingSubtitle = composingSubtitle(resolved))
                 compute(resolved)
+            }
+        }
+
+        /** "Composing Mom, Dad and Ava" — dynamic subtitle for the computing shimmer state. */
+        private fun composingSubtitle(c: FindATimeCriteria): String {
+            val names = c.requiredMembers.map { it.name.substringBefore(" ") }
+            return when {
+                names.isEmpty() -> "Overlaying everyone's availability"
+                names.size == 1 -> "Composing ${names[0]}'s availability"
+                else -> "Composing ${names.dropLast(1).joinToString(", ")} and ${names.last()}"
             }
         }
 

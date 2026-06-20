@@ -137,6 +137,7 @@ class BookingDetailViewModel
                 requesterSub = data.requesterSub,
                 slotLabel = data.whenRange,
                 intakeCount = data.intakeAnswers.size,
+                hasConflict = data.hasConflict,
             )
         }
 

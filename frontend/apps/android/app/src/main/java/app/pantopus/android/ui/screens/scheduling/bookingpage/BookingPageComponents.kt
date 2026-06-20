@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -55,16 +54,14 @@ object BookingLinkUrls {
 
 private val MONO = FontFamily.Monospace
 
-// ─── Top bar (back · centered title · right Save text action) ───────────────
+// ─── Top bar (back · centered title) ────────────────────────────────────────
+// Design: booking-link-frames.jsx renders <TopBar title="Booking link"/> with
+// no trailing action slot in all 7 frames. Save lives solely in BLSaveBar.
 
 @Composable
 internal fun BLTopBar(
     title: String,
     onBack: () -> Unit,
-    onSave: () -> Unit,
-    saving: Boolean,
-    saveEnabled: Boolean,
-    saveLabel: String = "Save",
 ) {
     Column {
         Row(
@@ -90,19 +87,8 @@ internal fun BLTopBar(
                 modifier = Modifier.weight(1f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            val saveColor = if (saving || !saveEnabled) PantopusColors.appTextMuted else PantopusColors.primary600
-            Text(
-                if (saving) "Saving" else saveLabel,
-                color = saveColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .clickable(enabled = !saving && saveEnabled, onClickLabel = saveLabel, onClick = onSave)
-                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1)
-                        .testTag("blTopBarSave"),
-            )
+            // Symmetry spacer to keep title visually centred (same width as back button).
+            Box(modifier = Modifier.size(32.dp))
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
     }

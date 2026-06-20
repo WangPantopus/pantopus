@@ -90,7 +90,11 @@ fun ConfirmedBody(
 
             confirmed.paid?.let { ReceiptCapsule(it) }
 
-            CalendarCluster(accent = pillar.accent, onAddTo = onAddToCalendar, onDownloadIcs = onDownloadIcs)
+            // Design FramePending: no CalendarCluster shown for pending-approval bookings.
+            // CalendarCluster only appears on confirmed frames (FrameConfirmedFree, FramePaid, etc.)
+            if (!pending) {
+                CalendarCluster(accent = pillar.accent, onAddTo = onAddToCalendar, onDownloadIcs = onDownloadIcs)
+            }
 
             ManageNote(accent = pillar.accent, onManage = onManage, enabled = confirmed.manageToken != null)
 

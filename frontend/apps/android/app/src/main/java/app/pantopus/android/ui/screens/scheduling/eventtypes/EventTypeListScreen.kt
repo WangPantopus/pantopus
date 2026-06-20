@@ -55,8 +55,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
-import app.pantopus.android.ui.screens.shared.identity.IdentityOption
-import app.pantopus.android.ui.screens.shared.identity.IdentitySwitcherPillRow
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -195,50 +193,80 @@ fun EventTypeListScreen(
 private fun FilterHeader(
     pillar: SchedulingPillar,
     tab: EventTypeTab,
-    onSelectPillar: (SchedulingPillar) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSelectPillar: (SchedulingPillar) -> Unit,
     onSelectTab: (EventTypeTab) -> Unit,
 ) {
     Column {
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(pillar.accentBg, PantopusColors.appSurface)))
-                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+                    .background(PantopusColors.appSurface)
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                IdentitySwitcherPillRow(
-                    options =
-                        listOf(
-                            IdentityOption("personal", "Personal", PantopusIcon.User, SchedulingPillar.Personal.accent),
-                            IdentityOption("home", "Home", PantopusIcon.Home, SchedulingPillar.Home.accent),
-                            IdentityOption("business", "Business", PantopusIcon.Briefcase, SchedulingPillar.Business.accent),
-                        ),
-                    activeId =
-                        when (pillar) {
-                            SchedulingPillar.Personal -> "personal"
-                            SchedulingPillar.Home -> "home"
-                            SchedulingPillar.Business -> "business"
-                        },
-                    onSelect = { id ->
-                        onSelectPillar(
-                            when (id) {
-                                "home" -> SchedulingPillar.Home
-                                "business" -> SchedulingPillar.Business
-                                else -> SchedulingPillar.Personal
-                            },
-                        )
-                    },
-                    identifierPrefix = EventTypeListTags.PILLAR_PREFIX,
-                )
-                EtSegmented(
-                    options = EventTypeTab.entries.map { it.label },
-                    selected = tab.label,
-                    onSelect = { label -> EventTypeTab.entries.firstOrNull { it.label == label }?.let(onSelectTab) },
-                )
-            }
+            // Design FilterHeader: single static identity pill in pillar accent color.
+            // The switcher row is NOT in the design — the user arrives scoped to one owner.
+            PillarIdentityPill(
+                pillar = pillar,
+                modifier = Modifier.testTag(EventTypeListTags.PILLAR_PREFIX),
+            )
+            EtSegmented(
+                options = EventTypeTab.entries.map { it.label },
+                selected = tab.label,
+                onSelect = { label -> EventTypeTab.entries.firstOrNull { it.label == label }?.let(onSelectTab) },
+            )
         }
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
+    }
+}
+
+/**
+ * Static single-pillar identity pill. Design FilterHeader shows ONE pill in
+ * pillar accent color with pillar accent bg — Personal sky / Home green /
+ * Business violet. Not interactive; owner is resolved at the VM level before
+ * the screen opens.
+ */
+@Composable
+private fun PillarIdentityPill(
+    pillar: SchedulingPillar,
+    modifier: Modifier = Modifier,
+) {
+    val icon =
+        when (pillar) {
+            SchedulingPillar.Personal -> PantopusIcon.User
+            SchedulingPillar.Home -> PantopusIcon.Home
+            SchedulingPillar.Business -> PantopusIcon.Briefcase
+        }
+    val label =
+        when (pillar) {
+            SchedulingPillar.Personal -> "Personal"
+            SchedulingPillar.Home -> "Home"
+            SchedulingPillar.Business -> "Business"
+        }
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(pillar.accentBg)
+                .padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 11.dp,
+            strokeWidth = 2.4f,
+            tint = pillar.accent,
+        )
+        Text(
+            text = label.uppercase(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.05.em,
+            color = pillar.accent,
+        )
     }
 }
 

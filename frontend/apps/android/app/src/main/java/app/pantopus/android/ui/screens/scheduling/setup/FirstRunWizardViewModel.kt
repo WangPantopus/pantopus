@@ -46,11 +46,14 @@ data class FirstRunWizardUiState(
     val hours: Map<Int, Boolean> = DEFAULT_HOURS,
     val timezoneId: String = ZoneId.systemDefault().id,
     val isSubmitting: Boolean = false,
+    /** True when the user re-enters step 3 having already completed steps 1–2. */
+    val isResume: Boolean = false,
 ) {
     val shareLink: String get() = if (slug.isBlank()) "pantopus.com/book/…" else "pantopus.com/book/$slug"
 }
 
-private val DEFAULT_HOURS = mapOf(1 to true, 2 to true, 3 to true, 4 to true, 5 to true, 6 to false, 7 to false)
+// Weekday keys follow ISO backend contract: 0 = Sunday, 1 = Monday … 6 = Saturday.
+private val DEFAULT_HOURS = mapOf(0 to false, 1 to true, 2 to true, 3 to true, 4 to true, 5 to true, 6 to false)
 
 /**
  * A2 First-Run Wizard ("Set up booking link"), Personal pillar. Plugs into
@@ -133,7 +136,9 @@ class FirstRunWizardViewModel
             if (s.step == STEP_LINK) {
                 _finished.value = true
             } else {
-                _state.value = s.copy(step = s.step - 1)
+                // Navigating back from success to hours marks it as a resume re-entry.
+                val resume = s.step == STEP_SUCCESS
+                _state.value = s.copy(step = s.step - 1, isResume = resume)
             }
         }
 

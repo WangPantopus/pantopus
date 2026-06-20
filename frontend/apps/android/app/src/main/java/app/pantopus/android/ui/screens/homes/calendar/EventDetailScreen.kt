@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -48,7 +49,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.ui.components.EmptyState
-import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
@@ -260,12 +260,29 @@ private fun LoadedShell(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                GhostButton(
-                    title = "Edit",
-                    onClick = onEdit,
-                    isEnabled = !snapshot.isDeleting,
-                    modifier = Modifier.weight(1f).testTag("eventDetail_edit"),
-                )
+                // Design shows `<SecondaryBtn icon="pencil">Edit</SecondaryBtn>` —
+                // outlined button with a leading Pencil glyph.
+                // (event-detail-frames.jsx:113)
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 44.dp)
+                            .alpha(if (snapshot.isDeleting) 0.5f else 1f)
+                            .clip(RoundedCornerShape(Radii.lg))
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                            .clickable(enabled = !snapshot.isDeleting, onClick = onEdit)
+                            .testTag("eventDetail_edit"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    ) {
+                        PantopusIconImage(icon = PantopusIcon.Pencil, contentDescription = null, size = 16.dp, tint = PantopusColors.appText)
+                        Text(text = "Edit", style = PantopusTextStyle.body, color = PantopusColors.appText)
+                    }
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s1),

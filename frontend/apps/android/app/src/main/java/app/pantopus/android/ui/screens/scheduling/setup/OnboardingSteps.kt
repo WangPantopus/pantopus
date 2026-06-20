@@ -53,6 +53,7 @@ private val BUSINESS_TEAM =
         Triple(SeededPerson("owner", "You", "Owner", "Y"), "OWNER", true),
         Triple(SeededPerson("t2", "Priya N.", "Stylist", "PN"), "STYLIST", false),
         Triple(SeededPerson("t3", "Marcus L.", "Stylist", "ML"), "STYLIST", false),
+        Triple(SeededPerson("t4", "Dana W.", "Front desk", "DW"), "FRONT DESK", false),
     )
 
 private data class ServiceChoice(val id: String, val icon: PantopusIcon, val label: String)
@@ -539,7 +540,6 @@ internal fun OnboardingServicePicker(
     serviceType: String,
     duration: Int,
     priceText: String,
-    paidEnabled: Boolean,
     pillar: SchedulingPillar,
     onSelect: (String) -> Unit,
     onDuration: (Int) -> Unit,
@@ -558,9 +558,7 @@ internal fun OnboardingServicePicker(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp)) {
             DurationStepperChips(duration, pillar, onDuration, Modifier.weight(1f))
-            if (paidEnabled) {
-                PriceField(priceText, onPrice, Modifier.weight(1f))
-            }
+            PriceField(priceText, onPrice, Modifier.weight(1f))
         }
     }
 }

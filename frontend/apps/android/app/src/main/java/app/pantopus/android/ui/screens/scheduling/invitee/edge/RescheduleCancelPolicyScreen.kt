@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.DestructiveButton
@@ -129,9 +130,11 @@ private fun ManageTopBar(onBack: () -> Unit) {
         ) {
             PantopusIconImage(icon = PantopusIcon.ChevronLeft, contentDescription = "Back", size = 20.dp, tint = PantopusColors.appText)
         }
+        // Design frames.jsx line 55: fontSize 15, fontWeight 600, centered.
         Text(
             text = "Your booking",
-            style = PantopusTextStyle.h3,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Center,
@@ -174,7 +177,7 @@ fun ManageContent(
 
             // Spec FrameRescheduleClosed adds an inline "Cancel instead" link below the note.
             if (mode == ManagePolicyMode.RescheduleClosed && view.canCancel) {
-                CancelInsteadLink(onClick = onCancel)
+                CancelInsteadLink(pillar = view.pillar, onClick = onCancel)
             }
 
             if (mode == ManagePolicyMode.FreeToChange) {
@@ -190,6 +193,7 @@ fun ManageContent(
                             icon = PantopusIcon.CalendarClock,
                             label = "Reschedule",
                             sub = "Pick a new time that works for you.",
+                            pillar = view.pillar,
                             onClick = onReschedule,
                         )
                     }
@@ -199,6 +203,7 @@ fun ManageContent(
                             label = "Cancel booking",
                             sub = view.refundEstimateLabel?.let { "Refund: $it" } ?: "Release this time.",
                             destructive = true,
+                            pillar = view.pillar,
                             onClick = onCancel,
                         )
                     }
@@ -294,7 +299,10 @@ private const val HOST_GHOST_BORDER_ALPHA = 0.4f
 
 /** The centered primary "Cancel instead" inline link (spec FrameRescheduleClosed). */
 @Composable
-private fun CancelInsteadLink(onClick: () -> Unit) {
+private fun CancelInsteadLink(
+    pillar: SchedulingPillar,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(Spacing.s1),
         horizontalArrangement = Arrangement.Center,
@@ -304,14 +312,14 @@ private fun CancelInsteadLink(onClick: () -> Unit) {
             icon = PantopusIcon.XCircle,
             contentDescription = null,
             size = 14.dp,
-            tint = SchedulingPillar.Personal.accent,
+            tint = pillar.accent,
             modifier = Modifier.padding(end = Spacing.s1),
         )
         Text(
             text = "Cancel instead",
             style = PantopusTextStyle.small,
             fontWeight = FontWeight.Bold,
-            color = SchedulingPillar.Personal.accent,
+            color = pillar.accent,
         )
     }
 }
@@ -322,9 +330,10 @@ private fun ManageActionRow(
     label: String,
     sub: String,
     onClick: () -> Unit,
+    pillar: SchedulingPillar = SchedulingPillar.Personal,
     destructive: Boolean = false,
 ) {
-    val accent = if (destructive) PantopusColors.error else SchedulingPillar.Personal.accent
+    val accent = if (destructive) PantopusColors.error else pillar.accent
     Row(
         modifier =
             Modifier
@@ -343,7 +352,7 @@ private fun ManageActionRow(
                     32.dp,
                 ).clip(
                     RoundedCornerShape(Radii.md),
-                ).background(if (destructive) PantopusColors.errorBg else SchedulingPillar.Personal.accentBg),
+                ).background(if (destructive) PantopusColors.errorBg else pillar.accentBg),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = accent)

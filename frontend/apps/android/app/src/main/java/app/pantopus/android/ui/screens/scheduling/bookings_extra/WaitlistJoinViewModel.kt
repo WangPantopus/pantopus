@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.scheduling.bookings_extra
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.PublicWaitlistJoinRequest
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,9 +34,11 @@ data class WaitlistJoinUiState(
     val preferredTime: String = "",
     val joining: Boolean = false,
     val didJoin: Boolean = false,
+    /** True when the backend returns 409 — the invitee is already on the waitlist. */
+    val alreadyJoined: Boolean = false,
     val error: String? = null,
 ) {
-    val canJoin: Boolean get() = email.contains("@") && email.contains(".") && !joining
+    val canJoin: Boolean get() = email.isNotBlank() && !joining
 }
 
 /**
@@ -56,6 +59,10 @@ class WaitlistJoinViewModel
         private var slug: String = ""
         private var eventTypeSlug: String = ""
         private var started = false
+
+        companion object {
+            private const val HTTP_CONFLICT = 409
+        }
 
         fun start(args: WaitlistJoinArgs) {
             if (started) return
@@ -89,9 +96,16 @@ class WaitlistJoinViewModel
                         email = current.email.trim(),
                         name = current.name.trim().ifBlank { null },
                     )
-                when (repo.publicJoinWaitlist(slug, eventTypeSlug, body)) {
+                when (val r = repo.publicJoinWaitlist(slug, eventTypeSlug, body)) {
                     is NetworkResult.Success -> _state.update { it.copy(joining = false, didJoin = true) }
-                    is NetworkResult.Failure -> _state.update { it.copy(joining = false, error = "Couldn't join the waitlist — try again.") }
+                    is NetworkResult.Failure ->
+                        if (r.error is NetworkError.ClientError && r.error.code == HTTP_CONFLICT) {
+                            // 409: invitee is already on the waitlist (backend returns
+                            // this when the phone/email matches an existing entry).
+                            _state.update { it.copy(joining = false, alreadyJoined = true) }
+                        } else {
+                            _state.update { it.copy(joining = false, error = "Couldn't join the waitlist — try again.") }
+                        }
                 }
             }
         }

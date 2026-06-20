@@ -44,6 +44,7 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling.packages.PkgCard
 import app.pantopus.android.ui.screens.scheduling.packages.PkgComingSoon
 import app.pantopus.android.ui.screens.scheduling.packages.PkgRowCard
@@ -171,7 +172,11 @@ private fun InvoicesLoadedBody(
                 .padding(top = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        SummaryCard(count = state.countLabel, total = state.totalLabel)
+        SummaryCard(
+            outstanding = state.outstandingLabel,
+            collectedMonth = state.collectedMonthLabel,
+            hasOverdue = state.hasOverdue,
+        )
         FilterChips(selected = filter, accent = state.pillar.accent, onSelect = onSelectFilter)
         PkgRowCard {
             val lastSection = state.sections.lastIndex
@@ -210,14 +215,24 @@ private fun InvoicesLoadedBody(
 
 @Composable
 private fun SummaryCard(
-    count: String,
-    total: String,
+    outstanding: String,
+    collectedMonth: String,
+    hasOverdue: Boolean,
 ) {
     PkgCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Stat(label = "Invoices", value = count, modifier = Modifier.weight(1f))
+            Stat(
+                label = "Outstanding",
+                value = outstanding,
+                overdue = hasOverdue,
+                modifier = Modifier.weight(1f),
+            )
             Box(modifier = Modifier.width(1.dp).height(40.dp).background(PantopusColors.appBorder))
-            Stat(label = "Total invoiced", value = total, modifier = Modifier.weight(1f))
+            Stat(
+                label = "Collected · month",
+                value = collectedMonth,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -227,21 +242,25 @@ private fun Stat(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
+    /** When true, paints both label and value in warning-amber (overdue treatment). */
+    overdue: Boolean = false,
 ) {
+    val labelColor = if (overdue) PantopusColors.warning else PantopusColors.appTextSecondary
+    val valueColor = if (overdue) PantopusColors.warning else PantopusColors.appText
     Column(
         modifier = modifier.padding(horizontal = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = label.uppercase(),
-            color = PantopusColors.appTextSecondary,
+            color = labelColor,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.6.sp,
         )
         Text(
             text = value,
-            color = PantopusColors.appText,
+            color = valueColor,
             fontSize = 21.sp,
             fontWeight = FontWeight.Black,
             maxLines = 1,
@@ -302,6 +321,12 @@ private fun InvoiceRow(
     amount: String,
     pillar: SchedulingPillar,
     onClick: () -> Unit,
+    /**
+     * Invoice lifecycle status for the trailing pill (paid/sent/overdue/void/refunded).
+     * Null until the backend DTO exposes a `status` field — pill slot is structurally
+     * present but renders nothing when null (deferred: InvoiceDto has no `status`).
+     */
+    invoiceStatus: String? = null,
 ) {
     Row(
         modifier =
@@ -344,12 +369,25 @@ private fun InvoiceRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = amount,
-            color = PantopusColors.appText,
-            fontSize = 13.5.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        // Trailing: amount + optional status pill (design: amount above, pill below).
+        // Pill is deferred until InvoiceDto gains a `status` field.
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = amount,
+                color = PantopusColors.appText,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            if (invoiceStatus != null) {
+                SchedulingStatusPill(
+                    status = invoiceStatus,
+                    showIcon = false,
+                )
+            }
+        }
     }
 }
 

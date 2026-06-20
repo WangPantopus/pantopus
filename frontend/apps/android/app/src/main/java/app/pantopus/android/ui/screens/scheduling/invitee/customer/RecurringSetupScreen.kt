@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod")
+@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.scheduling.invitee.customer
 
@@ -18,17 +18,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
@@ -93,6 +97,9 @@ fun RecurringSetupScreen(
                     onStepTime = viewModel::stepTime,
                     onSetCount = viewModel::setCount,
                     onStepCount = viewModel::stepCount,
+                    onReview = viewModel::review,
+                    onRemoveOccurrence = viewModel::removeOccurrence,
+                    onBackFromReview = viewModel::backFromReview,
                     onConfirm = viewModel::confirm,
                     onDone = onBack,
                     onRetry = viewModel::resetSubmit,
@@ -137,15 +144,39 @@ fun RecurringBody(
     onStepTime: (Int) -> Unit,
     onSetCount: (Int) -> Unit,
     onStepCount: (Int) -> Unit,
+    onReview: () -> Unit,
+    onRemoveOccurrence: (RecurrenceOccurrence) -> Unit,
+    onBackFromReview: () -> Unit,
     onConfirm: () -> Unit,
     onDone: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (submit is RecurringSubmitState.Result) {
-        ResultBody(result = submit, occurrences = occurrences, modifier = modifier, onDone = onDone)
-        return
+    when {
+        submit is RecurringSubmitState.Result -> {
+            ResultBody(result = submit, occurrences = occurrences, modifier = modifier, onDone = onDone)
+            return
+        }
+        submit is RecurringSubmitState.Reviewing -> {
+            ReviewBody(
+                reviewing = submit,
+                weekdayShort = weekdayShort,
+                timeLabel = timeLabel,
+                onRemove = onRemoveOccurrence,
+                onBack = onBackFromReview,
+                onConfirm = onConfirm,
+                modifier = modifier,
+            )
+            return
+        }
     }
+    // ── Configure step (Frames 1, 2, 3) ──────────────────────────────────────
+    val unavailableCount = occurrences.count { it.status == OccurrenceStatus.Unavailable }
+    val failedCount = occurrences.count { it.status == OccurrenceStatus.Failed }
+    val openCount = occurrences.count { it.status == OccurrenceStatus.Open }
+    // Frame 3: partial-series path — some occurrences are fully booked (Unavailable).
+    val isPartial = unavailableCount > 0
+
     Column(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(Spacing.s4),
@@ -167,17 +198,21 @@ fun RecurringBody(
                 onStepCount = onStepCount,
             )
             if (occurrences.isNotEmpty()) {
+                // Frame 3: warn banner when some weeks are fully booked (Unavailable).
+                if (isPartial) {
+                    PartialSeriesBanner(openCount = openCount, totalCount = occurrences.size)
+                }
                 SeriesStrip(occurrences = occurrences)
-                val failedCount = occurrences.count { it.status == OccurrenceStatus.Failed }
-                val openCount = occurrences.size - failedCount
                 val overlineText =
                     when {
+                        unavailableCount > 0 -> "$openCount OPEN · $unavailableCount FULL"
                         failedCount == 0 -> "ALL ${occurrences.size} OPEN"
                         else -> "$openCount OPEN · $failedCount NEEDS A NEW TIME"
                     }
                 Text(text = overlineText, style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
                 occurrences.forEach { OccurrenceRow(it) }
-                SummaryChip(count = occurrences.size, weekdayShort = weekdayShort, timeLabel = timeLabel, rangeLabel = rangeLabel)
+                // SummaryChip shows open-count in partial, total count otherwise.
+                SummaryChip(count = if (isPartial) openCount else occurrences.size, weekdayShort = weekdayShort, timeLabel = timeLabel, rangeLabel = rangeLabel)
             }
             (submit as? RecurringSubmitState.Error)?.let {
                 Text(text = it.message, style = PantopusTextStyle.small, color = PantopusColors.error)
@@ -185,13 +220,30 @@ fun RecurringBody(
         }
         Column(
             modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            PrimaryButton(
-                title = if (submit is RecurringSubmitState.Error) "Try again" else "Confirm ${occurrences.size} bookings",
-                onClick = if (submit is RecurringSubmitState.Error) onRetry else onConfirm,
-                isLoading = submit is RecurringSubmitState.Saving,
-                isEnabled = occurrences.isNotEmpty(),
-            )
+            when {
+                submit is RecurringSubmitState.Error -> {
+                    PrimaryButton(title = "Try again", onClick = onRetry)
+                }
+                isPartial -> {
+                    // Frame 3 CTAs: "Book the N that work" (primary) + "Adjust the series" (ghost).
+                    PrimaryButton(
+                        title = "Book the $openCount that work",
+                        onClick = onReview,
+                        isEnabled = openCount > 0,
+                    )
+                    GhostButton(title = "Adjust the series", onClick = { /* navigates back to configure — already on configure */ })
+                }
+                else -> {
+                    PrimaryButton(
+                        title = "Review ${occurrences.size} bookings",
+                        onClick = onReview,
+                        isLoading = submit is RecurringSubmitState.Saving,
+                        isEnabled = occurrences.isNotEmpty(),
+                    )
+                }
+            }
         }
     }
 }
@@ -217,24 +269,15 @@ private fun ConfigCard(
                 .padding(Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
+        // Design RepeatsSelect: a single-row dropdown affordance with repeat icon +
+        // current value label + chevron-down. No segmented chips; no Daily option.
+        // (recurring-frames.jsx lines 92-103)
         FieldLabel("Repeats")
+        RepeatsDropdownRow(value = config.repeat)
+        FieldLabel("On")
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.fillMaxWidth()) {
-            RecurrenceRepeat.entries.forEach { r ->
-                Segment(
-                    label = if (r == RecurrenceRepeat.Weekly) "Weekly" else "Daily",
-                    selected = r == config.repeat,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    onRepeat(r)
-                }
-            }
-        }
-        if (config.repeat == RecurrenceRepeat.Weekly) {
-            FieldLabel("On")
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1), modifier = Modifier.fillMaxWidth()) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { i, d ->
-                    WeekdayChip(label = d, selected = i == config.weekdayIndex, modifier = Modifier.weight(1f)) { onWeekday(i) }
-                }
+            listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { i, d ->
+                WeekdayChip(label = d, selected = i == config.weekdayIndex, modifier = Modifier.weight(1f)) { onWeekday(i) }
             }
         }
         FieldLabel("Time")
@@ -255,12 +298,41 @@ private fun ConfigCard(
                 Segment(label = n.toString(), selected = n == config.count, modifier = Modifier.weight(1f)) { onSetCount(n) }
             }
         }
-        val cadence = if (config.repeat == RecurrenceRepeat.Weekly) weekdayShort else "day"
         Text(
-            text = "We'll find $timeLabel each $cadence and flag any that's taken.",
+            text = "We'll find $timeLabel each $weekdayShort and flag any that's taken.",
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
         )
+    }
+}
+
+/**
+ * Design RepeatsSelect: a single-row dropdown affordance.
+ * repeat icon (accent) + "Weekly" label + chevron-down.
+ * (recurring-frames.jsx lines 92-103)
+ */
+@Composable
+private fun RepeatsDropdownRow(value: RecurrenceRepeat) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 15.dp, tint = ACCENT)
+        Text(
+            text = when (value) { RecurrenceRepeat.Weekly -> "Weekly" },
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
+        PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = 16.dp, tint = PantopusColors.appTextMuted)
     }
 }
 
@@ -393,19 +465,25 @@ private fun SeriesStrip(occurrences: List<RecurrenceOccurrence>) {
     ) {
         occurrences.forEach { occ ->
             val failed = occ.status == OccurrenceStatus.Failed
+            val unavailable = occ.status == OccurrenceStatus.Unavailable
             Box(
                 modifier =
                     Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(if (failed) PantopusColors.warningBg else ACCENT),
+                        .background(
+                            when {
+                                failed || unavailable -> PantopusColors.warningBg
+                                else -> ACCENT
+                            },
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = occ.dateLabel.substringAfterLast(' '),
                     style = PantopusTextStyle.caption,
                     fontWeight = FontWeight.Bold,
-                    color = if (failed) PantopusColors.warning else PantopusColors.appTextInverse,
+                    color = if (failed || unavailable) PantopusColors.warning else PantopusColors.appTextInverse,
                 )
             }
         }
@@ -415,6 +493,7 @@ private fun SeriesStrip(occurrences: List<RecurrenceOccurrence>) {
 @Composable
 private fun OccurrenceRow(occ: RecurrenceOccurrence) {
     val failed = occ.status == OccurrenceStatus.Failed
+    val unavailable = occ.status == OccurrenceStatus.Unavailable
     Row(
         modifier =
             Modifier
@@ -422,48 +501,99 @@ private fun OccurrenceRow(occ: RecurrenceOccurrence) {
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, if (failed) PantopusColors.warningLight else PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                // Design Frame 3: unavailable rows rendered at 0.6 opacity.
+                .alpha(if (unavailable) 0.6f else 1f)
                 .padding(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
+        // Icon tile: success green for open, warn amber for conflict, sunken for unavailable.
         Box(
             modifier =
-                Modifier.size(
-                    30.dp,
-                ).clip(RoundedCornerShape(Radii.md)).background(if (failed) PantopusColors.warningBg else PantopusColors.successBg),
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(
+                        when {
+                            failed -> PantopusColors.warningBg
+                            unavailable -> PantopusColors.appSurfaceSunken
+                            else -> PantopusColors.successBg
+                        },
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = if (failed) PantopusIcon.AlertCircle else PantopusIcon.CalendarCheck,
+                icon =
+                    when {
+                        failed -> PantopusIcon.AlertCircle
+                        // Design Frame 3 OccurrenceRow unavailable: calendar-x icon.
+                        unavailable -> PantopusIcon.CalendarX
+                        else -> PantopusIcon.CalendarCheck
+                    },
                 contentDescription = null,
                 size = 15.dp,
-                tint = if (failed) PantopusColors.warning else PantopusColors.success,
+                tint =
+                    when {
+                        failed -> PantopusColors.warning
+                        unavailable -> PantopusColors.appTextMuted
+                        else -> PantopusColors.success
+                    },
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = occ.dateLabel, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
             Text(
-                text = if (failed) "That time is taken" else occ.timeLabel,
+                text = occ.dateLabel,
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                // Design: strikethrough date text for unavailable rows.
+                textDecoration = if (unavailable) TextDecoration.LineThrough else TextDecoration.None,
+                color = if (unavailable) PantopusColors.appTextMuted else PantopusColors.appText,
+            )
+            Text(
+                text =
+                    when {
+                        failed -> "That time is taken"
+                        unavailable -> "Fully booked"
+                        else -> occ.timeLabel
+                    },
                 style = PantopusTextStyle.caption,
                 color = if (failed) PantopusColors.warning else PantopusColors.appTextSecondary,
             )
         }
-        if (failed) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(text = "PICK ANOTHER", style = PantopusTextStyle.overline, color = ACCENT)
-                PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 13.dp, tint = ACCENT)
+        when {
+            failed -> {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                    Text(text = "PICK ANOTHER", style = PantopusTextStyle.overline, color = ACCENT)
+                    PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 13.dp, tint = ACCENT)
+                }
             }
-        } else {
-            Text(
-                text = "OPEN",
-                style = PantopusTextStyle.overline,
-                color = PantopusColors.success,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.pill))
-                        .background(PantopusColors.successBg)
-                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-            )
+            unavailable -> {
+                // Design Frame 3: "Full" badge in a neutral sunken pill at 0.6 opacity via parent.
+                Text(
+                    text = "Full",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextMuted,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.appSurfaceSunken)
+                            .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                )
+            }
+            else -> {
+                Text(
+                    text = "OPEN",
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.success,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.successBg)
+                            .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+                )
+            }
         }
     }
 }
@@ -496,6 +626,213 @@ private fun SummaryChip(
             if (rangeLabel.isNotEmpty()) {
                 Text(text = rangeLabel, style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
             }
+        }
+    }
+}
+
+/**
+ * Frame 3 warn banner: "We can book N of M" (recurring-frames.jsx Banner component,
+ * lines 271-281). Appears when some occurrences are Unavailable (fully booked).
+ */
+@Composable
+private fun PartialSeriesBanner(openCount: Int, totalCount: Int) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.AlertCircle, contentDescription = null, size = 16.dp, tint = PantopusColors.warning)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Text(
+                text = "We can book $openCount of $totalCount",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                // Design WARN_DK = #92400E; closest available token = warmAmber (#B45309).
+                color = PantopusColors.warmAmber,
+            )
+            Text(
+                text = "The other ${totalCount - openCount} ${if (totalCount - openCount == 1) "week is" else "weeks are"} full. Book the ${if (openCount == 1) "one" else openCount.toString()} that ${if (openCount == 1) "works" else "work"}, or adjust the pattern.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.warning,
+            )
+        }
+    }
+}
+
+/**
+ * Ghost / secondary CTA button matching the design's GhostCTA shape
+ * (recurring-frames.jsx lines 302-304).
+ */
+@Composable
+private fun GhostButton(title: String, onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.s3),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = title,
+            style = PantopusTextStyle.small,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+    }
+}
+
+/**
+ * Frame 4 — Series Summary (before confirm). Shows the recap header, a card
+ * listing every occurrence with a per-row remove (×) button, and a total price
+ * row. Tapping "Confirm N bookings" fires the API.
+ * (recurring-frames.jsx lines 382-406, FrameSummary)
+ */
+@Composable
+private fun ReviewBody(
+    reviewing: RecurringSubmitState.Reviewing,
+    weekdayShort: String,
+    timeLabel: String,
+    onRemove: (RecurrenceOccurrence) -> Unit,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val occs = reviewing.reviewOccurrences
+    Column(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            // Recap header: 34×34 accentBg rounded-9 square + repeat icon (17dp) +
+            // "N-session series" title + event-name secondary line.
+            // (recurring-frames.jsx lines 385-391)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(ACCENT_BG),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 17.dp, tint = ACCENT)
+                }
+                Column {
+                    Text(
+                        text = "${occs.size}-session series",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                    )
+                    Text(
+                        text = "$weekdayShort $timeLabel",
+                        fontSize = 11.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+            // RecapRow list inside a card.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.xl))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                        .padding(horizontal = Spacing.s3),
+            ) {
+                occs.forEachIndexed { index, occ ->
+                    RecapRow(occ = occ, isLast = index == occs.lastIndex, onRemove = { onRemove(occ) })
+                }
+            }
+            // Total price row — /my-bookings lean payload doesn't carry price; render
+            // session count only as the designed empty/placeholder for when price lands.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s1),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${occs.size} ${if (occs.size == 1) "session" else "sessions"}",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextSecondary,
+                )
+                // Price data not available from the current payload; shows session count
+                // (backend join needed — acknowledged per design parity notes).
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface).padding(Spacing.s4),
+        ) {
+            PrimaryButton(title = "Confirm ${occs.size} bookings", onClick = onConfirm)
+        }
+    }
+}
+
+/**
+ * One occurrence row in the Frame 4 summary card.
+ * calendar-check icon + date + time + per-row remove (×) button.
+ * (recurring-frames.jsx RecapRow, lines 372-381)
+ */
+@Composable
+private fun RecapRow(
+    occ: RecurrenceOccurrence,
+    isLast: Boolean,
+    onRemove: () -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.CalendarCheck,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.success,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = occ.dateLabel,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    text = occ.timeLabel,
+                    fontSize = 10.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            // Per-row remove (×) button: 26dp circle, sunken bg.
+            Box(
+                modifier =
+                    Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .clickable(onClickLabel = "Remove ${occ.dateLabel}", onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Remove", size = 13.dp, tint = PantopusColors.appTextSecondary)
+            }
+        }
+        if (!isLast) {
+            HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
         }
     }
 }

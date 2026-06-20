@@ -12,7 +12,9 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -24,6 +26,7 @@ import java.time.ZoneId
 import javax.inject.Inject
 
 private const val SAVED_TOAST_MS = 2000L
+private const val SAVED_CHIP_MS = 1800L
 private const val MIN_PER_DAY = 1440
 private const val MIN_PER_HOUR = 60
 
@@ -46,6 +49,11 @@ data class SettingsData(
     val timezoneValue: String,
     val paymentsConnected: Boolean,
     val monoFooter: String,
+    val pillar: SchedulingPillar = SchedulingPillar.Personal,
+    /** Key of the row currently being saved (null = none in-flight). */
+    val savingRow: String? = null,
+    /** Key of the row that just finished saving (shows SavedChip briefly). */
+    val justSavedRow: String? = null,
 )
 
 /** A3 Scheduling Settings Root ("Booking settings"). Personal default (arg-less route). */
@@ -103,6 +111,7 @@ class SchedulingSettingsRootViewModel
                 timezoneValue = "$zone · auto",
                 paymentsConnected = paymentsConnected,
                 monoFooter = "pantopus.com/book/${page.slug ?: "…"} · owner · you",
+                pillar = owner.pillar(),
             )
         }
 
@@ -125,6 +134,34 @@ class SchedulingSettingsRootViewModel
                     is NetworkResult.Failure -> flashToast("Couldn't disable scheduling")
                 }
             }
+        }
+
+        /**
+         * Signal that a specific row write is in-flight.
+         * Call before the network request; call [rowSaved] or [rowSaveFailed] on completion.
+         */
+        fun rowSaving(rowKey: String) {
+            val loaded = _state.value as? SchedulingSettingsUiState.Loaded ?: return
+            _state.value = SchedulingSettingsUiState.Loaded(loaded.data.copy(savingRow = rowKey, justSavedRow = null))
+        }
+
+        /** Signal that the in-flight row write succeeded — shows SavedChip briefly. */
+        fun rowSaved(rowKey: String) {
+            val loaded = _state.value as? SchedulingSettingsUiState.Loaded ?: return
+            _state.value = SchedulingSettingsUiState.Loaded(loaded.data.copy(savingRow = null, justSavedRow = rowKey))
+            viewModelScope.launch {
+                delay(SAVED_CHIP_MS)
+                val current = _state.value as? SchedulingSettingsUiState.Loaded ?: return@launch
+                if (current.data.justSavedRow == rowKey) {
+                    _state.value = SchedulingSettingsUiState.Loaded(current.data.copy(justSavedRow = null))
+                }
+            }
+        }
+
+        /** Signal that the in-flight row write failed — clears shimmer, no chip. */
+        fun rowSaveFailed() {
+            val loaded = _state.value as? SchedulingSettingsUiState.Loaded ?: return
+            _state.value = SchedulingSettingsUiState.Loaded(loaded.data.copy(savingRow = null, justSavedRow = null))
         }
 
         private fun flashToast(message: String) {

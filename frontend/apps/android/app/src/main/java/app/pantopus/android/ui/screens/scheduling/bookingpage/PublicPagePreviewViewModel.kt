@@ -10,6 +10,8 @@ import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,8 +46,12 @@ class PublicPagePreviewViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
+        private val ownerRelay: BookingPageOwnerRelay,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        private val owner: SchedulingOwner = ownerRelay.consume() ?: SchedulingOwner.Personal
+
+        /** The resolved pillar for UI accent — derived from owner at init time. */
+        val pillar: SchedulingPillar = owner.pillar()
 
         private val _state = MutableStateFlow<PreviewUiState>(PreviewUiState.Loading)
         val state: StateFlow<PreviewUiState> = _state.asStateFlow()

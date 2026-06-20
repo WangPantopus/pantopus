@@ -26,6 +26,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +55,7 @@ fun PublicPagePreviewScreen(
     viewModel: PublicPagePreviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pillar = viewModel.pillar
     LaunchedEffect(Unit) { viewModel.load() }
 
     Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
@@ -60,12 +64,12 @@ fun PublicPagePreviewScreen(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
                 PreviewUiState.Loading -> SchedulingLoadingSkeleton(modifier = Modifier.fillMaxSize(), rows = 4)
-                is PreviewUiState.Rendered -> RenderedBody(s)
-                is PreviewUiState.AllHidden -> AllHiddenBody(s)
+                is PreviewUiState.Rendered -> RenderedBody(s, pillar)
+                is PreviewUiState.AllHidden -> AllHiddenBody(s, pillar)
                 is PreviewUiState.Notice ->
                     PausedExpiredUnavailableState(
                         state = SchedulingTerminalState.Paused,
-                        pillar = SchedulingPillar.Personal,
+                        pillar = pillar,
                         title = s.title,
                         body = s.body,
                     )
@@ -140,7 +144,7 @@ private fun PreviewCaption() {
 }
 
 @Composable
-private fun RenderedBody(s: PreviewUiState.Rendered) {
+private fun RenderedBody(s: PreviewUiState.Rendered, pillar: SchedulingPillar) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
@@ -151,27 +155,46 @@ private fun RenderedBody(s: PreviewUiState.Rendered) {
                     .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
-            PublicHeader(s.header)
-            s.eventTypes.forEachIndexed { index, et -> EventTypeCard(et, selected = index == 0) }
+            PublicHeader(s.header, pillar)
+            s.eventTypes.forEachIndexed { index, et -> EventTypeCard(et, selected = index == 0, pillar = pillar) }
         }
-        InertPickTimeCta()
+        InertPickTimeCta(pillar)
     }
 }
 
 @Composable
-private fun AllHiddenBody(s: PreviewUiState.AllHidden) {
+private fun AllHiddenBody(s: PreviewUiState.AllHidden, pillar: SchedulingPillar) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.s4, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
-        PublicHeader(s.header)
+        PublicHeader(s.header, pillar)
+        // Design (booking-preview-frames.jsx:286): 1px dashed border using appBorderStrong.
+        // Compose's border() only draws solid strokes; drawBehind with PathEffect.dashPathEffect
+        // replicates the design's CSS "1px dashed" appearance.
+        val borderColor = PantopusColors.appBorderStrong
+        val cornerRadius = Radii.xl
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.xl))
+                    .clip(RoundedCornerShape(cornerRadius))
                     .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.xl))
+                    .drawBehind {
+                        val strokeWidthPx = 1.dp.toPx()
+                        val dashLen = 6.dp.toPx()
+                        val gapLen = 4.dp.toPx()
+                        val cornerPx = cornerRadius.toPx()
+                        drawRoundRect(
+                            color = borderColor,
+                            size = size,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerPx),
+                            style = Stroke(
+                                width = strokeWidthPx,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLen, gapLen)),
+                            ),
+                        )
+                    }
                     .padding(vertical = Spacing.s6, horizontal = Spacing.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -200,9 +223,9 @@ private fun AllHiddenBody(s: PreviewUiState.AllHidden) {
 }
 
 @Composable
-private fun PublicHeader(header: PreviewHeader) {
+private fun PublicHeader(header: PreviewHeader, pillar: SchedulingPillar) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        BLAvatar(initials = header.initials, pillar = SchedulingPillar.Personal, diameter = 64.dp, fontSize = 22.sp)
+        BLAvatar(initials = header.initials, pillar = pillar, diameter = 64.dp, fontSize = 22.sp)
         Text(
             header.name.ifBlank { "Your name" },
             color = PantopusColors.appText,
@@ -236,6 +259,7 @@ private fun PublicHeader(header: PreviewHeader) {
 private fun EventTypeCard(
     et: PublicEventTypeView,
     selected: Boolean,
+    pillar: SchedulingPillar,
 ) {
     val duration = et.defaultDuration ?: et.durations.firstOrNull() ?: 30
     Row(
@@ -246,7 +270,7 @@ private fun EventTypeCard(
                 .background(PantopusColors.appSurface)
                 .border(
                     if (selected) 1.5.dp else 1.dp,
-                    if (selected) PantopusColors.primary600 else PantopusColors.appBorder,
+                    if (selected) pillar.accent else PantopusColors.appBorder,
                     RoundedCornerShape(Radii.xl),
                 )
                 .padding(13.dp),
@@ -258,14 +282,14 @@ private fun EventTypeCard(
                 Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(Radii.lg))
-                    .background(if (selected) PantopusColors.primary50 else PantopusColors.appSurfaceSunken),
+                    .background(if (selected) pillar.accentBg else PantopusColors.appSurfaceSunken),
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
                 icon = serviceIcon(et.locationMode),
                 contentDescription = null,
                 size = 18.dp,
-                tint = if (selected) PantopusColors.primary600 else PantopusColors.appTextStrong,
+                tint = if (selected) pillar.accent else PantopusColors.appTextStrong,
             )
         }
         Column(Modifier.weight(1f)) {
@@ -284,7 +308,7 @@ private fun EventTypeCard(
                     )
                     Text("$duration min", color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
                 }
-                ModeChip(et.locationMode)
+                ModeChip(et.locationMode, pillar)
             }
         }
         PantopusIconImage(icon = PantopusIcon.ChevronRight, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextMuted)
@@ -292,7 +316,7 @@ private fun EventTypeCard(
 }
 
 @Composable
-private fun ModeChip(locationMode: String?) {
+private fun ModeChip(locationMode: String?, pillar: SchedulingPillar) {
     val label =
         when (locationMode) {
             "video" -> "Video call"
@@ -304,18 +328,18 @@ private fun ModeChip(locationMode: String?) {
         modifier =
             Modifier
                 .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.primary50)
+                .background(pillar.accentBg)
                 .padding(horizontal = Spacing.s2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = serviceIcon(locationMode), contentDescription = null, size = 10.dp, tint = PantopusColors.primary700)
-        Text(label, color = PantopusColors.primary700, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        PantopusIconImage(icon = serviceIcon(locationMode), contentDescription = null, size = 10.dp, tint = pillar.accent)
+        Text(label, color = pillar.accent, fontWeight = FontWeight.Bold, fontSize = 10.sp)
     }
 }
 
 @Composable
-private fun InertPickTimeCta() {
+private fun InertPickTimeCta(pillar: SchedulingPillar) {
     Column(
         modifier =
             Modifier
@@ -332,7 +356,7 @@ private fun InertPickTimeCta() {
                     .padding(top = Spacing.s2)
                     .height(44.dp)
                     .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.primary600),
+                    .background(pillar.accent),
             contentAlignment = Alignment.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {

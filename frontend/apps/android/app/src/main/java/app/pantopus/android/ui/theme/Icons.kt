@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAlert
 import androidx.compose.material.icons.filled.AddBox
@@ -99,10 +100,13 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FolderShared
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GppGood
+import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Groups
@@ -118,6 +122,8 @@ import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.InsertEmoticon
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Lightbulb
@@ -158,6 +164,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.PestControl
@@ -181,6 +188,7 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Scale
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Science
@@ -627,6 +635,37 @@ enum class PantopusIcon(
     Calendarly("calendarly"),
     QrCode("qr-code"),
     Ticket("ticket"),
+
+    // Calendarly shared-primitive glyphs flagged across ~70 scheduling screens
+    // that Material's set doesn't already cover under another case:
+    // `scale` (capacity / weighing-priority rows, fairness split), `list-
+    // ordered` (numbered round-robin / step rails, ordered policy lists),
+    // `package-open` (unboxed / fulfilled package state, "no packages" empty),
+    // `user-x` (declined host / removed attendee / no-show person), `concentric`
+    // (the Calendarly brand concentric-ring mark used on the app-handoff
+    // interstitial / brand splash), and `workflow` (branching-node automation
+    // graph — H2 Workflows List empty-state hero). Each maps to the closest
+    // Material vector below in `source()`.
+    Scale("scale"),
+    ListOrdered("list-ordered"),
+    PackageOpen("package-open"),
+    UserX("user-x"),
+    Concentric("concentric"),
+    Workflow("workflow"),
+
+    // G8 packages-list + G10 buy-package glyphs. Lucide `layers` (stacked-layer
+    // card) used in all three package-list contexts (row icon, empty hero, payouts
+    // gate). Lucide `ticket-check` (ticket with a checkmark) used in the
+    // EligibleRow on BuyPackage — Material lacks a direct equivalent so
+    // `TaskAlt` (circle-check) is the closest available vector.
+    Layers("layers"),
+    TicketCheck("ticket-check"),
+    // F15 — Permission-Gated Scheduler: "Ask to manage" pill. Lucide `shield-plus`
+    // (shield with a plus sign) — Material `GppMaybe` is the closest available.
+    ShieldPlus("shield-plus"),
+    // F8 — Household Availability: quiet-hours DisclosureRow. Lucide `moon`
+    // (crescent moon) — Material `DarkMode` is the closest available.
+    Moon("moon"),
     ;
 
     companion object {
@@ -858,6 +897,21 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.Calendarly -> IconSource.Material(Icons.Filled.CalendarMonth)
         PantopusIcon.QrCode -> IconSource.Material(Icons.Filled.QrCode2)
         PantopusIcon.Ticket -> IconSource.Material(Icons.Filled.ConfirmationNumber)
+        // Calendarly shared-primitive glyphs. Material lacks 1:1 Lucide
+        // equivalents; each falls back to the closest visually-similar vector:
+        // `Scale` (Lucide scale balance), `FormatListNumbered` (numbered list),
+        // `Inventory2` (open package — same crate glyph as `Package`, the
+        // signal is reinforced by context/state), `PersonOff` (user-x), and
+        // `RadioButtonChecked` (concentric ring → the brand mark).
+        PantopusIcon.Scale -> IconSource.Material(Icons.Filled.Scale)
+        PantopusIcon.ListOrdered -> IconSource.Material(Icons.Filled.FormatListNumbered)
+        PantopusIcon.PackageOpen -> IconSource.Material(Icons.Filled.Inventory2)
+        PantopusIcon.UserX -> IconSource.Material(Icons.Filled.PersonOff)
+        PantopusIcon.Concentric -> IconSource.Material(Icons.Filled.RadioButtonChecked)
+        // H2 Workflows List empty-state hero. Lucide's `workflow` shows a
+        // branching node graph (arrows between boxes). Material's `AccountTree`
+        // is the closest equivalent — a hierarchical branching-node tree.
+        PantopusIcon.Workflow -> IconSource.Material(Icons.Filled.AccountTree)
         PantopusIcon.Vote -> IconSource.Material(Icons.Filled.HowToVote)
         PantopusIcon.LifeBuoy -> IconSource.Material(Icons.Filled.Support)
         PantopusIcon.HardHat -> IconSource.Material(Icons.Filled.Engineering)
@@ -1012,6 +1066,20 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.SearchX -> IconSource.Material(Icons.Filled.SearchOff)
         PantopusIcon.PauseCircle -> IconSource.Material(Icons.Filled.PauseCircle)
         PantopusIcon.BellPlus -> IconSource.Material(Icons.Filled.AddAlert)
+        // G8 packages-list row/empty/gate icon (stacked layers). Material ships
+        // a direct `Layers` vector in the extended icon set.
+        PantopusIcon.Layers -> IconSource.Material(Icons.Filled.Layers)
+        // G10 EligibleRow ticket-with-check icon. Material lacks a direct
+        // ticket+check composite; `TaskAlt` (circle-with-check) is the closest
+        // available vector — swap to a Lucide drawable when the export lands.
+        PantopusIcon.TicketCheck -> IconSource.Material(Icons.Filled.TaskAlt)
+        // F15 — "Ask to manage" pill: shield with a plus. Material `GppMaybe`
+        // (shield with a question mark) is the closest available — swap to
+        // a real Lucide `shield-plus` drawable when the export lands.
+        PantopusIcon.ShieldPlus -> IconSource.Material(Icons.Filled.GppMaybe)
+        // F8 — Quiet-hours DisclosureRow: crescent moon. Material `DarkMode`
+        // (moon/dark-mode icon) is the closest available vector.
+        PantopusIcon.Moon -> IconSource.Material(Icons.Filled.DarkMode)
     }
 
 /**

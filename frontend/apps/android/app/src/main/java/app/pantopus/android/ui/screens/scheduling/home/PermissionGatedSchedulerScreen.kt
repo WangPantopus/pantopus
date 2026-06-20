@@ -246,7 +246,7 @@ private fun AskToManagePill(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.ShieldCheck,
+            icon = PantopusIcon.ShieldPlus,
             contentDescription = null,
             size = 12.dp,
             tint = PantopusColors.homeDark,

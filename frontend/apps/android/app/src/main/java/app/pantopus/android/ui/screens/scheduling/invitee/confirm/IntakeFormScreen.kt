@@ -182,7 +182,8 @@ fun IntakeFormBody(
             Column {
                 ConfirmOverline("A few questions")
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                    LabeledField(label = "Phone number") {
+                    // Design intake-booking-frames.jsx:274 marks phone required (red asterisk).
+                    LabeledField(label = "Phone number", required = true) {
                         ConfirmTextInput(
                             value = values.phone,
                             onValueChange = { onPatch(values.copy(phone = it)) },

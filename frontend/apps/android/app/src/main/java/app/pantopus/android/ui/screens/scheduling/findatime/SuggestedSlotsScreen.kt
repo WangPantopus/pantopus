@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import androidx.compose.foundation.layout.fillMaxHeight
 
 const val SUGGESTED_SLOTS_TAG = "suggestedSlotsScreen"
 
@@ -66,7 +68,11 @@ fun SuggestedSlotsScreen(
     LaunchedEffect(Unit) { viewModel.start() }
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showTz by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    // F5 major fix: Edit button opens the setup criteria editor in a sheet,
+    // rather than navigating back entirely (mirrors iOS FindATimeSetupView sheet).
+    var showEdit by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tzQuery by remember { mutableStateOf("") }
 
     SuggestedSlotsContent(
@@ -78,6 +84,7 @@ fun SuggestedSlotsScreen(
         onSendProposal = viewModel::sendProposal,
         onTimezoneClick = { showTz = true },
         onViewResponses = { pollId -> onNavigate(SchedulingRoutes.memberPollResponse(pollId)) },
+        onOpenEdit = { showEdit = true },
     )
 
     if (showTz) {
@@ -98,6 +105,25 @@ fun SuggestedSlotsScreen(
             accent = HomeAccent,
         )
     }
+
+    // F5 major fix: Edit sheet — reopens the F4 setup criteria editor inline.
+    // On "Next" it triggers a reload of the slots (re-run find-a-time with updated criteria).
+    if (showEdit) {
+        ModalBottomSheet(
+            onDismissRequest = { showEdit = false },
+            sheetState = editSheetState,
+            modifier = Modifier.fillMaxHeight(),
+        ) {
+            FindATimeSetupScreen(
+                onBack = { showEdit = false },
+                onNavigate = {
+                    // "Next" submits criteria back to the session; reload slots and close sheet.
+                    showEdit = false
+                    viewModel.load()
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -111,6 +137,8 @@ fun SuggestedSlotsContent(
     onTimezoneClick: () -> Unit,
     onViewResponses: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // F5 major fix: Edit button now opens the setup editor sheet, not back.
+    onOpenEdit: () -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize().background(PantopusColors.appBg).testTag(SUGGESTED_SLOTS_TAG)) {
         val showEdit = state is SuggestedSlotsUiState.Loaded || state is SuggestedSlotsUiState.Empty
@@ -118,17 +146,23 @@ fun SuggestedSlotsContent(
             title = "Suggested times",
             onBack = onBack,
             trailingText = if (showEdit) "Edit" else null,
-            onTrailing = onBack,
+            // F5 major fix: trailing Edit opens the setup editor sheet, not back.
+            onTrailing = onOpenEdit,
         )
         when (state) {
             is SuggestedSlotsUiState.Loading -> {
                 SubHeadPlaceholder()
-                ComposingBody()
+                ComposingBody(composingSubtitle = state.composingSubtitle)
             }
             is SuggestedSlotsUiState.Error -> ErrorState(message = state.message, onRetry = onRetry)
             is SuggestedSlotsUiState.Empty -> {
                 SubHead(header = state.header, onTimezoneClick = onTimezoneClick)
-                NoOverlapBody(onMakeOptional = onBack, onWiden = onBack)
+                NoOverlapBody(
+                    memberCount = state.header.peopleLabel.firstOrNull { it.isDigit() }
+                        ?.digitToInt() ?: 0,
+                    onMakeOptional = onOpenEdit,
+                    onWiden = onOpenEdit,
+                )
             }
             is SuggestedSlotsUiState.Loaded -> {
                 SubHead(header = state.header, onTimezoneClick = onTimezoneClick)
@@ -425,7 +459,10 @@ private fun SingleBestCard(
 // ─── Composing / no-overlap / success ─────────────────────────────────────────
 
 @Composable
-private fun ComposingBody() {
+private fun ComposingBody(
+    // F5 nit fix: dynamic subtitle from member names per design frame 1.
+    composingSubtitle: String? = null,
+) {
     Column(modifier = Modifier.fillMaxSize().padding(Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -435,7 +472,7 @@ private fun ComposingBody() {
                 color = PantopusColors.appText,
             )
             Text(
-                text = "Overlaying everyone's availability",
+                text = composingSubtitle ?: "Overlaying everyone's availability",
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.appTextSecondary,
                 modifier = Modifier.padding(top = Spacing.s1),
@@ -463,6 +500,7 @@ private fun ComposingBody() {
 private fun NoOverlapBody(
     onMakeOptional: () -> Unit,
     onWiden: () -> Unit,
+    memberCount: Int = 0,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.s6),
@@ -476,7 +514,8 @@ private fun NoOverlapBody(
             PantopusIconImage(icon = PantopusIcon.CalendarX, contentDescription = null, size = 28.dp, tint = PantopusColors.warning)
         }
         Text(
-            text = "No time works for everyone",
+            // F5 nit fix: dynamic count — "No time works for all 3" per design frame 3.
+            text = if (memberCount > 0) "No time works for all $memberCount" else "No time works for everyone",
             style = PantopusTextStyle.h3,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,

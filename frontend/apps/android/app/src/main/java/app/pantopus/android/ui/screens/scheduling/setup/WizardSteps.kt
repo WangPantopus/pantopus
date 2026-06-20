@@ -50,13 +50,13 @@ private val DURATIONS = listOf(15, 30, 45, 60)
 
 private val DAY_LABELS =
     listOf(
+        0 to "Sunday",
         1 to "Monday",
         2 to "Tuesday",
         3 to "Wednesday",
         4 to "Thursday",
         5 to "Friday",
         6 to "Saturday",
-        7 to "Sunday",
     )
 
 @Composable

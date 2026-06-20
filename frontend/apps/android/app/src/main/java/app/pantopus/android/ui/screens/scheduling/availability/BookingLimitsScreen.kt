@@ -133,6 +133,17 @@ private fun LimitsBody(
             onMinus = { viewModel.changeMaxPerDay(-1) },
             onPlus = { viewModel.changeMaxPerDay(1) },
         )
+        // Design: "Max per week" StepperRow (booking-limits-frames.jsx:151,173,201).
+        // Rendered as a disabled placeholder — no backend weekly_cap field yet.
+        StepperRow(
+            label = "Max per week",
+            value = form.maxPerWeek.toString(),
+            unit = null,
+            caption = "Most bookings you'll take in a week.",
+            enabled = false,
+            onMinus = {},
+            onPlus = {},
+        )
         StepperRow(
             label = "Per-person limit",
             value = if (form.perPerson == 0) "No limit" else form.perPerson.toString(),
@@ -186,17 +197,18 @@ private fun StepperRow(
     onPlus: () -> Unit,
     error: Boolean = false,
     errorMessage: String? = null,
+    enabled: Boolean = true,
 ) {
     A3Card {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Text(
                 label,
                 modifier = Modifier.weight(1f),
-                color = PantopusColors.appText,
+                color = if (enabled) PantopusColors.appText else PantopusColors.appTextMuted,
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-            A3Stepper(value = value, unit = unit, error = error, onMinus = onMinus, onPlus = onPlus)
+            A3Stepper(value = value, unit = unit, error = error, enabled = enabled, onMinus = onMinus, onPlus = onPlus)
         }
         if (error && errorMessage != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
