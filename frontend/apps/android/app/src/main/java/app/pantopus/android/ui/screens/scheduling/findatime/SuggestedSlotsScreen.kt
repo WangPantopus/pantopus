@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,7 +50,6 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import androidx.compose.foundation.layout.fillMaxHeight
 
 const val SUGGESTED_SLOTS_TAG = "suggestedSlotsScreen"
 
@@ -158,8 +158,9 @@ fun SuggestedSlotsContent(
             is SuggestedSlotsUiState.Empty -> {
                 SubHead(header = state.header, onTimezoneClick = onTimezoneClick)
                 NoOverlapBody(
-                    memberCount = state.header.peopleLabel.firstOrNull { it.isDigit() }
-                        ?.digitToInt() ?: 0,
+                    memberCount =
+                        state.header.peopleLabel.firstOrNull { it.isDigit() }
+                            ?.digitToInt() ?: 0,
                     onMakeOptional = onOpenEdit,
                     onWiden = onOpenEdit,
                 )

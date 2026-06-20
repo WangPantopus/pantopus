@@ -168,7 +168,7 @@ final class RecurringSetupViewModel {
 
     /// The local start instants for the configured series.
     var sessions: [Date] {
-        let calendar = self.calendar
+        let calendar = calendar
         let now = Date()
         let comps = calendar.dateComponents([.hour, .minute], from: timeOfDay)
         let today = calendar.startOfDay(for: now)
@@ -210,7 +210,9 @@ final class RecurringSetupViewModel {
 
     /// Per-occurrence status. Always `.open` until an availability source can
     /// flag individual weeks as taken (`.conflict`) or full (`.unavailable`).
-    private func status(forIndex _: Int) -> OccurrenceStatus { .open }
+    private func status(forIndex _: Int) -> OccurrenceStatus {
+        .open
+    }
 
     /// The occurrences the owner is actually booking — the configured series
     /// minus any removed on the recap step (design Frame 4).
@@ -219,7 +221,9 @@ final class RecurringSetupViewModel {
     }
 
     /// How many occurrences will be booked after removals.
-    var bookableCount: Int { bookableOccurrences.count }
+    var bookableCount: Int {
+        bookableOccurrences.count
+    }
 
     /// Remove / restore a single occurrence on the recap step.
     func toggleRemoved(index: Int) {
@@ -285,7 +289,9 @@ final class RecurringSetupViewModel {
 
     // MARK: - Presentation helpers
 
-    var durationMin: Int { eventType?.defaultDuration ?? eventType?.durations.first ?? 30 }
+    var durationMin: Int {
+        eventType?.defaultDuration ?? eventType?.durations.first ?? 30
+    }
 
     var isPriced: Bool {
         SchedulingFeatureFlags.paidEnabled && (eventType?.priceCents ?? 0) > 0
@@ -310,7 +316,9 @@ final class RecurringSetupViewModel {
     /// The event-type name for the recap header ("Intro call"). The design also
     /// shows "· with <host>", but the host display name isn't on this surface's
     /// payload, so it's omitted rather than faked.
-    var recapEventName: String { eventType?.name ?? "Series" }
+    var recapEventName: String {
+        eventType?.name ?? "Series"
+    }
 
     /// State-aware occurrence overline ("All 6 open"). Conflict/full counts are
     /// reserved for when availability data can mark individual weeks.
@@ -354,10 +362,14 @@ final class RecurringSetupViewModel {
     /// The host-pillar accent — sky for Personal, green for Home, violet for
     /// Business. Paints the selected occurrences and the active CTA, per the
     /// design's "Host pillar accent" note.
-    var accent: Color { owner.theme.accent }
+    var accent: Color {
+        owner.theme.accent
+    }
 
     /// Lightest pillar tint — selected/recap chips, the summary chip fill.
-    var accentBg: Color { owner.theme.accentBg }
+    var accentBg: Color {
+        owner.theme.accentBg
+    }
 
     private func monthDay(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -384,9 +396,11 @@ final class RecurringSetupViewModel {
 extension RecurringSetupViewModel {
     static func previewConfiguring() -> RecurringSetupViewModel {
         let viewModel = RecurringSetupViewModel(owner: .personal, eventTypeId: "et1", push: { _ in }, client: .shared)
+        // swiftlint:disable line_length
         let json = #"""
         {"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30],"default_duration":30,"price_cents":4000,"currency":"usd"}}
         """#
+        // swiftlint:enable line_length
         if let data = json.data(using: .utf8), let response = try? JSONDecoder().decode(EventTypeDetailResponse.self, from: data) {
             viewModel.eventType = response.eventType
         }

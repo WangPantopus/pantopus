@@ -19,6 +19,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Overflow-button anchor preference key
 
 /// Carries each row's overflow-button frame (in the root coordinate space) so
@@ -66,12 +68,12 @@ struct EventTypeListView: View {
                         eventType: target,
                         anchor: menuAnchorRect,
                         containerSize: proxy.size,
-                        onCopyLink:  { viewModel.copyLink(target) },
+                        onCopyLink: { viewModel.copyLink(target) },
                         onDuplicate: { Task { await viewModel.duplicate(target) } },
-                        onShare:     { viewModel.share(target) },
-                        onToggle:    { Task { await viewModel.toggleHidden(target) } },
-                        onDelete:    { viewModel.deleteTarget = target },
-                        onDismiss:   { viewModel.menuTarget = nil }
+                        onShare: { viewModel.share(target) },
+                        onToggle: { Task { await viewModel.toggleHidden(target) } },
+                        onDelete: { viewModel.deleteTarget = target },
+                        onDismiss: { viewModel.menuTarget = nil }
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topTrailing)))
                     .animation(.easeOut(duration: 0.15), value: viewModel.menuTarget != nil)
@@ -156,9 +158,8 @@ struct EventTypeListView: View {
             .accessibilityIdentifier("scheduling.eventTypes.identityPill")
 
             EventTypeSegmentedFilter(
-                selected: viewModel.currentTab,
-                onSelect: { viewModel.selectTab($0) }
-            )
+                selected: viewModel.currentTab
+            ) { viewModel.selectTab($0) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s3)
@@ -176,9 +177,9 @@ struct EventTypeListView: View {
         switch viewModel.state {
         case .loading:
             EventTypeListSkeleton()
-        case .error(let message):
+        case let .error(message):
             errorState(message)
-        case .empty(let empty):
+        case let .empty(empty):
             emptyState(empty)
         case .loaded:
             rowsList
@@ -568,11 +569,11 @@ private struct EventTypeOverflowMenu: View {
         let toggleLabel = eventType.isActive == false ? "Make active" : "Hide"
         let toggleIcon: PantopusIcon = eventType.isActive == false ? .eye : .eyeOff
         return [
-            MenuItem(icon: .link,  label: "Copy booking link", isDanger: false, isSeparated: false, action: onCopyLink),
-            MenuItem(icon: .copy,  label: "Duplicate",         isDanger: false, isSeparated: false, action: onDuplicate),
-            MenuItem(icon: .share2, label: "Share",            isDanger: false, isSeparated: false, action: onShare),
-            MenuItem(icon: toggleIcon, label: toggleLabel,     isDanger: false, isSeparated: false, action: onToggle),
-            MenuItem(icon: .trash2, label: "Delete",           isDanger: true,  isSeparated: true,  action: onDelete),
+            MenuItem(icon: .link, label: "Copy booking link", isDanger: false, isSeparated: false, action: onCopyLink),
+            MenuItem(icon: .copy, label: "Duplicate", isDanger: false, isSeparated: false, action: onDuplicate),
+            MenuItem(icon: .share2, label: "Share", isDanger: false, isSeparated: false, action: onShare),
+            MenuItem(icon: toggleIcon, label: toggleLabel, isDanger: false, isSeparated: false, action: onToggle),
+            MenuItem(icon: .trash2, label: "Delete", isDanger: true, isSeparated: true, action: onDelete)
         ]
     }
 
@@ -591,8 +592,8 @@ private struct EventTypeOverflowMenu: View {
 
     /// Estimated card height (4pt padding top+bottom + rows).
     private var cardHeight: CGFloat {
-        let rowH: CGFloat = 35       // 9pt + 10pt padding + icon height ~15
-        let separatorH: CGFloat = 7  // 1pt border + marginTop 3 + padding 3
+        let rowH: CGFloat = 35 // 9pt + 10pt padding + icon height ~15
+        let separatorH: CGFloat = 7 // 1pt border + marginTop 3 + padding 3
         return 4 + CGFloat(items.count) * rowH + separatorH + 4
     }
 
@@ -607,8 +608,10 @@ private struct EventTypeOverflowMenu: View {
             // Menu card.
             menuCard
                 .frame(width: menuWidth)
-                .position(x: cardOrigin.x + menuWidth / 2,
-                          y: cardOrigin.y + cardHeight / 2)
+                .position(
+                    x: cardOrigin.x + menuWidth / 2,
+                    y: cardOrigin.y + cardHeight / 2
+                )
                 .accessibilityIdentifier("scheduling.eventTypes.overflowMenu.\(eventType.id)")
         }
     }
@@ -625,7 +628,7 @@ private struct EventTypeOverflowMenu: View {
             RoundedRectangle(cornerRadius: 12).stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        // Design shadow: 0 16px 40px rgba(17,24,39,0.22) — #111827 = appText token
+        // Design shadow: 0 16px 40px rgba(17,24,39,0.22) — 111827 = appText token
         .shadow(color: Theme.Color.appText.opacity(0.22), radius: 20, x: 0, y: 8)
     }
 
@@ -642,8 +645,12 @@ private struct EventTypeOverflowMenu: View {
             item.action()
         } label: {
             HStack(spacing: 10) {
-                Icon(item.icon, size: 15, strokeWidth: 2,
-                     color: item.isDanger ? Theme.Color.error : (isFirst ? Theme.Color.primary600 : Theme.Color.appTextSecondary))
+                Icon(
+                    item.icon,
+                    size: 15,
+                    strokeWidth: 2,
+                    color: item.isDanger ? Theme.Color.error : (isFirst ? Theme.Color.primary600 : Theme.Color.appTextSecondary)
+                )
                 Text(item.label)
                     .font(.system(size: 12.5, weight: isFirst ? .bold : .medium))
                     .foregroundStyle(item.isDanger ? Theme.Color.error : (isFirst ? Theme.Color.primary700 : Theme.Color.appText))

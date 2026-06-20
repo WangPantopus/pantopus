@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -71,7 +79,12 @@ fun BookingSearchFilterScreen(
                 applyStatusBarInset = true,
                 trailing = {
                     IconButton(onClick = viewModel::openFilter) {
-                        PantopusIconImage(icon = PantopusIcon.SlidersHorizontal, contentDescription = "Filter", size = 20.dp, tint = if (applied.isActive) PantopusColors.primary600 else PantopusColors.appText)
+                        PantopusIconImage(
+                            icon = PantopusIcon.SlidersHorizontal,
+                            contentDescription = "Filter",
+                            size = 20.dp,
+                            tint = if (applied.isActive) PantopusColors.primary600 else PantopusColors.appText,
+                        )
                     }
                 },
             )
@@ -85,7 +98,12 @@ fun BookingSearchFilterScreen(
                     EmptyState(
                         icon = PantopusIcon.Search,
                         headline = "No bookings match",
-                        subcopy = if (search.isBlank() && !applied.isActive) "Search by invitee, or filter by status, owner, event type, and date." else "Try a different search or clear your filters.",
+                        subcopy =
+                            if (search.isBlank() && !applied.isActive) {
+                                "Search by invitee, or filter by status, owner, event type, and date."
+                            } else {
+                                "Try a different search or clear your filters."
+                            },
                         ctaTitle = "Adjust filters",
                         onCta = viewModel::openFilter,
                     )

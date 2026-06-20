@@ -12,6 +12,9 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
+// swiftlint:disable:next type_body_length
 struct RescheduleReassignSheet: View {
     @State private var viewModel: RescheduleReassignViewModel
     @State private var showTimezone = false
@@ -507,9 +510,8 @@ struct RescheduleReassignSheet: View {
                 booking: .preview(status: "confirmed", ownerType: "business"),
                 actions: BookingActions(owner: .business(id: "b")),
                 tz: "America/Los_Angeles"
-            ),
-            onCompleted: {}
-        )
+            )
+        ) {}
     }
 }
 #endif

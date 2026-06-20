@@ -12,6 +12,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Chrome
 
 /// Back chevron + centered title + optional trailing control (period/sort chip).
@@ -37,9 +39,12 @@ struct InsightsTopBar<Trailing: View>: View {
             }
             .accessibilityLabel("Back")
             Text(title)
-                .font(.system(size: 15, weight: .semibold)).tracking(-0.2)
+                .font(.system(size: 15, weight: .semibold))
+                .tracking(-0.2)
                 .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity).lineLimit(1).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
             trailing.frame(minWidth: 36, alignment: .trailing)
         }
@@ -165,7 +170,8 @@ struct StatTileView: View {
                     Text(tile.value)
                         .font(.system(size: 23, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
-                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     if let delta = tile.delta { DeltaChip(delta: delta) }
                 }
                 if let caption = tile.caption {
@@ -233,7 +239,7 @@ struct ProportionBar: View {
 struct RankedRowView: View {
     let row: RankedRow
     var accent: Color = Theme.Color.primary600
-    var onTap: (() -> Void)? = nil
+    var onTap: (() -> Void)?
 
     var body: some View {
         let content = HStack(spacing: 11) {
@@ -417,7 +423,7 @@ struct InsightsSkeleton: View {
                     Shimmer(height: 120, cornerRadius: Radii.xl)
                 case .list:
                     Shimmer(height: 96, cornerRadius: Radii.xl)
-                    ForEach(0 ..< 4, id: \.self) { _ in
+                    ForEach(0..<4, id: \.self) { _ in
                         Shimmer(height: 60, cornerRadius: Radii.lg)
                     }
                 }
@@ -448,13 +454,15 @@ struct InsightsErrorView: View {
             Text(message)
                 .font(.system(size: 13.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
                     Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .accessibilityIdentifier("scheduling.insights.retry")
@@ -470,7 +478,7 @@ struct InsightsErrorView: View {
 struct InsightsLinkRow: View {
     let icon: PantopusIcon
     let title: String
-    var subtitle: String? = nil
+    var subtitle: String?
     var accent: Color = Theme.Color.primary600
     let action: () -> Void
 

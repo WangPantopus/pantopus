@@ -76,11 +76,18 @@ final class InviteeReviewConfirmViewModel {
 
     // MARK: - Derived presentation
 
-    var accent: Color { DiscoveryTheme.accent(forOwnerType: page?.ownerType) }
-    var avatarColors: [Color] { DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType) }
+    var accent: Color {
+        DiscoveryTheme.accent(forOwnerType: page?.ownerType)
+    }
+
+    var avatarColors: [Color] {
+        DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType)
+    }
 
     /// Paid surfaces only appear when the event is priced AND the flag is on.
-    var showsPaidSurfaces: Bool { (eventType?.isPriced ?? false) && SchedulingFeatureFlags.paidEnabled }
+    var showsPaidSurfaces: Bool {
+        (eventType?.isPriced ?? false) && SchedulingFeatureFlags.paidEnabled
+    }
 
     var isDeposit: Bool {
         guard let event = eventType else { return false }
@@ -108,7 +115,9 @@ final class InviteeReviewConfirmViewModel {
     /// Whether any credit row is present in `priceRows` — gates the `CreditChip`
     /// (Frame 4) and the "Credit applied · use a different one" label on
     /// `ApplyCreditRow`. Always `false` until the backend exposes credit data.
-    var hasCreditApplied: Bool { priceRows.contains { $0.credit } }
+    var hasCreditApplied: Bool {
+        priceRows.contains { $0.credit }
+    }
 
     /// The deposit amount rendered (bold) in the deposit note + due-now hero.
     var depositAmountLabel: String {
@@ -144,7 +153,9 @@ final class InviteeReviewConfirmViewModel {
         return "Pay \(ConfirmFormat.money(cents: cents, currency: eventType?.currency)) & book"
     }
 
-    var ctaIcon: PantopusIcon { showsPaidSurfaces ? .lock : .check }
+    var ctaIcon: PantopusIcon {
+        showsPaidSurfaces ? .lock : .check
+    }
 
     /// The amount charged now (deposit when applicable, else the full price).
     var chargeCents: Int? {
@@ -212,7 +223,9 @@ final class InviteeReviewConfirmViewModel {
         await load()
     }
 
-    var needsDetails: Bool { draft.fullName.isEmpty || draft.email.isEmpty }
+    var needsDetails: Bool {
+        draft.fullName.isEmpty || draft.email.isEmpty
+    }
 
     // MARK: - Confirm
 
@@ -248,8 +261,12 @@ final class InviteeReviewConfirmViewModel {
             handle(error)
         } catch {
             state = .ready
-            inlineBanner = InlineBanner(tone: .error, icon: .alertTriangle, title: "Couldn't confirm your booking",
-                                        message: "Something went wrong. Your time is still held — try again.")
+            inlineBanner = InlineBanner(
+                tone: .error,
+                icon: .alertTriangle,
+                title: "Couldn't confirm your booking",
+                message: "Something went wrong. Your time is still held — try again."
+            )
         }
     }
 
@@ -261,24 +278,42 @@ final class InviteeReviewConfirmViewModel {
             slotTakenActive = true
         case let .conflict(code, message):
             if code == "PAGE_PAUSED" {
-                inlineBanner = InlineBanner(tone: .warning, icon: .pause, title: "This page paused bookings",
-                                            message: message ?? "The host isn't accepting bookings right now.")
+                inlineBanner = InlineBanner(
+                    tone: .warning,
+                    icon: .pause,
+                    title: "This page paused bookings",
+                    message: message ?? "The host isn't accepting bookings right now."
+                )
             } else {
-                inlineBanner = InlineBanner(tone: .warning, icon: .alertTriangle,
-                                            title: "Couldn't confirm your booking", message: message)
+                inlineBanner = InlineBanner(
+                    tone: .warning,
+                    icon: .alertTriangle,
+                    title: "Couldn't confirm your booking",
+                    message: message
+                )
             }
         case let .validation(message, _):
-            inlineBanner = InlineBanner(tone: .error, icon: .alertCircle, title: "Check your details",
-                                        message: message ?? "Some required details are missing.")
+            inlineBanner = InlineBanner(
+                tone: .error,
+                icon: .alertCircle,
+                title: "Check your details",
+                message: message ?? "Some required details are missing."
+            )
         default:
-            inlineBanner = InlineBanner(tone: .error, icon: .alertTriangle, title: "Couldn't confirm your booking",
-                                        message: error.userMessage)
+            inlineBanner = InlineBanner(
+                tone: .error,
+                icon: .alertTriangle,
+                title: "Couldn't confirm your booking",
+                message: error.userMessage
+            )
         }
     }
 
     // MARK: - Slot-taken recovery
 
-    func presentSlotTaken() { showSlotTakenSheet = true }
+    func presentSlotTaken() {
+        showSlotTakenSheet = true
+    }
 
     func selectAlternative(_ alternative: SchedulingSlotAlternative) async {
         bookingStart = alternative.start
@@ -353,14 +388,20 @@ extension InviteeReviewConfirmViewModel {
 
     private static func make(priceCents: Int?) -> InviteeReviewConfirmViewModel {
         let viewModel = InviteeReviewConfirmViewModel(
-            slug: "ada", eventTypeSlug: "intro", start: "2026-06-17T16:30:00Z",
-            tz: "America/Los_Angeles", push: { _ in }, client: .shared
+            slug: "ada",
+            eventTypeSlug: "intro",
+            start: "2026-06-17T16:30:00Z",
+            tz: "America/Los_Angeles",
+            push: { _ in },
+            client: .shared
         )
         let priceJSON = priceCents.map { ", \"price_cents\": \($0), \"currency\": \"usd\"" } ?? ""
         let json = """
         {"page":{"slug":"ada","title":"Maria Kessler","owner_type":"user"},
         "status":"active",
-        "eventTypes":[{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video","cancellation_window_min":1440\(priceJSON)}]}
+        "eventTypes":[{"id":"et1","name":"Intro call","slug":"intro",
+        "default_duration":30,"location_mode":"video",
+        "cancellation_window_min":1440\(priceJSON)}]}
         """
         if let data = json.data(using: .utf8), let view = try? JSONDecoder().decode(PublicBookView.self, from: data) {
             viewModel.page = view.page

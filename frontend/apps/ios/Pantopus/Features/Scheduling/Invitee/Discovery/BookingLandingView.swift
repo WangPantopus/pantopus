@@ -12,6 +12,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct BookingLandingView: View {
     @State private var viewModel: BookingLandingViewModel
     @State private var openInAppDismissed = false

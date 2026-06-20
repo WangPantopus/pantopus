@@ -12,17 +12,28 @@ import XCTest
 
 @MainActor
 final class TeamBookingAvailabilityViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func client(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingClient {
         SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
     }
 
-    private func vm(owner: SchedulingOwner = .business(id: "biz1"), _ routes: [String: [SequencedURLProtocol.Response]]) -> TeamBookingAvailabilityViewModel {
+    private func vm(
+        owner: SchedulingOwner = .business(id: "biz1"),
+        _ routes: [String: [SequencedURLProtocol.Response]]
+    ) -> TeamBookingAvailabilityViewModel {
         TeamBookingAvailabilityViewModel(owner: owner, tz: "America/Los_Angeles", push: { _ in }, client: client(routes))
     }
 
+    // swiftlint:disable:next line_length
     private let members = #"{"members":[{"id":"m1","role_base":"owner","title":"Owner","user":{"id":"u1","name":"Dana Reyes","username":"dana"}},{"id":"m2","role_base":"staff","title":"Stylist","user":{"id":"u2","name":"Marcus Lee","username":"marcus"}}]}"#
     private let ownerAccess = #"{"hasAccess":true,"isOwner":true,"role_base":"owner","permissions":["team.manage"]}"#
     private let noTypes = #"{"eventTypes":[]}"#
@@ -30,6 +41,7 @@ final class TeamBookingAvailabilityViewModelTests: XCTestCase {
     /// u1 has openings this week; u2 has none.
     private func freeBody() -> String {
         let today = ISO8601DateFormatter().string(from: Date())
+        // swiftlint:disable:next line_length
         return "{\"members\":[\"u1\",\"u2\"],\"freeByMember\":{\"u1\":[{\"start\":\"\(today)\",\"end\":\"\(today)\",\"startLocal\":\"\(today)\"}],\"u2\":[]}}"
     }
 

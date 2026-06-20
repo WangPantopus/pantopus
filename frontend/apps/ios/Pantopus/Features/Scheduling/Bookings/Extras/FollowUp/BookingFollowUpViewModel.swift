@@ -13,9 +13,11 @@
 import Observation
 import SwiftUI
 
-enum FollowUpOutcome: String, CaseIterable, Identifiable, Sendable {
+enum FollowUpOutcome: String, CaseIterable, Identifiable {
     case completed, noShow, rebookNeeded
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -71,8 +73,13 @@ final class BookingFollowUpViewModel {
         self.client = client
     }
 
-    private var trimmedMessage: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedNote: String { privateNote.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedMessage: String {
+        message.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedNote: String {
+        privateNote.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     /// True when there is no outcome selected and no message typed — the CTA
     /// becomes the calm ghost "Save note only". Matches Frame 1 (blank open)
@@ -87,7 +94,9 @@ final class BookingFollowUpViewModel {
         isSaveNoteOnly ? true : !trimmedMessage.isEmpty
     }
 
-    var canAppendRebookLink: Bool { eventTypeId != nil && !isAppendingLink }
+    var canAppendRebookLink: Bool {
+        eventTypeId != nil && !isAppendingLink
+    }
 
     var primaryTitle: String {
         if errorMessage != nil, !isSaveNoteOnly { return "Try again" }
@@ -100,7 +109,9 @@ final class BookingFollowUpViewModel {
         return isSaveNoteOnly ? .lock : .send
     }
 
-    var primaryIsGhost: Bool { isSaveNoteOnly && errorMessage == nil }
+    var primaryIsGhost: Bool {
+        isSaveNoteOnly && errorMessage == nil
+    }
 
     func select(_ outcome: FollowUpOutcome) {
         if self.outcome == outcome {

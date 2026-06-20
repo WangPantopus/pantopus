@@ -27,7 +27,9 @@ struct DefaultRemindersView: View {
         self.onClose = onClose
     }
 
-    private func close() { onClose?() ?? dismiss() }
+    private func close() {
+        onClose?() ?? dismiss()
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -117,8 +119,12 @@ struct DefaultRemindersView: View {
         return Button { model.toggle(minutes) } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 11) {
-                    Icon(on ? .checkCircle2 : .circle, size: 21, strokeWidth: on ? 2.4 : 2,
-                         color: on ? model.accent : Theme.Color.appBorderStrong)
+                    Icon(
+                        on ? .checkCircle2 : .circle,
+                        size: 21,
+                        strokeWidth: on ? 2.4 : 2,
+                        color: on ? model.accent : Theme.Color.appBorderStrong
+                    )
                     Text(label)
                         .font(.system(size: 14, weight: on ? .semibold : .medium))
                         .foregroundStyle(on ? Theme.Color.appText : Theme.Color.appTextSecondary)
@@ -175,9 +181,8 @@ struct DefaultRemindersView: View {
                     AutoSegmented(
                         options: ReminderPreset.Unit.allCases.map(\.label),
                         selectedIndex: ReminderPreset.Unit.allCases.firstIndex(of: model.customUnit) ?? 1,
-                        accent: model.accent,
-                        onSelect: { idx in model.setCustomUnit(ReminderPreset.Unit.allCases[idx]) }
-                    )
+                        accent: model.accent
+                    ) { idx in model.setCustomUnit(ReminderPreset.Unit.allCases[idx]) }
                 }
                 Text("\(AutomationsFormat.duration(model.customResolvedMinutes)) before each event starts.")
                     .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary)
@@ -209,9 +214,8 @@ struct DefaultRemindersView: View {
         AutoSheetFooter {
             AutoPrimaryButton(
                 title: model.isSaving ? "Saving" : "Save",
-                isSaving: model.isSaving,
-                action: { Task { await model.save() } }
-            )
+                isSaving: model.isSaving
+            ) { Task { await model.save() } }
         }
     }
 
@@ -246,7 +250,9 @@ struct DefaultRemindersView: View {
 private struct ReminderRowData: Identifiable {
     let minutes: Int
     let label: String
-    var id: Int { minutes }
+    var id: Int {
+        minutes
+    }
 }
 
 #if DEBUG

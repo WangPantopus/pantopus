@@ -333,7 +333,12 @@ private fun SummaryLoading() {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.width(88.dp).height(11.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurfaceSunken))
         Spacer(Modifier.weight(1f))
-        Box(modifier = Modifier.width(120.dp).height(26.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appSurfaceSunken))
+        Box(
+            modifier =
+                Modifier.width(
+                    120.dp,
+                ).height(26.dp).clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appSurfaceSunken),
+        )
     }
     Spacer(Modifier.height(14.dp))
     // Stat cells row

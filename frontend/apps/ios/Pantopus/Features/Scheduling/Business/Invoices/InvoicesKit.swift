@@ -48,12 +48,16 @@ enum InvoiceParsing {
     }
 
     private static func firstString(_ dict: [String: JSONValue], _ keys: [String]) -> String? {
-        for key in keys { if let value = dict[key]?.stringValue, !value.isEmpty { return value } }
+        for key in keys {
+            if let value = dict[key]?.stringValue, !value.isEmpty { return value }
+        }
         return nil
     }
 
     private static func firstInt(_ dict: [String: JSONValue], _ keys: [String]) -> Int? {
-        for key in keys { if let value = dict[key]?.numberValue { return Int(value) } }
+        for key in keys {
+            if let value = dict[key]?.numberValue { return Int(value) }
+        }
         return nil
     }
 }

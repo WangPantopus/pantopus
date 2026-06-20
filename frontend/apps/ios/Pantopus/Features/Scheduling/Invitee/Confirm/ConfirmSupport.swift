@@ -11,6 +11,7 @@
 //  Tokens-only styling (Theme.Color / Spacing / Radii / Icon).
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 
 // MARK: - Formatting
@@ -102,7 +103,7 @@ enum ConfirmPillar {
 // MARK: - Draft model + in-session handoff store
 
 /// A single intake answer value (mirrors the host question field types).
-enum InviteeAnswer: Sendable, Hashable {
+enum InviteeAnswer: Hashable {
     case text(String)
     case choices([String])
     case flag(Bool)
@@ -126,7 +127,7 @@ enum InviteeAnswer: Sendable, Hashable {
 }
 
 /// The invitee-entered details collected on D1 and confirmed on D2.
-struct InviteeBookingDraft: Sendable, Hashable {
+struct InviteeBookingDraft: Hashable {
     var firstName: String = ""
     var lastName: String = ""
     var email: String = ""
@@ -165,7 +166,7 @@ struct InviteeBookingDraft: Sendable, Hashable {
 /// The full context handed from D1 to D2. The frozen `.inviteeReviewConfirm`
 /// route cannot carry the draft / loaded event type, so D1 stashes it here and
 /// D2 reads it back by key (same NavigationStack, same session).
-struct InviteeReviewContext: Sendable {
+struct InviteeReviewContext {
     let slug: String
     let eventTypeSlug: String
     let start: String
@@ -207,7 +208,9 @@ final class InviteeBookingDraftStore {
 /// 11pt uppercase section overline (mirrors Form.html overlines).
 struct ConfirmOverline: View {
     let text: String
-    init(_ text: String) { self.text = text }
+    init(_ text: String) {
+        self.text = text
+    }
 
     var body: some View {
         Text(text)
@@ -282,9 +285,9 @@ struct ConfirmBanner: View {
     let tone: Tone
     let icon: PantopusIcon
     let title: String
-    var message: String? = nil
-    var linkLabel: String? = nil
-    var onTapLink: (() -> Void)? = nil
+    var message: String?
+    var linkLabel: String?
+    var onTapLink: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
@@ -332,7 +335,9 @@ struct ConfirmBanner: View {
         }
     }
 
-    private var darkForeground: Color { foreground }
+    private var darkForeground: Color {
+        foreground
+    }
 
     private var background: Color {
         switch tone {
@@ -372,7 +377,7 @@ struct ConfirmFooter<Content: View>: View {
 /// Full-width primary CTA used in the footers.
 struct ConfirmPrimaryButton: View {
     let label: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var accent: Color = Theme.Color.primary600
     var isDisabled: Bool = false
     let action: () -> Void
@@ -466,14 +471,14 @@ struct BookingSummary {
     var avatarColors: [Color]
     var accent: Color
     var eventName: String
-    var hostName: String? = nil
-    var pillarTitle: String? = nil
-    var dateLine: String? = nil
-    var tzLabel: String? = nil
-    var locationTitle: String? = nil
-    var locationSub: String? = nil
-    var attendeePrimary: String? = nil
-    var attendeeSecondary: String? = nil
+    var hostName: String?
+    var pillarTitle: String?
+    var dateLine: String?
+    var tzLabel: String?
+    var locationTitle: String?
+    var locationSub: String?
+    var attendeePrimary: String?
+    var attendeeSecondary: String?
     var answers: [(question: String, answer: String)] = []
 }
 
@@ -530,7 +535,9 @@ struct BookingSummaryCard: View {
     }
 
     private var divider: some View {
-        Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        Rectangle()
+            .fill(Theme.Color.appBorder)
+            .frame(height: 1)
             .padding(.vertical, Spacing.s1)
     }
 
@@ -664,5 +671,7 @@ extension PublicEventTypeView {
     }
 
     /// Whether this event type is priced (gates the paid surfaces with the flag).
-    var isPriced: Bool { (priceCents ?? 0) > 0 }
+    var isPriced: Bool {
+        (priceCents ?? 0) > 0
+    }
 }

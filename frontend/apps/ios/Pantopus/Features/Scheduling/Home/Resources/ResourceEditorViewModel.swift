@@ -74,12 +74,19 @@ final class ResourceEditorViewModel {
         self.client = client
     }
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // MARK: Derived
 
-    var isCreate: Bool { resourceId == nil }
-    var screenTitle: String { isCreate ? "New resource" : "Edit resource" }
+    var isCreate: Bool {
+        resourceId == nil
+    }
+
+    var screenTitle: String {
+        isCreate ? "New resource" : "Edit resource"
+    }
 
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && maxDurationHours > 0

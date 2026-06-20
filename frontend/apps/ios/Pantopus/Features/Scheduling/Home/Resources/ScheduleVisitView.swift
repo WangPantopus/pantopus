@@ -26,17 +26,18 @@ struct ScheduleVisitView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { _ = await viewModel.save() } }
-        ) {
-            switch viewModel.loadState {
-            case .loading:
-                loadingBody
-            case let .error(message):
-                errorBody(message)
-            case .ready:
-                readyBody
+            onCommit: { Task { _ = await viewModel.save() } },
+            content: {
+                switch viewModel.loadState {
+                case .loading:
+                    loadingBody
+                case let .error(message):
+                    errorBody(message)
+                case .ready:
+                    readyBody
+                }
             }
-        }
+        )
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.scheduleVisit")
         .task { await viewModel.load() }
@@ -80,10 +81,10 @@ struct ScheduleVisitView: View {
         .padding(.horizontal, Spacing.s4)
     }
 
-    // Sections render via the local `SectionCard` (Home-green overline,
-    // matching the spec's `Section` overline color H.accent700 and Android),
-    // not the shared `FormFieldGroup` (gray overline). Horizontally inset to
-    // align with the FormShell's section gutter.
+    /// Sections render via the local `SectionCard` (Home-green overline,
+    /// matching the spec's `Section` overline color H.accent700 and Android),
+    /// not the shared `FormFieldGroup` (gray overline). Horizontally inset to
+    /// align with the FormShell's section gutter.
     private var detailsGroup: some View {
         SectionCard {
             TextField("e.g. Plumber visit", text: $viewModel.title)

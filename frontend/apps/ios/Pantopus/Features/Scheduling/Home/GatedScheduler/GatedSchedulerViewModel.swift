@@ -158,6 +158,9 @@ final class GatedSchedulerViewModel {
                 )
             )
             // Optimistically clear the actioned assignment — it's resolved.
+            // Drop it from the source events too; otherwise the rebuild()
+            // refresh below re-derives it straight back into `assignments`.
+            events.removeAll { $0.id == eventId }
             assignments.removeAll { $0.id == item.id }
             if assignments.isEmpty { rebuild() }
         } catch {

@@ -89,12 +89,12 @@ struct BookingsInboxView: View {
 
     // MARK: - Scope pills
 
-    // The cross-owner scope row (All / Personal / Home / Business) matching the
-    // design's horizontally-scrolling pill switcher. The inbox is scoped to a
-    // single owner per route, so the pill for the active owner is filled in its
-    // identity colour and the others are rendered (for parity) but disabled —
-    // cross-owner navigation needs an owner directory the route doesn't carry
-    // (deferred). The active pill follows the owner-polymorphic accent.
+    /// The cross-owner scope row (All / Personal / Home / Business) matching the
+    /// design's horizontally-scrolling pill switcher. The inbox is scoped to a
+    /// single owner per route, so the pill for the active owner is filled in its
+    /// identity colour and the others are rendered (for parity) but disabled —
+    /// cross-owner navigation needs an owner directory the route doesn't carry
+    /// (deferred). The active pill follows the owner-polymorphic accent.
     private var scopePills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 7) {
@@ -255,7 +255,7 @@ struct BookingsInboxView: View {
         switch viewModel.phase {
         case .loading:
             loadingList
-        case .error(let message):
+        case let .error(message):
             errorView(message)
         case .ready:
             if viewModel.isEmpty {
@@ -326,7 +326,7 @@ extension BookingsInboxView {
             .padding(.horizontal, Spacing.s4)
             .frame(height: 46)
             // Design (bookings-inbox-frames.jsx:222): FAB background is fixed
-            // PRIMARY (#0284c7) regardless of the active owner pillar — not
+            // PRIMARY (0284c7) regardless of the active owner pillar — not
             // accent-polymorphic. Use the stable operational token so a
             // Home/Business host's FAB stays primary blue, not green/violet.
             .background(SchedulingIdentityTheme.operationalPrimary)

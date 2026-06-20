@@ -43,20 +43,42 @@ final class WorkflowsListViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    private var globalWorkflows: [WorkflowDTO] { workflows.filter { ($0.eventTypeId ?? "").isEmpty } }
-    private var scopedWorkflows: [WorkflowDTO] { workflows.filter { !($0.eventTypeId ?? "").isEmpty } }
+    var accent: Color {
+        theme.accent
+    }
 
-    var globalCount: Int { globalWorkflows.count }
-    var scopedCount: Int { scopedWorkflows.count }
+    var accentBg: Color {
+        theme.accentBg
+    }
 
-    var visibleWorkflows: [WorkflowDTO] { scope == .global ? globalWorkflows : scopedWorkflows }
+    private var globalWorkflows: [WorkflowDTO] {
+        workflows.filter { ($0.eventTypeId ?? "").isEmpty }
+    }
+
+    private var scopedWorkflows: [WorkflowDTO] {
+        workflows.filter { !($0.eventTypeId ?? "").isEmpty }
+    }
+
+    var globalCount: Int {
+        globalWorkflows.count
+    }
+
+    var scopedCount: Int {
+        scopedWorkflows.count
+    }
+
+    var visibleWorkflows: [WorkflowDTO] {
+        scope == .global ? globalWorkflows : scopedWorkflows
+    }
 
     /// Pinned-card subtitle, e.g. "1 day + 1 hour before · Push".
-    var remindersSummary: String { AutomationsFormat.remindersSummary(reminderMinutes) }
+    var remindersSummary: String {
+        AutomationsFormat.remindersSummary(reminderMinutes)
+    }
 
     init(
         owner: SchedulingOwner,
@@ -89,7 +111,9 @@ final class WorkflowsListViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Row state
 
@@ -97,7 +121,9 @@ final class WorkflowsListViewModel {
         activeOverrides[workflow.id] ?? (workflow.isActive ?? true)
     }
 
-    func statusKey(_ workflow: WorkflowDTO) -> String { isActive(workflow) ? "active" : "paused" }
+    func statusKey(_ workflow: WorkflowDTO) -> String {
+        isActive(workflow) ? "active" : "paused"
+    }
 
     // MARK: Toggle active
 
@@ -132,10 +158,27 @@ final class WorkflowsListViewModel {
 
     // MARK: Navigation
 
-    func openDefaultReminders() { showRemindersSheet = true }
-    func remindersSheetDismissed() { Task { await load() } }
-    func createWorkflow() { push(.workflowEditor(owner: owner, workflowId: nil)) }
-    func openWorkflow(_ workflow: WorkflowDTO) { push(.workflowEditor(owner: owner, workflowId: workflow.id)) }
-    func openTemplates() { push(.messageTemplateLibrary(owner: owner)) }
-    func selectScope(_ index: Int) { scope = Scope(rawValue: index) ?? .global }
+    func openDefaultReminders() {
+        showRemindersSheet = true
+    }
+
+    func remindersSheetDismissed() {
+        Task { await load() }
+    }
+
+    func createWorkflow() {
+        push(.workflowEditor(owner: owner, workflowId: nil))
+    }
+
+    func openWorkflow(_ workflow: WorkflowDTO) {
+        push(.workflowEditor(owner: owner, workflowId: workflow.id))
+    }
+
+    func openTemplates() {
+        push(.messageTemplateLibrary(owner: owner))
+    }
+
+    func selectScope(_ index: Int) {
+        scope = Scope(rawValue: index) ?? .global
+    }
 }

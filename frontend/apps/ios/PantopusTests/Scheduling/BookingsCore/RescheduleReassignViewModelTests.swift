@@ -23,7 +23,10 @@ final class RescheduleReassignViewModelTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeViewModel(owner: SchedulingOwner = .personal, routes: [String: [SequencedURLProtocol.Response]]) -> RescheduleReassignViewModel {
+    private func makeViewModel(
+        owner: SchedulingOwner = .personal,
+        routes: [String: [SequencedURLProtocol.Response]]
+    ) -> RescheduleReassignViewModel {
         let session = SequencedURLProtocol.makeSession(routeResponses: routes)
         let actions = BookingActions(owner: owner, client: SchedulingClient(client: APIClient(session: session, retryPolicy: .none)))
         return RescheduleReassignViewModel(

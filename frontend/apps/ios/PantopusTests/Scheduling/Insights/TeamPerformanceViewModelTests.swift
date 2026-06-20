@@ -11,18 +11,33 @@ import XCTest
 
 @MainActor
 final class TeamPerformanceViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
 
-    private func vm(owner: SchedulingOwner = .business(id: "biz1"), _ routes: [String: [SequencedURLProtocol.Response]]) -> TeamPerformanceViewModel {
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
+
+    private func vm(
+        owner: SchedulingOwner = .business(id: "biz1"),
+        _ routes: [String: [SequencedURLProtocol.Response]]
+    ) -> TeamPerformanceViewModel {
         TeamPerformanceViewModel(
             owner: owner,
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
+    // swiftlint:disable:next line_length
     private let members = #"{"members":[{"id":"m1","role_base":"owner","user":{"id":"u1","name":"Dana Reyes","username":"dana"}},{"id":"m2","role_base":"staff","user":{"id":"u2","name":"Marcus Lee","username":"marcus"}}]}"#
+    // swiftlint:disable:next line_length
     private let team = #"{"window_days":30,"hosts":[{"host_user_id":"u1","total":8,"confirmed":2,"completed":6,"no_show":1,"cancelled":1},{"host_user_id":"u2","total":4,"confirmed":1,"completed":2,"no_show":2,"cancelled":0}]}"#
 
     func testBusinessOnlyForPersonalOwner() async {
@@ -77,8 +92,10 @@ final class TeamPerformanceViewModelTests: XCTestCase {
     }
 
     func testSingleMemberCollapses() async {
+        // swiftlint:disable:next line_length
+        let singleHost = #"{"window_days":30,"hosts":[{"host_user_id":"u1","total":5,"confirmed":1,"completed":4,"no_show":0,"cancelled":0}]}"#
         let model = vm([
-            "/api/scheduling/insights/team": [.status(200, body: #"{"window_days":30,"hosts":[{"host_user_id":"u1","total":5,"confirmed":1,"completed":4,"no_show":0,"cancelled":0}]}"#)],
+            "/api/scheduling/insights/team": [.status(200, body: singleHost)],
             "/api/businesses/biz1/members": [.status(200, body: members)]
         ])
         await model.load()

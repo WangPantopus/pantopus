@@ -35,6 +35,7 @@ final class DefaultRemindersViewModelTests: XCTestCase {
     }
 
     func testLoadExistingSortedDescending() async {
+        // swiftlint:disable:next line_length
         let page = #"{"page":{"id":"p1","owner_type":"user","slug":"sam","is_live":true,"is_paused":false,"reminder_minutes":[15,1440,30]}}"#
         SequencedURLProtocol.sequence = [.status(200, body: page)]
         let vm = DefaultRemindersViewModel(owner: .personal, client: makeClient())
@@ -68,7 +69,11 @@ final class DefaultRemindersViewModelTests: XCTestCase {
     func testSavePutsReminders() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: emptyPage),
-            .status(200, body: #"{"page":{"id":"p1","owner_type":"user","slug":"sam","is_live":true,"is_paused":false,"reminder_minutes":[1440,60]}}"#),
+            .status(
+                200,
+                // swiftlint:disable:next line_length
+                body: #"{"page":{"id":"p1","owner_type":"user","slug":"sam","is_live":true,"is_paused":false,"reminder_minutes":[1440,60]}}"#
+            )
         ]
         let vm = DefaultRemindersViewModel(owner: .personal, client: makeClient())
         await vm.load()

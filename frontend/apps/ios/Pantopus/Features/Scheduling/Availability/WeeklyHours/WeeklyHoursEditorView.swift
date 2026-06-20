@@ -24,7 +24,9 @@ struct WeeklyHoursEditorView: View {
     private struct TimeRangeEdit: Identifiable {
         let weekday: Int
         let range: TimeRange
-        var id: UUID { range.id }
+        var id: UUID {
+            range.id
+        }
     }
 
     private var isReady: Bool {
@@ -95,23 +97,24 @@ struct WeeklyHoursEditorView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { await viewModel.save() } }
-        ) {
-            AvailabilityHeaderPill()
-            if viewModel.isUnset {
-                CompositionGapCard()
-                WeeklyHoursEmptyHero { viewModel.applyNineToFiveDefault() }
-                linkGroup
-            } else {
-                if viewModel.allOff {
-                    NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+            onCommit: { Task { await viewModel.save() } },
+            content: {
+                AvailabilityHeaderPill()
+                if viewModel.isUnset {
+                    CompositionGapCard()
+                    WeeklyHoursEmptyHero { viewModel.applyNineToFiveDefault() }
+                    linkGroup
+                } else {
+                    if viewModel.allOff {
+                        NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+                    }
+                    nameGroup
+                    timezoneGroup
+                    weeklyHoursGroup
+                    linkGroup
                 }
-                nameGroup
-                timezoneGroup
-                weeklyHoursGroup
-                linkGroup
             }
-        }
+        )
     }
 
     // MARK: Groups
@@ -152,8 +155,8 @@ struct WeeklyHoursEditorView: View {
         }
     }
 
-    // Bordered field button (1.5px border, globe + value + chevron-down) with a
-    // muted "· auto" suffix when the timezone is auto-detected.
+    /// Bordered field button (1.5px border, globe + value + chevron-down) with a
+    /// muted "· auto" suffix when the timezone is auto-detected.
     private var timezoneFieldButton: some View {
         Button { viewModel.showTimezoneSheet = true } label: {
             HStack(spacing: Spacing.s2) {
@@ -179,14 +182,13 @@ struct WeeklyHoursEditorView: View {
 
     private var timezoneLabel: some View {
         // Bold the city; render the " · auto" suffix in muted fg4.
-        (
-            Text(viewModel.timezoneCityDisplay)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(Theme.Color.appText)
-                + Text(viewModel.lockTimezone ? " · auto" : "")
-                .font(.system(size: 13))
-                .foregroundColor(Theme.Color.appTextMuted)
-        )
+
+        Text(viewModel.timezoneCityDisplay)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(Theme.Color.appText)
+            + Text(viewModel.lockTimezone ? " · auto" : "")
+            .font(.system(size: 13))
+            .foregroundColor(Theme.Color.appTextMuted)
     }
 
     private var weeklyHoursGroup: some View {
@@ -208,7 +210,7 @@ struct WeeklyHoursEditorView: View {
         }
     }
 
-    // No overline in the design's links card (`<Card pillar="personal">` only).
+    /// No overline in the design's links card (`<Card pillar="personal">` only).
     private var linkGroup: some View {
         AvailabilityCard {
             SchedulingLinkRow(

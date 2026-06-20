@@ -67,7 +67,7 @@ final class ManualBookingViewModel: WizardModel {
     var selectedSlotStart: String?
     var selectedDay = Calendar.current.startOfDay(for: Date())
 
-    // Step 3 — details
+    /// Step 3 — details
     var inviteeName = ""
     /// Resolution state for the invitee search — drives whether the verified
     /// card (Frame 3) or the info banner + invite-by flow (Frame 4) is shown.
@@ -107,7 +107,9 @@ final class ManualBookingViewModel: WizardModel {
         eventTypes.first { $0.id == selectedEventTypeId }
     }
 
-    var identity: WizardIdentity { owner.theme.identity }
+    var identity: WizardIdentity {
+        owner.theme.identity
+    }
 
     // MARK: WizardModel chrome
 
@@ -148,7 +150,7 @@ final class ManualBookingViewModel: WizardModel {
     /// The named step-rail model (reschedule-frames StepRail: Event · Time ·
     /// Details · Review). The active step is filled; completed steps show a
     /// check; the active label is shown inline.
-    var stepRailSteps: [(index: Int, title: String, isCurrent: Bool, isDone: Bool)] {
+    var stepRailSteps: [(index: Int, title: String, isCurrent: Bool, isDone: Bool)] { // swiftlint:disable:this large_tuple
         let titles = ["Event", "Time", "Details", "Review"]
         return titles.enumerated().map { offset, title in
             let idx = offset + 1
@@ -189,7 +191,9 @@ final class ManualBookingViewModel: WizardModel {
         }
     }
 
-    func discardConfirmed() { shouldDismiss = true }
+    func discardConfirmed() {
+        shouldDismiss = true
+    }
 
     func primaryTapped() {
         switch step {
@@ -272,7 +276,7 @@ final class ManualBookingViewModel: WizardModel {
     var dayStrip: [Date] {
         let calendar = tzCalendar()
         let start = calendar.startOfDay(for: Date())
-        return (0 ..< 7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
     var slotsForSelectedDay: [SlotDTO] {

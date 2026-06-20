@@ -28,9 +28,9 @@ struct PayoutsEarningsView: View {
     }
 
     var body: some View {
-        PaidSurfaceGate(title: "Wallet", onBack: { dismiss() }) {
+        PaidSurfaceGate(title: "Wallet", onBack: { dismiss() }, content: {
             gatedBody
-        }
+        })
         .task { await model.load() }
     }
 
@@ -42,9 +42,8 @@ struct PayoutsEarningsView: View {
                     Icon(.history, size: 19, color: Theme.Color.appText)
                         .frame(width: 36, height: 36)
                         .accessibilityLabel("Transaction history")
-                ),
-                onBack: { dismiss() }
-            )
+                )
+            ) { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -114,9 +113,8 @@ extension PayoutsEarningsView {
                 if model.payoutState == .enabled, !model.isEmpty {
                     sectionOverline("Taxes").padding(.top, Spacing.s4)
                     TaxDocsRow(
-                        docs: WalletTaxDocs(ready: false, bodyText: "Documents are issued in mid-January."),
-                        onTap: { Task { await model.openDashboard() } }
-                    )
+                        docs: WalletTaxDocs(ready: false, bodyText: "Documents are issued in mid-January.")
+                    ) { Task { await model.openDashboard() } }
                 }
 
                 Color.clear.frame(height: 112)
@@ -560,7 +558,7 @@ private struct PayoutsWithdrawLocked: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        PayoutsEarningsView(owner: .business(id: "biz1"), push: { _ in })
+        PayoutsEarningsView(owner: .business(id: "biz1")) { _ in }
     }
 }
 #endif

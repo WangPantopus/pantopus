@@ -154,8 +154,7 @@ class MessageTemplateEditorViewModel
             _state.value = loaded.copy(form = transform(loaded.form))
         }
 
-        private fun SchedulingError.loadMessage(): String =
-            (this as? SchedulingError.Generic)?.message ?: "Couldn't load this template."
+        private fun SchedulingError.loadMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't load this template."
 
         private fun SchedulingError.saveMessage(): String =
             when (this) {

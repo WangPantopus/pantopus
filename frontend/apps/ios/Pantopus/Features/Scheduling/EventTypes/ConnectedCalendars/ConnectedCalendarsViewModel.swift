@@ -27,8 +27,8 @@ struct CalendarProvider: Identifiable, Hashable {
         self.icon = icon
     }
 
-    // Design glyphs (connected-calendars-frames.jsx PROVIDERS): Google
-    // `calendar-days`, Apple `calendar`, Outlook `calendar-range`.
+    /// Design glyphs (connected-calendars-frames.jsx PROVIDERS): Google
+    /// `calendar-days`, Apple `calendar`, Outlook `calendar-range`.
     static let all: [CalendarProvider] = [
         CalendarProvider(id: "google", name: "Google Calendar", shortName: "Google", icon: .calendarDays),
         CalendarProvider(id: "apple", name: "Apple Calendar", shortName: "Apple", icon: .calendar),
@@ -62,7 +62,9 @@ final class ConnectedCalendarsViewModel {
 
     /// v1 always returns no linked accounts, so the screen leads with the
     /// calm coming-soon hero.
-    var isComingSoon: Bool { calendars.isEmpty }
+    var isComingSoon: Bool {
+        calendars.isEmpty
+    }
 
     let providers = CalendarProvider.all
 
@@ -71,7 +73,9 @@ final class ConnectedCalendarsViewModel {
         await fetch()
     }
 
-    func reload() async { await fetch() }
+    func reload() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading

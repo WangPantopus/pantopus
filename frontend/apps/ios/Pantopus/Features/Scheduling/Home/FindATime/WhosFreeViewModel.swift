@@ -21,28 +21,30 @@ final class WhosFreeViewModel {
         case error(message: String)
     }
 
-    enum ViewMode: String, Sendable, Hashable {
+    enum ViewMode: String, Hashable {
         case day
         case week
     }
 
-    enum CellState: Sendable, Hashable {
+    enum CellState: Hashable {
         case free
         case busy
-        /// Soft-hold / maybe block — design amber `#fef3c7`. The home `whos-free`
+        /// Soft-hold / maybe block — design amber `fef3c7`. The home `whos-free`
         /// read only emits free slots today, so this isn't produced from live data
         /// yet (see `deferredBackend`); the grid + legend model it for parity.
         case tentative
-        /// Outside the member's working/awake window — design hatched `#f9fafb`.
+        /// Outside the member's working/awake window — design hatched `f9fafb`.
         /// Not distinguished by the current wire contract; modelled for parity.
         case offHours
         case unknown
     }
 
-    struct GridRow: Identifiable, Sendable, Hashable {
+    struct GridRow: Identifiable, Hashable {
         let member: FindATimeMember
         let cells: [CellState]
-        var id: String { member.id }
+        var id: String {
+            member.id
+        }
     }
 
     /// 2-hour buckets the design columns map to (8a … 6p).
@@ -55,7 +57,9 @@ final class WhosFreeViewModel {
     private let push: @MainActor (SchedulingRoute) -> Void
     private let client: SchedulingClient
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // State.
     private(set) var phase: Phase = .loading
@@ -91,7 +95,9 @@ final class WhosFreeViewModel {
         rows.first { row in row.cells.allSatisfy { $0 == .unknown } }?.member.displayName
     }
 
-    var columnLabels: [String] { Self.columnLabels }
+    var columnLabels: [String] {
+        Self.columnLabels
+    }
 
     // MARK: - Load
 
@@ -120,7 +126,9 @@ final class WhosFreeViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     /// Top-bar "Add" — open the find-a-time setup to plan a household time.
     func startFindATime() {
@@ -165,7 +173,9 @@ final class WhosFreeViewModel {
             let endComponents = calendar.dateComponents([.hour, .minute], from: end)
             let rawEnd = (endComponents.hour ?? startHour) + ((endComponents.minute ?? 0) > 0 ? 1 : 0)
             let endHour = max(startHour + 1, min(rawEnd, 24))
-            for hour in startHour..<endHour { hours.insert(hour) }
+            for hour in startHour..<endHour {
+                hours.insert(hour)
+            }
         }
         return hours
     }

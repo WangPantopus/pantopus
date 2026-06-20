@@ -430,9 +430,10 @@ fun FunnelStepRow(
 ) {
     val trailing = "$count${percent?.let { " · $it" } ?: ""}"
     Column(
-        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = "$label: $count${percent?.let { ", $it" } ?: ""}"
-        },
+        modifier =
+            modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+                contentDescription = "$label: $count${percent?.let { ", $it" } ?: ""}"
+            },
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -25,7 +25,9 @@ struct HubSummaryCard: View {
     let onRetry: () -> Void
     let onInsights: () -> Void
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -97,7 +99,8 @@ struct HubSummaryCard: View {
         Text(title)
             .font(.system(size: 11, weight: on ? .bold : .semibold))
             .foregroundStyle(on ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
-            .padding(.horizontal, 11).padding(.vertical, 5)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5)
             .background(on ? theme.accent : Color.clear)
             .clipShape(Capsule())
     }
@@ -110,10 +113,17 @@ struct HubSummaryCard: View {
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 3) {
                 if let delta { Icon(delta >= 0 ? .arrowUp : .arrowDown, size: 16, strokeWidth: 2.6, color: color) }
-                Text(value).font(.system(size: 22, weight: .bold)).tracking(-0.5).foregroundStyle(color).monospacedDigit()
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .tracking(-0.5)
+                    .foregroundStyle(color)
+                    .monospacedDigit()
             }
-            Text(label).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextSecondary)
-                .lineLimit(1).minimumScaleFactor(0.8)
+            Text(label)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -128,10 +138,15 @@ struct HubSummaryCard: View {
                 HStack(spacing: 5) {
                     Circle().fill(theme.accent).frame(width: 6, height: 6)
                     Text(nameFor(item.eventTypeId ?? "") ?? "Other")
-                        .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong).lineLimit(1)
-                    Text("\(item.count ?? 0)").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.appTextMuted)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .lineLimit(1)
+                    Text("\(item.count ?? 0)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextMuted)
                 }
-                .padding(.horizontal, 9).padding(.vertical, Spacing.s1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, Spacing.s1)
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(Capsule())
             }
@@ -152,7 +167,9 @@ struct HubSummaryCard: View {
         }
     }
 
-    private func deltaText(_ pct: Int) -> String { "\(pct >= 0 ? "+" : "")\(pct)%" }
+    private func deltaText(_ pct: Int) -> String {
+        "\(pct >= 0 ? "+" : "")\(pct)%"
+    }
 
     // MARK: Empty
 
@@ -175,8 +192,16 @@ struct HubSummaryCard: View {
                 Spacer(minLength: Spacing.s0)
             }
             .padding(.top, 14)
-            SetupPrimaryCTA(title: "Share booking link", icon: .share, iconTrailing: false, owner: owner, height: 44, fontSize: 13.5, action: onShare)
-                .padding(.top, 14)
+            SetupPrimaryCTA(
+                title: "Share booking link",
+                icon: .share,
+                iconTrailing: false,
+                owner: owner,
+                height: 44,
+                fontSize: 13.5,
+                action: onShare
+            )
+            .padding(.top, 14)
         }
     }
 
@@ -195,16 +220,24 @@ struct HubSummaryCard: View {
                 }
                 .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Couldn't load your numbers").font(.system(size: 13.5, weight: .semibold)).tracking(-0.1).foregroundStyle(Theme.Color.appText)
-                    Text("Check your connection and try again.").font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    Text("Couldn't load your numbers")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Check your connection and try again.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer(minLength: Spacing.s2)
                 Button(action: onRetry) {
                     HStack(spacing: 5) {
                         Icon(.refreshCw, size: 13, color: Theme.Color.appTextStrong)
-                        Text("Retry").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+                        Text("Retry")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
                     }
-                    .padding(.horizontal, 14).padding(.vertical, Spacing.s2)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, Spacing.s2)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
                 }
             }
@@ -225,14 +258,19 @@ struct HubSummaryCard: View {
             HStack(alignment: .center, spacing: 10) {
                 ForEach(0..<4, id: \.self) { i in
                     VStack(alignment: .leading, spacing: 6) {
-                        Shimmer(height: 22, cornerRadius: 5).frame(maxWidth: .infinity).scaleEffect(x: 0.7, anchor: .leading)
-                        Shimmer(height: 9, cornerRadius: 3).frame(maxWidth: .infinity).scaleEffect(x: 0.9, anchor: .leading)
+                        Shimmer(height: 22, cornerRadius: 5)
+                            .frame(maxWidth: .infinity)
+                            .scaleEffect(x: 0.7, anchor: .leading)
+                        Shimmer(height: 9, cornerRadius: 3)
+                            .frame(maxWidth: .infinity)
+                            .scaleEffect(x: 0.9, anchor: .leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if i < 3 { divider }
                 }
             }
-            Shimmer(height: 40, cornerRadius: Radii.sm).padding(.top, Spacing.s4)
+            Shimmer(height: 40, cornerRadius: Radii.sm)
+                .padding(.top, Spacing.s4)
             HStack {
                 Spacer()
                 Shimmer(width: 86, height: 12, cornerRadius: 3)
@@ -262,14 +300,18 @@ private struct Sparkline: View {
                 if pts.count >= 2 {
                     Path { p in
                         p.move(to: CGPoint(x: pts[0].x, y: h))
-                        for pt in pts { p.addLine(to: pt) }
+                        for pt in pts {
+                            p.addLine(to: pt)
+                        }
                         p.addLine(to: CGPoint(x: pts[pts.count - 1].x, y: h))
                         p.closeSubpath()
                     }
                     .fill(accent.opacity(0.08))
                     Path { p in
                         p.move(to: pts[0])
-                        for pt in pts.dropFirst() { p.addLine(to: pt) }
+                        for pt in pts.dropFirst() {
+                            p.addLine(to: pt)
+                        }
                     }
                     .stroke(accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     if let last = pts.last {

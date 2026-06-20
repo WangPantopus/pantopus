@@ -13,9 +13,12 @@
 import Observation
 import SwiftUI
 
-enum NudgeAudience: String, CaseIterable, Identifiable, Sendable {
+enum NudgeAudience: String, CaseIterable, Identifiable {
     case all, confirmed, noShows
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
+
     var label: String {
         switch self {
         case .all: "All attendees"
@@ -26,7 +29,7 @@ enum NudgeAudience: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// Recipient counts per audience, supplied by the presenting screen.
-struct NudgeAudienceCounts: Sendable, Equatable {
+struct NudgeAudienceCounts: Equatable {
     var all: Int
     var confirmed: Int
     var noShows: Int
@@ -83,9 +86,17 @@ final class SendNudgeViewModel {
         self.client = client
     }
 
-    var recipientCount: Int { counts.count(for: audience) }
-    var isOverLimit: Bool { message.count > characterLimit }
-    var hasRecipients: Bool { recipientCount > 0 }
+    var recipientCount: Int {
+        counts.count(for: audience)
+    }
+
+    var isOverLimit: Bool {
+        message.count > characterLimit
+    }
+
+    var hasRecipients: Bool {
+        recipientCount > 0
+    }
 
     var canSend: Bool {
         !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -94,7 +105,9 @@ final class SendNudgeViewModel {
             && !isSending
     }
 
-    var ctaTitle: String { hasRecipients ? "Send to \(recipientCount)" : "Send" }
+    var ctaTitle: String {
+        hasRecipients ? "Send to \(recipientCount)" : "Send"
+    }
 
     /// Dark-toast confirmation copy shown after a successful send,
     /// e.g. "Update sent to 12 attendees".
@@ -108,7 +121,7 @@ final class SendNudgeViewModel {
 
     func presentTemplatePicker() async {
         if templates.isEmpty {
-            templates = (try? await loadTemplates()) ?? []
+            templates = await (try? loadTemplates()) ?? []
         }
         isTemplatePickerPresented = true
     }

@@ -13,7 +13,7 @@
 import Foundation
 
 /// A pickable team member for the assignment sheets.
-struct AssignmentMember: Identifiable, Hashable, Sendable {
+struct AssignmentMember: Identifiable, Hashable {
     let id: String // user id (assignee subject_id)
     let name: String
     let avatarURL: String?
@@ -21,7 +21,7 @@ struct AssignmentMember: Identifiable, Hashable, Sendable {
 }
 
 /// The loaded assignment context for an event type.
-struct AssignmentPool: Sendable {
+struct AssignmentPool {
     let eventType: EventTypeDTO
     let assignees: [EventTypeAssigneeDTO]
     let members: [AssignmentMember]

@@ -17,7 +17,7 @@ final class EventTypeFormatTests: XCTestCase {
 
     func testDurationsAndLocation() {
         let summary = EventTypeFormat.durationsAndLocation([30, 60], location: .phone)
-        XCTAssertEqual(summary, "30, 60 min · Phone")
+        XCTAssertEqual(summary, "30, 1 hr · Phone")
     }
 
     func testPriceContainsAmount() {

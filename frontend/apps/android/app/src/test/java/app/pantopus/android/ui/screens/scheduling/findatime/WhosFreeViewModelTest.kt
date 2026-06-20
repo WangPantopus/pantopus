@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.findatime
 
@@ -12,11 +12,14 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -36,10 +39,12 @@ class WhosFreeViewModelTest {
     private val members: HomeMembersRepository = mockk()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val session = FindATimeSession()
+    private val networkMonitor: NetworkMonitor = mockk()
 
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
+        every { networkMonitor.isOnline } returns MutableStateFlow(true)
         coEvery { homes.myHomes() } returns NetworkResult.Success(MyHomesResponse(homes = listOf(home("home-1")), message = null))
         coEvery { members.listOccupants("home-1") } returns
             NetworkResult.Success(
@@ -58,7 +63,7 @@ class WhosFreeViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = WhosFreeViewModel(homes, members, repo, session)
+    private fun vm() = WhosFreeViewModel(homes, members, repo, session, networkMonitor)
 
     /** A free block whose local start hour lands in a grid bucket. */
     private fun freeBlock(localHour: Int) =

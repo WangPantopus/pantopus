@@ -24,24 +24,25 @@ final class FirstRunWizardModel: WizardModel {
     private(set) var isFinished = false
     var pendingShareURL: URL?
 
-    // Resume state — true when the wizard was opened with steps 1–2 already
-    // complete (i.e. starting at step 3). The screen shows a ResumeBanner.
+    /// Resume state — true when the wizard was opened with steps 1–2 already
+    /// complete (i.e. starting at step 3). The screen shows a ResumeBanner.
     private(set) var isResuming = false
 
-    // Step 1 — handle.
+    /// Step 1 — handle.
     var slug: String = "" {
         didSet { if slug != oldValue { onSlugEdited() } }
     }
+
     private(set) var slugState: SlugFieldState = .idle
 
     // Step 2 — type.
     var locationMode: String = "video"
     var duration: Int = 30
 
-    // Step 3 — hours (default Mon–Fri on).
+    /// Step 3 — hours (default Mon–Fri on).
     var hoursEnabled: [Int: Bool] = [1: true, 2: true, 3: true, 4: true, 5: true, 6: false, 0: false]
 
-    // Submission flags.
+    /// Submission flags.
     private(set) var isSubmitting = false
 
     let owner: SchedulingOwner
@@ -52,7 +53,9 @@ final class FirstRunWizardModel: WizardModel {
     private var slugCheckTask: Task<Void, Never>?
     private var seededTimezone = false
 
-    var theme: SchedulingIdentityTheme { owner.theme }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     /// - Parameters:
     ///   - owner: The scheduling owner pillar (Personal / Home / Business).
@@ -71,7 +74,9 @@ final class FirstRunWizardModel: WizardModel {
 
     // MARK: Derived
 
-    var rangeLabel: String { "9:00 AM – 5:00 PM" }
+    var rangeLabel: String {
+        "9:00 AM – 5:00 PM"
+    }
 
     var shareLink: String {
         slug.isEmpty ? "pantopus.com/book/…" : "pantopus.com/book/\(slug)"
@@ -87,7 +92,7 @@ final class FirstRunWizardModel: WizardModel {
     var chrome: WizardChrome {
         switch step {
         case .link:
-            return WizardChrome(
+            WizardChrome(
                 title: "Set up booking",
                 progressLabel: .stepOf(current: 1, total: 4),
                 progressFraction: 0.25,
@@ -103,7 +108,7 @@ final class FirstRunWizardModel: WizardModel {
                 showsProgressBar: false
             )
         case .type:
-            return WizardChrome(
+            WizardChrome(
                 title: "Set up booking",
                 progressLabel: .stepOf(current: 2, total: 4),
                 progressFraction: 0.5,
@@ -116,7 +121,7 @@ final class FirstRunWizardModel: WizardModel {
                 showsProgressBar: false
             )
         case .hours:
-            return WizardChrome(
+            WizardChrome(
                 title: "Set up booking",
                 progressLabel: .stepOf(current: 3, total: 4),
                 progressFraction: 0.75,
@@ -130,7 +135,7 @@ final class FirstRunWizardModel: WizardModel {
                 showsProgressBar: false
             )
         case .success:
-            return WizardChrome(
+            WizardChrome(
                 title: "Set up booking",
                 progressLabel: .stepOf(current: 4, total: 4),
                 progressFraction: 1,
@@ -159,7 +164,9 @@ final class FirstRunWizardModel: WizardModel {
         }
     }
 
-    func discardConfirmed() { isFinished = true }
+    func discardConfirmed() {
+        isFinished = true
+    }
 
     func primaryTapped() {
         guard !isSubmitting else { return }
@@ -201,7 +208,9 @@ final class FirstRunWizardModel: WizardModel {
     private func onSlugEdited() {
         slugCheckTask?.cancel()
         let candidate = slug.trimmingCharacters(in: .whitespaces)
-        guard !candidate.isEmpty else { slugState = .idle; return }
+        guard !candidate.isEmpty else { slugState = .idle
+            return
+        }
         slugState = .checking
         slugCheckTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
@@ -236,7 +245,10 @@ final class FirstRunWizardModel: WizardModel {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            _ = try await client.request(SchedulingEndpoints.updateBookingPageSlug(owner: owner, BookingPageSlugRequest(slug: candidate))) as BookingPageResponse
+            _ = try await client.request(SchedulingEndpoints.updateBookingPageSlug(
+                owner: owner,
+                BookingPageSlugRequest(slug: candidate)
+            )) as BookingPageResponse
             step = .type
         } catch let error as SchedulingError {
             if error.code == "SLUG_TAKEN" {
@@ -272,7 +284,9 @@ final class FirstRunWizardModel: WizardModel {
                 step = .hours
                 return
             } catch let error as SchedulingError {
-                if error.code == "SLUG_TAKEN" { attempt += 1; continue }
+                if error.code == "SLUG_TAKEN" { attempt += 1
+                    continue
+                }
                 // Non-slug failures: advance anyway (slug is already claimed; the
                 // hub will reflect whatever exists). Surface nothing blocking.
                 step = .hours
@@ -292,7 +306,10 @@ final class FirstRunWizardModel: WizardModel {
         isSubmitting = true
         defer { isSubmitting = false }
         if !seededTimezone {
-            _ = try? await client.request(SchedulingEndpoints.updateBookingPage(owner: owner, BookingPageUpdateRequest(timezone: timezoneIdentifier))) as BookingPageResponse
+            _ = try? await client.request(SchedulingEndpoints.updateBookingPage(
+                owner: owner,
+                BookingPageUpdateRequest(timezone: timezoneIdentifier)
+            )) as BookingPageResponse
             seededTimezone = true
         }
         step = .success

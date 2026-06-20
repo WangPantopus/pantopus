@@ -8,6 +8,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 struct ResourceEditorView: View {
     @State private var viewModel: ResourceEditorViewModel
     @Environment(\.dismiss) private var dismiss
@@ -25,17 +27,18 @@ struct ResourceEditorView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { if await viewModel.save() { dismiss() } } }
-        ) {
-            switch viewModel.loadState {
-            case .loading:
-                loadingBody
-            case let .error(message):
-                errorBody(message)
-            case .ready:
-                readyBody
+            onCommit: { Task { if await viewModel.save() { dismiss() } } },
+            content: {
+                switch viewModel.loadState {
+                case .loading:
+                    loadingBody
+                case let .error(message):
+                    errorBody(message)
+                case .ready:
+                    readyBody
+                }
             }
-        }
+        )
         .opacity(viewModel.isSaving ? 0.45 : 1)
         .allowsHitTesting(!viewModel.isSaving)
         .overlay {
@@ -58,9 +61,8 @@ struct ResourceEditorView: View {
             if viewModel.showDeleteConfirm {
                 ResourceDeleteDialog(
                     resourceName: viewModel.name,
-                    isPresented: $viewModel.showDeleteConfirm,
-                    onDelete: { Task { if await viewModel.confirmDelete() { dismiss() } } }
-                )
+                    isPresented: $viewModel.showDeleteConfirm
+                ) { Task { if await viewModel.confirmDelete() { dismiss() } } }
             }
         }
     }
@@ -108,8 +110,8 @@ struct ResourceEditorView: View {
         }
     }
 
-    // F10 "Photo" section — dashed "Add a photo · Optional" affordance. The
-    // image-picker wiring is deferred; this renders the designed structure.
+    /// F10 "Photo" section — dashed "Add a photo · Optional" affordance. The
+    /// image-picker wiring is deferred; this renders the designed structure.
     private var photoGroup: some View {
         FormFieldGroup("Photo") {
             PhotoAddRow()
@@ -130,9 +132,9 @@ struct ResourceEditorView: View {
         }
     }
 
-    // F10 "Specific" member picker — avatar + name + check rows. The member
-    // directory feed is deferred (see ResourceEditorViewModel.members), so the
-    // rows render once a roster is present and otherwise show the caption.
+    /// F10 "Specific" member picker — avatar + name + check rows. The member
+    /// directory feed is deferred (see ResourceEditorViewModel.members), so the
+    /// rows render once a roster is present and otherwise show the caption.
     @ViewBuilder private var specificMemberPicker: some View {
         if viewModel.members.isEmpty {
             Text("In this version, all active home members can book. Per-member access is coming soon.")
@@ -153,9 +155,9 @@ struct ResourceEditorView: View {
         }
     }
 
-    // F10 "Booking rules" collapsible disclosure. The header carries a green
-    // overline + chevron; collapsed shows the smart-defaults helper, expanded
-    // shows the Max duration / Buffer / Requires-approval rows.
+    /// F10 "Booking rules" collapsible disclosure. The header carries a green
+    /// overline + chevron; collapsed shows the smart-defaults helper, expanded
+    /// shows the Max duration / Buffer / Requires-approval rows.
     private var rulesGroup: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             Button {

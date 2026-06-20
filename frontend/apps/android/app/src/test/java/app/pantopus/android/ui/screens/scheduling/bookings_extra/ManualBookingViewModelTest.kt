@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "ktlint:standard:max-line-length")
 @file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -48,7 +48,9 @@ class ManualBookingViewModelTest {
         Dispatchers.setMain(dispatcher)
         coEvery { repo.getBookingPage(any()) } returns NetworkResult.Success(BookingPageResponse(BookingPageDto(id = "p1", slug = "myslug")))
         coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(listOf(eventType)))
-        coEvery { repo.publicGetSlots(any(), any(), any(), any(), any()) } returns NetworkResult.Success(PublicSlotsResponse(slots = listOf(slotA, slotB)))
+        coEvery {
+            repo.publicGetSlots(any(), any(), any(), any(), any())
+        } returns NetworkResult.Success(PublicSlotsResponse(slots = listOf(slotA, slotB)))
         coEvery { repo.getBookings(any(), any(), any(), any(), any(), any()) } returns NetworkResult.Success(GetBookingsResponse(emptyList()))
     }
 

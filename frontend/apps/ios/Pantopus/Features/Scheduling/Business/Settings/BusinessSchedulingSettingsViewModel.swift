@@ -55,9 +55,17 @@ final class BusinessSchedulingSettingsViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     /// Admin gating — only show the read-only lock when we positively know the
     /// caller lacks `team.manage`. Unknown/owner ⇒ editable.
@@ -66,21 +74,35 @@ final class BusinessSchedulingSettingsViewModel {
         return access.isOwner == true || access.permissions.contains("team.manage")
     }
 
-    var isGated: Bool { access != nil && !canManage }
+    var isGated: Bool {
+        access != nil && !canManage
+    }
 
-    var timezone: String { page?.timezone ?? SchedulingTime.deviceTimeZoneIdentifier }
+    var timezone: String {
+        page?.timezone ?? SchedulingTime.deviceTimeZoneIdentifier
+    }
 
-    var paymentsConnected: Bool { payments?.connected == true }
+    var paymentsConnected: Bool {
+        payments?.connected == true
+    }
 
     /// Connected-payout sub-line. The design shows the masked payout account
     /// ("Payout to ••4291"), but `PaymentsStatusDTO` exposes no bank-last4 /
     /// payout-destination field, so we surface the honest "Payout connected"
     /// until that lands (see deferredBackend). Kept as a single source so the
     /// row updates automatically once the field exists.
-    var payoutSub: String { "Payout connected" }
-    var hasPaidServices: Bool { eventTypes.contains { ($0.priceCents ?? 0) > 0 } }
+    var payoutSub: String {
+        "Payout connected"
+    }
+
+    var hasPaidServices: Bool {
+        eventTypes.contains { ($0.priceCents ?? 0) > 0 }
+    }
+
     /// Frame 4 trigger — paid services exist but Stripe isn't connected yet.
-    var paymentsRequired: Bool { hasPaidServices && !paymentsConnected }
+    var paymentsRequired: Bool {
+        hasPaidServices && !paymentsConnected
+    }
 
     init(
         owner: SchedulingOwner,
@@ -105,8 +127,8 @@ final class BusinessSchedulingSettingsViewModel {
             async let prefsR: NotificationPreferencesResponse? = try? client.request(SchedulingEndpoints.getNotificationPreferences())
 
             payments = await paymentsR
-            eventTypes = (await typesR)?.eventTypes ?? []
-            applyPrefs((await prefsR)?.prefs)
+            eventTypes = await (typesR)?.eventTypes ?? []
+            await applyPrefs(prefsR?.prefs)
             confirmationApprove = majorityRequiresApproval
 
             if let businessId = owner.businessIdValue {
@@ -120,7 +142,9 @@ final class BusinessSchedulingSettingsViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Notification preferences
 
@@ -186,11 +210,25 @@ final class BusinessSchedulingSettingsViewModel {
 
     // MARK: Navigation
 
-    func openTimezone() { showTimezoneSheet = true }
-    func openSchedulingDefaults() { push(.eventTypeList(owner: owner)) }
-    func openCancellationPolicy() { push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil)) }
-    func openPayments() { push(.paymentsSetup(owner: owner)) }
-    func openTeam() { push(.teamBookingAvailability(owner: owner, tz: SchedulingTime.deviceTimeZoneIdentifier)) }
+    func openTimezone() {
+        showTimezoneSheet = true
+    }
+
+    func openSchedulingDefaults() {
+        push(.eventTypeList(owner: owner))
+    }
+
+    func openCancellationPolicy() {
+        push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil))
+    }
+
+    func openPayments() {
+        push(.paymentsSetup(owner: owner))
+    }
+
+    func openTeam() {
+        push(.teamBookingAvailability(owner: owner, tz: SchedulingTime.deviceTimeZoneIdentifier))
+    }
 
     // MARK: Representative defaults (per-service on the backend)
 
@@ -200,7 +238,9 @@ final class BusinessSchedulingSettingsViewModel {
         return flags.filter { $0 }.count * 2 >= flags.count
     }
 
-    var minNoticeValue: String { mostCommon(eventTypes.compactMap(\.minNoticeMin)).map(Self.durationLabel) ?? "Set per service" }
+    var minNoticeValue: String {
+        mostCommon(eventTypes.compactMap(\.minNoticeMin)).map(Self.durationLabel) ?? "Set per service"
+    }
 
     var horizonValue: String {
         guard let days = mostCommon(eventTypes.compactMap(\.maxHorizonDays)) else { return "Set per service" }

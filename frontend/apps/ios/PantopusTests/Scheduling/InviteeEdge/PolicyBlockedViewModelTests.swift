@@ -28,6 +28,7 @@ final class PolicyBlockedViewModelTests: XCTestCase {
     }
 
     private func decode<T: Decodable>(_ json: String) -> T {
+        // swiftlint:disable:next force_try
         try! JSONDecoder().decode(T.self, from: Data(json.utf8))
     }
 
@@ -46,7 +47,8 @@ final class PolicyBlockedViewModelTests: XCTestCase {
     }
 
     func testPaidPastFreeWindowIsCancelCutoffNoRefund() {
-        let actions: ManageActions = decode(#"{"can_cancel":true,"can_reschedule":false,"free_cancel_until":"2000-01-01T00:00:00Z","refund_estimate_cents":0}"#)
+        let actions: ManageActions =
+            decode(#"{"can_cancel":true,"can_reschedule":false,"free_cancel_until":"2000-01-01T00:00:00Z","refund_estimate_cents":0}"#)
         let payment: ManagePayment = decode(#"{"amount_total":4800,"currency":"usd","payment_status":"succeeded"}"#)
         let state = PolicyBlockedViewModel.derive(actions: actions, payment: payment)
         guard case .cancelCutoffNoRefund = state else { return XCTFail("expected cancelCutoffNoRefund, got \(state)") }

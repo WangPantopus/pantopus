@@ -116,8 +116,10 @@ struct VariablePickerSheet: View {
             }
             Text("No variables match").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.Color.appText)
             Text("Try a different word, or use the event link variables.")
-                .font(.system(size: 12.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 230)
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 230)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

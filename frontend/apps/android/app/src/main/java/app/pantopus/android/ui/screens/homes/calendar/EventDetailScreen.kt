@@ -279,7 +279,12 @@ private fun LoadedShell(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
                     ) {
-                        PantopusIconImage(icon = PantopusIcon.Pencil, contentDescription = null, size = 16.dp, tint = PantopusColors.appText)
+                        PantopusIconImage(
+                            icon = PantopusIcon.Pencil,
+                            contentDescription = null,
+                            size = 16.dp,
+                            tint = PantopusColors.appText,
+                        )
                         Text(text = "Edit", style = PantopusTextStyle.body, color = PantopusColors.appText)
                     }
                 }

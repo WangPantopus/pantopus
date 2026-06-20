@@ -30,12 +30,12 @@ final class WaitlistJoinViewModelTests: XCTestCase {
         )
     }
 
-    func testCanJoinRequiresValidEmail() {
+    func testCanJoinRequiresPhone() {
         let viewModel = makeVM()
         XCTAssertFalse(viewModel.canJoin)
-        viewModel.email = "not-an-email"
+        viewModel.phone = "  "
         XCTAssertFalse(viewModel.canJoin)
-        viewModel.email = "rosa@example.com"
+        viewModel.phone = "555-0100"
         XCTAssertTrue(viewModel.canJoin)
     }
 
@@ -43,7 +43,7 @@ final class WaitlistJoinViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(201, body: #"{"waitlist":{"id":"w1","status":"waiting"}}"#)]
         let viewModel = makeVM()
         viewModel.name = "Rosa"
-        viewModel.email = "rosa@example.com"
+        viewModel.phone = "555-0100"
         await viewModel.join()
         XCTAssertTrue(viewModel.didJoin)
         XCTAssertNil(viewModel.errorMessage)
@@ -52,7 +52,7 @@ final class WaitlistJoinViewModelTests: XCTestCase {
     func testJoinErrorSurfacesMessage() async {
         SequencedURLProtocol.sequence = [.status(404, body: #"{"error":"NOT_FOUND","message":"No such page"}"#)]
         let viewModel = makeVM()
-        viewModel.email = "rosa@example.com"
+        viewModel.phone = "555-0100"
         await viewModel.join()
         XCTAssertFalse(viewModel.didJoin)
         XCTAssertNotNil(viewModel.errorMessage)

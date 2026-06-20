@@ -64,7 +64,13 @@ class FindATimeSnapshotTest {
     // ─── F5 Suggested slots ──────────────────────────────────────────────────
 
     private fun header() =
-        SlotsHeader(peopleLabel = "3 people", durationLabel = "30 min", windowLabel = "this week", tzId = "America/Los_Angeles", tzLabel = "PT")
+        SlotsHeader(
+            peopleLabel = "3 people",
+            durationLabel = "30 min",
+            windowLabel = "this week",
+            tzId = "America/Los_Angeles",
+            tzLabel = "PT",
+        )
 
     private fun slotRow(
         time: String,
@@ -99,7 +105,13 @@ class FindATimeSnapshotTest {
                             expandedStart = "2026-06-22T21:00:00Z",
                             isSingle = false,
                         ),
-                    onBack = {}, onRetry = {}, onToggleExpand = {}, onBook = {}, onSendProposal = {}, onTimezoneClick = {}, onViewResponses = {},
+                    onBack = {},
+                    onRetry = {},
+                    onToggleExpand = {},
+                    onBook = {},
+                    onSendProposal = {},
+                    onTimezoneClick = {},
+                    onViewResponses = {},
                 )
             }
         }
@@ -110,7 +122,13 @@ class FindATimeSnapshotTest {
             Frame {
                 SuggestedSlotsContent(
                     state = SuggestedSlotsUiState.Empty(header()),
-                    onBack = {}, onRetry = {}, onToggleExpand = {}, onBook = {}, onSendProposal = {}, onTimezoneClick = {}, onViewResponses = {},
+                    onBack = {},
+                    onRetry = {},
+                    onToggleExpand = {},
+                    onBook = {},
+                    onSendProposal = {},
+                    onTimezoneClick = {},
+                    onViewResponses = {},
                 )
             }
         }
@@ -135,7 +153,12 @@ class FindATimeSnapshotTest {
                             voterEmail = "mom@home.test",
                             needsEmail = false,
                         ),
-                    onBack = {}, onRetry = {}, onVote = { _, _ -> }, onName = {}, onEmail = {}, onSubmit = {},
+                    onBack = {},
+                    onRetry = {},
+                    onVote = { _, _ -> },
+                    onName = {},
+                    onEmail = {},
+                    onSubmit = {},
                 )
             }
         }
@@ -146,6 +169,7 @@ class FindATimeSnapshotTest {
     fun f7_whos_free_loaded() =
         paparazzi.snapshot {
             val cols = listOf("8a", "10a", "12p", "2p", "4p", "6p").map { GridColumn(it) }
+
             fun row(
                 m: FindMember,
                 cells: List<CellState>,

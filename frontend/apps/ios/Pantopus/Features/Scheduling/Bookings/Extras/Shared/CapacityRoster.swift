@@ -20,7 +20,10 @@ struct CapacityHeaderCard: View {
     var pending = 0
     var accent: Color
 
-    private var isFull: Bool { total > 0 && filled >= total }
+    private var isFull: Bool {
+        total > 0 && filled >= total
+    }
+
     private var fraction: Double {
         guard total > 0 else { return 0 }
         return min(1, Double(filled) / Double(total))

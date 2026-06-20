@@ -165,7 +165,9 @@ public struct SchedulingStatusPill: View {
         labelOverride = mapped == .unknown ? Self.humanize(raw) : nil
     }
 
-    private var label: String { labelOverride ?? status.label }
+    private var label: String {
+        labelOverride ?? status.label
+    }
 
     /// "in_review" / "in-review" → "In review"; blank → nil (falls back to "Status").
     private static func humanize(_ raw: String) -> String? {

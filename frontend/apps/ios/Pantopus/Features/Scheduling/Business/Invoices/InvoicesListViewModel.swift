@@ -29,7 +29,9 @@ final class InvoicesListViewModel {
         case overdue = "Overdue"
         case refunded = "Refunded"
 
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     // MARK: Inputs
@@ -49,15 +51,23 @@ final class InvoicesListViewModel {
     /// Active status filter chip. View-only until the DTO carries `status`.
     var selectedFilter: InvoiceFilter = .all
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    /// The two-stat summary structure (`invoiceslist-frames.jsx` `Summary`).
-    /// Design KPIs: "Outstanding" (amber when any invoice is overdue) /
-    /// "Collected · month" (driven by per-invoice `status` + `paid_at`).
-    /// The lean DTO omits those fields, so we surface DTO-derivable totals in
-    /// the same two-column / label layout — values sharpen once the fields land.
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    // The two-stat summary structure (`invoiceslist-frames.jsx` `Summary`).
+    // Design KPIs: "Outstanding" (amber when any invoice is overdue) /
+    // "Collected · month" (driven by per-invoice `status` + `paid_at`).
+    // The lean DTO omits those fields, so we surface DTO-derivable totals in
+    // the same two-column / label layout — values sharpen once the fields land.
 
     /// Left KPI: Outstanding total (design `invoiceslist-frames.jsx` line 25).
     /// Until `status` lands, this shows the running sum of all invoices — the
@@ -69,20 +79,24 @@ final class InvoicesListViewModel {
     /// Right KPI: Collected this month (design `invoiceslist-frames.jsx` line 30).
     /// Until `paid_at` lands, we show the invoice count with a "this month"
     /// fallback label that matches the designed slot without fabricating revenue.
-    var collectedMonthLabel: String { "\(invoices.count)" }
+    var collectedMonthLabel: String {
+        "\(invoices.count)"
+    }
 
     /// Drives the summary's amber treatment (design `Summary overdue`). No
     /// `status` in the DTO yet → always false; wire to per-invoice status once
     /// the field lands.
-    var hasOverdue: Bool { false }
+    var hasOverdue: Bool {
+        false
+    }
 
     /// Backend status string for a single invoice. Returns nil until the DTO
     /// exposes a `status` field — the row pill renders only when non-nil.
-    func invoiceStatus(_ invoice: InvoiceDTO) -> String? {
+    func invoiceStatus(_: InvoiceDTO) -> String? {
         // InvoiceDTO currently has no `status` field. Return nil so the pill
         // is hidden rather than fabricating a status. Wire to `invoice.status`
         // once the Foundation DTO gap (InvoicesKit.swift note) is resolved.
-        return nil
+        nil
     }
 
     init(
@@ -98,7 +112,9 @@ final class InvoicesListViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = .loading
         do {
             if let status: PaymentsStatusDTO = try? await client.request(SchedulingEndpoints.paymentsStatus(owner: owner)) {
@@ -122,14 +138,23 @@ final class InvoicesListViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Actions
 
-    func openInvoice(_ invoice: InvoiceDTO) { push(.invoiceDetail(owner: owner, invoiceId: invoice.id)) }
-    func connectPayments() { push(.paymentsSetup(owner: owner)) }
+    func openInvoice(_ invoice: InvoiceDTO) {
+        push(.invoiceDetail(owner: owner, invoiceId: invoice.id))
+    }
 
-    func selectFilter(_ filter: InvoiceFilter) { selectedFilter = filter }
+    func connectPayments() {
+        push(.paymentsSetup(owner: owner))
+    }
+
+    func selectFilter(_ filter: InvoiceFilter) {
+        selectedFilter = filter
+    }
 
     /// Top-bar search affordance (`invoiceslist-frames.jsx` `SearchBtn`). The
     /// design draws the glyph but wires no destination, and there is no invoice

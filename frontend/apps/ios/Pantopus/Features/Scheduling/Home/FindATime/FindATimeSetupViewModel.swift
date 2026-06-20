@@ -34,7 +34,9 @@ final class FindATimeSetupViewModel {
     private let onProceed: @MainActor (FindATimeDraft) -> Void
     private let client: SchedulingClient
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // State.
     private(set) var phase: Phase = .loading
@@ -86,9 +88,17 @@ final class FindATimeSetupViewModel {
         rows.filter { $0.requirement == .required }.map(\.member)
     }
 
-    var hasRequiredMember: Bool { !requiredMemberIds.isEmpty }
-    var dateRangeValid: Bool { fromDate <= toDate }
-    var isValid: Bool { hasRequiredMember && dateRangeValid }
+    var hasRequiredMember: Bool {
+        !requiredMemberIds.isEmpty
+    }
+
+    var dateRangeValid: Bool {
+        fromDate <= toDate
+    }
+
+    var isValid: Bool {
+        hasRequiredMember && dateRangeValid
+    }
 
     var effectiveTitle: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)

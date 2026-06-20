@@ -169,7 +169,10 @@ class InviteeConfirmViewModel
             _state.update { it.copy(errorMessage = null) }
         }
 
-        fun pickAlternative(startUtc: String, endUtc: String?) {
+        fun pickAlternative(
+            startUtc: String,
+            endUtc: String?,
+        ) {
             _state.update { it.copy(conflict = null, slotStartUtc = startUtc, slotEndUtc = endUtc, step = ConfirmStep.Review) }
             submit(startUtc, endUtc)
         }
@@ -259,7 +262,12 @@ class InviteeConfirmViewModel
                 is SchedulingError.Paused ->
                     _state.update { it.copy(errorMessage = "This page isn't accepting bookings right now.", submitting = false) }
                 is SchedulingError.Expired ->
-                    _state.update { it.copy(errorMessage = "This link is no longer valid. Ask your host for a new one.", submitting = false) }
+                    _state.update {
+                        it.copy(
+                            errorMessage = "This link is no longer valid. Ask your host for a new one.",
+                            submitting = false,
+                        )
+                    }
                 is SchedulingError.Unavailable ->
                     _state.update { it.copy(errorMessage = "This booking page is unavailable.", submitting = false) }
                 is SchedulingError.Generic ->

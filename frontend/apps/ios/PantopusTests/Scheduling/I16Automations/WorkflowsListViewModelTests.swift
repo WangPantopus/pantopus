@@ -23,6 +23,7 @@ final class WorkflowsListViewModelTests: XCTestCase {
         ))
     }
 
+    // swiftlint:disable:next line_length
     private let page = #"{"page":{"id":"p1","owner_type":"user","slug":"sam","is_live":true,"is_paused":false,"reminder_minutes":[1440,60]}}"#
 
     func testLoadEmpty() async {
@@ -35,12 +36,14 @@ final class WorkflowsListViewModelTests: XCTestCase {
     }
 
     func testLoadPopulatedSplitsScope() async {
+        // swiftlint:disable line_length
         let body = #"""
         {"workflows":[
           {"id":"w1","name":"Email attendees","trigger":"booking_created","action":"email","offset_minutes":0,"is_active":true,"event_type_id":null},
           {"id":"w2","name":"Reminder","trigger":"before_start","action":"push","offset_minutes":60,"is_active":false,"event_type_id":"et1"}
         ]}
         """#
+        // swiftlint:enable line_length
         SequencedURLProtocol.sequence = [.status(200, body: body), .status(200, body: page)]
         let vm = WorkflowsListViewModel(owner: .personal, push: { _ in }, client: makeClient())
         await vm.load()
@@ -59,7 +62,9 @@ final class WorkflowsListViewModelTests: XCTestCase {
     }
 
     func testToggleActiveFlipsRow() async {
+        // swiftlint:disable:next line_length
         let listBody = #"{"workflows":[{"id":"w1","name":"Email","trigger":"booking_created","action":"email","offset_minutes":0,"is_active":true,"event_type_id":null}]}"#
+        // swiftlint:disable:next line_length
         let updated = #"{"workflow":{"id":"w1","name":"Email","trigger":"booking_created","action":"email","offset_minutes":0,"is_active":false,"event_type_id":null}}"#
         SequencedURLProtocol.sequence = [.status(200, body: listBody), .status(200, body: page), .status(200, body: updated)]
         let vm = WorkflowsListViewModel(owner: .personal, push: { _ in }, client: makeClient())

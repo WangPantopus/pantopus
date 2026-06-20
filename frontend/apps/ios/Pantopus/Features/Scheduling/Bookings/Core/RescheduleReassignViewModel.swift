@@ -15,19 +15,21 @@ import SwiftUI
 /// (reschedule-frames FrameMemberPicker). Ids only — the named roster awaits a
 /// cross-stream source, so the rail shows id-initials (mirroring Android's
 /// `MemberOption`).
-struct ReassignCandidate: Identifiable, Hashable, Sendable {
+struct ReassignCandidate: Identifiable, Hashable {
     let id: String
     let initials: String
     let label: String
 }
 
 /// One chip in the E4 horizontal weekday strip (reschedule-frames DayStrip).
-struct DayStripEntry: Identifiable, Hashable, Sendable {
+struct DayStripEntry: Identifiable, Hashable {
     let date: Date
     let weekday: String
     let dayNumber: String
     let isSelected: Bool
-    var id: Date { date }
+    var id: Date {
+        date
+    }
 }
 
 @Observable
@@ -71,8 +73,13 @@ final class RescheduleReassignViewModel {
     private var didLoad = false
     private var fetchGeneration = 0
 
-    var accent: Color { owner.theme.accent }
-    var canReassign: Bool { BookingsPillar.supportsReassign(owner) }
+    var accent: Color {
+        owner.theme.accent
+    }
+
+    var canReassign: Bool {
+        BookingsPillar.supportsReassign(owner)
+    }
 
     init(
         owner: SchedulingOwner,
@@ -91,8 +98,13 @@ final class RescheduleReassignViewModel {
 
     // MARK: - Derived
 
-    var availableDays: Set<Date> { BookingsCalendar.availableDays(rangeSlots, tz: timezoneId) }
-    var daySlots: [SlotDTO] { BookingsCalendar.slots(rangeSlots, on: selectedDate, tz: timezoneId) }
+    var availableDays: Set<Date> {
+        BookingsCalendar.availableDays(rangeSlots, tz: timezoneId)
+    }
+
+    var daySlots: [SlotDTO] {
+        BookingsCalendar.slots(rangeSlots, on: selectedDate, tz: timezoneId)
+    }
 
     /// The horizontal weekday strip (JSX DayStrip): every day with at least one
     /// open slot in the visible range, soonest-first, with the selected flag.
@@ -137,7 +149,9 @@ final class RescheduleReassignViewModel {
         }
     }
 
-    var currentTimeLabel: String { BookingsTime.relativeWhen(startUTC: booking.startAt, tz: timezoneId) }
+    var currentTimeLabel: String {
+        BookingsTime.relativeWhen(startUTC: booking.startAt, tz: timezoneId)
+    }
 
     var newTimeLabel: String? {
         selectedSlot.map { BookingsTime.headerWhen(startUTC: $0.start, endUTC: $0.end, tz: timezoneId) }
@@ -173,11 +187,15 @@ final class RescheduleReassignViewModel {
         if error != nil { return "Try again" }
         return mode == .propose ? "Send proposal" : "Reschedule now"
     }
+
     var ctaIcon: PantopusIcon {
         if error != nil { return .rotateCw }
         return mode == .propose ? .send : .calendarCheck
     }
-    var canSubmit: Bool { selectedSlot != nil && !submitting }
+
+    var canSubmit: Bool {
+        selectedSlot != nil && !submitting
+    }
 
     // MARK: - Loading
 
@@ -188,7 +206,9 @@ final class RescheduleReassignViewModel {
         if phase == .ready, availableDays.isEmpty { await jumpNextAvailable() }
     }
 
-    func refresh() async { await fetchRange() }
+    func refresh() async {
+        await fetchRange()
+    }
 
     private func fetchRange() async {
         fetchGeneration &+= 1

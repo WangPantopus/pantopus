@@ -37,9 +37,8 @@ final class NotificationPermissionViewModelTests: XCTestCase {
             owner: .personal,
             initialFrame: frame,
             accountEmail: "maria@pantopus.co",
-            service: makeService(),
-            onResult: { box.value = $0 }
-        )
+            service: makeService()
+        ) { box.value = $0 }
     }
 
     func testUseEmailInsteadShowsEmailFrameWithAccountEmail() {
@@ -58,7 +57,7 @@ final class NotificationPermissionViewModelTests: XCTestCase {
     func testVerifyEmailConnectsAndReportsResult() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"prefs":{"notify_me":{"new_booking":true}}}"#),
-            .status(200, body: #"{"prefs":{"channels":{"email":true}}}"#),
+            .status(200, body: #"{"prefs":{"channels":{"email":true}}}"#)
         ]
         let box = ResultBox()
         let viewModel = makeViewModel(frame: .emailVerify(email: "maria@pantopus.co"), box: box)
@@ -126,7 +125,7 @@ final class NotificationChannelServiceTests: XCTestCase {
 
     func testConnectedChannelsDecodesPrefs() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"prefs":{"channels":{"push":true,"email":false,"sms":true}}}"#),
+            .status(200, body: #"{"prefs":{"channels":{"push":true,"email":false,"sms":true}}}"#)
         ]
         let channels = await makeService().connectedChannels()
         XCTAssertTrue(channels.contains(.push))
@@ -143,7 +142,7 @@ final class NotificationChannelServiceTests: XCTestCase {
     func testSetChannelGetsThenPutsPreservingKeys() async throws {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"prefs":{"notify_me":{"new_booking":true}}}"#),
-            .status(200, body: #"{"prefs":{"notify_me":{"new_booking":true},"channels":{"email":true}}}"#),
+            .status(200, body: #"{"prefs":{"notify_me":{"new_booking":true},"channels":{"email":true}}}"#)
         ]
         try await makeService().setChannel(.email, enabled: true)
         // Both the GET and the PUT must have been consumed.

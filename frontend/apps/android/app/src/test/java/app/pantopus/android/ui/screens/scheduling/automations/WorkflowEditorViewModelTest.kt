@@ -38,8 +38,7 @@ class WorkflowEditorViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm(id: String) =
-        WorkflowEditorViewModel(SavedStateHandle(mapOf(SchedulingRoutes.ARG_WORKFLOW_ID to id)), repo, errors)
+    private fun vm(id: String) = WorkflowEditorViewModel(SavedStateHandle(mapOf(SchedulingRoutes.ARG_WORKFLOW_ID to id)), repo, errors)
 
     private fun loaded(vm: WorkflowEditorViewModel) = vm.state.value as WorkflowEditorUiState.Loaded
 

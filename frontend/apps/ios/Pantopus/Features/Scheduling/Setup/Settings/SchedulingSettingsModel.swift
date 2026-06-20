@@ -43,9 +43,18 @@ final class SchedulingSettingsModel {
     private let client = SchedulingClient.shared
     private let api = APIClient.shared
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var isBusiness: Bool { if case .business = owner { return true }; return false }
-    var paidEnabled: Bool { SchedulingFeatureFlags.paidEnabled }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var isBusiness: Bool {
+        if case .business = owner { return true }
+        return false
+    }
+
+    var paidEnabled: Bool {
+        SchedulingFeatureFlags.paidEnabled
+    }
 
     init(owner: SchedulingOwner, push: @escaping @MainActor (SchedulingRoute) -> Void) {
         self.owner = owner
@@ -62,7 +71,7 @@ final class SchedulingSettingsModel {
             async let paymentsR: PaymentsStatusDTO? = try? api.request(SchedulingEndpoints.paymentsStatus(owner: owner))
             async let typesR: EventTypesResponse? = try? api.request(SchedulingEndpoints.getEventTypes(owner: owner))
             payments = await paymentsR
-            eventTypeCount = (await typesR)?.eventTypes.count ?? 0
+            eventTypeCount = await (typesR)?.eventTypes.count ?? 0
             // "Fresh" when the page has no reminders configured and no event types.
             isFresh = (pageResult.page.reminderMinutes?.isEmpty ?? true) && eventTypeCount == 0
             phase = .loaded
@@ -73,20 +82,22 @@ final class SchedulingSettingsModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Derived display
 
-    var slug: String { page?.slug ?? "" }
+    var slug: String {
+        page?.slug ?? ""
+    }
 
     var monoFooter: String {
-        let ownerTag: String = {
-            switch owner {
-            case .personal: "owner · you"
-            case .home: "owner · household"
-            case .business: "owner · business"
-            }
-        }()
+        let ownerTag: String = switch owner {
+        case .personal: "owner · you"
+        case .home: "owner · household"
+        case .business: "owner · business"
+        }
         return "pantopus.com/book/\(slug.isEmpty ? "…" : slug) · \(ownerTag)"
     }
 
@@ -100,8 +111,13 @@ final class SchedulingSettingsModel {
         return mins.sorted(by: >).map(Self.reminderLabel).joined(separator: " · ")
     }
 
-    var paymentsConnected: Bool { payments?.connected == true }
-    var paymentsApplicable: Bool { payments?.applicable == true }
+    var paymentsConnected: Bool {
+        payments?.connected == true
+    }
+
+    var paymentsApplicable: Bool {
+        payments?.applicable == true
+    }
 
     static func reminderLabel(_ minutes: Int) -> String {
         switch minutes {
@@ -113,14 +129,37 @@ final class SchedulingSettingsModel {
 
     // MARK: Navigation
 
-    func openNotifications() { push(.notificationPreferences(owner: owner)) }
-    func openReminders() { push(.defaultReminders(owner: owner)) }
-    func openWorkflows() { push(.workflowsList(owner: owner)) }
-    func openTemplates() { push(.messageTemplateLibrary(owner: owner)) }
-    func openAvailability() { push(.availabilityScheduleList) }
-    func openCancellationPolicy() { push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil)) }
-    func openPayments() { push(.paymentsSetup(owner: owner)) }
-    func openTeam() { push(.teamBookingAvailability(owner: owner, tz: SchedulingTime.deviceTimeZoneIdentifier)) }
+    func openNotifications() {
+        push(.notificationPreferences(owner: owner))
+    }
+
+    func openReminders() {
+        push(.defaultReminders(owner: owner))
+    }
+
+    func openWorkflows() {
+        push(.workflowsList(owner: owner))
+    }
+
+    func openTemplates() {
+        push(.messageTemplateLibrary(owner: owner))
+    }
+
+    func openAvailability() {
+        push(.availabilityScheduleList)
+    }
+
+    func openCancellationPolicy() {
+        push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil))
+    }
+
+    func openPayments() {
+        push(.paymentsSetup(owner: owner))
+    }
+
+    func openTeam() {
+        push(.teamBookingAvailability(owner: owner, tz: SchedulingTime.deviceTimeZoneIdentifier))
+    }
 
     // MARK: Danger zone
 

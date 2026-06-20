@@ -29,9 +29,11 @@ struct CancellationPolicyEditorView: View {
     }
 
     var body: some View {
-        PaidSurfaceGate(title: "Cancellation policy", onBack: { dismiss() }) {
-            gatedBody
-        }
+        PaidSurfaceGate(
+            title: "Cancellation policy",
+            onBack: { dismiss() },
+            content: { gatedBody }
+        )
         .task { await model.load() }
         .onChange(of: model.didSave) { _, saved in
             if saved { dismiss() }
@@ -40,7 +42,7 @@ struct CancellationPolicyEditorView: View {
 
     private var gatedBody: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Cancellation & refund policy", onBack: { dismiss() })
+            BizTopBar(title: "Cancellation & refund policy") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -169,10 +171,10 @@ struct CancellationPolicyEditorView: View {
         }
     }
 
-    private func customRow<Trailing: View>(
+    private func customRow(
         icon: PantopusIcon,
         label: String,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: () -> some View
     ) -> some View {
         HStack(spacing: 11) {
             iconTile(icon)
@@ -344,7 +346,7 @@ private struct UnitStepper: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        CancellationPolicyEditorView(owner: .business(id: "biz1"), eventTypeId: nil, push: { _ in })
+        CancellationPolicyEditorView(owner: .business(id: "biz1"), eventTypeId: nil) { _ in }
     }
 }
 #endif

@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
@@ -269,8 +277,7 @@ class BookingSearchFilterViewModel
 
         private fun isoStart(date: LocalDate): String = date.atStartOfDay(ZoneOffset.UTC).toInstant().toString()
 
-        private fun parseDate(value: String?): String? =
-            value?.let { runCatching { isoStart(LocalDate.parse(it)) }.getOrNull() }
+        private fun parseDate(value: String?): String? = value?.let { runCatching { isoStart(LocalDate.parse(it)) }.getOrNull() }
 
         private fun BookingDto.toRowUi(): BookingRowUi =
             BookingRowUi(

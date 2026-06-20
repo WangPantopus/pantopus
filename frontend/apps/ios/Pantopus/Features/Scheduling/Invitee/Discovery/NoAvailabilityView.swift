@@ -46,6 +46,7 @@ struct NoAvailabilityView: View {
                 primaryAction: { await viewModel.seeNextMonth() },
                 secondaryTitle: "Get notified when times open",
                 secondaryIcon: .bell,
+                // swiftlint:disable:next trailing_closure
                 secondaryAction: { viewModel.notifyWhenAvailable() }
             )
             .padding(.horizontal, Spacing.s4)
@@ -55,10 +56,9 @@ struct NoAvailabilityView: View {
                 headline: "Times open up in \(monthName)",
                 caption: "Open times are available — pick one that works for you.",
                 primaryTitle: "See open times",
-                primaryIcon: .arrowRight,
-                primaryAction: { viewModel.openPicker() }
-            )
-            .padding(.horizontal, Spacing.s4)
+                primaryIcon: .arrowRight
+            ) { viewModel.openPicker() }
+                .padding(.horizontal, Spacing.s4)
         case .paused:
             DiscoveryNotice(
                 icon: .pause,

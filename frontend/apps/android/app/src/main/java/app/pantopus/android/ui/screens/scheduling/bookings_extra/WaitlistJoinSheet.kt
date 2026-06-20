@@ -226,7 +226,11 @@ private fun AlreadyJoinedState(
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
         )
-        GhostButton(title = "Leave waitlist", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4))
+        GhostButton(
+            title = "Leave waitlist",
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4),
+        )
     }
 }
 
@@ -270,6 +274,10 @@ private fun JoinedConfirmation(
         // No backend leave-waitlist endpoint exists yet; the button dismisses the
         // sheet. When the leave endpoint ships, wire onDone to a dedicated onLeave
         // callback that calls DELETE /waitlist/:id.
-        GhostButton(title = "Leave waitlist", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4))
+        GhostButton(
+            title = "Leave waitlist",
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2, bottom = Spacing.s4),
+        )
     }
 }

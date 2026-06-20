@@ -28,14 +28,19 @@ final class InviteeManageBookingViewModelTests: XCTestCase {
         return InviteeManageBookingViewModel(token: "mt_abc123", push: pushed, client: client)
     }
 
+    // swiftlint:disable line_length
     private func body(status: String, canAct: Bool) -> String {
         """
-        {"booking":{"id":"b1","status":"\(status)","start_at":"2026-09-17T16:30:00Z","end_at":"2026-09-17T17:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
+        {"booking":{"id":"b1","status":"\(
+            status
+        )","start_at":"2026-09-17T16:30:00Z","end_at":"2026-09-17T17:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
         "actions":{"can_cancel":\(canAct),"can_reschedule":\(canAct)},
         "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video","cancellation_window_min":1440},
         "page":{"slug":"ada","title":"Maria Kessler","owner_type":"user","timezone":"America/Los_Angeles"}}
         """
     }
+
+    // swiftlint:enable line_length
 
     func testConfirmedWithActionsAllowsRescheduleAndCancel() async {
         SequencedURLProtocol.sequence = [.status(200, body: body(status: "confirmed", canAct: true))]
@@ -78,9 +83,9 @@ final class InviteeManageBookingViewModelTests: XCTestCase {
         let cancelResult = #"{"booking":{"id":"b1","status":"cancelled"}}"#
         let cancelledManage = body(status: "cancelled", canAct: false)
         SequencedURLProtocol.sequence = [
-            .status(200, body: confirmed),       // load
-            .status(200, body: cancelResult),    // POST cancel
-            .status(200, body: cancelledManage)  // refetch
+            .status(200, body: confirmed), // load
+            .status(200, body: cancelResult), // POST cancel
+            .status(200, body: cancelledManage) // refetch
         ]
         let viewModel = makeViewModel()
         await viewModel.load()

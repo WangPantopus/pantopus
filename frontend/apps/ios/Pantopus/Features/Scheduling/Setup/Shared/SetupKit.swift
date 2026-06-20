@@ -120,7 +120,9 @@ struct SetupIdentityPills: View {
 /// because Home/Business owners need an id resolved before switching.
 enum SchedulingPillarChoice: String, CaseIterable, Identifiable {
     case personal, home, business
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {
@@ -192,7 +194,9 @@ struct SetupPrimaryCTA: View {
         .accessibilityIdentifier("schedulingPrimaryCTA")
     }
 
-    private var labelColor: Color { enabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted }
+    private var labelColor: Color {
+        enabled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted
+    }
 }
 
 /// Bordered neutral button.
@@ -256,7 +260,8 @@ struct SetupSectionHeader: View {
     var body: some View {
         HStack(alignment: .center) {
             Text(title.uppercased())
-                .font(.system(size: 10.5, weight: .bold)).tracking(0.84)
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.84)
                 .foregroundStyle(Theme.Color.appTextSecondary)
             Spacer(minLength: Spacing.s2)
             if let actionTitle, let action {
@@ -318,7 +323,6 @@ struct SetupChip: View {
 // MARK: - Small helpers
 
 /// Rounded icon tile (leading glyph in rows / banners).
-@ViewBuilder
 func setupIconTile(_ icon: PantopusIcon, bg: Color, fg: Color, size: CGFloat = 34, glyph: CGFloat = 18) -> some View {
     ZStack {
         RoundedRectangle(cornerRadius: 9, style: .continuous).fill(bg)

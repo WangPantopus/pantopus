@@ -119,8 +119,7 @@ object FindATimeFormat {
         hour: Int,
         bucketStartHours: List<Int>,
         bucketSpanHours: Int,
-    ): Int =
-        bucketStartHours.indexOfFirst { start -> hour >= start && hour < start + bucketSpanHours }
+    ): Int = bucketStartHours.indexOfFirst { start -> hour >= start && hour < start + bucketSpanHours }
 
     private const val MIN_PER_HOUR = 60
     private const val DAYS_IN_WEEK = 7L

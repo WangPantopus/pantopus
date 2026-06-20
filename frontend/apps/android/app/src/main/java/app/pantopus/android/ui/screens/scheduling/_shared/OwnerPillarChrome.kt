@@ -40,8 +40,9 @@ enum class SchedulingPillar {
     ;
 
     /**
-     * Header/CTA/selected accent — Personal sky #0284C7, Home green #16A34A,
-     * Business violet #7C3AED (matches `--color-identity-*` in the token CSS).
+     * Header/CTA/selected accent — Personal sky, Home green, Business violet
+     * (the `--color-identity-*` tokens; [PantopusColors.personal] /
+     * [PantopusColors.home] / [PantopusColors.business]).
      */
     val accent: Color
         get() =
@@ -53,9 +54,9 @@ enum class SchedulingPillar {
 
     /**
      * Soft tint for chips / selected-slot / header backgrounds — the design's
-     * `--color-identity-*-bg` (Personal #DBEAFE, Home #DCFCE7, Business
-     * #F3E8FF). Note Personal uses [PantopusColors.personalBg] (#DBEAFE), NOT
-     * `primary50` (#F0F9FF) — the design pillar bg is the deeper blue-100.
+     * `--color-identity-*-bg` tokens. Note Personal uses
+     * [PantopusColors.personalBg] (blue-100), NOT `primary50` (blue-50) — the
+     * design pillar bg is the deeper blue-100.
      */
     val accentBg: Color
         get() =
@@ -86,7 +87,7 @@ enum class SchedulingPillar {
         private const val ACCENT_RING_ALPHA = 0.35f
 
         /**
-         * The FIXED operational primary blue (#0284C7) for host-side action
+         * The FIXED operational primary blue ([PantopusColors.primary600]) for host-side action
          * chrome — Approve / primary dock / bookings-management FAB. These are
          * NOT pillar-tinted: an approve button on a Business booking is still
          * blue, never violet. Use [SchedulingPillar.accent] for invitee-facing

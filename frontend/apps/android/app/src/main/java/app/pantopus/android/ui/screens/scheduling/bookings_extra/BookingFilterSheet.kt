@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -242,14 +250,22 @@ private fun ActiveFiltersSummary(
         ExtrasChipFlow {
             draft.status?.let { ExtrasRemovableChip(label = it.label, accent = statusAccent(it), onRemove = { onStatus(null) }) }
             if (draft.scope != BookingScopeFilter.All) {
-                ExtrasRemovableChip(label = draft.scope.label, accent = bookingScopeAccent(draft.scope), onRemove = { onScope(BookingScopeFilter.All) })
+                ExtrasRemovableChip(
+                    label = draft.scope.label,
+                    accent = bookingScopeAccent(draft.scope),
+                    onRemove = { onScope(BookingScopeFilter.All) },
+                )
             }
             draft.eventTypeId?.let { id ->
                 val name = eventTypes.firstOrNull { it.id == id }?.name ?: "Event type"
                 ExtrasRemovableChip(label = name, accent = PantopusColors.primary600, onRemove = { onEventType(null) })
             }
             if (draft.dateRange != BookingDateRange.Anytime) {
-                ExtrasRemovableChip(label = draft.dateRange.label, accent = PantopusColors.info, onRemove = { onDateRange(BookingDateRange.Anytime) })
+                ExtrasRemovableChip(
+                    label = draft.dateRange.label,
+                    accent = PantopusColors.info,
+                    onRemove = { onDateRange(BookingDateRange.Anytime) },
+                )
             }
         }
     }

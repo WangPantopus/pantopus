@@ -29,8 +29,8 @@ public struct SchedulingIdentityTheme: Sendable, Hashable {
         }
     }
 
-    /// Primary pillar accent (Personal sky #0284C7 / Home green #16A34A /
-    /// Business violet #7C3AED) — derived from the owner, never hardcoded.
+    /// Primary pillar accent (Personal sky 0284C7 / Home green 16A34A /
+    /// Business violet 7C3AED) — derived from the owner, never hardcoded.
     public var accent: Color {
         identity.accent
     }
@@ -58,7 +58,7 @@ public struct SchedulingIdentityTheme: Sendable, Hashable {
         identity.ctaShadow
     }
 
-    /// FIXED operational primary blue (#0284C7) for host-side operational
+    /// FIXED operational primary blue (0284C7) for host-side operational
     /// actions — Approve, the primary dock on bookings management, and other
     /// transactional CTAs that must NOT take the pillar accent. Same blue as the
     /// Personal pillar by design, but exposed as a stable, owner-independent

@@ -166,8 +166,7 @@ private fun summaryText(
     usesOffset: Boolean,
     resolvedMinutes: Int,
     isInvalid: Boolean,
-): String =
-    if (isInvalid) "Pick a number greater than zero" else trigger.summary(if (usesOffset) resolvedMinutes else 0)
+): String = if (isInvalid) "Pick a number greater than zero" else trigger.summary(if (usesOffset) resolvedMinutes else 0)
 
 private fun unitShort(unit: ReminderPreset.Unit): String =
     when (unit) {

@@ -46,7 +46,7 @@ struct MyBookingsView: View {
             loading
         case .empty:
             emptyState
-        case .error(let message):
+        case let .error(message):
             EmptyState(
                 icon: .calendar,
                 headline: "We couldn't load your bookings",
@@ -123,6 +123,7 @@ struct MyBookingsView: View {
         .accessibilityIdentifier("scheduling.myBookings.segment.\(title)")
     }
 
+    // swiftlint:disable:next function_body_length
     private func bookingRow(_ booking: BookingDTO) -> some View {
         let isPast = viewModel.segment == .past
         let tz = booking.inviteeTimezone ?? SchedulingTime.deviceTimeZoneIdentifier
@@ -231,7 +232,7 @@ struct MyBookingsView: View {
 
     /// Status pill with a local "Approve pending" label for the pending-approval
     /// state. All other statuses delegate to the shared pill which maps pending →
-    /// INFO-blue (my-bookings-frames.jsx:157 — INFO_BG/#F0F9FF, INFO/#0369A1).
+    /// INFO-blue (my-bookings-frames.jsx:157 — INFO_BG/F0F9FF, INFO/0369A1).
     @ViewBuilder
     private func statusPill(for status: String) -> some View {
         let key = status.lowercased().replacingOccurrences(of: "-", with: "_")

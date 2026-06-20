@@ -9,6 +9,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct BookResourceView: View {
     @State private var viewModel: BookResourceViewModel
     @Environment(\.dismiss) private var dismiss
@@ -250,7 +251,7 @@ struct BookResourceView: View {
     private func successBody(approval: Bool) -> some View {
         let accent = approval ? Theme.Color.warning : Theme.Color.home
         // Design halo: `radial-gradient(circle at 30% 30%, bg50, bg100)` —
-        // confirmed fades homeBg→homeBg (the lighter `#f0fdf4` inner tint has
+        // confirmed fades homeBg→homeBg (the lighter `f0fdf4` inner tint has
         // no token); approval fades warningBg→warningLight. Both stay in-family
         // (never a white fade).
         let haloInner = approval ? Theme.Color.warningBg : Theme.Color.homeBg

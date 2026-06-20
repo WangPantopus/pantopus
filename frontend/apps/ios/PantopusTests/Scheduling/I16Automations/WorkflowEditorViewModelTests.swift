@@ -43,7 +43,11 @@ final class WorkflowEditorViewModelTests: XCTestCase {
         vm.message = "Hi {{attendee_name}}, see you soon."
         XCTAssertTrue(vm.canSave)
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"workflow":{"id":"w9","name":"Email attendees","trigger":"before_start","action":"email","offset_minutes":60,"is_active":true}}"#),
+            .status(
+                200,
+                // swiftlint:disable:next line_length
+                body: #"{"workflow":{"id":"w9","name":"Email attendees","trigger":"before_start","action":"email","offset_minutes":60,"is_active":true}}"#
+            )
         ]
         let saved = await vm.save()
         XCTAssertTrue(saved)
@@ -51,6 +55,7 @@ final class WorkflowEditorViewModelTests: XCTestCase {
     }
 
     func testLoadExistingPopulatesFields() async {
+        // swiftlint:disable:next line_length
         let body = #"{"workflows":[{"id":"w1","name":"Thanks","trigger":"after_end","action":"email","offset_minutes":120,"message_template":"Thanks!","is_active":false,"event_type_id":null}]}"#
         SequencedURLProtocol.sequence = [.status(200, body: body)]
         let vm = WorkflowEditorViewModel(owner: .personal, workflowId: "w1", client: makeClient())

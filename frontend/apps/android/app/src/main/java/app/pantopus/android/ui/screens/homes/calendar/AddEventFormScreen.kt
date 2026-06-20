@@ -458,10 +458,24 @@ private fun ScheduleGroup(
             )
         }
         HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
-        DateTimeValueRow(label = "Starts", value = state.startDate, allDay = state.allDay, testTagPrefix = "addEvent_startDate", isError = false, onChange = onSetStart)
+        DateTimeValueRow(
+            label = "Starts",
+            value = state.startDate,
+            allDay = state.allDay,
+            testTagPrefix = "addEvent_startDate",
+            isError = false,
+            onChange = onSetStart,
+        )
         if (!state.allDay && state.endDate != null) {
             HorizontalDivider(color = PantopusColors.appBorder, thickness = 1.dp)
-            DateTimeValueRow(label = "Ends", value = state.endDate, allDay = false, testTagPrefix = "addEvent_endDate", isError = state.endError != null, onChange = onSetEnd)
+            DateTimeValueRow(
+                label = "Ends",
+                value = state.endDate,
+                allDay = false,
+                testTagPrefix = "addEvent_endDate",
+                isError = state.endError != null,
+                onChange = onSetEnd,
+            )
             state.endError?.let { error ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -601,7 +615,12 @@ private fun AttendeesGroup(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
             ) {
-                PantopusIconImage(icon = PantopusIcon.UsersRound, contentDescription = null, size = 18.dp, tint = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.UsersRound,
+                    contentDescription = null,
+                    size = 18.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
                 Text(
                     text = if (state.isLoadingMembers) "Loading household members…" else "No household members loaded yet.",
                     style = PantopusTextStyle.small,
@@ -611,7 +630,11 @@ private fun AttendeesGroup(
         } else {
             Column {
                 state.attendees.forEachIndexed { index, attendee ->
-                    AttendeeRow(attendee = attendee, isSelected = attendee.id in state.selectedAttendeeIds, onClick = { onToggle(attendee.id) })
+                    AttendeeRow(
+                        attendee = attendee,
+                        isSelected = attendee.id in state.selectedAttendeeIds,
+                        onClick = { onToggle(attendee.id) },
+                    )
                     if (index != state.attendees.lastIndex) {
                         HorizontalDivider(color = PantopusColors.appBorderSubtle, thickness = 1.dp)
                     }
@@ -693,7 +716,12 @@ private fun ReminderGroup(
                             .testTag("addEvent_reminder_${offset.label}"),
                 ) {
                     if (on) {
-                        PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 12.dp, tint = PantopusColors.homeDark)
+                        PantopusIconImage(
+                            icon = PantopusIcon.Check,
+                            contentDescription = null,
+                            size = 12.dp,
+                            tint = PantopusColors.homeDark,
+                        )
                     }
                     Text(
                         text = offset.label,
@@ -729,7 +757,11 @@ private fun RequestRsvpGroup(
                 modifier = Modifier.testTag("addEvent_requestRsvpToggle"),
             )
         }
-        Text(text = "Members get a Going / Maybe / Can't prompt", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        Text(
+            text = "Members get a Going / Maybe / Can't prompt",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 

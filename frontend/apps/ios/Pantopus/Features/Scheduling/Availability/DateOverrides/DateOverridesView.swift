@@ -15,6 +15,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+// swiftlint:disable:next type_body_length
 struct DateOverridesView: View {
     @State private var viewModel: DateOverridesViewModel
     @Environment(\.dismiss) private var dismiss
@@ -126,7 +128,7 @@ struct DateOverridesView: View {
         .accessibilityIdentifier("scheduling.dateOverrides.calendar")
     }
 
-    // "July 2026" label + chevron-left / chevron-right navigation.
+    /// "July 2026" label + chevron-left / chevron-right navigation.
     private var monthNavHeader: some View {
         HStack {
             Text(Self.monthTitle(viewModel.displayedMonth))
@@ -159,7 +161,7 @@ struct DateOverridesView: View {
         .padding(.bottom, Spacing.s2 + 2)
     }
 
-    // Single-character S/M/T/W/T/F/S row.
+    /// Single-character S/M/T/W/T/F/S row.
     private var weekdayHeader: some View {
         HStack(spacing: 1) {
             ForEach(Array(Self.weekdayLabels.enumerated()), id: \.offset) { _, label in
@@ -174,7 +176,7 @@ struct DateOverridesView: View {
         .padding(.bottom, Spacing.s1)
     }
 
-    // 7-column day grid with tap-to-select, selected-day circle, and override dots.
+    /// 7-column day grid with tap-to-select, selected-day circle, and override dots.
     private var dayGrid: some View {
         let cells = Self.calendarCells(for: viewModel.displayedMonth)
         let overrideDates = Set(viewModel.overrides.map(\.date))
@@ -206,13 +208,13 @@ struct DateOverridesView: View {
         }
     }
 
-    // Individual day cell: 28pt circle background, day number, 4pt override dot.
+    /// Individual day cell: 28pt circle background, day number, 4pt override dot.
     private func dayCellView(
         day: Int,
         isSelected: Bool,
         hasOverride: Bool,
         isToday: Bool,
-        dayKey: String
+        dayKey _: String
     ) -> some View {
         Button {
             viewModel.selectDay(day)
@@ -381,9 +383,9 @@ struct DateOverridesView: View {
         }
     }
 
-    // The range composer lives in a child sheet so the link-row idiom matches
-    // the design (a chevron row that "opens range mode") while keeping the
-    // existing range ViewModel state.
+    /// The range composer lives in a child sheet so the link-row idiom matches
+    /// the design (a chevron row that "opens range mode") while keeping the
+    /// existing range ViewModel state.
     private var rangeComposer: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HStack(alignment: .bottom) {
@@ -583,9 +585,9 @@ struct DateOverridesView: View {
         .pantopusShadow(.sm)
     }
 
-    // The imported-holiday list (design Frame 4). Read-only; the names come
-    // from USHolidays. Removing a single one is not offered — the set is
-    // all-or-nothing per the explainer.
+    /// The imported-holiday list (design Frame 4). Read-only; the names come
+    /// from USHolidays. Removing a single one is not offered — the set is
+    /// all-or-nothing per the explainer.
     @ViewBuilder
     private var holidayImportSection: some View {
         sectionLabel("From US public holidays")

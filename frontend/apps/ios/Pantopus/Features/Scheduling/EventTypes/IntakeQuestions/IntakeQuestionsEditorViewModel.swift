@@ -14,7 +14,7 @@ import SwiftUI
 
 /// The intake-question field types the editor exposes. Mirrors the backend
 /// `field_type` enum.
-enum QuestionFieldType: String, CaseIterable, Identifiable, Sendable {
+enum QuestionFieldType: String, CaseIterable, Identifiable {
     case text
     case textarea
     case select
@@ -22,7 +22,9 @@ enum QuestionFieldType: String, CaseIterable, Identifiable, Sendable {
     case checkbox
     case phone
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -35,7 +37,9 @@ enum QuestionFieldType: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var needsOptions: Bool { self == .select || self == .multiselect || self == .checkbox }
+    var needsOptions: Bool {
+        self == .select || self == .multiselect || self == .checkbox
+    }
 
     static func from(_ raw: String?) -> QuestionFieldType {
         QuestionFieldType(rawValue: raw ?? "text") ?? .text
@@ -96,8 +100,13 @@ final class IntakeQuestionsEditorViewModel {
         self.client = client
     }
 
-    var isValid: Bool { questions.allSatisfy(\.isValid) }
-    var isDirty: Bool { signature() != baselineSignature }
+    var isValid: Bool {
+        questions.allSatisfy(\.isValid)
+    }
+
+    var isDirty: Bool {
+        signature() != baselineSignature
+    }
 
     // MARK: Load
 
@@ -106,7 +115,9 @@ final class IntakeQuestionsEditorViewModel {
         await fetch()
     }
 
-    func reload() async { await fetch() }
+    func reload() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading
@@ -185,13 +196,19 @@ final class IntakeQuestionsEditorViewModel {
     /// "Add a question" — append a blank question and open its inline editor
     /// (the design renders it as the blue `EditGroup` field group below the
     /// list). Alias of `addQuestion()` for the bespoke UI.
-    func startAdd() { addQuestion() }
+    func startAdd() {
+        addQuestion()
+    }
 
     /// Open the inline editor for an existing row (tapping the row).
-    func edit(_ id: UUID) { expandedId = id }
+    func edit(_ id: UUID) {
+        expandedId = id
+    }
 
     /// True when this question's row is replaced by the inline `EditGroup`.
-    func isEditing(_ id: UUID) -> Bool { expandedId == id }
+    func isEditing(_ id: UUID) -> Bool {
+        expandedId == id
+    }
 
     /// "Save question" — close the inline editor, keeping the live-bound edits.
     /// A blank/invalid question is dropped rather than persisted.
@@ -214,10 +231,12 @@ final class IntakeQuestionsEditorViewModel {
 
 extension IntakeQuestionsEditorViewModel {
     func signature() -> String {
-        questions.map { question in
-            let opts = question.options.joined(separator: ",")
-            return "\(question.label)|\(question.fieldType.rawValue)|\(opts)|\(question.required)"
-        }.joined(separator: "~")
+        questions
+            .map { question in
+                let opts = question.options.joined(separator: ",")
+                return "\(question.label)|\(question.fieldType.rawValue)|\(opts)|\(question.required)"
+            }
+            .joined(separator: "~")
     }
 
     /// Returns `true` when the save succeeded so the caller can pop the editor.

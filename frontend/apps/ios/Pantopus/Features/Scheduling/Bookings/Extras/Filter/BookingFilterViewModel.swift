@@ -14,9 +14,12 @@
 import Observation
 import SwiftUI
 
-enum BookingFilterStatus: String, CaseIterable, Identifiable, Sendable {
+enum BookingFilterStatus: String, CaseIterable, Identifiable {
     case upcoming, pending, past, cancelled, noShow
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
+
     var label: String {
         switch self {
         case .upcoming: "Upcoming"
@@ -39,9 +42,12 @@ enum BookingFilterStatus: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum BookingDateRangeFilter: String, CaseIterable, Identifiable, Sendable {
+enum BookingDateRangeFilter: String, CaseIterable, Identifiable {
     case today, thisWeek, thisMonth, custom
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
+
     var label: String {
         switch self {
         case .today: "Today"
@@ -54,9 +60,12 @@ enum BookingDateRangeFilter: String, CaseIterable, Identifiable, Sendable {
 
 /// Owner-context facet. Carries an optional concrete `SchedulingOwner` (only the
 /// active scope is fully resolvable here; others are recorded for the inbox).
-enum BookingScopeFilter: String, CaseIterable, Identifiable, Sendable {
+enum BookingScopeFilter: String, CaseIterable, Identifiable {
     case all, personal, home, business
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
+
     var label: String {
         switch self {
         case .all: "All"
@@ -68,7 +77,7 @@ enum BookingScopeFilter: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// The applied filter set returned to the presenting inbox.
-struct BookingFilters: Sendable, Equatable {
+struct BookingFilters: Equatable {
     var status: BookingFilterStatus?
     var eventTypeId: String?
     var dateRange: BookingDateRangeFilter?
@@ -82,7 +91,7 @@ struct BookingFilters: Sendable, Equatable {
 @MainActor
 final class BookingFilterViewModel {
     /// (id, label) for the event-type facet, supplied by the inbox.
-    struct EventTypeOption: Identifiable, Sendable, Hashable {
+    struct EventTypeOption: Identifiable, Hashable {
         let id: String
         let name: String
     }
@@ -108,14 +117,13 @@ final class BookingFilterViewModel {
         self.owner = owner
         self.eventTypeOptions = eventTypeOptions
         self.client = client
-        let scope: BookingScopeFilter
-        switch owner {
-        case .personal: scope = .personal
-        case .home: scope = .home
-        case .business: scope = .business
+        let scope: BookingScopeFilter = switch owner {
+        case .personal: .personal
+        case .home: .home
+        case .business: .business
         }
         self.scope = scope
-        self.defaultScope = scope
+        defaultScope = scope
     }
 
     // MARK: Derived
@@ -149,7 +157,9 @@ final class BookingFilterViewModel {
         }
     }
 
-    var ctaEnabled: Bool { resultCount != 0 }
+    var ctaEnabled: Bool {
+        resultCount != 0
+    }
 
     var activeSummary: [ActiveFilterChip] {
         var chips: [ActiveFilterChip] = []
@@ -169,13 +179,13 @@ final class BookingFilterViewModel {
         return chips
     }
 
-    struct ActiveFilterChip: Identifiable, Sendable, Equatable {
+    struct ActiveFilterChip: Identifiable, Equatable {
         let id: String
         let title: String
         let tint: ChipTint
     }
 
-    enum ChipTint: Sendable, Equatable { case neutral, warning, error, personal, home, business }
+    enum ChipTint: Equatable { case neutral, warning, error, personal, home, business }
 
     func statusTint(_ status: BookingFilterStatus) -> ChipTint {
         switch status {

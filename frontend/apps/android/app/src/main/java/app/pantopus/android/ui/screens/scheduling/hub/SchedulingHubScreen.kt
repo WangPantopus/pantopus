@@ -141,9 +141,7 @@ fun SchedulingHubScreen(
 }
 
 @Composable
-private fun HubTopBar(
-    canEdit: Boolean,
-) {
+private fun HubTopBar(canEdit: Boolean) {
     Column {
         Box(
             modifier =

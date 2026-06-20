@@ -12,7 +12,7 @@ import XCTest
 
 @MainActor
 final class HomeAgendaBuilderTests: XCTestCase {
-    // Sunday 2025-10-12 12:00 UTC.
+    /// Sunday 2025-10-12 12:00 UTC.
     private static let now: Date = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
@@ -20,6 +20,7 @@ final class HomeAgendaBuilderTests: XCTestCase {
     }()
 
     private static let cal = HomeCalendarViewModel.utcCalendar
+    // swiftlint:disable:next force_unwrapping
     private static let tz = TimeZone(identifier: "UTC")!
 
     private func event(
@@ -89,7 +90,9 @@ final class HomeAgendaBuilderTests: XCTestCase {
             calendar: Self.cal,
             timeZone: Self.tz,
             selectedIsoDate: nil
-        ).flatMap(\.items).first
+        )
+        .flatMap(\.items)
+        .first
         XCTAssertEqual(item?.eventId, "e1")
         XCTAssertFalse(item?.isBooking == true)
         XCTAssertEqual(item?.members.count, 2)
@@ -126,7 +129,8 @@ final class HomeAgendaBuilderTests: XCTestCase {
             calendar: Self.cal,
             timeZone: Self.tz,
             selectedIsoDate: nil
-        ).map(\.header)
+        )
+        .map(\.header)
         XCTAssertEqual(headers.count, 3)
         XCTAssertTrue(headers[0].hasPrefix("Today"))
         XCTAssertTrue(headers[1].hasPrefix("Tomorrow"))
@@ -145,7 +149,9 @@ final class HomeAgendaBuilderTests: XCTestCase {
             calendar: Self.cal,
             timeZone: Self.tz,
             selectedIsoDate: nil
-        ).flatMap(\.items).map(\.id)
+        )
+        .flatMap(\.items)
+        .map(\.id)
         XCTAssertEqual(ids, ["today"])
     }
 }

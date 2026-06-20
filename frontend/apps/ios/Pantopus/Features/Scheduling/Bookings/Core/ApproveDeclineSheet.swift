@@ -43,7 +43,9 @@ final class ApproveDeclineViewModel {
         mode = startInDecline ? .decline : .review
     }
 
-    var title: String { mode == .review ? "Review request" : "Decline request" }
+    var title: String {
+        mode == .review ? "Review request" : "Decline request"
+    }
 
     func switchToDecline() {
         mode = .decline
@@ -266,8 +268,11 @@ struct ApproveDeclineSheet: View {
     Color.clear.sheet(isPresented: .constant(true)) {
         ApproveDeclineSheet(
             viewModel: ApproveDeclineViewModel(
-                owner: .business(id: "b"), booking: .preview(status: "pending", ownerType: "business"),
-                eventName: "Studio consultation", startInDecline: false, actions: BookingActions(owner: .business(id: "b"))
+                owner: .business(id: "b"),
+                booking: .preview(status: "pending", ownerType: "business"),
+                eventName: "Studio consultation",
+                startInDecline: false,
+                actions: BookingActions(owner: .business(id: "b"))
             ),
             onCompleted: {},
             onProposeTime: {}
@@ -279,13 +284,15 @@ struct ApproveDeclineSheet: View {
     Color.clear.sheet(isPresented: .constant(true)) {
         ApproveDeclineSheet(
             viewModel: ApproveDeclineViewModel(
-                owner: .business(id: "b"), booking: .preview(status: "pending", ownerType: "business"),
-                eventName: "Studio consultation", startInDecline: false, actions: BookingActions(owner: .business(id: "b"))
+                owner: .business(id: "b"),
+                booking: .preview(status: "pending", ownerType: "business"),
+                eventName: "Studio consultation",
+                startInDecline: false,
+                actions: BookingActions(owner: .business(id: "b"))
             ),
             onCompleted: {},
             onProposeTime: {},
-            showConflictWarning: true,
-            onViewConflict: {}
+            showConflictWarning: true
         )
     }
 }

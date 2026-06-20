@@ -51,11 +51,15 @@ final class WaitlistManagementViewModel {
         self.client = client
     }
 
-    var waitingCount: Int { entries.count }
+    var waitingCount: Int {
+        entries.count
+    }
 
     /// Seats shown as filled on the capacity bar. Unknown ⇒ fall back to the
     /// cap so the bar reads full (matches the conservative `isFull` default).
-    var displayedFilled: Int { seatsFilled ?? seatTotal }
+    var displayedFilled: Int {
+        seatsFilled ?? seatTotal
+    }
 
     /// Whether every seat is taken. Drives the capacity bar tone, the section
     /// overline copy, and whether promote is offered. Unknown filled ⇒ full.
@@ -65,7 +69,9 @@ final class WaitlistManagementViewModel {
     }
 
     /// Open seats remaining (never negative). `0` when full / unknown.
-    var openSeats: Int { max(0, seatTotal - displayedFilled) }
+    var openSeats: Int {
+        max(0, seatTotal - displayedFilled)
+    }
 
     /// Section overline: "1 seat open · promote available" / "2 seats open · …"
     /// when there's room, else "All seats filled".
@@ -80,7 +86,9 @@ final class WaitlistManagementViewModel {
         await fetch(showLoading: phase != .ready)
     }
 
-    func refresh() async { await fetch(showLoading: false) }
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
 
     private func fetch(showLoading: Bool) async {
         if showLoading { phase = .loading }

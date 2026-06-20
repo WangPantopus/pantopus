@@ -44,8 +44,13 @@ final class InviteeReviewConfirmViewModelTests: XCTestCase {
         }
         let draft = InviteeBookingDraft(firstName: "Maya", lastName: "Chen", email: "maya.chen@gmail.com")
         InviteeBookingDraftStore.shared.set(InviteeReviewContext(
-            slug: slug, eventTypeSlug: eventTypeSlug, start: start, tz: tz,
-            eventType: eventType, page: view.page, draft: draft
+            slug: slug,
+            eventTypeSlug: eventTypeSlug,
+            start: start,
+            tz: tz,
+            eventType: eventType,
+            page: view.page,
+            draft: draft
         ))
     }
 

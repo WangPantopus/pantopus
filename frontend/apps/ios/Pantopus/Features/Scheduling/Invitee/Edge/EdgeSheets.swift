@@ -65,7 +65,10 @@ private struct SlotTakenSheetModifier: ViewModifier {
                     item = nil
                     onPickAnother()
                 },
-                onJoinWaitlist: onJoinWaitlist.map { join in { item = nil; join() } }
+                onJoinWaitlist: onJoinWaitlist.map { join in { item = nil
+                    join()
+                }
+                }
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)

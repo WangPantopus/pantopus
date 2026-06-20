@@ -34,7 +34,7 @@ struct CodeBoxField: View {
                 .accessibilityValue(code.isEmpty ? "Empty" : code.map(String.init).joined(separator: " "))
 
             HStack(spacing: Spacing.s2) {
-                ForEach(0 ..< length, id: \.self) { index in
+                ForEach(0..<length, id: \.self) { index in
                     box(at: index)
                 }
             }

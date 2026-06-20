@@ -39,6 +39,7 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
     private(set) var state: ListOfRowsState = .loading
 
     // MARK: Bespoke display projection
+
     //
     // The design renders each schedule as its own standalone white card (16pt
     // radius, 36pt icon tile, vertical-ellipsis kebab) with a 10pt gap and a
@@ -267,9 +268,8 @@ final class AvailabilityScheduleListViewModel: ListOfRowsDataSource {
                 icon: .calendarClock,
                 headline: "You don't have a schedule yet",
                 subcopy: "Set the hours you're open to bookings. Your home and business pages build from this.",
-                ctaTitle: "Add working hours",
-                onCTA: { [weak self] in Task { @MainActor in await self?.createDefaultSchedule() } }
-            ))
+                ctaTitle: "Add working hours"
+            ) { [weak self] in Task { @MainActor in await self?.createDefaultSchedule() } })
             displayPhase = .empty
             return
         }

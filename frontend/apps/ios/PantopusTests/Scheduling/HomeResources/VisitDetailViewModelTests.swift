@@ -23,6 +23,7 @@ final class VisitDetailViewModelTests: XCTestCase {
         ))
     }
 
+    // swiftlint:disable:next line_length
     private static let occupants = #"{"occupants":[{"id":"o1","user_id":"u1","role":"member","is_active":true,"display_name":"Dad"}],"pendingInvites":[]}"#
 
     private static func eventBody(start: String, end: String) -> String {
@@ -36,7 +37,7 @@ final class VisitDetailViewModelTests: XCTestCase {
     func testUpcomingVisitIsConfirmed() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.eventBody(start: "2099-01-01T10:00:00Z", end: "2099-01-01T11:00:00Z")),
-            .status(200, body: Self.occupants),
+            .status(200, body: Self.occupants)
         ]
         let viewModel = VisitDetailViewModel(homeId: "h1", eventId: "e1", push: { _ in }, client: makeClient())
         await viewModel.load()
@@ -53,7 +54,7 @@ final class VisitDetailViewModelTests: XCTestCase {
     func testPastVisitIsDone() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.eventBody(start: "2000-01-01T10:00:00Z", end: "2000-01-01T11:00:00Z")),
-            .status(200, body: Self.occupants),
+            .status(200, body: Self.occupants)
         ]
         let viewModel = VisitDetailViewModel(homeId: "h1", eventId: "e1", push: { _ in }, client: makeClient())
         await viewModel.load()

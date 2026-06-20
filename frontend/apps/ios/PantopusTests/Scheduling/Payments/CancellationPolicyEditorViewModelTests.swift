@@ -13,8 +13,15 @@ import XCTest
 
 @MainActor
 final class CancellationPolicyEditorViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func client(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingClient {
         SchedulingClient(client: APIClient(
@@ -93,15 +100,21 @@ final class CancellationPolicyEditorViewModelTests: XCTestCase {
     func testRefundPolicyMapping() async {
         let model = pageVM(["/api/scheduling/booking-page": [.status(200, body: page("\"Flexible\""))]])
         await model.load()
-        model.select(.flexible); XCTAssertEqual(model.refundPolicyValue, "full")
-        model.select(.moderate); XCTAssertEqual(model.refundPolicyValue, "partial")
-        model.select(.strict); XCTAssertEqual(model.refundPolicyValue, "none")
-        model.select(.custom)
-        model.customRefundPct = 0; model.depositNonRefundable = false
-        XCTAssertEqual(model.refundPolicyValue, "none")
-        model.customRefundPct = 100; model.depositNonRefundable = false
+        model.select(.flexible)
         XCTAssertEqual(model.refundPolicyValue, "full")
-        model.customRefundPct = 40; model.depositNonRefundable = true
+        model.select(.moderate)
+        XCTAssertEqual(model.refundPolicyValue, "partial")
+        model.select(.strict)
+        XCTAssertEqual(model.refundPolicyValue, "none")
+        model.select(.custom)
+        model.customRefundPct = 0
+        model.depositNonRefundable = false
+        XCTAssertEqual(model.refundPolicyValue, "none")
+        model.customRefundPct = 100
+        model.depositNonRefundable = false
+        XCTAssertEqual(model.refundPolicyValue, "full")
+        model.customRefundPct = 40
+        model.depositNonRefundable = true
         XCTAssertEqual(model.refundPolicyValue, "deposit_only")
     }
 

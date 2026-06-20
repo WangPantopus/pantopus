@@ -9,6 +9,7 @@
 //  `scheduling-setup-frames.jsx` / `onboarding-shell.jsx`.
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 
 // MARK: - Slug field state
@@ -28,7 +29,8 @@ struct WizardOverline: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 10.5, weight: .semibold)).tracking(0.84)
+            .font(.system(size: 10.5, weight: .semibold))
+            .tracking(0.84)
             .foregroundStyle(Theme.Color.appTextSecondary)
     }
 }
@@ -39,9 +41,15 @@ struct WizardHeadline: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 22, weight: .bold)).tracking(-0.3).foregroundStyle(Theme.Color.appText)
+            Text(title)
+                .font(.system(size: 22, weight: .bold))
+                .tracking(-0.3)
+                .foregroundStyle(Theme.Color.appText)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(sub).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary).lineSpacing(2)
+            Text(sub)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -89,7 +97,8 @@ struct WizardStepRail: View {
                 if isDone {
                     Icon(.check, size: 11, strokeWidth: 3, color: Theme.Color.appTextInverse)
                 } else {
-                    Text("\(step.0)").font(.system(size: 10.5, weight: .bold)).foregroundStyle(filled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
+                    Text("\(step.0)").font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(filled ? Theme.Color.appTextInverse : Theme.Color.appTextMuted)
                 }
             }
             .frame(width: 22, height: 22)
@@ -115,7 +124,10 @@ struct WizardHandleField: View {
 
     @FocusState private var focused: Bool
 
-    private var isTaken: Bool { if case .taken = state { return true }; return false }
+    private var isTaken: Bool {
+        if case .taken = state { return true }
+        return false
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -165,23 +177,34 @@ struct WizardHandleField: View {
             HStack(spacing: Spacing.s2) {
                 HStack(spacing: 5) {
                     Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.success)
-                    Text("Available").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.Color.success)
+                    Text("Available")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.success)
                 }
-                .padding(.horizontal, 9).padding(.vertical, Spacing.s1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, Spacing.s1)
                 .background(Theme.Color.successLight)
                 .clipShape(Capsule())
-                Text(availableHint).font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1).minimumScaleFactor(0.8)
+                Text(availableHint)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .padding(.top, 10)
         case let .taken(suggestions):
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
                     Icon(.alertCircle, size: 13, color: Theme.Color.error)
-                    Text("That link is taken").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.Color.error)
+                    Text("That link is taken")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.error)
                 }
                 if !suggestions.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
-                        Text("Try one of these:").font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+                        Text("Try one of these:")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                         FlowChips(suggestions: suggestions, accent: accent, accentBg: accentBg, onPick: onPick)
                     }
                 }
@@ -214,10 +237,13 @@ private struct FlowChips: View {
     private func chip(_ s: String) -> some View {
         Button { onPick(s) } label: {
             HStack(spacing: 6) {
-                Text(s).font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(Theme.Color.primary700)
+                Text(s)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Theme.Color.primary700)
                 Icon(.arrowUpRight, size: 12, color: Theme.Color.primary700)
             }
-            .padding(.horizontal, 11).padding(.vertical, 7)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
             .background(accentBg)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Theme.Color.primary100, lineWidth: 1))
@@ -234,6 +260,7 @@ struct WizardTypePicker: View {
     let accent: Color
     let accentBg: Color
 
+    // swiftlint:disable:next large_tuple
     private let locations: [(String, String, PantopusIcon)] = [
         ("video", "Video call", .video),
         ("phone", "Phone", .phone),
@@ -247,7 +274,10 @@ struct WizardTypePicker: View {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 WizardOverline(text: "How you meet")
                 VStack(spacing: Spacing.s2) {
-                    ForEach(stride(from: 0, to: locations.count, by: 2).map { Array(locations[$0..<min($0 + 2, locations.count)]) }, id: \.first!.0) { pair in
+                    ForEach(
+                        stride(from: 0, to: locations.count, by: 2).map { Array(locations[$0..<min($0 + 2, locations.count)]) },
+                        id: \.first!.0
+                    ) { pair in
                         HStack(spacing: Spacing.s2) {
                             ForEach(pair, id: \.0) { loc in
                                 locationTile(loc)
@@ -266,6 +296,7 @@ struct WizardTypePicker: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // swiftlint:disable:next large_tuple
     private func locationTile(_ loc: (String, String, PantopusIcon)) -> some View {
         let active = locationMode == loc.0
         return Button { locationMode = loc.0 } label: {
@@ -275,13 +306,20 @@ struct WizardTypePicker: View {
                     Icon(loc.2, size: 15, strokeWidth: 2.2, color: active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong)
                 }
                 .frame(width: 30, height: 30)
-                Text(loc.1).font(.system(size: 12.5, weight: active ? .bold : .semibold)).foregroundStyle(active ? accent : Theme.Color.appText).lineLimit(1)
+                Text(loc.1)
+                    .font(.system(size: 12.5, weight: active ? .bold : .semibold))
+                    .foregroundStyle(active ? accent : Theme.Color.appText)
+                    .lineLimit(1)
                 Spacer(minLength: Spacing.s0)
             }
-            .padding(.horizontal, Spacing.s3).padding(.vertical, 13)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 13)
             .background(active ? accentBg : Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(active ? accent : Theme.Color.appBorder, lineWidth: 1.5))
+            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(
+                active ? accent : Theme.Color.appBorder,
+                lineWidth: 1.5
+            ))
         }
         .accessibilityIdentifier("wizardLocation_\(loc.0)")
     }
@@ -296,7 +334,10 @@ struct WizardTypePicker: View {
                 .frame(height: 38)
                 .background(active ? accent : Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(active ? accent : Theme.Color.appBorder, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(
+                    active ? accent : Theme.Color.appBorder,
+                    lineWidth: 1
+                ))
         }
         .accessibilityIdentifier("wizardDuration_\(d)")
     }
@@ -314,15 +355,22 @@ struct WizardTimezoneChip: View {
             WizardOverline(text: "Timezone")
             HStack(spacing: Spacing.s2) {
                 Icon(.globe, size: 15, color: Theme.Color.primary700)
-                Text(identifier).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.primary700)
-                Text("AUTO").font(.system(size: 9.5, weight: .bold)).tracking(0.4).foregroundStyle(Theme.Color.primary600)
-                    .padding(.horizontal, 7).padding(.vertical, 2)
+                Text(identifier)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                Text("AUTO")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(0.4)
+                    .foregroundStyle(Theme.Color.primary600)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
                     .background(Theme.Color.appSurface)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(Theme.Color.primary100, lineWidth: 1))
                 Icon(.chevronDown, size: 14, color: Theme.Color.primary700)
             }
-            .padding(.horizontal, Spacing.s3).padding(.vertical, 9)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 9)
             .background(Theme.Color.primary50)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Theme.Color.primary100, lineWidth: 1))
@@ -365,23 +413,36 @@ struct WizardHoursGrid: View {
             Button { enabled[day.0] = !on } label: { SetupMiniToggle(isOn: on, accent: accent) }
                 .accessibilityIdentifier("wizardDay_\(day.0)")
                 .accessibilityLabel(day.1)
-            Text(day.1).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(on ? Theme.Color.appText : Theme.Color.appTextMuted).frame(width: 78, alignment: .leading)
+            Text(day.1)
+                .font(.system(size: 13.5, weight: .semibold))
+                .foregroundStyle(on ? Theme.Color.appText : Theme.Color.appTextMuted)
+                .frame(
+                    width: 78,
+                    alignment: .leading
+                )
             Spacer(minLength: Spacing.s2)
             if on {
                 HStack(spacing: 7) {
                     Icon(.clock, size: 13, color: accent)
-                    Text(rangeLabel).font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.Color.appText).monospacedDigit()
+                    Text(rangeLabel)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .monospacedDigit()
                     Icon(.chevronRight, size: 13, color: Theme.Color.appTextMuted)
                 }
-                .padding(.horizontal, 11).padding(.vertical, 7)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
                 .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
             } else {
-                Text("Unavailable").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.Color.appTextMuted)
+                Text("Unavailable")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextMuted)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
+        .padding(.horizontal, 14)
+        .padding(.vertical, Spacing.s3)
     }
 }
 
@@ -402,33 +463,53 @@ struct WizardSuccessHero: View {
                 Circle().fill(
                     RadialGradient(colors: [accentBg, accentBg.opacity(0.5)], center: .init(x: 0.3, y: 0.3), startRadius: 0, endRadius: 96)
                 )
-                Circle().fill(accent).frame(width: 60, height: 60).pantopusShadow(shadow)
+                Circle()
+                    .fill(accent)
+                    .frame(width: 60, height: 60)
+                    .pantopusShadow(shadow)
                 Icon(.check, size: 32, strokeWidth: 3, color: Theme.Color.appTextInverse)
             }
             .frame(width: 96, height: 96)
             .padding(.bottom, 22)
-            Text(title).font(.system(size: 22, weight: .bold)).tracking(-0.3).foregroundStyle(Theme.Color.appText)
-                .multilineTextAlignment(.center).padding(.bottom, Spacing.s2)
-            Text(sub).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).lineSpacing(2).frame(maxWidth: 280).padding(.bottom, 22)
+            Text(title)
+                .font(.system(size: 22, weight: .bold))
+                .tracking(-0.3)
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+                .padding(.bottom, Spacing.s2)
+            Text(sub)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .frame(maxWidth: 280)
+                .padding(.bottom, 22)
 
             HStack(spacing: 10) {
                 Icon(.link, size: 16, color: accent)
-                Text(link).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(Theme.Color.appText)
-                    .lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
+                Text(link)
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Button(action: onCopy) {
                     HStack(spacing: 5) {
                         Icon(.copy, size: 13, color: Theme.Color.primary700)
-                        Text("Copy").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.Color.primary700)
+                        Text("Copy")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.Color.primary700)
                     }
-                    .padding(.horizontal, 11).padding(.vertical, 7)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
                     .background(accentBg)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(accentBg, lineWidth: 1))
                 }
                 .accessibilityIdentifier("wizardSuccessCopy")
             }
-            .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
+            .padding(.horizontal, 14)
+            .padding(.vertical, Spacing.s3)
             .setupCard(radius: Radii.lg)
         }
         .frame(maxWidth: .infinity)

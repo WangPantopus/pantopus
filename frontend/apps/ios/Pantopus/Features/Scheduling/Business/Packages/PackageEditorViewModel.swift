@@ -79,17 +79,35 @@ final class PackageEditorViewModel {
     private(set) var nameError = false
     private var snapshot = Snapshot()
 
-    var isEditing: Bool { packageId != nil }
+    var isEditing: Bool {
+        packageId != nil
+    }
+
     /// Sessions count and redeems-against tiles are locked when the owner has
     /// buyers holding active credits — matches Frame 4 of createpackage-frames.jsx.
-    var isLocked: Bool { isEditing && hasActiveBuyers }
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var isLocked: Bool {
+        isEditing && hasActiveBuyers
+    }
 
-    var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && sessionsCount >= 1 }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var isDirty: Bool { Snapshot(self) != snapshot }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && sessionsCount >= 1
+    }
+
+    var isDirty: Bool {
+        Snapshot(self) != snapshot
+    }
 
     /// Live "$44.00 per session" math for the price card.
     var perSessionLabel: String {
@@ -111,7 +129,9 @@ final class PackageEditorViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = isEditing ? .loading : .ready
         // Event types power the "redeems against" tiles — best-effort.
         if let types: EventTypesResponse = try? await client.request(SchedulingEndpoints.getEventTypes(owner: owner)) {
@@ -164,7 +184,9 @@ final class PackageEditorViewModel {
 
     /// Create or update, then invoke `onDone` (pop) on success.
     func save(onDone: @escaping () -> Void) async {
-        guard isValid else { nameError = name.trimmingCharacters(in: .whitespaces).isEmpty; return }
+        guard isValid else { nameError = name.trimmingCharacters(in: .whitespaces).isEmpty
+            return
+        }
         nameError = false
         saving = true
         defer { saving = false }

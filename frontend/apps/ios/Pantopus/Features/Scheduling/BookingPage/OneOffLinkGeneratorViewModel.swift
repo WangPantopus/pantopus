@@ -374,11 +374,11 @@ public final class OneOffLinkGeneratorViewModel {
         if let expiresAt,
            let formatted = SchedulingTime.localString(utcISO: expiresAt, tz: timeZoneIdentifier) {
             // Trust the server's actual expiry over the requested chip.
-            return "Expires \(formatted)"
+            "Expires \(formatted)"
         } else if expiry == .never {
-            return "No expiry"
+            "No expiry"
         } else {
-            return "Expires in \(expiry.label.lowercased())"
+            "Expires in \(expiry.label.lowercased())"
         }
     }
 

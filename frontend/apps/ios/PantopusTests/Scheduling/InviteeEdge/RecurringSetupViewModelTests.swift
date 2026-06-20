@@ -27,6 +27,7 @@ final class RecurringSetupViewModelTests: XCTestCase {
         return RecurringSetupViewModel(owner: .personal, eventTypeId: "et1", push: { _ in }, client: client)
     }
 
+    // swiftlint:disable:next line_length
     private let eventTypeJSON = #"{"eventType":{"id":"et1","name":"Intro","slug":"intro","durations":[30],"default_duration":30,"price_cents":4000,"currency":"usd"}}"#
 
     func testLoadConfigures() async {
@@ -73,6 +74,7 @@ final class RecurringSetupViewModelTests: XCTestCase {
     }
 
     func testConfirmConflictSurfacesRecovery() async {
+        // swiftlint:disable:next line_length
         let conflict = #"{"error":"SLOT_CONFLICT","message":"taken","alternatives":[{"start":"2026-07-07T20:00:00Z","end":"2026-07-07T20:30:00Z","startLocal":"2026-07-07T13:00:00"}]}"#
         SequencedURLProtocol.sequence = [.status(200, body: eventTypeJSON), .status(409, body: conflict)]
         let viewModel = makeViewModel()

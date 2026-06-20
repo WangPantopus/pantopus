@@ -4,6 +4,7 @@
     "LongMethod",
     "LongParameterList",
     "MaxLineLength",
+    "ktlint:standard:max-line-length",
 )
 
 package app.pantopus.android.ui.screens.homes.calendar
@@ -16,7 +17,6 @@ import app.pantopus.android.data.api.models.homes.HomeEventResponse
 import app.pantopus.android.data.api.models.homes.OccupantDto
 import app.pantopus.android.data.api.models.homes.OccupantsResponse
 import app.pantopus.android.data.api.models.homes.UpdateHomeEventRequest
-import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
@@ -289,7 +289,13 @@ class AddEventFormViewModelTest {
         runTest {
             stubOccupants()
             stubEditSource(
-                CalendarEventDto(id = "e1", homeId = "home-1", eventType = "social", title = "Soccer game", startAt = "2025-10-12T16:00:00Z"),
+                CalendarEventDto(
+                    id = "e1",
+                    homeId = "home-1",
+                    eventType = "social",
+                    title = "Soccer game",
+                    startAt = "2025-10-12T16:00:00Z",
+                ),
             )
             val captured = slot<UpdateHomeEventRequest>()
             coEvery { repo.updateHomeEvent("home-1", "e1", capture(captured)) } returns

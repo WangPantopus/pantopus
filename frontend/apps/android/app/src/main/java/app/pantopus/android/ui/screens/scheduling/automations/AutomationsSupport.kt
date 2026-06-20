@@ -90,8 +90,7 @@ enum class WorkflowTrigger(val wire: String) {
 
     companion object {
         /** Tolerant decode of an arbitrary backend string (defaults to created). */
-        fun fromWire(wire: String?): WorkflowTrigger =
-            entries.firstOrNull { it.wire == (wire ?: "").lowercase() } ?: BookingCreated
+        fun fromWire(wire: String?): WorkflowTrigger = entries.firstOrNull { it.wire == (wire ?: "").lowercase() } ?: BookingCreated
     }
 }
 
@@ -152,8 +151,7 @@ enum class WorkflowChannel(val wire: String) {
             }
 
     companion object {
-        fun fromWire(wire: String?): WorkflowChannel =
-            entries.firstOrNull { it.wire == (wire ?: "").lowercase() } ?: Email
+        fun fromWire(wire: String?): WorkflowChannel = entries.firstOrNull { it.wire == (wire ?: "").lowercase() } ?: Email
 
         /** SMS soft length limit; over this a message sends as multiple segments. */
         const val SMS_SEGMENT_LIMIT = 160

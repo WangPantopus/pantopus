@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "ktlint:standard:max-line-length")
 @file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra

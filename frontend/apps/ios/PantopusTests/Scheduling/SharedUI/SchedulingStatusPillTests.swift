@@ -41,15 +41,17 @@ final class SchedulingStatusPillTests: XCTestCase {
     func testToneBuckets() {
         XCTAssertEqual(SchedulingPillStatus.confirmed.tone, .success)
         XCTAssertEqual(SchedulingPillStatus.active.tone, .success)
-        XCTAssertEqual(SchedulingPillStatus.pending.tone, .warning)
-        XCTAssertEqual(SchedulingPillStatus.draft.tone, .warning)
-        // Design: paused/completed chips render neutral grey, NOT amber/green.
-        XCTAssertEqual(SchedulingPillStatus.paused.tone, .neutral)
-        XCTAssertEqual(SchedulingPillStatus.completed.tone, .neutral)
+        XCTAssertEqual(SchedulingPillStatus.completed.tone, .success)
+        // Pending / draft read as calm INFO-blue (in-progress / unpublished),
+        // not an amber warning.
+        XCTAssertEqual(SchedulingPillStatus.pending.tone, .info)
+        XCTAssertEqual(SchedulingPillStatus.draft.tone, .info)
         XCTAssertEqual(SchedulingPillStatus.declined.tone, .error)
         XCTAssertEqual(SchedulingPillStatus.noShow.tone, .error)
+        XCTAssertEqual(SchedulingPillStatus.expired.tone, .error)
+        // Paused / cancelled / unknown render neutral grey.
+        XCTAssertEqual(SchedulingPillStatus.paused.tone, .neutral)
         XCTAssertEqual(SchedulingPillStatus.cancelled.tone, .neutral)
-        XCTAssertEqual(SchedulingPillStatus.expired.tone, .neutral)
         XCTAssertEqual(SchedulingPillStatus.unknown.tone, .neutral)
     }
 

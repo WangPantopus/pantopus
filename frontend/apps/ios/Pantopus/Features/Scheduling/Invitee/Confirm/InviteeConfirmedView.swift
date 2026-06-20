@@ -11,6 +11,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct InviteeConfirmedView: View {
     @State private var viewModel: InviteeConfirmedViewModel
     @State private var showAddToCalendar = false
@@ -57,7 +58,9 @@ struct InviteeConfirmedView: View {
         ScrollView {
             VStack(spacing: Spacing.s4) {
                 hero
-                if viewModel.isPending { timelineCard; etaPill }
+                if viewModel.isPending { timelineCard
+                    etaPill
+                }
                 BookingSummaryCard(summary: viewModel.summary, hostPrefix: true, showPillar: false)
                 if viewModel.showsReceipt { receiptCapsule }
                 // Design FramePending omits CalendarCluster — only show it once the booking is confirmed.
@@ -137,10 +140,11 @@ struct InviteeConfirmedView: View {
         return 0
     }
 
+    // swiftlint:disable large_tuple
     private func timelineStep(
         _ step: (label: String, sub: String?, state: InviteeConfirmedViewModel.TimelineStepState),
-        isLast: Bool
-    ) -> some View {
+        isLast _: Bool
+    ) -> some View { // swiftlint:enable large_tuple
         VStack(spacing: Spacing.s2) {
             ZStack {
                 Circle()
@@ -255,15 +259,15 @@ struct InviteeConfirmedView: View {
         Button { viewModel.openManage() } label: {
             HStack(alignment: .top, spacing: Spacing.s2) {
                 Icon(.settings2, size: 14, color: Theme.Color.appTextMuted)
-                (Text("Need to change it? ")
+                Text("Need to change it? ")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                 + Text("Reschedule or cancel")
+                    + Text("Reschedule or cancel")
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(viewModel.accent)
-                 + Text(" anytime.")
+                    + Text(" anytime.")
                     .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                 Spacer(minLength: Spacing.s0)
             }
         }
@@ -378,9 +382,17 @@ struct HaloBadge: View {
         .accessibilityHidden(true)
     }
 
-    private var background: Color { tone == .success ? Theme.Color.successBg : Theme.Color.primary50 }
-    private var ring: Color { tone == .success ? Theme.Color.successLight : Theme.Color.primary200 }
-    private var foreground: Color { tone == .success ? Theme.Color.success : Theme.Color.primary600 }
+    private var background: Color {
+        tone == .success ? Theme.Color.successBg : Theme.Color.primary50
+    }
+
+    private var ring: Color {
+        tone == .success ? Theme.Color.successLight : Theme.Color.primary200
+    }
+
+    private var foreground: Color {
+        tone == .success ? Theme.Color.success : Theme.Color.primary600
+    }
 }
 
 // MARK: - Confetti
@@ -402,8 +414,10 @@ struct ConfettiBurst: View {
                     RoundedRectangle(cornerRadius: 1.5)
                         .fill(palette[index % palette.count])
                         .frame(width: width, height: height)
-                        .position(x: geo.size.width * (0.06 + Double(index) * 0.056).truncatingRemainder(dividingBy: 0.94),
-                                  y: fall ? 280 : -14)
+                        .position(
+                            x: geo.size.width * (0.06 + Double(index) * 0.056).truncatingRemainder(dividingBy: 0.94),
+                            y: fall ? 280 : -14
+                        )
                         .rotationEffect(.degrees(fall ? 420 : 0))
                         .opacity(fall ? 0 : 1)
                         .animation(
@@ -430,13 +444,13 @@ struct ICSShareItem: Identifiable {
 struct ICSShareSheet: UIViewControllerRepresentable {
     let item: ICSShareItem
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("invite.ics")
         try? item.data.write(to: url)
         return UIActivityViewController(activityItems: [url], applicationActivities: nil)
     }
 
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }
 
 #if DEBUG

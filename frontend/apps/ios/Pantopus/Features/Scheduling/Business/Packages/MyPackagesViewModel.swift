@@ -43,7 +43,9 @@ final class MyPackagesViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = .loading
         do {
             let result: MyPackagesResponse = try await client.request(SchedulingEndpoints.getMyPackages())
@@ -56,12 +58,19 @@ final class MyPackagesViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Actions
 
-    func useCredit(_ credit: PackageCreditDTO) { creditForUse = credit }
-    func browseServices() { push(.customerMyBookings) }
+    func useCredit(_ credit: PackageCreditDTO) {
+        creditForUse = credit
+    }
+
+    func browseServices() {
+        push(.customerMyBookings)
+    }
 
     func buyAgain(_ credit: PackageCreditDTO) {
         guard let packageId = credit.packageId else { return }
@@ -86,11 +95,22 @@ final class MyPackagesViewModel {
         }
     }
 
-    func theme(for credit: PackageCreditDTO) -> SchedulingIdentityTheme { owner(for: credit.bookingPackage).theme }
+    func theme(for credit: PackageCreditDTO) -> SchedulingIdentityTheme {
+        owner(for: credit.bookingPackage).theme
+    }
 
-    func remaining(_ credit: PackageCreditDTO) -> Int { credit.remainingSessions ?? 0 }
-    func total(_ credit: PackageCreditDTO) -> Int { max(credit.bookingPackage?.sessionsCount ?? remaining(credit), remaining(credit)) }
-    func isSpent(_ credit: PackageCreditDTO) -> Bool { remaining(credit) == 0 }
+    func remaining(_ credit: PackageCreditDTO) -> Int {
+        credit.remainingSessions ?? 0
+    }
+
+    func total(_ credit: PackageCreditDTO) -> Int {
+        max(credit.bookingPackage?.sessionsCount ?? remaining(credit), remaining(credit))
+    }
+
+    func isSpent(_ credit: PackageCreditDTO) -> Bool {
+        remaining(credit) == 0
+    }
+
     func progress(_ credit: PackageCreditDTO) -> Double {
         let totalCount = total(credit)
         guard totalCount > 0 else { return 0 }

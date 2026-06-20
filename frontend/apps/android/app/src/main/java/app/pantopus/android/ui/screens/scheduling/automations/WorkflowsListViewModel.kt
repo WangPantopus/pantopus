@@ -130,8 +130,7 @@ class WorkflowsListViewModel
                 else -> "Couldn't load your workflows."
             }
 
-        private fun SchedulingError.toastMessage(): String =
-            (this as? SchedulingError.Generic)?.message ?: "Couldn't update this workflow."
+        private fun SchedulingError.toastMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't update this workflow."
     }
 
 @Immutable

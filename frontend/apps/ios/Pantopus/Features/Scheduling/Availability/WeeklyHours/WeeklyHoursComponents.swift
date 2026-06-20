@@ -18,8 +18,8 @@ import SwiftUI
 // button, positioned above or below depending on available space.
 
 private struct DayCopyPopover: View {
-    let sourceDay: Int                   // weekday index of the row being copied
-    @Binding var checkedDays: Set<Int>   // independent per-day toggles
+    let sourceDay: Int // weekday index of the row being copied
+    @Binding var checkedDays: Set<Int> // independent per-day toggles
     let onCopy: ([Int]) -> Void
     let onDismiss: () -> Void
 

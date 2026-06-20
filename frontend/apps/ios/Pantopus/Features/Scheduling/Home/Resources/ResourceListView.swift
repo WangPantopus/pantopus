@@ -20,7 +20,9 @@ struct ResourceListView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
-    private var isOffline: Bool { !NetworkMonitor.shared.isOnline }
+    private var isOffline: Bool {
+        !NetworkMonitor.shared.isOnline
+    }
 
     /// FAB shows on the loaded + empty frames only (not loading / error /
     /// offline), matching the design's per-frame FAB visibility.

@@ -96,8 +96,7 @@ class RemindersQuickSetupViewModel
 
         fun hideCustom() = updateLoaded { it.copy(showCustom = false) }
 
-        fun stepCustom(delta: Int) =
-            updateLoaded { it.copy(customValue = (it.customValue + delta).coerceIn(1, MAX_CUSTOM_VALUE)) }
+        fun stepCustom(delta: Int) = updateLoaded { it.copy(customValue = (it.customValue + delta).coerceIn(1, MAX_CUSTOM_VALUE)) }
 
         fun setCustomUnit(unit: ReminderPreset.Unit) = updateLoaded { it.copy(customUnit = unit) }
 

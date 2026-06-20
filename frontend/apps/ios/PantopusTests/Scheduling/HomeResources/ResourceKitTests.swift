@@ -62,7 +62,7 @@ final class ResourceKitTests: XCTestCase {
     func testHomeMemberFromOccupantsFiltersInactive() {
         let occupants = [
             OccupantDTO(id: "o1", userId: "u1", role: "member", isActive: true, displayName: "Dad"),
-            OccupantDTO(id: "o2", userId: "u2", role: "member", isActive: false, displayName: "Ghost"),
+            OccupantDTO(id: "o2", userId: "u2", role: "member", isActive: false, displayName: "Ghost")
         ]
         let members = ResourceHomeMember.from(occupants: occupants)
         XCTAssertEqual(members.count, 1)

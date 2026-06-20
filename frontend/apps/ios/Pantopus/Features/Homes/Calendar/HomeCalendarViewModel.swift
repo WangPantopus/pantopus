@@ -807,7 +807,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
     /// Home id exposed for the local cross-stream route presenter's owner
     /// context. (The `homeId` stored prop stays private.)
-    var homeIdForRouting: String { homeId }
+    var homeIdForRouting: String {
+        homeId
+    }
 
     func openWhosFree() {
         presentedRoute = PresentedHomeRoute(

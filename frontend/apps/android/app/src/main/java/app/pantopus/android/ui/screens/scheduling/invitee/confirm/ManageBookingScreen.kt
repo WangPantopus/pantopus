@@ -242,10 +242,11 @@ fun ManageBookingContent(
         // Design FramePast (manage-booking-frames.jsx:286): PolicyCard shown with
         // "Booked a follow-up? Manage it from the new confirmation email." for past bookings.
         // Confirmed/Pending also show the standard cancellation policy card.
-        val policyText = when (data.status) {
-            ManageStatus.Past -> "Booked a follow-up? Manage it from the new confirmation email."
-            else -> data.cancellationPolicy
-        }
+        val policyText =
+            when (data.status) {
+                ManageStatus.Past -> "Booked a follow-up? Manage it from the new confirmation email."
+                else -> data.cancellationPolicy
+            }
         if (!policyText.isNullOrBlank()) {
             PolicyCard(
                 policy = policyText,
@@ -551,13 +552,26 @@ private fun ManageExpired(
                 tint = PantopusColors.appTextInverse,
                 modifier = Modifier.padding(end = Spacing.s1),
             )
-            Text(text = "Request a new link", style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
+            Text(
+                text = "Request a new link",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
         }
         Box(
-            modifier = Modifier.fillMaxWidth().height(38.dp).padding(top = Spacing.s2).clickable(onClickLabel = "Contact host", onClick = onContactHost),
+            modifier =
+                Modifier.fillMaxWidth().height(
+                    38.dp,
+                ).padding(top = Spacing.s2).clickable(onClickLabel = "Contact host", onClick = onContactHost),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text = "Contact host", style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
+            Text(
+                text = "Contact host",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+            )
         }
     }
 }

@@ -26,7 +26,7 @@ import Foundation
 
 /// The bookable resource taxonomy (`resource_type` wire enum). Drives the
 /// leading tile glyph and the type badge label across F9–F12.
-enum ResourceKind: String, CaseIterable, Sendable {
+enum ResourceKind: String, CaseIterable {
     case room
     case vehicle
     case tool
@@ -76,7 +76,7 @@ enum ResourceKind: String, CaseIterable, Sendable {
 }
 
 /// Smart rule defaults seeded from a resource type.
-struct ResourceRuleDefaults: Sendable, Equatable {
+struct ResourceRuleDefaults: Equatable {
     var maxDurationMin: Int
     var bufferMin: Int
     var requiresApproval: Bool
@@ -84,7 +84,7 @@ struct ResourceRuleDefaults: Sendable, Equatable {
 
 /// `who_can_book` wire enum (v1 honours `members`; `specific`/`guests` are
 /// stored but gate to members server-side).
-enum WhoCanBook: String, CaseIterable, Sendable {
+enum WhoCanBook: String, CaseIterable {
     case members
     case specific
     case guests
@@ -108,7 +108,7 @@ enum WhoCanBook: String, CaseIterable, Sendable {
 /// `visit_type` wire enum. The backend accepts ONLY `vendor` | `guest`
 /// (scheduling.js:973) — the design's Delivery/Service chips have no v1
 /// persistence, so this stream ships the two contract-backed types.
-enum VisitKind: String, CaseIterable, Sendable {
+enum VisitKind: String, CaseIterable {
     case vendor
     case guest
 
@@ -137,7 +137,7 @@ enum VisitKind: String, CaseIterable, Sendable {
 /// The backend stores it verbatim; this stream owns the shape:
 /// `{ "days": [1,2,3,4,5], "start": "07:00", "end": "22:00" }` (days are
 /// `Calendar` weekday integers, Sun = 1 … Sat = 7).
-struct AvailableHours: Sendable, Equatable {
+struct AvailableHours: Equatable {
     /// Sun = 1 … Sat = 7, matching `Calendar.component(.weekday:)`.
     var days: Set<Int>
     /// `HH:mm` (24h).
@@ -172,7 +172,7 @@ struct AvailableHours: Sendable, Equatable {
         .object([
             "days": .array(days.sorted().map { JSONValue.number(Double($0)) }),
             "start": .string(start),
-            "end": .string(end),
+            "end": .string(end)
         ])
     }
 
@@ -186,7 +186,7 @@ struct AvailableHours: Sendable, Equatable {
 
 /// Lightweight household member used for avatars + the who-is-home / for-whom
 /// pickers. Projected from the shared `OccupantDTO` roster.
-struct ResourceHomeMember: Identifiable, Sendable, Hashable {
+struct ResourceHomeMember: Identifiable, Hashable {
     let id: String
     let name: String
     let avatarURL: URL?
@@ -194,7 +194,7 @@ struct ResourceHomeMember: Identifiable, Sendable, Hashable {
     /// 1–2 letter initials for the avatar disc.
     var initials: String {
         let parts = name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init).joined()
+        let letters = parts.compactMap(\.first).map(String.init).joined()
         return letters.isEmpty ? "?" : letters.uppercased()
     }
 
@@ -202,7 +202,9 @@ struct ResourceHomeMember: Identifiable, Sendable, Hashable {
     /// across screens without storing colour server-side.
     var toneIndex: Int {
         var hash = 5381
-        for byte in id.utf8 { hash = ((hash << 5) &+ hash) &+ Int(byte) }
+        for byte in id.utf8 {
+            hash = ((hash << 5) &+ hash) &+ Int(byte)
+        }
         return abs(hash) % MemberTone.allCases.count
     }
 
@@ -219,7 +221,7 @@ struct ResourceHomeMember: Identifiable, Sendable, Hashable {
     /// Project the active-occupant roster into bookable members.
     static func from(occupants: [OccupantDTO]) -> [ResourceHomeMember] {
         occupants
-            .filter { $0.isActive }
+            .filter(\.isActive)
             .map { occupant in
                 ResourceHomeMember(
                     id: occupant.userId,
@@ -231,7 +233,7 @@ struct ResourceHomeMember: Identifiable, Sendable, Hashable {
 }
 
 /// Token-mapped avatar tones (kept off raw hex; resolved by `MemberAvatar`).
-enum MemberTone: CaseIterable, Sendable {
+enum MemberTone: CaseIterable {
     case green, sky, violet, amber, rose, teal
 }
 
@@ -241,7 +243,7 @@ enum MemberTone: CaseIterable, Sendable {
 /// Decodes `resource_id` — which the shared `BookingDTO` omits — so resource
 /// detail/booking screens can scope to one resource. See the Foundation-gap
 /// note at the top of this file.
-struct ResourceBooking: Decodable, Sendable, Hashable, Identifiable {
+struct ResourceBooking: Decodable, Hashable, Identifiable {
     let id: String
     let resourceId: String?
     let startAt: String?
@@ -273,7 +275,7 @@ struct ResourceBooking: Decodable, Sendable, Hashable, Identifiable {
 }
 
 /// Envelope for `GET …/scheduling/bookings` decoded into the local row shape.
-struct ResourceBookingsResponse: Decodable, Sendable {
+struct ResourceBookingsResponse: Decodable {
     let bookings: [ResourceBooking]
 }
 
@@ -283,9 +285,13 @@ struct ResourceBookingsResponse: Decodable, Sendable {
 /// reads pass the device IANA tz; instants are stored/compared in UTC.
 enum ResourceTime {
     /// Device IANA tz — sent on every calendar read, used for local rendering.
-    static var tz: String { SchedulingTime.deviceTimeZoneIdentifier }
+    static var tz: String {
+        SchedulingTime.deviceTimeZoneIdentifier
+    }
 
-    private static var zone: TimeZone { TimeZone(identifier: tz) ?? .current }
+    private static var zone: TimeZone {
+        TimeZone(identifier: tz) ?? .current
+    }
 
     /// Encode a `Date` to a UTC ISO-8601 string for write bodies.
     static func utcISO(_ date: Date) -> String {

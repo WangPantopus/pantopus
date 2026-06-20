@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  FindATimeSetupView.swift
 //  Pantopus
@@ -10,6 +11,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct FindATimeSetupView: View {
     @State private var viewModel: FindATimeSetupViewModel
     @Environment(\.dismiss) private var dismiss
@@ -64,14 +66,15 @@ struct FindATimeSetupView: View {
                 isDirty: true,
                 isSaving: viewModel.isComputing,
                 onClose: { dismiss() },
-                onCommit: { Task { await viewModel.next() } }
-            ) {
-                if viewModel.isComputing {
-                    computingBody
-                } else {
-                    formBody
+                onCommit: { Task { await viewModel.next() } },
+                content: {
+                    if viewModel.isComputing {
+                        computingBody
+                    } else {
+                        formBody
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -99,9 +102,11 @@ struct FindATimeSetupView: View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.info, size: 15, color: Theme.Color.info)
             VStack(alignment: .leading, spacing: Spacing.s2) {
-                Text("Times come from each member's personal availability. Pantopus finds the overlap — it never changes anyone's calendar.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextStrong)
+                Text(
+                    "Times come from each member's personal availability. Pantopus finds the overlap — it never changes anyone's calendar."
+                )
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextStrong)
                 if viewModel.explainerExpanded {
                     Divider().background(Theme.Color.infoLight)
                     ForEach(Self.steps, id: \.text) { step in

@@ -182,8 +182,7 @@ open class HomesRepository
             homeId: String,
             eventId: String,
             status: String,
-        ): NetworkResult<HomeEventRsvpResponse> =
-            safeApiCall { api.rsvpHomeEvent(homeId, eventId, HomeEventRsvpRequest(status)) }
+        ): NetworkResult<HomeEventRsvpResponse> = safeApiCall { api.rsvpHomeEvent(homeId, eventId, HomeEventRsvpRequest(status)) }
         // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
         /** `GET /api/homes/:id/emergencies`. */

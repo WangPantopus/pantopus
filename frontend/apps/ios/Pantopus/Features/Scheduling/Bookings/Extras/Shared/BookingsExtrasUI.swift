@@ -21,13 +21,7 @@ struct ExtrasDialog<Content: View>: View {
     /// Tapping the scrim dismisses unless the dialog is mid-submit.
     let isDismissable: Bool
     let onDismiss: () -> Void
-    let content: Content
-
-    init(isDismissable: Bool, onDismiss: @escaping () -> Void, @ViewBuilder content: () -> Content) {
-        self.isDismissable = isDismissable
-        self.onDismiss = onDismiss
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
         ZStack {
@@ -189,11 +183,7 @@ struct ExtrasSheetGrabber: View {
 
 /// Sticky footer container with a top hairline border (sheet CTA row).
 struct ExtrasStickyFooter<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
         VStack(spacing: 0) {

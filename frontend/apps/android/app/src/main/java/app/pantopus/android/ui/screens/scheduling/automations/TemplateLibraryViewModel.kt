@@ -171,8 +171,7 @@ class TemplateLibraryViewModel
             }
         }
 
-        private fun SchedulingError.loadMessage(): String =
-            (this as? SchedulingError.Generic)?.message ?: "Couldn't load your templates."
+        private fun SchedulingError.loadMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't load your templates."
 
         private fun SchedulingError.actionMessage(): String =
             (this as? SchedulingError.Generic)?.message ?: "Something went wrong. Please try again."

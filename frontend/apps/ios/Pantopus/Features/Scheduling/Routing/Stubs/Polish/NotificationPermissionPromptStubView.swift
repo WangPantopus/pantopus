@@ -39,9 +39,8 @@ struct NotifPermissionPromptStubView: View {
             owner: stub.owner,
             initialFrame: .push,
             accountEmail: NotificationPermissionScreenView.currentAccountEmail(),
-            service: .shared,
-            onResult: { _ in }
-        )
+            service: .shared
+        ) { _ in }
     }
 
     var body: some View {

@@ -12,6 +12,8 @@ import Foundation
 import Observation
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Local summary DTO
 
 /// Lenient decode of `GET /bookings/summary`. The deployed backend
@@ -19,7 +21,7 @@ import SwiftUI
 /// noShowCount / sparkline / byEventType`; the API doc described
 /// `totalThisMonth / noShowRate / nextBooking`. Every field is optional so the
 /// card binds to whichever shape the environment serves.
-struct HubSummary: Decodable, Sendable {
+struct HubSummary: Decodable {
     let bookingsThisMonth: Int?
     let bookingsLastMonth: Int?
     let deltaPct: Int?
@@ -31,25 +33,47 @@ struct HubSummary: Decodable, Sendable {
     let sparkline: [Spark]?
     let byEventType: [EventTypeCount]?
 
-    struct Spark: Decodable, Sendable { let date: String?; let count: Int? }
-    struct EventTypeCount: Decodable, Sendable, Identifiable {
-        let eventTypeId: String?
+    struct Spark: Decodable { let date: String?
         let count: Int?
-        var id: String { eventTypeId ?? UUID().uuidString }
-        enum CodingKeys: String, CodingKey { case eventTypeId = "event_type_id"; case count }
     }
 
-    var bookings: Int { bookingsThisMonth ?? totalThisMonth ?? 0 }
-    var upcoming: Int { upcomingCount ?? 0 }
+    struct EventTypeCount: Decodable, Identifiable {
+        let eventTypeId: String?
+        let count: Int?
+        var id: String {
+            eventTypeId ?? UUID().uuidString
+        }
+
+        enum CodingKeys: String, CodingKey { case eventTypeId = "event_type_id"
+            case count
+        }
+    }
+
+    var bookings: Int {
+        bookingsThisMonth ?? totalThisMonth ?? 0
+    }
+
+    var upcoming: Int {
+        upcomingCount ?? 0
+    }
+
     var noShows: Int {
         if let noShowCount { return noShowCount }
         if let noShowRate { return Int(noShowRate.rounded()) }
         return 0
     }
 
-    var hasDelta: Bool { deltaPct != nil }
-    var sparkCounts: [Int] { (sparkline ?? []).map { $0.count ?? 0 } }
-    var isEmpty: Bool { bookings == 0 && upcoming == 0 && (byEventType?.isEmpty ?? true) }
+    var hasDelta: Bool {
+        deltaPct != nil
+    }
+
+    var sparkCounts: [Int] {
+        (sparkline ?? []).map { $0.count ?? 0 }
+    }
+
+    var isEmpty: Bool {
+        bookings == 0 && upcoming == 0 && (byEventType?.isEmpty ?? true)
+    }
 }
 
 // MARK: - Agenda projection
@@ -80,6 +104,7 @@ struct HubAgendaSection: Identifiable {
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class SchedulingHubModel {
     enum Phase: Equatable {
         case loading, empty, loaded
@@ -104,7 +129,9 @@ final class SchedulingHubModel {
     private let client = SchedulingClient.shared
     private let api = APIClient.shared
 
-    var theme: SchedulingIdentityTheme { owner.theme }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     init(owner: SchedulingOwner, push: @escaping @MainActor (SchedulingRoute) -> Void) {
         self.owner = owner
@@ -118,7 +145,9 @@ final class SchedulingHubModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     func selectPillar(_ choice: SchedulingPillarChoice) async {
         guard !choice.matches(owner) else { return }
@@ -127,9 +156,9 @@ final class SchedulingHubModel {
         case .personal:
             owner = .personal
         case .home:
-            owner = .home(homeId: (await resolveFirstHomeId()) ?? "")
+            owner = await .home(homeId: resolveFirstHomeId() ?? "")
         case .business:
-            owner = .business(id: (await resolveCurrentUserId()) ?? "")
+            owner = await .business(id: resolveCurrentUserId() ?? "")
         }
         await fetch()
     }
@@ -158,14 +187,14 @@ final class SchedulingHubModel {
 
         page = pageResult.page
         isPaused = pageResult.page.isPaused
-        eventTypes = (await typesR)?.eventTypes ?? []
+        eventTypes = await (typesR)?.eventTypes ?? []
         let s = await summaryR
         summary = s
         summaryFailed = (s == nil)
-        upcoming = (await upcomingR)?.bookings ?? []
-        pending = (await pendingR)?.bookings ?? []
-        availabilityRules = (await availR)?.rules ?? []
-        connectedCalendars = (await calR)?.calendars ?? []
+        upcoming = await (upcomingR)?.bookings ?? []
+        pending = await (pendingR)?.bookings ?? []
+        availabilityRules = await (availR)?.rules ?? []
+        connectedCalendars = await (calR)?.calendars ?? []
 
         phase = eventTypes.isEmpty ? .empty : .loaded
     }
@@ -192,18 +221,45 @@ final class SchedulingHubModel {
 
     // MARK: Navigation
 
-    func openSetup() { push(.firstRunWizard(owner: owner)) }
-    func openOnboarding() { push(.onboardingHomeBusiness(owner: owner)) }
-    func openSettings() { push(.settingsRoot(owner: owner)) }
-    func openBookings() { push(.bookingsInbox(owner: owner)) }
-    func openEventTypes() { push(.eventTypeList(owner: owner)) }
-    func openAvailability() { push(.availabilityScheduleList) }
-    func openConnectedCalendars() { push(.connectedCalendars(owner: owner)) }
-    func openInsights() { push(.insightsDashboard(owner: owner)) }
+    func openSetup() {
+        push(.firstRunWizard(owner: owner))
+    }
+
+    func openOnboarding() {
+        push(.onboardingHomeBusiness(owner: owner))
+    }
+
+    func openSettings() {
+        push(.settingsRoot(owner: owner))
+    }
+
+    func openBookings() {
+        push(.bookingsInbox(owner: owner))
+    }
+
+    func openEventTypes() {
+        push(.eventTypeList(owner: owner))
+    }
+
+    func openAvailability() {
+        push(.availabilityScheduleList)
+    }
+
+    func openConnectedCalendars() {
+        push(.connectedCalendars(owner: owner))
+    }
+
+    func openInsights() {
+        push(.insightsDashboard(owner: owner))
+    }
 
     /// Empty-state CTA — personal launches A2; home/business launch A6.
     func startSetup() {
-        owner.isPersonal ? openSetup() : openOnboarding()
+        if owner.isPersonal {
+            openSetup()
+        } else {
+            openOnboarding()
+        }
     }
 
     // MARK: Derived display
@@ -283,12 +339,15 @@ final class SchedulingHubModel {
             seen.insert(b.id)
             all.append(b)
         }
-        let parsed: [(Date, BookingDTO)] = all.compactMap { dto in
-            guard let startStr = dto.startAt, let d = SchedulingTime.parseUTC(startStr) else { return nil }
-            return (d, dto)
-        }.sorted { $0.0 < $1.0 }
+        let parsed: [(Date, BookingDTO)] = all
+            .compactMap { dto in
+                guard let startStr = dto.startAt, let d = SchedulingTime.parseUTC(startStr) else { return nil }
+                return (d, dto)
+            }
+            .sorted { $0.0 < $1.0 }
 
         var order: [String] = []
+        // swiftlint:disable:next large_tuple
         var buckets: [String: (header: String, sub: String, rows: [HubBookingRow])] = [:]
         for (date, dto) in parsed {
             let bucket = Self.dayBucket(date, now: now, tz: tz)
@@ -315,13 +374,16 @@ final class SchedulingHubModel {
         let tone = Self.avatarTone(for: name)
         return HubBookingRow(
             id: dto.id,
-            icon: kind.icon, iconBg: kind.bg, iconFg: kind.fg,
+            icon: kind.icon,
+            iconBg: kind.bg,
+            iconFg: kind.fg,
             title: et?.name ?? "Booking",
             timeLabel: Self.clockLabel(date, tz: tz),
             metaLabel: meta,
             bookerName: name,
             bookerInitials: setupInitials(name),
-            bookerBg: tone.bg, bookerFg: tone.fg,
+            bookerBg: tone.bg,
+            bookerFg: tone.fg,
             status: dto.status
         )
     }
@@ -351,6 +413,7 @@ final class SchedulingHubModel {
         }
     }
 
+    // swiftlint:disable:next large_tuple
     static func kind(for mode: String?) -> (icon: PantopusIcon, bg: Color, fg: Color) {
         switch mode {
         case "video": (.video, Theme.Color.primary100, Theme.Color.primary600)
@@ -366,7 +429,7 @@ final class SchedulingHubModel {
             (Theme.Color.homeBg, Theme.Color.homeDark),
             (Theme.Color.warmAmberBg, Theme.Color.warning),
             (Theme.Color.roseBg, Theme.Color.rose),
-            (Theme.Color.businessBg, Theme.Color.businessDark),
+            (Theme.Color.businessBg, Theme.Color.businessDark)
         ]
         let hash = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return tones[hash % tones.count]
@@ -376,7 +439,7 @@ final class SchedulingHubModel {
         let weekdays = Set(rules.map(\.weekday))
         let monFri: Set<Int> = [1, 2, 3, 4, 5]
         let dayLabel: String
-        if monFri.isSubset(of: weekdays), weekdays.intersection([0, 6]).isEmpty {
+        if monFri.isSubset(of: weekdays), weekdays.isDisjoint(with: [0, 6]) {
             dayLabel = "Mon–Fri"
         } else {
             let order = [1, 2, 3, 4, 5, 6, 0]
@@ -414,6 +477,7 @@ final class SchedulingHubModel {
         return "\(mins) min"
     }
 
+    // swiftlint:disable:next large_tuple
     static func dayBucket(_ date: Date, now: Date, tz: TimeZone) -> (key: String, header: String, sub: String) {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
@@ -441,7 +505,10 @@ final class SchedulingHubModel {
 // MARK: - Owner helpers
 
 extension SchedulingOwner {
-    var isPersonal: Bool { if case .personal = self { return true }; return false }
+    var isPersonal: Bool {
+        if case .personal = self { return true }
+        return false
+    }
 }
 
 extension SchedulingTime {

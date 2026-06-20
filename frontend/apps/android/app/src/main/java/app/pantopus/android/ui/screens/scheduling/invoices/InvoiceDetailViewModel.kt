@@ -191,13 +191,14 @@ class InvoiceDetailViewModel
                 invoiceStatus = null,
                 // "Created" is always present (from created_at). Sent/Paid/Refunded/Voided
                 // events are deferred until the DTO exposes `status` / `paid_at`.
-                timelineEvents = listOf(
-                    InvoiceTimelineEvent(
-                        label = "Created",
-                        timeLabel = issuedLabel,
-                        isDone = true,
+                timelineEvents =
+                    listOf(
+                        InvoiceTimelineEvent(
+                            label = "Created",
+                            timeLabel = issuedLabel,
+                            isDone = true,
+                        ),
                     ),
-                ),
             )
         }
 

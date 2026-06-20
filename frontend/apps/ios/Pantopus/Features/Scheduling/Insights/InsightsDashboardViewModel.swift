@@ -44,10 +44,21 @@ final class InsightsDashboardViewModel {
 
     // MARK: Derived chrome
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
-    var isBusiness: Bool { if case .business = owner { return true } else { return false } }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var isBusiness: Bool {
+        if case .business = owner { true } else { false }
+    }
 
     init(
         owner: SchedulingOwner,
@@ -70,7 +81,7 @@ final class InsightsDashboardViewModel {
 
             async let typesR: EventTypesResponse? = try? client.request(SchedulingEndpoints.getEventTypes(owner: owner))
             async let reportR: InsightsNoShowReport? = try? client.request(SchedulingEndpoints.noShowInsights(owner: owner, days: days))
-            eventTypes = (await typesR)?.eventTypes ?? []
+            eventTypes = await (typesR)?.eventTypes ?? []
             report = await reportR
 
             phase = isEmpty ? .empty : .loaded
@@ -81,23 +92,32 @@ final class InsightsDashboardViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     func apply(_ newFilter: InsightsFilter) async {
         filter = newFilter
         await load()
     }
 
-    func openFilter() { showFilterSheet = true }
+    func openFilter() {
+        showFilterSheet = true
+    }
 
     // MARK: Derived data
 
     private var eventTypeNames: [String: String] {
-        Dictionary(eventTypes.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(eventTypes.map { ($0.id, $0.name) }) { first, _ in first }
     }
 
-    private var bookingsThisMonth: Int { summary?.bookingsThisMonth ?? 0 }
-    private var upcoming: Int { summary?.upcomingCount ?? 0 }
+    private var bookingsThisMonth: Int {
+        summary?.bookingsThisMonth ?? 0
+    }
+
+    private var upcoming: Int {
+        summary?.upcomingCount ?? 0
+    }
 
     private var isEmpty: Bool {
         let noSummary = bookingsThisMonth == 0 && upcoming == 0 && (summary?.byEventType?.isEmpty ?? true)
@@ -122,7 +142,9 @@ final class InsightsDashboardViewModel {
         ]
     }
 
-    var dayBars: [DayBar] { InsightsMath.dailyBars(sparkline: summary?.sparkline, maxBars: 14) }
+    var dayBars: [DayBar] {
+        InsightsMath.dailyBars(sparkline: summary?.sparkline, maxBars: 14)
+    }
 
     /// True once there are enough bookings to read a trend (suppress otherwise).
     var hasTrend: Bool {
@@ -130,11 +152,10 @@ final class InsightsDashboardViewModel {
     }
 
     var topTypes: [RankedRow] {
-        let source: [InsightsSummary.EventTypeCount]?
-        if filter.eventTypeIds.isEmpty {
-            source = summary?.byEventType
+        let source: [InsightsSummary.EventTypeCount]? = if filter.eventTypeIds.isEmpty {
+            summary?.byEventType
         } else {
-            source = summary?.byEventType?.filter { filter.eventTypeIds.contains($0.eventTypeId ?? "") }
+            summary?.byEventType?.filter { filter.eventTypeIds.contains($0.eventTypeId ?? "") }
         }
         return InsightsMath.topEventTypes(byEventType: source, names: eventTypeNames, limit: 5)
     }
@@ -151,8 +172,19 @@ final class InsightsDashboardViewModel {
 
     // MARK: Navigation
 
-    func openType(_ id: String) { push(.perEventTypePerformance(owner: owner, eventTypeId: id)) }
-    func openNoShowReport() { push(.noShowReport(owner: owner)) }
-    func openTeamPerformance() { push(.teamPerformance(owner: owner)) }
-    func openBookingPage() { push(.bookingPageManagement(owner: owner)) }
+    func openType(_ id: String) {
+        push(.perEventTypePerformance(owner: owner, eventTypeId: id))
+    }
+
+    func openNoShowReport() {
+        push(.noShowReport(owner: owner))
+    }
+
+    func openTeamPerformance() {
+        push(.teamPerformance(owner: owner))
+    }
+
+    func openBookingPage() {
+        push(.bookingPageManagement(owner: owner))
+    }
 }

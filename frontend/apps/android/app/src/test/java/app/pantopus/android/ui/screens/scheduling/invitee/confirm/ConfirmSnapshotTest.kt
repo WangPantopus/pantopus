@@ -72,7 +72,12 @@ class ConfirmSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 IntakeFormBody(
-                    state = ConfirmFlowState(slotStartUtc = "2026-06-17T16:30:00Z", slotEndUtc = "2026-06-17T17:00:00Z", tz = "America/Los_Angeles"),
+                    state =
+                        ConfirmFlowState(
+                            slotStartUtc = "2026-06-17T16:30:00Z",
+                            slotEndUtc = "2026-06-17T17:00:00Z",
+                            tz = "America/Los_Angeles",
+                        ),
                     args = args(),
                     pillar = pillar,
                     questions = emptyList(),
@@ -121,7 +126,14 @@ class ConfirmSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 ConfirmedBody(
-                    confirmed = ConfirmedData(bookingId = "b1", manageToken = "mt1", sentToEmail = "maya.chen@example.com", requiresApproval = false, confirmationMessage = null),
+                    confirmed =
+                        ConfirmedData(
+                            bookingId = "b1",
+                            manageToken = "mt1",
+                            sentToEmail = "maya.chen@example.com",
+                            requiresApproval = false,
+                            confirmationMessage = null,
+                        ),
                     args = args(),
                     pillar = pillar,
                     whenLabel = "Wed, Jun 17 · 9:30–10:00 AM",
@@ -163,7 +175,14 @@ class ConfirmSnapshotTest {
         paparazzi.snapshot {
             Frame {
                 ConfirmedBody(
-                    confirmed = ConfirmedData(bookingId = "b1", manageToken = "mt1", sentToEmail = "maya.chen@example.com", requiresApproval = true, confirmationMessage = null),
+                    confirmed =
+                        ConfirmedData(
+                            bookingId = "b1",
+                            manageToken = "mt1",
+                            sentToEmail = "maya.chen@example.com",
+                            requiresApproval = true,
+                            confirmationMessage = null,
+                        ),
                     args = args(requiresApproval = true),
                     pillar = pillar,
                     whenLabel = "Wed, Jun 17 · 9:30–10:00 AM",

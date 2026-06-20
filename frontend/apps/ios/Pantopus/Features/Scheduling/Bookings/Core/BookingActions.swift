@@ -15,7 +15,7 @@ import Foundation
 /// Thin owner-scoped facade over `SchedulingEndpoints` + `SchedulingClient` for
 /// the host booking lifecycle. Constructed with the screen's `SchedulingOwner`;
 /// every call injects it via the endpoint builders.
-struct BookingActions: Sendable {
+struct BookingActions {
     let owner: SchedulingOwner
     private let client: SchedulingClient
 
@@ -48,7 +48,7 @@ struct BookingActions: Sendable {
     /// (the bookings list omits it).
     func eventTypeNames() async throws -> [String: String] {
         let response: EventTypesResponse = try await client.request(SchedulingEndpoints.getEventTypes(owner: owner))
-        return Dictionary(response.eventTypes.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return Dictionary(response.eventTypes.map { ($0.id, $0.name) }) { first, _ in first }
     }
 
     /// `GET /bookings/:id` — booking + attendees + minimal event type.
@@ -92,7 +92,8 @@ struct BookingActions: Sendable {
     func reschedule(id: String, startAt: String, hostUserId: String? = nil, reason: String? = nil) async throws -> BookingDTO {
         try await mutation(
             SchedulingEndpoints.rescheduleBooking(
-                owner: owner, id: id,
+                owner: owner,
+                id: id,
                 RescheduleBookingRequest(startAt: startAt, hostUserId: hostUserId, reason: reason)
             )
         )
@@ -103,7 +104,8 @@ struct BookingActions: Sendable {
     func proposeReschedule(id: String, startAt: String, hostUserId: String? = nil) async throws -> BookingDTO {
         try await mutation(
             SchedulingEndpoints.proposeReschedule(
-                owner: owner, id: id,
+                owner: owner,
+                id: id,
                 ProposeRescheduleRequest(startAt: startAt, hostUserId: hostUserId)
             )
         )

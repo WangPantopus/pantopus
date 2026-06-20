@@ -26,9 +26,8 @@ struct CollectiveEventSetupSheet: View {
                 BizSheetFooter {
                     BizPrimaryButton(
                         title: model.isSaving ? "Saving" : "Save",
-                        isSaving: model.isSaving,
-                        action: { Task { if await model.save() { onClose() } } }
-                    )
+                        isSaving: model.isSaving
+                    ) { Task { if await model.save() { onClose() } } }
                 }
             }
         }
@@ -52,23 +51,39 @@ struct CollectiveEventSetupSheet: View {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 masterToggle
                 if model.requireMultiple {
-                    countCard(label: "Required staff", sub: "How many must be free",
-                              value: model.requiredStaff, onDec: { model.decrementRequired() }, onInc: { model.incrementRequired() })
+                    countCard(
+                        label: "Required staff",
+                        sub: "How many must be free",
+                        value: model.requiredStaff,
+                        onDec: { model.decrementRequired() },
+                        onInc: { model.incrementRequired() }
+                    )
                     tiles
                     // Frame 3: no-overlap warning between Tiles and Members
                     // (collective-frames.jsx:133). Rendered when checked members
                     // share no free windows. Save remains enabled per design.
                     if model.noOverlap {
-                        BizNote(tone: .warning, icon: .alertTriangle,
-                                text: "Selected members have no shared openings. Widen their hours or adjust the member selection.")
+                        BizNote(
+                            tone: .warning,
+                            icon: .alertTriangle,
+                            text: "Selected members have no shared openings. Widen their hours or adjust the member selection."
+                        )
                     }
                     membersSection
-                    countCard(label: "Seats per appointment", sub: "Capacity for each slot",
-                              value: model.seatsPerAppointment, onDec: { model.decrementSeats() }, onInc: { model.incrementSeats() })
+                    countCard(
+                        label: "Seats per appointment",
+                        sub: "Capacity for each slot",
+                        value: model.seatsPerAppointment,
+                        onDec: { model.decrementSeats() },
+                        onInc: { model.incrementSeats() }
+                    )
                     // Design `Note icon="git-merge"` — two availability streams
                     // converging (SF `arrow.triangle.merge`).
-                    BizNote(tone: .info, icon: .gitMerge,
-                            text: "Times come from where every required member is free. Fewer common openings means fewer slots.")
+                    BizNote(
+                        tone: .info,
+                        icon: .gitMerge,
+                        text: "Times come from where every required member is free. Fewer common openings means fewer slots."
+                    )
                 } else {
                     BizNote(tone: .info, icon: .info, text: "Turn on if a booking needs more than one person.")
                 }
@@ -82,6 +97,7 @@ struct CollectiveEventSetupSheet: View {
         }
     }
 
+    // swiftlint:disable:next inclusive_language
     private var masterToggle: some View {
         BizCard(padding: EdgeInsets(top: Spacing.s3, leading: 13, bottom: Spacing.s3, trailing: 13)) {
             HStack(spacing: 11) {
@@ -131,10 +147,13 @@ struct CollectiveEventSetupSheet: View {
                     Spacer()
                     if on { Icon(.check, size: 14, strokeWidth: 3, color: Theme.Color.business) }
                 }
-                Text(label).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                Text(label)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 11).padding(.vertical, 11)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(on ? Theme.Color.businessBg : Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
@@ -199,11 +218,17 @@ struct CollectiveEventSetupSheet: View {
         VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 240)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 240)
             Button { Task { await model.load() } } label: {
-                Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
-                    .padding(.horizontal, Spacing.s4).padding(.vertical, Spacing.s2)
+                Text("Try again")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.vertical, Spacing.s2)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

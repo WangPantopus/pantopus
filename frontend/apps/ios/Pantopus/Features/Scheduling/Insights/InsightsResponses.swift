@@ -27,7 +27,7 @@ import Foundation
 /// upcomingCount, noShowCount, sparkline:[{date,count}],
 /// byEventType:[{event_type_id,count}] }` (top level is camelCase; only the
 /// nested `byEventType` row is snake_case).
-struct InsightsSummary: Decodable, Sendable, Hashable {
+struct InsightsSummary: Decodable, Hashable {
     let bookingsThisMonth: Int?
     let bookingsLastMonth: Int?
     let deltaPct: Int?
@@ -37,17 +37,19 @@ struct InsightsSummary: Decodable, Sendable, Hashable {
     let byEventType: [EventTypeCount]?
 
     /// One day in the 30-day sparkline.
-    struct SparkPoint: Decodable, Sendable, Hashable {
+    struct SparkPoint: Decodable, Hashable {
         let date: String?
         let count: Int?
     }
 
     /// One per-event-type bucket (`event_type_id` + count), server-sorted desc.
-    struct EventTypeCount: Decodable, Sendable, Hashable, Identifiable {
+    struct EventTypeCount: Decodable, Hashable, Identifiable {
         let eventTypeId: String?
         let count: Int?
 
-        var id: String { eventTypeId ?? UUID().uuidString }
+        var id: String {
+            eventTypeId ?? UUID().uuidString
+        }
 
         enum CodingKeys: String, CodingKey {
             case eventTypeId = "event_type_id"
@@ -61,7 +63,7 @@ struct InsightsSummary: Decodable, Sendable, Hashable {
 /// Lenient decode of `GET …/insights/no-shows?days`.
 /// Deployed shape: `{ window_days, completed, no_show, cancelled, no_show_rate,
 /// recent_no_shows:[{id, start_at, status, invitee_name, event_type_id}] }`.
-struct InsightsNoShowReport: Decodable, Sendable, Hashable {
+struct InsightsNoShowReport: Decodable, Hashable {
     let windowDays: Int?
     let completed: Int?
     let noShow: Int?
@@ -80,14 +82,16 @@ struct InsightsNoShowReport: Decodable, Sendable, Hashable {
     }
 
     /// One recent no-show row.
-    struct RecentNoShow: Decodable, Sendable, Hashable, Identifiable {
+    struct RecentNoShow: Decodable, Hashable, Identifiable {
         let bookingId: String?
         let startAt: String?
         let status: String?
         let inviteeName: String?
         let eventTypeId: String?
 
-        var id: String { bookingId ?? "\(inviteeName ?? "?")-\(startAt ?? "?")" }
+        var id: String {
+            bookingId ?? "\(inviteeName ?? "?")-\(startAt ?? "?")"
+        }
 
         enum CodingKeys: String, CodingKey {
             case bookingId = "id"
@@ -107,7 +111,7 @@ struct InsightsNoShowReport: Decodable, Sendable, Hashable {
 /// The deployed service does NOT return member names, revenue, ratings, or avg
 /// duration — those are resolved/omitted client-side (member names via the core
 /// `BusinessTeamEndpoints.members`).
-struct InsightsTeamReport: Decodable, Sendable, Hashable {
+struct InsightsTeamReport: Decodable, Hashable {
     let windowDays: Int?
     let hosts: [HostStat]?
 
@@ -117,7 +121,7 @@ struct InsightsTeamReport: Decodable, Sendable, Hashable {
     }
 
     /// Per-host booking tallies over the window.
-    struct HostStat: Decodable, Sendable, Hashable, Identifiable {
+    struct HostStat: Decodable, Hashable, Identifiable {
         let hostUserId: String?
         let total: Int?
         let confirmed: Int?
@@ -125,7 +129,9 @@ struct InsightsTeamReport: Decodable, Sendable, Hashable {
         let noShow: Int?
         let cancelled: Int?
 
-        var id: String { hostUserId ?? UUID().uuidString }
+        var id: String {
+            hostUserId ?? UUID().uuidString
+        }
 
         enum CodingKeys: String, CodingKey {
             case hostUserId = "host_user_id"

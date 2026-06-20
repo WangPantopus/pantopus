@@ -11,14 +11,24 @@ import XCTest
 
 @MainActor
 final class NoShowReportViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> NoShowReportViewModel {
         NoShowReportViewModel(
             owner: .personal,
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
@@ -44,13 +54,18 @@ final class NoShowReportViewModelTests: XCTestCase {
         XCTAssertEqual(model.segments.first { $0.kind == .honored }?.count, 18)
         XCTAssertEqual(model.recentRows.count, 2)
         // Repeat invitee gets flagged; event-type name is joined.
-        XCTAssertTrue(model.recentRows.allSatisfy { $0.isRepeat })
+        XCTAssertTrue(model.recentRows.allSatisfy(\.isRepeat))
         XCTAssertTrue(model.recentRows.first?.detail.contains("Intro call") ?? false)
     }
 
     func testCelebratoryWhenZeroNoShows() async {
         let model = vm([
-            "/api/scheduling/insights/no-shows": [.status(200, body: #"{"window_days":30,"completed":12,"no_show":0,"cancelled":1,"no_show_rate":0,"recent_no_shows":[]}"#)],
+            "/api/scheduling/insights/no-shows": [
+                .status(
+                    200,
+                    body: #"{"window_days":30,"completed":12,"no_show":0,"cancelled":1,"no_show_rate":0,"recent_no_shows":[]}"#
+                )
+            ],
             "/api/scheduling/event-types": [.status(200, body: eventTypes)]
         ])
         await model.load()

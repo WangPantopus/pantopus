@@ -124,7 +124,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
             // CSS fee2e2
             Color(red: 0xFE / 255.0, green: 0xE2 / 255.0, blue: 0xE2 / 255.0)
         case .meal:
-            // CSS fef3c7 — warm amber, pairs with the design meal dot #d97706.
+            // CSS fef3c7 — warm amber, pairs with the design meal dot d97706.
             Color(red: 0xFE / 255.0, green: 0xF3 / 255.0, blue: 0xC7 / 255.0)
         case .trash:
             // CSS e2e8f0

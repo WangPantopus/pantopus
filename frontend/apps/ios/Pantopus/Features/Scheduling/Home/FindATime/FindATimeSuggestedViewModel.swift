@@ -31,7 +31,9 @@ final class FindATimeSuggestedViewModel {
     private let client: SchedulingClient
     private var activeDraft: FindATimeDraft?
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // State.
     private(set) var phase: Phase = .loading
@@ -67,8 +69,13 @@ final class FindATimeSuggestedViewModel {
 
     // MARK: - Derived
 
-    var memberIds: [String] { members.map(\.id) }
-    var isSingleBest: Bool { suggested.count == 1 }
+    var memberIds: [String] {
+        members.map(\.id)
+    }
+
+    var isSingleBest: Bool {
+        suggested.count == 1
+    }
 
     var headerSummary: String {
         let people = members.count
@@ -81,11 +88,10 @@ final class FindATimeSuggestedViewModel {
     var composingSubtitle: String {
         let names = members.map(\.displayName)
         guard !names.isEmpty else { return "Composing your household's free time" }
-        let list: String
-        switch names.count {
-        case 1: list = names[0]
-        case 2: list = "\(names[0]) and \(names[1])"
-        default: list = "\(names.dropLast().joined(separator: ", ")) and \(names[names.count - 1])"
+        let list: String = switch names.count {
+        case 1: names[0]
+        case 2: "\(names[0]) and \(names[1])"
+        default: "\(names.dropLast().joined(separator: ", ")) and \(names[names.count - 1])"
         }
         return "Composing \(list)"
     }
@@ -190,10 +196,10 @@ final class FindATimeSuggestedViewModel {
             let free = slot.eligibleHosts.map { Set($0).intersection(memberIdSet) } ?? memberIdSet
             return SuggestedSlot(slot: slot, members: members, freeMemberIds: free)
         }
-        bestSlotStart = suggested.max(by: { lhs, rhs in
+        bestSlotStart = suggested.max { lhs, rhs in
             if lhs.freeCount != rhs.freeCount { return lhs.freeCount < rhs.freeCount }
             return lhs.slot.start > rhs.slot.start
-        })?.slot.start
+        }?.slot.start
         expandedSlotStart = bestSlotStart
         phase = .ready
     }
@@ -204,7 +210,9 @@ final class FindATimeSuggestedViewModel {
         expandedSlotStart = (expandedSlotStart == slot.slot.start) ? nil : slot.slot.start
     }
 
-    func isBest(_ slot: SuggestedSlot) -> Bool { slot.slot.start == bestSlotStart }
+    func isBest(_ slot: SuggestedSlot) -> Bool {
+        slot.slot.start == bestSlotStart
+    }
 
     // MARK: - Book (one calendar event)
 

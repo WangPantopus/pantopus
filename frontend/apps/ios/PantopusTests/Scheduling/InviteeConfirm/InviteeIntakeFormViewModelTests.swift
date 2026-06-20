@@ -31,8 +31,13 @@ final class InviteeIntakeFormViewModelTests: XCTestCase {
     private func makeViewModel(pushed: @escaping @MainActor (SchedulingRoute) -> Void = { _ in }) -> InviteeIntakeFormViewModel {
         let client = SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(), retryPolicy: .none))
         return InviteeIntakeFormViewModel(
-            slug: slug, eventTypeSlug: eventTypeSlug, start: start, tz: tz,
-            prefill: nil, push: pushed, client: client
+            slug: slug,
+            eventTypeSlug: eventTypeSlug,
+            start: start,
+            tz: tz,
+            prefill: nil,
+            push: pushed,
+            client: client
         )
     }
 
@@ -44,7 +49,8 @@ final class InviteeIntakeFormViewModelTests: XCTestCase {
         "questions":[
         {"id":"q1","label":"What should we cover?","field_type":"textarea","required":true,"sort_order":0},
         {"id":"q2","label":"Phone number","field_type":"phone","required":true,"sort_order":1},
-        {"id":"q3","label":"How did you hear about us?","field_type":"select","options":["A friend","Search"],"required":false,"sort_order":2}
+        {"id":"q3","label":"How did you hear about us?","field_type":"select",
+        "options":["A friend","Search"],"required":false,"sort_order":2}
         ]}]}
         """
     }

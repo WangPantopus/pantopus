@@ -17,7 +17,7 @@ import SwiftUI
 /// One readiness pill in the Stripe status hero. Mirrors `paymentssetup-frames`
 /// `ReadyPill` (on = success, warn = amber clock, off = sunken minus).
 struct ReadinessPill: View {
-    enum State: Sendable, Equatable { case on, warn, off }
+    enum State: Equatable { case on, warn, off }
 
     let label: String
     let state: State

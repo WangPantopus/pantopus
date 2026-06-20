@@ -39,9 +39,17 @@ final class NoShowReportViewModel {
 
     // MARK: Chrome
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     init(
         owner: SchedulingOwner,
@@ -64,7 +72,7 @@ final class NoShowReportViewModel {
             )
             report = reportResult
             async let typesR: EventTypesResponse? = try? client.request(SchedulingEndpoints.getEventTypes(owner: owner))
-            eventTypes = (await typesR)?.eventTypes ?? []
+            eventTypes = await (typesR)?.eventTypes ?? []
             phase = (reportResult.noShow ?? 0) == 0 ? .celebratory : .loaded
         } catch let error as SchedulingError {
             phase = .error(error.userMessage ?? "Couldn't load the report.")
@@ -73,28 +81,36 @@ final class NoShowReportViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     func apply(_ newFilter: InsightsFilter) async {
         filter = newFilter
         await load()
     }
 
-    func openFilter() { showFilterSheet = true }
+    func openFilter() {
+        showFilterSheet = true
+    }
 
     // MARK: Derived
 
     private var eventTypeNames: [String: String] {
-        Dictionary(eventTypes.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(eventTypes.map { ($0.id, $0.name) }) { first, _ in first }
     }
 
-    var windowDays: Int { report?.windowDays ?? filter.days() }
+    var windowDays: Int {
+        report?.windowDays ?? filter.days()
+    }
 
     var totalConsidered: Int {
         (report?.completed ?? 0) + (report?.noShow ?? 0) + (report?.cancelled ?? 0)
     }
 
-    var noShowRateLabel: String { InsightsFormat.percent(report?.noShowRate) }
+    var noShowRateLabel: String {
+        InsightsFormat.percent(report?.noShowRate)
+    }
 
     var subLabel: String {
         "of \(totalConsidered) booking\(totalConsidered == 1 ? "" : "s") in \(windowDays) days"
@@ -136,5 +152,7 @@ final class NoShowReportViewModel {
 
     // MARK: Navigation
 
-    func openPolicy() { push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil)) }
+    func openPolicy() {
+        push(.cancellationPolicyEditor(owner: owner, eventTypeId: nil))
+    }
 }

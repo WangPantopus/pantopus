@@ -236,7 +236,10 @@ internal fun SettingsConnectPill(
 @Composable
 internal fun SettingsSavedChip() {
     Row(
-        modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.successLight).padding(horizontal = 9.dp, vertical = 4.dp),
+        modifier =
+            Modifier.clip(
+                RoundedCornerShape(Radii.pill),
+            ).background(PantopusColors.successLight).padding(horizontal = 9.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -255,11 +258,12 @@ internal fun SettingsRowShimmer(
     height: Dp = 14.dp,
 ) {
     Box(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .clip(RoundedCornerShape(7.dp))
-            .background(PantopusColors.appSurfaceSunken),
+        modifier =
+            Modifier
+                .width(width)
+                .height(height)
+                .clip(RoundedCornerShape(7.dp))
+                .background(PantopusColors.appSurfaceSunken),
     )
 }
 

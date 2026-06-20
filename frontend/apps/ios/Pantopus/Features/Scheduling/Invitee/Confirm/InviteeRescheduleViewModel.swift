@@ -54,10 +54,21 @@ final class InviteeRescheduleViewModel {
 
     // MARK: - Derived
 
-    var timezoneLabel: String { DiscoveryTimeZone.label(for: timezoneId) }
-    var availableDays: Set<Date> { DiscoveryCalendar.availableDays(monthSlots, tz: timezoneId) }
-    var daySlots: [SlotDTO] { DiscoveryCalendar.slots(monthSlots, on: selectedDate, tz: timezoneId) }
-    var dstHint: String? { DiscoveryCalendar.dstHint(monthAnchor: monthAnchor, tz: timezoneId) }
+    var timezoneLabel: String {
+        DiscoveryTimeZone.label(for: timezoneId)
+    }
+
+    var availableDays: Set<Date> {
+        DiscoveryCalendar.availableDays(monthSlots, tz: timezoneId)
+    }
+
+    var daySlots: [SlotDTO] {
+        DiscoveryCalendar.slots(monthSlots, on: selectedDate, tz: timezoneId)
+    }
+
+    var dstHint: String? {
+        DiscoveryCalendar.dstHint(monthAnchor: monthAnchor, tz: timezoneId)
+    }
 
     var slotPickerState: SlotPicker.LoadState {
         if phase == .loading { return .loading }
@@ -66,7 +77,9 @@ final class InviteeRescheduleViewModel {
         return .loaded
     }
 
-    var canSubmit: Bool { selectedSlotStart != nil && !submitting }
+    var canSubmit: Bool {
+        selectedSlotStart != nil && !submitting
+    }
 
     // MARK: - Loading
 
@@ -76,7 +89,9 @@ final class InviteeRescheduleViewModel {
         await fetchMonth()
     }
 
-    func refresh() async { await fetchMonth() }
+    func refresh() async {
+        await fetchMonth()
+    }
 
     private func fetchMonth() async {
         phase = .loading
@@ -105,7 +120,9 @@ final class InviteeRescheduleViewModel {
         selectedSlotStart = nil
     }
 
-    func selectSlot(_ slot: SlotDTO) { selectedSlotStart = slot.start }
+    func selectSlot(_ slot: SlotDTO) {
+        selectedSlotStart = slot.start
+    }
 
     func changeMonth(_ delta: Int) async {
         let cal = DiscoveryCalendar.calendar(tz: timezoneId)

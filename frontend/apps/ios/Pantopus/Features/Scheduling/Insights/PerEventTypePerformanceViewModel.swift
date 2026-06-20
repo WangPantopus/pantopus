@@ -39,9 +39,17 @@ final class PerEventTypePerformanceViewModel {
 
     // MARK: Chrome
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     init(
         owner: SchedulingOwner,
@@ -69,7 +77,7 @@ final class PerEventTypePerformanceViewModel {
             async let bookingsR: BookingsResponse? = try? client.request(
                 SchedulingEndpoints.getBookings(owner: owner, eventTypeId: eventTypeId, from: range.from, to: range.to)
             )
-            bookings = (await bookingsR)?.bookings ?? []
+            bookings = await (bookingsR)?.bookings ?? []
 
             phase = bookings.isEmpty ? .empty : .loaded
         } catch let error as SchedulingError {
@@ -79,18 +87,24 @@ final class PerEventTypePerformanceViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     func apply(_ newFilter: InsightsFilter) async {
         filter = newFilter
         await load()
     }
 
-    func openFilter() { showFilterSheet = true }
+    func openFilter() {
+        showFilterSheet = true
+    }
 
     // MARK: Derived
 
-    var title: String { eventType?.name ?? "Performance" }
+    var title: String {
+        eventType?.name ?? "Performance"
+    }
 
     var durationLabel: String {
         let minutes = eventType?.defaultDuration ?? eventType?.durations.first
@@ -101,7 +115,9 @@ final class PerEventTypePerformanceViewModel {
         InsightsFormat.money(cents: eventType?.priceCents, currency: eventType?.currency) ?? "Free"
     }
 
-    private var perf: EventTypePerf { InsightsMath.eventTypePerf(bookings: bookings) }
+    private var perf: EventTypePerf {
+        InsightsMath.eventTypePerf(bookings: bookings)
+    }
 
     var tiles: [MetricTile] {
         [
@@ -138,7 +154,9 @@ final class PerEventTypePerformanceViewModel {
         InsightsMath.dailyBars(bookings: bookings, tz: SchedulingTime.deviceTimeZoneIdentifier, days: filter.days(), maxBars: 14)
     }
 
-    var hasTrend: Bool { bookings.count >= 3 }
+    var hasTrend: Bool {
+        bookings.count >= 3
+    }
 
     struct FunnelStep: Identifiable, Hashable {
         let id: String
@@ -150,6 +168,11 @@ final class PerEventTypePerformanceViewModel {
 
     // MARK: Navigation
 
-    func openEditor() { push(.eventTypeEditor(owner: owner, eventTypeId: eventTypeId)) }
-    func openBookingPage() { push(.bookingPageManagement(owner: owner)) }
+    func openEditor() {
+        push(.eventTypeEditor(owner: owner, eventTypeId: eventTypeId))
+    }
+
+    func openBookingPage() {
+        push(.bookingPageManagement(owner: owner))
+    }
 }

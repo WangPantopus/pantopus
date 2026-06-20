@@ -49,9 +49,17 @@ final class DefaultRemindersViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     /// Page minutes that aren't one of the fixed presets — rendered as extra
     /// "custom" rows beneath the preset card so saved values never disappear.
@@ -60,10 +68,14 @@ final class DefaultRemindersViewModel {
         return reminderMinutes.filter { !presets.contains($0) }.sorted(by: >)
     }
 
-    var isDirty: Bool { Set(reminderMinutes) != Set(lastSaved) }
+    var isDirty: Bool {
+        Set(reminderMinutes) != Set(lastSaved)
+    }
 
     /// Custom value resolves to this many minutes-before-start.
-    var customResolvedMinutes: Int { max(0, customValue) * customUnit.multiplier }
+    var customResolvedMinutes: Int {
+        max(0, customValue) * customUnit.multiplier
+    }
 
     init(owner: SchedulingOwner, client: SchedulingClient) {
         self.owner = owner
@@ -105,7 +117,9 @@ final class DefaultRemindersViewModel {
 
     // MARK: Editing
 
-    func isOn(_ minutes: Int) -> Bool { reminderMinutes.contains(minutes) }
+    func isOn(_ minutes: Int) -> Bool {
+        reminderMinutes.contains(minutes)
+    }
 
     func toggle(_ minutes: Int) {
         if let idx = reminderMinutes.firstIndex(of: minutes) {
@@ -120,7 +134,9 @@ final class DefaultRemindersViewModel {
         customValue = max(1, min(customValue + delta, 999))
     }
 
-    func setCustomUnit(_ unit: ReminderPreset.Unit) { customUnit = unit }
+    func setCustomUnit(_ unit: ReminderPreset.Unit) {
+        customUnit = unit
+    }
 
     func addCustom() {
         let minutes = customResolvedMinutes

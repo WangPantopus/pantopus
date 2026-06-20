@@ -36,7 +36,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.scheduling.ConnectedCalendarDto
@@ -47,6 +46,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.SchedulingPalette
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
@@ -68,21 +68,18 @@ private val PROVIDER_NAMES =
         "outlook" to "Outlook",
     )
 
-// Per-brand tile colors (design PROVIDERS.color). Parsed from hex at runtime so
-// no `Color(0x…)` literal trips the token guard.
+// Per-brand tile colors (design PROVIDERS.color), sourced from the theme-layer
+// SchedulingPalette so no brand hex literal lives in feature code.
 private val PROVIDER_BRAND_COLORS =
     mapOf(
-        "google" to "#1a73e8",
-        "apple" to "#1d1d1f",
-        "outlook" to "#0f6cbd",
+        "google" to SchedulingPalette.calendarGoogle,
+        "apple" to SchedulingPalette.calendarApple,
+        "outlook" to SchedulingPalette.calendarOutlook,
     )
 
-private fun brandColor(provider: String): Color =
-    runCatching { Color((PROVIDER_BRAND_COLORS[provider] ?: "#0284c7").toColorInt()) }
-        .getOrDefault(PantopusColors.primary600)
+private fun brandColor(provider: String): Color = PROVIDER_BRAND_COLORS[provider] ?: PantopusColors.primary600
 
-private fun providerName(provider: String): String =
-    PROVIDER_NAMES[provider] ?: provider.replaceFirstChar { it.uppercase() }
+private fun providerName(provider: String): String = PROVIDER_NAMES[provider] ?: provider.replaceFirstChar { it.uppercase() }
 
 /** Calendar-connection state derived from the DTO `status` wire value. */
 private enum class CalendarRowKind { CONNECTED, REAUTH, DENIED, CONNECTING, CONNECT }
@@ -402,7 +399,9 @@ private fun ConnectedRow(
     }
 }
 
-private fun syncedAgo(@Suppress("UNUSED_PARAMETER") iso: String?): String = "Synced just now"
+private fun syncedAgo(
+    @Suppress("UNUSED_PARAMETER") iso: String?,
+): String = "Synced just now"
 
 // ─── Re-auth needed row (warning banner) ─────────────────────────────────────
 

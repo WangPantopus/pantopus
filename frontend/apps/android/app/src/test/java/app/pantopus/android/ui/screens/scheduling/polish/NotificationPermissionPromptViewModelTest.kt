@@ -32,6 +32,7 @@ class NotificationPermissionPromptViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val authRepo: AuthRepository = mockk()
+    private val ownerRelay = NotificationPromptOwnerRelay()
 
     private val email = "maria@pantopus.co"
 
@@ -50,7 +51,7 @@ class NotificationPermissionPromptViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = NotificationPermissionPromptViewModel(repo, authRepo)
+    private fun vm() = NotificationPermissionPromptViewModel(repo, authRepo, ownerRelay)
 
     @Test
     fun `account email is read from the auth repository`() {

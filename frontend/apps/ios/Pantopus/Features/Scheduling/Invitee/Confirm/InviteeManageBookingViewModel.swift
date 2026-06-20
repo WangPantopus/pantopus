@@ -53,15 +53,37 @@ final class InviteeManageBookingViewModel {
 
     // MARK: - Derived
 
-    private var booking: PublicBookingDTO? { response?.booking }
-    private var actions: ManageActions? { response?.actions }
-    private var eventType: PublicEventTypeView? { response?.eventType }
-    private var page: PublicPageView? { response?.page }
+    private var booking: PublicBookingDTO? {
+        response?.booking
+    }
 
-    var accent: Color { DiscoveryTheme.accent(forOwnerType: page?.ownerType) }
-    var accentBg: Color { DiscoveryTheme.accentBg(forOwnerType: page?.ownerType) }
-    var bookingTz: String { booking?.inviteeTimezone ?? page?.timezone ?? SchedulingTime.deviceTimeZoneIdentifier }
-    var slug: String? { page?.slug }
+    private var actions: ManageActions? {
+        response?.actions
+    }
+
+    private var eventType: PublicEventTypeView? {
+        response?.eventType
+    }
+
+    private var page: PublicPageView? {
+        response?.page
+    }
+
+    var accent: Color {
+        DiscoveryTheme.accent(forOwnerType: page?.ownerType)
+    }
+
+    var accentBg: Color {
+        DiscoveryTheme.accentBg(forOwnerType: page?.ownerType)
+    }
+
+    var bookingTz: String {
+        booking?.inviteeTimezone ?? page?.timezone ?? SchedulingTime.deviceTimeZoneIdentifier
+    }
+
+    var slug: String? {
+        page?.slug
+    }
 
     var lifecycle: Lifecycle {
         let status = (booking?.status ?? "").lowercased()
@@ -81,8 +103,13 @@ final class InviteeManageBookingViewModel {
         }
     }
 
-    var canReschedule: Bool { (actions?.canReschedule ?? false) && lifecycle == .confirmed }
-    var canCancel: Bool { (actions?.canCancel ?? false) && lifecycle == .confirmed }
+    var canReschedule: Bool {
+        (actions?.canReschedule ?? false) && lifecycle == .confirmed
+    }
+
+    var canCancel: Bool {
+        (actions?.canCancel ?? false) && lifecycle == .confirmed
+    }
 
     /// Confirmed + still in the future but neither action allowed → window closed.
     var windowClosed: Bool {
@@ -90,7 +117,9 @@ final class InviteeManageBookingViewModel {
         return !(actions?.canReschedule ?? false) && !(actions?.canCancel ?? false)
     }
 
-    var showsActions: Bool { lifecycle == .confirmed }
+    var showsActions: Bool {
+        lifecycle == .confirmed
+    }
 
     var summary: BookingSummary {
         let duration = eventType?.bookingDuration ?? 30
@@ -98,8 +127,10 @@ final class InviteeManageBookingViewModel {
             SchedulingTime.parseUTC(start).map { endISO(for: $0, durationMin: duration) }
         }
         let tz = bookingTz
-        let location = DiscoveryLocation.label(mode: eventType?.locationMode ?? booking?.locationMode,
-                                               detail: eventType?.locationDetail ?? booking?.locationDetail)
+        let location = DiscoveryLocation.label(
+            mode: eventType?.locationMode ?? booking?.locationMode,
+            detail: eventType?.locationDetail ?? booking?.locationDetail
+        )
         return BookingSummary(
             initials: ConfirmFormat.initials(from: page?.title),
             avatarColors: DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType),
@@ -143,7 +174,9 @@ final class InviteeManageBookingViewModel {
         return "Changes are closed online. \(host) can still help directly."
     }
 
-    var hostFirstName: String { DiscoveryTheme.firstName(from: page?.title) }
+    var hostFirstName: String {
+        DiscoveryTheme.firstName(from: page?.title)
+    }
 
     /// Display name for the host used in "Contact <host>" affordances.
     var hostContactName: String {
@@ -166,7 +199,9 @@ final class InviteeManageBookingViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         state = .loading
@@ -258,9 +293,18 @@ final class InviteeManageBookingViewModel {
 
 #if DEBUG
 extension InviteeManageBookingViewModel {
-    static func previewConfirmed() -> InviteeManageBookingViewModel { make(status: "confirmed", canAct: true) }
-    static func previewWindowClosed() -> InviteeManageBookingViewModel { make(status: "confirmed", canAct: false) }
-    static func previewCancelled() -> InviteeManageBookingViewModel { make(status: "cancelled", canAct: false) }
+    static func previewConfirmed() -> InviteeManageBookingViewModel {
+        make(status: "confirmed", canAct: true)
+    }
+
+    static func previewWindowClosed() -> InviteeManageBookingViewModel {
+        make(status: "confirmed", canAct: false)
+    }
+
+    static func previewCancelled() -> InviteeManageBookingViewModel {
+        make(status: "cancelled", canAct: false)
+    }
+
     static func previewExpired() -> InviteeManageBookingViewModel {
         let viewModel = InviteeManageBookingViewModel(token: "tok", push: { _ in }, client: .shared)
         viewModel.state = .expired
@@ -269,12 +313,16 @@ extension InviteeManageBookingViewModel {
 
     private static func make(status: String, canAct: Bool) -> InviteeManageBookingViewModel {
         let viewModel = InviteeManageBookingViewModel(token: "tok", push: { _ in }, client: .shared)
+        // swiftlint:disable line_length
         let json = """
-        {"booking":{"id":"b1","status":"\(status)","start_at":"2026-09-17T16:30:00Z","end_at":"2026-09-17T17:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
+        {"booking":{"id":"b1","status":"\(
+            status
+        )","start_at":"2026-09-17T16:30:00Z","end_at":"2026-09-17T17:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
         "actions":{"can_cancel":\(canAct),"can_reschedule":\(canAct)},
         "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video","cancellation_window_min":1440},
         "page":{"slug":"ada","title":"Maria Kessler","owner_type":"user","timezone":"America/Los_Angeles"}}
         """
+        // swiftlint:enable line_length
         if let data = json.data(using: .utf8), let response = try? JSONDecoder().decode(ManageBookingResponse.self, from: data) {
             viewModel.response = response
             viewModel.state = .loaded

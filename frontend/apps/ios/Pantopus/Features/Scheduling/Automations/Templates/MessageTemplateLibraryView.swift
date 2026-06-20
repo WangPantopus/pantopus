@@ -142,9 +142,8 @@ struct MessageTemplateLibraryView: View {
                         subcopy: "Edit a starter or write your own to reuse in workflows.",
                         accent: model.accent,
                         accentBg: model.accentBg,
-                        ctaTitle: "New template",
-                        onCTA: { model.createNew() }
-                    )
+                        ctaTitle: "New template"
+                    ) { model.createNew() }
                 } else {
                     AutoInlineEmpty(
                         icon: .search,
@@ -254,7 +253,7 @@ struct MessageTemplateLibraryView: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        MessageTemplateLibraryView(owner: .personal, push: { _ in })
+        MessageTemplateLibraryView(owner: .personal) { _ in }
     }
 }
 #endif

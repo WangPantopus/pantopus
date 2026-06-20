@@ -44,15 +44,20 @@ struct BookingActionSheetView: View {
     let onCompleted: () async -> Void
     var onSwitchToReschedule: ((BookingDTO) -> Void)?
 
-    private var actions: BookingActions { BookingActions(owner: owner) }
+    private var actions: BookingActions {
+        BookingActions(owner: owner)
+    }
 
     var body: some View {
         switch sheet {
         case let .review(booking):
             ApproveDeclineSheet(
                 viewModel: ApproveDeclineViewModel(
-                    owner: owner, booking: booking, eventName: eventName,
-                    startInDecline: false, actions: actions
+                    owner: owner,
+                    booking: booking,
+                    eventName: eventName,
+                    startInDecline: false,
+                    actions: actions
                 ),
                 onCompleted: onCompleted,
                 onProposeTime: onSwitchToReschedule.map { handler in { handler(booking) } }
@@ -60,8 +65,11 @@ struct BookingActionSheetView: View {
         case let .decline(booking):
             ApproveDeclineSheet(
                 viewModel: ApproveDeclineViewModel(
-                    owner: owner, booking: booking, eventName: eventName,
-                    startInDecline: true, actions: actions
+                    owner: owner,
+                    booking: booking,
+                    eventName: eventName,
+                    startInDecline: true,
+                    actions: actions
                 ),
                 onCompleted: onCompleted,
                 onProposeTime: onSwitchToReschedule.map { handler in { handler(booking) } }

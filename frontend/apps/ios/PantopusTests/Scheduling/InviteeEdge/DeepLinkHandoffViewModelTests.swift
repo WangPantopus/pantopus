@@ -27,11 +27,13 @@ final class DeepLinkHandoffViewModelTests: XCTestCase {
     }
 
     func testResolvedShowsBooking() async {
+        // swiftlint:disable line_length
         let json = #"""
         {"booking":{"id":"b1","status":"confirmed","start_at":"2026-06-17T16:30:00Z","invitee_name":"Maya","invitee_timezone":"America/Los_Angeles"},
          "eventType":{"id":"et1","name":"Consultation","default_duration":30},
          "page":{"slug":"dr-lee","title":"Dr. Lee","owner_type":"user","timezone":"America/Los_Angeles"}}
         """#
+        // swiftlint:enable line_length
         SequencedURLProtocol.sequence = [.status(200, body: json)]
         let viewModel = makeViewModel()
         await viewModel.load()

@@ -20,7 +20,7 @@ struct MyPackagesView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "My packages", onBack: { dismiss() })
+            PkgTopBar(title: "My packages") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -63,7 +63,8 @@ struct MyPackagesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 Text("Tap a credit to book your next session.")
-                    .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     .padding(.horizontal, Spacing.s1)
                 ForEach(model.credits) { credit in
                     CreditCard(
@@ -114,24 +115,30 @@ private struct CreditCard: View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             ownerRow
             Text(credit.bookingPackage?.name ?? "Package")
-                .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
                 .padding(.top, 10)
             HStack(alignment: .firstTextBaseline) {
                 Text(spent ? "0 of \(total) left" : "\(remaining) of \(total) left")
-                    .font(.system(size: 18, weight: .heavy)).tracking(-0.4)
+                    .font(.system(size: 18, weight: .heavy))
+                    .tracking(-0.4)
                     .foregroundStyle(spent ? Theme.Color.appTextSecondary : Theme.Color.appText)
                 Spacer()
                 if spent { PkgChip(text: "All used", tone: .neutral, uppercased: true) }
             }
-            .padding(.top, 8).padding(.bottom, 6)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
             meter
             if let purchased {
-                Text("Purchased \(purchased)").font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                Text("Purchased \(purchased)")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     .padding(.top, 7)
             }
             cta.padding(.top, 11)
         }
-        .padding(.horizontal, 14).padding(.vertical, 13)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
         .background(Theme.Color.appSurface)
         .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
@@ -142,10 +149,14 @@ private struct CreditCard: View {
     /// Displayed owner label. The `my-packages` contract carries no owner display
     /// name, so we fall back to the pillar label ("Business provider"); the real
     /// owner name + per-owner accent badge is a backend follow-up.
-    private var ownerName: String { "\(ownerTheme.title) provider" }
+    private var ownerName: String {
+        "\(ownerTheme.title) provider"
+    }
 
     /// First letter of the owner label for the gradient initial-disc (JSX `name[0]`).
-    private var ownerInitial: String { String(ownerName.prefix(1)).uppercased() }
+    private var ownerInitial: String {
+        String(ownerName.prefix(1)).uppercased()
+    }
 
     private var ownerRow: some View {
         HStack(spacing: 9) {
@@ -176,8 +187,10 @@ private struct CreditCard: View {
         if spent {
             Button(action: onBuyAgain) {
                 Text("Buy again")
-                    .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.Color.primary600)
-                    .frame(maxWidth: .infinity).frame(height: 40)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
                     .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .buttonStyle(.plain)
@@ -185,9 +198,12 @@ private struct CreditCard: View {
             Button(action: onUse) {
                 HStack(spacing: 7) {
                     Icon(.calendarPlus, size: 15, color: Theme.Color.appTextInverse)
-                    Text("Book with a credit").font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
+                    Text("Book with a credit")
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .frame(maxWidth: .infinity).frame(height: 42)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
                 .background(Theme.Color.personal)
                 .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 // Design `Book with a credit` CTA carries a sky-tinted shadow

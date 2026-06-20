@@ -106,9 +106,9 @@ struct PollResponseView: View {
         .safeAreaInset(edge: .bottom) { submitBar }
     }
 
-    // Design info Banner (poll-response-frames `Banner tone="info"`): infoBg
-    // wash, info-tone glyph + body. Shown when any slot conflicts with the
-    // member's personal calendar.
+    /// Design info Banner (poll-response-frames `Banner tone="info"`): infoBg
+    /// wash, info-tone glyph + body. Shown when any slot conflicts with the
+    /// member's personal calendar.
     private var conflictPrefillBanner: some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.info, size: 15, color: Theme.Color.info)
@@ -127,9 +127,9 @@ struct PollResponseView: View {
         }
     }
 
-    // Design PollSlot: pad 11px/13px, a 9px gap between the label row and the
-    // vote control, and an optional conflict pill + personal-calendar caption.
-    // Hand-rolled rather than `FindATimeCard` so the tighter rhythm holds.
+    /// Design PollSlot: pad 11px/13px, a 9px gap between the label row and the
+    /// vote control, and an optional conflict pill + personal-calendar caption.
+    /// Hand-rolled rather than `FindATimeCard` so the tighter rhythm holds.
     private func pollSlot(_ option: PollOptionRow) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .center, spacing: Spacing.s2) {
@@ -166,7 +166,7 @@ struct PollResponseView: View {
         .allowsHitTesting(!viewModel.isClosed)
     }
 
-    // Design conflict pill: errorBg wash, alert-triangle glyph + "Conflicts: …".
+    /// Design conflict pill: errorBg wash, alert-triangle glyph + "Conflicts: …".
     private func conflictPill(_ title: String) -> some View {
         HStack(spacing: Spacing.s1) {
             Icon(.alertTriangle, size: 10, color: Theme.Color.error)

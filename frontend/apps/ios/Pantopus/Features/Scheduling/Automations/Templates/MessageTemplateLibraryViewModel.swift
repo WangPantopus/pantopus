@@ -39,11 +39,21 @@ final class MessageTemplateLibraryViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    private var needle: String { query.trimmingCharacters(in: .whitespaces).lowercased() }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    private var needle: String {
+        query.trimmingCharacters(in: .whitespaces).lowercased()
+    }
 
     var visibleStarters: [StarterTemplate] {
         guard !needle.isEmpty else { return starters }
@@ -80,12 +90,19 @@ final class MessageTemplateLibraryViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Navigation
 
-    func createNew() { push(.messageTemplateEditor(owner: owner, templateId: nil)) }
-    func openTemplate(_ template: MessageTemplateDTO) { push(.messageTemplateEditor(owner: owner, templateId: template.id)) }
+    func createNew() {
+        push(.messageTemplateEditor(owner: owner, templateId: nil))
+    }
+
+    func openTemplate(_ template: MessageTemplateDTO) {
+        push(.messageTemplateEditor(owner: owner, templateId: template.id))
+    }
 
     // MARK: Mutations
 

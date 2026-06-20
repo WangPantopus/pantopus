@@ -86,7 +86,9 @@ final class BookResourceViewModel {
         self.client = client
     }
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // MARK: Load
 
@@ -146,7 +148,9 @@ final class BookResourceViewModel {
 
     // MARK: Day navigation
 
-    var dayLabel: String { ResourceTime.dayStripLabel(selectedDay) }
+    var dayLabel: String {
+        ResourceTime.dayStripLabel(selectedDay)
+    }
 
     func stepDay(_ delta: Int) {
         var cal = Calendar(identifier: .gregorian)
@@ -166,7 +170,9 @@ final class BookResourceViewModel {
 
     // MARK: Grid
 
-    var hours: [Int] { Array(Self.firstHour...Self.lastHour) }
+    var hours: [Int] {
+        Array(Self.firstHour...Self.lastHour)
+    }
 
     private var takenHours: Set<Int> {
         var set = Set<Int>()
@@ -179,7 +185,9 @@ final class BookResourceViewModel {
             let startHour = cal.component(.hour, from: start)
             let endComps = cal.dateComponents([.hour, .minute], from: end)
             let endHour = (endComps.hour ?? startHour) + ((endComps.minute ?? 0) > 0 ? 1 : 0)
-            for hour in startHour..<max(startHour + 1, endHour) { set.insert(hour) }
+            for hour in startHour..<max(startHour + 1, endHour) {
+                set.insert(hour)
+            }
         }
         return set
     }
@@ -352,9 +360,13 @@ final class BookResourceViewModel {
         selectionCount = max(1, endHour - startHour)
     }
 
-    func dismissConflict() { slotConflict = nil }
+    func dismissConflict() {
+        slotConflict = nil
+    }
 
-    func backToCalendar() { push(.homeCalendar(homeId: homeId)) }
+    func backToCalendar() {
+        push(.homeCalendar(homeId: homeId))
+    }
 
     /// SlotTakenSheet driver.
     struct SlotConflictPresentation: Identifiable {

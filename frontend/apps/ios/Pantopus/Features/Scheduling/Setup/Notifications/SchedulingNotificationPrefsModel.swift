@@ -28,7 +28,9 @@ final class SchedulingNotificationPrefsModel {
         var enabled: Bool
         /// Confirmation row is locked on (attendees always get a confirmation).
         var locked: Bool = false
-        var id: String { key }
+        var id: String {
+            key
+        }
     }
 
     private(set) var phase: Phase = .loading
@@ -52,7 +54,9 @@ final class SchedulingNotificationPrefsModel {
     private let client = SchedulingClient.shared
     private let api = APIClient.shared
 
-    var theme: SchedulingIdentityTheme { owner.theme }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     /// Lead-time presets shown as chips (minutes → label).
     static let leadTimePresets: [(Int, String)] = [(1440, "1 day"), (60, "1 hr"), (15, "15 min")]
@@ -94,12 +98,22 @@ final class SchedulingNotificationPrefsModel {
         }
 
         notifyMe = [
-            Row(key: "new_booking", label: "New booking", sub: "We'll tell you the moment someone books.", enabled: b(me, "new_booking", default: true)),
+            Row(
+                key: "new_booking",
+                label: "New booking",
+                sub: "We'll tell you the moment someone books.",
+                enabled: b(me, "new_booking", default: true)
+            ),
             Row(key: "cancellation", label: "Cancellation", sub: nil, enabled: b(me, "cancellation", default: true)),
             Row(key: "reschedule", label: "Reschedule", sub: nil, enabled: b(me, "reschedule", default: true)),
             Row(key: "reminder", label: "Reminder sent", sub: "When your reminder goes out", enabled: b(me, "reminder", default: true)),
             Row(key: "no_show", label: "No-show", sub: "Attendee missed the booking", enabled: b(me, "no_show", default: false)),
-            Row(key: "booking_request", label: "Daily agenda", sub: "Each morning at 8am", enabled: b(me, "booking_request", default: false))
+            Row(
+                key: "booking_request",
+                label: "Daily agenda",
+                sub: "Each morning at 8am",
+                enabled: b(me, "booking_request", default: false)
+            )
         ]
         notifyAttendees = [
             Row(key: "confirmation", label: "Booking confirmation", sub: "Sent the moment they book", enabled: true, locked: true),
@@ -123,7 +137,9 @@ final class SchedulingNotificationPrefsModel {
         Task { await persistPrefs() }
     }
 
-    func isReminderActive(_ minutes: Int) -> Bool { reminderMinutes.contains(minutes) }
+    func isReminderActive(_ minutes: Int) -> Bool {
+        reminderMinutes.contains(minutes)
+    }
 
     func toggleReminder(_ minutes: Int) {
         if let idx = reminderMinutes.firstIndex(of: minutes) {
@@ -157,9 +173,13 @@ final class SchedulingNotificationPrefsModel {
     private func persistPrefs() async {
         // Overlay edited keys onto the preserved root.
         var me = prefsRoot["notify_me"]?.dictValue ?? [:]
-        for row in notifyMe { me[row.key] = .bool(row.enabled) }
+        for row in notifyMe {
+            me[row.key] = .bool(row.enabled)
+        }
         var att = prefsRoot["notify_attendees"]?.dictValue ?? [:]
-        for row in notifyAttendees where !row.locked { att[row.key] = .bool(row.enabled) }
+        for row in notifyAttendees where !row.locked {
+            att[row.key] = .bool(row.enabled)
+        }
         // Keep confirmation explicitly true.
         att["confirmation"] = .bool(true)
 
@@ -170,7 +190,8 @@ final class SchedulingNotificationPrefsModel {
 
         let request = UpdateNotificationPreferencesRequest(prefs: .object(root))
         do {
-            let result: NotificationPreferencesResponse = try await client.request(SchedulingEndpoints.updateNotificationPreferences(request))
+            let result: NotificationPreferencesResponse = try await client
+                .request(SchedulingEndpoints.updateNotificationPreferences(request))
             prefsRoot = result.prefs.dictValue ?? root
         } catch {
             // Optimistic UI already applied; re-fetch on failure to resync.

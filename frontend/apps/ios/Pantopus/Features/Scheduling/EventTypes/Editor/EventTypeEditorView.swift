@@ -9,8 +9,10 @@
 //  questions / booking limits / reminders.
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct EventTypeEditorView: View {
     @State private var viewModel: EventTypeEditorViewModel
     @Environment(\.dismiss) private var dismiss
@@ -90,15 +92,16 @@ struct EventTypeEditorView: View {
                     EventTypeSaveBar(
                         label: viewModel.saveBarLabel,
                         isEnabled: viewModel.formValid && viewModel.isDirty && !viewModel.isSaving,
-                        isSaving: viewModel.isSaving,
-                        onCommit: { Task { if await viewModel.save() { dismiss() } } }
-                    )
+                        isSaving: viewModel.isSaving
+                    ) { Task { if await viewModel.save() { dismiss() } } }
                 )
             }
         )
     }
 
-    private var accent: Color { viewModel.owner.theme.accent }
+    private var accent: Color {
+        viewModel.owner.theme.accent
+    }
 
     // MARK: Identity pill
 
@@ -121,10 +124,10 @@ struct EventTypeEditorView: View {
 
     // MARK: Basics
 
-    // Design `BasicsCard` — Name, Description (multiline), Colour. The booking
-    // link slug is auto-derived from the name (the design omits a slug field),
-    // so the only slug affordance is its auto-derivation; a SLUG_TAKEN error
-    // surfaces under the name (resolve by renaming).
+    /// Design `BasicsCard` — Name, Description (multiline), Colour. The booking
+    /// link slug is auto-derived from the name (the design omits a slug field),
+    /// so the only slug affordance is its auto-derivation; a SLUG_TAKEN error
+    /// surfaces under the name (resolve by renaming).
     private var basicsGroup: some View {
         PillarFieldGroup("Basics", accent: accent) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -178,8 +181,8 @@ struct EventTypeEditorView: View {
         }
     }
 
-    // Design `DurationCard` single mode — a "Length" label over a wrap row that
-    // holds the compact bordered stepper inline with the 15/45/60 quick chips.
+    /// Design `DurationCard` single mode — a "Length" label over a wrap row that
+    /// holds the compact bordered stepper inline with the 15/45/60 quick chips.
     private var singleDuration: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("Length")
@@ -313,10 +316,11 @@ struct EventTypeEditorView: View {
             isExpanded: viewModel.advancedExpanded,
             onToggle: {
                 withAnimation(.easeInOut(duration: 0.2)) { viewModel.advancedExpanded.toggle() }
+            },
+            content: {
+                if viewModel.advancedExpanded { advancedControls }
             }
-        ) {
-            if viewModel.advancedExpanded { advancedControls }
-        }
+        )
     }
 
     private var advancedControls: some View {
@@ -354,20 +358,26 @@ struct EventTypeEditorView: View {
 
     private var visibilityGroup: some View {
         PillarFieldGroup(nil, accent: accent) {
-            IconToggleRow(icon: .userCheck,
-                          title: "Require approval",
-                          subtitle: "Approve each booking before it's confirmed.",
-                          isOn: $viewModel.requiresApproval)
+            IconToggleRow(
+                icon: .userCheck,
+                title: "Require approval",
+                subtitle: "Approve each booking before it's confirmed.",
+                isOn: $viewModel.requiresApproval
+            )
             Divider().background(Theme.Color.appBorderSubtle)
-            IconToggleRow(icon: .eyeOff,
-                          title: "Unlisted (link only)",
-                          subtitle: "Hidden from your public page.",
-                          isOn: $viewModel.visibilitySecret)
+            IconToggleRow(
+                icon: .eyeOff,
+                title: "Unlisted (link only)",
+                subtitle: "Hidden from your public page.",
+                isOn: $viewModel.visibilitySecret
+            )
             Divider().background(Theme.Color.appBorderSubtle)
-            IconToggleRow(icon: .circleCheck,
-                          title: "Active",
-                          subtitle: "People can book this right now.",
-                          isOn: $viewModel.isActiveField)
+            IconToggleRow(
+                icon: .circleCheck,
+                title: "Active",
+                subtitle: "People can book this right now.",
+                isOn: $viewModel.isActiveField
+            )
         }
     }
 
@@ -377,9 +387,11 @@ struct EventTypeEditorView: View {
     private var pricingGroup: some View {
         if viewModel.paidVisible {
             PillarFieldGroup("Pricing & payment", accent: accent) {
-                CaptionToggle(title: "Charge for this booking",
-                              caption: "Collect payment when someone books.",
-                              isOn: $viewModel.chargeEnabled)
+                CaptionToggle(
+                    title: "Charge for this booking",
+                    caption: "Collect payment when someone books.",
+                    isOn: $viewModel.chargeEnabled
+                )
                 if viewModel.chargeEnabled { pricingControls }
             }
         }

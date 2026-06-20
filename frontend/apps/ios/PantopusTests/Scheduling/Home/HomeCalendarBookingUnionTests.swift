@@ -32,7 +32,13 @@ final class HomeCalendarBookingUnionTests: XCTestCase {
 
     private func makeVM() -> HomeCalendarViewModel {
         let frozen = Self.fixedNow
-        return HomeCalendarViewModel(homeId: "home-1", api: makeAPI(), now: { frozen })
+        // NB: pass `now:` as a *labelled* argument. The unlabelled trailing
+        // closure form `… makeAPI()) { frozen }` binds (via deprecated
+        // backward matching) to `onAddEvent`, NOT `now`, leaving the clock at
+        // the real `Date()` — which buckets the 2025-10-12 fixtures into the
+        // past so the agenda comes back empty.
+        let now: @Sendable () -> Date = { frozen }
+        return HomeCalendarViewModel(homeId: "home-1", api: makeAPI(), now: now)
     }
 
     private static let bookingBody = """

@@ -10,6 +10,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct FindATimeSuggestedView: View {
     @State private var viewModel: FindATimeSuggestedViewModel
     @State private var showTimezoneSheet = false
@@ -191,9 +192,11 @@ struct FindATimeSuggestedView: View {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     HStack(spacing: Spacing.s1) {
                         Icon(.calendarCheck, size: 14, color: Theme.Color.home)
-                        Text("Book \(FindATimeFormat.dayTimeLabel(utcISO: slot.slot.start, tz: viewModel.tz)) · \(viewModel.durationMin) min")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(Theme.Color.appTextStrong)
+                        Text(
+                            "Book \(FindATimeFormat.dayTimeLabel(utcISO: slot.slot.start, tz: viewModel.tz)) · \(viewModel.durationMin) min"
+                        )
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextStrong)
                     }
                     FindATimePrimaryButton(title: "Book it", icon: .check, isLoading: viewModel.isActing) {
                         await viewModel.book(slot)

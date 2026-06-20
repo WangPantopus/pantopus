@@ -69,7 +69,10 @@ final class RosterWaitlistViewModelTests: XCTestCase {
     func testWaitlistLoadBuildsEntries() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"eventType":{"id":"et1","name":"Class","slug":"c","durations":[60],"seat_cap":12}}"#),
-            .status(200, body: #"{"waitlist":[{"id":"w1","status":"waiting"},{"id":"w2","status":"waiting"},{"id":"w3","status":"waiting"}]}"#)
+            .status(
+                200,
+                body: #"{"waitlist":[{"id":"w1","status":"waiting"},{"id":"w2","status":"waiting"},{"id":"w3","status":"waiting"}]}"#
+            )
         ]
         let viewModel = WaitlistManagementViewModel(owner: .personal, eventTypeId: "et1", push: { _ in }, client: makeClient())
         await viewModel.load()

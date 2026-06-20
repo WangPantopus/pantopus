@@ -110,16 +110,25 @@ object InsightsFormat {
     private val MONTH_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
     /** A whole-number percent value (already 0–100) → "13%"; null → em dash. */
-    fun percent(value: Double?, dashIfNil: Boolean = true): String {
+    fun percent(
+        value: Double?,
+        dashIfNil: Boolean = true,
+    ): String {
         if (value == null || value.isNaN() || value.isInfinite()) return if (dashIfNil) "—" else "0%"
         return "${value.roundToInt()}%"
     }
 
     /** A whole-number percent value (already 0–100) → "13%"; null → em dash. */
-    fun percent(value: Int?, dashIfNil: Boolean = true): String = percent(value?.toDouble(), dashIfNil)
+    fun percent(
+        value: Int?,
+        dashIfNil: Boolean = true,
+    ): String = percent(value?.toDouble(), dashIfNil)
 
     /** A fraction (0–1) → "13%". */
-    fun percentFraction(fraction: Double?, dashIfNil: Boolean = true): String {
+    fun percentFraction(
+        fraction: Double?,
+        dashIfNil: Boolean = true,
+    ): String {
         if (fraction == null || fraction.isNaN() || fraction.isInfinite()) return if (dashIfNil) "—" else "0%"
         return "${(fraction * 100).roundToInt()}%"
     }
@@ -144,7 +153,10 @@ object InsightsFormat {
     fun shortDay(date: LocalDate): String = date.format(MONTH_DAY)
 
     /** "Jun 16" from a UTC ISO string rendered in [zone]; falls back to the date portion. */
-    fun dayLabel(iso: String?, zone: ZoneId): String {
+    fun dayLabel(
+        iso: String?,
+        zone: ZoneId,
+    ): String {
         if (iso == null) return ""
         val instant = parseInstant(iso)
         if (instant != null) return instant.atZone(zone).toLocalDate().format(MONTH_DAY)
@@ -259,7 +271,10 @@ object InsightsMath {
     private val MONTH_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
     /** Bars from the summary's 30-day sparkline (most recent [maxBars]). */
-    fun dailyBars(sparkline: List<SummarySparkPoint>?, maxBars: Int = 14): List<DayBar> {
+    fun dailyBars(
+        sparkline: List<SummarySparkPoint>?,
+        maxBars: Int = 14,
+    ): List<DayBar> {
         val points = (sparkline ?: emptyList()).takeLast(maxBars)
         val maxValue = max(1, points.maxOfOrNull { it.count } ?: 0)
         val zone = ZoneId.systemDefault()
@@ -355,7 +370,11 @@ object InsightsMath {
     }
 
     /** Reliability breakdown segments from a no-show report. */
-    fun breakdown(completed: Int, cancelled: Int, noShow: Int): List<BreakdownSegment> {
+    fun breakdown(
+        completed: Int,
+        cancelled: Int,
+        noShow: Int,
+    ): List<BreakdownSegment> {
         val total = max(1, completed + cancelled + noShow)
         return listOf(
             BreakdownSegment(BreakdownSegment.Kind.Honored, "Honored", completed, completed.toDouble() / total),

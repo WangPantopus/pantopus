@@ -34,7 +34,9 @@ final class VisitDetailViewModel {
     /// visit lands on step 2 (Confirmed) and a done visit on step 3 (Done);
     /// the earlier Offered/Reserved steps render as completed. The offer/
     /// reserve/link lifecycle the design also draws has no v1 backend.
-    var statusStep: Int { lifecycle == .done ? 3 : 2 }
+    var statusStep: Int {
+        lifecycle == .done ? 3 : 2
+    }
 
     /// The design renders a header terminal chip in the Completed/Cancelled/
     /// No-show states. The only terminal state this model derives is `done` →
@@ -96,8 +98,13 @@ final class VisitDetailViewModel {
 
     // MARK: Load
 
-    func load() async { await fetch(showLoading: !isLoaded) }
-    func refresh() async { await fetch(showLoading: false) }
+    func load() async {
+        await fetch(showLoading: !isLoaded)
+    }
+
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
 
     private func fetch(showLoading: Bool) async {
         if showLoading { state = .loading }
@@ -180,8 +187,13 @@ final class VisitDetailViewModel {
 
     // MARK: Actions
 
-    func beginEdit() { isEditing = true }
-    func bookAgain() { push(.scheduleVisit(homeId: homeId)) }
+    func beginEdit() {
+        isEditing = true
+    }
+
+    func bookAgain() {
+        push(.scheduleVisit(homeId: homeId))
+    }
 
     /// The design footer carries a trailing message affordance. There is no
     /// visit-messaging endpoint in v1, so this is a no-op placeholder until a

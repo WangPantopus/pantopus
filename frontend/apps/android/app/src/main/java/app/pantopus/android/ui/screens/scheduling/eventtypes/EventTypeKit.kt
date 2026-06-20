@@ -40,6 +40,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.SchedulingPalette
 import app.pantopus.android.ui.theme.Spacing
 
 /**
@@ -54,20 +55,12 @@ import app.pantopus.android.ui.theme.Spacing
  */
 
 // ─── Per-event-type swatch palette (design DOT colors + editor swatches) ────
-// Parsed at runtime from hex strings, so no `Color(0x…)` literal trips the
-// token guard. These are the bespoke category accents the design assigns to a
-// bookable; the backend's own `color` hex (when present) takes precedence.
-internal val EVENT_TYPE_SWATCHES =
-    listOf(
-        "#2980b9",
-        "#0284c7",
-        "#16a34a",
-        "#0d9488",
-        "#7c3aed",
-        "#d97706",
-        "#f97316",
-        "#e11d48",
-    )
+// Sourced from the theme-layer SchedulingPalette so the hex literals stay out
+// of feature code. These are the bespoke category accents the design assigns to
+// a bookable; the backend's own `color` hex (when present) takes precedence.
+// Kept as backend-wire `#rrggbb` strings — the editor persists the selected
+// swatch verbatim as the event type's `color`.
+internal val EVENT_TYPE_SWATCHES = SchedulingPalette.eventTypeSwatchHex
 
 internal fun parseEventColor(hex: String?): Color? =
     hex?.takeIf { it.isNotBlank() }?.let { raw ->

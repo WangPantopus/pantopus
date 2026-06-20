@@ -19,7 +19,9 @@ struct SendNudgeSheet: View {
         self.onClose = onClose
     }
 
-    private var theme: SchedulingIdentityTheme { viewModel.owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        viewModel.owner.theme
+    }
 
     var body: some View {
         ZStack {

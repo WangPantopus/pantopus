@@ -13,7 +13,7 @@ struct ExtrasFlowLayout: Layout {
     var horizontalSpacing: CGFloat = Spacing.s2
     var verticalSpacing: CGFloat = Spacing.s2
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> CGSize {
         let maxWidth = proposal.width ?? .greatestFiniteMagnitude
         var x: CGFloat = 0
         var y: CGFloat = 0
@@ -31,7 +31,7 @@ struct ExtrasFlowLayout: Layout {
         return CGSize(width: proposal.width ?? max(x - horizontalSpacing, 0), height: y + rowHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         var x = bounds.minX
         var y = bounds.minY
         var rowHeight: CGFloat = 0

@@ -28,7 +28,9 @@ final class MemberWorkingHoursViewModel {
     struct DayHours: Identifiable, Hashable {
         let weekday: Int // 0=Sun … 6=Sat
         var ranges: [TimeRange]
-        var id: Int { weekday }
+        var id: Int {
+            weekday
+        }
     }
 
     /// The upcoming dated exception shown above the week grid. Drives both the
@@ -60,10 +62,12 @@ final class MemberWorkingHoursViewModel {
 
     // MARK: Derived
 
-    var isReadOnly: Bool { if case .readOnly = mode { return true } else { return false } }
+    var isReadOnly: Bool {
+        if case .readOnly = mode { true } else { false }
+    }
 
     var readOnlyMemberName: String? {
-        if case let .readOnly(name) = mode { return name } else { return nil }
+        if case let .readOnly(name) = mode { name } else { nil }
     }
 
     var title: String {
@@ -73,7 +77,9 @@ final class MemberWorkingHoursViewModel {
         }
     }
 
-    var formValid: Bool { days.allSatisfy { $0.ranges.allSatisfy(\.isValid) } }
+    var formValid: Bool {
+        days.allSatisfy { $0.ranges.allSatisfy(\.isValid) }
+    }
 
     init(mode: Mode, client: SchedulingClient) {
         self.mode = mode
@@ -97,7 +103,7 @@ final class MemberWorkingHoursViewModel {
         phase = .loading
         do {
             let response: AvailabilityResponse = try await client.request(SchedulingEndpoints.getAvailability())
-            let schedule = response.schedules.first(where: { $0.isDefault == true }) ?? response.schedules.first
+            let schedule = response.schedules.first { $0.isDefault == true } ?? response.schedules.first
             guard let schedule else {
                 phase = .error("You don't have a working-hours schedule yet.")
                 return
@@ -158,7 +164,9 @@ final class MemberWorkingHoursViewModel {
         }
     }
 
-    func changeTimezone(_ identifier: String) { timezoneId = identifier }
+    func changeTimezone(_ identifier: String) {
+        timezoneId = identifier
+    }
 
     // MARK: Save
 

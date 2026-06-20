@@ -283,8 +283,7 @@ class HomeCalendarViewModel
             }
         }
 
-        private fun signedInUserId(): String? =
-            (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+        private fun signedInUserId(): String? = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
 
         enum class WeekShift { Previous, Next }
     }

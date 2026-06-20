@@ -688,7 +688,7 @@ private struct NotesGroup: View {
 private struct ChipFlow: Layout {
     var spacing: CGFloat
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var rows = layoutRows(maxWidth: maxWidth, subviews: subviews)
         let height = rows.isEmpty ? 0 : rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(rows.count - 1)
@@ -696,7 +696,7 @@ private struct ChipFlow: Layout {
         return CGSize(width: min(maxWidth, max(width, 0)), height: height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         let rows = layoutRows(maxWidth: bounds.width, subviews: subviews)
         var y = bounds.minY
         for row in rows {
@@ -714,7 +714,10 @@ private struct ChipFlow: Layout {
         }
     }
 
-    private struct Row { var items: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+    private struct Row { var items: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
 
     private func layoutRows(maxWidth: CGFloat, subviews: Subviews) -> [Row] {
         var rows: [Row] = []

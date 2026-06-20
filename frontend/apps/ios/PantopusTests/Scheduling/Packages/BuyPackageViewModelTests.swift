@@ -11,13 +11,38 @@ import XCTest
 
 @MainActor
 final class BuyPackageViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = true }
-    override func tearDown() { SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = false; super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = true
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = false
+        super.tearDown()
+    }
 
     private struct StubPresenter: PaymentSheetPresenting {
         let outcome: PaymentSheetOutcome
-        func presentAddCard(setupIntentClientSecret: String, customer: String, ephemeralKey: String, publishableKey: String?) async -> PaymentSheetOutcome { outcome }
-        func presentPayment(clientSecret: String, customer: String, ephemeralKey: String, isSetupIntent: Bool, publishableKey: String?) async -> PaymentSheetOutcome { outcome }
+        func presentAddCard(
+            setupIntentClientSecret _: String,
+            customer _: String,
+            ephemeralKey _: String,
+            publishableKey _: String?
+        ) async -> PaymentSheetOutcome {
+            outcome
+        }
+
+        func presentPayment(
+            clientSecret _: String,
+            customer _: String,
+            ephemeralKey _: String,
+            isSetupIntent _: Bool,
+            publishableKey _: String?
+        ) async -> PaymentSheetOutcome {
+            outcome
+        }
     }
 
     private func vm(
@@ -28,17 +53,24 @@ final class BuyPackageViewModelTests: XCTestCase {
             owner: .business(id: "biz1"),
             packageId: "pk1",
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none)),
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            )),
             presenter: StubPresenter(outcome: presenter)
         )
     }
 
+    // swiftlint:disable:next line_length
     private let freeBuy = #"{"credit":{"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":5,"purchased_at":"2026-06-15T00:00:00Z"},"clientSecret":null}"#
+    // swiftlint:disable:next line_length
     private let paidBuy = #"{"credit":{"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":5,"purchased_at":"2026-06-15T00:00:00Z"},"clientSecret":"pi_test_secret"}"#
 
     func testFreePackagePaidWithoutSheet() async {
-        let model = vm(presenter: .failed(message: "should-not-be-used"),
-                       ["/api/scheduling/packages/pk1/buy": [.status(201, body: freeBuy)]])
+        let model = vm(
+            presenter: .failed(message: "should-not-be-used"),
+            ["/api/scheduling/packages/pk1/buy": [.status(201, body: freeBuy)]]
+        )
         await model.pay()
         XCTAssertEqual(model.payState, .paid)
     }
@@ -50,8 +82,10 @@ final class BuyPackageViewModelTests: XCTestCase {
     }
 
     func testDeclinedWhenSheetFails() async {
-        let model = vm(presenter: .failed(message: "Your card was declined."),
-                       ["/api/scheduling/packages/pk1/buy": [.status(201, body: paidBuy)]])
+        let model = vm(
+            presenter: .failed(message: "Your card was declined."),
+            ["/api/scheduling/packages/pk1/buy": [.status(201, body: paidBuy)]]
+        )
         await model.pay()
         guard case .declined = model.payState else { return XCTFail("expected declined") }
     }
@@ -63,7 +97,9 @@ final class BuyPackageViewModelTests: XCTestCase {
     }
 
     func testLoadDetectsExistingCreditUpsell() async {
+        // swiftlint:disable:next line_length
         let packages = #"{"packages":[{"id":"pk1","owner_type":"business","owner_id":"biz1","name":"5-session cleaning","sessions_count":5,"price_cents":22000,"currency":"USD","is_active":true,"created_at":"2026-06-10T00:00:00Z"}]}"#
+        // swiftlint:disable:next line_length
         let mine = #"{"credits":[{"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":2,"purchased_at":"2026-05-01T00:00:00Z","BookingPackage":{"name":"5-session cleaning","sessions_count":5,"owner_type":"business","owner_id":"biz1"}}]}"#
         let model = vm([
             "/api/scheduling/packages": [.status(200, body: packages)],

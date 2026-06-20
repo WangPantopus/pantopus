@@ -162,11 +162,9 @@ class NotificationPermissionPromptViewModel
                 )
             }
 
-        fun updateCode(value: String) =
-            _state.update { it.copy(code = value.filter(Char::isDigit).take(CODE_LENGTH)) }
+        fun updateCode(value: String) = _state.update { it.copy(code = value.filter(Char::isDigit).take(CODE_LENGTH)) }
 
-        fun updatePhone(value: String) =
-            _state.update { it.copy(phone = value.filter(Char::isDigit).take(MAX_PHONE_DIGITS)) }
+        fun updatePhone(value: String) = _state.update { it.copy(phone = value.filter(Char::isDigit).take(MAX_PHONE_DIGITS)) }
 
         fun verifyEmail() {
             if (!_state.value.isCodeComplete) return
@@ -231,6 +229,7 @@ class NotificationPermissionPromptViewModel
         ) {
             val current = repo.getNotificationPreferences()
             val root = ((current as? NetworkResult.Success)?.data?.prefs ?: emptyMap()).toMutableMap()
+
             @Suppress("UNCHECKED_CAST")
             val channels = (root["channels"] as? Map<String, Any?>)?.toMutableMap() ?: mutableMapOf()
             channels[channel.key] = enabled

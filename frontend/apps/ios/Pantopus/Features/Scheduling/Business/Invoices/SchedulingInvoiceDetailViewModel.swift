@@ -33,14 +33,34 @@ final class SchedulingInvoiceDetailViewModel {
     private(set) var sending = false
     private(set) var showSentToast = false
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var totalLabel: String { SchedulingMoney.format(cents: invoice?.totalCents, currency: invoice?.currency) }
-    var currencyCode: String { (invoice?.currency ?? "USD").uppercased() }
-    var reference: String { "INV-" + invoiceId.prefix(6).uppercased() }
-    var issuedLabel: String { PackagesFormat.dayString(invoice?.createdAt) ?? "—" }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var totalLabel: String {
+        SchedulingMoney.format(cents: invoice?.totalCents, currency: invoice?.currency)
+    }
+
+    var currencyCode: String {
+        (invoice?.currency ?? "USD").uppercased()
+    }
+
+    var reference: String {
+        "INV-" + invoiceId.prefix(6).uppercased()
+    }
+
+    var issuedLabel: String {
+        PackagesFormat.dayString(invoice?.createdAt) ?? "—"
+    }
+
     var recipientLabel: String {
         guard let recipient = invoice?.recipientUserId else { return "Customer" }
         return "Customer · " + recipient.prefix(6).uppercased()
@@ -98,7 +118,9 @@ final class SchedulingInvoiceDetailViewModel {
         return line
     }
 
-    var shareText: String { "\(reference) · \(totalLabel)" }
+    var shareText: String {
+        "\(reference) · \(totalLabel)"
+    }
 
     /// Best-available invoice status for the top-bar pill and dock CTA set.
     /// The DTO carries no `status` field; we derive the lifecycle state from
@@ -135,7 +157,7 @@ final class SchedulingInvoiceDetailViewModel {
         case "paid", "refunded": .shareDownload
         case "partial": .markPaidSendBalance
         case "void": .shareOnly
-        default: .sendOnly          // draft (and any unknown)
+        default: .sendOnly // draft (and any unknown)
         }
     }
 
@@ -154,7 +176,9 @@ final class SchedulingInvoiceDetailViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = .loading
         do {
             let result: InvoiceResponse = try await client.request(SchedulingEndpoints.getInvoice(owner: owner, id: invoiceId))
@@ -168,7 +192,9 @@ final class SchedulingInvoiceDetailViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Actions
 

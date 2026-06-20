@@ -40,7 +40,7 @@ struct MessagePreviewStubView: View {
     }
 
     var body: some View {
-        MessagePreviewView(owner: viewModel.owner, templateId: viewModel.templateId, onClose: { dismiss() })
+        MessagePreviewView(owner: viewModel.owner, templateId: viewModel.templateId) { dismiss() }
     }
 }
 

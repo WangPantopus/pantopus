@@ -138,8 +138,7 @@ struct IntakeQuestionEditGroup: View {
         )
     }
 
-    @ViewBuilder
-    private func field<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func field(label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
@@ -186,7 +185,7 @@ struct IntakeQuestionEditGroup: View {
         }
     }
 
-    // Bordered white surface row (design `EditGroup` required row).
+    /// Bordered white surface row (design `EditGroup` required row).
     private var requiredRow: some View {
         HStack {
             Text("Make this required")

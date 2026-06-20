@@ -13,8 +13,15 @@ import XCTest
 
 @MainActor
 final class PaymentsSetupViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func vm(
         status: String,

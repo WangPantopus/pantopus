@@ -22,7 +22,11 @@ final class BookingDetailViewModelTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeViewModel(owner: SchedulingOwner = .personal, id: String = "bk1", routes: [String: [SequencedURLProtocol.Response]]) -> BookingDetailViewModel {
+    private func makeViewModel(
+        owner: SchedulingOwner = .personal,
+        id: String = "bk1",
+        routes: [String: [SequencedURLProtocol.Response]]
+    ) -> BookingDetailViewModel {
         let session = SequencedURLProtocol.makeSession(routeResponses: routes)
         let actions = BookingActions(owner: owner, client: SchedulingClient(client: APIClient(session: session, retryPolicy: .none)))
         return BookingDetailViewModel(owner: owner, bookingId: id, push: { _ in }, actions: actions)

@@ -103,7 +103,6 @@ class SetupSnapshotTest {
                         serviceType = "consultation",
                         duration = 30,
                         priceText = "120",
-                        paidEnabled = true,
                         pillar = SchedulingPillar.Business,
                         onSelect = {},
                         onDuration = {},

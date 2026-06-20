@@ -73,16 +73,18 @@ struct MessagePreviewView: View {
             AutoUnderlineTabs(
                 tabs: order.map(\.label),
                 selectedIndex: order.firstIndex(of: model.activeChannel) ?? 0,
-                accent: model.accent,
-                onSelect: { model.activeChannel = order[$0] }
-            )
+                accent: model.accent
+            ) { model.activeChannel = order[$0] }
             ScrollView {
                 VStack(spacing: Spacing.s4) {
                     stage
                     AutoGhostButton(title: "Send test to me", icon: .send) { model.sendTest() }
                     if let note = model.testNote {
-                        AutoNote(tone: model.testNoteIsError ? .error : .success,
-                                 icon: model.testNoteIsError ? .alertTriangle : .checkCircle, text: note)
+                        AutoNote(
+                            tone: model.testNoteIsError ? .error : .success,
+                            icon: model.testNoteIsError ? .alertTriangle : .checkCircle,
+                            text: note
+                        )
                     }
                     Color.clear.frame(height: Spacing.s2)
                 }
@@ -148,7 +150,10 @@ struct MessagePreviewView: View {
                 Text(subject).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appText).padding(.bottom, Spacing.s1)
             }
             AutoRowDivider().padding(.vertical, Spacing.s2)
-            Text(model.filledBody).font(.system(size: 12.5)).foregroundStyle(Theme.Color.appTextStrong).fixedSize(horizontal: false, vertical: true)
+            Text(model.filledBody).font(.system(size: 12.5)).foregroundStyle(Theme.Color.appTextStrong).fixedSize(
+                horizontal: false,
+                vertical: true
+            )
             AutoRowDivider().padding(.vertical, Spacing.s2)
             Text("Sent by Pantopus scheduling").font(.system(size: 10)).foregroundStyle(Theme.Color.appTextMuted)
         }
@@ -188,8 +193,10 @@ struct MessagePreviewView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 Spacer(minLength: Spacing.s6)
             }
-            Text("\(model.filledBody.count) characters · \(model.filledBody.count > WorkflowChannel.smsSegmentLimit ? "2 messages" : "1 message")")
-                .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextMuted)
+            let msgCount = model.filledBody.count > WorkflowChannel.smsSegmentLimit ? "2 messages" : "1 message"
+            Text("\(model.filledBody.count) characters · \(msgCount)")
+                .font(.system(size: 10.5))
+                .foregroundStyle(Theme.Color.appTextMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

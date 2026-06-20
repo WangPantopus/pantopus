@@ -23,7 +23,7 @@ import SwiftUI
 final class CancellationPolicyEditorViewModel {
     enum Phase: Equatable { case loading, loaded, error(String) }
 
-    enum Preset: String, CaseIterable, Equatable, Sendable {
+    enum Preset: String, CaseIterable, Equatable {
         case flexible = "Flexible"
         case moderate = "Moderate"
         case strict = "Strict"
@@ -41,7 +41,7 @@ final class CancellationPolicyEditorViewModel {
 
     /// How a no-show is charged. Page-level stores the raw string; per-service
     /// maps it to `no_show_fee_cents`.
-    enum NoShowMode: String, CaseIterable, Equatable, Sendable {
+    enum NoShowMode: String, CaseIterable, Equatable {
         case chargeFull = "charge_full"
         case chargeDeposit = "charge_deposit"
         case noCharge = "no_charge"
@@ -80,19 +80,40 @@ final class CancellationPolicyEditorViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var isCustom: Bool { selectedPreset == .custom }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var isCustom: Bool {
+        selectedPreset == .custom
+    }
 
     /// The cutoff ladder the stepper walks (hours).
     static let cutoffLadder = [0, 1, 2, 4, 6, 12, 24, 48, 72]
 
-    var canDecrementCutoff: Bool { customCutoffHours > (Self.cutoffLadder.first ?? 0) }
-    var canIncrementCutoff: Bool { customCutoffHours < (Self.cutoffLadder.last ?? 0) }
-    var canDecrementRefund: Bool { customRefundPct > 0 }
-    var canIncrementRefund: Bool { customRefundPct < 100 }
+    var canDecrementCutoff: Bool {
+        customCutoffHours > (Self.cutoffLadder.first ?? 0)
+    }
+
+    var canIncrementCutoff: Bool {
+        customCutoffHours < (Self.cutoffLadder.last ?? 0)
+    }
+
+    var canDecrementRefund: Bool {
+        customRefundPct > 0
+    }
+
+    var canIncrementRefund: Bool {
+        customRefundPct < 100
+    }
 
     /// The plain-language sentence shown to invitees (frame preview).
     var previewText: String {
@@ -162,23 +183,28 @@ final class CancellationPolicyEditorViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Selection
 
     func select(_ preset: Preset) {
         selectedPreset = preset
         switch preset {
-        case .flexible: customCutoffHours = 24; customRefundPct = 0
-        case .moderate: customCutoffHours = 48; customRefundPct = 50
-        case .strict: customCutoffHours = 0; customRefundPct = 0
+        case .flexible: customCutoffHours = 24
+            customRefundPct = 0
+        case .moderate: customCutoffHours = 48
+            customRefundPct = 50
+        case .strict: customCutoffHours = 0
+            customRefundPct = 0
         case .custom: break // keep current custom values
         }
     }
 
     func decrementCutoff() {
         guard let idx = Self.cutoffLadder.firstIndex(of: customCutoffHours), idx > 0 else {
-            customCutoffHours = Self.cutoffLadder.last(where: { $0 < customCutoffHours }) ?? 0
+            customCutoffHours = Self.cutoffLadder.last { $0 < customCutoffHours } ?? 0
             return
         }
         customCutoffHours = Self.cutoffLadder[idx - 1]
@@ -186,14 +212,19 @@ final class CancellationPolicyEditorViewModel {
 
     func incrementCutoff() {
         guard let idx = Self.cutoffLadder.firstIndex(of: customCutoffHours), idx < Self.cutoffLadder.count - 1 else {
-            customCutoffHours = Self.cutoffLadder.first(where: { $0 > customCutoffHours }) ?? Self.cutoffLadder.last ?? customCutoffHours
+            customCutoffHours = Self.cutoffLadder.first { $0 > customCutoffHours } ?? Self.cutoffLadder.last ?? customCutoffHours
             return
         }
         customCutoffHours = Self.cutoffLadder[idx + 1]
     }
 
-    func decrementRefund() { customRefundPct = max(0, customRefundPct - 5) }
-    func incrementRefund() { customRefundPct = min(100, customRefundPct + 5) }
+    func decrementRefund() {
+        customRefundPct = max(0, customRefundPct - 5)
+    }
+
+    func incrementRefund() {
+        customRefundPct = min(100, customRefundPct + 5)
+    }
 
     func cycleNoShow() {
         let all = NoShowMode.allCases
@@ -228,16 +259,18 @@ final class CancellationPolicyEditorViewModel {
         }
     }
 
-    func clearSaveError() { saveError = nil }
+    func clearSaveError() {
+        saveError = nil
+    }
 
     // MARK: Page-level encoding (cancellation_policy free-form)
 
     func pagePolicyValue() -> JSONValue {
         switch selectedPreset {
         case .flexible, .moderate, .strict:
-            return .string(selectedPreset.rawValue)
+            .string(selectedPreset.rawValue)
         case .custom:
-            return .object([
+            .object([
                 "preset": .string("custom"),
                 "free_cancel_window_min": .number(Double(customCutoffHours * 60)),
                 "refund_after_pct": .number(Double(customRefundPct)),
@@ -292,22 +325,26 @@ final class CancellationPolicyEditorViewModel {
         depositNonRefundable = (et.depositRefundable == false) || policy == "deposit_only"
         customCutoffHours = window / 60
         switch (policy, window) {
-        case ("full", 1440): selectedPreset = .flexible; customRefundPct = 0
-        case ("partial", 2880): selectedPreset = .moderate; customRefundPct = 50
-        case ("none", _): selectedPreset = .strict; customRefundPct = 0
+        case ("full", 1440): selectedPreset = .flexible
+            customRefundPct = 0
+        case ("partial", 2880): selectedPreset = .moderate
+            customRefundPct = 50
+        case ("none", _): selectedPreset = .strict
+            customRefundPct = 0
         default:
             selectedPreset = .custom
             customRefundPct = Self.refundPct(for: policy)
         }
         // Derive no-show mode from the stored fee.
         let fee = et.noShowFeeCents ?? 0
-        if fee == 0 { noShowMode = .noCharge }
-        else if fee == depositCents, depositCents > 0 { noShowMode = .chargeDeposit }
-        else { noShowMode = .chargeFull }
+        if fee == 0 { noShowMode = .noCharge } else if fee == depositCents,
+                                                       depositCents > 0 { noShowMode = .chargeDeposit } else { noShowMode = .chargeFull }
     }
 
     private func applyPagePolicy(_ value: JSONValue?) {
-        guard let value else { selectedPreset = .flexible; return }
+        guard let value else { selectedPreset = .flexible
+            return
+        }
         if let raw = value.stringValue, let preset = Preset(rawValue: raw) {
             select(preset)
             return

@@ -27,7 +27,9 @@ public enum NotificationChannel: String, Sendable, Hashable, CaseIterable {
 
     /// SMS is not yet deliverable server-side — surfaced with the same
     /// "coming soon" treatment as the locked S column and the 501 connect.
-    public var isComingSoon: Bool { self == .sms }
+    public var isComingSoon: Bool {
+        self == .sms
+    }
 
     /// Hero glyph for the channel's prompt frame.
     var glyph: PantopusIcon {

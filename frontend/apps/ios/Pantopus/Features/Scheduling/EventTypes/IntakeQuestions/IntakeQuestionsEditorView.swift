@@ -67,18 +67,19 @@ struct IntakeQuestionsEditorView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { if await viewModel.save() { dismiss() } } }
-        ) {
-            overline
-            helper
-            lockedDefaults
-            questionList
-            addButton
-        }
+            onCommit: { Task { if await viewModel.save() { dismiss() } } },
+            content: {
+                overline
+                helper
+                lockedDefaults
+                questionList
+                addButton
+            }
+        )
     }
 
-    // Pillar-accent overline ("Personal · Intro call") above the title — the
-    // design sheet's identity line (FormShell already prints the subtitle).
+    /// Pillar-accent overline ("Personal · Intro call") above the title — the
+    /// design sheet's identity line (FormShell already prints the subtitle).
     private var overline: some View {
         Text(viewModel.pillarOverline.uppercased())
             .font(.system(size: 9.5, weight: .bold))
@@ -96,8 +97,8 @@ struct IntakeQuestionsEditorView: View {
             .padding(.horizontal, Spacing.s4)
     }
 
-    // Locked defaults — bare white ListBlock card (no overline), each row a
-    // sunken icon tile + label + "Always asked" caption + lock glyph.
+    /// Locked defaults — bare white ListBlock card (no overline), each row a
+    /// sunken icon tile + label + "Always asked" caption + lock glyph.
     private var lockedDefaults: some View {
         VStack(spacing: 0) {
             IntakeLockedRow(icon: .user, title: "Name", isLast: false)
@@ -110,7 +111,6 @@ struct IntakeQuestionsEditorView: View {
         .padding(.horizontal, Spacing.s4)
     }
 
-    @ViewBuilder
     private var questionList: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
             Text("Your questions".uppercased())
@@ -132,13 +132,13 @@ struct IntakeQuestionsEditorView: View {
         }
     }
 
-    // One white ListBlock card; flat rows separated by 1px dividers. The row
-    // being edited is replaced in place by the blue EditGroup field group.
+    /// One white ListBlock card; flat rows separated by 1px dividers. The row
+    /// being edited is replaced in place by the blue EditGroup field group.
     private var questionsCard: some View {
         VStack(spacing: 0) {
             ForEach($viewModel.questions) { $question in
                 let id = question.id
-                let index = viewModel.questions.firstIndex(where: { $0.id == id }) ?? 0
+                let index = viewModel.questions.firstIndex { $0.id == id } ?? 0
                 if viewModel.isEditing(id) {
                     IntakeQuestionEditGroup(
                         question: $question,
@@ -171,19 +171,22 @@ struct IntakeQuestionsEditorView: View {
     }
 
     private var addButton: some View {
-        Button(action: { viewModel.startAdd() }) {
-            HStack(spacing: 7) {
-                Icon(.plus, size: 17, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
-                Text("Add a question")
-                    .font(.system(size: 13.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
+        Button(
+            action: { viewModel.startAdd() },
+            label: {
+                HStack(spacing: 7) {
+                    Icon(.plus, size: 17, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                    Text("Add a question")
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                .pantopusShadow(.primary)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background(Theme.Color.primary600)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .pantopusShadow(.primary)
-        }
+        )
         .buttonStyle(.plain)
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s2)

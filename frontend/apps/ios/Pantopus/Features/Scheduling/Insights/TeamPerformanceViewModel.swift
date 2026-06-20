@@ -50,9 +50,17 @@ final class TeamPerformanceViewModel {
 
     // MARK: Chrome
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     private var businessId: String? {
         if case let .business(id) = owner { return id }
@@ -87,7 +95,7 @@ final class TeamPerformanceViewModel {
             async let membersR: BusinessTeamMembersResponse? = try? client.request(
                 BusinessTeamEndpoints.members(businessId: businessId)
             )
-            applyMembers((await membersR)?.members ?? [])
+            await applyMembers(membersR?.members ?? [])
 
             phase = hostRows.isEmpty ? .empty : .loaded
         } catch let error as SchedulingError {
@@ -97,14 +105,18 @@ final class TeamPerformanceViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     func apply(_ newFilter: InsightsFilter) async {
         filter = newFilter
         await load()
     }
 
-    func openFilter() { showFilterSheet = true }
+    func openFilter() {
+        showFilterSheet = true
+    }
 
     func toggleSort() {
         sort = sort == .bookings ? .noShow : .bookings
@@ -143,15 +155,27 @@ final class TeamPerformanceViewModel {
         return rows
     }
 
-    var balanceLabel: String { InsightsMath.balanceLabel(hostRows) }
+    var balanceLabel: String {
+        InsightsMath.balanceLabel(hostRows)
+    }
 
-    var totalBookings: Int { hostRows.reduce(0) { $0 + $1.bookings } }
+    var totalBookings: Int {
+        hostRows.reduce(0) { $0 + $1.bookings }
+    }
 
-    var isSingleMember: Bool { hostRows.count == 1 }
+    var isSingleMember: Bool {
+        hostRows.count == 1
+    }
 
-    var sortLabel: String { sort.title }
+    var sortLabel: String {
+        sort.title
+    }
 
-    var memberOptions: [InsightsFilterOption] { memberOptionList }
+    var memberOptions: [InsightsFilterOption] {
+        memberOptionList
+    }
 
-    var windowDays: Int { report?.windowDays ?? filter.days() }
+    var windowDays: Int {
+        report?.windowDays ?? filter.days()
+    }
 }

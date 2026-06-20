@@ -45,6 +45,7 @@ final class SlotTakenScreenViewModelTests: XCTestCase {
     }
 
     func testNoSlotsBecomesFullyBooked() async {
+        // swiftlint:disable:next line_length
         let json = #"{"eventType":{"id":"et1","name":"Intro","durations":[30],"default_duration":30},"timezone":"America/New_York","status":"active","slots":[]}"#
         SequencedURLProtocol.sequence = [.status(200, body: json)]
         let viewModel = makeViewModel()

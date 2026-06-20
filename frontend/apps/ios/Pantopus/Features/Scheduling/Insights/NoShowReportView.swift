@@ -24,9 +24,9 @@ struct NoShowReportView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            InsightsTopBar(title: "No-shows & cancellations", onBack: { dismiss() }) {
+            InsightsTopBar(title: "No-shows & cancellations", onBack: { dismiss() }, trailing: {
                 InsightsPeriodChip(label: model.filter.chipLabel(), accent: model.accent) { model.openFilter() }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -37,11 +37,10 @@ struct NoShowReportView: View {
                 initial: model.filter,
                 eventTypeOptions: [],
                 memberOptions: [],
-                accent: model.accent,
-                onApply: { applied in Task { await model.apply(applied) } }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+                accent: model.accent
+            ) { applied in Task { await model.apply(applied) } }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
     }
@@ -184,11 +183,11 @@ struct NoShowReportView: View {
                         .font(.system(size: 11.5))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button(action: { model.openPolicy() }) {
+                    Button(action: { model.openPolicy() }, label: {
                         Text("Set a policy")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(model.accent)
-                    }
+                    })
                     .padding(.top, 2)
                     .accessibilityIdentifier("scheduling.insights.setPolicy")
                 }
@@ -228,7 +227,7 @@ struct NoShowReportView: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        NoShowReportView(owner: .personal, push: { _ in })
+        NoShowReportView(owner: .personal) { _ in }
     }
 }
 #endif

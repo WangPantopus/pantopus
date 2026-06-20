@@ -75,7 +75,9 @@ final class ResourceDetailViewModel {
     /// only when the backend provides them (see deferred-backend note).
     private(set) var fullyBookedThroughLabel: String?
     private(set) var nextOpeningLabel: String?
-    var isFullyBooked: Bool { nextOpeningLabel != nil }
+    var isFullyBooked: Bool {
+        nextOpeningLabel != nil
+    }
 
     // MARK: Dependencies
 
@@ -97,7 +99,9 @@ final class ResourceDetailViewModel {
         self.client = client
     }
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     private var isLoaded: Bool {
         if case .loaded = state { return true }
@@ -106,8 +110,13 @@ final class ResourceDetailViewModel {
 
     // MARK: Load
 
-    func load() async { await fetch(showLoading: !isLoaded) }
-    func refresh() async { await fetch(showLoading: false) }
+    func load() async {
+        await fetch(showLoading: !isLoaded)
+    }
+
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
 
     private func fetch(showLoading: Bool) async {
         if showLoading { state = .loading }
@@ -139,9 +148,8 @@ final class ResourceDetailViewModel {
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
             return Dictionary(
-                ResourceHomeMember.from(occupants: response.occupants).map { ($0.id, $0) },
-                uniquingKeysWith: { first, _ in first }
-            )
+                ResourceHomeMember.from(occupants: response.occupants).map { ($0.id, $0) }
+            ) { first, _ in first }
         } catch {
             return [:]
         }
@@ -234,13 +242,19 @@ final class ResourceDetailViewModel {
 
     // MARK: Actions
 
-    func bookThis() { push(.bookResource(homeId: homeId, resourceId: resourceId)) }
+    func bookThis() {
+        push(.bookResource(homeId: homeId, resourceId: resourceId))
+    }
 
     /// Fully-booked CTA — routes to the same booking sheet (the next-opening
     /// slot is selected there). No dedicated endpoint.
-    func bookNextOpening() { push(.bookResource(homeId: homeId, resourceId: resourceId)) }
+    func bookNextOpening() {
+        push(.bookResource(homeId: homeId, resourceId: resourceId))
+    }
 
-    func edit() { push(.resourceEditor(homeId: homeId, resourceId: resourceId)) }
+    func edit() {
+        push(.resourceEditor(homeId: homeId, resourceId: resourceId))
+    }
 
     /// Header pending-approval badge tap — scrolls/anchors to the approval
     /// queue, which already lives in the same scroll view; surfaced as an

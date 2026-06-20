@@ -54,22 +54,23 @@ struct BookingLimitsView: View {
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { if await viewModel.save() { dismiss() } } }
-        ) {
-            sheetOverline
-            helper
-            noticeRow
-            windowRow
-            dailyCapRow
-            weeklyCapRow
-            perPersonRow
-            startTimesRow
-        }
+            onCommit: { Task { if await viewModel.save() { dismiss() } } },
+            content: {
+                sheetOverline
+                helper
+                noticeRow
+                windowRow
+                dailyCapRow
+                weeklyCapRow
+                perPersonRow
+                startTimesRow
+            }
+        )
     }
 
-    // Left-aligned sky overline beneath the top bar — FormShell only offers a
-    // centered title, so the design's "PERSONAL · WORKING HOURS" overline
-    // rides above the cards as a leading label.
+    /// Left-aligned sky overline beneath the top bar — FormShell only offers a
+    /// centered title, so the design's "PERSONAL · WORKING HOURS" overline
+    /// rides above the cards as a leading label.
     private var sheetOverline: some View {
         Text("PERSONAL · WORKING HOURS")
             .font(.system(size: 9.5, weight: .bold))
@@ -127,8 +128,8 @@ struct BookingLimitsView: View {
         )
     }
 
-    // NOTE: backend has no weekly_cap field — row is rendered per the design
-    // as a disabled placeholder until the backend exposes the field.
+    /// NOTE: backend has no weekly_cap field — row is rendered per the design
+    /// as a disabled placeholder until the backend exposes the field.
     private var weeklyCapRow: some View {
         stepperRow(
             "Max per week",
@@ -174,10 +175,11 @@ struct BookingLimitsView: View {
 
     // MARK: Building blocks
 
-    /// One rule card: label (semibold) + bordered stepper on one line, caption
-    /// (or error) below. Mirrors the design's `StepperRow` / `RowCard`.
-    /// Pass `disabled: true` for placeholder rows whose backend field is not
-    /// yet available (e.g. "Max per week" awaiting weekly_cap support).
+    // One rule card: label (semibold) + bordered stepper on one line, caption
+    // (or error) below. Mirrors the design's `StepperRow` / `RowCard`.
+    // Pass `disabled: true` for placeholder rows whose backend field is not
+    // yet available (e.g. "Max per week" awaiting weekly_cap support).
+    // swiftlint:disable function_parameter_count
     private func stepperRow(
         _ label: String,
         caption: String,
@@ -221,7 +223,7 @@ struct BookingLimitsView: View {
             }
         }
         .opacity(disabled ? 0.7 : 1)
-    }
+    } // swiftlint:enable function_parameter_count
 
     private func rowCard(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {

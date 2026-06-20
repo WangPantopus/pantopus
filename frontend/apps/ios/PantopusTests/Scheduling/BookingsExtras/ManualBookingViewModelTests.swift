@@ -30,7 +30,11 @@ final class ManualBookingViewModelTests: XCTestCase {
 
     func testLoadEventTypesEnablesContinue() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"eventTypes":[{"id":"et1","name":"Discovery call","slug":"discovery","durations":[30],"default_duration":30,"location_mode":"video","is_active":true}]}"#)
+            .status(
+                200,
+                // swiftlint:disable:next line_length
+                body: #"{"eventTypes":[{"id":"et1","name":"Discovery call","slug":"discovery","durations":[30],"default_duration":30,"location_mode":"video","is_active":true}]}"#
+            )
         ]
         let viewModel = makeVM()
         await viewModel.load()
@@ -54,10 +58,10 @@ final class ManualBookingViewModelTests: XCTestCase {
     }
 
     func testCreateConflictShowsSlotTaken() async {
+        // swiftlint:disable:next line_length
+        let conflictBody = #"{"error":"SLOT_TAKEN","message":"Just taken","alternatives":[{"start":"2026-06-14T18:00:00Z","end":"2026-06-14T18:30:00Z","startLocal":"2026-06-14T11:00:00"}]}"#
         SequencedURLProtocol.sequence = [
-            .status(409, body: #"""
-            {"error":"SLOT_TAKEN","message":"Just taken","alternatives":[{"start":"2026-06-14T18:00:00Z","end":"2026-06-14T18:30:00Z","startLocal":"2026-06-14T11:00:00"}]}
-            """#)
+            .status(409, body: conflictBody)
         ]
         let viewModel = makeVM()
         viewModel.selectedEventTypeId = "et1"

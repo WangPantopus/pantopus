@@ -30,9 +30,9 @@ public struct CalendarEventDTO: Decodable, Sendable, Hashable, Identifiable {
     public let createdAt: String?
     public let updatedAt: String?
 
-    // Calendarly booking-union + migration-164 fields (all Optional so existing
-    // decodes still pass). Consumed read-only by I10 (Home calendar & RSVP) and
-    // I12 (resources/visits calendar union).
+    /// Calendarly booking-union + migration-164 fields (all Optional so existing
+    /// decodes still pass). Consumed read-only by I10 (Home calendar & RSVP) and
+    /// I12 (resources/visits calendar union).
     /// `private` | `members` | `public_preview` (migration 164).
     public let visibility: String?
     /// `event` | `booking` — the booking-union marker. Booking rows are merged

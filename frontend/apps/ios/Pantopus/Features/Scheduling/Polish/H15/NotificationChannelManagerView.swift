@@ -18,6 +18,7 @@
 import SwiftUI
 import UIKit
 
+// swiftlint:disable:next type_body_length
 struct NotificationChannelManagerView: View {
     @State private var viewModel: NotificationChannelManagerViewModel
     @State private var showPrompt = false
@@ -34,11 +35,10 @@ struct NotificationChannelManagerView: View {
     /// Convenience: resolve the signed-in account email at the call site.
     @MainActor
     init(owner: SchedulingOwner, client: SchedulingClient = .shared) {
-        let email: String
-        if case let .signedIn(user) = AuthManager.shared.state {
-            email = user.email
+        let email: String = if case let .signedIn(user) = AuthManager.shared.state {
+            user.email
         } else {
-            email = ""
+            ""
         }
         _viewModel = State(
             wrappedValue: NotificationChannelManagerViewModel(
@@ -220,7 +220,6 @@ struct NotificationChannelManagerView: View {
 
     // MARK: - More channels section
 
-    @ViewBuilder
     private var moreChannelsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             sectionHeading("More channels")
@@ -433,14 +432,13 @@ struct NotificationChannelManagerView: View {
             owner: vm.owner,
             initialFrame: frame,
             accountEmail: vm.accountEmail,
-            service: NotificationChannelService.shared,
-            onResult: { result in
-                Task { @MainActor in
-                    vm.handlePromptResult(result)
-                    vm.activePromptFrame = nil
-                }
+            service: NotificationChannelService.shared
+        ) { result in
+            Task { @MainActor in
+                vm.handlePromptResult(result)
+                vm.activePromptFrame = nil
             }
-        )
+        }
     }
 
     // MARK: - Helpers
@@ -460,9 +458,9 @@ struct NotificationChannelManagerView: View {
 private extension NotificationChannel {
     var displayName: String {
         switch self {
-        case .push:  "Push (this device)"
+        case .push: "Push (this device)"
         case .email: "Email"
-        case .sms:   "SMS"
+        case .sms: "SMS"
         }
     }
 }

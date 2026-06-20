@@ -92,9 +92,8 @@ struct TerminalStateView: View {
         switch kind {
         case .privateLink:
             TerminalCodeInput(
-                code: $viewModel.accessCode,
-                onSubmit: { viewModel.submitAccessCode() }
-            )
+                code: $viewModel.accessCode
+            ) { viewModel.submitAccessCode() }
         case .paused:
             if let note = viewModel.hostNote {
                 TerminalPausedCard(
@@ -121,7 +120,6 @@ struct TerminalStateView: View {
         }
     }
 
-    @ViewBuilder
     private func dock(kind: TerminalKind) -> some View {
         EdgeDock {
             dockExtra(kind: kind)

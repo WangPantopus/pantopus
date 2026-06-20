@@ -32,17 +32,21 @@ class PublicPagePreviewViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
+    private val ownerRelay = BookingPageOwnerRelay()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = PublicPagePreviewViewModel(repo, errors)
+    private fun vm() = PublicPagePreviewViewModel(repo, errors, ownerRelay)
 
-    private fun hostPage(slug: String? = "maria-k", isLive: Boolean = true, isPaused: Boolean = false) =
-        NetworkResult.Success(
-            BookingPageResponse(BookingPageDto(id = "p", slug = slug, isLive = isLive, isPaused = isPaused, title = "Maria")),
-        )
+    private fun hostPage(
+        slug: String? = "maria-k",
+        isLive: Boolean = true,
+        isPaused: Boolean = false,
+    ) = NetworkResult.Success(
+        BookingPageResponse(BookingPageDto(id = "p", slug = slug, isLive = isLive, isPaused = isPaused, title = "Maria")),
+    )
 
     @Test
     fun `unpublished page yields off notice`() =

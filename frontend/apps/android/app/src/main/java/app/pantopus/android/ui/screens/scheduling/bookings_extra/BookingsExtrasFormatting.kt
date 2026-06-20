@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
@@ -76,14 +84,10 @@ internal object BookingsExtrasFormatting {
     }
 
     /** Short weekday ("Tue") for the manual-booking day strip. */
-    fun weekdayShort(
-        date: LocalDate,
-    ): String = date.format(WEEKDAY_SHORT)
+    fun weekdayShort(date: LocalDate): String = date.format(WEEKDAY_SHORT)
 
     /** Day-of-month ("14") for the manual-booking day strip. */
-    fun dayNumber(
-        date: LocalDate,
-    ): String = date.format(DAY_NUM)
+    fun dayNumber(date: LocalDate): String = date.format(DAY_NUM)
 
     /** Up-to-two-letter initials for an avatar disc. */
     fun initials(name: String?): String {

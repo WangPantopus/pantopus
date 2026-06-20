@@ -40,7 +40,9 @@ extension BookingDetailView {
     var noShowBannerText: String {
         let first = (viewModel.booking?.inviteeName ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: " ").first.map(String.init)
+            .split(separator: " ")
+            .first
+            .map(String.init)
         if let first, !first.isEmpty {
             return "Marked no-show · \(first) didn't attend"
         }
@@ -51,8 +53,10 @@ extension BookingDetailView {
     var followUpPromoBanner: some View {
         let first = (viewModel.booking?.inviteeName ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: " ").first.map(String.init)
-        let subject = (first?.isEmpty == false) ? first! : "them"
+            .split(separator: " ")
+            .first
+            .map(String.init)
+        let subject = first.flatMap { $0.isEmpty ? nil : $0 } ?? "them"
         return HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.sparkles, size: 16, color: Theme.Color.primary600)
                 .padding(.top, 1)
@@ -277,10 +281,14 @@ extension BookingDetailView {
         let fg: Color
         let bg: Color
         switch tone {
-        case .error: fg = Theme.Color.error; bg = Theme.Color.errorBg
-        case .neutral: fg = Theme.Color.appTextSecondary; bg = Theme.Color.appSurfaceSunken
-        case .success: fg = Theme.Color.success; bg = Theme.Color.successBg
-        case .info: fg = Theme.Color.primary600; bg = Theme.Color.primary50
+        case .error: fg = Theme.Color.error
+            bg = Theme.Color.errorBg
+        case .neutral: fg = Theme.Color.appTextSecondary
+            bg = Theme.Color.appSurfaceSunken
+        case .success: fg = Theme.Color.success
+            bg = Theme.Color.successBg
+        case .info: fg = Theme.Color.primary600
+            bg = Theme.Color.primary50
         }
         return HStack(spacing: Spacing.s2) {
             Icon(icon, size: 16, color: fg)
@@ -301,15 +309,15 @@ extension BookingDetailView {
     var locationLabel: (title: String, detail: String?)? {
         switch (viewModel.locationMode ?? "").lowercased() {
         case "video", "google_meet", "zoom", "meet", "teams":
-            return ("Pantopus Video", "Video call · link sent on confirm")
+            ("Pantopus Video", "Video call · link sent on confirm")
         case "in_person", "in-person", "inperson":
-            return ("In person", "Location shared with the invitee")
+            ("In person", "Location shared with the invitee")
         case "phone", "phone_call":
-            return ("Phone call", "We'll connect you at the scheduled time")
+            ("Phone call", "We'll connect you at the scheduled time")
         case "":
-            return nil
+            nil
         default:
-            return ("Custom", nil)
+            ("Custom", nil)
         }
     }
 

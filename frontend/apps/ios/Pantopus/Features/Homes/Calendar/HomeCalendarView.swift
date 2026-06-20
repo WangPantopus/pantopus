@@ -19,7 +19,9 @@ public struct HomeCalendarView: View {
         _viewModel = State(initialValue: viewModel)
     }
 
-    private var isOffline: Bool { !NetworkMonitor.shared.isOnline }
+    private var isOffline: Bool {
+        !NetworkMonitor.shared.isOnline
+    }
 
     public var body: some View {
         @Bindable var bindable = viewModel
@@ -62,9 +64,8 @@ public struct HomeCalendarView: View {
         .fullScreenCover(item: $bindable.presentedRoute) { presented in
             HomeSchedulingRouteHost(
                 initialRoute: presented.route,
-                homeId: viewModel.homeIdForRouting,
-                onDismiss: { viewModel.presentedRoute = nil }
-            )
+                homeId: viewModel.homeIdForRouting
+            ) { viewModel.presentedRoute = nil }
         }
     }
 
@@ -84,7 +85,7 @@ public struct HomeCalendarView: View {
     /// Every frame keeps the month strip + filter-chip chrome (and, when
     /// offline, the inline amber banner) pinned above a swapping body region.
     /// The design's loading / error / offline frames all retain that chrome.
-    @ViewBuilder private var content: some View {
+    private var content: some View {
         VStack(spacing: 0) {
             if isOffline {
                 OfflineCalendarBanner()
@@ -100,9 +101,8 @@ public struct HomeCalendarView: View {
             if showsFilterRow {
                 FilterChipRow(
                     chips: viewModel.filterChips,
-                    selected: viewModel.memberFilter,
-                    onSelect: { viewModel.selectFilter($0) }
-                )
+                    selected: viewModel.memberFilter
+                ) { viewModel.selectFilter($0) }
             }
             bodyRegion
         }
@@ -197,15 +197,13 @@ public struct HomeCalendarView: View {
         case let .filteredMember(name):
             FilteredEmpty(
                 title: "No events for \(name) this week",
-                subcopy: "\(name.capitalized) has nothing scheduled in this range.",
-                onClear: { viewModel.clearMemberFilter() }
-            )
+                subcopy: "\(name.capitalized) has nothing scheduled in this range."
+            ) { viewModel.clearMemberFilter() }
         case .filteredDay:
             FilteredEmpty(
                 title: "Nothing on this day",
-                subcopy: "Pick a different day or jump back to today.",
-                onClear: { viewModel.jumpToToday() }
-            )
+                subcopy: "Pick a different day or jump back to today."
+            ) { viewModel.jumpToToday() }
         }
     }
 

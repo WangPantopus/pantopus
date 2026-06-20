@@ -14,7 +14,7 @@ import Foundation
 
 /// A member's answer for one proposed slot. Wire values are the public poll's
 /// `yes | maybe | no`.
-enum PollResponseChoice: String, Sendable, Hashable, CaseIterable {
+enum PollResponseChoice: String, Hashable, CaseIterable {
     case works = "yes"
     case ifNeeded = "maybe"
     case cant = "no"
@@ -36,7 +36,7 @@ enum PollResponseChoice: String, Sendable, Hashable, CaseIterable {
 /// poll read does not yet expose per-member busy windows, so the view-model
 /// leaves this `nil` today; the rendering is wired so the frame lights up the
 /// moment that data lands.
-struct PollOptionRow: Identifiable, Hashable, Sendable {
+struct PollOptionRow: Identifiable, Hashable {
     let id: String
     let startAt: String?
     let endAt: String?
@@ -96,16 +96,26 @@ final class PollResponseViewModel {
 
     // MARK: - Derived
 
-    var isClosed: Bool { phase == .closed }
+    var isClosed: Bool {
+        phase == .closed
+    }
+
     /// Design gate (Frame 2): Submit is enabled once **at least one** slot has a
     /// vote — not all slots. Android's `any { it.vote != null }` matches this intent.
-    var allAnswered: Bool { !options.isEmpty && options.contains { selections[$0.id] != nil } }
-    var answeredCount: Int { options.filter { selections[$0.id] != nil }.count }
+    var allAnswered: Bool {
+        !options.isEmpty && options.contains { selections[$0.id] != nil }
+    }
+
+    var answeredCount: Int {
+        options.filter { selections[$0.id] != nil }.count
+    }
 
     /// Any proposed slot clashes with the member's personal calendar — drives the
     /// design's info pre-fill banner (F6 Frame 3). Backend does not yet supply
     /// per-member busy windows, so this is `false` until that data lands.
-    var hasConflicts: Bool { options.contains { $0.conflict != nil } }
+    var hasConflicts: Bool {
+        options.contains { $0.conflict != nil }
+    }
 
     var subtitle: String {
         var parts: [String] = []
@@ -123,7 +133,9 @@ final class PollResponseViewModel {
         return FindATimeFormat.dayTimeLabel(utcISO: start, tz: tz)
     }
 
-    func selection(for option: PollOptionRow) -> PollResponseChoice? { selections[option.id] }
+    func selection(for option: PollOptionRow) -> PollResponseChoice? {
+        selections[option.id]
+    }
 
     // MARK: - Load
 

@@ -41,19 +41,34 @@ final class InviteeConfirmedViewModel {
 
     // MARK: - Derived
 
-    private var booking: PublicBookingDTO? { response?.booking }
-    private var eventType: PublicEventTypeView? { response?.eventType }
-    private var page: PublicPageView? { response?.page }
-    private var payment: ManagePayment? { response?.payment }
+    private var booking: PublicBookingDTO? {
+        response?.booking
+    }
 
-    var accent: Color { DiscoveryTheme.accent(forOwnerType: page?.ownerType) }
+    private var eventType: PublicEventTypeView? {
+        response?.eventType
+    }
+
+    private var page: PublicPageView? {
+        response?.page
+    }
+
+    private var payment: ManagePayment? {
+        response?.payment
+    }
+
+    var accent: Color {
+        DiscoveryTheme.accent(forOwnerType: page?.ownerType)
+    }
 
     /// Pending host approval → info hero + timeline; else success hero.
     var isPending: Bool {
         (booking?.status.lowercased() == "pending") || (booking?.requiresApproval ?? false)
     }
 
-    var heroTitle: String { isPending ? "Request sent" : "You're booked" }
+    var heroTitle: String {
+        isPending ? "Request sent" : "You're booked"
+    }
 
     /// The success-hero variant, derived from the payment shape. Each carries its
     /// own body copy mirroring the design's per-frame thank-you lines.
@@ -96,8 +111,10 @@ final class InviteeConfirmedViewModel {
             SchedulingTime.parseUTC(start).map { endISO(for: $0, durationMin: duration) }
         }
         let tz = bookingTz
-        let location = DiscoveryLocation.label(mode: eventType?.locationMode ?? booking?.locationMode,
-                                               detail: eventType?.locationDetail ?? booking?.locationDetail)
+        let location = DiscoveryLocation.label(
+            mode: eventType?.locationMode ?? booking?.locationMode,
+            detail: eventType?.locationDetail ?? booking?.locationDetail
+        )
         return BookingSummary(
             initials: ConfirmFormat.initials(from: page?.title),
             avatarColors: DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType),
@@ -169,6 +186,7 @@ final class InviteeConfirmedViewModel {
         return "\(ConfirmFormat.money(cents: balance, currency: payment?.currency)) due at your visit"
     }
 
+    // swiftlint:disable:next large_tuple
     var timelineSteps: [(label: String, sub: String?, state: TimelineStepState)] {
         [
             ("Submitted", "Just now", .done),
@@ -187,7 +205,9 @@ final class InviteeConfirmedViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         state = .loading
@@ -220,11 +240,21 @@ final class InviteeConfirmedViewModel {
 
 #if DEBUG
 extension InviteeConfirmedViewModel {
-    static func previewConfirmed() -> InviteeConfirmedViewModel { make(status: "confirmed") }
-    static func previewPending() -> InviteeConfirmedViewModel { make(status: "pending") }
-    static func previewPaid() -> InviteeConfirmedViewModel {
-        make(status: "confirmed", paymentJSON: #""payment":{"amount_total":4800,"currency":"usd","payment_status":"paid","paid_at":"2026-06-13T16:41:00Z"},"#)
+    static func previewConfirmed() -> InviteeConfirmedViewModel {
+        make(status: "confirmed")
     }
+
+    static func previewPending() -> InviteeConfirmedViewModel {
+        make(status: "pending")
+    }
+
+    static func previewPaid() -> InviteeConfirmedViewModel {
+        make(
+            status: "confirmed",
+            paymentJSON: #""payment":{"amount_total":4800,"currency":"usd","payment_status":"paid","paid_at":"2026-06-13T16:41:00Z"},"#
+        )
+    }
+
     static func previewDeposit() -> InviteeConfirmedViewModel {
         make(
             status: "confirmed",
@@ -232,6 +262,7 @@ extension InviteeConfirmedViewModel {
             paymentJSON: #""payment":{"amount_total":6000,"currency":"usd","payment_status":"paid","paid_at":"2026-06-13T16:41:00Z"},"#
         )
     }
+
     static func previewSending() -> InviteeConfirmedViewModel {
         make(status: "confirmed", paymentJSON: #""payment":{"amount_total":4800,"currency":"usd","payment_status":"processing"},"#)
     }
@@ -247,7 +278,10 @@ extension InviteeConfirmedViewModel {
         let viewModel = InviteeConfirmedViewModel(manageToken: "tok_preview", push: { _ in }, client: .shared)
         let depositField = depositCents.map { ",\"deposit_cents\":\($0)" } ?? ""
         let json = """
-        {"booking":{"id":"b1","status":"\(status)","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
+        {"booking":{"id":"b1","status":"\(
+            status
+        )","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z",
+        "invitee_timezone":"America/Los_Angeles","location_mode":"video"},
         "actions":{"can_cancel":true,"can_reschedule":true},
         \(paymentJSON)
         "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video"\(depositField)},

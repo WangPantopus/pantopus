@@ -16,7 +16,7 @@ import Foundation
 /// Find-a-time engine mode. `collective` = everyone required free at once;
 /// `roundRobin` = whoever's free can cover. Maps to the `mode` body field on
 /// `POST /find-a-time`.
-enum FindATimeMode: String, Sendable, Hashable, CaseIterable {
+enum FindATimeMode: String, Hashable, CaseIterable {
     case collective
     case roundRobin = "round_robin"
 
@@ -42,13 +42,15 @@ enum FindATimeMode: String, Sendable, Hashable, CaseIterable {
     }
 
     /// The wire value sent to `POST /find-a-time` (`mode`).
-    var wireValue: String { rawValue }
+    var wireValue: String {
+        rawValue
+    }
 }
 
 /// Round-robin coverage rule — a setup affordance (F4). The backend
 /// `find-a-time` engine takes only `mode`, so this is recorded for the proposal
 /// copy but not sent on the slot read.
-enum RoundRobinRule: String, Sendable, Hashable, CaseIterable {
+enum RoundRobinRule: String, Hashable, CaseIterable {
     case fairRotation
     case byRole
 
@@ -66,12 +68,14 @@ enum RoundRobinRule: String, Sendable, Hashable, CaseIterable {
 /// the availability grid, and the suggested-slot dots. Avatar colour is
 /// derived deterministically from the user id (token-based gradient), since the
 /// scheduling reads return only bare member UUIDs.
-struct FindATimeMember: Identifiable, Hashable, Sendable {
+struct FindATimeMember: Identifiable, Hashable {
     let id: String
     let displayName: String
     let initials: String
 
-    var tone: MemberAvatarTone { MemberAvatarTone.tone(for: id) }
+    var tone: MemberAvatarTone {
+        MemberAvatarTone.tone(for: id)
+    }
 
     /// Build from a home occupant row; falls back display name → `@username`
     /// → "Member".
@@ -110,17 +114,19 @@ struct FindATimeMember: Identifiable, Hashable, Sendable {
 /// Whether a member must be free (counts in the overlap) or is excluded from
 /// the requirement. "Optional" members are dropped from `member_ids` so making
 /// someone optional relaxes the constraint (the F4 no-overlap recovery).
-enum FindATimeRequirement: String, Sendable, Hashable {
+enum FindATimeRequirement: String, Hashable {
     case required
     case optional
 }
 
 /// A who's-needed picker row: a member + its current requirement.
-struct FindATimePickRow: Identifiable, Hashable, Sendable {
+struct FindATimePickRow: Identifiable, Hashable {
     let member: FindATimeMember
     var requirement: FindATimeRequirement
 
-    var id: String { member.id }
+    var id: String {
+        member.id
+    }
 }
 
 // MARK: - Draft (F4 → F5 hand-off)
@@ -130,7 +136,7 @@ struct FindATimePickRow: Identifiable, Hashable, Sendable {
 /// route can't carry rich params, so F4 stashes this in `FindATimeDraftStore`
 /// before navigating; F5 reads it (and falls back to defaults if absent, e.g.
 /// when entered directly).
-struct FindATimeDraft: Sendable, Hashable {
+struct FindATimeDraft: Hashable {
     let homeId: String
     let title: String
     /// Members shown as dots in F5 — the required set considered.
@@ -169,18 +175,28 @@ enum FindATimeDraftStore {
 
 /// A find-a-time result row decorated for display: the raw slot plus the
 /// free/busy split across the considered members.
-struct SuggestedSlot: Identifiable, Hashable, Sendable {
+struct SuggestedSlot: Identifiable, Hashable {
     let slot: SlotDTO
     /// Members considered (the required set), in display order.
     let members: [FindATimeMember]
     /// Member ids free for this slot (`eligibleHosts`).
     let freeMemberIds: Set<String>
 
-    var id: String { slot.start }
+    var id: String {
+        slot.start
+    }
 
-    var freeCount: Int { members.filter { freeMemberIds.contains($0.id) }.count }
-    var totalCount: Int { members.count }
-    var allFree: Bool { totalCount > 0 && freeCount == totalCount }
+    var freeCount: Int {
+        members.filter { freeMemberIds.contains($0.id) }.count
+    }
+
+    var totalCount: Int {
+        members.count
+    }
+
+    var allFree: Bool {
+        totalCount > 0 && freeCount == totalCount
+    }
 
     /// "All 3 free" / "2 of 3 free".
     var coverageLabel: String {

@@ -30,9 +30,9 @@ struct PerEventTypePerformanceView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            InsightsTopBar(title: model.title, onBack: { dismiss() }) {
+            InsightsTopBar(title: model.title, onBack: { dismiss() }, trailing: {
                 InsightsPeriodChip(label: model.filter.chipLabel(), accent: model.accent) { model.openFilter() }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -43,11 +43,10 @@ struct PerEventTypePerformanceView: View {
                 initial: model.filter,
                 eventTypeOptions: [],
                 memberOptions: [],
-                accent: model.accent,
-                onApply: { applied in Task { await model.apply(applied) } }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+                accent: model.accent
+            ) { applied in Task { await model.apply(applied) } }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
     }
@@ -169,7 +168,7 @@ struct PerEventTypePerformanceView: View {
     // MARK: Edit
 
     private var editButton: some View {
-        Button(action: { model.openEditor() }) {
+        Button(action: { model.openEditor() }, label: {
             HStack(spacing: 6) {
                 Icon(.pencil, size: 14, color: Theme.Color.appTextStrong)
                 Text("Edit event type").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
@@ -177,7 +176,7 @@ struct PerEventTypePerformanceView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
-        }
+        })
         .accessibilityIdentifier("scheduling.insights.editEventType")
     }
 
@@ -202,7 +201,7 @@ struct PerEventTypePerformanceView: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 280)
-                    Button(action: { model.openBookingPage() }) {
+                    Button(action: { model.openBookingPage() }, label: {
                         Text("Share booking link")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Theme.Color.appTextInverse)
@@ -210,7 +209,7 @@ struct PerEventTypePerformanceView: View {
                             .frame(height: 40)
                             .background(model.accent)
                             .clipShape(Capsule())
-                    }
+                    })
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, Spacing.s8)
@@ -224,7 +223,7 @@ struct PerEventTypePerformanceView: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        PerEventTypePerformanceView(owner: .personal, eventTypeId: "preview", push: { _ in })
+        PerEventTypePerformanceView(owner: .personal, eventTypeId: "preview") { _ in }
     }
 }
 #endif

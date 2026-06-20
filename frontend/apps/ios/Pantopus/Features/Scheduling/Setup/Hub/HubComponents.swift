@@ -11,6 +11,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Composed-availability note (Home / Business)
 
 /// Soft pillar-tinted explainer + member avatar stack. Shown above the booking
@@ -19,7 +21,9 @@ struct HubComposedNote: View {
     let owner: SchedulingOwner
     let members: [String]
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -71,7 +75,9 @@ struct HubLinkCard: View {
     let onCopy: () -> Void
     let onShare: () -> Void
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -159,7 +165,9 @@ private struct HubLinkPreview: View {
     let role: String
     let paused: Bool
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         ZStack {
@@ -214,7 +222,10 @@ private struct HubLinkPreview: View {
                             .padding(.vertical, Spacing.s1)
                             .background(paused ? Theme.Color.appSurfaceSunken : theme.accentBg)
                             .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous).stroke(paused ? Theme.Color.appBorder : Theme.Color.primary200, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous).stroke(
+                                paused ? Theme.Color.appBorder : Theme.Color.primary200,
+                                lineWidth: 1
+                            ))
                     }
                 }
                 .padding(.top, 6)
@@ -254,7 +265,9 @@ struct HubPauseRow: View {
     let isOn: Bool
     let onToggle: (Bool) -> Void
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
@@ -289,8 +302,11 @@ struct HubPausedBanner: View {
             }
             Spacer(minLength: Spacing.s2)
             Button(action: onResume) {
-                Text("Resume").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 14).padding(.vertical, Spacing.s2)
+                Text("Resume")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, Spacing.s2)
                     .background(Theme.Color.warning)
                     .clipShape(Capsule())
             }
@@ -310,7 +326,9 @@ struct HubPausedBanner: View {
 struct HubReadOnlyStatus: View {
     let owner: SchedulingOwner
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
@@ -366,11 +384,15 @@ struct HubBookingRowCard: View {
             VStack(alignment: .leading, spacing: Spacing.s0) {
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
                     Text(row.title)
-                        .font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-                        .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.timeLabel)
-                        .font(.system(size: 13, weight: .bold)).tracking(-0.2)
-                        .foregroundStyle(Theme.Color.appText).monospacedDigit()
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(-0.2)
+                        .foregroundStyle(Theme.Color.appText)
+                        .monospacedDigit()
                 }
                 .padding(.bottom, 3)
 
@@ -383,9 +405,15 @@ struct HubBookingRowCard: View {
                 HStack(spacing: Spacing.s2) {
                     HStack(spacing: 6) {
                         Text(row.bookerInitials)
-                            .font(.system(size: 9, weight: .bold)).foregroundStyle(row.bookerFg)
-                            .frame(width: 20, height: 20).background(row.bookerBg).clipShape(Circle())
-                        Text(row.bookerName).font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.Color.appTextStrong).lineLimit(1)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(row.bookerFg)
+                            .frame(width: 20, height: 20)
+                            .background(row.bookerBg)
+                            .clipShape(Circle())
+                        Text(row.bookerName)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .lineLimit(1)
                     }
                     Spacer(minLength: Spacing.s2)
                     SchedulingStatusPill(status: row.status)
@@ -467,7 +495,9 @@ struct HubEmptyState: View {
     let owner: SchedulingOwner
     let onSetUp: () -> Void
 
-    private var theme: SchedulingIdentityTheme { owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
     private var headline: String {
         switch owner {
@@ -506,17 +536,29 @@ struct HubEmptyState: View {
         VStack(spacing: Spacing.s0) {
             ZStack {
                 Circle().fill(
-                    RadialGradient(colors: [theme.accentBg, theme.accentBg.opacity(0.6)], center: .init(x: 0.3, y: 0.3), startRadius: 0, endRadius: 88)
+                    RadialGradient(
+                        colors: [theme.accentBg, theme.accentBg.opacity(0.6)],
+                        center: .init(x: 0.3, y: 0.3),
+                        startRadius: 0,
+                        endRadius: 88
+                    )
                 )
                 Icon(.calendarPlus, size: 38, strokeWidth: 1.7, color: theme.accent)
             }
             .frame(width: 88, height: 88)
             .padding(.bottom, 18)
-            Text(headline).font(.system(size: 20, weight: .bold)).tracking(-0.3).foregroundStyle(Theme.Color.appText)
+            Text(headline)
+                .font(.system(size: 20, weight: .bold))
+                .tracking(-0.3)
+                .foregroundStyle(Theme.Color.appText)
                 .multilineTextAlignment(.center)
                 .padding(.bottom, Spacing.s2)
-            Text(subhead).font(.system(size: 13)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).lineSpacing(3).frame(maxWidth: 280)
+            Text(subhead)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 280)
         }
         .padding(.horizontal, Spacing.s6)
         .padding(.top, 34)
@@ -528,7 +570,10 @@ struct HubEmptyState: View {
                 setupIconTile(.wandSparkles, bg: Theme.Color.warningBg, fg: Theme.Color.warning, size: 38, glyph: 19)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Three quick steps").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appText)
-                    Text(stepsLine).pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextStrong).lineSpacing(2)
+                    Text(stepsLine)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                        .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Spacing.s0)
@@ -575,6 +620,7 @@ struct HubEmptyState: View {
         .padding(.horizontal, Spacing.s4)
     }
 
+    // swiftlint:disable:next large_tuple
     private var placeholderRows: [(Int, String, PantopusIcon)] {
         [(0, "Event types", .layoutGrid), (1, "Availability", .clock), (2, "Connected calendars", .calendarClock)]
     }

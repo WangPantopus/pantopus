@@ -23,14 +23,17 @@ struct BuyPackageView: View {
         // Construct the presenter in the init body (not a default arg) so the
         // @MainActor initialiser is evaluated in-context, mirroring the VM build.
         _model = State(wrappedValue: BuyPackageViewModel(
-            owner: owner, packageId: packageId, push: push, client: client,
+            owner: owner,
+            packageId: packageId,
+            push: push,
+            client: client,
             presenter: StripePaymentSheetPresenter()
         ))
     }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "Buy package", onBack: { dismiss() })
+            PkgTopBar(title: "Buy package") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -59,14 +62,15 @@ struct BuyPackageView: View {
     private var checkout: some View {
         // Declined (frame 3) and already-owns-credits (frame 4) drop the intro
         // caption + eligibility row to keep the sheet focused, matching the JSX.
-        let isDeclined = { if case .declined = model.payState { return true } else { return false } }()
+        let isDeclined = if case .declined = model.payState { true } else { false }
         let hasUpsell = model.existingCredit != nil
         return VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(spacing: Spacing.s3) {
                     if !isDeclined && !hasUpsell && !model.isGuest {
                         Text("Save by buying sessions up front.")
-                            .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if case let .declined(message) = model.payState { declinedBanner(message) }
@@ -84,7 +88,8 @@ struct BuyPackageView: View {
             }
             PkgDock {
                 PkgPrimaryButton(
-                    label: model.payButtonLabel, icon: .lock,
+                    label: model.payButtonLabel,
+                    icon: .lock,
                     loading: model.payState == .paying
                 ) { Task { await model.pay() } }
             }
@@ -101,15 +106,19 @@ struct BuyPackageView: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(model.package?.name ?? "Package")
-                        .font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
                     Icon(.badgeCheck, size: 14, color: model.accent)
                 }
-                Text("\(model.theme.title) provider").font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+                Text("\(model.theme.title) provider")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
             }
             Spacer()
         }
-        .padding(.horizontal, 13).padding(.vertical, 11)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .background(Theme.Color.appSurface)
         .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
@@ -119,10 +128,14 @@ struct BuyPackageView: View {
     private var summaryCard: some View {
         let sessions = model.package?.sessionsCount ?? 0
         return PkgCard {
-            Text(model.package?.name ?? "Package").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appText)
+            Text(model.package?.name ?? "Package")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
             line(label: "\(sessions) session\(sessions == 1 ? "" : "s") × \(model.perSessionLabel)", value: model.totalLabel)
             line(label: "Per session", value: model.perSessionLabel)
-            Divider().background(Theme.Color.appBorder).padding(.vertical, 3)
+            Divider()
+                .background(Theme.Color.appBorder)
+                .padding(.vertical, 3)
             line(label: "Total", value: model.totalLabel, strong: true)
         }
     }
@@ -134,25 +147,32 @@ struct BuyPackageView: View {
                 .foregroundStyle(strong ? Theme.Color.appText : Theme.Color.appTextStrong)
             Spacer()
             Text(value)
-                .font(.system(size: strong ? 16 : 13, weight: .bold)).monospacedDigit()
+                .font(.system(size: strong ? 16 : 13, weight: .bold))
+                .monospacedDigit()
                 .foregroundStyle(Theme.Color.appText)
         }
     }
 
     private var eligibleRow: some View {
         HStack(alignment: .top, spacing: 10) {
-            Icon(.ticketCheck, size: 16, color: model.accent).padding(.top, 1)
+            Icon(.ticketCheck, size: 16, color: model.accent)
+                .padding(.top, 1)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Use credits on").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                Text("Use credits on")
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
                 Text(model.package?.eventTypeId == nil ? "All of this provider's services" : "The selected service")
-                    .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextStrong)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextStrong)
                 Text("Credits expire 1 year after purchase")
-                    .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     .padding(.top, 2)
             }
             Spacer()
         }
-        .padding(.horizontal, 13).padding(.vertical, 11)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .background(model.theme.accentBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
@@ -167,11 +187,13 @@ struct BuyPackageView: View {
                 .background(Theme.Color.appSurfaceSunken)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
             Text("Add a payment method")
-                .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.Color.appText)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
             Spacer()
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
         }
-        .padding(.horizontal, 13).padding(.vertical, 11)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .background(Theme.Color.appSurface)
         .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
@@ -181,16 +203,20 @@ struct BuyPackageView: View {
     /// "Sign in" link are not yet bound to an auth/receipt endpoint.
     private var guestEmailCard: some View {
         PkgCard {
-            Text("Email").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+            Text("Email")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
             Text("you@email.com")
-                .font(.system(size: 12.5)).foregroundStyle(Theme.Color.appTextMuted)
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.Color.appTextMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 11).padding(.vertical, 10)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 10)
                 .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1.5))
             (
                 Text("We'll send your receipt and credits here. ")
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                + Text("Sign in").foregroundStyle(Theme.Color.primary600).fontWeight(.bold)
+                    + Text("Sign in").foregroundStyle(Theme.Color.primary600).fontWeight(.bold)
             )
             .font(.system(size: 10.5))
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -199,7 +225,8 @@ struct BuyPackageView: View {
 
     private var footnote: some View {
         Text("Free cancellation up to 24 hours before. After that, no refund. Use your credits any time before they expire.")
-            .font(.system(size: 10.5)).foregroundStyle(Theme.Color.appTextSecondary)
+            .font(.system(size: 10.5))
+            .foregroundStyle(Theme.Color.appTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -210,14 +237,19 @@ struct BuyPackageView: View {
     private func upsellBanner(_ credit: PackageCreditDTO) -> some View {
         VStack(spacing: 10) {
             HStack(alignment: .top, spacing: 9) {
-                Icon(.ticket, size: 16, color: Theme.Color.info).padding(.top, 1)
-                Text("You already have \(credit.remainingSessions ?? 0) credit\((credit.remainingSessions ?? 0) == 1 ? "" : "s") left on this package.")
-                    .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+                Icon(.ticket, size: 16, color: Theme.Color.info)
+                    .padding(.top, 1)
+                let remaining = credit.remainingSessions ?? 0
+                let plural = remaining == 1 ? "" : "s"
+                Text("You already have \(remaining) credit\(plural) left on this package.")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             PkgGhostButton(label: "Use a credit instead") { model.useCreditInstead() }
         }
-        .padding(.horizontal, 13).padding(.vertical, 12)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
         .background(Theme.Color.infoBg)
         .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.infoLight, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
@@ -232,10 +264,14 @@ struct BuyPackageView: View {
                 Circle().fill(Theme.Color.successBg).frame(width: 72, height: 72)
                 Icon(.checkCircle, size: 34, color: Theme.Color.success)
             }
-            Text("Credits added").font(.system(size: 20, weight: .semibold)).foregroundStyle(Theme.Color.appText)
+            Text("Credits added")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
             Text("Your package credits are ready. Book a session any time before they expire.")
-                .font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 280)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
             Spacer()
             PkgPrimaryButton(label: "View my packages", icon: .tag) { model.useCreditInstead() }
                 .padding(.horizontal, Spacing.s4)

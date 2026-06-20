@@ -29,7 +29,7 @@ struct TeamBookingAvailabilityView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Booking availability", trailing: assignmentAction, onBack: { dismiss() })
+            BizTopBar(title: "Booking availability", trailing: assignmentAction) { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -58,9 +58,9 @@ struct TeamBookingAvailabilityView: View {
         }
         .sheet(item: Binding(get: { model.assignmentTarget }, set: { model.assignmentTarget = $0 })) { target in
             if target.collective {
-                CollectiveEventSetupSheet(owner: model.owner, eventTypeId: target.id, onClose: { model.assignmentTarget = nil })
+                CollectiveEventSetupSheet(owner: model.owner, eventTypeId: target.id) { model.assignmentTarget = nil }
             } else {
-                RoundRobinAssignmentSheet(owner: model.owner, eventTypeId: target.id, onClose: { model.assignmentTarget = nil })
+                RoundRobinAssignmentSheet(owner: model.owner, eventTypeId: target.id) { model.assignmentTarget = nil }
             }
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
@@ -103,8 +103,11 @@ struct TeamBookingAvailabilityView: View {
     private var loadedBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                BizNote(tone: .info, icon: .info,
-                        text: "Bookings use each member's personal availability. Edit a member's hours to change when they can be booked.")
+                BizNote(
+                    tone: .info,
+                    icon: .info,
+                    text: "Bookings use each member's personal availability. Edit a member's hours to change when they can be booked."
+                )
 
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     BizOverline(text: "Team")
@@ -206,8 +209,11 @@ struct TeamBookingAvailabilityView: View {
     private var loadingBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                BizNote(tone: .info, icon: .info,
-                        text: "Bookings use each member's personal availability. Edit a member's hours to change when they can be booked.")
+                BizNote(
+                    tone: .info,
+                    icon: .info,
+                    text: "Bookings use each member's personal availability. Edit a member's hours to change when they can be booked."
+                )
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     BizOverline(text: "Team")
                     BizCard {
@@ -245,14 +251,18 @@ struct TeamBookingAvailabilityView: View {
                 Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
             Text("Couldn't load your team").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button { Task { await model.load() } } label: {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
                     Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()
@@ -314,11 +324,15 @@ struct AssignmentPickerSheet: View {
                                 Spacer(minLength: Spacing.s2)
                                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
                             }
-                            .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, Spacing.s3)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Theme.Color.appSurface)
                             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(
+                                Theme.Color.appBorder,
+                                lineWidth: 1
+                            ))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)

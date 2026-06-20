@@ -11,8 +11,17 @@ import XCTest
 
 @MainActor
 final class InvoicesViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = true }
-    override func tearDown() { SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = false; super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = true
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = false
+        super.tearDown()
+    }
 
     private func session(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingClient {
         SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
@@ -24,12 +33,14 @@ final class InvoicesViewModelTests: XCTestCase {
         InvoicesListViewModel(owner: .business(id: "biz1"), push: { _ in }, client: session(routes))
     }
 
+    // swiftlint:disable line_length
     private let invoices = #"""
     {"invoices":[
       {"id":"inv1","business_user_id":"biz1","recipient_user_id":"u9","total_cents":22000,"currency":"USD","created_at":"2026-06-12T10:00:00Z"},
       {"id":"inv2","business_user_id":"biz1","recipient_user_id":"u8","total_cents":8000,"currency":"USD","created_at":"2026-06-10T10:00:00Z"}
     ]}
     """#
+    // swiftlint:enable line_length
 
     func testListLoadedGroupsAndSums() async {
         let model = listVM([
@@ -40,8 +51,8 @@ final class InvoicesViewModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .loaded)
         XCTAssertEqual(model.invoices.count, 2)
         XCTAssertEqual(model.sections.count, 2)
-        XCTAssertEqual(model.countLabel, "2")
-        XCTAssertTrue(model.totalLabel.contains("300"))
+        XCTAssertEqual(model.collectedMonthLabel, "2")
+        XCTAssertTrue(model.outstandingLabel.contains("300"))
         XCTAssertTrue(model.reference(model.invoices[0]).hasPrefix("INV-"))
     }
 

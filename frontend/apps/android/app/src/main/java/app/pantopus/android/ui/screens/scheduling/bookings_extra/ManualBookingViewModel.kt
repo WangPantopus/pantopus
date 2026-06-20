@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
@@ -118,7 +126,13 @@ class ManualBookingViewModel
                             )
                         }
                     }
-                    is NetworkResult.Failure -> _state.update { it.copy(loadingEventTypes = false, loadError = "Couldn't load your event types.") }
+                    is NetworkResult.Failure ->
+                        _state.update {
+                            it.copy(
+                                loadingEventTypes = false,
+                                loadError = "Couldn't load your event types.",
+                            )
+                        }
                 }
             }
         }
@@ -277,7 +291,13 @@ class ManualBookingViewModel
 
         fun bookAnother() {
             started = false
-            _state.value = ManualBookingUiState(loadingEventTypes = false, tzLabel = tzLabel(), eventTypes = _state.value.eventTypes, pillar = _state.value.pillar)
+            _state.value =
+                ManualBookingUiState(
+                    loadingEventTypes = false,
+                    tzLabel = tzLabel(),
+                    eventTypes = _state.value.eventTypes,
+                    pillar = _state.value.pillar,
+                )
             started = true
         }
 
@@ -305,15 +325,13 @@ class ManualBookingViewModel
             )
         }
 
-        private fun nearestAlternatives(): List<SlotDto> =
-            allSlots.filter { it.start != _state.value.selectedSlotStart }.take(ALT_COUNT)
+        private fun nearestAlternatives(): List<SlotDto> = allSlots.filter { it.start != _state.value.selectedSlotStart }.take(ALT_COUNT)
 
         // ─── Helpers ─────────────────────────────────────────────────────────
 
         private fun slotsForDay(day: LocalDate): List<SlotDto> = allSlots.filter { dayOf(it) == day }
 
-        private fun dayOf(slot: SlotDto): LocalDate? =
-            BookingsExtrasFormatting.instantOrNull(slot.start)?.atZone(zone)?.toLocalDate()
+        private fun dayOf(slot: SlotDto): LocalDate? = BookingsExtrasFormatting.instantOrNull(slot.start)?.atZone(zone)?.toLocalDate()
 
         private fun tzLabel(): String = "Times in ${zone.id.substringAfterLast('/').replace('_', ' ')} · tap to change"
 

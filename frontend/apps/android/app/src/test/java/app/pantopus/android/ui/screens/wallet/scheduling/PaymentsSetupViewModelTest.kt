@@ -43,8 +43,7 @@ class PaymentsSetupViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun flags(enabled: Boolean) =
-        SchedulingFeatureFlags().apply { environment = if (enabled) "development" else "production" }
+    private fun flags(enabled: Boolean) = SchedulingFeatureFlags().apply { environment = if (enabled) "development" else "production" }
 
     private fun vm(enabled: Boolean = true) = PaymentsSetupViewModel(repo, connect, flags(enabled), auth)
 

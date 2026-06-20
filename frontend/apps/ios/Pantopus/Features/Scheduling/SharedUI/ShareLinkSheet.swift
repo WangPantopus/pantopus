@@ -13,6 +13,8 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 import UIKit
 
+// swiftlint:disable type_body_length
+
 /// Owner booking-link share sheet. Persistence (toggles), system share, and
 /// regeneration are wired by the presenting stream via callbacks.
 public struct ShareLinkSheet: View {
@@ -95,7 +97,7 @@ public struct ShareLinkSheet: View {
         }
     }
 
-    // Floating green "Link copied" pill toast (design Frame 3).
+    /// Floating green "Link copied" pill toast (design Frame 3).
     @ViewBuilder
     private var copiedToast: some View {
         if copied {

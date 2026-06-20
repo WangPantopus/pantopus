@@ -36,18 +36,21 @@ struct MessageTemplateEditorView: View {
         .navigationBarBackButtonHidden(true)
         .task { await model.load() }
         .sheet(isPresented: $model.showVariablePicker) {
-            VariablePickerSheet(accent: model.accent, onInsert: { model.insert(variable: $0) }, onClose: { model.showVariablePicker = false })
+            VariablePickerSheet(
+                accent: model.accent,
+                onInsert: { model.insert(variable: $0) },
+                onClose: { model.showVariablePicker = false }
+            )
         }
         .sheet(isPresented: $model.showPreview) {
             MessagePreviewView(
                 owner: model.owner,
                 subject: model.previewSubject,
                 body: model.body,
-                channel: model.channel,
-                onClose: { model.showPreview = false }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+                channel: model.channel
+            ) { model.showPreview = false }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
             "Delete \"\(model.name.isEmpty ? "this template" : model.name)\"?",
@@ -170,9 +173,8 @@ struct MessageTemplateEditorView: View {
                             isOn: model.channel == channel,
                             isComingSoon: channel.isComingSoon,
                             accent: model.accent,
-                            accentBg: model.accentBg,
-                            onTap: { model.setChannel(channel) }
-                        )
+                            accentBg: model.accentBg
+                        ) { model.setChannel(channel) }
                     }
                     Spacer(minLength: Spacing.s0)
                 }

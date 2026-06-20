@@ -68,8 +68,8 @@ final class AddEventFormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.reminderOffsets, [.tenMin])
         XCTAssertFalse(vm.requestRsvp)
         XCTAssertTrue(vm.selectedAttendeeIds.isEmpty)
-        XCTAssertEqual(vm.screenTitle, "Add event")
-        XCTAssertEqual(vm.commitLabel, "Add")
+        XCTAssertEqual(vm.screenTitle, "New event")
+        XCTAssertEqual(vm.commitLabel, "Save")
     }
 
     // MARK: - Validation

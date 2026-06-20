@@ -4,7 +4,7 @@
 //
 //  G7 · Stream I14. Exercises the payouts/earnings projections — payout-state
 //  derivation from the Connect account, source classification, pending →
-//  "Processing" rendering — and a populated load against stubbed Wallet +
+//  "Pending" rendering — and a populated load against stubbed Wallet +
 //  Connect endpoints with the booking-source filter applied.
 //
 
@@ -13,8 +13,15 @@ import XCTest
 
 @MainActor
 final class PayoutsEarningsViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     // MARK: - Pure projections
 
@@ -40,7 +47,7 @@ final class PayoutsEarningsViewModelTests: XCTestCase {
         XCTAssertEqual(PayoutsEarningsViewModel.source(for: "gig_income", description: "Lawn mow"), .gigs)
     }
 
-    func testProjectRowPendingShowsProcessing() throws {
+    func testProjectRowPendingShowsPending() throws {
         let json = """
         {"id":"t1","type":"gig_income","amount":4800,"status":"pending",
         "created_at":"2026-06-15T14:00:00Z","description":"Booking · Dana"}
@@ -48,7 +55,7 @@ final class PayoutsEarningsViewModelTests: XCTestCase {
         let tx = try JSONDecoder().decode(WalletTransactionDTO.self, from: Data(json.utf8))
         let row = PayoutsEarningsViewModel.projectRow(from: tx)
         XCTAssertTrue(row.isPending)
-        XCTAssertEqual(row.statusLabel, "Processing")
+        XCTAssertEqual(row.statusLabel, "Pending")
         XCTAssertEqual(row.source, .booking)
         XCTAssertEqual(row.amount, "48.00")
         XCTAssertEqual(row.direction, .in)

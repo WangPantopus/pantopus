@@ -48,10 +48,21 @@ final class RoundRobinAssignmentViewModel {
 
     // MARK: Derived
 
-    var checkedCount: Int { picks.filter(\.checked).count }
-    var doneDisabled: Bool { checkedCount == 0 || isSaving }
-    var isSingleMember: Bool { checkedCount == 1 }
-    var firstCheckedName: String? { picks.first(where: \.checked)?.name }
+    var checkedCount: Int {
+        picks.filter(\.checked).count
+    }
+
+    var doneDisabled: Bool {
+        checkedCount == 0 || isSaving
+    }
+
+    var isSingleMember: Bool {
+        checkedCount == 1
+    }
+
+    var firstCheckedName: String? {
+        picks.first(where: \.checked)?.name
+    }
 
     init(owner: SchedulingOwner, eventTypeId: String, client: SchedulingClient) {
         self.owner = owner
@@ -65,7 +76,7 @@ final class RoundRobinAssignmentViewModel {
         phase = .loading
         do {
             let pool = try await AssignmentLoader.loadPool(owner: owner, eventTypeId: eventTypeId, client: client)
-            let assignedById = Dictionary(pool.assignees.map { ($0.subjectId, $0) }, uniquingKeysWith: { first, _ in first })
+            let assignedById = Dictionary(pool.assignees.map { ($0.subjectId, $0) }) { first, _ in first }
             picks = pool.members.map { member in
                 let assignee = assignedById[member.id]
                 return Pick(
@@ -80,7 +91,14 @@ final class RoundRobinAssignmentViewModel {
             // Members assigned but not in the roster fetch (defensive) — keep them.
             let knownIds = Set(picks.map(\.id))
             for assignee in pool.assignees where !knownIds.contains(assignee.subjectId) {
-                picks.append(Pick(id: assignee.subjectId, name: "Member", avatarURL: nil, role: nil, checked: true, weight: assignee.weight ?? 1))
+                picks.append(Pick(
+                    id: assignee.subjectId,
+                    name: "Member",
+                    avatarURL: nil,
+                    role: nil,
+                    checked: true,
+                    weight: assignee.weight ?? 1
+                ))
             }
             selectedRule = Self.inferRule(pool.assignees)
             phase = .ready
@@ -93,7 +111,9 @@ final class RoundRobinAssignmentViewModel {
 
     // MARK: Editing
 
-    func selectRule(_ rule: Rule) { selectedRule = rule }
+    func selectRule(_ rule: Rule) {
+        selectedRule = rule
+    }
 
     func toggle(_ id: String) {
         guard let idx = picks.firstIndex(where: { $0.id == id }) else { return }

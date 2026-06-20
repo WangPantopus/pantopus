@@ -11,18 +11,29 @@ import XCTest
 
 @MainActor
 final class PerEventTypePerformanceViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> PerEventTypePerformanceViewModel {
         PerEventTypePerformanceViewModel(
             owner: .personal,
             eventTypeId: "et1",
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
+    // swiftlint:disable:next line_length
     private let detail = #"{"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30],"default_duration":30,"price_cents":5000,"currency":"USD"},"assignees":[],"questions":[]}"#
 
     func testLoadedBuildsHeaderTilesAndFunnel() async {

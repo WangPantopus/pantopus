@@ -103,8 +103,9 @@ class PaymentRetryViewModel
                 is CheckoutOutcome.Paid -> load(manageToken) // re-read; webhook reconciles
                 is CheckoutOutcome.Canceled -> Unit // stay on the retry sheet
                 is CheckoutOutcome.Declined -> {
-                    val slotTime = (_state.value as? PaymentRetryUiState.Declined)?.slotTime
-                        ?: (_state.value as? PaymentRetryUiState.Timeout)?.slotTime
+                    val slotTime =
+                        (_state.value as? PaymentRetryUiState.Declined)?.slotTime
+                            ?: (_state.value as? PaymentRetryUiState.Timeout)?.slotTime
                     _state.value =
                         PaymentRetryUiState.Declined(
                             amountLabel = (_state.value as? PaymentRetryUiState.Declined)?.amountLabel.orEmpty(),

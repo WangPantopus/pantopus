@@ -23,11 +23,11 @@ struct SchedulingPackagesListView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "Packages", onBack: { dismiss() }) {
+            PkgTopBar(title: "Packages", onBack: { dismiss() }, trailing: {
                 if model.phase != .comingSoon {
                     PkgTopBarIconButton(icon: .plus, accessibilityLabel: "Create a package") { model.createPackage() }
                 }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -104,9 +104,8 @@ struct SchedulingPackagesListView: View {
         PkgSegmented(
             options: ["Active", "Archived"],
             selectedIndex: model.filter.rawValue,
-            accent: model.accent,
-            onSelect: { idx in model.filter = SchedulingPackagesListViewModel.Filter(rawValue: idx) ?? .active }
-        )
+            accent: model.accent
+        ) { idx in model.filter = SchedulingPackagesListViewModel.Filter(rawValue: idx) ?? .active }
     }
 
     private var intro: some View {
@@ -164,18 +163,25 @@ struct SchedulingPackagesListView: View {
                         .foregroundStyle(Theme.Color.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Button(action: { model.connectPayments() }) {
-                    HStack(spacing: 6) {
-                        Icon(.externalLink, size: 14, color: Theme.Color.appTextInverse)
-                        Text("Connect payments").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
+                Button(
+                    action: { model.connectPayments() },
+                    label: {
+                        HStack(spacing: 6) {
+                            Icon(.externalLink, size: 14, color: Theme.Color.appTextInverse)
+                            Text("Connect payments")
+                                .font(.system(size: 12.5, weight: .bold))
+                                .foregroundStyle(Theme.Color.appTextInverse)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     }
-                    .frame(maxWidth: .infinity).frame(height: 38)
-                    .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                }
+                )
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 14).padding(.vertical, 13)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
             .frame(maxWidth: 260)
             .background(Theme.Color.warningBg)
             .overlay(
@@ -229,7 +235,9 @@ private struct PackagePill: View {
     let onArchive: () -> Void
     let onRestore: () -> Void
 
-    private var isArchived: Bool { package.isActive == false }
+    private var isArchived: Bool {
+        package.isActive == false
+    }
 
     private var accessibilityLabel: String {
         var parts = [package.name, subtitle, isArchived ? "archived" : "active"]
@@ -245,11 +253,13 @@ private struct PackagePill: View {
                 .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(package.name)
-                    .font(.system(size: 13.5, weight: .bold)).tracking(-0.1)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .tracking(-0.1)
                     .foregroundStyle(Theme.Color.appText)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     .lineLimit(1)
                 HStack(spacing: 7) {
                     PkgChip(text: isArchived ? "Archived" : "Active", tone: isArchived ? .neutral : .success, uppercased: true)
@@ -280,7 +290,8 @@ private struct PackagePill: View {
                 Text("Restore")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextStrong)
-                    .padding(.horizontal, 12).frame(height: 28)
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .buttonStyle(.plain)
@@ -288,7 +299,13 @@ private struct PackagePill: View {
         } else {
             Menu {
                 Button { onTap() } label: { Label { Text("Edit") } icon: { Icon(.pencil, size: 16, color: Theme.Color.appText) } }
-                Button(role: .destructive, action: onArchive) { Label { Text("Archive") } icon: { Icon(.archive, size: 16, color: Theme.Color.error) } }
+                Button(role: .destructive, action: onArchive) { Label { Text("Archive") } icon: { Icon(
+                    .archive,
+                    size: 16,
+                    color: Theme.Color.error
+                )
+                }
+                }
             } label: {
                 Icon(.moreVertical, size: 18, color: Theme.Color.appTextMuted).frame(width: 32, height: 32)
             }

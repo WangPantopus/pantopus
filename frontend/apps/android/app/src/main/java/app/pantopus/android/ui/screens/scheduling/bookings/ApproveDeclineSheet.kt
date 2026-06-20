@@ -134,7 +134,7 @@ fun ApproveDeclineSheet(
                     modifier = Modifier.testTag("approveDeclineConfirmDecline"),
                 )
             } else {
-                // Design: Approve CTA is always PRIMARY blue (#0284c7), not the pillar
+                // Design: Approve CTA is always PRIMARY blue (primary600), not the pillar
                 // accent (approve-decline-frames.jsx:20, :126 — background:PRIMARY).
                 PillarFilledButton(
                     label = "Approve",

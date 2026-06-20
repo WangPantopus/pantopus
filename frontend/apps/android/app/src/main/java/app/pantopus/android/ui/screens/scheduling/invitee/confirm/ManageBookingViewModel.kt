@@ -86,7 +86,8 @@ class ManageBookingViewModel
                     is NetworkResult.Failure -> {
                         when (errors.decode(result.error, notFoundAs = SchedulingError.Expired)) {
                             is SchedulingError.Expired, is SchedulingError.Unavailable -> _state.value = ManageBookingUiState.Expired
-                            is SchedulingError.Generic -> _state.value = ManageBookingUiState.Error("We couldn't load this booking. Please try again.")
+                            is SchedulingError.Generic ->
+                                _state.value = ManageBookingUiState.Error("We couldn't load this booking. Please try again.")
                             else -> _state.value = ManageBookingUiState.Expired
                         }
                     }
@@ -127,8 +128,20 @@ class ManageBookingViewModel
                     is NetworkResult.Failure ->
                         when (val decoded = errors.decode(r.error)) {
                             is SchedulingError.Conflict -> _reschedule.update { it?.copy(submitting = false, conflict = decoded) }
-                            is SchedulingError.Generic -> _reschedule.update { it?.copy(submitting = false, errorMessage = decoded.message) }
-                            else -> _reschedule.update { it?.copy(submitting = false, errorMessage = "Couldn't reschedule. Please try again.") }
+                            is SchedulingError.Generic ->
+                                _reschedule.update {
+                                    it?.copy(
+                                        submitting = false,
+                                        errorMessage = decoded.message,
+                                    )
+                                }
+                            else ->
+                                _reschedule.update {
+                                    it?.copy(
+                                        submitting = false,
+                                        errorMessage = "Couldn't reschedule. Please try again.",
+                                    )
+                                }
                         }
                 }
             }
@@ -172,12 +185,19 @@ class ManageBookingViewModel
             val et = response.eventType
             val page = response.page
             val actions = response.actions ?: ManageActions()
-            val tz = booking.inviteeTimezone?.takeIf { it.isNotBlank() } ?: page?.timezone?.takeIf { it.isNotBlank() } ?: ConfirmUtils.deviceTimezone()
+            val tz =
+                booking.inviteeTimezone?.takeIf { it.isNotBlank() }
+                    ?: page?.timezone?.takeIf { it.isNotBlank() }
+                    ?: ConfirmUtils.deviceTimezone()
             val status = resolveStatus(booking.status, booking.endAt)
             val isActive = status == ManageStatus.Confirmed || status == ManageStatus.Pending
             val canReschedule = isActive && (actions.canReschedule == true) && (actions.inviteeRescheduleAllowed != false)
             val canCancel = isActive && (actions.canCancel == true) && (actions.inviteeCancelAllowed != false)
-            val location = ConfirmUtils.locationLabel(booking.locationMode ?: et?.locationMode, booking.locationDetail ?: et?.locationDetail)
+            val location =
+                ConfirmUtils.locationLabel(
+                    booking.locationMode ?: et?.locationMode,
+                    booking.locationDetail ?: et?.locationDetail,
+                )
             return ManageBookingData(
                 token = token,
                 status = status,

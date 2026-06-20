@@ -24,14 +24,16 @@ final class ManageTokenStore {
 
     /// One persisted booking handle. Carries just enough metadata to render a
     /// lightweight list entry without a network round-trip.
-    struct Entry: Codable, Sendable, Hashable, Identifiable {
+    struct Entry: Codable, Hashable, Identifiable {
         let bookingId: String
         let manageToken: String
         let eventTypeName: String?
         let startAt: String?
         let savedAt: Date
 
-        var id: String { bookingId }
+        var id: String {
+            bookingId
+        }
     }
 
     private let defaults: UserDefaults
@@ -75,7 +77,9 @@ final class ManageTokenStore {
     }
 
     /// All persisted handles, newest first (for a future "My bookings" list).
-    func allEntries() -> [Entry] { cache }
+    func allEntries() -> [Entry] {
+        cache
+    }
 
     /// Forget a single booking handle (e.g. after the booking is cancelled).
     func remove(bookingId: String) {

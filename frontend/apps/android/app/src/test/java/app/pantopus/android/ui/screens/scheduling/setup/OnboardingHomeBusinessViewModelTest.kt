@@ -13,7 +13,6 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
-import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import com.squareup.moshi.Moshi
@@ -41,13 +40,12 @@ class OnboardingHomeBusinessViewModelTest {
     private val homes: HomesRepository = mockk()
     private val auth: AuthRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
-    private val flags = SchedulingFeatureFlags().apply { environment = "development" }
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = OnboardingHomeBusinessViewModel(repo, homes, auth, errors, flags)
+    private fun vm() = OnboardingHomeBusinessViewModel(repo, homes, auth, errors)
 
     private fun myHome(id: String) =
         MyHome(

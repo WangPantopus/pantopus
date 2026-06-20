@@ -10,6 +10,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct MemberWorkingHoursSheet: View {
     @State private var model: MemberWorkingHoursViewModel
     var accent: Color = Theme.Color.business
@@ -39,9 +40,8 @@ struct MemberWorkingHoursSheet: View {
                     BizPrimaryButton(
                         title: model.isSaving ? "Saving" : "Save hours",
                         isSaving: model.isSaving,
-                        isDisabled: !model.formValid,
-                        action: { Task { if await model.save() { onClose() } } }
-                    )
+                        isDisabled: !model.formValid
+                    ) { Task { if await model.save() { onClose() } } }
                 }
             }
         }
@@ -106,7 +106,8 @@ struct MemberWorkingHoursSheet: View {
                 Text(model.timezoneId).font(.system(size: 11.5, weight: .bold)).foregroundStyle(accent)
                 Icon(.chevronDown, size: 13, color: accent)
             }
-            .padding(.horizontal, 11).frame(height: 30)
+            .padding(.horizontal, 11)
+            .frame(height: 30)
             .background(Theme.Color.businessBg)
             .clipShape(Capsule())
         }
@@ -169,7 +170,8 @@ struct MemberWorkingHoursSheet: View {
         Text(range.display)
             .font(.system(size: 11, weight: .bold))
             .foregroundStyle(Theme.Color.appTextSecondary)
-            .padding(.horizontal, 9).padding(.vertical, 5)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(Theme.Color.appSurfaceSunken)
             .clipShape(Capsule())
     }
@@ -198,7 +200,8 @@ struct MemberWorkingHoursSheet: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(range.display)")
         }
-        .padding(.horizontal, 9).padding(.vertical, 5)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
         .background(Theme.Color.businessBg)
         .clipShape(Capsule())
     }
@@ -270,7 +273,8 @@ struct MemberWorkingHoursSheet: View {
             Spacer(minLength: Spacing.s0)
             Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
         }
-        .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
         .background(isError ? Theme.Color.errorBg : Theme.Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         .overlay(
@@ -314,7 +318,8 @@ struct MemberWorkingHoursSheet: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 13).padding(.vertical, Spacing.s3)
+        .padding(.horizontal, 13)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.businessBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
@@ -348,11 +353,17 @@ struct MemberWorkingHoursSheet: View {
         VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 240)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 240)
             Button { Task { await model.load() } } label: {
-                Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
-                    .padding(.horizontal, Spacing.s4).padding(.vertical, Spacing.s2)
+                Text("Try again")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.vertical, Spacing.s2)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

@@ -9,6 +9,8 @@ import app.pantopus.android.data.api.models.scheduling.GetWaitlistResponse
 import app.pantopus.android.data.api.models.scheduling.SchedulingOkResponse
 import app.pantopus.android.data.api.models.scheduling.WaitlistEntryDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -28,6 +30,8 @@ import org.junit.Test
 class WaitlistViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo = mockk<SchedulingRepository>()
+    private val homes = mockk<HomesRepository>(relaxed = true)
+    private val auth = mockk<AuthRepository>(relaxed = true)
 
     private val eventType = EventTypeDto(id = "et1", name = "Group class", slug = "group", durations = listOf(60), seatCap = 10)
     private val entries =
@@ -52,7 +56,7 @@ class WaitlistViewModelTest {
             coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(listOf(eventType)))
             coEvery { repo.getWaitlist(any(), any()) } returns NetworkResult.Success(GetWaitlistResponse(entries))
 
-            val vm = WaitlistViewModel(repo)
+            val vm = WaitlistViewModel(repo, homes, auth)
             vm.start()
             advanceUntilIdle()
 
@@ -68,7 +72,7 @@ class WaitlistViewModelTest {
         runTest(dispatcher) {
             coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(emptyList()))
 
-            val vm = WaitlistViewModel(repo)
+            val vm = WaitlistViewModel(repo, homes, auth)
             vm.start()
             advanceUntilIdle()
 
@@ -82,7 +86,7 @@ class WaitlistViewModelTest {
             coEvery { repo.getWaitlist(any(), any()) } returns NetworkResult.Success(GetWaitlistResponse(entries))
             coEvery { repo.promoteWaitlist(any(), any()) } returns NetworkResult.Success(SchedulingOkResponse())
 
-            val vm = WaitlistViewModel(repo)
+            val vm = WaitlistViewModel(repo, homes, auth)
             vm.start()
             advanceUntilIdle()
             vm.promote("w1")

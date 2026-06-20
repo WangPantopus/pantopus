@@ -17,7 +17,9 @@ struct WaitlistManagementView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
-    private var theme: SchedulingIdentityTheme { viewModel.owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        viewModel.owner.theme
+    }
 
     var body: some View {
         content
@@ -101,7 +103,7 @@ struct WaitlistManagementView: View {
             VStack(spacing: Spacing.s3) {
                 Shimmer(height: 74, cornerRadius: Radii.xl)
                     .padding(.top, Spacing.s3)
-                ForEach(0 ..< 3, id: \.self) { _ in
+                ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 84, cornerRadius: Radii.lg + 2)
                 }
             }

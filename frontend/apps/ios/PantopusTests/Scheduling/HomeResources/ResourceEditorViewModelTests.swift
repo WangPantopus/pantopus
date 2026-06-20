@@ -44,7 +44,7 @@ final class ResourceEditorViewModelTests: XCTestCase {
 
     func testCreateSaveSucceeds() async {
         SequencedURLProtocol.sequence = [
-            .status(201, body: #"{"resource":{"id":"r1","name":"Power tools","resource_type":"tool"}}"#),
+            .status(201, body: #"{"resource":{"id":"r1","name":"Power tools","resource_type":"tool"}}"#)
         ]
         let viewModel = ResourceEditorViewModel(homeId: "h1", resourceId: nil, push: { _ in }, client: makeClient())
         await viewModel.load()
@@ -60,7 +60,7 @@ final class ResourceEditorViewModelTests: XCTestCase {
             .status(200, body: #"""
             {"resources":[{"id":"r1","name":"EV charger","resource_type":"charger",
              "max_duration_min":240,"buffer_min":15,"requires_approval":false,"who_can_book":"members","is_active":true}]}
-            """#),
+            """#)
         ]
         let viewModel = ResourceEditorViewModel(homeId: "h1", resourceId: "r1", push: { _ in }, client: makeClient())
         await viewModel.load()

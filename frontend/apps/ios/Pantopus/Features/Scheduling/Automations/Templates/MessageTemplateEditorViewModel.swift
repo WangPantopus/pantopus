@@ -46,32 +46,79 @@ final class MessageTemplateEditorViewModel {
     private(set) var isDeleting = false
     var deleteError: String?
 
-    var isNew: Bool { templateId == nil }
-    var navTitle: String { isNew ? "New template" : "Edit template" }
+    var isNew: Bool {
+        templateId == nil
+    }
+
+    var navTitle: String {
+        isNew ? "New template" : "Edit template"
+    }
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var showsSubject: Bool { channel == .email || channel == .sms }
-    var subjectRequired: Bool { channel == .email }
+    var accent: Color {
+        theme.accent
+    }
 
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
-    private var trimmedBody: String { body.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedSubject: String { subject.trimmingCharacters(in: .whitespaces) }
+    var accentBg: Color {
+        theme.accentBg
+    }
 
-    var nameIsEmpty: Bool { trimmedName.isEmpty }
-    var bodyIsEmpty: Bool { trimmedBody.isEmpty }
-    var subjectMissing: Bool { subjectRequired && trimmedSubject.isEmpty }
+    var showsSubject: Bool {
+        channel == .email || channel == .sms
+    }
 
-    var canSave: Bool { !nameIsEmpty && !bodyIsEmpty && !subjectMissing && !isSaving }
-    var canPreview: Bool { !bodyIsEmpty }
+    var subjectRequired: Bool {
+        channel == .email
+    }
 
-    var bodyCount: Int { body.count }
-    var counterLimit: Int { channel == .sms ? WorkflowChannel.smsSegmentLimit : WorkflowChannel.bodyCounterLimit }
-    var isOverLimit: Bool { channel == .sms && bodyCount > WorkflowChannel.smsSegmentLimit }
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var trimmedBody: String {
+        body.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedSubject: String {
+        subject.trimmingCharacters(in: .whitespaces)
+    }
+
+    var nameIsEmpty: Bool {
+        trimmedName.isEmpty
+    }
+
+    var bodyIsEmpty: Bool {
+        trimmedBody.isEmpty
+    }
+
+    var subjectMissing: Bool {
+        subjectRequired && trimmedSubject.isEmpty
+    }
+
+    var canSave: Bool {
+        !nameIsEmpty && !bodyIsEmpty && !subjectMissing && !isSaving
+    }
+
+    var canPreview: Bool {
+        !bodyIsEmpty
+    }
+
+    var bodyCount: Int {
+        body.count
+    }
+
+    var counterLimit: Int {
+        channel == .sms ? WorkflowChannel.smsSegmentLimit : WorkflowChannel.bodyCounterLimit
+    }
+
+    var isOverLimit: Bool {
+        channel == .sms && bodyCount > WorkflowChannel.smsSegmentLimit
+    }
 
     init(
         owner: SchedulingOwner,
@@ -86,7 +133,9 @@ final class MessageTemplateEditorViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard let templateId else { phase = .loaded; return }
+        guard let templateId else { phase = .loaded
+            return
+        }
         if case .loaded = phase {} else { phase = .loading }
         do {
             let response: MessageTemplatesResponse = try await client.request(SchedulingEndpoints.getMessageTemplates(owner: owner))
@@ -120,7 +169,9 @@ final class MessageTemplateEditorViewModel {
         showVariablePicker = false
     }
 
-    var previewSubject: String? { showsSubject && !trimmedSubject.isEmpty ? subject : nil }
+    var previewSubject: String? {
+        showsSubject && !trimmedSubject.isEmpty ? subject : nil
+    }
 
     // MARK: Save
 

@@ -100,12 +100,23 @@ final class NudgeAndFollowUpViewModelTests: XCTestCase {
 
     func testSaveNoteOnlyMode() {
         let viewModel = makeFollowUp()
-        XCTAssertFalse(viewModel.isSaveNoteOnly)
+        // Blank open (no outcome, no send message) is save-note-only from the
+        // start — the CTA is the calm ghost "Save note only" (Frame 1). A typed
+        // private note does not change this since it has no send/network path.
+        XCTAssertTrue(viewModel.isSaveNoteOnly)
         viewModel.privateNote = "Follow up next quarter"
         XCTAssertTrue(viewModel.isSaveNoteOnly)
         XCTAssertTrue(viewModel.primaryIsGhost)
         XCTAssertEqual(viewModel.primaryTitle, "Save note only")
         XCTAssertEqual(viewModel.primaryIcon, .lock)
+
+        // Composing a send message exits save-note-only mode and surfaces the
+        // active "Send follow-up" CTA.
+        viewModel.message = "Thanks for the time today."
+        XCTAssertFalse(viewModel.isSaveNoteOnly)
+        XCTAssertFalse(viewModel.primaryIsGhost)
+        XCTAssertEqual(viewModel.primaryTitle, "Send follow-up")
+        XCTAssertEqual(viewModel.primaryIcon, .send)
     }
 
     func testFollowUpSendSuccess() async {

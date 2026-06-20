@@ -207,7 +207,10 @@ private fun ReviewSummaryCard(
 }
 
 @Composable
-private fun PriceBreakdown(et: PublicEventTypeView, accent: androidx.compose.ui.graphics.Color) {
+private fun PriceBreakdown(
+    et: PublicEventTypeView,
+    accent: androidx.compose.ui.graphics.Color,
+) {
     val mode = ConfirmUtils.priceMode(et.priceCents, et.depositCents)
     val currency = et.currency
     Column(

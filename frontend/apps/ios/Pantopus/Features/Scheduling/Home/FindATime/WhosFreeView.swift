@@ -9,6 +9,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct WhosFreeView: View {
     @State private var viewModel: WhosFreeViewModel
     @State private var selectedMemberId: String?
@@ -18,12 +19,16 @@ struct WhosFreeView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
-    private var isOffline: Bool { !NetworkMonitor.shared.isOnline }
+    private var isOffline: Bool {
+        !NetworkMonitor.shared.isOnline
+    }
 
     private struct WhosFreeSelection: Identifiable, Hashable {
         let member: FindATimeMember
         let bucketIndex: Int
-        var id: String { "\(member.id)-\(bucketIndex)" }
+        var id: String {
+            "\(member.id)-\(bucketIndex)"
+        }
     }
 
     var body: some View {
@@ -55,7 +60,6 @@ struct WhosFreeView: View {
             }
     }
 
-    @ViewBuilder
     private var content: some View {
         VStack(spacing: 0) {
             head
@@ -252,13 +256,12 @@ struct WhosFreeView: View {
     }
 
     private func cellAccessibility(_ state: WhosFreeViewModel.CellState, member: FindATimeMember, bucketIndex: Int) -> String {
-        let stateLabel: String
-        switch state {
-        case .free: stateLabel = "free"
-        case .busy: stateLabel = "busy"
-        case .tentative: stateLabel = "tentative"
-        case .offHours: stateLabel = "off-hours"
-        case .unknown: stateLabel = "availability unknown"
+        let stateLabel: String = switch state {
+        case .free: "free"
+        case .busy: "busy"
+        case .tentative: "tentative"
+        case .offHours: "off-hours"
+        case .unknown: "availability unknown"
         }
         return "\(member.displayName), \(viewModel.columnLabels[bucketIndex]), \(stateLabel)"
     }
@@ -422,7 +425,7 @@ struct WhosFreeView: View {
             .buttonStyle(.plain)
         }
         .padding(Spacing.s3)
-        .frame(width: 134)  // Design whos-free-frames.jsx:42 specifies width:134
+        .frame(width: 134) // Design whos-free-frames.jsx:42 specifies width:134
     }
 
     // MARK: Loading

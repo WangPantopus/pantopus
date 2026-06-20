@@ -66,7 +66,12 @@ class BookingsExtraSnapshotTest {
     fun roster_underCapacity() {
         paparazzi.snapshot {
             Frame {
-                RosterContent(data = roster(filled = 12, seatTotal = 16, waiting = 3), onPromote = {}, onAdjustCapacity = {}, onAddAttendee = {}, onRowNoShow = { _, _ -> })
+                RosterContent(data = roster(filled = 12, seatTotal = 16, waiting = 3), onPromote = {
+                }, onAdjustCapacity = {}, onAddAttendee = {}, onRowNoShow = {
+                        _,
+                        _,
+                    ->
+                })
             }
         }
     }
@@ -75,7 +80,12 @@ class BookingsExtraSnapshotTest {
     fun roster_full() {
         paparazzi.snapshot {
             Frame {
-                RosterContent(data = roster(filled = 16, seatTotal = 16, waiting = 3), onPromote = {}, onAdjustCapacity = {}, onAddAttendee = {}, onRowNoShow = { _, _ -> })
+                RosterContent(data = roster(filled = 16, seatTotal = 16, waiting = 3), onPromote = {
+                }, onAdjustCapacity = {}, onAddAttendee = {}, onRowNoShow = {
+                        _,
+                        _,
+                    ->
+                })
             }
         }
     }

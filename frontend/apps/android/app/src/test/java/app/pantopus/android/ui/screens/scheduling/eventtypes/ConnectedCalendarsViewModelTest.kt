@@ -49,13 +49,15 @@ class ConnectedCalendarsViewModelTest {
         }
 
     @Test
-    fun `a read failure still resolves to loaded-empty`() =
+    fun `a read failure surfaces the error state`() =
         runTest(dispatcher) {
+            // A real network failure surfaces the retryable Error state (the VM
+            // no longer masks it as Loaded(emptyList()) — see the VM comment).
             coEvery { repo.getConnectedCalendars() } returns NetworkResult.Failure(NetworkError.Server(500, null))
             val model = vm()
             model.start()
             advanceUntilIdle()
-            assertTrue(model.state.value is ConnectedCalendarsUiState.Loaded)
+            assertTrue(model.state.value is ConnectedCalendarsUiState.Error)
         }
 
     @Test

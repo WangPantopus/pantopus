@@ -36,16 +36,34 @@ final class SchedulingPackagesListViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var activePackages: [SchedulingPackageDTO] { packages.filter { $0.isActive != false } }
-    var archivedPackages: [SchedulingPackageDTO] { packages.filter { $0.isActive == false } }
-    var visiblePackages: [SchedulingPackageDTO] { filter == .active ? activePackages : archivedPackages }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var activePackages: [SchedulingPackageDTO] {
+        packages.filter { $0.isActive != false }
+    }
+
+    var archivedPackages: [SchedulingPackageDTO] {
+        packages.filter { $0.isActive == false }
+    }
+
+    var visiblePackages: [SchedulingPackageDTO] {
+        filter == .active ? activePackages : archivedPackages
+    }
 
     /// The owner has no live packages AND hasn't connected payouts yet — frame 3.
-    var showsPayoutsGate: Bool { filter == .active && activePackages.isEmpty && paymentsApplicable && !paymentsConnected }
+    var showsPayoutsGate: Bool {
+        filter == .active && activePackages.isEmpty && paymentsApplicable && !paymentsConnected
+    }
 
     init(
         owner: SchedulingOwner,
@@ -60,7 +78,9 @@ final class SchedulingPackagesListViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = .loading
         do {
             let result: PackagesResponse = try await client.request(SchedulingEndpoints.getPackages(owner: owner))
@@ -78,13 +98,23 @@ final class SchedulingPackagesListViewModel {
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Actions
 
-    func createPackage() { push(.packageEditor(owner: owner, packageId: nil)) }
-    func openPackage(_ package: SchedulingPackageDTO) { push(.packageEditor(owner: owner, packageId: package.id)) }
-    func connectPayments() { push(.paymentsSetup(owner: owner)) }
+    func createPackage() {
+        push(.packageEditor(owner: owner, packageId: nil))
+    }
+
+    func openPackage(_ package: SchedulingPackageDTO) {
+        push(.packageEditor(owner: owner, packageId: package.id))
+    }
+
+    func connectPayments() {
+        push(.paymentsSetup(owner: owner))
+    }
 
     /// Soft-delete (archive) a live package — `DELETE /packages/:id` sets
     /// is_active=false. Optimistically flips the local flag, then reloads.

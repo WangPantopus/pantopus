@@ -13,6 +13,8 @@
 import SwiftUI
 import UIKit
 
+// swiftlint:disable file_length
+
 // MARK: - Money & date formatting
 
 /// Currency / per-session math used across packages, buy, credits, invoices.
@@ -109,9 +111,11 @@ struct PkgTopBar<Trailing: View>: View {
                 Color.clear.frame(width: 36, height: 36)
             }
             Text(title)
-                .font(.system(size: 15, weight: .semibold)).tracking(-0.2)
+                .font(.system(size: 15, weight: .semibold))
+                .tracking(-0.2)
                 .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity).lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             trailing.frame(minWidth: 36, alignment: .trailing)
         }
@@ -144,15 +148,16 @@ struct PkgTopBarIconButton: View {
 /// design's `Card overline=…` section primitive (radius 16, hairline border,
 /// soft shadow).
 struct PkgCard<Content: View>: View {
-    var overline: String? = nil
-    var padding: EdgeInsets = EdgeInsets(top: 13, leading: 14, bottom: 13, trailing: 14)
+    var overline: String?
+    var padding = EdgeInsets(top: 13, leading: 14, bottom: 13, trailing: 14)
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             if let overline {
                 Text(overline.uppercased())
-                    .font(.system(size: 10, weight: .bold)).tracking(0.6)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.6)
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
             content
@@ -249,8 +254,10 @@ struct PkgSegmented: View {
                     Text(opt)
                         .font(.system(size: 12, weight: on ? .bold : .semibold))
                         .foregroundStyle(on ? accent : Theme.Color.appTextSecondary)
-                        .lineLimit(1).minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity).frame(height: 30)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
                         .background(on ? Theme.Color.appSurface : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                         .pantopusShadow(on ? .sm : .init(color: .clear, opacity: 0, radius: 0, x: 0, y: 0))
@@ -279,7 +286,8 @@ struct PkgStepper: View {
                 value = max(range.lowerBound, value - 1)
             }
             Text("\(value)")
-                .font(.system(size: 15, weight: .bold)).monospacedDigit()
+                .font(.system(size: 15, weight: .bold))
+                .monospacedDigit()
                 .foregroundStyle(Theme.Color.appText)
                 .frame(minWidth: 44)
             stepButton(.plus, enabled: !disabled && value < range.upperBound) {
@@ -307,7 +315,7 @@ struct PkgStepper: View {
 struct PkgToggleRow: View {
     let icon: PantopusIcon
     let label: String
-    var sub: String? = nil
+    var sub: String?
     @Binding var isOn: Bool
     var accent: Color = Theme.Color.primary600
 
@@ -335,12 +343,12 @@ struct PkgToggleRow: View {
 /// Labelled text input matching the design's form rows (1.5px border, sunken
 /// focus-free fill). `error` paints the border red and surfaces `helper`.
 struct PkgTextField: View {
-    var label: String? = nil
+    var label: String?
     let placeholder: String
     @Binding var text: String
     var keyboard: UIKeyboardType = .default
     var error = false
-    var helper: String? = nil
+    var helper: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -419,7 +427,7 @@ struct PkgNote: View {
 /// Full-width primary CTA (sky) with optional leading icon + in-flight spinner.
 struct PkgPrimaryButton: View {
     let label: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var loading = false
     var enabled = true
     let action: () -> Void
@@ -434,7 +442,8 @@ struct PkgPrimaryButton: View {
                     Text(label).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
                 }
             }
-            .frame(maxWidth: .infinity).frame(height: 48)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
             .background(Theme.Color.primary600)
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .opacity(enabled && !loading ? 1 : 0.45)
@@ -447,7 +456,7 @@ struct PkgPrimaryButton: View {
 /// Outline / ghost button used in docks and inline actions.
 struct PkgGhostButton: View {
     let label: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var enabled = true
     let action: () -> Void
 
@@ -457,7 +466,8 @@ struct PkgGhostButton: View {
                 if let icon { Icon(icon, size: 15, color: Theme.Color.appText) }
                 Text(label).font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
             }
-            .frame(maxWidth: .infinity).frame(height: 46)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
@@ -517,14 +527,16 @@ struct PkgStripeGate: View {
                         Icon(.externalLink, size: 15, color: Theme.Color.appTextInverse)
                         Text(ctaLabel).font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
                     }
-                    .padding(.horizontal, 22).frame(height: 40)
+                    .padding(.horizontal, 22)
+                    .frame(height: 40)
                     .background(Theme.Color.primary600)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
             }
-            .padding(.horizontal, 16).padding(.vertical, 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
             .background(Theme.Color.warningBg)
             .overlay(
@@ -557,8 +569,10 @@ struct PkgComingSoon: View {
             }
             Text(title).font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
             Text(message)
-                .font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -582,14 +596,17 @@ struct PkgErrorState: View {
             }
             Text("Something went wrong").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
             Text(message)
-                .font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
                     Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .buttonStyle(.plain)

@@ -131,6 +131,7 @@ class PackageEditorViewModel
         private var eventTypes: List<EventTypeOption> = emptyList()
         private var saving = false
         private var started = false
+
         /** True when the package has sold credits (sessions/eligibility locked). */
         private var hasActiveBuyers = false
 

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.invitee.confirm
 
@@ -73,7 +73,13 @@ class ManageBookingViewModelTest {
             ),
         payment = null,
         eventType = PublicEventTypeView(id = "et1", name = "Intro call", locationMode = "video"),
-        page = PublicPageView(slug = "maria", title = "Maria Kessler", ownerType = "user", cancellationPolicy = "Free cancellation up to 24h before."),
+        page =
+            PublicPageView(
+                slug = "maria",
+                title = "Maria Kessler",
+                ownerType = "user",
+                cancellationPolicy = "Free cancellation up to 24h before.",
+            ),
     )
 
     @Test
@@ -94,7 +100,9 @@ class ManageBookingViewModelTest {
     @Test
     fun `window closed when active but neither action allowed`() =
         runTest(dispatcher) {
-            coEvery { repo.publicGetManageBooking("tok") } returns NetworkResult.Success(manageResponse("confirmed", canReschedule = false, canCancel = false))
+            coEvery {
+                repo.publicGetManageBooking("tok")
+            } returns NetworkResult.Success(manageResponse("confirmed", canReschedule = false, canCancel = false))
             val vm = vm()
             vm.start()
             advanceUntilIdle()

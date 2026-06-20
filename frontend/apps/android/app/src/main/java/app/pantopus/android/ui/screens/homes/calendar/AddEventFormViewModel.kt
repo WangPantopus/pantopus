@@ -620,8 +620,7 @@ class AddEventFormViewModel
             )
         }
 
-        private fun remindersWire(snapshot: AddEventUiState): List<Int> =
-            snapshot.reminderOffsets.map { it.minutes }.sorted()
+        private fun remindersWire(snapshot: AddEventUiState): List<Int> = snapshot.reminderOffsets.map { it.minutes }.sorted()
 
         private fun sortedAttendeeIds(snapshot: AddEventUiState): List<String> =
             snapshot.attendees.map { it.id }.filter { it in snapshot.selectedAttendeeIds }

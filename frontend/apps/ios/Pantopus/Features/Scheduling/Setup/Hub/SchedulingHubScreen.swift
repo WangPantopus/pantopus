@@ -62,7 +62,7 @@ struct SchedulingHubScreen: View {
             SchedulingHubSkeleton(owner: model.owner)
         case .empty:
             ScrollView {
-                HubEmptyState(owner: model.owner, onSetUp: { model.startSetup() })
+                HubEmptyState(owner: model.owner) { model.startSetup() }
             }
             .background(Theme.Color.appBg)
         case .loaded:
@@ -116,7 +116,7 @@ struct SchedulingHubScreen: View {
         if !model.canEdit {
             HubReadOnlyStatus(owner: model.owner)
         } else if model.isPaused {
-            HubPausedBanner(onResume: { Task { await model.setPaused(false) } })
+            HubPausedBanner { Task { await model.setPaused(false) } }
         } else {
             HubPauseRow(owner: model.owner, isOn: !model.isPaused) { newOn in
                 Task { await model.setPaused(!newOn) }
@@ -184,19 +184,44 @@ struct SchedulingHubScreen: View {
 
     private var manageItems: [HubManageItem] {
         var items: [HubManageItem] = [
-            HubManageItem(id: "eventTypes", icon: .layoutGrid, label: "Event types", value: model.eventTypesValue, action: { model.openEventTypes() })
+            HubManageItem(
+                id: "eventTypes",
+                icon: .layoutGrid,
+                label: "Event types",
+                value: model.eventTypesValue
+            ) { model.openEventTypes() }
         ]
         if model.owner.isPersonal {
-            items.append(HubManageItem(id: "availability", icon: .clock, label: "Availability", value: model.availabilityValue ?? "Set hours", action: { model.openAvailability() }))
+            items.append(HubManageItem(
+                id: "availability",
+                icon: .clock,
+                label: "Availability",
+                value: model.availabilityValue ?? "Set hours"
+            ) { model.openAvailability() })
         } else {
-            items.append(HubManageItem(id: "memberAvailability", icon: .users, label: "Member availability", action: { model.openAvailability() }))
+            items.append(HubManageItem(
+                id: "memberAvailability",
+                icon: .users,
+                label: "Member availability"
+            ) { model.openAvailability() })
         }
-        items.append(HubManageItem(id: "calendars", icon: .calendarSync, label: "Connected calendars", value: model.connectedCalendarsValue, action: { model.openConnectedCalendars() }))
+        items.append(HubManageItem(
+            id: "calendars",
+            icon: .calendarSync,
+            label: "Connected calendars",
+            value: model.connectedCalendarsValue
+        ) { model.openConnectedCalendars() })
         if let pending = model.pendingValue {
-            items.append(HubManageItem(id: "bookings", icon: .inbox, label: "Bookings", value: pending, alert: true, action: { model.openBookings() }))
+            items.append(HubManageItem(
+                id: "bookings",
+                icon: .inbox,
+                label: "Bookings",
+                value: pending,
+                alert: true
+            ) { model.openBookings() })
         }
         if model.canEdit {
-            items.append(HubManageItem(id: "settings", icon: .settings, label: "Settings", action: { model.openSettings() }))
+            items.append(HubManageItem(id: "settings", icon: .settings, label: "Settings") { model.openSettings() })
         }
         return items
     }
@@ -218,14 +243,18 @@ struct SchedulingHubScreen: View {
                 Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
             Text("Couldn't load scheduling").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button { Task { await model.load() } } label: {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
                     Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .accessibilityIdentifier("schedulingHubRetry")
@@ -245,7 +274,8 @@ struct SchedulingHubScreen: View {
                     Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
                     Text("Link copied").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .background(Theme.Color.appText)
                 .clipShape(Capsule())
                 .pantopusShadow(.lg)
@@ -267,7 +297,8 @@ struct SchedulingHubScreen: View {
     }
 
     private func shareLink() {
-        guard let url = URL(string: model.bookingShareURL.isEmpty ? "https://\(model.bookingHandle)" : model.bookingShareURL) else { return }
+        guard let url = URL(string: model.bookingShareURL.isEmpty ? "https://\(model.bookingHandle)" : model.bookingShareURL)
+        else { return }
         shareURL = ShareURLItem(url: url)
     }
 
@@ -290,12 +321,18 @@ private struct SchedulingHubSkeleton: View {
             VStack(alignment: .leading, spacing: Spacing.s0) {
                 Shimmer(height: 252, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4).padding(.top, 14)
                 Shimmer(height: 60, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s3)
-                Shimmer(width: 130, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(.bottom, Spacing.s2)
+                Shimmer(width: 130, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(
+                    .bottom,
+                    Spacing.s2
+                )
                 VStack(spacing: Spacing.s2) {
                     ForEach(0..<2, id: \.self) { _ in skeletonBookingRow }
                 }
                 .padding(.horizontal, Spacing.s4)
-                Shimmer(width: 80, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(.bottom, Spacing.s2)
+                Shimmer(width: 80, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, Spacing.s5).padding(
+                    .bottom,
+                    Spacing.s2
+                )
                 skeletonManage.padding(.horizontal, Spacing.s4)
             }
         }
@@ -341,7 +378,9 @@ private struct SchedulingHubSkeleton: View {
 
 private struct ShareURLItem: Identifiable {
     let url: URL
-    var id: String { url.absoluteString }
+    var id: String {
+        url.absoluteString
+    }
 }
 
 private struct HubShareSheet: UIViewControllerRepresentable {

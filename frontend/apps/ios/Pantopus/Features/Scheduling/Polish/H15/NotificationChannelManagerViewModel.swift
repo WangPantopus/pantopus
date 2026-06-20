@@ -38,20 +38,20 @@ enum ChannelStatus: Equatable {
 
     var label: String {
         switch self {
-        case .on:          "On"
-        case .off:         "Not set up"
-        case .blocked:     "Blocked"
-        case .comingSoon:  "Coming soon"
+        case .on: "On"
+        case .off: "Not set up"
+        case .blocked: "Blocked"
+        case .comingSoon: "Coming soon"
         case .unsupported: "Not supported"
         }
     }
 
     var pillStatus: SchedulingPillStatus {
         switch self {
-        case .on:          .active
-        case .off:         .draft
-        case .blocked:     .unavailable
-        case .comingSoon:  .paused
+        case .on: .active
+        case .off: .draft
+        case .blocked: .unavailable
+        case .comingSoon: .paused
         case .unsupported: .cancelled
         }
     }
@@ -224,12 +224,14 @@ final class NotificationChannelManagerViewModel {
     private func scheduleToastDismiss() {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(3))
-            guard let self, self.connectToast != nil else { return }
-            self.connectToast = nil
+            guard let self, connectToast != nil else { return }
+            connectToast = nil
         }
     }
 
     // MARK: - Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 }

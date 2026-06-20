@@ -462,7 +462,7 @@ private fun pillarGradient(pillar: SchedulingPillar): Brush =
 private fun StatusPill(kind: BookingPillKind) {
     when (kind) {
         BookingPillKind.Confirmed -> SchedulingStatusPill(status = SchedulingPillStatus.Confirmed)
-        // Booker-side spec colours pending INFO blue (#F0F9FF/#0369A1), not the shared
+        // Booker-side spec colours pending INFO blue (infoBg / primary700), not the shared
         // pill's host-side amber — render it locally with the info tone to match the spec.
         BookingPillKind.Pending ->
             LocalStatusPill(

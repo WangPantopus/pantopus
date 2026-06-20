@@ -25,14 +25,13 @@ struct InsightsDashboardView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            InsightsTopBar(title: "Insights", onBack: { dismiss() }) {
+            InsightsTopBar(title: "Insights", onBack: { dismiss() }, trailing: {
                 InsightsPeriodChip(
                     label: model.filter.chipLabel(),
                     accent: model.accent,
-                    badge: model.filter.activeFilterCount,
-                    action: { model.openFilter() }
-                )
-            }
+                    badge: model.filter.activeFilterCount
+                ) { model.openFilter() }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -43,11 +42,10 @@ struct InsightsDashboardView: View {
                 initial: model.filter,
                 eventTypeOptions: model.eventTypeOptions,
                 memberOptions: [],
-                accent: model.accent,
-                onApply: { applied in Task { await model.apply(applied) } }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+                accent: model.accent
+            ) { applied in Task { await model.apply(applied) } }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
     }
@@ -176,7 +174,7 @@ struct InsightsDashboardView: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        InsightsDashboardView(owner: .business(id: "biz"), push: { _ in })
+        InsightsDashboardView(owner: .business(id: "biz")) { _ in }
     }
 }
 #endif

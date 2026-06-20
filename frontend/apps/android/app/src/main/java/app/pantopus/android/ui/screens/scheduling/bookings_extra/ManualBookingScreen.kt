@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -101,10 +109,33 @@ fun ManualBookingScreen(
                     else ->
                         when (state.step) {
                             ManualStep.EventType -> EventTypeStep(state = state, accent = accent, onSelect = viewModel::selectEventType)
-                            ManualStep.Time -> TimeStep(state = state, accent = accent, onSelectDay = viewModel::selectDay, onSelectSlot = viewModel::selectSlot)
-                            ManualStep.Details -> DetailsStep(state = state, accent = accent, onName = viewModel::setName, onContactMode = viewModel::setContactMode, onEmail = viewModel::setEmail, onPhone = viewModel::setPhone, onNote = viewModel::setNote)
-                            ManualStep.Review -> ReviewStep(state = state, onSkipApproval = viewModel::setSkipApproval, onSkipNotifications = viewModel::setSkipNotifications)
-                            ManualStep.Created -> CreatedStep(onViewBooking = { state.createdBookingId?.let { onNavigate(SchedulingRoutes.bookingDetail(it)) } }, onBookAnother = viewModel::bookAnother)
+                            ManualStep.Time ->
+                                TimeStep(
+                                    state = state,
+                                    accent = accent,
+                                    onSelectDay = viewModel::selectDay,
+                                    onSelectSlot = viewModel::selectSlot,
+                                )
+                            ManualStep.Details ->
+                                DetailsStep(
+                                    state = state,
+                                    accent = accent,
+                                    onName = viewModel::setName,
+                                    onContactMode = viewModel::setContactMode,
+                                    onEmail = viewModel::setEmail,
+                                    onPhone = viewModel::setPhone,
+                                    onNote = viewModel::setNote,
+                                )
+                            ManualStep.Review ->
+                                ReviewStep(
+                                    state = state,
+                                    onSkipApproval = viewModel::setSkipApproval,
+                                    onSkipNotifications = viewModel::setSkipNotifications,
+                                )
+                            ManualStep.Created ->
+                                CreatedStep(onViewBooking = {
+                                    state.createdBookingId?.let { onNavigate(SchedulingRoutes.bookingDetail(it)) }
+                                }, onBookAnother = viewModel::bookAnother)
                         }
                 }
             }
@@ -142,17 +173,36 @@ private fun StepRail(
             val done = index < currentIndex
             val current = index == currentIndex
             Box(
-                modifier = Modifier.size(22.dp).clip(CircleShape).background(if (done || current) accent else PantopusColors.appSurfaceSunken),
+                modifier =
+                    Modifier.size(
+                        22.dp,
+                    ).clip(CircleShape).background(if (done || current) accent else PantopusColors.appSurfaceSunken),
                 contentAlignment = Alignment.Center,
             ) {
                 if (done) {
-                    PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextInverse)
+                    PantopusIconImage(
+                        icon = PantopusIcon.Check,
+                        contentDescription = null,
+                        size = 14.dp,
+                        tint = PantopusColors.appTextInverse,
+                    )
                 } else {
-                    Text(text = "${index + 1}", style = PantopusTextStyle.caption, fontWeight = FontWeight.Bold, color = if (current) PantopusColors.appTextInverse else PantopusColors.appTextMuted)
+                    Text(
+                        text = "${index + 1}",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.Bold,
+                        color = if (current) PantopusColors.appTextInverse else PantopusColors.appTextMuted,
+                    )
                 }
             }
             if (current) {
-                Text(text = label, style = PantopusTextStyle.small, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText, modifier = Modifier.padding(start = Spacing.s1))
+                Text(
+                    text = label,
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.padding(start = Spacing.s1),
+                )
             }
             if (index < labels.size - 1) {
                 Box(modifier = Modifier.weight(1f).height(1.dp).padding(horizontal = Spacing.s2).background(PantopusColors.appBorder))
@@ -188,7 +238,12 @@ private fun EventTypeStep(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                 state.eventTypes.forEach { option ->
-                    EventTypeTile(option = option, selected = option.id == state.selectedEventTypeId, accent = accent, onClick = { onSelect(option.id) })
+                    EventTypeTile(
+                        option = option,
+                        selected = option.id == state.selectedEventTypeId,
+                        accent = accent,
+                        onClick = { onSelect(option.id) },
+                    )
                 }
             }
         }
@@ -222,10 +277,20 @@ private fun EventTypeTile(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(Radii.md)).background(if (selected) accent.copy(alpha = TILE_ICON_ALPHA) else PantopusColors.appSurfaceSunken),
+            modifier =
+                Modifier.size(
+                    40.dp,
+                ).clip(
+                    RoundedCornerShape(Radii.md),
+                ).background(if (selected) accent.copy(alpha = TILE_ICON_ALPHA) else PantopusColors.appSurfaceSunken),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = if (selected) accent else PantopusColors.appTextStrong)
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 18.dp,
+                tint = if (selected) accent else PantopusColors.appTextStrong,
+            )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(text = option.name, style = PantopusTextStyle.body, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
@@ -250,18 +315,40 @@ private fun TimeStep(
         TzChip(label = state.tzLabel)
         when {
             state.loadingSlots -> SchedulingLoadingSkeleton(rows = 3)
-            state.slotsError != null -> Text(text = state.slotsError.orEmpty(), style = PantopusTextStyle.small, color = PantopusColors.error)
-            state.days.isEmpty() -> Text(text = "No open times in the next two weeks.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+            state.slotsError != null ->
+                Text(
+                    text = state.slotsError.orEmpty(),
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.error,
+                )
+            state.days.isEmpty() ->
+                Text(
+                    text = "No open times in the next two weeks.",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appTextSecondary,
+                )
             else -> {
-                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
                     state.days.forEach { day ->
                         DayChip(day = day, selected = day == state.selectedDay, accent = accent, onClick = { onSelectDay(day) })
                     }
                 }
-                SlotTimeList(slots = state.daySlots, selectedStart = state.selectedSlotStart, onSelect = { onSelectSlot(it.start) }, accent = accent)
+                SlotTimeList(
+                    slots = state.daySlots,
+                    selectedStart = state.selectedSlotStart,
+                    onSelect = { onSelectSlot(it.start) },
+                    accent = accent,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                     PantopusIconImage(icon = PantopusIcon.Info, contentDescription = null, size = 13.dp, tint = PantopusColors.appTextMuted)
-                    Text(text = "Times come from each member's personal availability.", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+                    Text(
+                        text = "Times come from each member's personal availability.",
+                        style = PantopusTextStyle.caption,
+                        color = PantopusColors.appTextSecondary,
+                    )
                 }
             }
         }
@@ -287,15 +374,27 @@ private fun DayChip(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Text(text = BookingsExtrasFormatting.weekdayShort(day), style = PantopusTextStyle.overline, color = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary)
-        Text(text = BookingsExtrasFormatting.dayNumber(day), style = PantopusTextStyle.body, fontWeight = FontWeight.Bold, color = if (selected) PantopusColors.appTextInverse else PantopusColors.appText)
+        Text(
+            text = BookingsExtrasFormatting.weekdayShort(day),
+            style = PantopusTextStyle.overline,
+            color = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = BookingsExtrasFormatting.dayNumber(day),
+            style = PantopusTextStyle.body,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) PantopusColors.appTextInverse else PantopusColors.appText,
+        )
     }
 }
 
 @Composable
 private fun TzChip(label: String) {
     Row(
-        modifier = Modifier.clip(RoundedCornerShape(Radii.pill)).background(PantopusColors.appSurfaceSunken).padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+        modifier =
+            Modifier.clip(
+                RoundedCornerShape(Radii.pill),
+            ).background(PantopusColors.appSurfaceSunken).padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
@@ -315,22 +414,57 @@ private fun DetailsStep(
     onNote: (String) -> Unit,
 ) {
     StepScaffold(title = "Who's it for?") {
-        ExtrasInputField(value = state.inviteeName, onValueChange = onName, placeholder = "Full name", leadingIcon = PantopusIcon.User, accent = accent)
+        ExtrasInputField(
+            value = state.inviteeName,
+            onValueChange = onName,
+            placeholder = "Full name",
+            leadingIcon = PantopusIcon.User,
+            accent = accent,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             ExtrasOverline("Invite by")
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                InviteByRow(icon = PantopusIcon.Phone, label = "Phone", subtitle = "Recommended", selected = state.contactMode == ContactMode.Phone, onClick = { onContactMode(ContactMode.Phone) }, accent = accent)
-                InviteByRow(icon = PantopusIcon.Mail, label = "Email", selected = state.contactMode == ContactMode.Email, onClick = { onContactMode(ContactMode.Email) }, accent = accent)
+                InviteByRow(
+                    icon = PantopusIcon.Phone,
+                    label = "Phone",
+                    subtitle = "Recommended",
+                    selected = state.contactMode == ContactMode.Phone,
+                    onClick = { onContactMode(ContactMode.Phone) },
+                    accent = accent,
+                )
+                InviteByRow(icon = PantopusIcon.Mail, label = "Email", selected = state.contactMode == ContactMode.Email, onClick = {
+                    onContactMode(ContactMode.Email)
+                }, accent = accent)
             }
             if (state.contactMode == ContactMode.Phone) {
-                ExtrasInputField(value = state.inviteePhone, onValueChange = onPhone, placeholder = "Mobile number", leadingIcon = PantopusIcon.Phone, accent = accent, keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
+                ExtrasInputField(
+                    value = state.inviteePhone,
+                    onValueChange = onPhone,
+                    placeholder = "Mobile number",
+                    leadingIcon = PantopusIcon.Phone,
+                    accent = accent,
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone,
+                )
             } else {
-                ExtrasInputField(value = state.inviteeEmail, onValueChange = onEmail, placeholder = "Email address", leadingIcon = PantopusIcon.Mail, accent = accent, keyboardType = androidx.compose.ui.text.input.KeyboardType.Email)
+                ExtrasInputField(
+                    value = state.inviteeEmail,
+                    onValueChange = onEmail,
+                    placeholder = "Email address",
+                    leadingIcon = PantopusIcon.Mail,
+                    accent = accent,
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                )
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             ExtrasOverline("Note (optional)")
-            ExtrasMessageBox(value = state.note, onValueChange = onNote, placeholder = "Anything they should know…", accent = accent, minHeight = 64.dp)
+            ExtrasMessageBox(
+                value = state.note,
+                onValueChange = onNote,
+                placeholder = "Anything they should know…",
+                accent = accent,
+                minHeight = 64.dp,
+            )
         }
     }
 }
@@ -345,7 +479,12 @@ private fun ReviewStep(
     val contact = if (state.contactMode == ContactMode.Phone) state.inviteePhone else state.inviteeEmail
     StepScaffold(title = "Review & confirm") {
         Column(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.xl)).background(PantopusColors.appSurface).border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)).padding(Spacing.s4),
+            modifier =
+                Modifier.fillMaxWidth().clip(
+                    RoundedCornerShape(Radii.xl),
+                ).background(
+                    PantopusColors.appSurface,
+                ).border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl)).padding(Spacing.s4),
             verticalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             SummaryRow(label = "Event", value = eventName)
@@ -353,8 +492,21 @@ private fun ReviewStep(
             SummaryRow(label = "Invitee", value = state.inviteeName.ifBlank { "—" })
             SummaryRow(label = "Contact", value = contact.ifBlank { "—" })
         }
-        ExtrasChannelRow(icon = PantopusIcon.BadgeCheck, label = "Skip approval", checked = state.skipApproval, onCheckedChange = onSkipApproval, accent = state.pillar.accent, subtitle = "Follows the event type's approval setting")
-        ExtrasChannelRow(icon = PantopusIcon.BellOff, label = "Skip notifications", checked = state.skipNotifications, onCheckedChange = onSkipNotifications, accent = state.pillar.accent)
+        ExtrasChannelRow(
+            icon = PantopusIcon.BadgeCheck,
+            label = "Skip approval",
+            checked = state.skipApproval,
+            onCheckedChange = onSkipApproval,
+            accent = state.pillar.accent,
+            subtitle = "Follows the event type's approval setting",
+        )
+        ExtrasChannelRow(
+            icon = PantopusIcon.BellOff,
+            label = "Skip notifications",
+            checked = state.skipNotifications,
+            onCheckedChange = onSkipNotifications,
+            accent = state.pillar.accent,
+        )
         state.createError?.let { ExtrasInlineError(message = it) }
     }
 }
@@ -366,7 +518,13 @@ private fun SummaryRow(
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(text = label, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary, modifier = Modifier.width(84.dp))
-        Text(text = value, style = PantopusTextStyle.body, fontWeight = FontWeight.Medium, color = PantopusColors.appText, modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            style = PantopusTextStyle.body,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appText,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -381,8 +539,19 @@ private fun CreatedStep(
         verticalArrangement = Arrangement.Center,
     ) {
         ExtrasIconDisc(icon = PantopusIcon.Check, tint = PantopusColors.success, background = PantopusColors.successBg)
-        Text(text = "Booking created", style = PantopusTextStyle.h2, fontWeight = FontWeight.Bold, color = PantopusColors.appText, modifier = Modifier.padding(top = Spacing.s3))
-        Text(text = "We've added it and notified your invitee.", style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary, modifier = Modifier.padding(top = Spacing.s1, bottom = Spacing.s5))
+        Text(
+            text = "Booking created",
+            style = PantopusTextStyle.h2,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            modifier = Modifier.padding(top = Spacing.s3),
+        )
+        Text(
+            text = "We've added it and notified your invitee.",
+            style = PantopusTextStyle.small,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.padding(top = Spacing.s1, bottom = Spacing.s5),
+        )
         PrimaryButton(title = "View booking", onClick = onViewBooking, modifier = Modifier.fillMaxWidth())
         GhostButton(title = "Book another", onClick = onBookAnother, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2))
     }
@@ -417,10 +586,20 @@ private fun InviteByRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(Radii.md)).background(if (selected) accent.copy(alpha = TILE_ICON_ALPHA) else PantopusColors.appSurfaceSunken),
+            modifier =
+                Modifier.size(
+                    38.dp,
+                ).clip(
+                    RoundedCornerShape(Radii.md),
+                ).background(if (selected) accent.copy(alpha = TILE_ICON_ALPHA) else PantopusColors.appSurfaceSunken),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, tint = if (selected) accent else PantopusColors.appTextStrong)
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 18.dp,
+                tint = if (selected) accent else PantopusColors.appTextStrong,
+            )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(text = label, style = PantopusTextStyle.body, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)

@@ -49,9 +49,8 @@ struct NotificationPermissionScreenView: View {
                 owner: .personal,
                 initialFrame: .push,
                 accountEmail: "maria@pantopus.co",
-                service: .shared,
-                onResult: { _ in }
-            )
+                service: .shared
+            ) { _ in }
         )
     }
 }

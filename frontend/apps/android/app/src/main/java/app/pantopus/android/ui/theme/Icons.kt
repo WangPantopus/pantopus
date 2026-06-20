@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.CropSquare
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
@@ -104,7 +105,6 @@ import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Gavel
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.Grain
@@ -122,10 +122,9 @@ import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.InsertEmoticon
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Laptop
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -208,6 +207,7 @@ import androidx.compose.material.icons.filled.Support
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Timeline
@@ -660,9 +660,11 @@ enum class PantopusIcon(
     // `TaskAlt` (circle-check) is the closest available vector.
     Layers("layers"),
     TicketCheck("ticket-check"),
+
     // F15 — Permission-Gated Scheduler: "Ask to manage" pill. Lucide `shield-plus`
     // (shield with a plus sign) — Material `GppMaybe` is the closest available.
     ShieldPlus("shield-plus"),
+
     // F8 — Household Availability: quiet-hours DisclosureRow. Lucide `moon`
     // (crescent moon) — Material `DarkMode` is the closest available.
     Moon("moon"),

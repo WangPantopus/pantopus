@@ -86,7 +86,7 @@ struct BookingDetailView: View {
         switch viewModel.phase {
         case .loading:
             loadingView
-        case .error(let message):
+        case let .error(message):
             errorView(message)
         case .ready:
             if let booking = viewModel.booking {
@@ -326,7 +326,6 @@ struct BookingDetailView: View {
             accent: Theme.Color.error
         )
     }
-
 }
 
 #if DEBUG

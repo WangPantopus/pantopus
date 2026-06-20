@@ -38,8 +38,8 @@ final class WhosFreeViewModelTests: XCTestCase {
         """
     }
 
-    // u1 free 16:00–17:00Z → 12:00 EDT → the 12p bucket (index 2). u2 present but
-    // fully busy. u3 absent from `members` → unknown.
+    /// u1 free 16:00–17:00Z → 12:00 EDT → the 12p bucket (index 2). u2 present but
+    /// fully busy. u3 absent from `members` → unknown.
     private func whosFreeBody() -> String {
         """
         {"members":["u1","u2"],"freeByMember":{

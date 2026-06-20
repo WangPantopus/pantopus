@@ -114,9 +114,9 @@ final class FindATimeSuggestedViewModelTests: XCTestCase {
     }
 
     func testBookCreatesHomeEvent() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"event":{"id":"e1","home_id":"home1","event_type":"family","title":"Family call","start_at":"2030-07-01T16:00:00Z"}}"#)
-        ]
+        // swiftlint:disable:next line_length
+        let eventJSON = #"{"event":{"id":"e1","home_id":"home1","event_type":"family","title":"Family call","start_at":"2030-07-01T16:00:00Z"}}"#
+        SequencedURLProtocol.sequence = [.status(200, body: eventJSON)]
         let viewModel = makeViewModel(draft: draft(precomputed: [allFreeSlot()]))
         await viewModel.load()
         await viewModel.book(viewModel.suggested[0])
@@ -127,5 +127,6 @@ final class FindATimeSuggestedViewModelTests: XCTestCase {
         XCTAssertTrue(hit, "Book must create a home calendar event")
     }
 
+    // swiftlint:disable:next line_length
     private let allFreeSlotJSON = #"{"start":"2030-07-01T16:00:00Z","end":"2030-07-01T16:30:00Z","startLocal":"2030-07-01T12:00:00","eligibleHosts":["u1","u2","u3"]}"#
 }

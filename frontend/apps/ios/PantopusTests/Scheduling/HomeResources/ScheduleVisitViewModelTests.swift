@@ -42,7 +42,7 @@ final class ScheduleVisitViewModelTests: XCTestCase {
 
     func testSaveSucceedsAndNavigatesToDetail() async {
         SequencedURLProtocol.sequence = [
-            .status(201, body: #"{"visit":{"id":"v1","event_type":"vendor","title":"Plumber visit"}}"#),
+            .status(201, body: #"{"visit":{"id":"v1","event_type":"vendor","title":"Plumber visit"}}"#)
         ]
         var captured: SchedulingRoute?
         let viewModel = ScheduleVisitViewModel(homeId: "h1", push: { captured = $0 }, client: makeClient())

@@ -21,14 +21,14 @@ final class SchedulingIdentityThemeTests: XCTestCase {
         let theme = SchedulingIdentityTheme(.home(homeId: "h1"))
         XCTAssertEqual(theme.identity, .home)
         XCTAssertEqual(theme.title, "Home")
-        XCTAssertEqual(theme.icon, .home)
+        XCTAssertEqual(theme.icon, .house)
     }
 
     func testBusinessMapsToBusinessPillar() {
         let theme = SchedulingIdentityTheme(.business(id: "b1"))
         XCTAssertEqual(theme.identity, .business)
         XCTAssertEqual(theme.title, "Business")
-        XCTAssertEqual(theme.icon, .shoppingBag)
+        XCTAssertEqual(theme.icon, .briefcase)
     }
 
     func testOwnerConvenienceAccessor() {

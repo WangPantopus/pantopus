@@ -25,7 +25,7 @@ final class MessageTemplateLibraryViewModelTests: XCTestCase {
 
     func testLoadKeepsStartersAndLoadsMine() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"templates":[{"id":"t1","name":"Mine","channel":"email","subject":"s","body":"Hello"}]}"#),
+            .status(200, body: #"{"templates":[{"id":"t1","name":"Mine","channel":"email","subject":"s","body":"Hello"}]}"#)
         ]
         let vm = MessageTemplateLibraryViewModel(owner: .personal, push: { _ in }, client: makeClient())
         await vm.load()
@@ -38,7 +38,7 @@ final class MessageTemplateLibraryViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"templates":[]}"#),
             .status(200, body: #"{"template":{"id":"t1","name":"Reminder","channel":"push","body":"x"}}"#),
-            .status(200, body: #"{"templates":[{"id":"t1","name":"Reminder","channel":"push","body":"x"}]}"#),
+            .status(200, body: #"{"templates":[{"id":"t1","name":"Reminder","channel":"push","body":"x"}]}"#)
         ]
         let vm = MessageTemplateLibraryViewModel(owner: .personal, push: { _ in }, client: makeClient())
         await vm.load()
@@ -51,7 +51,7 @@ final class MessageTemplateLibraryViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"templates":[{"id":"t1","name":"Mine","channel":"email","subject":"s","body":"Hello"}]}"#),
             .status(200, body: #"{"ok":true}"#),
-            .status(200, body: #"{"templates":[]}"#),
+            .status(200, body: #"{"templates":[]}"#)
         ]
         let vm = MessageTemplateLibraryViewModel(owner: .personal, push: { _ in }, client: makeClient())
         await vm.load()
@@ -62,7 +62,7 @@ final class MessageTemplateLibraryViewModelTests: XCTestCase {
 
     func testSearchFilters() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"templates":[{"id":"t1","name":"Welcome","channel":"email","subject":"s","body":"Hello"}]}"#),
+            .status(200, body: #"{"templates":[{"id":"t1","name":"Welcome","channel":"email","subject":"s","body":"Hello"}]}"#)
         ]
         let vm = MessageTemplateLibraryViewModel(owner: .personal, push: { _ in }, client: makeClient())
         await vm.load()

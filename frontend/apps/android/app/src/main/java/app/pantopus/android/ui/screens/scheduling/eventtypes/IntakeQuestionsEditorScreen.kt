@@ -266,7 +266,12 @@ private fun QuestionRow(
                 modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).clickable(onClick = onDelete),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = "Delete", size = 15.dp, tint = PantopusColors.appTextMuted)
+                PantopusIconImage(
+                    icon = PantopusIcon.Trash2,
+                    contentDescription = "Delete",
+                    size = 15.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
             }
             Box(
                 modifier =

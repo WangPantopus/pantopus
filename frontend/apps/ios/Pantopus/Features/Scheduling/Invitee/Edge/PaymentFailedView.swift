@@ -69,7 +69,8 @@ struct PaymentFailedView: View {
 
     private var declined: some View {
         scaffold(
-            halo: .creditCard, tone: .error,
+            halo: .creditCard,
+            tone: .error,
             title: "Your payment didn't go through",
             body: "Your card was declined — not enough funds. Nothing was charged.",
             footnote: "Your time is still held. Try another card.",
@@ -87,7 +88,8 @@ struct PaymentFailedView: View {
 
     private var holdExpired: some View {
         scaffold(
-            halo: .creditCard, tone: .error,
+            halo: .creditCard,
+            tone: .error,
             title: "Your payment didn't go through",
             body: "Your time opened back up while we waited. You can grab a new one — still nothing charged.",
             footnote: "We never charge twice.",
@@ -104,7 +106,8 @@ struct PaymentFailedView: View {
 
     private var uncertain: some View {
         scaffold(
-            halo: .creditCard, tone: .info,
+            halo: .creditCard,
+            tone: .info,
             title: "We're not sure that went through",
             body: "The connection dropped before we heard back. We won't double-charge you — check again to see where it landed.",
             footnote: "We never charge twice.",
@@ -209,15 +212,16 @@ struct PaymentFailedView: View {
 
     // MARK: - Shared scaffold
 
-    private func scaffold<Body: View, Dock: View>(
+    // swiftlint:disable:next function_parameter_count
+    private func scaffold(
         halo: PantopusIcon,
         tone: EdgeTone,
         title: String,
         body: String,
         footnote: String,
         footnoteIcon: PantopusIcon,
-        @ViewBuilder content: () -> Body,
-        @ViewBuilder dock: () -> Dock
+        @ViewBuilder content: () -> some View,
+        @ViewBuilder dock: () -> some View
     ) -> some View {
         ScrollView {
             VStack(spacing: Spacing.s4) {

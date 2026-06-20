@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions", "CyclomaticComplexMethod", "LargeClass", "MatchingDeclarationName")
+@file:Suppress(
+    "PackageNaming",
+    "LongMethod",
+    "LongParameterList",
+    "TooManyFunctions",
+    "CyclomaticComplexMethod",
+    "LargeClass",
+    "MatchingDeclarationName",
+)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
@@ -123,7 +131,11 @@ internal fun FollowUpContent(
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(text = "Follow up", style = ExtrasType.header, color = PantopusColors.appText)
             if (state.headerSubtitle.isNotBlank()) {
-                Text(text = state.headerSubtitle, style = ExtrasType.note115.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = PantopusColors.appTextSecondary)
+                Text(
+                    text = state.headerSubtitle,
+                    style = ExtrasType.note115.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal),
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
 

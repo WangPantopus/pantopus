@@ -83,9 +83,10 @@ struct InsightsPeriodFilterSheet: View {
                     .foregroundStyle(Theme.Color.appText)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button(action: { dismiss() }) {
-                    Icon(.x, size: 18, color: Theme.Color.appTextSecondary).frame(width: 32, height: 32)
-                }
+                Button(action: { dismiss() }, label: {
+                    Icon(.x, size: 18, color: Theme.Color.appTextSecondary)
+                        .frame(width: 32, height: 32)
+                })
                 .accessibilityLabel("Close")
             }
             .padding(.horizontal, Spacing.s3)
@@ -217,7 +218,7 @@ struct InsightsPeriodFilterSheet: View {
             Button(action: {
                 onApply(working)
                 dismiss()
-            }) {
+            }, label: {
                 Text(applyLabel)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
@@ -225,7 +226,7 @@ struct InsightsPeriodFilterSheet: View {
                     .frame(height: 50)
                     .background(accent)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            }
+            })
             .padding(Spacing.s3)
             .accessibilityIdentifier("scheduling.insights.filterApply")
         }
@@ -302,8 +303,7 @@ private struct InsightsRadioDot: View {
         initial: .default,
         eventTypeOptions: [.init(id: "1", name: "Intro call"), .init(id: "2", name: "Deep dive")],
         memberOptions: [],
-        accent: Theme.Color.business,
-        onApply: { _ in }
-    )
+        accent: Theme.Color.business
+    ) { _ in }
 }
 #endif

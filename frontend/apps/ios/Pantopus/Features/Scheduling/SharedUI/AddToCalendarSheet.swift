@@ -18,6 +18,7 @@
 //  Tokens only.
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 
 /// Fetches the booking's `.ics` artifact on demand and tracks the view-only
@@ -75,15 +76,9 @@ struct OnDeviceCalendar: Identifiable, Hashable {
     let dotColor: Color
     let name: String
     let subtitle: String
-
-    init(id: String, dotColor: Color, name: String, subtitle: String) {
-        self.id = id
-        self.dotColor = dotColor
-        self.name = name
-        self.subtitle = subtitle
-    }
 }
 
+// swiftlint:disable type_body_length
 /// The add-to-calendar action sheet. Provider hand-offs (EventKit / Google /
 /// Outlook) are wired by the presenting stream via the callbacks.
 struct AddToCalendarSheet: View {
@@ -142,7 +137,6 @@ struct AddToCalendarSheet: View {
 
     // MARK: - Level 1 · Providers
 
-    @ViewBuilder
     private var providerLevel: some View {
         VStack(alignment: .leading, spacing: 0) {
             sheetHeader(title: "Add to your calendar", showBack: false)
@@ -200,7 +194,6 @@ struct AddToCalendarSheet: View {
 
     // MARK: - Level 2 · Choose a calendar
 
-    @ViewBuilder
     private var calendarPickerLevel: some View {
         VStack(alignment: .leading, spacing: 0) {
             sheetHeader(title: "Choose a calendar", showBack: true)
@@ -302,7 +295,7 @@ struct AddToCalendarSheet: View {
 
     // MARK: - Card scaffolding
 
-    private func rowCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    private func rowCard(@ViewBuilder _ content: () -> some View) -> some View {
         VStack(spacing: 0) { content() }
             .background(Theme.Color.appSurface)
             .overlay(
@@ -538,6 +531,8 @@ struct AddToCalendarSheet: View {
         }
     }
 }
+
+// swiftlint:enable type_body_length
 
 #if DEBUG
 #Preview("Web default") {

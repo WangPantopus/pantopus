@@ -11,6 +11,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 struct SchedulingSettingsScreen: View {
     @State private var model: SchedulingSettingsModel
     @State private var confirmReset = false
@@ -23,7 +25,7 @@ struct SchedulingSettingsScreen: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            SettingsTopBar52(title: "Booking settings", onBack: { dismiss() })
+            SettingsTopBar52(title: "Booking settings") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -70,7 +72,9 @@ struct SchedulingSettingsScreen: View {
         .background(Theme.Color.appBg)
     }
 
-    private var accent: Color { model.theme.accent }
+    private var accent: Color {
+        model.theme.accent
+    }
 
     // MARK: Automation
 
@@ -79,32 +83,28 @@ struct SchedulingSettingsScreen: View {
             SettingsRow(
                 label: "Default reminders",
                 sub: model.isFresh ? nil : (model.remindersValue ?? "1 day · 1 hr"),
-                trailing: model.isFresh ? .chipChevron(SettingsChip(text: "Off", tone: .warning)) : .chevron,
-                action: { model.openReminders() }
-            )
+                trailing: model.isFresh ? .chipChevron(SettingsChip(text: "Off", tone: .warning)) : .chevron
+            ) { model.openReminders() }
             SettingsDivider()
             SettingsRow(
                 label: "Workflows & follow-ups",
                 sub: model.isFresh ? "No workflows yet" : nil,
                 trailing: model.isFresh
                     ? .chipChevron(SettingsChip(text: "Set up", icon: .plus, tone: .warning))
-                    : .chipChevron(SettingsChip(text: "3 active", tone: .success)),
-                action: { model.openWorkflows() }
-            )
+                    : .chipChevron(SettingsChip(text: "3 active", tone: .success))
+            ) { model.openWorkflows() }
             SettingsDivider()
             SettingsRow(
                 label: "Message templates",
                 sub: model.isFresh ? "No templates yet" : "5 templates",
-                trailing: model.isFresh ? .chipChevron(SettingsChip(text: "Set up", icon: .plus, tone: .warning)) : .chevron,
-                action: { model.openTemplates() }
-            )
+                trailing: model.isFresh ? .chipChevron(SettingsChip(text: "Set up", icon: .plus, tone: .warning)) : .chevron
+            ) { model.openTemplates() }
             SettingsDivider()
             SettingsRow(
                 label: "Booking notifications",
                 sub: model.isFresh ? "Using defaults" : "Push · Email",
-                trailing: .chevron,
-                action: { model.openNotifications() }
-            )
+                trailing: .chevron
+            ) { model.openNotifications() }
         }
     }
 
@@ -115,23 +115,20 @@ struct SchedulingSettingsScreen: View {
             SettingsRow(
                 label: "Default timezone",
                 sub: model.savingRow == .defaultTimezone ? nil : model.timezoneValue,
-                trailing: timezoneTrailing,
-                action: { model.openAvailability() }
-            )
+                trailing: timezoneTrailing
+            ) { model.openAvailability() }
             SettingsDivider()
             SettingsRow(
                 label: "Default availability",
                 sub: "Mon–Fri, 9–5",
-                trailing: .chevron,
-                action: { model.openAvailability() }
-            )
+                trailing: .chevron
+            ) { model.openAvailability() }
             SettingsDivider()
             SettingsRow(
                 label: "Cancellation policy",
                 sub: model.savingRow == .cancellationPolicy ? nil : (model.isFresh ? nil : "24-hour notice"),
-                trailing: cancellationTrailing,
-                action: { model.openCancellationPolicy() }
-            )
+                trailing: cancellationTrailing
+            ) { model.openCancellationPolicy() }
         }
     }
 
@@ -156,9 +153,8 @@ struct SchedulingSettingsScreen: View {
                 sub: model.paymentsConnected ? "Stripe · connected" : "Take payment at booking",
                 trailing: model.paymentsConnected
                     ? .chipChevron(SettingsChip(text: "Connected", icon: .check, tone: .success))
-                    : .connectPill(accent: accent),
-                action: { model.openPayments() }
-            )
+                    : .connectPill(accent: accent)
+            ) { model.openPayments() }
         }
     }
 
@@ -169,18 +165,23 @@ struct SchedulingSettingsScreen: View {
             SettingsRow(
                 label: "Team & seats",
                 sub: "Manage members & booking seats",
-                trailing: .chevron,
-                action: { model.openTeam() }
-            )
+                trailing: .chevron
+            ) { model.openTeam() }
             SettingsDivider()
             VStack(alignment: .leading, spacing: Spacing.s0) {
-                Text("New bookings").font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.Color.appText)
-                Text("Choose how incoming bookings are handled.").pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextSecondary).padding(.top, 2)
+                Text("New bookings")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Choose how incoming bookings are handled.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.top, 2)
                 SettingsSegmented(options: ["Auto-confirm", "Approve first"], selected: 1, accent: accent)
                     .padding(.top, 10)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4).padding(.vertical, 14)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
         }
     }
 
@@ -209,7 +210,8 @@ struct SchedulingSettingsScreen: View {
                 .foregroundStyle(Theme.Color.appTextMuted)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.s4).padding(.top, 18)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, 18)
         }
     }
 
@@ -217,11 +219,14 @@ struct SchedulingSettingsScreen: View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
                 Icon(icon, size: 17, color: Theme.Color.error)
-                Text(label).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.Color.error)
+                Text(label)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.error)
                 Spacer(minLength: Spacing.s2)
                 if busy { ProgressView().tint(Theme.Color.error) }
             }
-            .padding(.horizontal, Spacing.s4).padding(.vertical, 14)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -234,9 +239,12 @@ struct SchedulingSettingsScreen: View {
             if model.showSavedToast {
                 HStack(spacing: Spacing.s2) {
                     Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
-                    Text("Changes saved").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
+                    Text("Changes saved")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .background(Theme.Color.appText)
                 .clipShape(Capsule())
                 .pantopusShadow(.lg)
@@ -257,12 +265,18 @@ struct SettingsTopBar52: View {
     var body: some View {
         HStack(spacing: Spacing.s0) {
             Button(action: onBack) {
-                Icon(.chevronLeft, size: 22, color: Theme.Color.appText).frame(width: 36, height: 36)
+                Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
+                    .frame(width: 36, height: 36)
             }
             .accessibilityIdentifier("settingsTopBarBack")
             .accessibilityLabel("Back")
-            Text(title).font(.system(size: 16, weight: .semibold)).tracking(-0.1).foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity).lineLimit(1).accessibilityAddTraits(.isHeader)
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .tracking(-0.1)
+                .foregroundStyle(Theme.Color.appText)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
             Color.clear.frame(width: 36, height: 36)
         }
         .padding(.horizontal, Spacing.s3)
@@ -282,16 +296,24 @@ struct SettingsGroup<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
-            Text(title.uppercased()).font(.system(size: 11, weight: .bold)).tracking(0.88).foregroundStyle(accent)
-                .padding(.horizontal, Spacing.s4).padding(.top, 18).padding(.bottom, Spacing.s2)
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.88)
+                .foregroundStyle(accent)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, 18)
+                .padding(.bottom, Spacing.s2)
             VStack(spacing: Spacing.s0) { content }
                 .background(Theme.Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
                 .padding(.horizontal, Spacing.s3)
             if let helper {
-                Text(helper).font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                    .padding(.horizontal, Spacing.s4).padding(.top, Spacing.s2)
+                Text(helper)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, Spacing.s2)
             }
         }
     }
@@ -324,15 +346,21 @@ struct SettingsRow: View {
         Button(action: action) {
             HStack(spacing: Spacing.s3) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.Color.appText)
+                    Text(label)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.Color.appText)
                     if let sub {
-                        Text(sub).pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1)
+                        Text(sub)
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
                     }
                 }
                 Spacer(minLength: Spacing.s2)
                 trailingView
             }
-            .padding(.horizontal, Spacing.s4).padding(.vertical, 14)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
             .frame(minHeight: 48)
             .contentShape(Rectangle())
         }
@@ -351,9 +379,13 @@ struct SettingsRow: View {
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
             }
         case let .connectPill(accent):
-            Text("Connect").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.Color.appTextInverse)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(accent).clipShape(Capsule())
+            Text("Connect")
+                .font(.system(size: 12.5, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(accent)
+                .clipShape(Capsule())
                 .pantopusShadow(PantopusShadow(color: accent, opacity: 0.27, radius: 3, x: 0, y: 2))
         case let .savingShimmer(width):
             Shimmer(width: width, height: 14, cornerRadius: 7)
@@ -365,11 +397,15 @@ struct SettingsRow: View {
         case let .tzLock(locked, accent):
             HStack(spacing: 6) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous).fill(locked ? Theme.Color.personalBg : Theme.Color.appSurfaceSunken)
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(locked ? Theme.Color.personalBg : Theme.Color.appSurfaceSunken)
                     Icon(locked ? .lock : .keyRound, size: 14, strokeWidth: 2.2, color: locked ? accent : Theme.Color.appTextMuted)
                 }
                 .frame(width: 30, height: 30)
-                .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(locked ? accent.opacity(0.2) : Theme.Color.appBorder, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: Radii.md, style: .continuous).stroke(
+                    locked ? accent.opacity(0.2) : Theme.Color.appBorder,
+                    lineWidth: 1
+                ))
                 Icon(.chevronRight, size: 16, color: Theme.Color.appTextSecondary)
             }
         }
@@ -384,10 +420,15 @@ struct SettingsChip: View {
     var body: some View {
         HStack(spacing: Spacing.s1) {
             if let icon { Icon(icon, size: 10, strokeWidth: 3, color: tone.fg) }
-            Text(text.uppercased()).font(.system(size: 10.5, weight: .bold)).tracking(0.4).foregroundStyle(tone.fg)
+            Text(text.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(tone.fg)
         }
-        .padding(.horizontal, Spacing.s2).padding(.vertical, 3)
-        .background(tone.bg).clipShape(Capsule())
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(tone.bg)
+        .clipShape(Capsule())
     }
 }
 
@@ -397,9 +438,12 @@ struct SettingsSavedChip: View {
     var body: some View {
         HStack(spacing: Spacing.s1) {
             Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.success)
-            Text("Saved").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.success)
+            Text("Saved")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.success)
         }
-        .padding(.horizontal, 9).padding(.vertical, Spacing.s1)
+        .padding(.horizontal, 9)
+        .padding(.vertical, Spacing.s1)
         .background(Theme.Color.successLight)
         .clipShape(Capsule())
     }
@@ -417,7 +461,8 @@ struct SettingsSegmented: View {
                 Text(opt)
                     .font(.system(size: 12.5, weight: on ? .bold : .semibold))
                     .foregroundStyle(on ? accent : Theme.Color.appTextSecondary)
-                    .frame(maxWidth: .infinity).frame(height: 32)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
                     .background(on ? Theme.Color.appSurface : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                     .pantopusShadow(on ? .sm : .init(color: .clear, opacity: 0, radius: 0, x: 0, y: 0))
@@ -457,14 +502,23 @@ private struct SettingsErrorView: View {
                 Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 64, height: 64)
                 Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
-            Text("Couldn't load settings").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary).multilineTextAlignment(.center).frame(maxWidth: 260)
+            Text("Couldn't load settings")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
-                    Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+                    Text("Try again")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

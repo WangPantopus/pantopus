@@ -17,7 +17,9 @@ struct NotificationChannelPromptView: View {
     /// Sheet presentations show a close X; the routed screen relies on nav back.
     var showsCloseButton = true
 
-    private var content: PromptContent { PromptContent(frame: viewModel.frame) }
+    private var content: PromptContent {
+        PromptContent(frame: viewModel.frame)
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -261,9 +263,8 @@ private func previewModel(_ frame: NotificationPromptFrame) -> NotificationPermi
         owner: .personal,
         initialFrame: frame,
         accountEmail: "maria@pantopus.co",
-        service: .shared,
-        onResult: { _ in }
-    )
+        service: .shared
+    ) { _ in }
 }
 
 #Preview("Push") { NotificationChannelPromptView(viewModel: previewModel(.push)) }

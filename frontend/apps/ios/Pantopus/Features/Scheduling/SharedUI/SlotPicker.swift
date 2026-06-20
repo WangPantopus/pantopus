@@ -12,6 +12,9 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
+// swiftlint:disable type_body_length
 /// The booker's date + time picker. Stateless: the parent supplies the month,
 /// selected day, the day's `slots`, the load `state`, and reacts to callbacks.
 public struct SlotPicker: View {
@@ -433,6 +436,8 @@ public struct SlotPicker: View {
     }
 }
 
+// swiftlint:enable type_body_length
+
 // MARK: - Month calendar strip
 
 private struct SlotPickerCalendar: View {
@@ -612,7 +617,9 @@ private struct SlotPickerEmptyCard: View {
     let title: String
     let message: String
     let accent: Color
+    // swiftlint:disable:next large_tuple
     let primary: (label: String, icon: PantopusIcon, action: () -> Void)?
+    // swiftlint:disable:next large_tuple
     let secondary: (label: String, icon: PantopusIcon, chip: String?, action: () -> Void)?
     /// Required-member free/busy cluster, rendered between the body and the CTAs
     /// for the composed-empty frame. Empty = not shown.

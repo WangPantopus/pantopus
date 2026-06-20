@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.invitee.confirm
 

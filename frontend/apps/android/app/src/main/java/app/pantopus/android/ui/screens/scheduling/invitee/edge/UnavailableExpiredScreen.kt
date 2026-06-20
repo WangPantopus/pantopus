@@ -110,11 +110,12 @@ fun UnavailableExpiredScreen(
         },
         // Design: "Get the app" is the unconditional filled CTA in the dock.
         // Passed as primaryAction → PillarPrimaryButton (filled, pillar color, h=46).
-        primaryAction = TerminalAction(
-            label = "Get the app",
-            onClick = onGetApp ?: {},
-            icon = PantopusIcon.Smartphone,
-        ),
+        primaryAction =
+            TerminalAction(
+                label = "Get the app",
+                onClick = onGetApp ?: {},
+                icon = PantopusIcon.Smartphone,
+            ),
         // "Back to Pantopus" ghost CTA.
         secondaryAction = TerminalAction(label = "Back to Pantopus", onClick = onBack),
     )
@@ -194,7 +195,13 @@ private fun TerminalExtra(
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         when (state) {
-            SchedulingTerminalState.Secret -> if (onSubmitAccessCode != null) AccessCodeField(pillar = pillar, onSubmit = onSubmitAccessCode)
+            SchedulingTerminalState.Secret ->
+                if (onSubmitAccessCode != null) {
+                    AccessCodeField(
+                        pillar = pillar,
+                        onSubmit = onSubmitAccessCode,
+                    )
+                }
             SchedulingTerminalState.Paused ->
                 if (pausedNote != null) {
                     PausedNoteCard(hostName = hostName, note = pausedNote, reopensLabel = reopensLabel)

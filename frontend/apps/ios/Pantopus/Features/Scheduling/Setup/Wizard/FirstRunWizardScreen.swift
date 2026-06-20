@@ -66,9 +66,8 @@ struct FirstRunWizardScreen: View {
                 slug: $model.slug,
                 state: model.slugState,
                 accent: model.theme.accent,
-                accentBg: model.theme.accentBg,
-                onPick: { model.pickSuggestion($0) }
-            )
+                accentBg: model.theme.accentBg
+            ) { model.pickSuggestion($0) }
         case .type:
             WizardHeadline(
                 title: "Pick a meeting type",
@@ -161,7 +160,9 @@ private struct WizardResumeBanner: View {
 
 private struct ShareItem: Identifiable {
     let url: URL
-    var id: String { url.absoluteString }
+    var id: String {
+        url.absoluteString
+    }
 }
 
 private struct WizardShareSheet: UIViewControllerRepresentable {

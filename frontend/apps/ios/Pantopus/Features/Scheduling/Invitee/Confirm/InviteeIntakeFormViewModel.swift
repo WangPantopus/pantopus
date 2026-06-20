@@ -15,13 +15,14 @@
 import SwiftUI
 
 /// Optional signed-in invitee identity used to prefill D1 ("Booking as …").
-struct InviteePrefill: Sendable, Hashable {
+struct InviteePrefill: Hashable {
     let name: String
     let email: String
 }
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class InviteeIntakeFormViewModel {
     enum State: Equatable {
         case loading
@@ -97,13 +98,33 @@ final class InviteeIntakeFormViewModel {
 
     // MARK: - Derived presentation
 
-    var accent: Color { DiscoveryTheme.accent(forOwnerType: page?.ownerType) }
-    var accentBg: Color { DiscoveryTheme.accentBg(forOwnerType: page?.ownerType) }
-    var avatarColors: [Color] { DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType) }
-    var hostName: String? { page?.title }
-    var hostFirstName: String { DiscoveryTheme.firstName(from: page?.title) }
-    var hostInitials: String { ConfirmFormat.initials(from: page?.title) }
-    var tzChipLabel: String { ConfirmFormat.tzChipLabel(tz: selectedTz) }
+    var accent: Color {
+        DiscoveryTheme.accent(forOwnerType: page?.ownerType)
+    }
+
+    var accentBg: Color {
+        DiscoveryTheme.accentBg(forOwnerType: page?.ownerType)
+    }
+
+    var avatarColors: [Color] {
+        DiscoveryTheme.avatarColors(forOwnerType: page?.ownerType)
+    }
+
+    var hostName: String? {
+        page?.title
+    }
+
+    var hostFirstName: String {
+        DiscoveryTheme.firstName(from: page?.title)
+    }
+
+    var hostInitials: String {
+        ConfirmFormat.initials(from: page?.title)
+    }
+
+    var tzChipLabel: String {
+        ConfirmFormat.tzChipLabel(tz: selectedTz)
+    }
 
     /// Textarea ("What should we cover?") placeholder — interpolates the host's
     /// first name when known ("A sentence or two helps Maria prepare."), else a
@@ -123,7 +144,9 @@ final class InviteeIntakeFormViewModel {
         return ConfirmFormat.dayAndTime(startUTC: start, endUTC: endAtISO, tz: selectedTz)
     }
 
-    func changeTimezone(_ identifier: String) { selectedTz = identifier }
+    func changeTimezone(_ identifier: String) {
+        selectedTz = identifier
+    }
 
     /// Sorted host questions for the schema-driven form section.
     var questions: [EventTypeQuestionDTO] {
@@ -144,7 +167,9 @@ final class InviteeIntakeFormViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         guard !isFetching else { return }
@@ -215,11 +240,11 @@ final class InviteeIntakeFormViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self else { return }
-                if self.holdExpired { return }
-                if self.holdRemaining > 0 {
-                    self.holdRemaining -= 1
+                if holdExpired { return }
+                if holdRemaining > 0 {
+                    holdRemaining -= 1
                 } else {
-                    self.holdExpired = true
+                    holdExpired = true
                     return
                 }
             }
@@ -258,7 +283,9 @@ final class InviteeIntakeFormViewModel {
         return nil
     }
 
-    func touchedContains(_ key: String) -> Bool { touched.contains(key) }
+    func touchedContains(_ key: String) -> Bool {
+        touched.contains(key)
+    }
 
     func selectSingleChoice(_ id: String, option: String) {
         answers[id] = .choices([option])
@@ -266,8 +293,7 @@ final class InviteeIntakeFormViewModel {
     }
 
     func toggleChoice(_ id: String, option: String) {
-        var current: [String]
-        if case let .choices(values)? = answers[id] { current = values } else { current = [] }
+        var current: [String] = if case let .choices(values)? = answers[id] { values } else { [] }
         if let index = current.firstIndex(of: option) { current.remove(at: index) } else { current.append(option) }
         answers[id] = .choices(current)
         touched.insert(id)
@@ -283,7 +309,9 @@ final class InviteeIntakeFormViewModel {
         touched.insert(id)
     }
 
-    func markTouched(_ key: String) { touched.insert(key) }
+    func markTouched(_ key: String) {
+        touched.insert(key)
+    }
 
     // MARK: - Guests
 
@@ -335,7 +363,7 @@ final class InviteeIntakeFormViewModel {
                   !lastName.trimmingCharacters(in: .whitespaces).isEmpty,
                   Self.isValidEmail(trimmedEmail) else { return false }
         }
-        for question in questions where (question.required ?? false) {
+        for question in questions where question.required ?? false {
             if !(answers[questionKey(question)]?.isAnswered ?? false) { return false }
         }
         return true

@@ -25,6 +25,7 @@ final class MyHouseholdAvailabilityViewModelTests: XCTestCase {
     }
 
     private func ephemeralDefaults() -> UserDefaults {
+        // swiftlint:disable:next force_unwrapping
         UserDefaults(suiteName: "test-\(UUID().uuidString)")!
     }
 

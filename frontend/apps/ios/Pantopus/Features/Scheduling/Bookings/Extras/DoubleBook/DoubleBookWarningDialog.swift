@@ -13,11 +13,11 @@
 import SwiftUI
 
 /// Describes the conflict an advisory double-book warning should render.
-struct DoubleBookConflict: Equatable, Sendable {
-    enum Severity: Sendable { case soft, hard }
+struct DoubleBookConflict: Equatable {
+    enum Severity { case soft, hard }
 
     /// One linked, tappable conflicting commitment.
-    struct LinkedEvent: Equatable, Sendable {
+    struct LinkedEvent: Equatable {
         let title: String
         let detail: String
     }
@@ -41,12 +41,16 @@ struct DoubleBookWarningDialog: View {
     var onBookAnyway: (() -> Void)?
     var onPickAnotherMember: (() -> Void)?
 
-    private var isHard: Bool { conflict.severity == .hard }
+    private var isHard: Bool {
+        conflict.severity == .hard
+    }
 
     /// JSX hardcodes `PRIMARY = E.blue600` (primary600) for both the soft
     /// "Book anyway" solid CTA and the hard "Pick another member" link — the
     /// pillar accent is not applied to these affordances in the design.
-    private var ctaAccent: Color { Theme.Color.primary600 }
+    private var ctaAccent: Color {
+        Theme.Color.primary600
+    }
 
     var body: some View {
         ExtrasDialog(isDismissable: true, onDismiss: onCancel) {

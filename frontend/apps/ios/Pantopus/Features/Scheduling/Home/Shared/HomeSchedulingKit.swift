@@ -78,23 +78,35 @@ public enum HomeMemberPalette {
     /// `Color(red:green:blue:)` form — the per-feature palette exception.
     private static let pairs: [(start: Color, end: Color)] = [
         // 34d399 → 16a34a (emerald → home green)
-        (Color(red: 0x34 / 255.0, green: 0xD3 / 255.0, blue: 0x99 / 255.0),
-         Color(red: 0x16 / 255.0, green: 0xA3 / 255.0, blue: 0x4A / 255.0)),
+        (
+            Color(red: 0x34 / 255.0, green: 0xD3 / 255.0, blue: 0x99 / 255.0),
+            Color(red: 0x16 / 255.0, green: 0xA3 / 255.0, blue: 0x4A / 255.0)
+        ),
         // 60a5fa → 2563eb (sky → indigo)
-        (Color(red: 0x60 / 255.0, green: 0xA5 / 255.0, blue: 0xFA / 255.0),
-         Color(red: 0x25 / 255.0, green: 0x63 / 255.0, blue: 0xEB / 255.0)),
+        (
+            Color(red: 0x60 / 255.0, green: 0xA5 / 255.0, blue: 0xFA / 255.0),
+            Color(red: 0x25 / 255.0, green: 0x63 / 255.0, blue: 0xEB / 255.0)
+        ),
         // f472b6 → db2777 (pink → rose)
-        (Color(red: 0xF4 / 255.0, green: 0x72 / 255.0, blue: 0xB6 / 255.0),
-         Color(red: 0xDB / 255.0, green: 0x27 / 255.0, blue: 0x77 / 255.0)),
+        (
+            Color(red: 0xF4 / 255.0, green: 0x72 / 255.0, blue: 0xB6 / 255.0),
+            Color(red: 0xDB / 255.0, green: 0x27 / 255.0, blue: 0x77 / 255.0)
+        ),
         // fbbf24 → d97706 (amber)
-        (Color(red: 0xFB / 255.0, green: 0xBF / 255.0, blue: 0x24 / 255.0),
-         Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)),
+        (
+            Color(red: 0xFB / 255.0, green: 0xBF / 255.0, blue: 0x24 / 255.0),
+            Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x06 / 255.0)
+        ),
         // c084fc → 7c3aed (violet)
-        (Color(red: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0xFC / 255.0),
-         Color(red: 0x7C / 255.0, green: 0x3A / 255.0, blue: 0xED / 255.0)),
+        (
+            Color(red: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0xFC / 255.0),
+            Color(red: 0x7C / 255.0, green: 0x3A / 255.0, blue: 0xED / 255.0)
+        ),
         // 2dd4bf → 0d9488 (teal)
-        (Color(red: 0x2D / 255.0, green: 0xD4 / 255.0, blue: 0xBF / 255.0),
-         Color(red: 0x0D / 255.0, green: 0x94 / 255.0, blue: 0x88 / 255.0))
+        (
+            Color(red: 0x2D / 255.0, green: 0xD4 / 255.0, blue: 0xBF / 255.0),
+            Color(red: 0x0D / 255.0, green: 0x94 / 255.0, blue: 0x88 / 255.0)
+        )
     ]
 }
 
@@ -324,22 +336,20 @@ struct HomeSchedulingRouteHost: View {
         NavigationStack(path: $path) {
             SchedulingRouter.destination(
                 for: initialRoute,
-                owner: .home(homeId: homeId),
-                push: { path.append($0) }
-            )
-            .navigationDestination(for: SchedulingRoute.self) { route in
-                SchedulingRouter.destination(
-                    for: route,
-                    owner: .home(homeId: homeId),
-                    push: { path.append($0) }
-                )
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { onDismiss() }
-                        .accessibilityIdentifier("homeSchedulingRouteHost_done")
+                owner: .home(homeId: homeId)
+            ) { path.append($0) }
+                .navigationDestination(for: SchedulingRoute.self) { route in
+                    SchedulingRouter.destination(
+                        for: route,
+                        owner: .home(homeId: homeId)
+                    ) { path.append($0) }
                 }
-            }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { onDismiss() }
+                            .accessibilityIdentifier("homeSchedulingRouteHost_done")
+                    }
+                }
         }
     }
 }

@@ -46,7 +46,9 @@ final class BookingsInboxViewModel {
     private var didLoad = false
     private var fetchGeneration = 0
 
-    var accent: Color { owner.theme.accent }
+    var accent: Color {
+        owner.theme.accent
+    }
 
     /// The active owner mapped to its scope-pill key, so the cross-owner pill row
     /// (All / Personal / Home / Business) can mark the right pill filled. The
@@ -98,7 +100,9 @@ final class BookingsInboxViewModel {
             }
     }
 
-    var isEmpty: Bool { phase == .ready && bookings.isEmpty }
+    var isEmpty: Bool {
+        phase == .ready && bookings.isEmpty
+    }
 
     func eventName(for booking: BookingDTO) -> String? {
         booking.eventTypeId.flatMap { eventNames[$0] }
@@ -140,7 +144,9 @@ final class BookingsInboxViewModel {
     // MARK: - Filter sheet (E9)
 
     /// Open the E9 filter sheet from the top-bar filter icon.
-    func presentFilterSheet() { filterSheetVisible = true }
+    func presentFilterSheet() {
+        filterSheetVisible = true
+    }
 
     /// Build the filter sheet's view-model, seeding its event-type facet from the
     /// inbox's best-effort event-type name map. The filter VM counts results
@@ -167,9 +173,9 @@ final class BookingsInboxViewModel {
         switch filters.status?.queryValue {
         case "upcoming": selectedTab = .upcoming
         case "pending": selectedTab = .pending
-        case "past": selectedTab = .past   // facet-only `.noShow` also maps here
+        case "past": selectedTab = .past // facet-only `.noShow` also maps here
         case "cancelled": selectedTab = .cancelled
-        default: break                      // no status facet → keep current tab
+        default: break // no status facet → keep current tab
         }
         await fetch()
     }
@@ -223,9 +229,17 @@ final class BookingsInboxViewModel {
         }
     }
 
-    func presentDecline(_ booking: BookingDTO) { activeSheet = .decline(booking) }
-    func presentReschedule(_ booking: BookingDTO) { activeSheet = .reschedule(booking) }
-    func presentCancel(_ booking: BookingDTO) { activeSheet = .cancel(booking) }
+    func presentDecline(_ booking: BookingDTO) {
+        activeSheet = .decline(booking)
+    }
+
+    func presentReschedule(_ booking: BookingDTO) {
+        activeSheet = .reschedule(booking)
+    }
+
+    func presentCancel(_ booking: BookingDTO) {
+        activeSheet = .cancel(booking)
+    }
 
     func openDetail(_ booking: BookingDTO) {
         push(.bookingDetail(owner: owner, bookingId: booking.id))
@@ -289,7 +303,10 @@ final class BookingsInboxViewModel {
 
 /// A rendered inbox section (a day bucket, or the pending "Needs your approval").
 struct BookingSection: Identifiable {
-    var id: String { title }
+    var id: String {
+        title
+    }
+
     let title: String
     let showsApprovalDot: Bool
     let bookings: [BookingDTO]
@@ -303,10 +320,22 @@ extension BookingsInboxViewModel {
         vm.eventNames = ["et1": "30-min intro call", "et2": "Garden walkthrough"]
         vm.pendingCount = 2
         vm.bookings = [
-            .preview(id: "b1", status: tab == .pending ? "pending" : "confirmed", ownerType: "user",
-                     invitee: "Dana Whitfield", start: "2030-06-18T21:00:00Z", eventTypeId: "et1"),
-            .preview(id: "b2", status: tab == .pending ? "pending" : "confirmed", ownerType: "home",
-                     invitee: "Mara Reyes", start: "2030-06-18T23:30:00Z", eventTypeId: "et2")
+            .preview(
+                id: "b1",
+                status: tab == .pending ? "pending" : "confirmed",
+                ownerType: "user",
+                invitee: "Dana Whitfield",
+                start: "2030-06-18T21:00:00Z",
+                eventTypeId: "et1"
+            ),
+            .preview(
+                id: "b2",
+                status: tab == .pending ? "pending" : "confirmed",
+                ownerType: "home",
+                invitee: "Mara Reyes",
+                start: "2030-06-18T23:30:00Z",
+                eventTypeId: "et2"
+            )
         ]
         vm.phase = .ready
         vm.didLoad = true

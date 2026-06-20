@@ -42,12 +42,29 @@ final class BookingDetailViewModel {
 
     // MARK: - Derived
 
-    var accent: Color { owner.theme.accent }
-    var booking: BookingDTO? { detail?.booking }
-    var attendees: [BookingAttendeeDTO] { detail?.attendees ?? [] }
-    var eventName: String? { detail?.eventType?.name }
-    var locationMode: String? { detail?.eventType?.locationMode }
-    var status: SchedulingPillStatus { booking.map { SchedulingPillStatus(backend: $0.status) } ?? .unknown }
+    var accent: Color {
+        owner.theme.accent
+    }
+
+    var booking: BookingDTO? {
+        detail?.booking
+    }
+
+    var attendees: [BookingAttendeeDTO] {
+        detail?.attendees ?? []
+    }
+
+    var eventName: String? {
+        detail?.eventType?.name
+    }
+
+    var locationMode: String? {
+        detail?.eventType?.locationMode
+    }
+
+    var status: SchedulingPillStatus {
+        booking.map { SchedulingPillStatus(backend: $0.status) } ?? .unknown
+    }
 
     var headerTime: String {
         BookingsTime.headerWhen(startUTC: booking?.startAt, endUTC: booking?.endAt)
@@ -58,13 +75,17 @@ final class BookingDetailViewModel {
         return date < Date()
     }
 
-    var canReassign: Bool { BookingsPillar.supportsReassign(owner) && (booking?.hostUserId != nil) }
+    var canReassign: Bool {
+        BookingsPillar.supportsReassign(owner) && (booking?.hostUserId != nil)
+    }
 
     /// Whether this booking overlaps another on the host's calendar. The booking
     /// payload carries no overlap flag yet, so this is `false` until the backend
     /// surfaces a conflict signal — the amber `ConflictBanner` (design frame 6)
     /// is wired and ready, gated on this. (deferredBackend: conflict detection.)
-    var hasConflict: Bool { false }
+    var hasConflict: Bool {
+        false
+    }
 
     /// The cancelled banner line — actor + date + quoted reason when available
     /// ("Cancelled by host on Jun 11 · '<reason>'"), matching design frame 4.
@@ -154,7 +175,9 @@ final class BookingDetailViewModel {
         await fetch()
     }
 
-    func refresh() async { await fetch() }
+    func refresh() async {
+        await fetch()
+    }
 
     private func fetch() async {
         phase = .loading
@@ -170,13 +193,28 @@ final class BookingDetailViewModel {
 
     // MARK: - Actions
 
-    func presentReview() { if let booking { activeSheet = .review(booking) } }
-    func presentDecline() { if let booking { activeSheet = .decline(booking) } }
-    func presentReschedule() { if let booking { activeSheet = .reschedule(booking) } }
-    func presentCancel() { if let booking { activeSheet = .cancel(booking) } }
-    func switchToReschedule(_ booking: BookingDTO) { activeSheet = .reschedule(booking) }
+    func presentReview() {
+        if let booking { activeSheet = .review(booking) }
+    }
+
+    func presentDecline() {
+        if let booking { activeSheet = .decline(booking) }
+    }
+
+    func presentReschedule() {
+        if let booking { activeSheet = .reschedule(booking) }
+    }
+
+    func presentCancel() {
+        if let booking { activeSheet = .cancel(booking) }
+    }
+
+    func switchToReschedule(_ booking: BookingDTO) {
+        activeSheet = .reschedule(booking)
+    }
 
     // MARK: - Dock CTAs awaiting backend wiring
+
     //
     // The per-state docks (design frames 3/4/5/8) surface Message, Follow up,
     // Rebook, Send rebook link and a conflict-banner "View". None of these have
@@ -229,7 +267,10 @@ final class BookingDetailViewModel {
 
 /// One node in the booking status timeline.
 struct BookingTimelineStep: Identifiable, Hashable {
-    var id: String { label }
+    var id: String {
+        label
+    }
+
     let label: String
     let time: String?
     let done: Bool
@@ -240,7 +281,9 @@ extension BookingDetailViewModel {
     static func preview(status: String = "confirmed", ownerType: String = "user", paid: Bool = false) -> BookingDetailViewModel {
         let vm = BookingDetailViewModel(
             owner: ownerType == "business" ? .business(id: "b") : (ownerType == "home" ? .home(homeId: "h") : .personal),
-            bookingId: "bk_preview", push: { _ in }, actions: BookingActions(owner: .personal)
+            bookingId: "bk_preview",
+            push: { _ in },
+            actions: BookingActions(owner: .personal)
         )
         vm.detail = .preview(status: status, ownerType: ownerType, paymentId: paid ? "pay_1" : nil)
         vm.phase = .ready

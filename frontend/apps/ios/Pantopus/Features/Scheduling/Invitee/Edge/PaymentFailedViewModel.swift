@@ -55,7 +55,9 @@ final class PaymentFailedViewModel {
         self.client = client
     }
 
-    var paidEnabled: Bool { SchedulingFeatureFlags.paidEnabled }
+    var paidEnabled: Bool {
+        SchedulingFeatureFlags.paidEnabled
+    }
 
     func load() async {
         guard !didLoad else { return }
@@ -118,13 +120,13 @@ final class PaymentFailedViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self, !Task.isCancelled else { return }
-                guard self.stage == .declined || self.stage == .uncertain else { return }
-                if self.holdRemaining <= 1 {
-                    self.holdRemaining = 0
-                    self.stage = .holdExpired
+                guard stage == .declined || stage == .uncertain else { return }
+                if holdRemaining <= 1 {
+                    holdRemaining = 0
+                    stage = .holdExpired
                     return
                 }
-                self.holdRemaining -= 1
+                holdRemaining -= 1
             }
         }
     }
@@ -159,8 +161,8 @@ final class PaymentFailedViewModel {
     private func scheduleHandoff() {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_800_000_000)
-            guard let self, self.stage == .succeeded else { return }
-            self.continueToBooking()
+            guard let self, stage == .succeeded else { return }
+            continueToBooking()
         }
     }
 

@@ -28,11 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
@@ -43,6 +41,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.SchedulingPalette
 import app.pantopus.android.ui.theme.Spacing
 
 private val SETTING_ICON_BOX = 32.dp
@@ -348,10 +347,11 @@ private fun ToggleRow(
     }
 }
 
-// Spec C.stripeBg / C.stripe are Stripe-brand swatches, not palette tokens —
-// parsed once at class-load (no Color(0x…)) so the disc reads as the Stripe mark.
-private val StripeDiscBg = Color("#f5f4ff".toColorInt())
-private val StripeDiscGlyph = Color("#635bff".toColorInt())
+// Spec C.stripeBg / C.stripe are Stripe-brand swatches, not design tokens —
+// sourced from the theme-layer SchedulingPalette so the disc reads as the
+// Stripe mark without a hex literal in feature code.
+private val StripeDiscBg = SchedulingPalette.stripeBg
+private val StripeDiscGlyph = SchedulingPalette.stripeBrand
 
 @Composable
 private fun PaymentsRow(

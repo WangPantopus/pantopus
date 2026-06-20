@@ -34,12 +34,13 @@ class BookingPageManageViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
+    private val ownerRelay = BookingPageOwnerRelay()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = BookingPageManageViewModel(repo, errors)
+    private fun vm() = BookingPageManageViewModel(repo, errors, ownerRelay)
 
     private fun page(
         slug: String = "maria-k",

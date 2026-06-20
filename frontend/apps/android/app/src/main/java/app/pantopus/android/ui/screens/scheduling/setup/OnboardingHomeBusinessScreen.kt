@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "CyclomaticComplexMethod", "UnusedParameter", "LongParameterList")
+@file:Suppress(
+    "PackageNaming",
+    "MagicNumber",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "UnusedParameter",
+    "LongParameterList",
+    "ktlint:standard:max-line-length",
+)
 
 package app.pantopus.android.ui.screens.scheduling.setup
 

@@ -17,14 +17,16 @@ import Foundation
 /// A workflow's lifecycle trigger. Raw value is the backend wire string
 /// (`trigger` on `SchedulingWorkflow`); `before_start` / `after_end` are the
 /// only triggers that carry an `offset_minutes`.
-enum WorkflowTrigger: String, CaseIterable, Sendable, Hashable, Identifiable {
+enum WorkflowTrigger: String, CaseIterable, Hashable, Identifiable {
     case bookingCreated = "booking_created"
     case cancelled
     case rescheduled
     case beforeStart = "before_start"
     case afterEnd = "after_end"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     /// Tolerant decode of an arbitrary backend string (defaults to created).
     init(wire: String?) {
@@ -64,21 +66,23 @@ enum WorkflowTrigger: String, CaseIterable, Sendable, Hashable, Identifiable {
     }
 
     /// Whether this trigger uses an `offset_minutes` builder (before/after).
-    var usesOffset: Bool { self == .beforeStart || self == .afterEnd }
+    var usesOffset: Bool {
+        self == .beforeStart || self == .afterEnd
+    }
 
     /// Plain-English, sentence-case summary used on workflow rows + the editor
     /// summary pill (e.g. "When a booking is created", "1 hour before it starts").
     func summary(offsetMinutes: Int) -> String {
         switch self {
-        case .bookingCreated: return "When a booking is created"
-        case .cancelled: return "When a booking is cancelled"
-        case .rescheduled: return "When a booking is rescheduled"
+        case .bookingCreated: "When a booking is created"
+        case .cancelled: "When a booking is cancelled"
+        case .rescheduled: "When a booking is rescheduled"
         case .beforeStart:
-            return offsetMinutes <= 0
+            offsetMinutes <= 0
                 ? "When it starts"
                 : "\(AutomationsFormat.duration(offsetMinutes)) before it starts"
         case .afterEnd:
-            return offsetMinutes <= 0
+            offsetMinutes <= 0
                 ? "When it ends"
                 : "\(AutomationsFormat.duration(offsetMinutes)) after it ends"
         }
@@ -89,7 +93,7 @@ enum WorkflowTrigger: String, CaseIterable, Sendable, Hashable, Identifiable {
 
 /// The channel a workflow's `action` fires on. Raw value is the backend wire
 /// string. SMS is rendered but disabled ("coming soon") until carrier support.
-enum WorkflowChannel: String, CaseIterable, Sendable, Hashable {
+enum WorkflowChannel: String, CaseIterable, Hashable {
     case email
     case push
     case inApp = "in_app"
@@ -119,10 +123,14 @@ enum WorkflowChannel: String, CaseIterable, Sendable, Hashable {
 
     /// SMS is not yet wired end-to-end (no carrier integration) — render the
     /// chip disabled with a "Coming soon" caption per the global contract.
-    var isComingSoon: Bool { self == .sms }
+    var isComingSoon: Bool {
+        self == .sms
+    }
 
     /// Whether this channel needs a subject line (email).
-    var needsSubject: Bool { self == .email }
+    var needsSubject: Bool {
+        self == .email
+    }
 
     /// Plain-English action summary on workflow rows (channel + implied
     /// recipient — the backend has no separate recipient field, so the channel
@@ -151,9 +159,15 @@ enum AutomationsFormat {
     static func duration(_ minutes: Int) -> String {
         let m = max(0, minutes)
         if m == 0 { return "0 minutes" }
-        if m % 10080 == 0 { let w = m / 10080; return "\(w) week\(w == 1 ? "" : "s")" }
-        if m % 1440 == 0 { let d = m / 1440; return "\(d) day\(d == 1 ? "" : "s")" }
-        if m % 60 == 0 { let h = m / 60; return "\(h) hour\(h == 1 ? "" : "s")" }
+        if m % 10080 == 0 { let w = m / 10080
+            return "\(w) week\(w == 1 ? "" : "s")"
+        }
+        if m % 1440 == 0 { let d = m / 1440
+            return "\(d) day\(d == 1 ? "" : "s")"
+        }
+        if m % 60 == 0 { let h = m / 60
+            return "\(h) hour\(h == 1 ? "" : "s")"
+        }
         return "\(m) minute\(m == 1 ? "" : "s")"
     }
 
@@ -208,7 +222,10 @@ enum ReminderPreset {
     /// Custom-time unit for the inline stepper.
     enum Unit: String, CaseIterable, Identifiable {
         case minutes, hours, days
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
+
         var label: String {
             switch self {
             case .minutes: "minutes"
@@ -230,8 +247,8 @@ enum ReminderPreset {
 // MARK: - Template variables (H6)
 
 /// A dynamic `{{token}}` a message can interpolate. Grouped for the picker.
-struct TemplateVariable: Identifiable, Sendable, Hashable {
-    enum Group: String, CaseIterable, Sendable {
+struct TemplateVariable: Identifiable, Hashable {
+    enum Group: String, CaseIterable {
         case event = "Event"
         case people = "People"
         case links = "Links"
@@ -245,16 +262,23 @@ struct TemplateVariable: Identifiable, Sendable, Hashable {
     /// Sample value shown in the picker + used to fill the preview.
     let sample: String
 
-    var id: String { key }
+    var id: String {
+        key
+    }
+
     /// The inserted token, e.g. `{{attendee_name}}`.
-    var token: String { "{{\(key)}}" }
+    var token: String {
+        "{{\(key)}}"
+    }
 }
 
 /// One grouped section of variables (Identifiable so it drives `ForEach`).
-struct VariableSection: Identifiable, Sendable {
+struct VariableSection: Identifiable {
     let group: TemplateVariable.Group
     let items: [TemplateVariable]
-    var id: String { group.rawValue }
+    var id: String {
+        group.rawValue
+    }
 }
 
 /// The full variable catalog offered in H6, grouped EVENT / PEOPLE / LINKS.
@@ -295,7 +319,7 @@ enum TemplateVariableCatalog {
 
 /// A read-only starter the user can duplicate into their own templates. These
 /// are client-side seeds (not backend rows) — duplicating POSTs a real copy.
-struct StarterTemplate: Identifiable, Sendable, Hashable {
+struct StarterTemplate: Identifiable, Hashable {
     let id: String
     let name: String
     let channel: WorkflowChannel
@@ -308,6 +332,7 @@ struct StarterTemplate: Identifiable, Sendable, Hashable {
             name: "Booking confirmation",
             channel: .email,
             subject: "You're booked: {{event_title}}",
+            // swiftlint:disable:next line_length
             body: "Hi {{attendee_name}}, your {{event_title}} is confirmed for {{event_date}} at {{event_time}}. Need to change it? {{reschedule_link}}"
         ),
         .init(

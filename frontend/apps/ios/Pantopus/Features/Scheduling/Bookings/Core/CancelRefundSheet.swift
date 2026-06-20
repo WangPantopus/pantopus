@@ -13,6 +13,8 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 @Observable
 @MainActor
 final class CancelRefundViewModel {
@@ -49,7 +51,9 @@ final class CancelRefundViewModel {
     }
 
     /// Paid surfaces stay behind the flag + Stripe TEST mode.
-    var isPaid: Bool { booking.paymentId != nil && SchedulingFeatureFlags.paidEnabled }
+    var isPaid: Bool {
+        booking.paymentId != nil && SchedulingFeatureFlags.paidEnabled
+    }
 
     /// Package-credit bookings (E5 frame 5) show the "Restore credit" switch in
     /// place of the money refund section. Driven by the real `package_credit_id`.
@@ -59,14 +63,18 @@ final class CancelRefundViewModel {
 
     /// Whether to render the money/preset refund section (E5 frames 2–4). A
     /// credit booking takes the restore-credit switch instead.
-    var showsRefundSection: Bool { isPaid && !creditRedeemed }
+    var showsRefundSection: Bool {
+        isPaid && !creditRedeemed
+    }
 
     /// Non-refundable deposit (E5 frame 4) dims the whole refund section, disables
     /// the preset control, renders the refund value in the muted tone, and swaps in
     /// the "non-refundable" explainer. There's no `non_refundable` signal on the
     /// owner-side `BookingDTO` yet, so this stays `false` (see `deferredBackend`);
     /// the rendering path is wired so the state is faithful once pricing lands.
-    var refundNonRefundable: Bool { false }
+    var refundNonRefundable: Bool {
+        false
+    }
 
     /// Per-preset policy explainer under the refund money rows (E5 frames 2–4).
     /// The free-cancellation-window / 50% copy mirrors the design; the concrete
@@ -121,8 +129,10 @@ final class CancelRefundViewModel {
         return isPaid ? "Cancel & refund" : "Cancel booking"
     }
 
-    // Frame 7 retry uses lucide `rotate-cw` (not `refresh-cw`); default is `x-circle`.
-    var confirmIcon: PantopusIcon { refundFailed ? .rotateCw : .xCircle }
+    /// Frame 7 retry uses lucide `rotate-cw` (not `refresh-cw`); default is `x-circle`.
+    var confirmIcon: PantopusIcon {
+        refundFailed ? .rotateCw : .xCircle
+    }
 
     func cancel() async {
         submitting = true
@@ -165,6 +175,7 @@ final class CancelRefundViewModel {
     }
 }
 
+// swiftlint:disable:next type_body_length
 struct CancelRefundSheet: View {
     @State private var viewModel: CancelRefundViewModel
     let onCompleted: () async -> Void
@@ -333,7 +344,9 @@ struct CancelRefundSheet: View {
     }
 
     /// Deferred money placeholder — the owner booking payload has no price.
-    private var deferredAmount: String { "—" }
+    private var deferredAmount: String {
+        "—"
+    }
 
     /// E5 frame 5 · Restore-credit switch for package-credit bookings.
     private func restoreCreditCard(_ isOn: Binding<Bool>) -> some View {
@@ -443,7 +456,11 @@ struct CancelRefundSheet: View {
     }
 
     private func terminalScaffold(
-        icon: PantopusIcon, iconTint: Color, iconBg: Color, title: String, body: String,
+        icon: PantopusIcon,
+        iconTint: Color,
+        iconBg: Color,
+        title: String,
+        body: String,
         showsRefundRow: Bool = false
     ) -> some View {
         VStack(spacing: Spacing.s4) {
@@ -508,8 +525,13 @@ struct CancelRefundSheet: View {
 }
 
 private extension CancelRefundViewModel {
-    var accent: Color { owner.theme.accent }
-    var accentBg: Color { owner.theme.accentBg }
+    var accent: Color {
+        owner.theme.accent
+    }
+
+    var accentBg: Color {
+        owner.theme.accentBg
+    }
 }
 
 #if DEBUG
@@ -521,9 +543,8 @@ private extension CancelRefundViewModel {
                 booking: .preview(status: "confirmed", ownerType: "user"),
                 eventName: "30-min intro call",
                 actions: BookingActions(owner: .personal)
-            ),
-            onCompleted: {}
-        )
+            )
+        ) {}
     }
 }
 #endif

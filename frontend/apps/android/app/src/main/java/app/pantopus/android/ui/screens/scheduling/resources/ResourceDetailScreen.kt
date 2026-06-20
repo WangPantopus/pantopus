@@ -248,7 +248,10 @@ private fun FullyBookedBanner(
 }
 
 @Composable
-private fun HeaderCard(loaded: ResourceDetailUiState.Loaded, onApprovalBadge: () -> Unit) {
+private fun HeaderCard(
+    loaded: ResourceDetailUiState.Loaded,
+    onApprovalBadge: () -> Unit,
+) {
     SectionCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,

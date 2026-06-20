@@ -56,7 +56,9 @@ final class ScheduleVisitViewModel {
         self.client = client
     }
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     // MARK: Load (member roster)
 

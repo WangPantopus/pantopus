@@ -18,7 +18,7 @@ import SwiftUI
 /// (`GET /bookings?status=…`): `upcoming` = confirmed+future, `pending` =
 /// awaiting approval, `past` = confirmed|completed|no_show+past, `cancelled` =
 /// cancelled|declined.
-enum BookingStatusFilter: String, CaseIterable, Hashable, Sendable {
+enum BookingStatusFilter: String, CaseIterable, Hashable {
     case upcoming
     case pending
     case past
@@ -87,7 +87,9 @@ enum BookingsPillar {
 /// bookings in the device timezone; instants are stored/compared in UTC.
 enum BookingsTime {
     /// The host's display timezone (their device zone).
-    static var displayTimeZone: String { SchedulingTime.deviceTimeZoneIdentifier }
+    static var displayTimeZone: String {
+        SchedulingTime.deviceTimeZoneIdentifier
+    }
 
     private static func calendar(_ tz: String) -> Calendar {
         var cal = Calendar(identifier: .gregorian)
@@ -161,7 +163,9 @@ enum BookingsTime {
     }
 
     private static func timeString(_ date: Date, tz: String) -> String {
-        format(date, tz: tz) { $0.timeStyle = .short; $0.dateStyle = .none }
+        format(date, tz: tz) { $0.timeStyle = .short
+            $0.dateStyle = .none
+        }
     }
 
     private static func timeStringNoMeridiem(_ date: Date, tz: String) -> String {
@@ -296,7 +300,7 @@ enum BookingsAvatar {
 // MARK: - Decline / cancel reasons & refund presets
 
 /// E3 decline reason chips.
-enum DeclineReason: String, CaseIterable, Hashable, Sendable {
+enum DeclineReason: String, CaseIterable, Hashable {
     case timeDoesntWork
     case fullyBooked
     case notAFit
@@ -313,7 +317,7 @@ enum DeclineReason: String, CaseIterable, Hashable, Sendable {
 }
 
 /// E5 cancel reason chips.
-enum CancelReason: String, CaseIterable, Hashable, Sendable {
+enum CancelReason: String, CaseIterable, Hashable {
     case changedPlans
     case emergency
     case foundSomeoneElse
@@ -330,7 +334,7 @@ enum CancelReason: String, CaseIterable, Hashable, Sendable {
 }
 
 /// E5 refund mode segmented control. Only shown for paid bookings.
-enum RefundPreset: String, CaseIterable, Hashable, Sendable {
+enum RefundPreset: String, CaseIterable, Hashable {
     case full
     case partial
     case perPolicy
@@ -346,7 +350,7 @@ enum RefundPreset: String, CaseIterable, Hashable, Sendable {
 
 /// E4 apply-mode segmented control (host only). "Propose" sends the new time for
 /// the invitee to accept; "Reschedule now" moves it immediately.
-enum RescheduleMode: String, CaseIterable, Hashable, Sendable {
+enum RescheduleMode: String, CaseIterable, Hashable {
     case propose
     case now
 

@@ -83,19 +83,31 @@ final class TeamBookingAvailabilityViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     var canManage: Bool {
         guard let access else { return true }
         return access.isOwner == true || access.permissions.contains("team.manage")
     }
 
-    var isGated: Bool { access != nil && !canManage }
+    var isGated: Bool {
+        access != nil && !canManage
+    }
 
     /// Whether the assignment entry (G1/G2) should be offered.
-    var hasAssignableServices: Bool { !eventTypes.isEmpty }
+    var hasAssignableServices: Bool {
+        !eventTypes.isEmpty
+    }
 
     init(
         owner: SchedulingOwner,
@@ -135,7 +147,7 @@ final class TeamBookingAvailabilityViewModel {
 
             let free = await freeR
             access = await accessR
-            eventTypes = (await typesR)?.eventTypes ?? []
+            eventTypes = await (typesR)?.eventTypes ?? []
 
             let freeByMember = free?.freeByMember ?? [:]
             rows = members.compactMap { member in
@@ -158,14 +170,18 @@ final class TeamBookingAvailabilityViewModel {
             coverage = Self.coverage(window: window, freeByMember: freeByMember)
             phase = rows.isEmpty ? .empty : .loaded
         } catch let error as SchedulingError {
-            if error.code == "BUSINESS_ONLY" { phase = .businessOnly; return }
+            if error.code == "BUSINESS_ONLY" { phase = .businessOnly
+                return
+            }
             phase = .error(error.userMessage ?? "Couldn't load your team.")
         } catch {
             phase = .error("Couldn't load your team.")
         }
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     // MARK: Navigation / presentation
 
@@ -173,7 +189,9 @@ final class TeamBookingAvailabilityViewModel {
         memberSheet = MemberSheetTarget(id: row.id, name: row.name, isSelf: row.isSelf)
     }
 
-    func openAssignmentPicker() { showAssignmentPicker = true }
+    func openAssignmentPicker() {
+        showAssignmentPicker = true
+    }
 
     func chooseAssignment(_ eventType: EventTypeDTO) {
         showAssignmentPicker = false
@@ -244,7 +262,9 @@ final class TeamBookingAvailabilityViewModel {
         let parts = ymd.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         var comps = DateComponents()
-        comps.year = parts[0]; comps.month = parts[1]; comps.day = parts[2]
+        comps.year = parts[0]
+        comps.month = parts[1]
+        comps.day = parts[2]
         guard let date = cal.date(from: comps) else { return nil }
         return cal.component(.weekday, from: date)
     }

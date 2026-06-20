@@ -120,7 +120,7 @@ struct IntakeAnswersDisclosure: View {
         if let s = value.stringValue { return s }
         if let n = value.numberValue { return n == n.rounded() ? String(Int(n)) : String(n) }
         if let b = value.boolValue { return b ? "Yes" : "No" }
-        if let arr = value.arrayValue { return arr.compactMap { $0.stringValue }.joined(separator: ", ") }
+        if let arr = value.arrayValue { return arr.compactMap(\.stringValue).joined(separator: ", ") }
         return "—"
     }
 

@@ -19,7 +19,9 @@ struct GroupRosterView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
-    private var theme: SchedulingIdentityTheme { viewModel.owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        viewModel.owner.theme
+    }
 
     var body: some View {
         content
@@ -207,7 +209,7 @@ struct GroupRosterView: View {
         return "Waitlist · \(viewModel.waitingCount)"
     }
 
-    private func section<Rows: View>(_ overline: String, @ViewBuilder rows: () -> Rows) -> some View {
+    private func section(_ overline: String, @ViewBuilder rows: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 1) {
             ExtrasOverline(text: overline)
                 .padding(.horizontal, Spacing.s4 + 2)
@@ -219,7 +221,7 @@ struct GroupRosterView: View {
 
     // MARK: Host controls
 
-    @ViewBuilder private var hostControls: some View {
+    private var hostControls: some View {
         VStack(spacing: Spacing.s2 + 1) {
             Button { viewModel.openAddAttendee() } label: {
                 HStack(spacing: Spacing.s3) {
@@ -308,7 +310,7 @@ struct GroupRosterView: View {
             VStack(spacing: Spacing.s3) {
                 Shimmer(height: 118, cornerRadius: Radii.xl)
                     .padding(.top, Spacing.s3)
-                ForEach(0 ..< 3, id: \.self) { _ in
+                ForEach(0..<3, id: \.self) { _ in
                     Shimmer(height: 60, cornerRadius: Radii.lg + 2)
                 }
             }

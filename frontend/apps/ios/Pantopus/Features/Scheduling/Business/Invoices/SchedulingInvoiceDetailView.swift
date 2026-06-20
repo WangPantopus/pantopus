@@ -14,6 +14,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct SchedulingInvoiceDetailView: View {
     @State private var model: SchedulingInvoiceDetailViewModel
     @Environment(\.dismiss) private var dismiss
@@ -32,12 +33,12 @@ struct SchedulingInvoiceDetailView: View {
             // Design: top-bar trailing = StatusPill showing invoice lifecycle
             // (`invoicedetail-frames.jsx` line 159). Rendered from the best-
             // available status (see `model.invoiceStatusString`).
-            PkgTopBar(title: "Invoice", onBack: { dismiss() }) {
+            PkgTopBar(title: "Invoice", onBack: { dismiss() }, trailing: {
                 if model.phase == .loaded {
                     InvoiceStatusChip(status: model.invoiceStatusString)
                         .padding(.trailing, Spacing.s2)
                 }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -85,7 +86,9 @@ struct SchedulingInvoiceDetailView: View {
     private var hero: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(model.totalLabel)
-                .font(.system(size: 30, weight: .heavy)).tracking(-1.1).monospacedDigit()
+                .font(.system(size: 30, weight: .heavy))
+                .tracking(-1.1)
+                .monospacedDigit()
                 .foregroundStyle(Theme.Color.appText)
             Text("total · \(model.currencyCode)").font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.Color.appTextSecondary)
         }
@@ -109,7 +112,8 @@ struct SchedulingInvoiceDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 11).padding(.vertical, 10)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
         .background(Theme.Color.appSurface)
         .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
@@ -128,8 +132,10 @@ struct SchedulingInvoiceDetailView: View {
             sectionHeader("Line items", icon: .list)
             if model.lineItems.isEmpty {
                 Text("Itemized details aren't available for this invoice.")
-                    .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                    .padding(.horizontal, 12).padding(.vertical, 14)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Theme.Color.appSurface)
                     .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
@@ -148,34 +154,50 @@ struct SchedulingInvoiceDetailView: View {
                 Text("UNIT").frame(width: 52, alignment: .trailing)
                 Text("TOTAL").frame(width: 56, alignment: .trailing)
             }
-            .font(.system(size: 8.5, weight: .bold)).tracking(0.6).foregroundStyle(Theme.Color.appTextMuted)
-            .padding(.horizontal, 11).padding(.vertical, 7)
+            .font(.system(size: 8.5, weight: .bold))
+            .tracking(0.6)
+            .foregroundStyle(Theme.Color.appTextMuted)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
             .background(Theme.Color.appSurfaceRaised)
             ForEach(model.lineItems) { item in
                 HStack(spacing: Spacing.s0) {
-                    Text(item.label).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.Color.appText)
-                        .frame(maxWidth: .infinity, alignment: .leading).lineLimit(2)
+                    Text(item.label)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.appText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(2)
                     Text(item.quantity.map(String.init) ?? "—")
-                        .font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
                         .frame(width: 24, alignment: .center)
                     Text(model.unitLabel(item))
-                        .font(.system(size: 11)).monospacedDigit()
+                        .font(.system(size: 11))
+                        .monospacedDigit()
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .frame(width: 52, alignment: .trailing)
                     Text(model.lineTotalLabel(item))
-                        .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
                         .foregroundStyle(Theme.Color.appText)
                         .frame(width: 56, alignment: .trailing)
                 }
-                .padding(.horizontal, 11).padding(.vertical, 9)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 9)
                 Divider().background(Theme.Color.appBorderSubtle)
             }
             HStack {
-                Text("Total").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                Text("Total")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
                 Spacer()
-                Text(model.totalLabel).font(.system(size: 15, weight: .heavy)).monospacedDigit().foregroundStyle(Theme.Color.appText)
+                Text(model.totalLabel)
+                    .font(.system(size: 15, weight: .heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.Color.appText)
             }
-            .padding(.horizontal, 11).padding(.vertical, 9)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
             .background(Theme.Color.appSurfaceRaised)
         }
         .background(Theme.Color.appSurface)
@@ -197,7 +219,8 @@ struct SchedulingInvoiceDetailView: View {
                     timelineRow(event, isLast: index == events.count - 1)
                 }
             }
-            .padding(.horizontal, 13).padding(.vertical, 12)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Color.appSurface)
             .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorder, lineWidth: 1))
@@ -241,7 +264,8 @@ struct SchedulingInvoiceDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("Payment terms", icon: .fileText)
             Text("Net 14 from issue. Pantopus Pay, card, or ACH.")
-                .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextStrong)
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.Color.appTextStrong)
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -295,7 +319,8 @@ struct SchedulingInvoiceDetailView: View {
                 Icon(.share2, size: 15, color: Theme.Color.appText)
                 Text("Share").font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
             }
-            .frame(maxWidth: .infinity).frame(height: 46)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
             .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.appBorderStrong, lineWidth: 1))
         }
         .accessibilityLabel("Share invoice")
@@ -319,7 +344,8 @@ struct SchedulingInvoiceDetailView: View {
                     Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
                     Text("Invoice sent").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .background(Theme.Color.appText)
                 .clipShape(Capsule())
                 .pantopusShadow(.lg)
@@ -335,7 +361,9 @@ struct SchedulingInvoiceDetailView: View {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 Shimmer(width: 200, height: 10)
                 Shimmer(width: 160, height: 30)
-                HStack(spacing: 8) { Shimmer(height: 64, cornerRadius: Radii.lg); Shimmer(height: 64, cornerRadius: Radii.lg) }
+                HStack(spacing: 8) { Shimmer(height: 64, cornerRadius: Radii.lg)
+                    Shimmer(height: 64, cornerRadius: Radii.lg)
+                }
                 Shimmer(height: 160, cornerRadius: Radii.lg)
             }
             .padding(.horizontal, Spacing.s4)

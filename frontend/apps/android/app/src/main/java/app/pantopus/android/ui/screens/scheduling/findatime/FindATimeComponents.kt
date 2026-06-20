@@ -143,7 +143,13 @@ fun FtBanner(
                 .border(1.dp, borderC, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 16.dp, tint = accent, modifier = Modifier.padding(end = Spacing.s2, top = 1.dp))
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 16.dp,
+            tint = accent,
+            modifier = Modifier.padding(end = Spacing.s2, top = 1.dp),
+        )
         Column(modifier = Modifier.weight(1f)) {
             if (title != null) {
                 Text(text = title, style = PantopusTextStyle.small, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
@@ -370,7 +376,13 @@ fun FtSecondaryButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 17.dp, tint = tint, modifier = Modifier.padding(end = Spacing.s2))
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 17.dp,
+                tint = tint,
+                modifier = Modifier.padding(end = Spacing.s2),
+            )
         }
         Text(text = label, style = PantopusTextStyle.body, fontWeight = FontWeight.Bold, color = tint)
     }
@@ -456,7 +468,13 @@ fun FtChip(
             Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(leadingDot).padding(end = Spacing.s1))
         }
         if (icon != null) {
-            PantopusIconImage(icon = icon, contentDescription = null, size = 10.dp, tint = fg, modifier = Modifier.padding(end = Spacing.s1))
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 10.dp,
+                tint = fg,
+                modifier = Modifier.padding(end = Spacing.s1),
+            )
         }
         Text(
             text = label,

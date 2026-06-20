@@ -27,7 +27,7 @@ extension SchedulingOwner {
 // MARK: - Semantic tones
 
 /// Inline-note / chip tones mapped to design-system tokens.
-enum BizTone: Sendable {
+enum BizTone {
     case info // business-tinted neutral note (design `Note tone="info"`)
     case infoBlue
     case warning
@@ -89,7 +89,7 @@ enum BizTone: Sendable {
 
 /// White card · 1px border · 16pt radius · soft shadow. Mirrors `biz-kit Card`.
 struct BizCard<Content: View>: View {
-    var padding: EdgeInsets = EdgeInsets(top: Spacing.s1, leading: 13, bottom: Spacing.s1, trailing: 13)
+    var padding = EdgeInsets(top: Spacing.s1, leading: 13, bottom: Spacing.s1, trailing: 13)
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -198,7 +198,7 @@ struct BizAvatar: View {
 
     private var initials: String {
         let parts = name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init)
+        let letters = parts.compactMap(\.first).map(String.init)
         return letters.isEmpty ? "•" : letters.joined().uppercased()
     }
 

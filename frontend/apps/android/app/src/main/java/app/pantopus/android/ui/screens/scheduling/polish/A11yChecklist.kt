@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MatchingDeclarationName")
+@file:Suppress("PackageNaming", "MatchingDeclarationName", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.polish
 
@@ -71,16 +71,14 @@ object SchedulingA11y {
      * Slot grids collapse to a single stacked column at accessibility font
      * scales so day numbers never truncate and every tile keeps a 48dp target.
      */
-    fun slotColumns(fontScale: Float): Int =
-        if (fontScale >= A11Y_ACCESSIBILITY_FONT_SCALE) SLOT_COLUMNS_REFLOWED else SLOT_COLUMNS_DEFAULT
+    fun slotColumns(fontScale: Float): Int = if (fontScale >= A11Y_ACCESSIBILITY_FONT_SCALE) SLOT_COLUMNS_REFLOWED else SLOT_COLUMNS_DEFAULT
 }
 
 /**
  * Guarantee a ≥[size] (default 48dp) interactive target — the floor every
  * scheduling control must meet, including at large text.
  */
-fun Modifier.a11yMinTapTarget(size: Dp = A11Y_MIN_TAP_TARGET_DP.dp): Modifier =
-    this.sizeIn(minWidth = size, minHeight = size)
+fun Modifier.a11yMinTapTarget(size: Dp = A11Y_MIN_TAP_TARGET_DP.dp): Modifier = this.sizeIn(minWidth = size, minHeight = size)
 
 /**
  * A visible focus ring for keyboard / switch-access focus (color is never the

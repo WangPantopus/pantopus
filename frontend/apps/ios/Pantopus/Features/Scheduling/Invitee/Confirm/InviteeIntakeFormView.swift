@@ -11,8 +11,10 @@
 //  draft to D2.
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct InviteeIntakeFormView: View {
     @State private var viewModel: InviteeIntakeFormViewModel
     @State private var showTimezoneSheet = false
@@ -155,7 +157,7 @@ struct InviteeIntakeFormView: View {
             Text("We're holding this time for ")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-            + Text(viewModel.holdLabel)
+                + Text(viewModel.holdLabel)
                 .font(.system(size: 11, weight: .bold).monospacedDigit())
                 .foregroundStyle(Theme.Color.appTextStrong)
         }
@@ -169,7 +171,8 @@ struct InviteeIntakeFormView: View {
             ConfirmOverline("Your info")
             HStack(alignment: .top, spacing: Spacing.s2) {
                 IntakeField(
-                    label: "First name", required: true,
+                    label: "First name",
+                    required: true,
                     value: bind(\.firstName, touch: "firstName"),
                     placeholder: "Maya",
                     showValid: showValid(for: "firstName", value: viewModel.firstName, error: viewModel.firstNameError),
@@ -177,7 +180,8 @@ struct InviteeIntakeFormView: View {
                     textContentType: .givenName
                 )
                 IntakeField(
-                    label: "Last name", required: true,
+                    label: "Last name",
+                    required: true,
                     value: bind(\.lastName, touch: "lastName"),
                     placeholder: "Chen",
                     showValid: showValid(for: "lastName", value: viewModel.lastName, error: viewModel.lastNameError),
@@ -186,7 +190,8 @@ struct InviteeIntakeFormView: View {
                 )
             }
             IntakeField(
-                label: "Email", required: true,
+                label: "Email",
+                required: true,
                 value: bind(\.email, touch: "email"),
                 placeholder: "you@email.com",
                 helper: "We'll only email you about this booking.",
@@ -214,10 +219,10 @@ struct InviteeIntakeFormView: View {
                 Text("You have an account. ")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.primary900)
-                + Text("Open in app")
+                    + Text("Open in app")
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(viewModel.accent)
-                + Text(" to use your saved details.")
+                    + Text(" to use your saved details.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.Color.primary900)
             )
@@ -295,28 +300,32 @@ struct InviteeIntakeFormView: View {
         switch (question.fieldType ?? "text").lowercased() {
         case "textarea":
             IntakeTextArea(
-                label: question.label, required: question.required ?? false,
+                label: question.label,
+                required: question.required ?? false,
                 value: answerBinding(key),
                 placeholder: viewModel.coverPlaceholder,
                 error: error
             )
         case "select":
             IntakeSelect(
-                label: question.label, required: question.required ?? false,
+                label: question.label,
+                required: question.required ?? false,
                 options: question.options ?? [],
                 selected: viewModel.isChoiceSelectedFirst(key),
-                error: error,
-                onSelect: { viewModel.selectSingleChoice(key, option: $0) }
-            )
+                error: error
+            ) { viewModel.selectSingleChoice(key, option: $0) }
         case "multiselect":
+            // swiftlint:disable trailing_closure
             IntakeMultiSelect(
-                label: question.label, required: question.required ?? false,
+                label: question.label,
+                required: question.required ?? false,
                 options: question.options ?? [],
                 isSelected: { viewModel.isChoiceSelected(key, option: $0) },
                 error: error,
                 accent: viewModel.accent,
                 onToggle: { viewModel.toggleChoice(key, option: $0) }
             )
+        // swiftlint:enable trailing_closure
         case "checkbox":
             IntakeCheckbox(
                 label: question.label,
@@ -326,7 +335,8 @@ struct InviteeIntakeFormView: View {
             )
         case "phone":
             IntakeField(
-                label: question.label, required: question.required ?? false,
+                label: question.label,
+                required: question.required ?? false,
                 value: answerBinding(key),
                 placeholder: "(555) 000-0000",
                 leading: "+1",
@@ -338,7 +348,8 @@ struct InviteeIntakeFormView: View {
             )
         default:
             IntakeField(
-                label: question.label, required: question.required ?? false,
+                label: question.label,
+                required: question.required ?? false,
                 value: answerBinding(key),
                 placeholder: "Type your answer",
                 showValid: showValid(for: key, value: viewModel.textAnswer(key), error: error),
@@ -362,9 +373,11 @@ struct InviteeIntakeFormView: View {
                 ForEach(Array(viewModel.guests.enumerated()), id: \.offset) { index, _ in
                     HStack(spacing: Spacing.s2) {
                         IntakeField(
-                            label: "", value: guestBinding(index),
+                            label: "",
+                            value: guestBinding(index),
                             placeholder: "guest@email.com",
-                            keyboard: .emailAddress, textContentType: .emailAddress
+                            keyboard: .emailAddress,
+                            textContentType: .emailAddress
                         )
                         Button { viewModel.removeGuest(at: index) } label: {
                             Icon(.x, size: 15, color: Theme.Color.appTextSecondary)
@@ -480,7 +493,9 @@ struct InviteeIntakeFormView: View {
     private func bind(_ keyPath: ReferenceWritableKeyPath<InviteeIntakeFormViewModel, String>, touch: String) -> Binding<String> {
         Binding(
             get: { viewModel[keyPath: keyPath] },
-            set: { viewModel[keyPath: keyPath] = $0; viewModel.markTouched(touch) }
+            set: { viewModel[keyPath: keyPath] = $0
+                viewModel.markTouched(touch)
+            }
         )
     }
 
@@ -511,12 +526,12 @@ private struct IntakeField: View {
     var required = false
     @Binding var value: String
     var placeholder = ""
-    var leading: String? = nil
-    var helper: String? = nil
+    var leading: String?
+    var helper: String?
     var showValid = false
-    var error: String? = nil
+    var error: String?
     var keyboard: UIKeyboardType = .default
-    var textContentType: UITextContentType? = nil
+    var textContentType: UITextContentType?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -557,7 +572,9 @@ private struct IntakeField: View {
         return Theme.Color.appBorder
     }
 
-    private var borderWidth: CGFloat { (error != nil || showValid) ? 1.5 : 1 }
+    private var borderWidth: CGFloat {
+        (error != nil || showValid) ? 1.5 : 1
+    }
 }
 
 private struct IntakeTextArea: View {
@@ -565,7 +582,7 @@ private struct IntakeTextArea: View {
     var required = false
     @Binding var value: String
     var placeholder = "A sentence or two helps."
-    var error: String? = nil
+    var error: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -580,8 +597,10 @@ private struct IntakeTextArea: View {
                 .background(Theme.Color.appSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .strokeBorder(error != nil ? Theme.Color.error : Theme.Color.appBorder,
-                                      lineWidth: error != nil ? 1.5 : 1)
+                        .strokeBorder(
+                            error != nil ? Theme.Color.error : Theme.Color.appBorder,
+                            lineWidth: error != nil ? 1.5 : 1
+                        )
                 )
             FieldFootnote(error: error, helper: nil)
         }
@@ -593,7 +612,7 @@ private struct IntakeSelect: View {
     var required = false
     let options: [String]
     let selected: String?
-    var error: String? = nil
+    var error: String?
     let onSelect: (String) -> Void
 
     var body: some View {
@@ -616,8 +635,10 @@ private struct IntakeSelect: View {
                 .background(Theme.Color.appSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .strokeBorder(error != nil ? Theme.Color.error : Theme.Color.appBorder,
-                                      lineWidth: error != nil ? 1.5 : 1)
+                        .strokeBorder(
+                            error != nil ? Theme.Color.error : Theme.Color.appBorder,
+                            lineWidth: error != nil ? 1.5 : 1
+                        )
                 )
             }
             FieldFootnote(error: error, helper: nil)
@@ -630,7 +651,7 @@ private struct IntakeMultiSelect: View {
     var required = false
     let options: [String]
     let isSelected: (String) -> Bool
-    var error: String? = nil
+    var error: String?
     let accent: Color
     let onToggle: (String) -> Void
 
@@ -671,7 +692,7 @@ private struct IntakeCheckbox: View {
     let label: String
     @Binding var isOn: Bool
     let accent: Color
-    var error: String? = nil
+    var error: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -689,8 +710,10 @@ private struct IntakeCheckbox: View {
                 .background(Theme.Color.appSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .strokeBorder(error != nil ? Theme.Color.error : Theme.Color.appBorder,
-                                      lineWidth: error != nil ? 1.5 : 1)
+                        .strokeBorder(
+                            error != nil ? Theme.Color.error : Theme.Color.appBorder,
+                            lineWidth: error != nil ? 1.5 : 1
+                        )
                 )
             }
             .buttonStyle(.plain)
@@ -716,7 +739,7 @@ private struct FieldLabelText: View {
 }
 
 private struct FieldFootnote: View {
-    var error: String? = nil
+    var error: String?
     var helper: String?
 
     var body: some View {

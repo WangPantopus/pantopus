@@ -48,6 +48,7 @@ public struct HomeAgendaSection: Sendable, Hashable, Identifiable {
 /// produces the richer `HomeAgendaItem` (assignees + booking-union) the
 /// bespoke design row needs.
 public enum HomeAgendaBuilder {
+    // swiftlint:disable:next function_parameter_count
     public static func sections(
         events: [CalendarEventDTO],
         members: [String: HomeMember],
@@ -202,6 +203,7 @@ public enum HomeAgendaBuilder {
         return isoDay(anchor, calendar: cal)
     }
 
+    // swiftlint:disable function_parameter_count
     /// Build a 7-day `MonthStripState` for the week anchored at `anchorIso`,
     /// counting events per day. Used by the gated scheduler (F15).
     static func weekStrip(
@@ -212,6 +214,7 @@ public enum HomeAgendaBuilder {
         calendar: Calendar,
         timeZone: TimeZone
     ) -> MonthStripState? {
+        // swiftlint:enable function_parameter_count
         var cal = calendar
         cal.timeZone = timeZone
         guard let anchor = parseIso(anchorIso, calendar: cal) else { return nil }

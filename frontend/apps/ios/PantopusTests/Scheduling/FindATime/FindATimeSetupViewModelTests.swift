@@ -48,6 +48,7 @@ final class FindATimeSetupViewModelTests: XCTestCase {
     }
 
     private func slotsBody() -> String {
+        // swiftlint:disable:next line_length
         #"{"slots":[{"start":"2030-07-01T16:00:00Z","end":"2030-07-01T16:30:00Z","startLocal":"2030-07-01T12:00:00","eligibleHosts":["u1","u2","u3"]}]}"#
     }
 
@@ -67,7 +68,9 @@ final class FindATimeSetupViewModelTests: XCTestCase {
         SequencedURLProtocol.sequence = [.status(200, body: occupantsBody())]
         let viewModel = makeViewModel()
         await viewModel.load()
-        for row in viewModel.rows { viewModel.setRequirement(.optional, for: row.id) }
+        for row in viewModel.rows {
+            viewModel.setRequirement(.optional, for: row.id)
+        }
 
         XCTAssertFalse(viewModel.hasRequiredMember)
         XCTAssertFalse(viewModel.isValid)

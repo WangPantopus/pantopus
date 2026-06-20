@@ -207,7 +207,7 @@ private fun ConflictCard(
 
 @Composable
 private fun MemberConflictNote(memberName: String) {
-    // HOME palette per the spec (bg #dcfce7, dot #16a34a, text #15803d) — the
+    // HOME palette per the spec (homeBg fill, home dot, homeDark text) — the
     // member-availability conflict is a home-pillar identity note, not a
     // success state.
     Row(

@@ -47,13 +47,15 @@ final class CollectiveEventSetupViewModel {
     private(set) var picks: [Pick] = []
     private(set) var isSaving = false
     private(set) var saveError: String?
-    // Frame 3: no-overlap warning. Set true when the checked members share no
-    // free windows. Full intersection detection is deferred (needs a
-    // team-availability probe). Set externally by the scheduler once
-    // availability data is available.
+    /// Frame 3: no-overlap warning. Set true when the checked members share no
+    /// free windows. Full intersection detection is deferred (needs a
+    /// team-availability probe). Set externally by the scheduler once
+    /// availability data is available.
     var noOverlap: Bool = false
 
-    var checkedCount: Int { picks.filter(\.checked).count }
+    var checkedCount: Int {
+        picks.filter(\.checked).count
+    }
 
     init(owner: SchedulingOwner, eventTypeId: String, client: SchedulingClient) {
         self.owner = owner
@@ -71,7 +73,13 @@ final class CollectiveEventSetupViewModel {
             requireMultiple = pool.eventType.assignmentMode == "collective"
             seatsPerAppointment = max(1, pool.eventType.seatCap ?? 1)
             picks = pool.members.map { member in
-                Pick(id: member.id, name: member.name, avatarURL: member.avatarURL, role: member.role, checked: assignedIds.contains(member.id))
+                Pick(
+                    id: member.id,
+                    name: member.name,
+                    avatarURL: member.avatarURL,
+                    role: member.role,
+                    checked: assignedIds.contains(member.id)
+                )
             }
             requiredStaff = max(2, checkedCount)
             phase = .ready
@@ -84,13 +92,29 @@ final class CollectiveEventSetupViewModel {
 
     // MARK: Editing
 
-    func setRequireMultiple(_ on: Bool) { requireMultiple = on }
-    func selectMode(_ mode: SelectionMode) { selectionMode = mode }
+    func setRequireMultiple(_ on: Bool) {
+        requireMultiple = on
+    }
 
-    func incrementRequired() { requiredStaff = min(requiredStaff + 1, max(2, picks.count)) }
-    func decrementRequired() { requiredStaff = max(requiredStaff - 1, 1) }
-    func incrementSeats() { seatsPerAppointment = min(seatsPerAppointment + 1, 50) }
-    func decrementSeats() { seatsPerAppointment = max(seatsPerAppointment - 1, 1) }
+    func selectMode(_ mode: SelectionMode) {
+        selectionMode = mode
+    }
+
+    func incrementRequired() {
+        requiredStaff = min(requiredStaff + 1, max(2, picks.count))
+    }
+
+    func decrementRequired() {
+        requiredStaff = max(requiredStaff - 1, 1)
+    }
+
+    func incrementSeats() {
+        seatsPerAppointment = min(seatsPerAppointment + 1, 50)
+    }
+
+    func decrementSeats() {
+        seatsPerAppointment = max(seatsPerAppointment - 1, 1)
+    }
 
     func toggle(_ id: String) {
         guard let idx = picks.firstIndex(where: { $0.id == id }) else { return }

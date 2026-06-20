@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -63,16 +62,17 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.SchedulingPalette
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
 private val PILLAR = SchedulingPillar.Business
 private const val TOAST_MS = 2500L
 
-// Stripe's brand indigo (#635bff) — a fixed external brand color the Pantopus
-// palette does not carry, so it is parsed at runtime per the tokens-only rule
-// (no raw 0x literal). Matches spec StripeBadge bg `C.stripe` and iOS stripeBrand.
-private val StripeBrand = Color("#635bff".toColorInt())
+// Stripe's brand indigo — a fixed external brand color the Pantopus design
+// system does not carry, sourced from the theme-layer SchedulingPalette per
+// the tokens-only rule. Matches spec StripeBadge bg `C.stripe` and iOS stripeBrand.
+private val StripeBrand = SchedulingPalette.stripeBrand
 
 @Composable
 fun PaymentsSetupScreen(

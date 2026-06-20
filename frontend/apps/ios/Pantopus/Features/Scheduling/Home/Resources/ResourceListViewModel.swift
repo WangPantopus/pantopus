@@ -16,7 +16,7 @@ import SwiftUI
 /// be expressed through the shared `ListOfRows` row chrome, so the loaded /
 /// empty / offline frames render bespoke from this projection. Loading / error
 /// still flow through the shared shell visuals (mirrored locally).
-struct ResourceListItem: Identifiable, Sendable {
+struct ResourceListItem: Identifiable {
     let id: String
     let name: String
     let kind: ResourceKind
@@ -29,7 +29,7 @@ struct ResourceListItem: Identifiable, Sendable {
 final class ResourceListViewModel: ListOfRowsDataSource {
     /// One-tap quick-start template (design F9 empty frame). Each opens the
     /// editor seeded with the template's resource kind.
-    struct ResourceTemplate: Identifiable, Sendable {
+    struct ResourceTemplate: Identifiable {
         let id: String
         let label: String
         let icon: PantopusIcon
@@ -43,7 +43,7 @@ final class ResourceListViewModel: ListOfRowsDataSource {
         ResourceTemplate(id: "driveway", label: "Driveway", icon: .car, kind: .vehicle, isNeutral: false),
         ResourceTemplate(id: "charger", label: "EV charger", icon: .zap, kind: .charger, isNeutral: false),
         ResourceTemplate(id: "tools", label: "Tools", icon: .wrench, kind: .tool, isNeutral: false),
-        ResourceTemplate(id: "other", label: "Other", icon: .plus, kind: .other, isNeutral: true),
+        ResourceTemplate(id: "other", label: "Other", icon: .plus, kind: .other, isNeutral: true)
     ]
 
     /// Loaded resource rows for the bespoke list (empty when the screen is
@@ -52,7 +52,9 @@ final class ResourceListViewModel: ListOfRowsDataSource {
 
     // MARK: ListOfRows chrome
 
-    var title: String { "Resources" }
+    var title: String {
+        "Resources"
+    }
 
     var topBarAction: TopBarAction? {
         TopBarAction(
@@ -64,7 +66,10 @@ final class ResourceListViewModel: ListOfRowsDataSource {
         }
     }
 
-    var tabs: [ListOfRowsTab] { [] }
+    var tabs: [ListOfRowsTab] {
+        []
+    }
+
     var selectedTab: String = ""
 
     var fab: FABAction? {
@@ -96,7 +101,9 @@ final class ResourceListViewModel: ListOfRowsDataSource {
         self.client = client
     }
 
-    private var owner: SchedulingOwner { .home(homeId: homeId) }
+    private var owner: SchedulingOwner {
+        .home(homeId: homeId)
+    }
 
     private var isLoaded: Bool {
         if case .loaded = state { return true }
@@ -105,8 +112,14 @@ final class ResourceListViewModel: ListOfRowsDataSource {
 
     // MARK: Load
 
-    func load() async { await fetch(showLoading: !isLoaded) }
-    func refresh() async { await fetch(showLoading: false) }
+    func load() async {
+        await fetch(showLoading: !isLoaded)
+    }
+
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
+
     func loadMoreIfNeeded() async {}
 
     private func fetch(showLoading: Bool) async {
@@ -152,7 +165,7 @@ final class ResourceListViewModel: ListOfRowsDataSource {
     /// Quick-start from an empty-frame template — opens the editor. (The wire
     /// has no template-seed param, so this lands on the same "new resource"
     /// editor the FAB / Add action open; the kind is the design hint.)
-    func openTemplate(_ template: ResourceTemplate) {
+    func openTemplate(_: ResourceTemplate) {
         openEditor()
     }
 

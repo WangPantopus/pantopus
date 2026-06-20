@@ -38,9 +38,8 @@ struct WorkflowEditorView: View {
             AutoUnderlineTabs(
                 tabs: ["Build", "Activity"],
                 selectedIndex: model.tab.rawValue,
-                accent: model.accent,
-                onSelect: { model.tab = WorkflowEditorViewModel.Tab(rawValue: $0) ?? .build }
-            )
+                accent: model.accent
+            ) { model.tab = WorkflowEditorViewModel.Tab(rawValue: $0) ?? .build }
             content
         }
         .background(Theme.Color.appBg)
@@ -67,11 +66,10 @@ struct WorkflowEditorView: View {
                 owner: model.owner,
                 subject: model.previewDraft.subject,
                 body: model.previewDraft.body,
-                channel: model.previewDraft.channel,
-                onClose: { model.showPreview = false }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+                channel: model.previewDraft.channel
+            ) { model.showPreview = false }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.workflows.editor")
@@ -177,9 +175,8 @@ struct WorkflowEditorView: View {
                                 isOn: model.channel == channel,
                                 isComingSoon: channel.isComingSoon,
                                 accent: model.accent,
-                                accentBg: model.accentBg,
-                                onTap: { model.setChannel(channel) }
-                            )
+                                accentBg: model.accentBg
+                            ) { model.setChannel(channel) }
                         }
                         Spacer(minLength: Spacing.s0)
                     }
@@ -227,7 +224,8 @@ struct WorkflowEditorView: View {
         if model.didAttemptSave, model.messageIsEmpty {
             Text("Add a message before saving.").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.Color.error)
         } else if model.channel == .sms {
-            Text("Messages over 160 characters send as more than one.").font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
+            Text("Messages over 160 characters send as more than one.").font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
         } else {
             Text("Variables fill in per booking.").font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
         }
@@ -257,7 +255,9 @@ struct WorkflowEditorView: View {
                     Text("Turn off to pause without deleting.").font(.system(size: 11)).foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 Spacer(minLength: Spacing.s2)
-                Toggle("", isOn: $model.isActive).labelsHidden().tint(model.accent)
+                Toggle("", isOn: $model.isActive)
+                    .labelsHidden()
+                    .tint(model.accent)
                     .accessibilityLabel("Workflow active")
             }
         }

@@ -136,7 +136,7 @@ fun formatDayRange(weekdays: Collection<Int>): String {
         }
     }
     return runs.joinToString(", ") { run ->
-        if (run.size >= 3) {
+        if (run.size >= 2) {
             "${weekdayShort(run.first())}–${weekdayShort(run.last())}"
         } else {
             run.joinToString(", ") { weekdayShort(it) }

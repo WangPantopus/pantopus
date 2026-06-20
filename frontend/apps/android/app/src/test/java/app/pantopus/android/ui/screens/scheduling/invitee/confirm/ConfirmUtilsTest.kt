@@ -56,7 +56,14 @@ class ConfirmUtilsTest {
                 guests = listOf("sam@example.com", " "),
                 answers = mapOf("q1" to AnswerValue.Text("Q3 rollout")),
             )
-        val body = ConfirmUtils.buildBookingRequest(values, startAtUtc = "2026-06-17T16:30:00Z", durationMin = 30, timezone = "America/Los_Angeles", questions = listOf(q))
+        val body =
+            ConfirmUtils.buildBookingRequest(
+                values,
+                startAtUtc = "2026-06-17T16:30:00Z",
+                durationMin = 30,
+                timezone = "America/Los_Angeles",
+                questions = listOf(q),
+            )
         assertEquals("Maya Chen", body.name)
         assertEquals("maya@example.com", body.email)
         assertEquals("(415) 555-0142", body.phone)

@@ -73,16 +73,14 @@ class MessageTemplateEditorViewModelTest {
         }
 
     @Test
-    fun `sms over the segment limit flags`() =
-        runTest(dispatcher) {
-            val vm = vm("new")
-            vm.start()
-            advanceUntilIdle()
-            vm.setChannel(WorkflowChannel.Sms)
-            vm.onBody("a".repeat(170))
-            assertTrue(loaded(vm).form.isOverLimit)
-            assertEquals(160, loaded(vm).form.counterLimit)
-        }
+    fun `sms over the segment limit flags`() {
+        // SMS is gated coming-soon at the channel picker (setChannel no-ops for
+        // it), so exercise the over-limit counter logic on an SMS-channel form
+        // directly: SMS caps at one 160-char segment.
+        val form = TemplateForm(channel = WorkflowChannel.Sms, body = "a".repeat(170))
+        assertTrue(form.isOverLimit)
+        assertEquals(160, form.counterLimit)
+    }
 
     @Test
     fun `save new posts template`() =

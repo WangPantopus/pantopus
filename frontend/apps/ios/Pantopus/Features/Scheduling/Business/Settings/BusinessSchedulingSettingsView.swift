@@ -10,6 +10,7 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
 struct BusinessSchedulingSettingsView: View {
     @State private var model: BusinessSchedulingSettingsViewModel
     @Environment(\.dismiss) private var dismiss
@@ -24,7 +25,7 @@ struct BusinessSchedulingSettingsView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Booking", onBack: { dismiss() })
+            BizTopBar(title: "Booking") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -96,10 +97,9 @@ struct BusinessSchedulingSettingsView: View {
                         options: ["Auto-confirm", "Approve each request"],
                         selectedIndex: model.confirmationApprove ? 1 : 0,
                         accent: model.accent,
-                        disabled: model.isGated,
-                        onSelect: { idx in model.confirmationApprove = idx == 1 }
-                    )
-                    .opacity(model.isGated ? 0.55 : 1)
+                        disabled: model.isGated
+                    ) { idx in model.confirmationApprove = idx == 1 }
+                        .opacity(model.isGated ? 0.55 : 1)
                     Text(model.confirmationApprove
                         ? "You approve each request before it lands on your calendar."
                         : "Auto-confirm sends the booking straight to your calendar.")
@@ -126,24 +126,44 @@ struct BusinessSchedulingSettingsView: View {
 
     // MARK: Scheduling
 
-    // Design G5: each row carries an independent chevron implying a per-row
-    // sub-screen (bizsettings-frames.jsx:55-64). Min-notice / horizon / buffers
-    // are per-SERVICE on the backend (no owner-level store), so all three route
-    // to the event-type list where the user edits them per service. No dedicated
-    // sub-screen routes exist for these fields (acknowledged cross-platform gap).
+    /// Design G5: each row carries an independent chevron implying a per-row
+    /// sub-screen (bizsettings-frames.jsx:55-64). Min-notice / horizon / buffers
+    /// are per-SERVICE on the backend (no owner-level store), so all three route
+    /// to the event-type list where the user edits them per service. No dedicated
+    /// sub-screen routes exist for these fields (acknowledged cross-platform gap).
     private var schedulingGroup: some View {
         BizGroup(title: "Scheduling") {
-            BizSettingsRow(icon: .clock, label: "Minimum notice", sub: model.minNoticeValue,
-                           trailing: { gatedChevron }, onTap: rowTap { model.openSchedulingDefaults() })
+            BizSettingsRow(
+                icon: .clock,
+                label: "Minimum notice",
+                sub: model.minNoticeValue,
+                trailing: { gatedChevron },
+                onTap: rowTap { model.openSchedulingDefaults() }
+            )
             BizRowDivider()
-            BizSettingsRow(icon: .calendarRange, label: "Booking horizon", sub: model.horizonValue,
-                           trailing: { gatedChevron }, onTap: rowTap { model.openSchedulingDefaults() })
+            BizSettingsRow(
+                icon: .calendarRange,
+                label: "Booking horizon",
+                sub: model.horizonValue,
+                trailing: { gatedChevron },
+                onTap: rowTap { model.openSchedulingDefaults() }
+            )
             BizRowDivider()
-            BizSettingsRow(icon: .arrowRightLeft, label: "Buffers", sub: model.buffersValue,
-                           trailing: { gatedChevron }, onTap: rowTap { model.openSchedulingDefaults() })
+            BizSettingsRow(
+                icon: .arrowRightLeft,
+                label: "Buffers",
+                sub: model.buffersValue,
+                trailing: { gatedChevron },
+                onTap: rowTap { model.openSchedulingDefaults() }
+            )
             BizRowDivider()
-            BizSettingsRow(icon: .globe, label: "Time zone", sub: model.timezone,
-                           trailing: { timezoneTrailing }, onTap: rowTap { model.openTimezone() })
+            BizSettingsRow(
+                icon: .globe,
+                label: "Time zone",
+                sub: model.timezone,
+                trailing: { timezoneTrailing },
+                onTap: rowTap { model.openTimezone() }
+            )
         }
         .opacity(model.isGated ? 0.7 : 1)
     }
@@ -161,8 +181,13 @@ struct BusinessSchedulingSettingsView: View {
 
     private var policyGroup: some View {
         BizGroup(title: "Policy") {
-            BizSettingsRow(icon: .shield, label: "Cancellation & no-show policy", sub: model.cancellationValue,
-                           trailing: { gatedChevron }, onTap: rowTap { model.openCancellationPolicy() })
+            BizSettingsRow(
+                icon: .shield,
+                label: "Cancellation & no-show policy",
+                sub: model.cancellationValue,
+                trailing: { gatedChevron },
+                onTap: rowTap { model.openCancellationPolicy() }
+            )
         }
     }
 
@@ -170,15 +195,31 @@ struct BusinessSchedulingSettingsView: View {
 
     private var notificationsGroup: some View {
         BizGroup(title: "Notifications") {
-            BizSettingsRow(icon: .bell, label: "Notify the owner", sub: nil, trailing: {
-                Toggle("", isOn: Binding(get: { model.notifyOwner }, set: { v in Task { await model.setNotifyOwner(v) } }))
-                    .labelsHidden().tint(model.accent).disabled(model.isGated)
-            }, onTap: nil)
+            BizSettingsRow(
+                icon: .bell,
+                label: "Notify the owner",
+                sub: nil,
+                trailing: {
+                    Toggle("", isOn: Binding(get: { model.notifyOwner }, set: { v in Task { await model.setNotifyOwner(v) } }))
+                        .labelsHidden()
+                        .tint(model.accent)
+                        .disabled(model.isGated)
+                },
+                onTap: nil
+            )
             BizRowDivider()
-            BizSettingsRow(icon: .userCheck, label: "Notify the assigned member", sub: nil, trailing: {
-                Toggle("", isOn: Binding(get: { model.notifyAssigned }, set: { v in Task { await model.setNotifyAssigned(v) } }))
-                    .labelsHidden().tint(model.accent).disabled(model.isGated)
-            }, onTap: nil)
+            BizSettingsRow(
+                icon: .userCheck,
+                label: "Notify the assigned member",
+                sub: nil,
+                trailing: {
+                    Toggle("", isOn: Binding(get: { model.notifyAssigned }, set: { v in Task { await model.setNotifyAssigned(v) } }))
+                        .labelsHidden()
+                        .tint(model.accent)
+                        .disabled(model.isGated)
+                },
+                onTap: nil
+            )
         }
         .opacity(model.isGated ? 0.7 : 1)
     }
@@ -188,10 +229,15 @@ struct BusinessSchedulingSettingsView: View {
     private var paymentsGroup: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             BizGroup(title: "Payments") {
-                BizSettingsRow(icon: .creditCard, iconTint: Theme.Color.stripeBrand,
-                               iconBg: Theme.Color.stripeBrand.opacity(0.10), label: "Stripe payments",
-                               sub: model.paymentsConnected ? model.payoutSub : "Not connected",
-                               trailing: { paymentsTrailing }, onTap: { model.openPayments() })
+                BizSettingsRow(
+                    icon: .creditCard,
+                    iconTint: Theme.Color.stripeBrand,
+                    iconBg: Theme.Color.stripeBrand.opacity(0.10),
+                    label: "Stripe payments",
+                    sub: model.paymentsConnected ? model.payoutSub : "Not connected",
+                    trailing: { paymentsTrailing },
+                    onTap: { model.openPayments() }
+                )
             }
             if model.paymentsRequired {
                 BizNote(tone: .warning, icon: .alertTriangle, text: "Connect payments to charge for services.")
@@ -258,9 +304,12 @@ struct BusinessSchedulingSettingsView: View {
             if model.showSavedToast {
                 HStack(spacing: Spacing.s2) {
                     Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
-                    Text("Changes saved").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
+                    Text("Changes saved")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .background(Theme.Color.appText)
                 .clipShape(Capsule())
                 .pantopusShadow(.lg)
@@ -288,13 +337,17 @@ struct BizTopBar: View {
     var body: some View {
         HStack(spacing: Spacing.s0) {
             Button(action: onBack) {
-                Icon(.chevronLeft, size: 21, color: Theme.Color.appText).frame(width: 36, height: 36)
+                Icon(.chevronLeft, size: 21, color: Theme.Color.appText)
+                    .frame(width: 36, height: 36)
             }
             .accessibilityLabel("Back")
             Text(title)
-                .font(.system(size: 15, weight: .semibold)).tracking(-0.2)
+                .font(.system(size: 15, weight: .semibold))
+                .tracking(-0.2)
                 .foregroundStyle(Theme.Color.appText)
-                .frame(maxWidth: .infinity).lineLimit(1).accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
             if let trailing {
                 trailing.frame(minWidth: 36, alignment: .trailing)
             } else {
@@ -366,7 +419,7 @@ struct BizSettingsRow<Trailing: View>: View {
             if let icon {
                 ZStack {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(iconBg ?? (iconTint == nil ? Theme.Color.appSurfaceSunken : iconTint!.opacity(0.14)))
+                        .fill(iconBg ?? (iconTint.map { $0.opacity(0.14) } ?? Theme.Color.appSurfaceSunken))
                     Icon(icon, size: 16, color: iconTint ?? Theme.Color.appTextSecondary)
                 }
                 .frame(width: 32, height: 32)
@@ -407,8 +460,10 @@ struct BizSegmented: View {
                     Text(opt)
                         .font(.system(size: 11, weight: on ? .bold : .semibold))
                         .foregroundStyle(on ? accent : Theme.Color.appTextSecondary)
-                        .lineLimit(1).minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
                         .background(on ? Theme.Color.appSurface : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                         .pantopusShadow(on ? .sm : .init(color: .clear, opacity: 0, radius: 0, x: 0, y: 0))
@@ -426,8 +481,8 @@ struct BizSegmented: View {
 // MARK: - Skeleton + error
 
 private struct BizSettingsSkeleton: View {
-    // Mirrors `bizsettings-frames.jsx` FrameLoading: three ShimGroups of 1 / 4 / 2
-    // rows, each row a 32×32 disc + two stacked text shimmers in a card.
+    /// Mirrors `bizsettings-frames.jsx` FrameLoading: three ShimGroups of 1 / 4 / 2
+    /// rows, each row a 32×32 disc + two stacked text shimmers in a card.
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -478,18 +533,28 @@ private struct BizSettingsError: View {
         VStack(spacing: Spacing.s4) {
             Spacer()
             ZStack {
-                Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 64, height: 64)
+                Circle()
+                    .fill(Theme.Color.appSurfaceSunken)
+                    .frame(width: 64, height: 64)
                 Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
-            Text("Couldn't load settings").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 260)
+            Text("Couldn't load settings")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
-                    Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+                    Text("Try again")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

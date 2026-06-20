@@ -13,7 +13,7 @@ import Observation
 import SwiftUI
 
 /// Single vs. multiple bookable durations.
-enum DurationMode: String, Sendable {
+enum DurationMode: String {
     case single
     case multiple
 }
@@ -21,11 +21,13 @@ enum DurationMode: String, Sendable {
 /// What the booker pays up front — the design `PricingCard` "Collect" segmented
 /// (Full amount / Deposit). Deposit collects a partial amount at booking
 /// (defaulting to half the price) with the balance settled later.
-enum CollectMode: String, Sendable, CaseIterable, Identifiable {
+enum CollectMode: String, CaseIterable, Identifiable {
     case full
     case deposit
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -94,11 +96,15 @@ final class EventTypeEditorViewModel {
     private var scheduleId: String?
     private var baselineSignature = ""
 
-    var isEditing: Bool { eventTypeId != nil }
+    var isEditing: Bool {
+        eventTypeId != nil
+    }
 
     /// Full-width save-bar label — the design's "Create event type" (create) /
     /// "Save event type" (edit).
-    var saveBarLabel: String { isEditing ? "Save event type" : "Create event type" }
+    var saveBarLabel: String {
+        isEditing ? "Save event type" : "Create event type"
+    }
 
     var showsAssignment: Bool {
         switch owner {
@@ -107,7 +113,9 @@ final class EventTypeEditorViewModel {
         }
     }
 
-    var paidVisible: Bool { SchedulingFeatureFlags.paidEnabled && owner.supportsPayments }
+    var paidVisible: Bool {
+        SchedulingFeatureFlags.paidEnabled && owner.supportsPayments
+    }
 
     init(
         owner: SchedulingOwner,
@@ -136,7 +144,9 @@ final class EventTypeEditorViewModel {
     }
 
     func reload() async {
-        guard let eventTypeId else { phase = .ready; return }
+        guard let eventTypeId else { phase = .ready
+            return
+        }
         await fetch(id: eventTypeId)
     }
 
@@ -258,9 +268,17 @@ extension EventTypeEditorViewModel {
     /// Preset durations offered as chips in multiple-duration mode.
     static let durationPresets = [15, 30, 45, 60, 90, 120]
 
-    var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var nameValid: Bool { !trimmedName.isEmpty }
-    var slugValid: Bool { EventTypeFormat.isValidSlug(slug) }
+    var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var nameValid: Bool {
+        !trimmedName.isEmpty
+    }
+
+    var slugValid: Bool {
+        EventTypeFormat.isValidSlug(slug)
+    }
 
     var durationsValid: Bool {
         !durations.isEmpty
@@ -276,11 +294,17 @@ extension EventTypeEditorViewModel {
         return Int((value * 100).rounded())
     }
 
-    var priceValid: Bool { !chargeEnabled || (parsedPriceCents.map { $0 > 0 } ?? false) }
+    var priceValid: Bool {
+        !chargeEnabled || (parsedPriceCents.map { $0 > 0 } ?? false)
+    }
 
-    var formValid: Bool { nameValid && slugValid && durationsValid && priceValid }
+    var formValid: Bool {
+        nameValid && slugValid && durationsValid && priceValid
+    }
 
-    var isDirty: Bool { signature() != baselineSignature }
+    var isDirty: Bool {
+        signature() != baselineSignature
+    }
 
     private func apply(_ dto: EventTypeDTO) {
         name = dto.name

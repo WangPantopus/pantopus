@@ -25,7 +25,9 @@ enum EventTypeTab: String {
 final class EventTypeListViewModel: ListOfRowsDataSource {
     // MARK: ListOfRowsDataSource chrome
 
-    var title: String { "Event types" }
+    var title: String {
+        "Event types"
+    }
 
     var topBarAction: TopBarAction? {
         TopBarAction(icon: .plus, accessibilityLabel: "New event type") { [weak self] in
@@ -48,7 +50,9 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         }
     }
 
-    var fab: FABAction? { nil }
+    var fab: FABAction? {
+        nil
+    }
 
     private(set) var state: ListOfRowsState = .loading
 
@@ -84,10 +88,16 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         self.client = client
     }
 
-    private var activeTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive != false } }
-    private var hiddenTypes: [EventTypeDTO] { eventTypes.filter { $0.isActive == false } }
+    private var activeTypes: [EventTypeDTO] {
+        eventTypes.filter { $0.isActive != false }
+    }
+
+    private var hiddenTypes: [EventTypeDTO] {
+        eventTypes.filter { $0.isActive == false }
+    }
 
     // MARK: Bespoke-view projection
+
     //
     // The B1 screen is rendered bespoke (not through `ListOfRowsView`) so it can
     // carry the design's per-row toggle, 6px colour dot, segmented Active/Hidden
@@ -97,20 +107,33 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     // expose the row data the bespoke rows need (toggle/dot) without altering it.
 
     /// Rows for the currently-selected tab, in wire order.
-    var visibleTypes: [EventTypeDTO] { tab == .active ? activeTypes : hiddenTypes }
+    var visibleTypes: [EventTypeDTO] {
+        tab == .active ? activeTypes : hiddenTypes
+    }
 
-    var activeCount: Int { activeTypes.count }
-    var hiddenCount: Int { hiddenTypes.count }
+    var activeCount: Int {
+        activeTypes.count
+    }
+
+    var hiddenCount: Int {
+        hiddenTypes.count
+    }
 
     /// Currently-selected filter tab (read-only; mutate via `selectedTab`).
-    var currentTab: EventTypeTab { tab }
+    var currentTab: EventTypeTab {
+        tab
+    }
 
     /// Pillar-accented uppercase section overline above the rows.
-    var sectionOverline: String { isBusiness ? "Bookable services" : "Your event types" }
+    var sectionOverline: String {
+        isBusiness ? "Bookable services" : "Your event types"
+    }
 
     /// Centered top-bar title — "Services" for business catalogs, "Event types"
     /// elsewhere (design `FrameBusiness` vs `FramePersonal`).
-    var screenTitle: String { isBusiness ? "Services" : "Event types" }
+    var screenTitle: String {
+        isBusiness ? "Services" : "Event types"
+    }
 
     /// Per-row meta line ("30 min · Video · $120") reused by the bespoke row.
     func rowMeta(for eventType: EventTypeDTO) -> String {
@@ -118,10 +141,14 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     }
 
     /// True when the row is hidden (`is_active=false`).
-    func isHidden(_ eventType: EventTypeDTO) -> Bool { eventType.isActive == false }
+    func isHidden(_ eventType: EventTypeDTO) -> Bool {
+        eventType.isActive == false
+    }
 
     /// True when the row is unlisted (`visibility=secret`) — drives the eye-off badge.
-    func isSecret(_ eventType: EventTypeDTO) -> Bool { eventType.visibility == "secret" }
+    func isSecret(_ eventType: EventTypeDTO) -> Bool {
+        eventType.visibility == "secret"
+    }
 
     /// Business owners price their bookable services (design `FrameBusiness`);
     /// personal events have no price concept (design `FramePersonal`).
@@ -222,7 +249,9 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         let taken = Set(eventTypes.map(\.slug))
         guard taken.contains(base) else { return base }
         var n = 2
-        while taken.contains("\(base)-\(n)") { n += 1 }
+        while taken.contains("\(base)-\(n)") {
+            n += 1
+        }
         return "\(base)-\(n)"
     }
 
@@ -306,11 +335,11 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     private static func message(for error: SchedulingError) -> String {
         switch error.code {
         case "HAS_UPCOMING_BOOKINGS":
-            return "This has upcoming bookings. Hide it instead to keep those on the calendar."
+            "This has upcoming bookings. Hide it instead to keep those on the calendar."
         case "SLUG_TAKEN":
-            return "That booking link is taken. Rename the copy and try again."
+            "That booking link is taken. Rename the copy and try again."
         default:
-            return error.userMessage ?? "Something went wrong. Please try again."
+            error.userMessage ?? "Something went wrong. Please try again."
         }
     }
 
@@ -413,9 +442,8 @@ private extension EventTypeListViewModel {
             icon: .calendarPlus,
             headline: "You don't have any event types yet",
             subcopy: "An event type is something people can book — a call, a meeting, a visit. Start from a template or build your own.",
-            ctaTitle: "Create your first event type",
-            onCTA: { [weak self] in Task { @MainActor in self?.createNew() } }
-        )
+            ctaTitle: "Create your first event type"
+        ) { [weak self] in Task { @MainActor in self?.createNew() } }
     }
 
     var emptyTabContent: ListOfRowsState.EmptyContent {
@@ -446,5 +474,7 @@ private extension EventTypeListViewModel {
 /// Identifiable wrapper so the booking link can drive a `.sheet(item:)`.
 struct ShareLinkItem: Identifiable {
     let link: String
-    var id: String { link }
+    var id: String {
+        link
+    }
 }

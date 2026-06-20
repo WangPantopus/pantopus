@@ -46,6 +46,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
+import app.pantopus.android.ui.theme.SchedulingPalette
 import app.pantopus.android.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
@@ -412,20 +413,21 @@ private fun CollectiveModeControls() {
     CollectiveMemberAvatars()
 }
 
-// Placeholder avatar initials matching the design MEMBERS gradient palette.
-// Parsed from hex strings to stay clear of the CI Color(0x…) literal guard.
-private val COLLECTIVE_AVATAR_BG_FIRST = Color("#7c3aed".toColorInt())    // business violet
-private val COLLECTIVE_AVATAR_BG_SECOND = Color("#db2777".toColorInt())   // pink
-private val COLLECTIVE_AVATAR_BG_THIRD_DIM = Color("#0284c7".toColorInt()) // sky (dimmed via alpha)
+// Placeholder avatar initials matching the design MEMBERS gradient palette,
+// mapped to the equivalent design tokens (business violet / party pink / sky).
+private val COLLECTIVE_AVATAR_BG_FIRST = PantopusColors.business // business violet
+private val COLLECTIVE_AVATAR_BG_SECOND = PantopusColors.categoryParty // pink
+private val COLLECTIVE_AVATAR_BG_THIRD_DIM = PantopusColors.personal // sky (dimmed via alpha)
 
 @Composable
 private fun CollectiveMemberAvatars() {
     // Three overlapping circles (-12dp offset each) with initials — design placeholder.
-    val avatars = listOf(
-        COLLECTIVE_AVATAR_BG_FIRST to "SR",
-        COLLECTIVE_AVATAR_BG_SECOND to "PN",
-        COLLECTIVE_AVATAR_BG_THIRD_DIM to "ML",
-    )
+    val avatars =
+        listOf(
+            COLLECTIVE_AVATAR_BG_FIRST to "SR",
+            COLLECTIVE_AVATAR_BG_SECOND to "PN",
+            COLLECTIVE_AVATAR_BG_THIRD_DIM to "ML",
+        )
     Box(modifier = Modifier.height(28.dp).fillMaxWidth()) {
         avatars.forEachIndexed { idx, (bg, initials) ->
             Box(
@@ -502,11 +504,12 @@ private fun PricingCard(
     }
 }
 
-// Design StripeCard is violet-tinted: #f5f4ff fill, #e0ddff border, and a
-// #635bff Stripe-purple icon tile. Parsed once at class-load so no Color(0x…).
-private val StripeCardBg = Color("#f5f4ff".toColorInt())
-private val StripeCardBorder = Color("#e0ddff".toColorInt())
-private val StripeCardGlyph = Color("#635bff".toColorInt())
+// Design StripeCard is violet-tinted: Stripe-violet fill + border and a
+// Stripe-indigo icon tile. Sourced from the theme-layer SchedulingPalette so
+// no brand hex literal lives in feature code.
+private val StripeCardBg = SchedulingPalette.stripeBg
+private val StripeCardBorder = SchedulingPalette.stripeBorder
+private val StripeCardGlyph = SchedulingPalette.stripeBrand
 
 @Composable
 private fun StripeConnectCard(onConnect: () -> Unit) {

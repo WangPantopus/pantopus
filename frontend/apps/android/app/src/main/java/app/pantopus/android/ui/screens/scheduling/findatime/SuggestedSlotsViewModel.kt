@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "TooManyFunctions", "MagicNumber", "LongMethod", "CyclomaticComplexMethod", "ReturnCount", "LongParameterList")
+@file:Suppress(
+    "PackageNaming",
+    "TooManyFunctions",
+    "MagicNumber",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "ReturnCount",
+    "LongParameterList",
+)
 
 package app.pantopus.android.ui.screens.scheduling.findatime
 

@@ -28,12 +28,16 @@ final class InviteeConfirmedViewModelTests: XCTestCase {
     }
 
     private func body(status: String) -> String {
+        // swiftlint:disable line_length
         """
-        {"booking":{"id":"b1","status":"\(status)","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
+        {"booking":{"id":"b1","status":"\(
+            status
+        )","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z","invitee_timezone":"America/Los_Angeles","location_mode":"video"},
         "actions":{"can_cancel":true,"can_reschedule":true},
         "eventType":{"id":"et1","name":"Intro call","slug":"intro","default_duration":30,"location_mode":"video"},
         "page":{"slug":"ada","title":"Maria Kessler","owner_type":"user","timezone":"America/Los_Angeles"}}
         """
+        // swiftlint:enable line_length
     }
 
     func testConfirmedBookingLoadsSuccessHero() async {

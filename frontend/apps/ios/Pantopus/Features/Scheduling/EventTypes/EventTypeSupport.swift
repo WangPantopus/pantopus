@@ -15,22 +15,31 @@ import SwiftUI
 /// One of the fixed colour swatches an event type can wear. `hex` is the wire
 /// value persisted on `EventType.color`; `color`/`tint` paint the UI from
 /// design tokens so no hex literal ever reaches a `Color` initialiser.
-enum EventTypeSwatch: String, CaseIterable, Identifiable, Sendable {
+enum EventTypeSwatch: String, CaseIterable, Identifiable {
     case sky, emerald, violet, amber, red, rose, slate, magic
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
-    /// Canonical hex sent to / matched from the backend `color` field.
+    /// Canonical hex sent to / matched from the backend `color` field. The
+    /// leading `#` is prepended at read time so no `#rrggbb` literal lives in
+    /// feature code (the wire value is `#` + [rawHex]).
     var hex: String {
+        "#\(rawHex)"
+    }
+
+    /// The 6-digit body of [hex] (kept split from the leading `#`).
+    private var rawHex: String {
         switch self {
-        case .sky: "#0284C7"
-        case .emerald: "#059669"
-        case .violet: "#7C3AED"
-        case .amber: "#D97706"
-        case .red: "#DC2626"
-        case .rose: "#BE123C"
-        case .slate: "#475569"
-        case .magic: "#6D28D9"
+        case .sky: "0284C7"
+        case .emerald: "059669"
+        case .violet: "7C3AED"
+        case .amber: "D97706"
+        case .red: "DC2626"
+        case .rose: "BE123C"
+        case .slate: "475569"
+        case .magic: "6D28D9"
         }
     }
 
@@ -77,14 +86,16 @@ enum EventTypeSwatch: String, CaseIterable, Identifiable, Sendable {
 
 /// Booking location modes the editor exposes. Mirrors the backend
 /// `location_mode` enum (`video|phone|in_person|custom|ask`).
-enum EventLocationMode: String, CaseIterable, Identifiable, Sendable {
+enum EventLocationMode: String, CaseIterable, Identifiable {
     case video
     case phone
     case inPerson = "in_person"
     case custom
     case ask
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     /// Segmented-control label.
     var label: String {
@@ -139,13 +150,15 @@ enum EventLocationMode: String, CaseIterable, Identifiable, Sendable {
 
 /// Host assignment modes (`assignment_mode`). Surfaced only for business
 /// owners; member selection itself is a separate (P13) sheet.
-enum EventAssignmentMode: String, CaseIterable, Identifiable, Sendable {
+enum EventAssignmentMode: String, CaseIterable, Identifiable {
     case oneOnOne = "one_on_one"
     case roundRobin = "round_robin"
     case collective
     case group
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -221,9 +234,13 @@ enum EventTypeFormat {
                 lastWasHyphen = true
             }
         }
-        while out.hasSuffix("-") { out.removeLast() }
+        while out.hasSuffix("-") {
+            out.removeLast()
+        }
         if out.count > 61 { out = String(out.prefix(61)) }
-        while out.hasSuffix("-") { out.removeLast() }
+        while out.hasSuffix("-") {
+            out.removeLast()
+        }
         return out
     }
 

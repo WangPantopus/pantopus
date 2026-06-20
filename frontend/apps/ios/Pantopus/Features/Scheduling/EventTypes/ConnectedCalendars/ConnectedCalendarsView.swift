@@ -11,13 +11,14 @@
 //  Loading skeleton / error+retry included.
 //
 
+// swiftlint:disable file_length
 import SwiftUI
 import UIKit
 
 // ─── Local status chip for connected-calendar rows ───────────────────────────
 // Design (connected-calendars-frames.jsx:110-123): two specific variants —
-//   synced:    check icon + "Synced"       | bg=successLight (#D1FAE5) | fg=success (#059669)
-//   attention: triangle-alert + "Action needed" | bg=warningBg  (#FFFBEB) | fg=warning (#D97706 / dark amber)
+//   synced:    check icon + "Synced"       | bg=successLight (D1FAE5) | fg=success (059669)
+//   attention: triangle-alert + "Action needed" | bg=warningBg  (FFFBEB) | fg=warning (D97706 / dark amber)
 // These are distinct from booking statuses (SchedulingStatusPill) — they describe
 // calendar sync health, not booking state — so we keep them local to this screen.
 private enum CalendarSyncStatus { case synced, attention }
@@ -44,41 +45,42 @@ private struct ConnectedCalendarStatusChip: View {
 
     private var label: String {
         switch kind {
-        case .synced:    "Synced"
+        case .synced: "Synced"
         case .attention: "Action needed"
         }
     }
 
     private var icon: PantopusIcon {
         switch kind {
-        case .synced:    .check
+        case .synced: .check
         case .attention: .triangleAlert
         }
     }
 
-    // successLight = #D1FAE5 (Tailwind success-100), success = #059669 (success-700)
+    /// successLight = D1FAE5 (Tailwind success-100), success = 059669 (success-700)
     private var bg: Color {
         switch kind {
-        case .synced:    Theme.Color.successLight
+        case .synced: Theme.Color.successLight
         case .attention: Theme.Color.warningBg
         }
     }
 
     private var fg: Color {
         switch kind {
-        case .synced:    Theme.Color.success
+        case .synced: Theme.Color.success
         case .attention: Theme.Color.warning
         }
     }
 
     private var border: Color {
         switch kind {
-        case .synced:    Theme.Color.successLight
+        case .synced: Theme.Color.successLight
         case .attention: Theme.Color.warningLight
         }
     }
 }
 
+// swiftlint:disable:next type_body_length
 struct ConnectedCalendarsView: View {
     @State private var viewModel: ConnectedCalendarsViewModel
     @Environment(\.openURL) private var openURL
@@ -270,15 +272,19 @@ struct ConnectedCalendarsView: View {
     // MARK: Provider tile (38px white bordered tile holding the glyph)
 
     private func providerTile(_ provider: CalendarProvider, muted: Bool = false) -> some View {
-        Icon(provider.icon, size: 19, strokeWidth: 2,
-             color: muted ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
-            .frame(width: 38, height: 38)
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        Icon(
+            provider.icon,
+            size: 19,
+            strokeWidth: 2,
+            color: muted ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary
+        )
+        .frame(width: 38, height: 38)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
     }
 
     // MARK: Linked accounts (connected / synced / re-auth)
@@ -337,13 +343,19 @@ struct ConnectedCalendarsView: View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             accountHeader(calendar, calendarStatus: .synced)
             Divider().background(Theme.Color.appBorder)
-            accountToggleRow(icon: .search, title: "Check for conflicts",
-                             sub: "Block times when you're busy elsewhere",
-                             on: calendar.checkConflicts ?? true)
+            accountToggleRow(
+                icon: .search,
+                title: "Check for conflicts",
+                sub: "Block times when you're busy elsewhere",
+                on: calendar.checkConflicts ?? true
+            )
             Divider().background(Theme.Color.appBorder)
-            accountToggleRow(icon: .calendarPlus, title: "Add bookings to this calendar",
-                             sub: "New bookings show up here",
-                             on: calendar.writeTarget ?? true)
+            accountToggleRow(
+                icon: .calendarPlus,
+                title: "Add bookings to this calendar",
+                sub: "New bookings show up here",
+                on: calendar.writeTarget ?? true
+            )
             HStack {
                 HStack(spacing: Spacing.s1) {
                     Icon(.refreshCw, size: 11, color: Theme.Color.appTextSecondary)

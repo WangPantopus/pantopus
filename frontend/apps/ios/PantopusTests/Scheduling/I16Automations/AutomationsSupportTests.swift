@@ -57,7 +57,7 @@ final class AutomationsSupportTests: XCTestCase {
 
     func testVariableCatalogSearch() {
         let grouped = TemplateVariableCatalog.grouped(filter: "name")
-        let labels = grouped.flatMap { $0.items }.map(\.label)
+        let labels = grouped.flatMap(\.items).map(\.label)
         XCTAssertTrue(labels.contains("Attendee name"))
         XCTAssertTrue(labels.contains("Host name"))
         XCTAssertFalse(labels.contains("Reschedule link"))

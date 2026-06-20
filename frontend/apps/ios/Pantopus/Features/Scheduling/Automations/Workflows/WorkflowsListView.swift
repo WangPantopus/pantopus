@@ -41,9 +41,8 @@ struct WorkflowsListView: View {
             AutoUnderlineTabs(
                 tabs: ["Global", "This event type"],
                 selectedIndex: model.scope.rawValue,
-                accent: model.accent,
-                onSelect: { model.selectScope($0) }
-            )
+                accent: model.accent
+            ) { model.selectScope($0) }
             content
         }
         .background(Theme.Color.appBg)
@@ -52,11 +51,11 @@ struct WorkflowsListView: View {
         .task { await model.load() }
         .onAppear { if case .loaded = model.phase { Task { await model.refresh() } } }
         .refreshable { await model.refresh() }
-        .sheet(isPresented: $model.showRemindersSheet, onDismiss: { model.remindersSheetDismissed() }) {
-            DefaultRemindersView(owner: model.owner, onClose: { model.showRemindersSheet = false })
+        .sheet(isPresented: $model.showRemindersSheet, onDismiss: { model.remindersSheetDismissed() }, content: {
+            DefaultRemindersView(owner: model.owner) { model.showRemindersSheet = false }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
+        })
         .alert("Heads up", isPresented: actionErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -315,7 +314,7 @@ struct WorkflowsListView: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        WorkflowsListView(owner: .personal, push: { _ in })
+        WorkflowsListView(owner: .personal) { _ in }
     }
 }
 #endif

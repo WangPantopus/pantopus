@@ -62,8 +62,7 @@ class InsightsDashboardViewModelTest {
             byEventType = listOf(SummaryByEventType("e1", 4)),
         )
 
-    private fun report() =
-        NoShowReportResponse(windowDays = 30, completed = 8, noShow = 2, cancelled = 1, noShowRate = 20)
+    private fun report() = NoShowReportResponse(windowDays = 30, completed = 8, noShow = 2, cancelled = 1, noShowRate = 20)
 
     @Test
     fun `loaded projects tiles, trend and top types`() =

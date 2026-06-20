@@ -49,15 +49,27 @@ final class WorkflowEditorViewModel {
     /// Set true once the user attempts to save with an empty message.
     private(set) var didAttemptSave = false
 
-    var isNew: Bool { workflowId == nil }
+    var isNew: Bool {
+        workflowId == nil
+    }
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var navTitle: String { isNew ? "New workflow" : "Edit workflow" }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var navTitle: String {
+        isNew ? "New workflow" : "Edit workflow"
+    }
 
     /// Channel-implied audience caption (no backend recipient field).
     var recipientCaption: String {
@@ -67,15 +79,34 @@ final class WorkflowEditorViewModel {
         }
     }
 
-    var trimmedMessage: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var messageIsEmpty: Bool { trimmedMessage.isEmpty }
-    var canSave: Bool { !messageIsEmpty && !isSaving }
-    var canPreview: Bool { !messageIsEmpty }
+    var trimmedMessage: String {
+        message.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var messageIsEmpty: Bool {
+        trimmedMessage.isEmpty
+    }
+
+    var canSave: Bool {
+        !messageIsEmpty && !isSaving
+    }
+
+    var canPreview: Bool {
+        !messageIsEmpty
+    }
 
     /// Body character count for the live counter.
-    var messageCount: Int { message.count }
-    var counterLimit: Int { channel == .sms ? WorkflowChannel.smsSegmentLimit : WorkflowChannel.bodyCounterLimit }
-    var isOverLimit: Bool { channel == .sms && messageCount > WorkflowChannel.smsSegmentLimit }
+    var messageCount: Int {
+        message.count
+    }
+
+    var counterLimit: Int {
+        channel == .sms ? WorkflowChannel.smsSegmentLimit : WorkflowChannel.bodyCounterLimit
+    }
+
+    var isOverLimit: Bool {
+        channel == .sms && messageCount > WorkflowChannel.smsSegmentLimit
+    }
 
     /// Resolved name sent to the backend (which requires a non-empty name).
     private var resolvedName: String {
@@ -201,17 +232,17 @@ final class WorkflowEditorViewModel {
     private static func message(for error: SchedulingError) -> String {
         switch error {
         case .forbidden:
-            return "Only admins can edit workflows here."
+            "Only admins can edit workflows here."
         case let .validation(_, details):
-            return details.first?.message ?? "Check the highlighted fields and try again."
+            details.first?.message ?? "Check the highlighted fields and try again."
         default:
-            return error.userMessage ?? "Couldn't save this workflow. Try again."
+            error.userMessage ?? "Couldn't save this workflow. Try again."
         }
     }
 }
 
 /// A draft message routed into the H7 preview sheet from an editor.
-struct MessagePreviewDraft: Hashable, Sendable {
+struct MessagePreviewDraft: Hashable {
     let subject: String?
     let body: String
     let channel: WorkflowChannel

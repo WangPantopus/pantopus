@@ -13,7 +13,7 @@ import Observation
 import SwiftUI
 
 /// A seated attendee or a waitlisted person, flattened for the row view.
-struct RosterPerson: Identifiable, Hashable, Sendable {
+struct RosterPerson: Identifiable, Hashable {
     let id: String
     let name: String
     var meta: String?
@@ -21,7 +21,9 @@ struct RosterPerson: Identifiable, Hashable, Sendable {
     /// Present for waitlist rows — the entry id to promote.
     var promoteEntryId: String?
 
-    var initials: String { BookingsExtrasFormatting.initials(from: name) }
+    var initials: String {
+        BookingsExtrasFormatting.initials(from: name)
+    }
 }
 
 @Observable
@@ -61,10 +63,21 @@ final class GroupRosterViewModel {
         self.client = client
     }
 
-    var filled: Int { seated.count }
-    var waitingCount: Int { waitlist.count }
-    var isFull: Bool { seatTotal > 0 && filled >= seatTotal }
-    var canAdjustCapacity: Bool { eventTypeId != nil }
+    var filled: Int {
+        seated.count
+    }
+
+    var waitingCount: Int {
+        waitlist.count
+    }
+
+    var isFull: Bool {
+        seatTotal > 0 && filled >= seatTotal
+    }
+
+    var canAdjustCapacity: Bool {
+        eventTypeId != nil
+    }
 
     var nudgeCounts: NudgeAudienceCounts {
         NudgeAudienceCounts(all: filled, confirmed: confirmedCount, noShows: 0)
@@ -81,7 +94,9 @@ final class GroupRosterViewModel {
         await fetch(showLoading: phase != .ready)
     }
 
-    func refresh() async { await fetch(showLoading: false) }
+    func refresh() async {
+        await fetch(showLoading: false)
+    }
 
     private func fetch(showLoading: Bool) async {
         if showLoading { phase = .loading }

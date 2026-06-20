@@ -255,7 +255,13 @@ private fun OverrideAwareTzContent(
                 val detected = options.firstOrNull { it.id == detectedId }
                 if (detected != null) {
                     TzSectionLabel("Detected")
-                    TzZoneListCard(rows = listOf(detected), selectedId = selectedId, detectedId = detectedId, accent = accent, onSelect = onSelect)
+                    TzZoneListCard(
+                        rows = listOf(detected),
+                        selectedId = selectedId,
+                        detectedId = detectedId,
+                        accent = accent,
+                        onSelect = onSelect,
+                    )
                 }
                 TzSectionLabel("Common")
                 TzZoneListCard(rows = filtered, selectedId = selectedId, detectedId = detectedId, accent = accent, onSelect = onSelect)

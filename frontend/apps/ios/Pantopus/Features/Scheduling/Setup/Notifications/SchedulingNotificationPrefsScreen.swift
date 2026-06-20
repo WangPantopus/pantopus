@@ -14,6 +14,8 @@
 import SwiftUI
 import UIKit
 
+// swiftlint:disable file_length
+
 struct SchedulingNotificationPrefsScreen: View {
     @State private var model: SchedulingNotificationPrefsModel
     @Environment(\.dismiss) private var dismiss
@@ -22,12 +24,17 @@ struct SchedulingNotificationPrefsScreen: View {
         _model = State(wrappedValue: SchedulingNotificationPrefsModel(owner: owner, push: push))
     }
 
-    private var accent: Color { model.theme.accent }
-    private var accentBg: Color { model.theme.accentBg }
+    private var accent: Color {
+        model.theme.accent
+    }
+
+    private var accentBg: Color {
+        model.theme.accentBg
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            SetupTopBar(title: "Notifications", leading: .back, onLeading: { dismiss() })
+            SetupTopBar(title: "Notifications", leading: .back) { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -55,33 +62,48 @@ struct SchedulingNotificationPrefsScreen: View {
 
                 sectionOverline("Scheduling & bookings")
 
-                NotifCategoryCard(label: "Notify me", accent: accent, accentBg: accentBg, opacity: model.paused ? 0.55 : 1, disabled: model.paused, helper: "Only you see these. Pick the channel for each event.", smsHint: model.showSmsHint, onSmsTap: { model.showSmsHint.toggle() }) {
-                    ForEach(Array(model.notifyMe.enumerated()), id: \.element.id) { idx, row in
-                        NotifMatrixRow(
-                            row: row,
-                            kind: .notifyMe,
-                            accent: accent,
-                            disabled: model.paused,
-                            pushOff: model.pushOff,
-                            onToggle: { model.toggleNotifyMe(row.key) }
-                        )
-                        if idx < model.notifyMe.count - 1 { notifDivider }
+                NotifCategoryCard(
+                    label: "Notify me",
+                    accent: accent,
+                    accentBg: accentBg,
+                    opacity: model.paused ? 0.55 : 1,
+                    disabled: model.paused,
+                    helper: "Only you see these. Pick the channel for each event.",
+                    smsHint: model.showSmsHint,
+                    onSmsTap: { model.showSmsHint.toggle() },
+                    content: {
+                        ForEach(Array(model.notifyMe.enumerated()), id: \.element.id) { idx, row in
+                            NotifMatrixRow(
+                                row: row,
+                                kind: .notifyMe,
+                                accent: accent,
+                                disabled: model.paused,
+                                pushOff: model.pushOff
+                            ) { model.toggleNotifyMe(row.key) }
+                            if idx < model.notifyMe.count - 1 { notifDivider }
+                        }
+                        reminderLeadTime
                     }
-                    reminderLeadTime
-                }
+                )
 
                 Color.clear.frame(height: 14)
 
-                NotifCategoryCard(label: "Notify attendees", accent: accent, accentBg: accentBg, opacity: model.paused ? 0.55 : 1, disabled: model.paused, helper: "Attendees always get a confirmation — you choose the rest.") {
+                NotifCategoryCard(
+                    label: "Notify attendees",
+                    accent: accent,
+                    accentBg: accentBg,
+                    opacity: model.paused ? 0.55 : 1,
+                    disabled: model.paused,
+                    helper: "Attendees always get a confirmation — you choose the rest."
+                ) {
                     ForEach(Array(model.notifyAttendees.enumerated()), id: \.element.id) { idx, row in
                         NotifMatrixRow(
                             row: row,
                             kind: .notifyAttendees,
                             accent: accent,
                             disabled: model.paused,
-                            pushOff: model.pushOff,
-                            onToggle: { model.toggleNotifyAttendees(row.key) }
-                        )
+                            pushOff: model.pushOff
+                        ) { model.toggleNotifyAttendees(row.key) }
                         if idx < model.notifyAttendees.count - 1 { notifDivider }
                     }
                 }
@@ -110,7 +132,9 @@ struct SchedulingNotificationPrefsScreen: View {
     private var reminderLeadTime: some View {
         VStack(alignment: .leading, spacing: 9) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-            Text("Send reminders").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+            Text("Send reminders")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextStrong)
                 .padding(.top, Spacing.s1)
             HStack(spacing: Spacing.s2) {
                 ForEach(SchedulingNotificationPrefsModel.leadTimePresets, id: \.0) { preset in
@@ -120,7 +144,9 @@ struct SchedulingNotificationPrefsScreen: View {
                 Spacer(minLength: Spacing.s0)
             }
         }
-        .padding(.horizontal, 14).padding(.top, Spacing.s3).padding(.bottom, Spacing.s3)
+        .padding(.horizontal, 14)
+        .padding(.top, Spacing.s3)
+        .padding(.bottom, Spacing.s3)
     }
 
     private func leadChip(minutes: Int, label: String) -> some View {
@@ -130,9 +156,11 @@ struct SchedulingNotificationPrefsScreen: View {
             HStack(spacing: 5) {
                 if active && !disabled { Icon(.check, size: 12, strokeWidth: 3, color: Theme.Color.appTextInverse) }
                 Text(label).font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(disabled ? Theme.Color.appTextMuted : (active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong))
+                    .foregroundStyle(disabled ? Theme.Color
+                        .appTextMuted : (active ? Theme.Color.appTextInverse : Theme.Color.appTextStrong))
             }
-            .padding(.horizontal, 13).padding(.vertical, 7)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 7)
             .background(disabled ? Theme.Color.appSurfaceSunken : (active ? accent : Theme.Color.appSurface))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(active ? accent : Theme.Color.appBorderStrong, lineWidth: 1))
@@ -147,7 +175,8 @@ struct SchedulingNotificationPrefsScreen: View {
                 Icon(.plus, size: 12, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
                 Text("Add").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextSecondary)
             }
-            .padding(.horizontal, 13).padding(.vertical, 7)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 7)
             .background(Theme.Color.appSurface)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 3])).foregroundStyle(Theme.Color.appBorderStrong))
@@ -174,18 +203,21 @@ struct SchedulingNotificationPrefsScreen: View {
                 Text("Resume")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.warning)
-                    .padding(.horizontal, 11).padding(.vertical, 5)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
                     .background(Theme.Color.appSurface)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(Theme.Color.warningLight, lineWidth: 1))
             }
             .accessibilityIdentifier("pauseBannerResume")
         }
-        .padding(.horizontal, 14).padding(.vertical, Spacing.s3)
+        .padding(.horizontal, 14)
+        .padding(.vertical, Spacing.s3)
         .background(Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
-        .padding(.horizontal, Spacing.s3).padding(.top, Spacing.s3)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.top, Spacing.s3)
     }
 
     private var pushOffNotice: some View {
@@ -199,17 +231,23 @@ struct SchedulingNotificationPrefsScreen: View {
                     UIApplication.shared.open(url)
                 }
             } label: {
-                Text("Settings").font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Theme.Color.error)
-                    .padding(.horizontal, 11).padding(.vertical, 5)
-                    .background(Theme.Color.appSurface).clipShape(Capsule())
+                Text("Settings")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.error)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                    .background(Theme.Color.appSurface)
+                    .clipShape(Capsule())
                     .overlay(Capsule().stroke(Theme.Color.errorLight, lineWidth: 1))
             }
         }
-        .padding(.horizontal, Spacing.s3).padding(.vertical, 10)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 10)
         .background(Theme.Color.errorBg)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.Color.errorLight, lineWidth: 1))
-        .padding(.horizontal, Spacing.s3).padding(.top, Spacing.s3)
+        .padding(.horizontal, Spacing.s3)
+        .padding(.top, Spacing.s3)
     }
 
     private var legend: some View {
@@ -223,7 +261,8 @@ struct SchedulingNotificationPrefsScreen: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, Spacing.s4).padding(.top, 18)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, 18)
     }
 }
 
@@ -310,7 +349,8 @@ struct NotifMatrixRow: View {
                     NotifChannelChip(letter: "S", state: .disabled, accent: accent)
                 }
             }
-            .padding(.horizontal, Spacing.s4).padding(.vertical, 11)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -318,7 +358,7 @@ struct NotifMatrixRow: View {
         .accessibilityIdentifier("notifRow_\(kind == .notifyMe ? "me" : "att")_\(row.key)")
     }
 
-    // "Notify me": P + E track the single boolean. Attendees: E only; P disabled.
+    /// "Notify me": P + E track the single boolean. Attendees: E only; P disabled.
     private var pState: NotifChipState {
         if disabled { return .disabled }
         switch kind {
@@ -369,8 +409,11 @@ struct NotifCategoryCard<Content: View>: View {
                 }
             }
             if let helper {
-                Text(helper).font(.system(size: 11.5)).foregroundStyle(disabled ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
-                    .padding(.horizontal, Spacing.s1).padding(.top, Spacing.s2)
+                Text(helper)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(disabled ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary)
+                    .padding(.horizontal, Spacing.s1)
+                    .padding(.top, Spacing.s2)
             }
         }
         .padding(.horizontal, Spacing.s3)
@@ -382,7 +425,11 @@ struct NotifCategoryCard<Content: View>: View {
             Spacer(minLength: Spacing.s2)
             HStack(spacing: Spacing.s1) {
                 ForEach(["P", "E"], id: \.self) { l in
-                    Text(l).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(0.3).foregroundStyle(Theme.Color.appTextMuted).frame(width: 22)
+                    Text(l)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(0.3)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                        .frame(width: 22)
                 }
                 HStack(spacing: 1) {
                     Text("S").font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(Theme.Color.appBorderStrong)
@@ -393,7 +440,9 @@ struct NotifCategoryCard<Content: View>: View {
                 .onTapGesture { onSmsTap?() }
             }
         }
-        .padding(.horizontal, Spacing.s4).padding(.top, 9).padding(.bottom, Spacing.s2)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, 9)
+        .padding(.bottom, Spacing.s2)
         .background(accentBg)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1) }
     }
@@ -402,7 +451,8 @@ struct NotifCategoryCard<Content: View>: View {
         Text("SMS coming soon")
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Theme.Color.appTextInverse)
-            .padding(.horizontal, 9).padding(.vertical, 5)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(Theme.Color.appText)
             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
@@ -423,7 +473,10 @@ private struct NotifSkeleton: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s0) {
-                Shimmer(width: 150, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, 18).padding(.bottom, Spacing.s2)
+                Shimmer(width: 150, height: 11, cornerRadius: Radii.xs).padding(.horizontal, Spacing.s4).padding(.top, 18).padding(
+                    .bottom,
+                    Spacing.s2
+                )
                 ForEach(0..<2, id: \.self) { _ in
                     Shimmer(height: 220, cornerRadius: Radii.lg).padding(.horizontal, Spacing.s3).padding(.bottom, 14)
                 }
@@ -445,13 +498,18 @@ private struct NotifErrorView: View {
                 Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
             Text("Couldn't load notifications").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.Color.appText)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary).multilineTextAlignment(.center).frame(maxWidth: 260)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
                     Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

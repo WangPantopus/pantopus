@@ -11,14 +11,24 @@ import XCTest
 
 @MainActor
 final class InsightsDashboardViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func vm(owner: SchedulingOwner = .personal, _ routes: [String: [SequencedURLProtocol.Response]]) -> InsightsDashboardViewModel {
         InsightsDashboardViewModel(
             owner: owner,
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
@@ -27,6 +37,7 @@ final class InsightsDashboardViewModelTests: XCTestCase {
      "sparkline":[{"date":"2026-06-01","count":2},{"date":"2026-06-02","count":3},{"date":"2026-06-03","count":1}],
      "byEventType":[{"event_type_id":"et1","count":7},{"event_type_id":"et2","count":5}]}
     """#
+    // swiftlint:disable:next line_length
     private let eventTypes = #"{"eventTypes":[{"id":"et1","name":"Intro call","slug":"intro","durations":[30]},{"id":"et2","name":"Deep dive","slug":"deep","durations":[60]}]}"#
     private let report = #"{"window_days":30,"completed":8,"no_show":2,"cancelled":1,"no_show_rate":20,"recent_no_shows":[]}"#
 
@@ -51,10 +62,12 @@ final class InsightsDashboardViewModelTests: XCTestCase {
     }
 
     func testEmptyWhenNoData() async {
+        let summaryEmpty = #"{"bookingsThisMonth":0,"upcomingCount":0,"sparkline":[],"byEventType":[]}"#
+        let noShowsEmpty = #"{"window_days":30,"completed":0,"no_show":0,"cancelled":0,"no_show_rate":0,"recent_no_shows":[]}"#
         let model = vm([
-            "/api/scheduling/bookings/summary": [.status(200, body: #"{"bookingsThisMonth":0,"upcomingCount":0,"sparkline":[],"byEventType":[]}"#)],
+            "/api/scheduling/bookings/summary": [.status(200, body: summaryEmpty)],
             "/api/scheduling/event-types": [.status(200, body: #"{"eventTypes":[]}"#)],
-            "/api/scheduling/insights/no-shows": [.status(200, body: #"{"window_days":30,"completed":0,"no_show":0,"cancelled":0,"no_show_rate":0,"recent_no_shows":[]}"#)]
+            "/api/scheduling/insights/no-shows": [.status(200, body: noShowsEmpty)]
         ])
         await model.load()
         XCTAssertEqual(model.phase, .empty)

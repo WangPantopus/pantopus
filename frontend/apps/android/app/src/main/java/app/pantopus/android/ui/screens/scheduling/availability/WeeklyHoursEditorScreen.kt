@@ -82,10 +82,11 @@ fun WeeklyHoursEditorScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         // Design: title is "Set hours" when isUnset (Frame 4), "Edit schedule" otherwise.
-        val topBarTitle = when (val s = state) {
-            is WeeklyHoursUiState.Content -> if (s.form.isUnset) "Set hours" else "Edit schedule"
-            else -> "Edit schedule"
-        }
+        val topBarTitle =
+            when (val s = state) {
+                is WeeklyHoursUiState.Content -> if (s.form.isUnset) "Set hours" else "Edit schedule"
+                else -> "Edit schedule"
+            }
         AvailabilityTopBar(title = topBarTitle, onBack = onBack)
         when (val s = state) {
             WeeklyHoursUiState.Loading ->

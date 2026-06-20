@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "TooManyFunctions", "MagicNumber", "LongMethod", "CyclomaticComplexMethod", "ReturnCount", "NestedBlockDepth")
+@file:Suppress(
+    "PackageNaming",
+    "TooManyFunctions",
+    "MagicNumber",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "ReturnCount",
+    "NestedBlockDepth",
+)
 
 package app.pantopus.android.ui.screens.scheduling.findatime
 
@@ -131,7 +139,11 @@ class MemberPollResponseViewModel
                         val decoded = errors.decode(r.error, notFoundAs = SchedulingError.Unavailable)
                         _state.value =
                             PollResponseUiState.Error(
-                                if (decoded is SchedulingError.Unavailable) "This poll isn't available anymore." else "We couldn't load this poll.",
+                                if (decoded is SchedulingError.Unavailable) {
+                                    "This poll isn't available anymore."
+                                } else {
+                                    "We couldn't load this poll."
+                                },
                             )
                     }
                 }
@@ -204,7 +216,17 @@ class MemberPollResponseViewModel
 
         fun setVoterName(value: String) = _state.update { s -> if (s is PollResponseUiState.Loaded) s.copy(voterName = value) else s }
 
-        fun setVoterEmail(value: String) = _state.update { s -> if (s is PollResponseUiState.Loaded) s.copy(voterEmail = value, error = null) else s }
+        fun setVoterEmail(value: String) =
+            _state.update { s ->
+                if (s is PollResponseUiState.Loaded) {
+                    s.copy(
+                        voterEmail = value,
+                        error = null,
+                    )
+                } else {
+                    s
+                }
+            }
 
         fun submit() {
             val loaded = state.value as? PollResponseUiState.Loaded ?: return

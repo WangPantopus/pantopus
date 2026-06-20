@@ -57,6 +57,7 @@ data class WeeklyHoursForm(
 ) {
     val allDaysOff: Boolean get() = days.none { it.enabled }
     val hasNoRules: Boolean get() = days.all { it.blocks.isEmpty() }
+
     /** Design Frame 4: show the "Set hours" / composition-gap hero state. */
     val isUnset: Boolean get() = allDaysOff && !isDirty
 }

@@ -98,10 +98,11 @@ class PublicPagePreviewViewModel
                     is NetworkResult.Failure -> {
                         _state.value =
                             when (errors.decode(publicResult.error, notFoundAs = SchedulingError.Paused)) {
-                                is SchedulingError.Paused -> PreviewUiState.Notice(
-                                    "Your page is paused",
-                                    "Turn it back on in Booking link to take bookings.",
-                                )
+                                is SchedulingError.Paused ->
+                                    PreviewUiState.Notice(
+                                        "Your page is paused",
+                                        "Turn it back on in Booking link to take bookings.",
+                                    )
                                 else -> PreviewUiState.Error("We couldn't load your page.")
                             }
                     }

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("PackageNaming", "MagicNumber", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.findatime
 
@@ -52,8 +52,7 @@ class MemberPollResponseViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() =
-        MemberPollResponseViewModel(repo, errors, auth, SavedStateHandle(mapOf(SchedulingRoutes.ARG_POLL_ID to "poll-1")))
+    private fun vm() = MemberPollResponseViewModel(repo, errors, auth, SavedStateHandle(mapOf(SchedulingRoutes.ARG_POLL_ID to "poll-1")))
 
     private fun openPoll() =
         PollDetailResponse(

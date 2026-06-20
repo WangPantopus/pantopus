@@ -38,9 +38,17 @@ struct TriggerPickerSheet: View {
         _unit = State(initialValue: unit)
     }
 
-    private var usesOffset: Bool { selected.usesOffset }
-    private var resolvedMinutes: Int { amount * unit.multiplier }
-    private var isInvalid: Bool { usesOffset && amount <= 0 }
+    private var usesOffset: Bool {
+        selected.usesOffset
+    }
+
+    private var resolvedMinutes: Int {
+        amount * unit.multiplier
+    }
+
+    private var isInvalid: Bool {
+        usesOffset && amount <= 0
+    }
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
@@ -82,9 +90,8 @@ struct TriggerPickerSheet: View {
                             sub: trigger.lifecycleDescription,
                             selected: selected == trigger,
                             accent: accent,
-                            icon: trigger.icon,
-                            onTap: { selected = trigger }
-                        )
+                            icon: trigger.icon
+                        ) { selected = trigger }
                         if idx < triggers.count - 1 { AutoRowDivider() }
                     }
                 }
@@ -106,9 +113,8 @@ struct TriggerPickerSheet: View {
                 AutoSegmented(
                     options: ReminderPreset.Unit.allCases.map { unitShort($0) },
                     selectedIndex: ReminderPreset.Unit.allCases.firstIndex(of: unit) ?? 1,
-                    accent: accent,
-                    onSelect: { unit = ReminderPreset.Unit.allCases[$0] }
-                )
+                    accent: accent
+                ) { unit = ReminderPreset.Unit.allCases[$0] }
             }
         }
     }

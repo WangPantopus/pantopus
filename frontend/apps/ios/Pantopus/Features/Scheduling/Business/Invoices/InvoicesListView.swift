@@ -23,11 +23,11 @@ struct InvoicesListView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: "Invoices", onBack: { dismiss() }) {
+            PkgTopBar(title: "Invoices", onBack: { dismiss() }, trailing: {
                 PkgTopBarIconButton(icon: .search, accessibilityLabel: "Search", tint: Theme.Color.appText) {
                     model.search()
                 }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -73,9 +73,11 @@ struct InvoicesListView: View {
                 filterChips
                 ForEach(model.sections) { section in
                     Text(section.day.uppercased())
-                        .font(.system(size: 9, weight: .bold)).tracking(0.8)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.8)
                         .foregroundStyle(Theme.Color.appTextMuted)
-                        .padding(.horizontal, Spacing.s1).padding(.top, Spacing.s1)
+                        .padding(.horizontal, Spacing.s1)
+                        .padding(.top, Spacing.s1)
                     PkgRowCard {
                         ForEach(Array(section.invoices.enumerated()), id: \.element.id) { index, invoice in
                             InvoiceRow(
@@ -84,9 +86,8 @@ struct InvoicesListView: View {
                                 service: model.service(invoice),
                                 amount: model.amount(invoice),
                                 status: model.invoiceStatus(invoice),
-                                ownerType: model.theme.title.lowercased(),
-                                onTap: { model.openInvoice(invoice) }
-                            )
+                                ownerType: model.theme.title.lowercased()
+                            ) { model.openInvoice(invoice) }
                             if index < section.invoices.count - 1 { Divider().background(Theme.Color.appBorder) }
                         }
                     }
@@ -149,12 +150,16 @@ struct InvoicesListView: View {
     private func stat(label: String, value: String, overdue: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .bold)).tracking(0.6)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.6)
                 .foregroundStyle(overdue ? Theme.Color.warning : Theme.Color.appTextSecondary)
             Text(value)
-                .font(.system(size: 21, weight: .heavy)).tracking(-0.5).monospacedDigit()
+                .font(.system(size: 21, weight: .heavy))
+                .tracking(-0.5)
+                .monospacedDigit()
                 .foregroundStyle(overdue ? Theme.Color.warning : Theme.Color.appText)
-                .lineLimit(1).minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Spacing.s3)
@@ -174,7 +179,9 @@ struct InvoicesListView: View {
                     ForEach(0..<4, id: \.self) { i in
                         HStack(spacing: 11) {
                             Shimmer(width: 34, height: 34, cornerRadius: Radii.pill)
-                            VStack(alignment: .leading, spacing: 6) { Shimmer(width: 120, height: 11); Shimmer(width: 80, height: 8) }
+                            VStack(alignment: .leading, spacing: 6) { Shimmer(width: 120, height: 11)
+                                Shimmer(width: 80, height: 8)
+                            }
                             Spacer()
                             Shimmer(width: 50, height: 24, cornerRadius: Radii.pill)
                         }
@@ -212,7 +219,7 @@ private struct InvoiceRow: View {
     /// Backend status string (paid/sent/overdue/void/refunded/draft).
     /// The DTO currently carries no `status` field so this is nil until
     /// the field lands — when present the `PkgChip` renders automatically.
-    var status: String? = nil
+    var status: String?
     let ownerType: String
     let onTap: () -> Void
 
@@ -242,7 +249,8 @@ private struct InvoiceRow: View {
                 // the DTO `status` field is present; hidden otherwise.
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(amount)
-                        .font(.system(size: 13.5, weight: .bold)).monospacedDigit()
+                        .font(.system(size: 13.5, weight: .bold))
+                        .monospacedDigit()
                         .foregroundStyle(Theme.Color.appText)
                     if let status {
                         InvoiceStatusChip(status: status)
@@ -256,4 +264,3 @@ private struct InvoiceRow: View {
         .accessibilityLabel("Invoice \(reference), \(service), \(amount)")
     }
 }
-

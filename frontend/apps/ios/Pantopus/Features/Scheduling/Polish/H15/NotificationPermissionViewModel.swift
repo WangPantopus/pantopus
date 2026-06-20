@@ -43,14 +43,16 @@ final class NotificationPermissionViewModel {
         onResult: @escaping (NotificationChannelConnectResult) -> Void
     ) {
         self.owner = owner
-        self.frame = initialFrame
+        frame = initialFrame
         self.accountEmail = accountEmail
         self.service = service
         self.onResult = onResult
     }
 
     /// Pillar accent for the connect CTA and hero tint.
-    var accent: Color { owner.theme.accent }
+    var accent: Color {
+        owner.theme.accent
+    }
 
     /// Whether the active verify frame has a complete 6-digit code.
     var isCodeComplete: Bool {
@@ -154,8 +156,8 @@ final class NotificationPermissionViewModel {
         toast = message
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(3))
-            guard let self, self.toast == message else { return }
-            self.toast = nil
+            guard let self, toast == message else { return }
+            toast = nil
         }
     }
 }

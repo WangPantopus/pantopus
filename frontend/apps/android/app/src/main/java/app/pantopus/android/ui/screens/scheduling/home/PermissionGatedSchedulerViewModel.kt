@@ -128,8 +128,7 @@ class PermissionGatedSchedulerViewModel
 
         fun refresh() = load()
 
-        private fun isForbidden(error: NetworkError): Boolean =
-            error is NetworkError.Forbidden || error.code == FORBIDDEN_CODE
+        private fun isForbidden(error: NetworkError): Boolean = error is NetworkError.Forbidden || error.code == FORBIDDEN_CODE
 
         private suspend fun resolveHomeId(): String? =
             when (val result = homes.myHomes()) {

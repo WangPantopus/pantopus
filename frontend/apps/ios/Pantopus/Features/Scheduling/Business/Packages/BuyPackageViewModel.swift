@@ -46,11 +46,22 @@ final class BuyPackageViewModel {
     /// link are not yet wired to an auth/receipt endpoint (deferred backend).
     private(set) var isGuest = false
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
 
-    var totalLabel: String { SchedulingMoney.format(cents: package?.priceCents, currency: package?.currency) }
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
+
+    var totalLabel: String {
+        SchedulingMoney.format(cents: package?.priceCents, currency: package?.currency)
+    }
+
     var perSessionLabel: String {
         SchedulingMoney.perSession(totalCents: package?.priceCents, sessions: package?.sessionsCount, currency: package?.currency)
     }
@@ -77,7 +88,9 @@ final class BuyPackageViewModel {
     // MARK: Lifecycle
 
     func load() async {
-        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon; return }
+        guard SchedulingFeatureFlags.paidEnabled else { phase = .comingSoon
+            return
+        }
         phase = .loading
         // Signed-out viewers see the guest-email card (buypackage frame 2).
         if case .signedOut = AuthManager.shared.state { isGuest = true }
@@ -123,5 +136,7 @@ final class BuyPackageViewModel {
     }
 
     /// Upsell action — go back to manage existing credits instead of buying more.
-    func useCreditInstead() { push(.myPackages) }
+    func useCreditInstead() {
+        push(.myPackages)
+    }
 }

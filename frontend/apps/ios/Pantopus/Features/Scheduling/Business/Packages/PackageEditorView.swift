@@ -23,7 +23,9 @@ struct PackageEditorView: View {
         _model = State(wrappedValue: PackageEditorViewModel(owner: owner, packageId: packageId, push: push, client: client))
     }
 
-    private var title: String { model.isEditing ? "Edit package" : "New package" }
+    private var title: String {
+        model.isEditing ? "Edit package" : "New package"
+    }
 
     var body: some View {
         Group {
@@ -66,22 +68,30 @@ struct PackageEditorView: View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             if !model.isEditing {
                 Text("Set a price and we'll do the per-session math.")
-                    .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
                     .padding(.horizontal, Spacing.s1)
             }
             detailsCard
             // Frame 4: when active buyers hold credits, warn and lock
             // sessions/eligibility tiles — createpackage-frames.jsx:162-163.
             if model.isLocked {
-                PkgNote(tone: .warning, icon: .lock,
-                        text: "\(model.activeBuyerCount) \(model.activeBuyerCount == 1 ? "person owns" : "people own") credits — you can't change sessions or eligibility while credits are active.")
+                PkgNote(
+                    tone: .warning,
+                    icon: .lock,
+                    // swiftlint:disable:next line_length
+                    text: "\(model.activeBuyerCount) \(model.activeBuyerCount == 1 ? "person owns" : "people own") credits — you can't change sessions or eligibility while credits are active."
+                )
             }
             redeemCard
             sessionsCard
             priceCard
             if model.isEditing {
-                PkgNote(tone: .info, icon: .info,
-                        text: "Changing the price creates a new Stripe price. Current buyers keep their terms.")
+                PkgNote(
+                    tone: .info,
+                    icon: .info,
+                    text: "Changing the price creates a new Stripe price. Current buyers keep their terms."
+                )
             }
             expiryCard
             activeCard
@@ -116,16 +126,27 @@ struct PackageEditorView: View {
                 Text("Credits apply to all of your services.")
                     .font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                    spacing: 8
+                ) {
                     EventTile(
-                        title: "All services", duration: "Any event", icon: .layers,
-                        selected: model.selectedEventTypeId == nil, accent: model.accent, accentBg: model.theme.accentBg,
+                        title: "All services",
+                        duration: "Any event",
+                        icon: .layers,
+                        selected: model.selectedEventTypeId == nil,
+                        accent: model.accent,
+                        accentBg: model.theme.accentBg,
                         locked: model.isLocked
                     ) { model.selectEventType(nil) }
                     ForEach(model.eventTypes) { type in
                         EventTile(
-                            title: type.name, duration: model.tileDuration(type), icon: .calendar,
-                            selected: model.selectedEventTypeId == type.id, accent: model.accent, accentBg: model.theme.accentBg,
+                            title: type.name,
+                            duration: model.tileDuration(type),
+                            icon: .calendar,
+                            selected: model.selectedEventTypeId == type.id,
+                            accent: model.accent,
+                            accentBg: model.theme.accentBg,
                             locked: model.isLocked
                         ) { model.selectEventType(type.id) }
                     }
@@ -149,13 +170,16 @@ struct PackageEditorView: View {
             HStack(alignment: .top, spacing: 8) {
                 PkgTextField(placeholder: "$0.00", text: $model.priceText, keyboard: .decimalPad)
                 Text("USD")
-                    .font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.Color.appTextStrong)
-                    .padding(.horizontal, 12).frame(height: 40)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .padding(.horizontal, 12)
+                    .frame(height: 40)
                     .background(Theme.Color.appSurfaceSunken)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             }
             Text("\(model.perSessionLabel) per session")
-                .font(.system(size: 11.5, weight: .bold)).foregroundStyle(model.accent)
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundStyle(model.accent)
         }
     }
 
@@ -178,8 +202,11 @@ struct PackageEditorView: View {
         // accent — keep the switch product sky.
         PkgCard {
             PkgToggleRow(
-                icon: .power, label: "Active", sub: "Buyers can purchase this package",
-                isOn: $model.isActive, accent: Theme.Color.primary600
+                icon: .power,
+                label: "Active",
+                sub: "Buyers can purchase this package",
+                isOn: $model.isActive,
+                accent: Theme.Color.primary600
             )
         }
     }
@@ -199,7 +226,7 @@ struct PackageEditorView: View {
 
     private var gated: some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: title, onBack: { dismiss() })
+            PkgTopBar(title: title) { dismiss() }
             PkgComingSoon(title: "Packages")
         }
         .background(Theme.Color.appBg)
@@ -208,7 +235,7 @@ struct PackageEditorView: View {
 
     private func errored(_ message: String) -> some View {
         VStack(spacing: Spacing.s0) {
-            PkgTopBar(title: title, onBack: { dismiss() })
+            PkgTopBar(title: title) { dismiss() }
             PkgErrorState(message: message) { Task { await model.load() } }
         }
         .background(Theme.Color.appBg)
@@ -223,7 +250,7 @@ struct PackageEditorView: View {
 /// stream-local because `PkgTextField` is single-line; promote to the shared
 /// kit if another screen needs it.
 private struct PkgMultilineField: View {
-    var label: String? = nil
+    var label: String?
     let placeholder: String
     @Binding var text: String
 
@@ -235,14 +262,17 @@ private struct PkgMultilineField: View {
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(placeholder)
-                        .font(.system(size: 13)).foregroundStyle(Theme.Color.appTextMuted)
-                        .padding(.horizontal, 11).padding(.vertical, 9)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 9)
                 }
                 TextField("", text: $text, axis: .vertical)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.Color.appText)
                     .lineLimit(2...5)
-                    .padding(.horizontal, 11).padding(.vertical, 9)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 9)
             }
             .frame(minHeight: 48, alignment: .topLeading)
             .background(Theme.Color.appSurface)
@@ -278,14 +308,18 @@ private struct EventTile: View {
                     if selected { Icon(.check, size: 14, strokeWidth: 3, color: accent) }
                 }
                 Text(title)
-                    .font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.Color.appText)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
                     .lineLimit(1)
                 if !duration.isEmpty {
-                    Text(duration).font(.system(size: 10)).foregroundStyle(Theme.Color.appTextSecondary)
+                    Text(duration)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 11).padding(.vertical, 10)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 10)
             .background(selected ? accentBg : Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)

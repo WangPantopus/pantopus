@@ -26,8 +26,8 @@ struct AutoTopBar: View {
 
     let title: String
     var leading: Leading = .back
-    var onLeading: (() -> Void)? = nil
-    var trailing: AnyView? = nil
+    var onLeading: (() -> Void)?
+    var trailing: AnyView?
 
     var body: some View {
         HStack(spacing: Spacing.s0) {
@@ -68,7 +68,7 @@ struct AutoTopBar: View {
 /// A primary-tinted text button for the top-bar trailing slot ("Save", "+").
 struct AutoTopBarTextButton: View {
     let title: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var isEnabled: Bool = true
     let action: () -> Void
 
@@ -83,14 +83,16 @@ struct AutoTopBarTextButton: View {
         .accessibilityIdentifier("automationsTopBarAction")
     }
 
-    private var color: Color { isEnabled ? Theme.Color.primary600 : Theme.Color.appTextMuted }
+    private var color: Color {
+        isEnabled ? Theme.Color.primary600 : Theme.Color.appTextMuted
+    }
 }
 
 // MARK: - Card + overline
 
 /// White card · 1px border · 16pt radius · soft shadow.
 struct AutoCard<Content: View>: View {
-    var padding: EdgeInsets = EdgeInsets(top: Spacing.s1, leading: 13, bottom: Spacing.s1, trailing: 13)
+    var padding = EdgeInsets(top: Spacing.s1, leading: 13, bottom: Spacing.s1, trailing: 13)
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -123,7 +125,7 @@ struct AutoOverline: View {
 
 // MARK: - Inline note
 
-enum AutoTone: Sendable {
+enum AutoTone {
     case info, warning, error, success, neutral
 
     var bg: Color {
@@ -160,9 +162,9 @@ enum AutoTone: Sendable {
 /// Semantic-tinted inline callout (paused / push-off / validation hints).
 struct AutoNote: View {
     let tone: AutoTone
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     let text: String
-    var trailing: AnyView? = nil
+    var trailing: AnyView?
 
     var body: some View {
         HStack(alignment: trailing == nil ? .top : .center, spacing: 9) {
@@ -194,7 +196,7 @@ struct AutoNote: View {
 /// Small uppercase pill chip (channel / usage badges).
 struct AutoChip: View {
     let text: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var tone: AutoTone = .neutral
 
     var body: some View {
@@ -220,7 +222,7 @@ struct AutoChannelChip: View {
     var isComingSoon: Bool = false
     var accent: Color = Theme.Color.primary600
     var accentBg: Color = Theme.Color.primary50
-    var onTap: (() -> Void)? = nil
+    var onTap: (() -> Void)?
 
     var body: some View {
         Group {
@@ -257,8 +259,13 @@ struct AutoChannelChip: View {
         return isOn ? accent : Theme.Color.appTextSecondary
     }
 
-    private var background: Color { isOn ? accentBg : Theme.Color.appSurface }
-    private var borderColor: Color { isOn ? accentBg : Theme.Color.appBorder }
+    private var background: Color {
+        isOn ? accentBg : Theme.Color.appSurface
+    }
+
+    private var borderColor: Color {
+        isOn ? accentBg : Theme.Color.appBorder
+    }
 }
 
 // MARK: - Underline tab strip (A08)
@@ -316,8 +323,10 @@ struct AutoSegmented: View {
                     Text(opt)
                         .font(.system(size: 11.5, weight: on ? .bold : .semibold))
                         .foregroundStyle(on ? accent : Theme.Color.appTextSecondary)
-                        .lineLimit(1).minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity).frame(height: 32)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
                         .background(on ? Theme.Color.appSurface : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                         .pantopusShadow(on ? .sm : .init(color: .clear, opacity: 0, radius: 0, x: 0, y: 0))
@@ -339,10 +348,10 @@ struct AutoSegmented: View {
 /// A 48pt selection row with a trailing radio — used by the Trigger Picker.
 struct AutoRadioRow: View {
     let label: String
-    var sub: String? = nil
+    var sub: String?
     let selected: Bool
     var accent: Color = Theme.Color.primary600
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     let onTap: () -> Void
 
     var body: some View {
@@ -422,8 +431,8 @@ struct AutoStepper: View {
 /// Bottom-sheet header: title + optional subhead + circular close.
 struct AutoSheetHeader: View {
     let title: String
-    var subhead: String? = nil
-    var trailing: AnyView? = nil
+    var subhead: String?
+    var trailing: AnyView?
     let onClose: () -> Void
 
     var body: some View {
@@ -477,7 +486,7 @@ struct AutoSheetFooter<Content: View>: View {
 /// Full-width primary CTA. Functional chrome → product sky.
 struct AutoPrimaryButton: View {
     let title: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     var isSaving: Bool = false
     var isDisabled: Bool = false
     let action: () -> Void
@@ -509,7 +518,7 @@ struct AutoPrimaryButton: View {
 /// Bordered neutral / outline button.
 struct AutoGhostButton: View {
     let title: String
-    var icon: PantopusIcon? = nil
+    var icon: PantopusIcon?
     let action: () -> Void
 
     var body: some View {
@@ -532,11 +541,12 @@ struct AutoGhostButton: View {
 
 /// Hairline row divider.
 struct AutoRowDivider: View {
-    var body: some View { Rectangle().fill(Theme.Color.appBorder).frame(height: 1) }
+    var body: some View {
+        Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+    }
 }
 
 /// Rounded leading glyph tile.
-@ViewBuilder
 func autoIconTile(_ icon: PantopusIcon, bg: Color, fg: Color, size: CGFloat = 34, glyph: CGFloat = 17) -> some View {
     ZStack {
         RoundedRectangle(cornerRadius: 9, style: .continuous).fill(bg)
@@ -578,8 +588,8 @@ struct AutoInlineEmpty: View {
     let subcopy: String
     var accent: Color = Theme.Color.primary600
     var accentBg: Color = Theme.Color.primary50
-    var ctaTitle: String? = nil
-    var onCTA: (() -> Void)? = nil
+    var ctaTitle: String?
+    var onCTA: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -620,17 +630,23 @@ struct AutoErrorView: View {
                 Circle().fill(Theme.Color.appSurfaceSunken).frame(width: 56, height: 56)
                 Icon(.cloudOff, size: 25, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
             }
-            Text(headline).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.Color.appText)
+            Text(headline)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
             Text(message)
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 240)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 240)
             Button(action: onRetry) {
                 HStack(spacing: 6) {
                     Icon(.refreshCw, size: 14, color: Theme.Color.appTextStrong)
-                    Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
+                    Text("Try again")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
                 }
-                .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
                 .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             .accessibilityIdentifier("automationsRetry")
@@ -724,9 +740,12 @@ struct AutoToast: View {
     var body: some View {
         HStack(spacing: Spacing.s2) {
             Icon(icon, size: 15, strokeWidth: 2.4, color: tint)
-            Text(text).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
+            Text(text)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
         }
-        .padding(.horizontal, Spacing.s4).padding(.vertical, 10)
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, 10)
         .background(Theme.Color.appText)
         .clipShape(Capsule())
         .pantopusShadow(.lg)

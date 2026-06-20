@@ -23,13 +23,18 @@ final class BookingsInboxViewModelTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeViewModel(owner: SchedulingOwner = .personal, routes: [String: [SequencedURLProtocol.Response]]) -> BookingsInboxViewModel {
+    private func makeViewModel(
+        owner: SchedulingOwner = .personal,
+        routes: [String: [SequencedURLProtocol.Response]]
+    ) -> BookingsInboxViewModel {
         let session = SequencedURLProtocol.makeSession(routeResponses: routes)
         let actions = BookingActions(owner: owner, client: SchedulingClient(client: APIClient(session: session, retryPolicy: .none)))
         return BookingsInboxViewModel(owner: owner, push: { _ in }, actions: actions)
     }
 
-    private func bookingsBody(_ inner: String) -> String { "{\"bookings\":[\(inner)]}" }
+    private func bookingsBody(_ inner: String) -> String {
+        "{\"bookings\":[\(inner)]}"
+    }
 
     private func captured(_ contains: String) -> URLRequest? {
         SequencedURLProtocol.capturedRequests.first { ($0.url?.absoluteString ?? "").contains(contains) }
@@ -44,7 +49,10 @@ final class BookingsInboxViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.phase, .ready)
         XCTAssertEqual(viewModel.bookings.count, 1)
         XCTAssertFalse(viewModel.isEmpty)
-        let query = captured("/bookings")?.url?.query ?? ""
+        // `load()` fires the best-effort summary (`/bookings/summary`, no status)
+        // BEFORE the list fetch, so match the list request by its `status` query
+        // rather than the looser `/bookings` substring (which hits summary first).
+        let query = captured("status=")?.url?.query ?? ""
         XCTAssertTrue(query.contains("status=upcoming"))
     }
 

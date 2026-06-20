@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod", "TooManyFunctions")
+@file:Suppress("PackageNaming", "MagicNumber", "LongParameterList", "LongMethod", "TooManyFunctions", "ktlint:standard:max-line-length")
 
 package app.pantopus.android.ui.screens.scheduling.invitee.customer
 
@@ -212,7 +212,12 @@ fun RecurringBody(
                 Text(text = overlineText, style = PantopusTextStyle.overline, color = PantopusColors.appTextSecondary)
                 occurrences.forEach { OccurrenceRow(it) }
                 // SummaryChip shows open-count in partial, total count otherwise.
-                SummaryChip(count = if (isPartial) openCount else occurrences.size, weekdayShort = weekdayShort, timeLabel = timeLabel, rangeLabel = rangeLabel)
+                SummaryChip(
+                    count = if (isPartial) openCount else occurrences.size,
+                    weekdayShort = weekdayShort,
+                    timeLabel = timeLabel,
+                    rangeLabel = rangeLabel,
+                )
             }
             (submit as? RecurringSubmitState.Error)?.let {
                 Text(text = it.message, style = PantopusTextStyle.small, color = PantopusColors.error)
@@ -326,7 +331,10 @@ private fun RepeatsDropdownRow(value: RecurrenceRepeat) {
     ) {
         PantopusIconImage(icon = PantopusIcon.ArrowsRepeat, contentDescription = null, size = 15.dp, tint = ACCENT)
         Text(
-            text = when (value) { RecurrenceRepeat.Weekly -> "Weekly" },
+            text =
+                when (value) {
+                    RecurrenceRepeat.Weekly -> "Weekly"
+                },
             style = PantopusTextStyle.small,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appText,
@@ -635,7 +643,10 @@ private fun SummaryChip(
  * lines 271-281). Appears when some occurrences are Unavailable (fully booked).
  */
 @Composable
-private fun PartialSeriesBanner(openCount: Int, totalCount: Int) {
+private fun PartialSeriesBanner(
+    openCount: Int,
+    totalCount: Int,
+) {
     Row(
         modifier =
             Modifier
@@ -653,7 +664,7 @@ private fun PartialSeriesBanner(openCount: Int, totalCount: Int) {
                 text = "We can book $openCount of $totalCount",
                 style = PantopusTextStyle.small,
                 fontWeight = FontWeight.Bold,
-                // Design WARN_DK = #92400E; closest available token = warmAmber (#B45309).
+                // Design WARN_DK (amber-800); closest available token = warmAmber (amber-700).
                 color = PantopusColors.warmAmber,
             )
             Text(
@@ -670,7 +681,10 @@ private fun PartialSeriesBanner(openCount: Int, totalCount: Int) {
  * (recurring-frames.jsx lines 302-304).
  */
 @Composable
-private fun GhostButton(title: String, onClick: () -> Unit) {
+private fun GhostButton(
+    title: String,
+    onClick: () -> Unit,
+) {
     Box(
         modifier =
             Modifier
@@ -828,7 +842,12 @@ private fun RecapRow(
                         .clickable(onClickLabel = "Remove ${occ.dateLabel}", onClick = onRemove),
                 contentAlignment = Alignment.Center,
             ) {
-                PantopusIconImage(icon = PantopusIcon.X, contentDescription = "Remove", size = 13.dp, tint = PantopusColors.appTextSecondary)
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = "Remove",
+                    size = 13.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
             }
         }
         if (!isLast) {

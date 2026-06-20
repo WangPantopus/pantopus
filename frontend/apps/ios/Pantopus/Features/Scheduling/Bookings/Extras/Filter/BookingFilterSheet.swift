@@ -192,7 +192,7 @@ struct BookingFilterSheet: View {
         }
     }
 
-    private func facetSection<Chips: View>(_ title: String, @ViewBuilder chips: () -> Chips) -> some View {
+    private func facetSection(_ title: String, @ViewBuilder chips: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 1) {
             ExtrasOverline(text: title)
             ExtrasFlowLayout { chips() }

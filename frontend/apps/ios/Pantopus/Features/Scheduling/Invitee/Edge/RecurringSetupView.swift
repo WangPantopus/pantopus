@@ -11,6 +11,9 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
+// swiftlint:disable:next type_body_length
 struct RecurringSetupView: View {
     @State private var viewModel: RecurringSetupViewModel
     @Environment(\.dismiss) private var dismiss
@@ -269,7 +272,7 @@ struct RecurringSetupView: View {
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
     }
 
-    private func field<Inner: View>(label: String, @ViewBuilder content: () -> Inner) -> some View {
+    private func field(label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
@@ -349,7 +352,9 @@ struct RecurringSetupView: View {
                 .buttonStyle(.plain)
                 Spacer()
                 HStack(spacing: 0) {
-                    stepperButton(icon: .minus, enabled: viewModel.count > viewModel.minCount, accented: false) { viewModel.decrementCount() }
+                    stepperButton(icon: .minus, enabled: viewModel.count > viewModel.minCount, accented: false) {
+                        viewModel.decrementCount()
+                    }
                     Text("\(viewModel.count)")
                         .font(.system(size: 13, weight: .bold))
                         .monospacedDigit()
@@ -657,9 +662,17 @@ struct RecurringSetupView: View {
 
     // MARK: - Date labels
 
-    private func monthLabel(_ date: Date) -> String { formatted(date, template: "MMM").uppercased() }
-    private func dayLabel(_ date: Date) -> String { formatted(date, template: "d") }
-    private func weekdayDateLabel(_ date: Date) -> String { formatted(date, template: "EEEMMMd") }
+    private func monthLabel(_ date: Date) -> String {
+        formatted(date, template: "MMM").uppercased()
+    }
+
+    private func dayLabel(_ date: Date) -> String {
+        formatted(date, template: "d")
+    }
+
+    private func weekdayDateLabel(_ date: Date) -> String {
+        formatted(date, template: "EEEMMMd")
+    }
 
     private func formatted(_ date: Date, template: String) -> String {
         let formatter = DateFormatter()

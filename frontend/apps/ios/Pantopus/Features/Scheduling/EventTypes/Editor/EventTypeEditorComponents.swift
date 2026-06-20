@@ -438,8 +438,13 @@ struct EventInfoCard: View {
     var actionTitle: String?
     var action: (() -> Void)?
 
-    private var fg: Color { tone == .warning ? Theme.Color.warning : Theme.Color.info }
-    private var bg: Color { tone == .warning ? Theme.Color.warningBg : Theme.Color.infoBg }
+    private var fg: Color {
+        tone == .warning ? Theme.Color.warning : Theme.Color.info
+    }
+
+    private var bg: Color {
+        tone == .warning ? Theme.Color.warningBg : Theme.Color.infoBg
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {

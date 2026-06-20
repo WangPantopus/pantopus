@@ -28,7 +28,12 @@ final class TerminalStateViewModelTests: XCTestCase {
     }
 
     func testPausedPageResolvesPaused() async {
-        SequencedURLProtocol.sequence = [.status(200, body: #"{"page":{"slug":"ada","title":"Maria Kessler","owner_type":"user"},"status":"paused","eventTypes":[]}"#)]
+        SequencedURLProtocol.sequence = [
+            .status(
+                200,
+                body: #"{"page":{"slug":"ada","title":"Maria Kessler","owner_type":"user"},"status":"paused","eventTypes":[]}"#
+            )
+        ]
         let viewModel = makeViewModel()
         await viewModel.load()
         guard case let .resolved(kind, hostName) = viewModel.state else {

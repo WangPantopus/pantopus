@@ -100,7 +100,9 @@ final class DiscoverySlotPickerViewModel {
     }
 
     /// `true` while a slot-taken race condition is active (Frame 6 toast is visible).
-    var slotJustTaken: Bool { takenSlotStart != nil }
+    var slotJustTaken: Bool {
+        takenSlotStart != nil
+    }
 
     var slotPickerState: SlotPicker.LoadState {
         switch phase {

@@ -84,7 +84,7 @@ class SlotPickerViewModel
 
         fun selectSlot(slot: SlotDto) {
             selectedSlotStart = slot.start
-            takenSlotStart = null  // selecting a new slot dismisses any prior taken-badge
+            takenSlotStart = null // selecting a new slot dismisses any prior taken-badge
             emitContent(slotsLoading = false)
         }
 

@@ -25,7 +25,7 @@ final class MessagePreviewViewModelTests: XCTestCase {
 
     func testDraftPreviewFillsFromBackend() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"subject":"Hi Sam R.","body":"Hello Maria K., see you soon."}"#),
+            .status(200, body: #"{"subject":"Hi Sam R.","body":"Hello Maria K., see you soon."}"#)
         ]
         let vm = MessagePreviewViewModel(
             owner: .personal,

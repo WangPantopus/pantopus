@@ -421,7 +421,7 @@ private fun ApprovalEtaPill() {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Spec EtaPill info tone uses the darker INFO_DK (#0369A1 = primary700)
+        // Spec EtaPill info tone uses the darker INFO_DK (primary700)
         // for the foreground, not the brighter info blue.
         PantopusIconImage(
             icon = PantopusIcon.Clock,

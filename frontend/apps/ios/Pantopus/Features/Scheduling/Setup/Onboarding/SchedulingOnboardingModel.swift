@@ -33,8 +33,11 @@ final class SchedulingOnboardingModel: WizardModel {
     var combineMode: String = "collective" // collective | round_robin
     var roundRobinRule: String = "balanced" // balanced | priority
 
-    // Business state.
-    var slug = "" { didSet { if slug != oldValue { onSlugEdited() } } }
+    /// Business state.
+    var slug = "" {
+        didSet { if slug != oldValue { onSlugEdited() } }
+    }
+
     private(set) var slugState: SlugFieldState = .idle
     var serviceType = "consultation"
     var duration = 30
@@ -45,11 +48,26 @@ final class SchedulingOnboardingModel: WizardModel {
     private let client = SchedulingClient.shared
     private var slugCheckTask: Task<Void, Never>?
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var identity: WizardIdentity { flow == .home ? .home : .business }
-    var accent: Color { identity.accent }
-    var accentBg: Color { identity.accentBg }
-    var paidEnabled: Bool { SchedulingFeatureFlags.paidEnabled }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var identity: WizardIdentity {
+        flow == .home ? .home : .business
+    }
+
+    var accent: Color {
+        identity.accent
+    }
+
+    var accentBg: Color {
+        identity.accentBg
+    }
+
+    var paidEnabled: Bool {
+        SchedulingFeatureFlags.paidEnabled
+    }
+
     let timezoneIdentifier: String
 
     init(owner: SchedulingOwner, push: @escaping @MainActor (SchedulingRoute) -> Void) {
@@ -71,9 +89,17 @@ final class SchedulingOnboardingModel: WizardModel {
         }
     }
 
-    var totalSteps: Int { steps.count }
-    var isSuccess: Bool { stepIndex > totalSteps }
-    var displayStep: Int { min(stepIndex, totalSteps) }
+    var totalSteps: Int {
+        steps.count
+    }
+
+    var isSuccess: Bool {
+        stepIndex > totalSteps
+    }
+
+    var displayStep: Int {
+        min(stepIndex, totalSteps)
+    }
 
     // MARK: Derived
 
@@ -103,7 +129,11 @@ final class SchedulingOnboardingModel: WizardModel {
                 primaryCTALabel: "Share link",
                 primaryCTAEnabled: true,
                 primaryCTAIdentifier: "onboardingShare",
-                secondaryCTA: WizardSecondaryCTA(label: flow == .home ? "Members" : "Add service", identifier: "onboardingSecondary", icon: flow == .home ? .users : .plus),
+                secondaryCTA: WizardSecondaryCTA(
+                    label: flow == .home ? "Members" : "Add service",
+                    identifier: "onboardingSecondary",
+                    icon: flow == .home ? .users : .plus
+                ),
                 isSubmitting: false,
                 dirty: false,
                 showsProgressBar: false
@@ -130,14 +160,14 @@ final class SchedulingOnboardingModel: WizardModel {
         switch flow {
         case .home:
             switch stepIndex {
-            case 1: return "Continue · \(selectedMembers.count) selected"
-            default: return "Continue"
+            case 1: "Continue · \(selectedMembers.count) selected"
+            default: "Continue"
             }
         case .business:
             switch stepIndex {
-            case 1: return "Continue · add a service"
-            case 4: return "Finish setup"
-            default: return "Continue"
+            case 1: "Continue · add a service"
+            case 4: "Finish setup"
+            default: "Continue"
             }
         }
     }
@@ -151,22 +181,26 @@ final class SchedulingOnboardingModel: WizardModel {
     private var secondaryCTA: WizardSecondaryCTA? {
         switch flow {
         case .home where stepIndex == 2:
-            return WizardSecondaryCTA(label: "Use defaults", identifier: "onboardingDefaults")
+            WizardSecondaryCTA(label: "Use defaults", identifier: "onboardingDefaults")
         case .business where stepIndex == 2:
-            return WizardSecondaryCTA(label: "Use defaults", identifier: "onboardingDefaults")
+            WizardSecondaryCTA(label: "Use defaults", identifier: "onboardingDefaults")
         case .business where stepIndex == 3:
-            return WizardSecondaryCTA(label: "Skip · just me", identifier: "onboardingSkipTeam")
+            WizardSecondaryCTA(label: "Skip · just me", identifier: "onboardingSkipTeam")
         default:
-            return nil
+            nil
         }
     }
 
     func leadingTapped() {
-        if isSuccess { stepIndex = totalSteps; return }
+        if isSuccess { stepIndex = totalSteps
+            return
+        }
         if stepIndex == 1 { isFinished = true } else { stepIndex -= 1 }
     }
 
-    func discardConfirmed() { isFinished = true }
+    func discardConfirmed() {
+        isFinished = true
+    }
 
     func primaryTapped() {
         guard !isSubmitting else { return }
@@ -186,12 +220,16 @@ final class SchedulingOnboardingModel: WizardModel {
     }
 
     func secondaryTapped() {
-        if isSuccess { isFinished = true; return }
+        if isSuccess { isFinished = true
+            return
+        }
         // Defaults / skip simply advance.
         if stepIndex < totalSteps { stepIndex += 1 } else { Task { await finishSetup() } }
     }
 
-    func finishAfterShare() { isFinished = true }
+    func finishAfterShare() {
+        isFinished = true
+    }
 
     // MARK: Members / team selection
 
@@ -203,14 +241,18 @@ final class SchedulingOnboardingModel: WizardModel {
         if seatedTeam.contains(id) { seatedTeam.remove(id) } else { seatedTeam.insert(id) }
     }
 
-    func pickSuggestion(_ s: String) { slug = s }
+    func pickSuggestion(_ s: String) {
+        slug = s
+    }
 
     // MARK: Slug check (Business)
 
     private func onSlugEdited() {
         slugCheckTask?.cancel()
         let candidate = slug.trimmingCharacters(in: .whitespaces)
-        guard !candidate.isEmpty else { slugState = .idle; return }
+        guard !candidate.isEmpty else { slugState = .idle
+            return
+        }
         slugState = .checking
         slugCheckTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
@@ -237,7 +279,10 @@ final class SchedulingOnboardingModel: WizardModel {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            _ = try await client.request(SchedulingEndpoints.updateBookingPageSlug(owner: owner, BookingPageSlugRequest(slug: candidate))) as BookingPageResponse
+            _ = try await client.request(SchedulingEndpoints.updateBookingPageSlug(
+                owner: owner,
+                BookingPageSlugRequest(slug: candidate)
+            )) as BookingPageResponse
             stepIndex = 2
         } catch let error as SchedulingError {
             if error.code == "SLUG_TAKEN" { await runSlugCheck(candidate) } else { slugState = .taken(suggestions: []) }
@@ -252,7 +297,10 @@ final class SchedulingOnboardingModel: WizardModel {
         isSubmitting = true
         defer { isSubmitting = false }
         // Seed page timezone (best-effort).
-        _ = try? await client.request(SchedulingEndpoints.updateBookingPage(owner: owner, BookingPageUpdateRequest(timezone: timezoneIdentifier))) as BookingPageResponse
+        _ = try? await client.request(SchedulingEndpoints.updateBookingPage(
+            owner: owner,
+            BookingPageUpdateRequest(timezone: timezoneIdentifier)
+        )) as BookingPageResponse
 
         let assignment = flow == .home ? (combineMode == "round_robin" ? "round_robin" : "collective") : "one_on_one"
         let requiresApproval = flow == .business ? (confirmMode == "approve") : false
@@ -278,7 +326,9 @@ final class SchedulingOnboardingModel: WizardModel {
                 stepIndex = totalSteps + 1
                 return
             } catch let error as SchedulingError {
-                if error.code == "SLUG_TAKEN" { attempt += 1; continue }
+                if error.code == "SLUG_TAKEN" { attempt += 1
+                    continue
+                }
                 stepIndex = totalSteps + 1
                 return
             } catch {

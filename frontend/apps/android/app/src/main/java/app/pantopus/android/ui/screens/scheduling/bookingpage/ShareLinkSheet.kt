@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -479,7 +480,7 @@ private fun saveQrToPhotos(context: android.content.Context) {
     canvas.drawColor(android.graphics.Color.WHITE)
     val cells = qrCells()
     val cell = px.toFloat() / QR_N
-    val paint = android.graphics.Paint().apply { color = android.graphics.Color.parseColor("#111827") }
+    val paint = android.graphics.Paint().apply { color = PantopusColors.appText.toArgb() }
     for (r in 0 until QR_N) {
         for (c in 0 until QR_N) {
             if (cells[r * QR_N + c]) {

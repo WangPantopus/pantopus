@@ -21,7 +21,9 @@ struct BlockOffTimeView: View {
     /// View-local target for a date / start / end picker sheet.
     private enum BlockPicker: String, Identifiable {
         case date, start, end
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     var body: some View {
@@ -33,23 +35,24 @@ struct BlockOffTimeView: View {
             isDirty: true,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
-            onCommit: { Task { if await viewModel.save() { dismiss() } } }
-        ) {
-            sheetOverline
-            detailsCard
-            if let conflict = viewModel.conflict {
-                conflictCard(conflict)
+            onCommit: { Task { if await viewModel.save() { dismiss() } } },
+            content: {
+                sheetOverline
+                detailsCard
+                if let conflict = viewModel.conflict {
+                    conflictCard(conflict)
+                }
+                repeatsCard
+                if viewModel.isSaving {
+                    savingBar
+                } else {
+                    AvailabilityLockFootnote(
+                        text: "This time won't be offered for booking. It's private to you."
+                    )
+                    .padding(.horizontal, Spacing.s4)
+                }
             }
-            repeatsCard
-            if viewModel.isSaving {
-                savingBar
-            } else {
-                AvailabilityLockFootnote(
-                    text: "This time won't be offered for booking. It's private to you."
-                )
-                .padding(.horizontal, Spacing.s4)
-            }
-        }
+        )
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.blockOffTime")
         .sheet(item: $activePicker) { picker in
@@ -62,7 +65,7 @@ struct BlockOffTimeView: View {
         }
     }
 
-    // Left-aligned sky overline beneath the centered top-bar title.
+    /// Left-aligned sky overline beneath the centered top-bar title.
     private var sheetOverline: some View {
         Text("PERSONAL · AVAILABILITY")
             .font(.system(size: 9.5, weight: .bold))
@@ -73,8 +76,8 @@ struct BlockOffTimeView: View {
             .accessibilityIdentifier("scheduling.blockOff.overline")
     }
 
-    // Reason + Date + All-day + time range live together in one borderless
-    // white card (no section overline), per the design's `DetailsCard`.
+    /// Reason + Date + All-day + time range live together in one borderless
+    /// white card (no section overline), per the design's `DetailsCard`.
     private var detailsCard: some View {
         AvailabilityCard {
             VStack(alignment: .leading, spacing: Spacing.s1) {
@@ -96,7 +99,7 @@ struct BlockOffTimeView: View {
                     accessibilityLabel: "Date, \(Self.dateLabel(viewModel.date))",
                     disabled: viewModel.isSaving
                 ) { activePicker = .date }
-                .accessibilityIdentifier("scheduling.blockOff.dateField")
+                    .accessibilityIdentifier("scheduling.blockOff.dateField")
             }
             Toggle(isOn: $viewModel.allDay) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -118,7 +121,7 @@ struct BlockOffTimeView: View {
                             accessibilityLabel: "Starts at \(viewModel.startTime.display)",
                             disabled: viewModel.isSaving
                         ) { activePicker = .start }
-                        .accessibilityIdentifier("scheduling.blockOff.startField")
+                            .accessibilityIdentifier("scheduling.blockOff.startField")
                     }
                     VStack(alignment: .leading, spacing: Spacing.s1) {
                         AvailabilityFieldLabel(text: "Ends")
@@ -128,7 +131,7 @@ struct BlockOffTimeView: View {
                             accessibilityLabel: "Ends at \(viewModel.endTime.display)",
                             disabled: viewModel.isSaving
                         ) { activePicker = .end }
-                        .accessibilityIdentifier("scheduling.blockOff.endField")
+                            .accessibilityIdentifier("scheduling.blockOff.endField")
                     }
                 }
                 if !viewModel.isValid {
@@ -162,7 +165,7 @@ struct BlockOffTimeView: View {
         }
     }
 
-    // Mirrors AvailabilityFieldButton's chrome but wraps a Menu label.
+    /// Mirrors AvailabilityFieldButton's chrome but wraps a Menu label.
     private var repeatsFieldButtonLabel: some View {
         HStack(spacing: Spacing.s2) {
             Icon(.arrowsRepeat, size: 15, color: Theme.Color.primary600)
@@ -184,7 +187,7 @@ struct BlockOffTimeView: View {
         .opacity(viewModel.isSaving ? 0.7 : 1)
     }
 
-    // Saving frame: a shimmer "Saving…" bar replaces the lock footnote.
+    /// Saving frame: a shimmer "Saving…" bar replaces the lock footnote.
     private var savingBar: some View {
         ZStack {
             Shimmer(height: 24, cornerRadius: Radii.md)
@@ -214,9 +217,9 @@ struct BlockOffTimeView: View {
         return formatter.string(from: date)
     }
 
-    // ─── Conflict warning card (chip-led, semantic) ──────────────
-    // Mirrors block-time-frames.jsx · ConflictCard: warningBg surface,
-    // "Booking overlap" warning chip, body copy, and a "View booking" link.
+    /// ─── Conflict warning card (chip-led, semantic) ──────────────
+    /// Mirrors block-time-frames.jsx · ConflictCard: warningBg surface,
+    /// "Booking overlap" warning chip, body copy, and a "View booking" link.
     private func conflictCard(_ conflict: BlockConflictWarning) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(spacing: Spacing.s1) {

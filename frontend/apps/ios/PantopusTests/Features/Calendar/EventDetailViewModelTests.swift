@@ -34,8 +34,8 @@ final class EventDetailViewModelTests: XCTestCase {
         )
     }
 
-    // Stream I10: the VM now fetches the single-event detail endpoint, which
-    // returns the event + per-attendee RSVP rows.
+    /// Stream I10: the VM now fetches the single-event detail endpoint, which
+    /// returns the event + per-attendee RSVP rows.
     private static let detailBody = """
     {"event":
       {"id":"e1","home_id":"home-1","event_type":"social",

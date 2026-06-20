@@ -11,10 +11,18 @@ import XCTest
 
 @MainActor
 final class UseCreditViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func credit() -> PackageCreditDTO {
+        // swiftlint:disable:next line_length
         let raw = #"{"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":2,"purchased_at":"2026-05-01T00:00:00Z","BookingPackage":{"name":"5-session cleaning","sessions_count":5,"owner_type":"business","owner_id":"biz1","event_type_id":"et1"}}"#
         // swiftlint:disable:next force_try
         return try! JSONDecoder().decode(PackageCreditDTO.self, from: Data(raw.utf8))
@@ -23,7 +31,10 @@ final class UseCreditViewModelTests: XCTestCase {
     private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> UseCreditViewModel {
         UseCreditViewModel(
             credit: credit(),
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
@@ -79,7 +90,7 @@ final class UseCreditViewModelTests: XCTestCase {
             "/api/scheduling/bookings/bk1/apply-credit": [.status(409, body: #"{"error":"CREDIT_NOT_APPLICABLE","message":"nope"}"#)]
         ])
         await model.load()
-        await model.apply(model.bookings[0]) { }
+        await model.apply(model.bookings[0]) {}
         XCTAssertEqual(model.conflictMessage, "This credit can't be used on that booking.")
     }
 }

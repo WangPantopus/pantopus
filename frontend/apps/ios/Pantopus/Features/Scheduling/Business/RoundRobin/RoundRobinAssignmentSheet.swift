@@ -31,9 +31,8 @@ struct RoundRobinAssignmentSheet: View {
                     BizPrimaryButton(
                         title: model.isSaving ? "Saving" : "Done",
                         isSaving: model.isSaving,
-                        isDisabled: model.doneDisabled,
-                        action: { Task { if await model.save() { onClose() } } }
-                    )
+                        isDisabled: model.doneDisabled
+                    ) { Task { if await model.save() { onClose() } } }
                 }
             }
         }
@@ -76,11 +75,17 @@ struct RoundRobinAssignmentSheet: View {
                 }
 
                 if model.isSingleMember {
-                    BizNote(tone: .biz, icon: .info,
-                            text: "Rotation needs two or more members. Bookings go to \(model.firstCheckedName ?? "this member") for now.")
+                    BizNote(
+                        tone: .biz,
+                        icon: .info,
+                        text: "Rotation needs two or more members. Bookings go to \(model.firstCheckedName ?? "this member") for now."
+                    )
                 } else if model.checkedCount >= 2 {
-                    BizNote(tone: .biz, icon: .arrowsRepeat,
-                            text: "New bookings rotate across \(model.checkedCount) members, weighted by your settings.")
+                    BizNote(
+                        tone: .biz,
+                        icon: .arrowsRepeat,
+                        text: "New bookings rotate across \(model.checkedCount) members, weighted by your settings."
+                    )
                 }
 
                 if let saveError = model.saveError {
@@ -118,7 +123,8 @@ struct RoundRobinAssignmentSheet: View {
                 }
                 .frame(width: 20, height: 20)
             }
-            .padding(.horizontal, Spacing.s3).padding(.vertical, 11)
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, 11)
             .background(selected ? Theme.Color.businessBg : Theme.Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
             .overlay(
@@ -174,7 +180,7 @@ struct RoundRobinAssignmentSheet: View {
                 // handle; steps are computed from drag distance vs. row height.
                 // Accessibility fallback via accessibilityAction.
                 Icon(.gripVertical, size: 20, color: dragPickId == pick.id ? Theme.Color.business : Theme.Color.appTextMuted)
-                    .frame(width: 30, height: 44)  // generous hit area
+                    .frame(width: 30, height: 44) // generous hit area
                     .contentShape(Rectangle())
                     .highPriorityGesture(
                         DragGesture(minimumDistance: 8, coordinateSpace: .local)
@@ -186,9 +192,13 @@ struct RoundRobinAssignmentSheet: View {
                                 let rowHeight: CGFloat = 54
                                 let steps = Int((value.translation.height / rowHeight).rounded())
                                 if steps > 0 {
-                                    for _ in 0..<steps { model.moveDown(pick.id) }
+                                    for _ in 0..<steps {
+                                        model.moveDown(pick.id)
+                                    }
                                 } else if steps < 0 {
-                                    for _ in 0..<(-steps) { model.moveUp(pick.id) }
+                                    for _ in 0..<(-steps) {
+                                        model.moveUp(pick.id)
+                                    }
                                 }
                                 dragPickId = nil
                                 dragOffset = 0
@@ -200,8 +210,6 @@ struct RoundRobinAssignmentSheet: View {
             case .strict:
                 EmptyView()
             }
-        } else {
-            EmptyView()
         }
     }
 
@@ -228,11 +236,17 @@ struct RoundRobinAssignmentSheet: View {
         VStack(spacing: Spacing.s3) {
             Spacer()
             Icon(.cloudOff, size: 28, strokeWidth: 1.8, color: Theme.Color.appTextSecondary)
-            Text(message).font(.system(size: 13.5)).foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 240)
+            Text(message)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 240)
             Button { Task { await model.load() } } label: {
-                Text("Try again").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
-                    .padding(.horizontal, Spacing.s4).padding(.vertical, Spacing.s2)
+                Text("Try again")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.vertical, Spacing.s2)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
             }
             Spacer()

@@ -11,20 +11,38 @@ import XCTest
 
 @MainActor
 final class MyPackagesViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = true }
-    override func tearDown() { SequencedURLProtocol.reset(); SchedulingFeatureFlags.paidEnabled = false; super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = true
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        SchedulingFeatureFlags.paidEnabled = false
+        super.tearDown()
+    }
 
     private func vm(_ routes: [String: [SequencedURLProtocol.Response]]) -> MyPackagesViewModel {
         MyPackagesViewModel(
             push: { _ in },
-            client: SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
+            client: SchedulingClient(client: APIClient(
+                session: SequencedURLProtocol.makeSession(routeResponses: routes),
+                retryPolicy: .none
+            ))
         )
     }
 
     private let credits = #"""
     {"credits":[
-      {"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":3,"purchased_at":"2026-06-01T00:00:00Z","BookingPackage":{"name":"5-session cleaning","sessions_count":5,"owner_type":"business","owner_id":"biz1","event_type_id":"et1"}},
-      {"id":"cr2","package_id":"pk2","buyer_user_id":"u1","remaining_sessions":0,"purchased_at":"2026-03-01T00:00:00Z","BookingPackage":{"name":"3 facials","sessions_count":3,"owner_type":"business","owner_id":"biz2"}}
+      {"id":"cr1","package_id":"pk1","buyer_user_id":"u1","remaining_sessions":3,
+       "purchased_at":"2026-06-01T00:00:00Z",
+       "BookingPackage":{"name":"5-session cleaning","sessions_count":5,
+       "owner_type":"business","owner_id":"biz1","event_type_id":"et1"}},
+      {"id":"cr2","package_id":"pk2","buyer_user_id":"u1","remaining_sessions":0,
+       "purchased_at":"2026-03-01T00:00:00Z",
+       "BookingPackage":{"name":"3 facials","sessions_count":3,
+       "owner_type":"business","owner_id":"biz2"}}
     ]}
     """#
 

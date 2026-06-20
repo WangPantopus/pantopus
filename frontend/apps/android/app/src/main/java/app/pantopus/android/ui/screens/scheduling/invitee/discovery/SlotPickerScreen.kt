@@ -816,11 +816,12 @@ private fun MemberFreeBusyRow(
     pillar: SchedulingPillar,
     modifier: Modifier = Modifier,
 ) {
-    val members = listOf(
-        Triple("AR", PantopusColors.business, true),
-        Triple("JL", PantopusColors.personal, false),
-        Triple("MK", PantopusColors.warning, true),
-    )
+    val members =
+        listOf(
+            Triple("AR", PantopusColors.business, true),
+            Triple("JL", PantopusColors.personal, false),
+            Triple("MK", PantopusColors.warning, true),
+        )
     Row(
         modifier = modifier.padding(vertical = Spacing.s2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
@@ -829,7 +830,10 @@ private fun MemberFreeBusyRow(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
                 Box {
                     Box(
-                        modifier = Modifier.size(34.dp).clip(CircleShape).background(color).border(2.dp, PantopusColors.appSurface, CircleShape),
+                        modifier =
+                            Modifier.size(
+                                34.dp,
+                            ).clip(CircleShape).background(color).border(2.dp, PantopusColors.appSurface, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

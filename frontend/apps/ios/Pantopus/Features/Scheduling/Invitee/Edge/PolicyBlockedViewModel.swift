@@ -205,6 +205,7 @@ final class PolicyBlockedViewModel {
 extension PolicyBlockedViewModel {
     static func preview(_ state: PolicyState) -> PolicyBlockedViewModel {
         let viewModel = PolicyBlockedViewModel(token: "tok", push: { _ in }, client: .shared)
+        // swiftlint:disable line_length
         let json = #"""
         {
           "booking": {"id":"b1","status":"confirmed","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z","invitee_timezone":"America/Los_Angeles"},
@@ -214,6 +215,7 @@ extension PolicyBlockedViewModel {
           "page": {"slug":"maria","title":"Maria Kessler","owner_type":"user","timezone":"America/Los_Angeles"}
         }
         """#
+        // swiftlint:enable line_length
         if let data = json.data(using: .utf8), let response = try? JSONDecoder().decode(ManageBookingResponse.self, from: data) {
             viewModel.state = .loaded(response, state)
         }

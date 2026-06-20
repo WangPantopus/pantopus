@@ -173,7 +173,7 @@ fun BookingsInboxScreen(
             }
         }
         if (state is BookingsInboxUiState.Content) {
-            // Design frame 222: FAB background is always PRIMARY (#0284c7), never
+            // Design frame 222: FAB background is always PRIMARY (primary600), never
             // the pillar accent — host operational CTA, not identity-tinted.
             ShareFab(
                 accent = SchedulingPillar.operationalPrimary,
@@ -602,7 +602,7 @@ private fun BookingRowCard(
                             1f,
                         ).testTag("${BookingsInboxTags.DECLINE_PREFIX}${row.id}"),
                 )
-                // Design: Approve button is always PRIMARY blue (#0284c7) for all pillars
+                // Design: Approve button is always PRIMARY blue (primary600) for all pillars
                 // (bookings-inbox-frames.jsx:33, :206 — background:PRIMARY). Not accent-polymorphic.
                 PillarFilledButton(
                     label = "Approve",

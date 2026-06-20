@@ -60,7 +60,7 @@ final class PackagesKitTests: XCTestCase {
 
     func testLineItemParsingEmptyForNonArray() throws {
         XCTAssertTrue(InvoiceParsing.lineItems(from: nil).isEmpty)
-        XCTAssertTrue(InvoiceParsing.lineItems(from: try jsonValue(#"{"not":"an array"}"#)).isEmpty)
+        XCTAssertTrue(try InvoiceParsing.lineItems(from: jsonValue(#"{"not":"an array"}"#)).isEmpty)
     }
 
     // MARK: Grouping

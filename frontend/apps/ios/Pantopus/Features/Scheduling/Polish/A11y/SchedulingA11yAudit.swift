@@ -66,7 +66,9 @@ public struct SchedulingA11yFinding: Sendable, Hashable, Identifiable {
     /// When flagged, the follow-up to file against the owning stream's files.
     public let followUp: String?
 
-    public var id: String { "\(surface)·\(requirement.rawValue)" }
+    public var id: String {
+        "\(surface)·\(requirement.rawValue)"
+    }
 
     public init(
         surface: String,

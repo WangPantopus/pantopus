@@ -9,6 +9,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct VisitDetailView: View {
     @State private var viewModel: VisitDetailViewModel
     @Environment(\.dismiss) private var dismiss
@@ -109,8 +110,8 @@ struct VisitDetailView: View {
         SectionCard {
             HStack(spacing: Spacing.s3) {
                 ZStack {
-                    // Design avatar gradient runs teal-400 #2dd4bf → teal-600
-                    // #0d9488. No teal-400/visit-teal token exists in the theme,
+                    // Design avatar gradient runs teal-400 2dd4bf → teal-600
+                    // 0d9488. No teal-400/visit-teal token exists in the theme,
                     // so the deep teal-600 `categoryUnboxing` seeds the top stop
                     // into teal-700 `categoryUnboxingDark`; white "PV" initials
                     // stay legible on this pairing. The exact teal-400 top stop
@@ -154,7 +155,7 @@ struct VisitDetailView: View {
     }
 
     /// Teal "Vendor"/"Guest" category chip (the design accents the visit type
-    /// with teal `#ccfbf1`/`#0f766e`, distinct from the home-green pillar).
+    /// with teal `ccfbf1`/`0f766e`, distinct from the home-green pillar).
     private var visitTypeChip: some View {
         HStack(spacing: Spacing.s1) {
             Icon(viewModel.kind.icon, size: 10, color: Theme.Color.categoryUnboxingDark)
@@ -316,7 +317,7 @@ struct VisitDetailView: View {
         }
     }
 
-    @ViewBuilder private var footer: some View {
+    private var footer: some View {
         HStack(spacing: Spacing.s2) {
             switch viewModel.lifecycle {
             case .confirmed:
@@ -404,7 +405,7 @@ struct VisitDetailView: View {
 
     private static func initials(_ title: String) -> String {
         let parts = title.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init).joined()
+        let letters = parts.compactMap(\.first).map(String.init).joined()
         return letters.isEmpty ? "V" : letters.uppercased()
     }
 
@@ -429,58 +430,59 @@ private struct VisitEditSheet: View {
             isDirty: true,
             isSaving: viewModel.isSavingEdit,
             onClose: { viewModel.isEditing = false },
-            onCommit: { Task { await viewModel.saveEdit() } }
-        ) {
-            FormFieldGroup("Details") {
-                TextField("Visit title", text: $viewModel.editTitle)
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.appText)
-                Divider().background(Theme.Color.appBorderSubtle)
-                Text("Visit type")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                HStack(spacing: Spacing.s2) {
-                    ForEach(VisitKind.allCases, id: \.self) { kind in
-                        SelectChipIcon(label: kind.label, icon: kind.icon, isOn: kind == viewModel.editKind) {
-                            viewModel.editKind = kind
+            onCommit: { Task { await viewModel.saveEdit() } },
+            content: {
+                FormFieldGroup("Details") {
+                    TextField("Visit title", text: $viewModel.editTitle)
+                        .font(Theme.Font.body)
+                        .foregroundStyle(Theme.Color.appText)
+                    Divider().background(Theme.Color.appBorderSubtle)
+                    Text("Visit type")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextStrong)
+                    HStack(spacing: Spacing.s2) {
+                        ForEach(VisitKind.allCases, id: \.self) { kind in
+                            SelectChipIcon(label: kind.label, icon: kind.icon, isOn: kind == viewModel.editKind) {
+                                viewModel.editKind = kind
+                            }
                         }
-                    }
-                    Spacer()
-                }
-            }
-            FormFieldGroup("Who must be home") {
-                ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
-                    Button { viewModel.toggleEditHost(member.id) } label: {
-                        HStack(spacing: Spacing.s2) {
-                            ResourceHomeMemberAvatar(member: member, size: 30)
-                            Text(member.name)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.Color.appText)
-                            Spacer()
-                            SelectionCheck(isOn: viewModel.editWhoIsHome.contains(member.id))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    if index < viewModel.members.count - 1 {
-                        Divider().background(Theme.Color.appBorderSubtle)
+                        Spacer()
                     }
                 }
+                FormFieldGroup("Who must be home") {
+                    ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
+                        Button { viewModel.toggleEditHost(member.id) } label: {
+                            HStack(spacing: Spacing.s2) {
+                                ResourceHomeMemberAvatar(member: member, size: 30)
+                                Text(member.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Theme.Color.appText)
+                                Spacer()
+                                SelectionCheck(isOn: viewModel.editWhoIsHome.contains(member.id))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        if index < viewModel.members.count - 1 {
+                            Divider().background(Theme.Color.appBorderSubtle)
+                        }
+                    }
+                }
+                FormFieldGroup("When") {
+                    DatePicker("Date", selection: $viewModel.editDate, displayedComponents: .date)
+                        .tint(Theme.Color.home)
+                    Divider().background(Theme.Color.appBorderSubtle)
+                    DatePicker("Start time", selection: $viewModel.editStart, displayedComponents: .hourAndMinute)
+                        .tint(Theme.Color.home)
+                    Divider().background(Theme.Color.appBorderSubtle)
+                    CounterRow(label: "Visit length", value: $viewModel.editDuration, unit: "hr", range: 1...12)
+                }
+                FormFieldGroup("Access") {
+                    TextField("Entry note for the visitor", text: $viewModel.editNote)
+                        .font(Theme.Font.body)
+                        .foregroundStyle(Theme.Color.appText)
+                }
             }
-            FormFieldGroup("When") {
-                DatePicker("Date", selection: $viewModel.editDate, displayedComponents: .date)
-                    .tint(Theme.Color.home)
-                Divider().background(Theme.Color.appBorderSubtle)
-                DatePicker("Start time", selection: $viewModel.editStart, displayedComponents: .hourAndMinute)
-                    .tint(Theme.Color.home)
-                Divider().background(Theme.Color.appBorderSubtle)
-                CounterRow(label: "Visit length", value: $viewModel.editDuration, unit: "hr", range: 1...12)
-            }
-            FormFieldGroup("Access") {
-                TextField("Entry note for the visitor", text: $viewModel.editNote)
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.appText)
-            }
-        }
+        )
         .accessibilityIdentifier("scheduling.visitEdit")
     }
 }

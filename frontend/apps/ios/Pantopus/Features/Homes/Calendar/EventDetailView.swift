@@ -88,7 +88,9 @@ final class EventDetailViewModel {
     // MARK: - RSVP (Stream I10)
 
     /// The signed-in member's user id, for the attendee-list "· you" suffix.
-    var currentUserId: String? { myUserId }
+    var currentUserId: String? {
+        myUserId
+    }
 
     /// The signed-in member's RSVP, or `nil` when they haven't replied.
     var myRsvp: HomeRsvpChoice? {
@@ -232,9 +234,9 @@ struct EventDetailView: View {
 private struct LoadingShell: View {
     let onBack: @MainActor () -> Void
 
-    // JSX `FrameLoading` (event-detail-frames.jsx:121-131): a title + subtitle
-    // shimmer, then a detail-grid card of icon-tile rows and an attendees card
-    // of avatar rows — mirrors the loaded geometry.
+    /// JSX `FrameLoading` (event-detail-frames.jsx:121-131): a title + subtitle
+    /// shimmer, then a detail-grid card of icon-tile rows and an attendees card
+    /// of avatar rows — mirrors the loaded geometry.
     var body: some View {
         ContentDetailShell(
             title: "Event",
@@ -256,9 +258,9 @@ private struct LoadingShell: View {
         )
     }
 
-    private func skeletonCard<Row: View>(
+    private func skeletonCard(
         rows: Int,
-        @ViewBuilder row: () -> Row
+        @ViewBuilder row: () -> some View
     ) -> some View {
         let row = row()
         return VStack(spacing: Spacing.s3) {
@@ -494,10 +496,10 @@ private struct EventHeader: View {
     let event: CalendarEventDTO
     let category: CalendarEventCategory
 
-    // JSX `EventHeader` (event-detail-frames.jsx:41-51): no leading icon tile,
-    // not carded. h2 title (21/700, letterSpacing -0.4, lineHeight 26) then a
-    // row of "Mon Jun 16 · 6:30 PM" (13/600, fg2) + the category chip. Location
-    // is NOT in the header — it lives in the detail grid.
+    /// JSX `EventHeader` (event-detail-frames.jsx:41-51): no leading icon tile,
+    /// not carded. h2 title (21/700, letterSpacing -0.4, lineHeight 26) then a
+    /// row of "Mon Jun 16 · 6:30 PM" (13/600, fg2) + the category chip. Location
+    /// is NOT in the header — it lives in the detail grid.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text(event.title)
@@ -558,8 +560,8 @@ private struct EventHeader: View {
 private struct CategoryPill: View {
     let category: CalendarEventCategory
 
-    // Design `CatChip` (home-shell.jsx:153-159): a 7×7 colored dot (`c.c`)
-    // + label in N.fg2 on N.sunken background — no icon glyph.
+    /// Design `CatChip` (home-shell.jsx:153-159): a 7×7 colored dot (`c.c`)
+    /// + label in N.fg2 on N.sunken background — no icon glyph.
     var body: some View {
         HStack(spacing: 5) {
             Circle()
@@ -723,9 +725,9 @@ private struct AttendeesSection: View {
     var currentUserId: String?
     var rsvpFor: (@MainActor (String) -> HomeRsvpChoice)?
 
-    // JSX Attendees card (event-detail-frames.jsx:105-108): a single `Card`
-    // whose first child is an `Overline` "Attendees", followed by `AttendeeRow`s
-    // with a per-member RSVP pill always shown and a "· you" suffix on self.
+    /// JSX Attendees card (event-detail-frames.jsx:105-108): a single `Card`
+    /// whose first child is an `Overline` "Attendees", followed by `AttendeeRow`s
+    /// with a per-member RSVP pill always shown and a "· you" suffix on self.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             SectionOverline(text: "Attendees")
@@ -796,7 +798,7 @@ private struct AttendeeRow: View {
                 Text(name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.Color.appText)
-                + Text(isYou ? " · you" : "")
+                    + Text(isYou ? " · you" : "")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.Color.appTextMuted)
             )
@@ -934,9 +936,9 @@ private struct YourRsvpCard: View {
 private struct NotesSection: View {
     let text: String
 
-    // JSX `NotesCard` (event-detail-frames.jsx:84-91): a single `Card` with an
-    // `Overline` "Notes" (default neutral fg3, no icon) over body text
-    // (12.5/fg2, line-height 18). No leading glyph, no inner card.
+    /// JSX `NotesCard` (event-detail-frames.jsx:84-91): a single `Card` with an
+    /// `Overline` "Notes" (default neutral fg3, no icon) over body text
+    /// (12.5/fg2, line-height 18). No leading glyph, no inner card.
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             SectionOverline(text: "Notes")

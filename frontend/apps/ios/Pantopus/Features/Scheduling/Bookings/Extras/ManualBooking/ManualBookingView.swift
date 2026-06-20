@@ -9,7 +9,7 @@
 //  the E12 stub.
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 import SwiftUI
 
@@ -21,7 +21,9 @@ struct ManualBookingView: View {
         _viewModel = State(wrappedValue: viewModel)
     }
 
-    private var theme: SchedulingIdentityTheme { viewModel.owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        viewModel.owner.theme
+    }
 
     var body: some View {
         WizardShell(model: viewModel, identity: viewModel.identity) {
@@ -80,6 +82,7 @@ struct ManualBookingView: View {
         .accessibilityIdentifier("manualBooking.stepRail")
     }
 
+    // swiftlint:disable:next large_tuple
     private func stepCircle(_ entry: (index: Int, title: String, isCurrent: Bool, isDone: Bool)) -> some View {
         ZStack {
             Circle()
@@ -102,7 +105,7 @@ struct ManualBookingView: View {
         switch viewModel.eventTypesPhase {
         case .loading:
             VStack(spacing: Spacing.s2 + 1) {
-                ForEach(0 ..< 4, id: \.self) { _ in Shimmer(height: 62, cornerRadius: Radii.lg + 2) }
+                ForEach(0..<4, id: \.self) { _ in Shimmer(height: 62, cornerRadius: Radii.lg + 2) }
             }
         case let .error(message):
             retryBlock(message) { await viewModel.load() }
@@ -162,10 +165,10 @@ struct ManualBookingView: View {
         switch viewModel.availabilityPhase {
         case .loading:
             HStack(spacing: Spacing.s2) {
-                ForEach(0 ..< 5, id: \.self) { _ in Shimmer(width: 48, height: 58, cornerRadius: Radii.lg) }
+                ForEach(0..<5, id: \.self) { _ in Shimmer(width: 48, height: 58, cornerRadius: Radii.lg) }
             }
             VStack(spacing: Spacing.s2) {
-                ForEach(0 ..< 4, id: \.self) { _ in Shimmer(height: 46, cornerRadius: Radii.lg) }
+                ForEach(0..<4, id: \.self) { _ in Shimmer(height: 46, cornerRadius: Radii.lg) }
             }
         case let .error(message):
             VStack(spacing: Spacing.s4) {

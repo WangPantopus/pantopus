@@ -12,8 +12,15 @@ import XCTest
 
 @MainActor
 final class BusinessSchedulingSettingsViewModelTests: XCTestCase {
-    override func setUp() { super.setUp(); SequencedURLProtocol.reset() }
-    override func tearDown() { SequencedURLProtocol.reset(); super.tearDown() }
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
 
     private func client(_ routes: [String: [SequencedURLProtocol.Response]]) -> SchedulingClient {
         SchedulingClient(client: APIClient(session: SequencedURLProtocol.makeSession(routeResponses: routes), retryPolicy: .none))
@@ -23,7 +30,9 @@ final class BusinessSchedulingSettingsViewModelTests: XCTestCase {
         BusinessSchedulingSettingsViewModel(owner: .business(id: "biz1"), push: { _ in }, client: client(routes))
     }
 
+    // swiftlint:disable:next line_length
     private let page = #"{"page":{"id":"p1","owner_type":"business","owner_id":"biz1","slug":"acme","is_live":true,"is_paused":false,"timezone":"America/Los_Angeles"}}"#
+    // swiftlint:disable:next line_length
     private let paidTypes = #"{"eventTypes":[{"id":"et1","name":"Haircut","slug":"haircut","durations":[45],"min_notice_min":240,"max_horizon_days":60,"buffer_before_min":10,"buffer_after_min":10,"price_cents":5000,"requires_approval":true,"assignment_mode":"round_robin","is_active":true}]}"#
     private let prefs = #"{"prefs":{"business_notify_owner":true,"business_notify_assigned_member":false,"keep_me":"yes"}}"#
     private let ownerAccess = #"{"hasAccess":true,"isOwner":true,"role_base":"owner","permissions":["team.manage"]}"#

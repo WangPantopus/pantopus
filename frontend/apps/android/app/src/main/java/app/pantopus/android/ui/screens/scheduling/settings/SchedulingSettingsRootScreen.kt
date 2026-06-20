@@ -170,23 +170,25 @@ private fun SettingsBody(
             val cancelSaved = data.justSavedRow == "cancellation"
             SettingsRow(
                 label = "Cancellation policy",
-                sublabel = when {
-                    cancelSaving -> null
-                    data.isFresh -> null
-                    else -> "24-hour notice"
-                },
+                sublabel =
+                    when {
+                        cancelSaving -> null
+                        data.isFresh -> null
+                        else -> "24-hour notice"
+                    },
                 showDivider = false,
                 onClick = { onNavigate(vm.cancellationPolicyRoute()) },
                 trailing = {
                     when {
                         cancelSaving -> SettingsRowShimmer(width = 84.dp)
-                        cancelSaved -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-                        ) {
-                            SettingsSavedChip()
-                            SettingsChevron()
-                        }
+                        cancelSaved ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                            ) {
+                                SettingsSavedChip()
+                                SettingsChevron()
+                            }
                         data.isFresh -> SettingsChipChevron("Set up", SettingsChipTone.Warning, PantopusIcon.Plus)
                         else -> SettingsChevron()
                     }

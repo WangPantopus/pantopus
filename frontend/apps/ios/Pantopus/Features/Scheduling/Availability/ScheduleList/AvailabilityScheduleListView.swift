@@ -150,7 +150,7 @@ struct AvailabilityScheduleListView: View {
         .refreshable { await viewModel.refresh() }
     }
 
-    // Raised bordered card with a leading 14pt info icon (single-schedule note).
+    /// Raised bordered card with a leading 14pt info icon (single-schedule note).
     private func scheduleNote(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 7) {
             Icon(.info, size: 14, strokeWidth: 2, color: Theme.Color.appTextMuted)
@@ -174,7 +174,7 @@ struct AvailabilityScheduleListView: View {
 
     // MARK: Loading
 
-    // Two skeleton rows matching the loaded card geometry (36pt md-radius tile).
+    /// Two skeleton rows matching the loaded card geometry (36pt md-radius tile).
     private var loadingList: some View {
         VStack(spacing: 10) {
             ForEach(0..<2, id: \.self) { _ in
@@ -291,7 +291,7 @@ private struct ScheduleCard: View {
         .accessibilityIdentifier("scheduling.availability.scheduleCard")
     }
 
-    // Summary in fg3, then an fg4 separator, then a bold fg2 timezone segment.
+    /// Summary in fg3, then an fg4 separator, then a bold fg2 timezone segment.
     private var subline: some View {
         (
             Text(row.summary)

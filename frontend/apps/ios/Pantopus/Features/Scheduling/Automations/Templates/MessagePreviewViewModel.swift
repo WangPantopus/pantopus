@@ -43,9 +43,17 @@ final class MessagePreviewViewModel {
     var testNote: String?
     var testNoteIsError = false
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     init(owner: SchedulingOwner, source: Source, client: SchedulingClient) {
         self.owner = owner
@@ -71,6 +79,7 @@ final class MessagePreviewViewModel {
         }
     }
 
+    // swiftlint:disable:next large_tuple
     private func resolveDraft() async throws -> (subject: String?, body: String, channel: WorkflowChannel) {
         switch source {
         case let .draft(subject, body, channel):

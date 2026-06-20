@@ -24,15 +24,15 @@ struct PaymentsSetupView: View {
     }
 
     var body: some View {
-        PaidSurfaceGate(title: "Payments", onBack: { dismiss() }) {
+        PaidSurfaceGate(title: "Payments", onBack: { dismiss() }, content: {
             gatedBody
-        }
+        })
         .task { await model.load() }
     }
 
     private var gatedBody: some View {
         VStack(spacing: Spacing.s0) {
-            BizTopBar(title: "Payments", onBack: { dismiss() })
+            BizTopBar(title: "Payments") { dismiss() }
             content
         }
         .background(Theme.Color.appBg)
@@ -51,7 +51,7 @@ struct PaymentsSetupView: View {
             if model.isApplicable {
                 loadedBody
             } else {
-                PaymentsNotApplicableView(onBack: { dismiss() })
+                PaymentsNotApplicableView { dismiss() }
             }
         case let .error(message):
             PaymentsErrorView(message: message) { Task { await model.load() } }
@@ -349,7 +349,7 @@ extension PaymentsSetupView {
 #if DEBUG
 #Preview {
     NavigationStack {
-        PaymentsSetupView(owner: .business(id: "biz1"), push: { _ in })
+        PaymentsSetupView(owner: .business(id: "biz1")) { _ in }
     }
 }
 #endif

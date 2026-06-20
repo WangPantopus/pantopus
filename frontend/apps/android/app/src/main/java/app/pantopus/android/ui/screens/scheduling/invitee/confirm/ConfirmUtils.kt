@@ -264,7 +264,7 @@ object ConfirmUtils {
     }
 
     fun initials(value: String?): String {
-        val parts = value.orEmpty().trim().split(Regex("[\\s@]+")).filter { it.isNotBlank() }
+        val parts = value.orEmpty().trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return "?"
         return parts.take(2).joinToString("") { it.first().uppercase() }
     }

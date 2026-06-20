@@ -12,6 +12,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct InviteeReviewConfirmView: View {
     @State private var viewModel: InviteeReviewConfirmViewModel
     @Environment(\.dismiss) private var dismiss
@@ -144,7 +145,9 @@ struct InviteeReviewConfirmView: View {
             ForEach(Array(viewModel.priceRows.enumerated()), id: \.offset) { _, row in
                 priceLineRow(row)
             }
-            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            Rectangle()
+                .fill(Theme.Color.appBorder)
+                .frame(height: 1)
                 .padding(.top, Spacing.s2)
                 .padding(.bottom, 6)
             if viewModel.isDeposit {
@@ -190,7 +193,7 @@ struct InviteeReviewConfirmView: View {
         .padding(.vertical, Spacing.s1)
     }
 
-    private func totalRow(title: String, amount: String, hero: Bool) -> some View {
+    private func totalRow(title: String, amount: String, hero _: Bool) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
                 .font(.system(size: 13, weight: .bold))
@@ -220,7 +223,7 @@ struct InviteeReviewConfirmView: View {
     /// "Credit applied · use a different one". Backend credit/promo endpoint is
     /// not yet wired — button is present as the designed placeholder.
     private var applyCreditRow: some View {
-        Button { } label: {
+        Button {} label: {
             HStack(spacing: Spacing.s2) {
                 Icon(.tag, size: 15, color: viewModel.accent)
                 Text(viewModel.hasCreditApplied ? "Credit applied · use a different one" : "Apply package credit or promo code")
@@ -310,9 +313,8 @@ struct InviteeReviewConfirmView: View {
             icon: .calendarX,
             title: "This time was just taken",
             message: viewModel.slotTakenBannerBody,
-            linkLabel: "See other times",
-            onTapLink: { viewModel.presentSlotTaken() }
-        )
+            linkLabel: "See other times"
+        ) { viewModel.presentSlotTaken() }
     }
 
     private var needDetailsNote: some View {

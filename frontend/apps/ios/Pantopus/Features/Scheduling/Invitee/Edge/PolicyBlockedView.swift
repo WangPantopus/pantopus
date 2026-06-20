@@ -94,10 +94,9 @@ struct PolicyBlockedView: View {
         .sheet(isPresented: $viewModel.showPolicySheet) {
             CancellationPolicySheet(
                 policy: viewModel.policyDisplay(response),
-                accent: EdgeOwnerTheme.accent(forOwnerType: response.page?.ownerType),
-                onClose: { viewModel.showPolicySheet = false }
-            )
-            .presentationDetents([.medium, .large])
+                accent: EdgeOwnerTheme.accent(forOwnerType: response.page?.ownerType)
+            ) { viewModel.showPolicySheet = false }
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -175,18 +174,16 @@ struct PolicyBlockedView: View {
                     icon: .calendarClock,
                     title: "Reschedule",
                     subtitle: "Pick a new time that works for you.",
-                    tone: .info,
-                    action: { viewModel.reschedule() }
-                )
+                    tone: .info
+                ) { viewModel.reschedule() }
             }
             if canCancel {
                 EdgeActionRow(
                     icon: .xCircle,
                     title: "Cancel booking",
                     subtitle: cancelSubtitle(freeUntil: freeUntil, tz: viewModel.tz(response)),
-                    tone: .error,
-                    action: { confirmCancel = true }
-                )
+                    tone: .error
+                ) { confirmCancel = true }
             }
         }
         .padding(.top, Spacing.s1)

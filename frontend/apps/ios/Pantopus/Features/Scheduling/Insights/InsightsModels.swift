@@ -14,14 +14,16 @@ import Foundation
 
 /// A date-range preset for the insights surfaces. `days` maps onto the report
 /// endpoints' `days` query (≤ 365); `custom` carries an explicit start/end.
-enum InsightsPeriod: String, Hashable, Sendable, CaseIterable, Identifiable {
+enum InsightsPeriod: String, Hashable, CaseIterable, Identifiable {
     case last7
     case last30
     case last90
     case yearToDate
     case custom
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     /// Fixed-window presets; `nil` for the computed windows.
     var presetDays: Int? {
@@ -46,7 +48,7 @@ enum InsightsPeriod: String, Hashable, Sendable, CaseIterable, Identifiable {
 
 /// The shared insights filter. Date range drives the API window; the event-type
 /// and member selections are applied client-side where a surface supports them.
-struct InsightsFilter: Hashable, Sendable {
+struct InsightsFilter: Hashable {
     var period: InsightsPeriod = .last30
     var customStart: Date?
     var customEnd: Date?
@@ -121,7 +123,9 @@ enum InsightsFormat {
         return "\(delta >= 0 ? "+" : "")\(delta)%"
     }
 
-    static func count(_ value: Int?) -> String { "\(value ?? 0)" }
+    static func count(_ value: Int?) -> String {
+        "\(value ?? 0)"
+    }
 
     /// "30 min" / "1 hr" / "1 hr 30 min".
     static func duration(min minutes: Int?) -> String {
@@ -170,8 +174,8 @@ struct MetricTile: Identifiable, Hashable {
     /// Overline label (Title Case is allowed only here).
     let label: String
     let value: String
-    var delta: Int? = nil
-    var caption: String? = nil
+    var delta: Int?
+    var caption: String?
 }
 
 /// A ranked row (top event types).
@@ -202,7 +206,9 @@ struct BreakdownSegment: Identifiable, Hashable {
     let count: Int
     /// 0…1 of the total.
     var fraction: Double
-    var id: String { kind.rawValue }
+    var id: String {
+        kind.rawValue
+    }
 }
 
 /// Aggregated funnel/stat numbers for a single event type.
@@ -218,8 +224,13 @@ struct EventTypePerf: Hashable {
     var noShowRate: Double?
 
     static let empty = EventTypePerf(
-        booked: 0, confirmed: 0, completed: 0, noShow: 0, cancelled: 0,
-        completionRate: nil, noShowRate: nil
+        booked: 0,
+        confirmed: 0,
+        completed: 0,
+        noShow: 0,
+        cancelled: 0,
+        completionRate: nil,
+        noShowRate: nil
     )
 }
 
@@ -239,13 +250,13 @@ struct HostRow: Identifiable, Hashable {
 }
 
 /// One selectable option (event type / member) in the H13 filter sheet.
-struct InsightsFilterOption: Identifiable, Hashable, Sendable {
+struct InsightsFilterOption: Identifiable, Hashable {
     let id: String
     let name: String
 }
 
 /// How team performance is sorted.
-enum HostSort: String, Hashable, Sendable, CaseIterable {
+enum HostSort: String, Hashable, CaseIterable {
     case bookings
     case noShow
 
@@ -301,6 +312,7 @@ enum InsightsMath {
         }
 
         let windowDays = min(max(span, 1), maxBars)
+        // swiftlint:disable:next large_tuple
         var buckets: [(key: String, label: String, value: Int)] = []
         for offset in stride(from: windowDays - 1, through: 0, by: -1) {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { continue }
@@ -379,6 +391,7 @@ enum InsightsMath {
         names: [String: String],
         sort: HostSort = .bookings
     ) -> [HostRow] {
+        // swiftlint:disable:next large_tuple
         let stats = (hosts ?? []).compactMap { stat -> (id: String, total: Int, completed: Int, noShow: Int, cancelled: Int)? in
             guard let id = stat.hostUserId else { return nil }
             return (id, stat.total ?? 0, stat.completed ?? 0, stat.noShow ?? 0, stat.cancelled ?? 0)
@@ -432,7 +445,7 @@ enum InsightsMath {
 
     static func initials(from name: String) -> String {
         let parts = name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first }.map(String.init)
+        let letters = parts.compactMap(\.first).map(String.init)
         return letters.isEmpty ? "?" : letters.joined().uppercased()
     }
 

@@ -25,11 +25,11 @@ struct TeamPerformanceView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            InsightsTopBar(title: "Team performance", onBack: { dismiss() }) {
+            InsightsTopBar(title: "Team performance", onBack: { dismiss() }, trailing: {
                 if case .loaded = model.phase {
                     InsightsSortChip(label: model.sortLabel, accent: model.accent) { model.toggleSort() }
                 }
-            }
+            })
             content
         }
         .background(Theme.Color.appBg)
@@ -40,11 +40,10 @@ struct TeamPerformanceView: View {
                 initial: model.filter,
                 eventTypeOptions: [],
                 memberOptions: model.memberOptions,
-                accent: model.accent,
-                onApply: { applied in Task { await model.apply(applied) } }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+                accent: model.accent
+            ) { applied in Task { await model.apply(applied) } }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
     }
@@ -250,7 +249,7 @@ private struct TeamBalanceBar: View {
 #if DEBUG
 #Preview {
     NavigationStack {
-        TeamPerformanceView(owner: .business(id: "biz"), push: { _ in })
+        TeamPerformanceView(owner: .business(id: "biz")) { _ in }
     }
 }
 #endif

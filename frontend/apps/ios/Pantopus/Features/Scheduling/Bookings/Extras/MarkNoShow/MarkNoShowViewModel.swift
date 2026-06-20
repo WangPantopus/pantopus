@@ -16,12 +16,17 @@ import SwiftUI
 
 /// One no-show target — a single booking (1:1) or one attendee's booking row
 /// within a group event.
-struct NoShowTarget: Identifiable, Hashable, Sendable {
+struct NoShowTarget: Identifiable, Hashable {
     let bookingId: String
     let name: String
 
-    var id: String { bookingId }
-    var initials: String { BookingsExtrasFormatting.initials(from: name) }
+    var id: String {
+        bookingId
+    }
+
+    var initials: String {
+        BookingsExtrasFormatting.initials(from: name)
+    }
 }
 
 @Observable
@@ -41,13 +46,17 @@ final class MarkNoShowViewModel {
         self.owner = owner
         self.targets = targets
         // Default to every target selected; the host deselects anyone who showed.
-        self.selectedIds = Set(targets.map(\.bookingId))
+        selectedIds = Set(targets.map(\.bookingId))
         self.client = client
     }
 
-    var isGroup: Bool { targets.count > 1 }
+    var isGroup: Bool {
+        targets.count > 1
+    }
 
-    var canConfirm: Bool { !selectedIds.isEmpty }
+    var canConfirm: Bool {
+        !selectedIds.isEmpty
+    }
 
     var confirmTitle: String {
         isGroup ? "Mark \(selectedIds.count) as no-show" : "Mark no-show"

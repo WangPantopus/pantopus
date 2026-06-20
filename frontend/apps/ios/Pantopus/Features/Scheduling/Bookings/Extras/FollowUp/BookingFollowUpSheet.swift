@@ -19,7 +19,9 @@ struct BookingFollowUpSheet: View {
         self.onClose = onClose
     }
 
-    private var theme: SchedulingIdentityTheme { viewModel.owner.theme }
+    private var theme: SchedulingIdentityTheme {
+        viewModel.owner.theme
+    }
 
     var body: some View {
         ZStack {
@@ -143,7 +145,7 @@ struct BookingFollowUpSheet: View {
         )
     }
 
-    @ViewBuilder private var footer: some View {
+    private var footer: some View {
         ExtrasStickyFooter {
             if viewModel.primaryIsGhost {
                 ExtrasGhostButton(title: viewModel.primaryTitle, icon: viewModel.primaryIcon) {

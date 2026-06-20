@@ -26,7 +26,7 @@ final class ResourceListViewModelTests: XCTestCase {
     func testLoadEmptyProducesEmptyState() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"resources":[]}"#),
-            .status(200, body: #"{"bookings":[]}"#),
+            .status(200, body: #"{"bookings":[]}"#)
         ]
         let viewModel = ResourceListViewModel(homeId: "h1", push: { _ in }, client: makeClient())
         await viewModel.load()
@@ -38,7 +38,7 @@ final class ResourceListViewModelTests: XCTestCase {
     func testLoadPopulatedProducesLoaded() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: #"{"resources":[{"id":"r1","name":"EV charger","resource_type":"charger","is_active":true}]}"#),
-            .status(200, body: #"{"bookings":[]}"#),
+            .status(200, body: #"{"bookings":[]}"#)
         ]
         let viewModel = ResourceListViewModel(homeId: "h1", push: { _ in }, client: makeClient())
         await viewModel.load()

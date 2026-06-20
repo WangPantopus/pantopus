@@ -144,7 +144,10 @@ private fun PreviewCaption() {
 }
 
 @Composable
-private fun RenderedBody(s: PreviewUiState.Rendered, pillar: SchedulingPillar) {
+private fun RenderedBody(
+    s: PreviewUiState.Rendered,
+    pillar: SchedulingPillar,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
@@ -163,7 +166,10 @@ private fun RenderedBody(s: PreviewUiState.Rendered, pillar: SchedulingPillar) {
 }
 
 @Composable
-private fun AllHiddenBody(s: PreviewUiState.AllHidden, pillar: SchedulingPillar) {
+private fun AllHiddenBody(
+    s: PreviewUiState.AllHidden,
+    pillar: SchedulingPillar,
+) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.s4, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
@@ -189,10 +195,11 @@ private fun AllHiddenBody(s: PreviewUiState.AllHidden, pillar: SchedulingPillar)
                             color = borderColor,
                             size = size,
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerPx),
-                            style = Stroke(
-                                width = strokeWidthPx,
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLen, gapLen)),
-                            ),
+                            style =
+                                Stroke(
+                                    width = strokeWidthPx,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLen, gapLen)),
+                                ),
                         )
                     }
                     .padding(vertical = Spacing.s6, horizontal = Spacing.s5),
@@ -223,7 +230,10 @@ private fun AllHiddenBody(s: PreviewUiState.AllHidden, pillar: SchedulingPillar)
 }
 
 @Composable
-private fun PublicHeader(header: PreviewHeader, pillar: SchedulingPillar) {
+private fun PublicHeader(
+    header: PreviewHeader,
+    pillar: SchedulingPillar,
+) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         BLAvatar(initials = header.initials, pillar = pillar, diameter = 64.dp, fontSize = 22.sp)
         Text(
@@ -316,7 +326,10 @@ private fun EventTypeCard(
 }
 
 @Composable
-private fun ModeChip(locationMode: String?, pillar: SchedulingPillar) {
+private fun ModeChip(
+    locationMode: String?,
+    pillar: SchedulingPillar,
+) {
     val label =
         when (locationMode) {
             "video" -> "Video call"

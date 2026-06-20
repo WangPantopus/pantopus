@@ -57,9 +57,9 @@ final class DateOverridesViewModel {
     var isRange = false
     var rangeEndDate = Date()
 
-    // Custom month calendar navigation — tracks which month is currently shown.
-    // Initialized in `init` to the first of the current month.
-    var displayedMonth: Date = Date()
+    /// Custom month calendar navigation — tracks which month is currently shown.
+    /// Initialized in `init` to the first of the current month.
+    var displayedMonth = Date()
 
     /// Advance the displayed month by `delta` months (positive = forward).
     func stepMonth(_ delta: Int) {
@@ -92,7 +92,7 @@ final class DateOverridesViewModel {
         // calendar grid opens on the right page.
         let cal = Calendar.current
         let comps = cal.dateComponents([.year, .month], from: Date())
-        self.displayedMonth = cal.date(from: comps) ?? Date()
+        displayedMonth = cal.date(from: comps) ?? Date()
     }
 
     // MARK: Derived

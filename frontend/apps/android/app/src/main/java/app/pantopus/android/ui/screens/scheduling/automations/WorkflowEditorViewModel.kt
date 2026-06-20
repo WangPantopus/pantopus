@@ -185,8 +185,7 @@ class WorkflowEditorViewModel
             )
         }
 
-        private fun SchedulingError.loadMessage(): String =
-            (this as? SchedulingError.Generic)?.message ?: "Couldn't load this workflow."
+        private fun SchedulingError.loadMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't load this workflow."
 
         private fun SchedulingError.saveMessage(): String =
             when (this) {

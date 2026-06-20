@@ -52,9 +52,17 @@ final class PaymentsSetupViewModel {
 
     // MARK: Derived
 
-    var theme: SchedulingIdentityTheme { owner.theme }
-    var accent: Color { theme.accent }
-    var accentBg: Color { theme.accentBg }
+    var theme: SchedulingIdentityTheme {
+        owner.theme
+    }
+
+    var accent: Color {
+        theme.accent
+    }
+
+    var accentBg: Color {
+        theme.accentBg
+    }
 
     /// Homes don't take payments directly; the endpoint echoes `applicable:false`.
     var isApplicable: Bool {
@@ -87,7 +95,9 @@ final class PaymentsSetupViewModel {
     }
 
     /// Whether the account rows show real (connected) values vs em-dashed gates.
-    var isConnected: Bool { status?.connected == true }
+    var isConnected: Bool {
+        status?.connected == true
+    }
 
     init(
         owner: SchedulingOwner,
@@ -114,7 +124,9 @@ final class PaymentsSetupViewModel {
         await fetch()
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     private func fetch(showLoading: Bool = true) async {
         if showLoading { phase = .loading }
@@ -175,6 +187,11 @@ final class PaymentsSetupViewModel {
         }
     }
 
-    func dismissReturnedBanner() { justReturned = false }
-    func clearActionMessage() { actionMessage = nil }
+    func dismissReturnedBanner() {
+        justReturned = false
+    }
+
+    func clearActionMessage() {
+        actionMessage = nil
+    }
 }

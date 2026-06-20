@@ -50,13 +50,20 @@ class SettingsSnapshotTest {
     fun notif_notify_me_card() =
         paparazzi.snapshot {
             Frame {
-                NotifCategoryCard(label = "Notify me", helper = "Only you see these. Pick the channel for each event.", disabled = false) {
+                NotifCategoryCard(
+                    label = "Notify me",
+                    helper = "Only you see these. Pick the channel for each event.",
+                    disabled = false,
+                    accent = PantopusColors.primary600,
+                    accentBg = PantopusColors.primary50,
+                ) {
                     NotifMatrixRow(
                         row = NotifRow("new_booking", "New booking", "We'll tell you the moment someone books.", enabled = true),
                         isAttendee = false,
                         paused = false,
                         pushOff = false,
                         showDivider = true,
+                        accent = PantopusColors.primary600,
                         onToggle = {},
                     )
                     NotifMatrixRow(
@@ -65,9 +72,10 @@ class SettingsSnapshotTest {
                         paused = false,
                         pushOff = false,
                         showDivider = true,
+                        accent = PantopusColors.primary600,
                         onToggle = {},
                     )
-                    ReminderLeadTime(selected = listOf(1440, 60), paused = false, onToggle = {})
+                    ReminderLeadTime(selected = listOf(1440, 60), paused = false, accent = PantopusColors.primary600, onToggle = {})
                 }
             }
         }
@@ -80,6 +88,8 @@ class SettingsSnapshotTest {
                     label = "Notify attendees",
                     helper = "Attendees always get a confirmation — you choose the rest.",
                     disabled = false,
+                    accent = PantopusColors.primary600,
+                    accentBg = PantopusColors.primary50,
                 ) {
                     NotifMatrixRow(
                         row = NotifRow("confirmation", "Booking confirmation", "Sent the moment they book", enabled = true, locked = true),
@@ -87,6 +97,7 @@ class SettingsSnapshotTest {
                         paused = false,
                         pushOff = false,
                         showDivider = false,
+                        accent = PantopusColors.primary600,
                         onToggle = {},
                     )
                 }

@@ -167,9 +167,15 @@ extension MyBookingsViewModel {
         let viewModel = MyBookingsViewModel(push: { _ in }, client: .shared)
         let json = #"""
         {"bookings":[
-          {"id":"b1","owner_type":"user","status":"confirmed","start_at":"2026-06-18T21:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles"},
-          {"id":"b2","owner_type":"business","status":"pending","start_at":"2026-06-19T17:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles"},
-          {"id":"b3","owner_type":"home","status":"completed","start_at":"2026-06-01T16:00:00Z","invitee_name":"Maya Chen","invitee_timezone":"America/Los_Angeles"}
+          {"id":"b1","owner_type":"user","status":"confirmed",
+           "start_at":"2026-06-18T21:00:00Z","invitee_name":"Maya Chen",
+           "invitee_timezone":"America/Los_Angeles"},
+          {"id":"b2","owner_type":"business","status":"pending",
+           "start_at":"2026-06-19T17:00:00Z","invitee_name":"Maya Chen",
+           "invitee_timezone":"America/Los_Angeles"},
+          {"id":"b3","owner_type":"home","status":"completed",
+           "start_at":"2026-06-01T16:00:00Z","invitee_name":"Maya Chen",
+           "invitee_timezone":"America/Los_Angeles"}
         ]}
         """#
         if let data = json.data(using: .utf8), let response = try? JSONDecoder().decode(BookingsResponse.self, from: data) {

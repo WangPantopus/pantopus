@@ -23,9 +23,8 @@ final class DateOverridesAndBlockOffViewModelTests: XCTestCase {
         ))
     }
 
-    private static let twoSchedulesOverrides = #"""
-    {"schedules":[],"rules":[],"overrides":[{"schedule_id":"s1","date":"2026-07-04","is_unavailable":true},{"schedule_id":"s2","date":"2026-08-01","is_unavailable":true}]}
-    """#
+    // swiftlint:disable:next line_length
+    private static let twoSchedulesOverrides = #"{"schedules":[],"rules":[],"overrides":[{"schedule_id":"s1","date":"2026-07-04","is_unavailable":true},{"schedule_id":"s2","date":"2026-08-01","is_unavailable":true}]}"#
 
     private static let emptyComposite = #"{"schedules":[],"rules":[],"overrides":[]}"#
     private static let blockResponse = #"""

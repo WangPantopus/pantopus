@@ -12,6 +12,7 @@
 
 import SwiftUI
 
+// swiftlint:disable:next type_body_length
 struct InviteeManageBookingView: View {
     @State private var viewModel: InviteeManageBookingViewModel
     @State private var showAddToCalendar = false
@@ -100,14 +101,18 @@ struct InviteeManageBookingView: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             ConfirmOverline("Manage")
             actionButton(
-                icon: .calendarClock, label: "Reschedule",
+                icon: .calendarClock,
+                label: "Reschedule",
                 sub: "Pick a new time that works for you.",
-                tone: .neutral, disabled: viewModel.windowClosed
+                tone: .neutral,
+                disabled: viewModel.windowClosed
             ) { viewModel.tapReschedule() }
             actionButton(
-                icon: .xCircle, label: "Cancel booking",
+                icon: .xCircle,
+                label: "Cancel booking",
                 sub: "Cancelling frees the slot for someone else.",
-                tone: .destructive, disabled: viewModel.windowClosed
+                tone: .destructive,
+                disabled: viewModel.windowClosed
             ) { viewModel.tapCancel() }
             if viewModel.windowClosed {
                 HStack(alignment: .top, spacing: Spacing.s2) {
@@ -125,9 +130,14 @@ struct InviteeManageBookingView: View {
 
     private enum ActionTone { case neutral, destructive }
 
+    // swiftlint:disable:next function_parameter_count
     private func actionButton(
-        icon: PantopusIcon, label: String, sub: String,
-        tone: ActionTone, disabled: Bool, action: @escaping () -> Void
+        icon: PantopusIcon,
+        label: String,
+        sub: String,
+        tone: ActionTone,
+        disabled: Bool,
+        action: @escaping () -> Void
     ) -> some View {
         let isErr = tone == .destructive
         let tileBg = disabled ? Theme.Color.appSurfaceSunken
@@ -267,7 +277,9 @@ struct InviteeManageBookingView: View {
             Spacer(minLength: Spacing.s0)
             ZStack {
                 Circle().fill(Theme.Color.warningBg).frame(width: 96, height: 96).opacity(0.6)
-                Circle().fill(Theme.Color.warningBg).frame(width: 74, height: 74)
+                Circle()
+                    .fill(Theme.Color.warningBg)
+                    .frame(width: 74, height: 74)
                     .overlay(Circle().strokeBorder(Theme.Color.warningLight, lineWidth: 2))
                     .overlay(Icon(.link, size: 32, strokeWidth: 1.9, color: Theme.Color.warning))
             }

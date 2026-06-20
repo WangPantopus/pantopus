@@ -49,10 +49,12 @@ final class MessageTemplateEditorViewModelTests: XCTestCase {
     func testSmsOverLimitFlags() async {
         let vm = MessageTemplateEditorViewModel(owner: .personal, templateId: nil, client: makeClient())
         await vm.load()
-        vm.setChannel(.sms)
+        // SMS is gated "Coming soon" so `setChannel(.sms)` is a no-op; assign the
+        // channel directly to exercise the over-limit counter logic.
+        vm.channel = .sms
         vm.body = String(repeating: "a", count: 170)
         XCTAssertTrue(vm.isOverLimit)
-        XCTAssertEqual(vm.counterLimit, 160)
+        XCTAssertEqual(vm.counterLimit, WorkflowChannel.smsSegmentLimit)
     }
 
     func testSaveNewPostsTemplate() async {
@@ -62,7 +64,10 @@ final class MessageTemplateEditorViewModelTests: XCTestCase {
         vm.subject = "Booked"
         vm.body = "Hi {{attendee_name}}"
         SequencedURLProtocol.sequence = [
-            .status(200, body: #"{"template":{"id":"t9","name":"Confirm","channel":"email","subject":"Booked","body":"Hi {{attendee_name}}"}}"#),
+            .status(
+                200,
+                body: #"{"template":{"id":"t9","name":"Confirm","channel":"email","subject":"Booked","body":"Hi {{attendee_name}}"}}"#
+            )
         ]
         let saved = await vm.save()
         XCTAssertTrue(saved)

@@ -16,13 +16,15 @@ import Observation
 
 /// The source axis for the earnings filter (a different axis than the Wallet's
 /// activity-category icon).
-enum EarningsSource: String, CaseIterable, Sendable, Identifiable {
+enum EarningsSource: String, CaseIterable, Identifiable {
     case all
     case gigs
     case booking
     case packages
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var label: String {
         switch self {
@@ -35,7 +37,7 @@ enum EarningsSource: String, CaseIterable, Sendable, Identifiable {
 }
 
 /// One projected earnings row.
-struct EarningRow: Identifiable, Equatable, Sendable {
+struct EarningRow: Identifiable, Equatable {
     let id: String
     let day: String
     let description: String
@@ -97,12 +99,18 @@ final class PayoutsEarningsViewModel {
         return allRows.filter { $0.source == source }
     }
 
-    var isEmpty: Bool { rows.isEmpty }
+    var isEmpty: Bool {
+        rows.isEmpty
+    }
 
     /// Whole-screen empty state (no balance and nothing earned).
-    var isFullyEmpty: Bool { availableCents == 0 && allRows.filter { $0.direction == .in }.isEmpty }
+    var isFullyEmpty: Bool {
+        availableCents == 0 && allRows.filter { $0.direction == .in }.isEmpty
+    }
 
-    var canWithdraw: Bool { payoutState == .enabled && availableCents >= 100 }
+    var canWithdraw: Bool {
+        payoutState == .enabled && availableCents >= 100
+    }
 
     init(
         owner: SchedulingOwner,
@@ -127,7 +135,9 @@ final class PayoutsEarningsViewModel {
         await fetch()
     }
 
-    func refresh() async { await load() }
+    func refresh() async {
+        await load()
+    }
 
     private func fetch(showLoading: Bool = true) async {
         if showLoading { phase = .loading }
@@ -231,7 +241,9 @@ final class PayoutsEarningsViewModel {
         }
     }
 
-    func clearToast() { toast = nil }
+    func clearToast() {
+        toast = nil
+    }
 
     // MARK: - Pure projections (unit-test surface)
 
