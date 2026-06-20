@@ -421,26 +421,27 @@ private fun PricingCard(
     }
 }
 
+// Design StripeCard is violet-tinted: #f5f4ff fill, #e0ddff border, and a
+// #635bff Stripe-purple icon tile. Parsed once at class-load so no Color(0x…).
+private val StripeCardBg = Color("#f5f4ff".toColorInt())
+private val StripeCardBorder = Color("#e0ddff".toColorInt())
+private val StripeCardGlyph = Color("#635bff".toColorInt())
+
 @Composable
 private fun StripeConnectCard(onConnect: () -> Unit) {
-    // Design StripeCard is violet-tinted: stripeBg #f5f4ff fill, #e0ddff border,
-    // and a #635bff Stripe-purple icon tile. Parsed at runtime so no Color(0x…).
-    val stripeBg = Color("#f5f4ff".toColorInt())
-    val stripeBorder = Color("#e0ddff".toColorInt())
-    val stripePurple = Color("#635bff".toColorInt())
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.md))
-                .background(stripeBg)
-                .border(1.dp, stripeBorder, RoundedCornerShape(Radii.md))
+                .background(StripeCardBg)
+                .border(1.dp, StripeCardBorder, RoundedCornerShape(Radii.md))
                 .padding(horizontal = Spacing.s3, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Box(
-                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(stripePurple),
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(Radii.md)).background(StripeCardGlyph),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(

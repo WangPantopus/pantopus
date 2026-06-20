@@ -21,6 +21,7 @@ struct SetupTopBar: View {
     var leading: Leading = .back
     var onLeading: (() -> Void)?
     var trailingIcon: PantopusIcon?
+    var trailingLabel: String?
     var onTrailing: (() -> Void)?
 
     var body: some View {
@@ -61,6 +62,7 @@ struct SetupTopBar: View {
                 Icon(trailingIcon, size: 22, color: Theme.Color.appText).frame(width: 36, height: 36)
             }
             .accessibilityIdentifier("schedulingTopBarTrailing")
+            .accessibilityLabel(trailingLabel ?? "More options")
         } else {
             Color.clear
         }

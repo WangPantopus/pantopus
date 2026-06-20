@@ -3,7 +3,6 @@
 package app.pantopus.android.ui.screens.scheduling._shared
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,15 +27,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.theme.PantopusColors
-import app.pantopus.android.ui.theme.PantopusElevation
 import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
-import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
 
@@ -164,23 +159,6 @@ fun SchedulingTopBar(
                     .background(PantopusColors.appBorder),
         )
     }
-}
-
-/**
- * White card surface: rounded corners + 1dp border + soft shadow. Mirrors iOS
- * `View.setupCard(radius:shadow:)`. Apply to any container that should read as
- * the design's section card.
- */
-fun Modifier.schedulingCard(
-    radius: Dp = Radii.xl,
-    elevation: PantopusElevation = PantopusElevations.sm,
-): Modifier {
-    val shape = RoundedCornerShape(radius)
-    return this
-        .pantopusShadow(elevation, shape)
-        .clip(shape)
-        .background(PantopusColors.appSurface)
-        .border(1.dp, PantopusColors.appBorder, shape)
 }
 
 private val MINI_TOGGLE_W = 32.dp

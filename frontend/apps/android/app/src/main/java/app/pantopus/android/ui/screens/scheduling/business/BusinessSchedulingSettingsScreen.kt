@@ -348,26 +348,27 @@ private fun ToggleRow(
     }
 }
 
+// Spec C.stripeBg / C.stripe are Stripe-brand swatches, not palette tokens —
+// parsed once at class-load (no Color(0x…)) so the disc reads as the Stripe mark.
+private val StripeDiscBg = Color("#f5f4ff".toColorInt())
+private val StripeDiscGlyph = Color("#635bff".toColorInt())
+
 @Composable
 private fun PaymentsRow(
     connected: Boolean,
     sub: String,
     onOpen: () -> Unit,
 ) {
-    // Spec C.stripeBg / C.stripe are Stripe-brand swatches, not palette tokens —
-    // parsed at runtime (no Color(0x…)) so the disc reads as the Stripe mark.
-    val stripeBg = Color("#f5f4ff".toColorInt())
-    val stripeGlyph = Color("#635bff".toColorInt())
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         Box(
-            modifier = Modifier.size(SETTING_ICON_BOX).clip(RoundedCornerShape(Radii.md)).background(stripeBg),
+            modifier = Modifier.size(SETTING_ICON_BOX).clip(RoundedCornerShape(Radii.md)).background(StripeDiscBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.CreditCard, contentDescription = null, size = 16.dp, tint = stripeGlyph)
+            PantopusIconImage(icon = PantopusIcon.CreditCard, contentDescription = null, size = 16.dp, tint = StripeDiscGlyph)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
