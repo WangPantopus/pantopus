@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowDown,
+  Bell,
   Calendar,
   CalendarCheck,
   CalendarClock,
@@ -69,6 +70,7 @@ export default function RescheduleReassignSheet({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proposed, setProposed] = useState(false);
+  const [notifyInvitee, setNotifyInvitee] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -79,6 +81,7 @@ export default function RescheduleReassignSheet({
     setError(null);
     setProposed(false);
     setSubmitting(false);
+    setNotifyInvitee(true);
     setHost(booking.host_user_id ?? null);
     if (!reassignable) {
       setMembers([]);
@@ -354,10 +357,36 @@ export default function RescheduleReassignSheet({
               <p className="mt-1.5 text-[11px] text-app-text-muted">
                 {authority === "propose"
                   ? "The invitee gets the new time to accept."
-                  : "The invitee is notified of the new time automatically."}
+                  : "Reschedules immediately with no proposal step."}
               </p>
             </div>
           )}
+
+          {/* Notify invitee toggle — always visible once in the picking flow */}
+          <button
+            type="button"
+            onClick={() => setNotifyInvitee((v) => !v)}
+            className="flex w-full items-center gap-3 rounded-xl border border-app-border bg-app-surface px-3 py-2.5 text-left transition hover:bg-app-hover"
+          >
+            <Bell className="h-[17px] w-[17px] shrink-0 text-app-text-secondary" aria-hidden />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-semibold text-app-text">Notify invitee</div>
+              <div className="text-[10.5px] text-app-text-muted">Push + message</div>
+            </div>
+            <div
+              className={clsx(
+                "relative h-[25px] w-[42px] shrink-0 rounded-full transition",
+                notifyInvitee ? tk.bg : "bg-app-border-strong",
+              )}
+            >
+              <div
+                className={clsx(
+                  "absolute top-[2.5px] h-5 w-5 rounded-full bg-white shadow transition-all",
+                  notifyInvitee ? "right-[2.5px]" : "left-[2.5px]",
+                )}
+              />
+            </div>
+          </button>
 
           {error && (
             <div className="rounded-xl border border-app-error-light bg-app-error-bg px-3 py-2.5">

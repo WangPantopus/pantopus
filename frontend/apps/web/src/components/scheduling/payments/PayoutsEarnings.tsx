@@ -14,8 +14,10 @@ import {
   ArrowDownToLine,
   Banknote,
   CalendarCheck,
+  ChevronRight,
   Clock,
   CreditCard,
+  FileText,
   Layers,
   Lock,
   Receipt,
@@ -110,7 +112,10 @@ const SOURCE_ICON = {
 
 function Hero({ earnings, hold }: { earnings: Earnings; hold?: boolean }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-app-business p-4 text-white shadow-lg">
+    <div
+      className="relative overflow-hidden rounded-2xl p-4 text-white shadow-lg"
+      style={{ background: "linear-gradient(155deg, #075985 0%, #0369a1 55%, #0284c7 100%)", boxShadow: "0 10px 24px rgba(2,132,199,0.28)" }}
+    >
       <svg
         viewBox="0 0 200 200"
         className="pointer-events-none absolute -right-9 -top-12 h-44 w-44 opacity-20"
@@ -142,40 +147,46 @@ function Hero({ earnings, hold }: { earnings: Earnings; hold?: boolean }) {
         />
       </svg>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-white/75">
+        <span className="text-[9.5px] font-bold uppercase tracking-wider text-sky-200">
           Available to withdraw
         </span>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+        <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[9.5px] font-bold uppercase text-white">
           USD
         </span>
       </div>
-      <div className="mt-1 text-4xl font-extrabold tabular-nums tracking-tight">
-        {formatUsd(earnings.available)}
+      <div className="mt-1 flex items-baseline gap-0.5">
+        <span className="mt-1.5 self-start text-lg font-bold text-sky-200">$</span>
+        <span className="text-4xl font-extrabold tabular-nums tracking-tight">
+          {formatUsd(earnings.available).replace(/^\$/, "")}
+        </span>
       </div>
       <div className="mt-3 flex rounded-xl border border-white/15 bg-white/10 p-2.5">
         <div className="flex-1 pr-3">
-          <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-white/80">
+          <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-sky-200">
             <Clock className="h-2.5 w-2.5" strokeWidth={2.5} aria-hidden />
-            Processing
+            Pending
           </div>
-          <div className="mt-0.5 text-base font-bold tabular-nums">
+          <div className="mt-0.5 text-base font-bold tabular-nums text-white">
             {formatUsd(earnings.pending)}
+          </div>
+          <div className="mt-0.5 text-[9.5px] text-sky-200/80">
+            {/* sub-label rendered only when data available */}
           </div>
         </div>
         <div className="w-px bg-white/15" />
         <div className="flex-1 pl-3">
-          <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-white/80">
+          <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-sky-200">
             <TrendingUp className="h-2.5 w-2.5" strokeWidth={2.5} aria-hidden />
             This month
           </div>
-          <div className="mt-0.5 text-base font-bold tabular-nums">
+          <div className="mt-0.5 text-base font-bold tabular-nums text-white">
             {formatUsd(earnings.this_month)}
           </div>
         </div>
       </div>
       {hold && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-200/50 bg-amber-300/20 px-2.5 py-2">
-          <ShieldAlert className="h-3.5 w-3.5 text-amber-100" aria-hidden />
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-300/45 bg-amber-300/20 px-2.5 py-2">
+          <ShieldAlert className="h-[13px] w-[13px] shrink-0 text-amber-200" aria-hidden />
           <div>
             <div className="text-[11px] font-bold text-amber-50">
               Withdrawals paused
@@ -379,7 +390,7 @@ export default function PayoutsEarnings({
                     </span>
                     {r.pending && (
                       <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[8.5px] font-bold uppercase text-amber-700">
-                        Processing
+                        Pending
                       </span>
                     )}
                   </div>
@@ -409,7 +420,7 @@ export default function PayoutsEarnings({
                       : r.outgoing
                         ? "Payout"
                         : r.pending
-                          ? "Processing"
+                          ? "Pending"
                           : "Cleared"}
                   </div>
                 </div>
@@ -467,20 +478,45 @@ export default function PayoutsEarnings({
         </Link>
       )}
 
+      {/* Tax Documents row — shown when payouts are enabled (mirrors iOS/Android TaxDocsRow condition). */}
+      {payoutsEnabled && !isEmpty && (
+        <>
+          <SectionLabel>Taxes</SectionLabel>
+          <Card
+            className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-app-hover"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-700">
+              <FileText className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-app-text">
+                Tax documents
+              </div>
+              <div className="mt-0.5 text-xs text-app-text-secondary">
+                YTD earnings · docs available mid-Jan
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden />
+          </Card>
+        </>
+      )}
+
       <InlineNote tone="info" icon={Clock}>
         Payouts settle through Stripe — pending booking earnings show as
         processing until they clear.
       </InlineNote>
 
-      {/* Withdraw handoff (the withdraw flow lives in Wallet). */}
+      {/* Withdraw button — sky primary per design (wallet-earnings-frames.jsx:166-173).
+          Settlement is server-side; this routes to the Wallet withdraw flow. */}
       {payoutsEnabled && !onHold ? (
         <Link
           href="/app/wallet"
-          className="inline-flex h-12 items-center justify-between gap-2 rounded-xl bg-app-business px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+          className="inline-flex h-12 items-center justify-between gap-2 rounded-xl px-4 text-sm font-bold text-white transition hover:opacity-95"
+          style={{ background: "#0284c7", boxShadow: "0 6px 16px rgba(2,132,199,0.28)" }}
         >
           <span className="inline-flex items-center gap-2">
             <ArrowDownToLine className="h-4 w-4" aria-hidden />
-            Manage &amp; withdraw in Wallet
+            Withdraw
           </span>
           <span className="tabular-nums">{formatUsd(earnings.available)}</span>
         </Link>

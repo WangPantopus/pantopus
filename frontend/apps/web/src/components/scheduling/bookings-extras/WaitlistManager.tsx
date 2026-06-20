@@ -9,8 +9,35 @@ import clsx from "clsx";
 import type { WaitlistEntry } from "@pantopus/types";
 import type { Pillar } from "@/components/scheduling/pillarTokens";
 import { pillarTokens } from "@/components/scheduling/pillarTokens";
-import { Avatar, SectionOverline } from "./ui";
+import { Avatar, CapacityBar, SectionOverline } from "./ui";
 import { fmtDate } from "./format";
+
+/** Capacity values for the header card — mirrors roster computeCapacity shape. */
+export interface WaitlistCapacity {
+  filled: number;
+  total: number;
+  pct: number;
+  full: boolean;
+  waiting: number;
+}
+
+function CapacityHeaderCard({
+  capacity,
+  pillar,
+}: {
+  capacity: WaitlistCapacity;
+  pillar: Pillar;
+}) {
+  return (
+    <div className="mb-3 rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm">
+      <div className="mb-2 text-sm font-bold text-app-text">
+        {capacity.filled} of {capacity.total} seats filled
+        {capacity.waiting > 0 && ` · ${capacity.waiting} waiting`}
+      </div>
+      <CapacityBar pct={capacity.pct} full={capacity.full} pillar={pillar} />
+    </div>
+  );
+}
 
 export default function WaitlistManager({
   pillar,
@@ -18,41 +45,52 @@ export default function WaitlistManager({
   waitlist,
   promotingId,
   onPromote,
+  capacity,
 }: {
   pillar: Pillar;
   eventTypeName: string;
   waitlist: WaitlistEntry[];
   promotingId: string | null;
   onPromote: (entry: WaitlistEntry) => void;
+  /** Optional capacity data for the header card. If absent, no header shown. */
+  capacity?: WaitlistCapacity | null;
 }) {
   const tk = pillarTokens(pillar);
   const waiting = waitlist.filter((w) => w.status === "waiting");
 
   if (waiting.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-app-border bg-app-surface px-6 py-14 text-center">
-        <span
-          className={clsx(
-            "flex h-14 w-14 items-center justify-center rounded-full",
-            tk.bgSoft,
-            tk.text,
-          )}
-        >
-          <Users className="h-6 w-6" aria-hidden />
-        </span>
-        <p className="text-sm font-semibold text-app-text">
-          No one’s waiting for {eventTypeName}
-        </p>
-        <p className="max-w-xs text-xs text-app-text-muted">
-          When this event type is fully booked, invitees can join the waitlist
-          and they’ll appear here.
-        </p>
-      </div>
+      <>
+        {capacity && (
+          <CapacityHeaderCard capacity={capacity} pillar={pillar} />
+        )}
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-app-border bg-app-surface px-6 py-14 text-center">
+          <span
+            className={clsx(
+              "flex h-14 w-14 items-center justify-center rounded-full",
+              tk.bgSoft,
+              tk.text,
+            )}
+          >
+            <Users className="h-6 w-6" aria-hidden />
+          </span>
+          <p className="text-sm font-semibold text-app-text">
+            No one&apos;s waiting for {eventTypeName}
+          </p>
+          <p className="max-w-xs text-xs text-app-text-muted">
+            When this event type is fully booked, invitees can join the waitlist
+            and they&apos;ll appear here.
+          </p>
+        </div>
+      </>
     );
   }
 
   return (
     <div>
+      {capacity && (
+        <CapacityHeaderCard capacity={capacity} pillar={pillar} />
+      )}
       <SectionOverline className="mb-2">
         {waiting.length} waiting
       </SectionOverline>

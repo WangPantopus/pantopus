@@ -10,13 +10,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import {
+  Bell,
   CalendarClock,
   ChevronLeft,
   CircleCheck,
   EyeOff,
+  Gauge,
   ListChecks,
   UserCheck,
-  Users,
   X,
 } from "lucide-react";
 import * as api from "@pantopus/api";
@@ -27,7 +28,10 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
-import { pillarForOwner } from "@/components/scheduling/pillarTokens";
+import {
+  pillarForOwner,
+  pillarTokens,
+} from "@/components/scheduling/pillarTokens";
 import { decodeError, fieldErrors } from "@/components/scheduling/decodeError";
 import {
   ColorSwatches,
@@ -58,13 +62,6 @@ import {
   validateForm,
   type EventTypeFormValues,
 } from "./eventTypeForm";
-
-const ASSIGNMENT_LABEL: Record<string, string> = {
-  one_on_one: "One-on-one",
-  collective: "Collective",
-  round_robin: "Round robin",
-  group: "Group event",
-};
 
 const LIST_PATH = "/app/scheduling/event-types";
 
@@ -487,16 +484,39 @@ export default function EventTypeForm({ id }: { id: string }) {
           </div>
         </EditorCard>
 
-        {/* Assignment — link out to W13 (business only) */}
+        {/* Assignment — inline segmented (business only) */}
         {pillar === "business" && (
           <EditorCard overline="Assignment" pillar={pillar}>
-            <LinkRow
-              icon={Users}
-              label="Who can be booked"
-              value={ASSIGNMENT_LABEL[values.assignment_mode] ?? "One-on-one"}
-              href="/app/scheduling/business"
-              last
+            <Segmented
+              ariaLabel="Assignment mode"
+              value={
+                (["one_on_one", "round_robin", "collective"].includes(
+                  values.assignment_mode,
+                )
+                  ? values.assignment_mode
+                  : "one_on_one") as
+                  | "one_on_one"
+                  | "round_robin"
+                  | "collective"
+              }
+              onChange={(m) => patch({ assignment_mode: m })}
+              disabled={disabled}
+              options={[
+                { value: "one_on_one" as const, label: "Anyone" },
+                { value: "round_robin" as const, label: "Specific" },
+                { value: "collective" as const, label: "Collective" },
+              ]}
             />
+            {values.assignment_mode === "collective" ? (
+              <p className="text-[11px] leading-snug text-app-text-secondary">
+                Everyone must be free. The booking goes on every required
+                host&apos;s calendar.
+              </p>
+            ) : (
+              <p className="text-[11px] leading-snug text-app-text-secondary">
+                Any seated teammate who&apos;s free can take the booking.
+              </p>
+            )}
           </EditorCard>
         )}
 
@@ -541,7 +561,7 @@ export default function EventTypeForm({ id }: { id: string }) {
           />
         </EditorCard>
 
-        {/* More — intake questions (edit mode only) */}
+        {/* More — intake questions + booking limits + reminders (edit mode only) */}
         {!isNew && (
           <EditorCard pillar={pillar}>
             <LinkRow
@@ -549,6 +569,18 @@ export default function EventTypeForm({ id }: { id: string }) {
               label="Intake questions"
               value={questionsSummary(questions.length)}
               onClick={() => setIntakeOpen(true)}
+            />
+            <LinkRow
+              icon={Gauge}
+              label="Booking limits"
+              value="Off"
+              disabled
+            />
+            <LinkRow
+              icon={Bell}
+              label="Reminders"
+              value="1 day, 1 hour before"
+              disabled
               last
             />
           </EditorCard>
@@ -607,12 +639,16 @@ export function EditorHeader({
   onBack,
   pillar,
   right,
+  overline,
 }: {
   title: string;
   onBack: () => void;
   pillar: "personal" | "home" | "business";
   right?: React.ReactNode;
+  /** Optional pillar-accent overline shown above the title (e.g. "Personal · Intro call"). */
+  overline?: string;
 }) {
+  const tk = pillarTokens(pillar);
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2">
@@ -624,14 +660,23 @@ export function EditorHeader({
         >
           <ChevronLeft className="h-5 w-5" aria-hidden />
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-app-text">
-          {title}
-        </h1>
+        <div className="min-w-0 flex-1">
+          {overline && (
+            <p
+              className={`mb-0.5 text-[9.5px] font-bold uppercase tracking-[0.08em] ${tk.text}`}
+            >
+              {overline}
+            </p>
+          )}
+          <h1 className="truncate text-xl font-bold text-app-text">{title}</h1>
+        </div>
         {right}
       </div>
-      <div className="mt-2 pl-7">
-        <PillarPill pillar={pillar} />
-      </div>
+      {!overline && (
+        <div className="mt-2 pl-7">
+          <PillarPill pillar={pillar} />
+        </div>
+      )}
     </div>
   );
 }

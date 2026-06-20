@@ -303,6 +303,32 @@ export function MonoFooter({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * ConnectPill — inline accent-filled CTA for the Payments row (fresh/unconnected state).
+ * Renders a "Connect" button tinted with the active pillar accent.
+ */
+export function ConnectPill({
+  pillar = "personal",
+  onClick,
+}: {
+  pillar?: Pillar;
+  onClick?: () => void;
+}) {
+  const tk = pillarTokens(pillar);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "whitespace-nowrap rounded-full px-3.5 py-[7px] text-[12.5px] font-bold text-white shadow-sm",
+        tk.bg,
+      )}
+    >
+      Connect
+    </button>
+  );
+}
+
 /** Small rounded icon tile (accent-tinted), used for card leading glyphs. */
 export function IconTile({
   icon: Icon,

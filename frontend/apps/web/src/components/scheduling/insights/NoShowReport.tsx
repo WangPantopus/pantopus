@@ -6,7 +6,8 @@
 // Read-only.
 
 import { useMemo } from "react";
-import { CalendarX2, PartyPopper } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarX2, PartyPopper, ShieldCheck } from "lucide-react";
 import * as api from "@pantopus/api";
 import type { Booking, NoShowInsights } from "@pantopus/types";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
@@ -182,6 +183,29 @@ export default function NoShowReport() {
           </ul>
         </Card>
       )}
+
+      {/* Policy callout — mirrors iOS/Android "Reduce no-shows" section */}
+      <div className="flex items-start gap-4 rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-warning-bg text-app-warning">
+          <ShieldCheck className="h-5 w-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="mb-0.5 text-sm font-semibold text-app-text">
+            Reduce no-shows
+          </p>
+          <p className="mb-3 text-xs leading-relaxed text-app-text-secondary">
+            A cancellation policy lets you charge a fee or hold a deposit when
+            invitees cancel late or don&apos;t show up.
+          </p>
+          <Link
+            href="/app/scheduling/payments/policy"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-app-info hover:underline"
+          >
+            Set a policy
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

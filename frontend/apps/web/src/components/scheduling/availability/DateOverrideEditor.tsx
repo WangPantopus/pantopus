@@ -324,7 +324,9 @@ export default function DateOverrideEditor({
             ) : (
               <CalendarOff className="h-[15px] w-[15px]" aria-hidden />
             )}
-            {choice === "custom" ? "Save custom hours" : "Block this date"}
+            {choice === "custom"
+            ? "Add custom hours for this day"
+            : "Block this date"}
           </button>
         </Card>
       )}
@@ -392,7 +394,7 @@ export default function DateOverrideEditor({
         </button>
       )}
 
-      {/* Holiday set */}
+      {/* Holiday set toggle */}
       <Card overline="Holiday sets">
         <ToggleRow
           icon={<Flag className="h-4 w-4" aria-hidden />}
@@ -407,6 +409,46 @@ export default function DateOverrideEditor({
           last
         />
       </Card>
+
+      {/* When the holiday set is on: section label + holiday list + footnote
+          (date-overrides-frames.jsx FrameHolidays lines 352–370) */}
+      {holidaySetOn && (
+        <>
+          <div className="px-0.5 pt-1 text-[9.5px] font-bold uppercase tracking-wider text-app-text-muted">
+            From US public holidays
+          </div>
+          <div className="rounded-2xl border border-app-border bg-app-surface px-3.5 shadow-sm">
+            {holidays.map((h, i) => (
+              <div
+                key={h.date}
+                className={clsx(
+                  "flex items-center gap-3 py-2.5",
+                  i !== holidays.length - 1 && "border-b border-app-border",
+                )}
+              >
+                <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+                  <CalendarOff className="h-4 w-4" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-app-text">
+                    {formatDateLabel(h.date)}
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-app-text-secondary">
+                    {h.name}
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full bg-app-surface-sunken px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-app-text-muted">
+                  Holiday
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="px-0.5 text-[11px] leading-relaxed text-app-text-secondary">
+            Holidays are blocked as a set. Turn the set off to remove them all
+            at once.
+          </p>
+        </>
+      )}
 
       {/* Existing overrides */}
       <div className="px-0.5 pt-1 text-[9.5px] font-bold uppercase tracking-wider text-app-text-muted">

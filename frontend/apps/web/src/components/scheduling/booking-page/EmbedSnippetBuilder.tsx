@@ -17,6 +17,7 @@ import {
   Copy,
   Globe,
   LayoutTemplate,
+  Palette,
   PanelBottom,
   RefreshCw,
   SquareMousePointer,
@@ -32,7 +33,7 @@ import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
 import ErrorState from "@/components/ui/ErrorState";
 import { toast } from "@/components/ui/toast-store";
-import { Card, Chips, Field, Segmented, TextInput } from "./controls";
+import { Card, Chips, Field, Segmented, TextInput, Toggle } from "./controls";
 import {
   buildEmbedSnippet,
   type CalendarLayout,
@@ -67,6 +68,7 @@ export default function EmbedSnippetBuilder() {
   const [hideHeader, setHideHeader] = useState(false);
   const [layout, setLayout] = useState<CalendarLayout>("month");
   const [copied, setCopied] = useState(false);
+  const [showOnPage, setShowOnPage] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,7 +210,7 @@ export default function EmbedSnippetBuilder() {
 
         {/* Appearance */}
         <Card>
-          <CardTitle icon={LayoutTemplate} sub="Match the widget to your site.">
+          <CardTitle icon={Palette} sub="Match the widget to your site.">
             Appearance
           </CardTitle>
 
@@ -278,6 +280,10 @@ export default function EmbedSnippetBuilder() {
               </span>
             </label>
           </div>
+
+          <Field label="Primary button label">
+            <TextInput value={buttonText} onChange={setButtonText} />
+          </Field>
 
           <Field label="Calendar layout">
             <Chips
@@ -362,21 +368,14 @@ export default function EmbedSnippetBuilder() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-app-text-strong">
-                Where it shows
+                Show inline on /b/{slug}
               </p>
               <p className="mt-0.5 text-xs text-app-text-secondary">
-                Use this on any external site, or link people straight to your
-                public page.
+                Use this on any site, or turn it on for your Pantopus business
+                page.
               </p>
             </div>
-            <a
-              href={`${APP_WEB_URL}/book/${encodeURIComponent(slug)}/embed`}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 rounded-lg border border-app-border px-3 py-1.5 text-xs font-semibold text-app-text hover:bg-app-hover"
-            >
-              Open
-            </a>
+            <Toggle on={showOnPage} onChange={setShowOnPage} label="Show inline on business page" />
           </div>
         </Card>
       </div>

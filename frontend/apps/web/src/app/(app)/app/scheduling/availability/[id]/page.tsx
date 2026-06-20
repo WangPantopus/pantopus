@@ -16,13 +16,16 @@ import type {
   AvailabilityOverride,
 } from "@pantopus/types";
 import {
+  CalendarClock,
   CalendarOff,
   ChevronLeft,
   ChevronRight,
   Globe,
+  Layers,
   Lock,
   Sliders,
   TriangleAlert,
+  User,
   WandSparkles,
 } from "lucide-react";
 import clsx from "clsx";
@@ -80,6 +83,10 @@ export default function AvailabilityEditorPage() {
   const [timezone, setTimezone] = useState("");
   const [days, setDays] = useState<DayModel[]>([]);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
+  // isUnset: true when the schedule has never had any rules set (fresh entry from
+  // Home/Business composer). Drives the CompositionGapCard + EmptyHero branch per
+  // the design's FrameEmpty. It flips to false the first time the user saves hours.
+  const [isUnset, setIsUnset] = useState(false);
 
   const [tab, setTab] = useState<Tab>("hours");
   const [dirty, setDirty] = useState(false);
@@ -108,7 +115,11 @@ export default function AvailabilityEditorPage() {
       );
       setName(schedule.name);
       setTimezone(schedule.timezone || detectTimezone());
-      setDays(rulesToDays(scopedRules));
+      const dayModels = rulesToDays(scopedRules);
+      setDays(dayModels);
+      // If no rules were ever set the schedule is "unset" — show CompositionGapCard
+      // + EmptyHero rather than the normal name/timezone/grid layout.
+      setIsUnset(dayModels.length === 0 && scopedRules.length === 0);
       setOverrides(
         rowsForSchedule<AvailabilityOverride>(bundle.overrides || [], id),
       );
@@ -133,6 +144,7 @@ export default function AvailabilityEditorPage() {
 
   const useQuickDefault = () => {
     setDays(seedDefaultDays());
+    setIsUnset(false);
     markDirty();
   };
 
@@ -150,6 +162,7 @@ export default function AvailabilityEditorPage() {
       );
       await api.scheduling.updateRules(id, daysToRules(days), owner);
       setDirty(false);
+      setIsUnset(false);
       toast.success("Schedule saved.");
     } catch (err) {
       toast.error(decodeError(err).message);
@@ -225,13 +238,22 @@ export default function AvailabilityEditorPage() {
   return (
     <div className="max-w-2xl pb-24">
       <BackLink onClick={() => router.push("/app/scheduling/availability")} />
-      <h1 className="mt-2 text-2xl font-bold text-app-text">Edit schedule</h1>
-      <p className="mt-0.5 text-sm text-app-text-secondary">
-        {name || "Working hours"}
-      </p>
+
+      {/* Page title — "Set hours" when unset (FrameEmpty), "Edit schedule" otherwise */}
+      <h1 className="mt-2 text-2xl font-bold text-app-text">
+        {isUnset ? "Set hours" : "Edit schedule"}
+      </h1>
+
+      {/* HeaderPill — personal identity chip shown below the top bar in every frame */}
+      <div className="mt-2.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-app-personal-bg px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-app-personal">
+          <User className="h-3 w-3" aria-hidden />
+          Personal
+        </span>
+      </div>
 
       {/* Tabs */}
-      <div className="mt-4 flex gap-1 border-b border-app-border">
+      <div className="mt-3 flex gap-1 border-b border-app-border">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -253,132 +275,228 @@ export default function AvailabilityEditorPage() {
       <div className="mt-4">
         {tab === "hours" && (
           <div className="space-y-3">
-            <Card overline="Schedule">
-              <FieldLabel>Name</FieldLabel>
-              <input
-                type="text"
-                value={name}
-                aria-label="Schedule name"
-                onChange={(e) => {
-                  setName(e.target.value);
-                  markDirty();
-                }}
-                placeholder="Working hours"
-                className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-sm text-app-text outline-none focus:border-app-personal"
-              />
-            </Card>
-
-            <Card overline="Timezone">
-              <FieldLabel>Time zone</FieldLabel>
-              <button
-                type="button"
-                onClick={() => setTzPicker(true)}
-                className="flex w-full items-center gap-2.5 rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-left shadow-sm"
-              >
-                <Globe
-                  className="h-4 w-4 shrink-0 text-app-text-secondary"
-                  aria-hidden
-                />
-                <span className="flex-1 text-sm font-medium text-app-text">
-                  {timezone ? zoneLabel(timezone) : "Select a time zone"}
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 text-app-text-muted"
-                  aria-hidden
-                />
-              </button>
-              <div className="mt-3">
-                <ToggleRow
-                  icon={<Lock className="h-4 w-4" aria-hidden />}
-                  label="Lock to my timezone"
-                  sub="Keep these hours even when you travel"
-                  on={lockTz}
-                  onChange={setLockTz}
-                  last
-                />
-              </div>
-            </Card>
-
-            {noHours && (
-              <div className="rounded-2xl border border-app-warning-light bg-app-warning-bg p-3.5">
-                <div className="flex items-start gap-2.5">
-                  <TriangleAlert
-                    className="mt-0.5 h-4 w-4 shrink-0 text-app-warning"
-                    aria-hidden
-                  />
-                  <div className="flex-1">
+            {/* FrameEmpty — unset / composition-gap state */}
+            {isUnset ? (
+              <>
+                {/* CompositionGapCard: explains that home/business build on these hours */}
+                <div className="flex items-start gap-3 rounded-2xl border border-app-personal/30 bg-app-personal-bg p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-personal/10 text-app-personal">
+                    <Layers className="h-4 w-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] font-bold text-app-text">
-                      No hours set
+                      Start with your hours
                     </p>
-                    <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
-                      People can&apos;t book you until you add at least one
-                      block.
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-app-text-secondary">
+                      Your family and business pages build on these hours, so
+                      set them first.
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={useQuickDefault}
-                  className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg border border-app-personal/30 bg-app-personal-bg py-2.5 text-[13px] font-bold text-primary-700"
-                >
-                  <WandSparkles className="h-4 w-4" aria-hidden /> Use 9–5,
-                  Mon–Fri
-                </button>
-              </div>
+
+                {/* EmptyHero card */}
+                <Card>
+                  <div className="flex flex-col items-center px-4 py-6 text-center">
+                    <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-app-personal-bg text-app-personal">
+                      <CalendarClock className="h-7 w-7" strokeWidth={1.9} aria-hidden />
+                    </span>
+                    <h2 className="text-[16px] font-bold tracking-tight text-app-text">
+                      Set your hours
+                    </h2>
+                    <p className="mt-1.5 max-w-[14rem] text-[12.5px] leading-relaxed text-app-text-secondary">
+                      Tell people the days and times you&apos;re open to
+                      bookings. You can fine-tune any day after.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={useQuickDefault}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-app-personal/30 bg-app-personal-bg py-2.5 text-[13px] font-bold text-primary-700"
+                    >
+                      <WandSparkles className="h-4 w-4" aria-hidden /> Use 9–5,
+                      Mon–Fri
+                    </button>
+                  </div>
+                </Card>
+
+                {/* LinksCard still shown in empty state */}
+                <Card>
+                  <button
+                    type="button"
+                    onClick={() => setTab("overrides")}
+                    className="flex w-full items-center gap-3 border-b border-app-border py-2.5 text-left"
+                  >
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+                      <CalendarOff className="h-[15px] w-[15px]" aria-hidden />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-[13px] font-semibold text-app-text">
+                        Date overrides &amp; holidays
+                      </span>
+                      <span className="text-[11px] text-app-text-secondary">
+                        None set
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-app-text-muted"
+                      aria-hidden
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("limits")}
+                    className="flex w-full items-center gap-3 py-2.5 text-left"
+                  >
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+                      <Sliders className="h-[15px] w-[15px]" aria-hidden />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-[13px] font-semibold text-app-text">
+                        Booking limits &amp; notice rules
+                      </span>
+                      <span className="text-[11px] text-app-text-secondary">
+                        Defaults
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-app-text-muted"
+                      aria-hidden
+                    />
+                  </button>
+                </Card>
+              </>
+            ) : (
+              /* Normal hours state (FrameDefault / FrameMultiBlock / FrameWarning) */
+              <>
+                <Card overline="Schedule">
+                  <FieldLabel>Name</FieldLabel>
+                  <input
+                    type="text"
+                    value={name}
+                    aria-label="Schedule name"
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      markDirty();
+                    }}
+                    placeholder="Working hours"
+                    className="w-full rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-sm text-app-text outline-none focus:border-app-personal"
+                  />
+                </Card>
+
+                <Card overline="Timezone">
+                  <FieldLabel>Time zone</FieldLabel>
+                  <button
+                    type="button"
+                    onClick={() => setTzPicker(true)}
+                    className="flex w-full items-center gap-2.5 rounded-lg border border-app-border bg-app-surface px-3 py-2.5 text-left shadow-sm"
+                  >
+                    <Globe
+                      className="h-4 w-4 shrink-0 text-app-text-secondary"
+                      aria-hidden
+                    />
+                    <span className="flex-1 text-sm font-medium text-app-text">
+                      {timezone ? zoneLabel(timezone) : "Select a time zone"}
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-app-text-muted"
+                      aria-hidden
+                    />
+                  </button>
+                  <div className="mt-3">
+                    <ToggleRow
+                      icon={<Lock className="h-4 w-4" aria-hidden />}
+                      label="Lock to my timezone"
+                      sub="Keep these hours even when you travel"
+                      on={lockTz}
+                      onChange={setLockTz}
+                      last
+                    />
+                  </div>
+                </Card>
+
+                {noHours && (
+                  <div className="rounded-2xl border border-app-warning-light bg-app-warning-bg p-3.5">
+                    <div className="flex items-start gap-2.5">
+                      <TriangleAlert
+                        className="mt-0.5 h-4 w-4 shrink-0 text-app-warning"
+                        aria-hidden
+                      />
+                      <div className="flex-1">
+                        <p className="text-[12.5px] font-bold text-app-text">
+                          No hours set
+                        </p>
+                        <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
+                          People can&apos;t book you until you add at least one
+                          block.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={useQuickDefault}
+                      className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg border border-app-personal/30 bg-app-personal-bg py-2.5 text-[13px] font-bold text-primary-700"
+                    >
+                      <WandSparkles className="h-4 w-4" aria-hidden /> Use 9–5,
+                      Mon–Fri
+                    </button>
+                  </div>
+                )}
+
+                <Card overline="Weekly hours">
+                  <WeeklyHoursGrid
+                    days={days}
+                    onChange={onDaysChange}
+                    disabled={saving}
+                  />
+                </Card>
+
+                <Card>
+                  <button
+                    type="button"
+                    onClick={() => setTab("overrides")}
+                    className="flex w-full items-center gap-3 border-b border-app-border py-2.5 text-left"
+                  >
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+                      <CalendarOff className="h-[15px] w-[15px]" aria-hidden />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-[13px] font-semibold text-app-text">
+                        Date overrides &amp; holidays
+                      </span>
+                      <span className="text-[11px] text-app-text-secondary">
+                        {overrides.length
+                          ? `${overrides.length} set`
+                          : "None set"}
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-app-text-muted"
+                      aria-hidden
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("limits")}
+                    className="flex w-full items-center gap-3 py-2.5 text-left"
+                  >
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
+                      <Sliders className="h-[15px] w-[15px]" aria-hidden />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-[13px] font-semibold text-app-text">
+                        Booking limits &amp; notice rules
+                      </span>
+                      <span className="text-[11px] text-app-text-secondary">
+                        Per event type
+                      </span>
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-app-text-muted"
+                      aria-hidden
+                    />
+                  </button>
+                </Card>
+              </>
             )}
-
-            <Card overline="Weekly hours">
-              <WeeklyHoursGrid
-                days={days}
-                onChange={onDaysChange}
-                disabled={saving}
-              />
-            </Card>
-
-            <Card>
-              <button
-                type="button"
-                onClick={() => setTab("overrides")}
-                className="flex w-full items-center gap-3 border-b border-app-border py-2.5 text-left"
-              >
-                <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
-                  <CalendarOff className="h-[15px] w-[15px]" aria-hidden />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-[13px] font-semibold text-app-text">
-                    Date overrides &amp; holidays
-                  </span>
-                  <span className="text-[11px] text-app-text-secondary">
-                    {overrides.length ? `${overrides.length} set` : "None set"}
-                  </span>
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 text-app-text-muted"
-                  aria-hidden
-                />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("limits")}
-                className="flex w-full items-center gap-3 py-2.5 text-left"
-              >
-                <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-app-surface-sunken text-app-text-secondary">
-                  <Sliders className="h-[15px] w-[15px]" aria-hidden />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-[13px] font-semibold text-app-text">
-                    Booking limits &amp; notice rules
-                  </span>
-                  <span className="text-[11px] text-app-text-secondary">
-                    Per event type
-                  </span>
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 text-app-text-muted"
-                  aria-hidden
-                />
-              </button>
-            </Card>
           </div>
         )}
 
@@ -390,11 +508,20 @@ export default function AvailabilityEditorPage() {
           />
         )}
 
-        {tab === "limits" && <BookingLimitsForm />}
+        {tab === "limits" && (
+          <BookingLimitsForm
+            onDone={async () => {
+              // NOTE: The backend has no schedule-level limits endpoint (limits live on
+              // event types). This saves to the event-type layer when that API is wired.
+              // For now the interaction is local-state only, matching the design's done CTA.
+              toast.success("Limits updated.");
+            }}
+          />
+        )}
       </div>
 
-      {/* Sticky save bar — only the weekly-hours tab persists via an explicit save. */}
-      {tab === "hours" && (
+      {/* Sticky save bar — hours tab (not in isUnset state) */}
+      {tab === "hours" && !isUnset && (
         <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-app-border bg-app-surface/95 px-4 py-3 backdrop-blur">
           <button
             type="button"

@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { ChevronLeft, Info, Power } from "lucide-react";
+import { ChevronLeft, Info, Lock, Power } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
   EventType,
@@ -44,7 +44,9 @@ import {
   EventTypeTiles,
   Note,
   PillarPill,
+  SegmentedControl,
   Stepper,
+  TextArea,
   TextField,
   ToggleRow,
 } from "@/components/scheduling/packages/ui";
@@ -70,6 +72,12 @@ export default function PackageEditor({
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // UI-only fields not persisted by the backend (design shows them view-only).
+  const [description, setDescription] = useState("");
+  const [expiry, setExpiry] = useState("1 year");
+  // Has-active-buyers locked state: backend does not expose a buyers count today;
+  // this flag gates UI only and would be wired to the API response when available.
+  const hasActiveBuyers = false; // TODO: wire to API when endpoint exposes it
 
   const load = useCallback(() => {
     let alive = true;
@@ -212,7 +220,22 @@ export default function PackageEditor({
                 placeholder="5-session cleaning"
                 error={errors.name}
               />
+              {/* Description: view-only UI field; not persisted by the backend. */}
+              <TextArea
+                label="Description"
+                value={description}
+                onChange={setDescription}
+                placeholder="What's included"
+                rows={3}
+              />
             </Card>
+
+            {hasActiveBuyers && (
+              <Note tone="warning" icon={Lock}>
+                People own credits — you can&apos;t change sessions or
+                eligibility while credits are active.
+              </Note>
+            )}
 
             <Card overline="Redeems against" pillar={pillar}>
               <p className="-mt-1 text-[11px] text-app-text-secondary">
@@ -223,6 +246,7 @@ export default function PackageEditor({
                 value={form.eventTypeId}
                 onChange={(v) => set("eventTypeId", v)}
                 pillar={pillar}
+                disabled={hasActiveBuyers}
               />
             </Card>
 
@@ -237,6 +261,7 @@ export default function PackageEditor({
                   min={MIN_SESSIONS}
                   max={MAX_SESSIONS}
                   ariaLabel="Number of sessions"
+                  disabled={hasActiveBuyers}
                 />
               </div>
               {errors.sessions_count && (
@@ -283,6 +308,15 @@ export default function PackageEditor({
                 keep their terms.
               </Note>
             )}
+
+            {/* Expiry card: view-only UI field; not persisted by the backend. */}
+            <Card overline="Expiry" pillar={pillar}>
+              <SegmentedControl
+                options={["90 days", "1 year", "Never"]}
+                value={expiry}
+                onChange={setExpiry}
+              />
+            </Card>
 
             <Card pillar={pillar}>
               <ToggleRow

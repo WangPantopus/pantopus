@@ -17,7 +17,10 @@ import {
   ChevronRight,
   CircleX,
   Clock,
+  CloudOff,
   House,
+  LoaderCircle,
+  RotateCw,
   TriangleAlert,
 } from "lucide-react";
 import { scheduling } from "@pantopus/api";
@@ -34,7 +37,7 @@ import {
 } from "@/components/scheduling/decodeError";
 import SlotConflictAlternatives from "@/components/scheduling/SlotConflictAlternatives";
 import { Avatar, type HomeMember } from "@/components/scheduling/home";
-import { Card, Overline, PrimaryButton } from "./primitives";
+import { Card, Overline, PrimaryButton, Section, TextArea } from "./primitives";
 import { formatHm, parseAvailableHours, rulesSummary } from "./resourceMeta";
 
 type ResourceBookingRow = Booking & { resource_id?: string | null };
@@ -95,6 +98,7 @@ export default function BookResource({
 
   const [forWhom, setForWhom] = useState<string | null>(currentUserId);
   const [whoOpen, setWhoOpen] = useState(false);
+  const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -303,11 +307,25 @@ export default function BookResource({
   if (loadErr) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-7 py-12 text-center">
-        <div className="text-[15px] font-bold text-app-text">
+        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-app-error-bg">
+          <CloudOff className="h-7 w-7 text-app-error" />
+        </div>
+        <div className="text-[15.5px] font-bold text-app-text">
           Couldn&apos;t load this resource
         </div>
+        <p className="mt-1.5 max-w-[220px] text-[12.5px] text-app-text-secondary">
+          Check your connection and try again.
+        </p>
         <div className="mt-4 w-40">
-          <PrimaryButton onClick={onCancel}>Go back</PrimaryButton>
+          <PrimaryButton
+            icon={RotateCw}
+            onClick={() => {
+              setLoadErr(false);
+              void loadBookings();
+            }}
+          >
+            Retry
+          </PrimaryButton>
         </div>
       </div>
     );
@@ -334,7 +352,19 @@ export default function BookResource({
         <span className="min-w-[52px]" />
       </div>
 
-      <div className="flex-1 space-y-3 overflow-auto p-3.5">
+      <div className="relative flex-1 overflow-hidden">
+        {/* Submitting overlay — form fades to 0.45 and centered spinner card floats above */}
+        {submitting && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2.5 rounded-2xl bg-white/90 px-6 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.1)]">
+              <LoaderCircle className="h-[26px] w-[26px] animate-spin text-app-home" />
+              <span className="text-[12.5px] font-semibold text-app-text-secondary">
+                Booking the {resource?.name ?? "resource"}
+              </span>
+            </div>
+          </div>
+        )}
+      <div className={`h-full overflow-auto space-y-3 p-3.5 ${submitting ? "pointer-events-none opacity-[0.45]" : ""}`}>
         {/* rules reminder */}
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -490,17 +520,27 @@ export default function BookResource({
             </div>
           </Card>
         )}
+
+        {/* Notes */}
+        <Section overline="Notes">
+          <TextArea
+            value={notes}
+            onChange={setNotes}
+            placeholder="Add a note (optional)"
+            rows={3}
+          />
+        </Section>
+      </div>
       </div>
 
       {/* Sticky submit */}
       <div className="border-t border-app-border bg-app-surface px-3.5 py-3">
         <PrimaryButton
-          icon={submitting ? undefined : Check}
-          loading={submitting}
+          icon={Check}
           disabled={!canSubmit}
           onClick={submit}
         >
-          {submitting ? "Booking…" : "Submit booking"}
+          Submit booking
         </PrimaryButton>
       </div>
     </div>

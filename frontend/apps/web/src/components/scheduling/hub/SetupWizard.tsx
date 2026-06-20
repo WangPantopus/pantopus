@@ -442,7 +442,7 @@ export default function SetupWizard() {
               <SuccessStep
                 slug={page.slug}
                 onAddType={() => router.push(`${BASE}/event-types`)}
-                onDone={() => router.push(BASE)}
+                onDone={() => router.push(`${BASE}/booking-page`)}
               />
             )}
           </div>
@@ -576,7 +576,7 @@ function SuccessStep({
           className="flex h-12 flex-[1.5] items-center justify-center gap-2 rounded-xl bg-app-personal text-sm font-semibold text-white hover:opacity-90"
         >
           <Share2 className="h-4 w-4" aria-hidden />
-          Go to scheduling
+          Share link
         </button>
       </div>
     </div>

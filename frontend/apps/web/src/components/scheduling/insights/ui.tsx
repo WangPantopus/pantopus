@@ -164,27 +164,57 @@ export function Card({
 
 // ─── KPI tiles ──────────────────────────────────────────────
 
+/** Delta chip: signed percent change vs prior period (e.g. +12% / -3%). */
+export function DeltaChip({
+  delta,
+}: {
+  delta: number | null | undefined;
+}) {
+  if (delta == null || Number.isNaN(delta)) return null;
+  const pct = Math.abs(delta) <= 1 ? delta * 100 : delta;
+  const up = pct >= 0;
+  const label = `${up ? "+" : ""}${Math.round(pct)}%`;
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+        up
+          ? "bg-app-success-bg text-app-success"
+          : "bg-app-error-bg text-app-error",
+      )}
+    >
+      {up ? "↑" : "↓"} {label}
+    </span>
+  );
+}
+
 export function KpiTile({
   value,
   label,
   hint,
+  delta,
   tone = "neutral",
 }: {
   value: string;
   label: string;
   hint?: string;
+  /** Signed rate delta vs prior period (fraction 0–1 or percent). */
+  delta?: number | null;
   tone?: Tone;
 }) {
   return (
     <div className="rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm">
-      <p
-        className={clsx(
-          "text-[26px] font-bold leading-8 tracking-[-0.02em] tabular-nums",
-          TONE_TEXT[tone],
-        )}
-      >
-        {value}
-      </p>
+      <div className="flex items-start justify-between gap-1">
+        <p
+          className={clsx(
+            "text-[26px] font-bold leading-8 tracking-[-0.02em] tabular-nums",
+            TONE_TEXT[tone],
+          )}
+        >
+          {value}
+        </p>
+        <DeltaChip delta={delta} />
+      </div>
       <p className="mt-1 text-[12.5px] font-semibold text-app-text-secondary">
         {label}
       </p>
@@ -426,11 +456,13 @@ export function EmptyReport({
   title,
   body,
   pillar,
+  children,
 }: {
   icon: LucideIcon;
   title: string;
   body: string;
   pillar: Pillar;
+  children?: ReactNode;
 }) {
   const tk = pillarTokens(pillar);
   return (
@@ -448,6 +480,7 @@ export function EmptyReport({
       <p className="max-w-xs text-sm leading-relaxed text-app-text-secondary">
         {body}
       </p>
+      {children && <div className="mt-5">{children}</div>}
     </div>
   );
 }

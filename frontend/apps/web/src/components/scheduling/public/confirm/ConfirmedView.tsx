@@ -28,10 +28,18 @@ import {
   decodeError,
   detectTimezone,
   pillarForOwner,
+  pillarTokens,
 } from "@/components/scheduling";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import BookingSummaryCard from "./BookingSummaryCard";
 import { formatCents, formatSlotRange } from "./confirmUtils";
+
+// Pillar → border-bg token class (literal strings so Tailwind JIT picks them up)
+const PILLAR_BORDER_BG: Record<string, string> = {
+  personal: "border-app-personal-bg",
+  home: "border-app-home-bg",
+  business: "border-app-business-bg",
+};
 
 const CONFETTI_COLORS = ["#0284c7", "#059669", "#f59e0b", "#7c3aed", "#38bdf8"];
 
@@ -245,6 +253,7 @@ export default function ConfirmedView({ token }: { token: string }) {
 
   const { booking, eventType, page, payment } = view;
   const pillar = pillarForOwner(page?.owner_type ?? booking.owner_type);
+  const tk = pillarTokens(pillar);
   const hostName = page?.title || "your host";
   const eventName = eventType?.name || "Your booking";
   const tz = booking.invitee_timezone || page?.timezone || detectTimezone();
@@ -369,7 +378,7 @@ export default function ConfirmedView({ token }: { token: string }) {
           />
           <span>
             Need to change it?{" "}
-            <span className="font-bold text-app-personal">
+            <span className={clsx("font-bold", tk.text)}>
               Reschedule or cancel
             </span>{" "}
             anytime.
@@ -379,9 +388,19 @@ export default function ConfirmedView({ token }: { token: string }) {
         {/* Create-account nudge */}
         <Link
           href="/signup"
-          className="flex items-center gap-3 rounded-xl border border-app-personal-bg bg-app-personal-bg/40 px-3.5 py-3"
+          className={clsx(
+            "flex items-center gap-3 rounded-xl border px-3.5 py-3",
+            tk.bgSoft,
+            PILLAR_BORDER_BG[pillar],
+          )}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-app-personal-bg bg-app-surface text-app-personal">
+          <span
+            className={clsx(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-app-surface",
+              tk.text,
+              PILLAR_BORDER_BG[pillar],
+            )}
+          >
             <UserPlus className="h-4 w-4" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
@@ -393,7 +412,7 @@ export default function ConfirmedView({ token }: { token: string }) {
             </span>
           </span>
           <CalendarClock
-            className="h-4 w-4 shrink-0 text-app-personal"
+            className={clsx("h-4 w-4 shrink-0", tk.text)}
             aria-hidden
           />
         </Link>

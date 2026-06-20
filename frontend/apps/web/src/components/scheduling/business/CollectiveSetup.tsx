@@ -175,7 +175,7 @@ export default function CollectiveSetup({
   onClose,
   owner,
   eventTypeId,
-  eventTypeName,
+  eventTypeName: _eventTypeName,
   roster,
   initialAssignees,
   initialSeatCap,
@@ -325,6 +325,8 @@ export default function CollectiveSetup({
     <BottomSheet
       open={open}
       onClose={saving ? () => {} : onClose}
+      title="Collective booking"
+      subhead="Every required member must be free at the same time."
       footer={
         <PrimaryButton onClick={save} disabled={saveDisabled} loading={saving}>
           {saving ? "Saving" : "Save"}
@@ -332,17 +334,6 @@ export default function CollectiveSetup({
       }
     >
       <div className="space-y-3">
-        <div>
-          <h3 className="text-base font-bold text-app-text">
-            Collective booking
-          </h3>
-          <p className="mt-1 text-xs text-app-text-secondary">
-            Every required member must be free at the same time for{" "}
-            <span className="font-semibold text-app-text">{eventTypeName}</span>
-            .
-          </p>
-        </div>
-
         <MasterToggleCard on={on} onChange={setOn} />
 
         {!on ? (

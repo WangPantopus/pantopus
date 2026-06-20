@@ -1,12 +1,16 @@
 "use client";
 
 // W17 · H10 — Per-Event-Type Performance. Bookings in the range, grouped by
-// event type and joined with the event-type list for names/colors. Volume,
-// completion, cancellations, no-show rate and average duration per type, with a
-// sort control. Read-only; derives from GET /bookings (range) + event types.
+// event type and joined with the event-type list for names/colors. Stats aligned
+// to iOS/Android: Booked / Completed / Completion% / No-show% per card.
+// Includes "Edit event type" footer CTA and separate empty states for zero event
+// types vs zero bookings in period, mirroring Android's NoTypes state.
+// DEFERRED: single-type detail layout (funnel card, trend chart) — fundamental
+// architecture change requiring routing restructure; no design frame.
 
 import { useMemo, useState } from "react";
-import { CalendarClock } from "lucide-react";
+import Link from "next/link";
+import { CalendarClock, Pencil } from "lucide-react";
 import * as api from "@pantopus/api";
 import type { Booking, EventType } from "@pantopus/types";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
@@ -18,7 +22,7 @@ import { useReport } from "./useReport";
 import { useInsightsFilters } from "./useInsightsFilters";
 import { aggregateByEventType, type EventTypeAgg } from "./aggregate";
 import { bookingListParams } from "./filters";
-import { formatCount, formatDurationMin, formatRate } from "./format";
+import { formatCount, formatRate } from "./format";
 import { Card, EmptyReport, InlineRetry, ReportSkeleton } from "./ui";
 
 interface Data {
@@ -109,6 +113,25 @@ export default function EventTypePerformance() {
       />
     );
 
+  // Distinguish: zero event types (NoTypes) vs zero bookings in period.
+  if (data.eventTypes.length === 0)
+    return (
+      <EmptyReport
+        icon={CalendarClock}
+        title="No event types yet"
+        body="Create an event type to start accepting bookings and track performance here."
+        pillar={pillar}
+      >
+        <Link
+          href="/app/scheduling/event-types"
+          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text-strong shadow-sm hover:bg-app-hover"
+        >
+          <Pencil className="h-4 w-4" aria-hidden />
+          Create an event type
+        </Link>
+      </EmptyReport>
+    );
+
   if (rows.length === 0)
     return (
       <EmptyReport
@@ -185,26 +208,38 @@ export default function EventTypePerformance() {
                 />
               </div>
 
+              {/* 2×2 stat grid aligned to iOS/Android: Booked · Completed · Completion% · No-show% */}
               <div className="grid grid-cols-4 gap-2">
+                <MiniStat
+                  value={formatCount(t.total)}
+                  label="Booked"
+                />
                 <MiniStat
                   value={formatCount(t.completed)}
                   label="Completed"
                   tone="success"
                 />
                 <MiniStat
-                  value={formatCount(t.cancelled)}
-                  label="Cancelled"
-                  tone="warning"
+                  value={formatRate(completionRate(t))}
+                  label="Completion"
+                  tone="success"
                 />
                 <MiniStat
                   value={formatRate(t.noShowRate)}
                   label="No-show"
                   tone="error"
                 />
-                <MiniStat
-                  value={formatDurationMin(t.avgDurationMin)}
-                  label="Avg length"
-                />
+              </div>
+
+              {/* "Edit event type" CTA — mirrors iOS/Android footer action */}
+              <div className="mt-3 border-t border-app-border-subtle pt-3">
+                <Link
+                  href={`/app/scheduling/event-types/${t.eventTypeId}`}
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-app-text-secondary hover:text-app-text"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Edit event type
+                </Link>
               </div>
             </Card>
           );

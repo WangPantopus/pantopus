@@ -111,16 +111,23 @@ export default function IntakeQuestionsPage() {
     );
   }
 
+  // Build the pillar-accent overline: "Personal · Intro call" style, matching the design's sheet header.
+  const pillarLabel =
+    pillar === "business"
+      ? "Business"
+      : pillar === "home"
+        ? "Home"
+        : "Personal";
+  const overline = name ? `${pillarLabel} · ${name}` : pillarLabel;
+
   return (
     <div className="pb-10">
       <EditorHeader
         title="Intake questions"
         pillar={pillar}
         onBack={() => router.push(editorPath)}
+        overline={overline}
       />
-      {name && (
-        <p className="mb-4 pl-7 text-sm text-app-text-secondary">for {name}</p>
-      )}
       <div className="rounded-2xl border border-app-border bg-app-surface p-4 shadow-sm">
         <IntakeQuestionsEditor
           eventTypeId={id}

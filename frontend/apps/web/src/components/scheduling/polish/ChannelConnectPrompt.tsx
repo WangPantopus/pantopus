@@ -168,9 +168,26 @@ export default function ChannelConnectPrompt({
           >
             <EnableHelp />
             <div className="mt-3 flex flex-col gap-2">
-              <PrimaryButton pillar={pillar} onClick={onClose}>
-                Keep email only
+              <PrimaryButton
+                pillar={pillar}
+                onClick={() => {
+                  // Web doesn't have a direct OS settings link like mobile; open
+                  // the browser's site-settings page for this origin instead.
+                  // This mirrors iOS/Android "Open Settings" primary CTA intent.
+                  const url = `chrome://settings/content/notifications?search=${encodeURIComponent(window.location.origin)}`;
+                  try {
+                    window.open(url, "_blank", "noopener");
+                  } catch {
+                    // Fallback: browsers block chrome:// URLs from JS; guide via
+                    // the disclosure panel which is always shown above.
+                  }
+                }}
+              >
+                Open browser settings
               </PrimaryButton>
+              <SecondaryButton pillar={pillar} onClick={onClose}>
+                Keep email only
+              </SecondaryButton>
             </div>
           </StatusFrame>
         );

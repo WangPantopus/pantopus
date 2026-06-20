@@ -6,6 +6,7 @@ interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   title?: string;
+  subhead?: string;
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
@@ -15,6 +16,7 @@ export default function BottomSheet({
   open,
   onClose,
   title,
+  subhead,
   children,
   footer,
   className = '',
@@ -63,17 +65,22 @@ export default function BottomSheet({
           <div className="w-8 h-1 rounded-full bg-app-muted/40" />
         </div>
 
-        {title && (
-          <div className="flex items-center justify-between px-5 py-3 border-b border-app">
-            <h3 className="text-sm font-bold text-app">{title}</h3>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-app-muted hover:text-app hover-bg-app rounded-lg transition"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        {(title || subhead) && (
+          <div className="flex-shrink-0 border-b border-app px-5 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {title && <h3 className="text-sm font-bold text-app">{title}</h3>}
+                {subhead && <p className="mt-0.5 text-xs text-app-muted">{subhead}</p>}
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 text-app-muted hover:text-app hover-bg-app rounded-lg transition flex-shrink-0"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 

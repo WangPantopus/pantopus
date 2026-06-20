@@ -27,12 +27,9 @@ function AvailabilityContent() {
         >
           <ArrowLeft className="h-5 w-5 text-app-text" />
         </button>
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-app-home">
-            Household
-          </div>
-          <h1 className="text-xl font-bold text-app-text">My availability</h1>
-        </div>
+        <h1 className="text-[15.5px] font-semibold tracking-tight text-app-text">
+          My availability
+        </h1>
       </div>
 
       <HouseholdAvailabilityForm homeId={homeId} />

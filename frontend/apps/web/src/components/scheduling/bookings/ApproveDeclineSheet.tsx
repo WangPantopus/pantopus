@@ -6,13 +6,24 @@
 // reason chips + note. Errors surface inline and re-enable the actions.
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Calendar, Check, ClipboardList, X } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  CalendarPlus,
+  Check,
+  ChevronDown,
+  ClipboardList,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import clsx from "clsx";
 import * as api from "@pantopus/api";
 import type { Booking, SchedulingOwnerRef } from "@pantopus/types";
 import BottomSheet from "@/components/ui/BottomSheet";
 import { decodeError } from "@/components/scheduling/decodeError";
 import {
   pillarTokens,
+  PRIMARY_BLUE_CLS,
   type Pillar,
 } from "@/components/scheduling/pillarTokens";
 import { Avatar, Banner, ReasonChips } from "./primitives";
@@ -34,6 +45,7 @@ export default function ApproveDeclineSheet({
   pillar = "personal",
   initialMode = "review",
   onDone,
+  onProposeTime,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +55,8 @@ export default function ApproveDeclineSheet({
   pillar?: Pillar;
   initialMode?: "review" | "decline";
   onDone: () => void;
+  /** Optional: called when the host taps "Propose another time" in decline mode. */
+  onProposeTime?: () => void;
 }) {
   const tk = pillarTokens(pillar);
   const tz = viewerTz();
@@ -51,6 +65,10 @@ export default function ApproveDeclineSheet({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  // hasConflict: TODO wire from booking detail API once backend provides it.
+  // Scaffold renders the banner when true.
+  const hasConflict = false;
 
   useEffect(() => {
     if (open) {
@@ -59,6 +77,7 @@ export default function ApproveDeclineSheet({
       setNote("");
       setError(null);
       setSubmitting(false);
+      setIntakeOpen(false);
     }
   }, [open, initialMode]);
 
@@ -136,21 +155,72 @@ export default function ApproveDeclineSheet({
           </div>
         </div>
 
+        {/* Conflict banner (Frame 3) — shown between SlotLine and inputs */}
+        {hasConflict && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <TriangleAlert
+              className="h-[17px] w-[17px] shrink-0 text-amber-600"
+              aria-hidden
+            />
+            <span className="flex-1 text-[11.5px] font-semibold leading-[15px] text-amber-700">
+              This slot overlaps a confirmed booking
+            </span>
+            <button
+              type="button"
+              className="text-[11.5px] font-bold text-amber-700"
+              onClick={() => {}}
+            >
+              View conflict
+            </button>
+          </div>
+        )}
+
         {mode === "review" ? (
           <>
+            {/* Expandable intake answers disclosure (design spec: tappable chevron) */}
             {intakeCount > 0 && (
-              <div className="flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => setIntakeOpen((v) => !v)}
+                aria-expanded={intakeOpen}
+                className="flex w-full items-center gap-2.5 rounded-xl border border-app-border bg-app-surface px-3 py-2.5"
+              >
                 <ClipboardList
                   className="h-4 w-4 text-app-text-secondary"
                   aria-hidden
                 />
-                <span className="flex-1 text-[13px] font-semibold text-app-text">
+                <span className="flex-1 text-left text-[13px] font-semibold text-app-text">
                   Intake answers
                 </span>
                 <span className="text-xs text-app-text-muted">
                   {intakeCount} {intakeCount === 1 ? "answer" : "answers"}
                 </span>
-              </div>
+                <ChevronDown
+                  className={clsx(
+                    "h-4 w-4 text-app-text-muted transition-transform",
+                    intakeOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
+            )}
+            {intakeOpen && booking.intake_answers && (
+              <dl className="space-y-2 rounded-xl border border-app-border bg-app-surface-sunken px-3 py-2.5">
+                {Object.entries(booking.intake_answers).map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-app-text-muted">
+                      {k}
+                    </dt>
+                    <dd className="mt-0.5 text-[13px] text-app-text">
+                      {Array.isArray(v)
+                        ? v.join(", ")
+                        : v == null
+                          ? "—"
+                          : String(v)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             )}
             <textarea
               value={note}
@@ -165,11 +235,16 @@ export default function ApproveDeclineSheet({
               </Banner>
             )}
             <div className="space-y-2.5">
+              {/* Approve: fixed PRIMARY blue per design spec (not pillar accent) */}
               <button
                 type="button"
                 disabled={submitting}
                 onClick={approve}
-                className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition disabled:opacity-70 ${tk.bg} ${tk.textOn}`}
+                className={clsx(
+                  "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition disabled:opacity-70",
+                  PRIMARY_BLUE_CLS.bg,
+                  PRIMARY_BLUE_CLS.textOn,
+                )}
               >
                 {submitting ? (
                   <Spinner />
@@ -200,6 +275,20 @@ export default function ApproveDeclineSheet({
                 onChange={setReason}
                 tone="error"
               />
+              {/* "Propose another time" link — design Frame 2, below chip row */}
+              {onProposeTime && (
+                <button
+                  type="button"
+                  onClick={onProposeTime}
+                  className={clsx(
+                    "mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-bold",
+                    PRIMARY_BLUE_CLS.text,
+                  )}
+                >
+                  <CalendarPlus className="h-[15px] w-[15px]" aria-hidden />
+                  Propose another time
+                </button>
+              )}
             </div>
             <textarea
               value={note}
@@ -213,29 +302,20 @@ export default function ApproveDeclineSheet({
                 {error}
               </Banner>
             )}
-            <div className="space-y-2.5">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={decline}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-app-error text-sm font-bold text-white transition disabled:opacity-70"
-              >
-                {submitting ? (
-                  <Spinner />
-                ) : (
-                  <X className="h-[18px] w-[18px]" aria-hidden />
-                )}
-                {submitting ? "Declining" : "Decline request"}
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setMode("review")}
-                className="h-11 w-full rounded-xl border border-app-border text-sm font-bold text-app-text-secondary transition hover:bg-app-hover disabled:opacity-50"
-              >
-                Back
-              </button>
-            </div>
+            {/* Design: decline mode shows only a single "Decline request" button (no Back) */}
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={decline}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-app-error text-sm font-bold text-white transition disabled:opacity-70"
+            >
+              {submitting ? (
+                <Spinner />
+              ) : (
+                <X className="h-[18px] w-[18px]" aria-hidden />
+              )}
+              {submitting ? "Declining" : "Decline request"}
+            </button>
           </>
         )}
       </div>

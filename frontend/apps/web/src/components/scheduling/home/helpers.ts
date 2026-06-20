@@ -375,13 +375,46 @@ export interface RsvpMeta {
   label: string;
   /** Tailwind classes for the pill. */
   cls: string;
+  /** Lucide icon name for the pill glyph (design: 11×11). */
+  icon: "check" | "help-circle" | "x" | "minus";
+  /** Tailwind classes for the recorded-state icon halo (bg + text). */
+  recordedHalo: string;
+  /** Lucide icon for the recorded-state circle. */
+  recordedIcon: "check" | "help-circle" | "x" | "minus";
+  /** Recorded-state title text (cross-platform canonical). */
+  recordedTitle: string;
 }
 export const RSVP_META: Record<RsvpStatus, RsvpMeta> = {
-  going: { label: "Going", cls: "bg-app-success-bg text-app-success" },
-  maybe: { label: "Maybe", cls: "bg-app-warning-bg text-app-warning" },
-  declined: { label: "Can't", cls: "bg-app-error-bg text-app-error" },
+  going: {
+    label: "Going",
+    cls: "bg-app-success-bg text-app-success",
+    icon: "check",
+    recordedHalo: "bg-app-success-bg text-app-success",
+    recordedIcon: "check",
+    recordedTitle: "You're going",
+  },
+  maybe: {
+    label: "Maybe",
+    cls: "bg-app-warning-bg text-app-warning",
+    icon: "help-circle",
+    recordedHalo: "bg-app-warning-bg text-app-warning",
+    recordedIcon: "help-circle",
+    recordedTitle: "You might go",
+  },
+  declined: {
+    label: "Can't",
+    cls: "bg-app-error-bg text-app-error",
+    icon: "x",
+    recordedHalo: "bg-app-error-bg text-app-error",
+    recordedIcon: "x",
+    recordedTitle: "You can't make it",
+  },
   pending: {
     label: "No reply",
     cls: "bg-app-surface-muted text-app-text-muted",
+    icon: "minus",
+    recordedHalo: "bg-app-surface-sunken text-app-text-muted",
+    recordedIcon: "minus",
+    recordedTitle: "No reply yet",
   },
 };

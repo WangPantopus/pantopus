@@ -207,11 +207,13 @@ export function workflowToForm(w: Workflow): WorkflowForm {
   };
 }
 
-/** Build the API input, dropping the offset for non-timed triggers. */
+/** Build the API input, dropping the offset for non-timed triggers. Name falls back to actionSummary when blank. */
 export function formToWorkflowInput(form: WorkflowForm) {
   const timed = triggerMeta(form.trigger).timed;
+  const resolvedName =
+    form.name.trim() || actionSummary(form.action);
   return {
-    name: form.name.trim(),
+    name: resolvedName,
     event_type_id: form.event_type_id,
     trigger: form.trigger,
     offset_minutes: timed ? form.offset_minutes : 0,
@@ -221,12 +223,12 @@ export function formToWorkflowInput(form: WorkflowForm) {
   };
 }
 
-/** Field-level validation mirroring the backend schema (name 1-200 etc.). */
+/** Field-level validation mirroring the backend schema (name optional, 0-200). */
 export function validateWorkflow(form: WorkflowForm): Record<string, string> {
   const errors: Record<string, string> = {};
   const name = form.name.trim();
-  if (!name) errors.name = "Give this workflow a name.";
-  else if (name.length > 200)
+  // Name is optional — blank falls back to channel.actionSummary server-side.
+  if (name.length > 200)
     errors.name = "Keep the name under 200 characters.";
   if (!TRIGGERS.some((t) => t.id === form.trigger))
     errors.trigger = "Pick a trigger.";

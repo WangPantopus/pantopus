@@ -7,9 +7,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  CalendarClock,
+  CalendarX,
   Check,
+  ChevronRight,
   Clock,
   CloudOff,
+  Plus,
   RotateCw,
   Timer,
   Users,
@@ -284,17 +288,25 @@ export default function ResourceDetail({
           })}
         </div>
         {canEdit && pending.length > 0 && (
-          <div className="flex items-center gap-2 rounded-xl border border-app-warning/30 bg-app-warning-bg px-3 py-2">
-            <Clock className="h-3.5 w-3.5 text-app-warning" />
-            <span className="text-[12px] font-bold text-app-warning">
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-app-warning/30 bg-app-warning-bg px-3 py-2 text-left transition hover:brightness-[0.97]"
+            onClick={() => {
+              const el = document.getElementById("approval-queue");
+              el?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <Clock className="h-3.5 w-3.5 shrink-0 text-app-warning" />
+            <span className="flex-1 text-[12px] font-bold text-app-warning">
               Pending approval ({pending.length})
             </span>
-          </div>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-app-warning" />
+          </button>
         )}
       </Card>
 
       {fullyBookedToday && nextOpening && (
-        <Banner tone="amber" icon={Clock} title="Fully booked today">
+        <Banner tone="amber" icon={CalendarX} title="Fully booked today">
           Next opening is {WEEKDAY_SHORT[new Date(nextOpening.start).getDay()]}{" "}
           {formatHm(nextOpening.startLocal.slice(11, 16))}. You can still book
           that.
@@ -412,6 +424,7 @@ export default function ResourceDetail({
         <div className="mx-auto max-w-2xl px-4 py-3">
           {fullyBookedToday && nextOpening ? (
             <PrimaryButton
+              icon={CalendarClock}
               onClick={() => onBook({ date: dayKeyOf(nextOpening.start) })}
             >
               Book next opening ·{" "}
@@ -419,7 +432,9 @@ export default function ResourceDetail({
               {formatHm(nextOpening.startLocal.slice(11, 16))}
             </PrimaryButton>
           ) : (
-            <PrimaryButton onClick={() => onBook()}>Book this</PrimaryButton>
+            <PrimaryButton icon={Plus} onClick={() => onBook()}>
+              Book this
+            </PrimaryButton>
           )}
         </div>
       </div>

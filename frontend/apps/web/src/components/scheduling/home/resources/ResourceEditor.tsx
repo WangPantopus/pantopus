@@ -12,13 +12,12 @@ import {
   ChevronDown,
   ChevronUp,
   ImagePlus,
-  Loader2,
+  LoaderCircle,
   Trash2,
   X,
 } from "lucide-react";
 import type { Resource, ResourceType, WhoCanBook } from "@pantopus/types";
 import { scheduling } from "@pantopus/api";
-import { confirmStore } from "@/components/ui/confirm-store";
 import { useSchedulingOwner } from "@/components/scheduling";
 import { decodeError, fieldErrors } from "@/components/scheduling/decodeError";
 import { Avatar } from "@/components/scheduling/home";
@@ -113,6 +112,7 @@ export default function ResourceEditor({
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const durError = maxHr <= 0;
   const hoursError = days.length === 0 || startTime >= endTime;
@@ -180,17 +180,14 @@ export default function ResourceEditor({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!resource) return;
-    const ok = await confirmStore.open({
-      title: `Delete ${resource.name}?`,
-      description:
-        "Existing bookings stay on the calendar. New bookings will be turned off.",
-      confirmLabel: "Delete",
-      cancelLabel: "Keep",
-      variant: "destructive",
-    });
-    if (!ok) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!resource) return;
+    setDeleteConfirmOpen(false);
     setSaving(true);
     try {
       await scheduling.deleteResource(resource.id, owner);
@@ -208,6 +205,42 @@ export default function ResourceEditor({
 
   return (
     <div className="flex h-full flex-col">
+      {/* Delete confirm dialog (design: trash-2 icon + stacked full-width buttons) */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
+          <div className="w-full max-w-xs rounded-2xl bg-app-surface p-5 shadow-[0_8px_40px_rgba(0,0,0,0.18)]">
+            <div className="mb-3 flex justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-app-error-bg">
+                <Trash2 className="h-6 w-6 text-app-error" />
+              </div>
+            </div>
+            <div className="mb-1 text-center text-[15px] font-bold text-app-text">
+              Delete {resource?.name}?
+            </div>
+            <p className="mb-4 text-center text-[12.5px] leading-[18px] text-app-text-secondary">
+              Existing bookings stay on the calendar. New bookings will be
+              turned off.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="h-11 w-full rounded-xl bg-app-error text-[13.5px] font-bold text-white transition hover:brightness-105"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="h-11 w-full rounded-xl border border-app-border-strong bg-app-surface text-[13.5px] font-bold text-app-text-secondary transition hover:bg-app-surface-sunken"
+              >
+                Keep
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* bar */}
       <div className="flex items-center justify-between border-b border-app-border-subtle px-3 py-2.5">
         <button
@@ -222,22 +255,30 @@ export default function ResourceEditor({
           {editing ? "Edit resource" : "New resource"}
         </div>
         <div className="min-w-[52px] text-right">
-          {saving ? (
-            <Loader2 className="ml-auto h-4 w-4 animate-spin text-app-text-muted" />
-          ) : (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave}
-              className="text-sm font-bold text-app-home disabled:text-app-text-muted"
-            >
-              Save
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave || saving}
+            className="text-sm font-bold text-app-home disabled:text-app-text-muted"
+          >
+            Save
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-auto p-3.5">
+      <div className="relative flex-1 overflow-hidden">
+        {/* Saving overlay — dims form content and shows centered spinner card */}
+        {saving && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2.5 rounded-2xl bg-white/90 px-6 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.1)]">
+              <LoaderCircle className="h-[26px] w-[26px] animate-spin text-app-home" />
+              <span className="text-[12.5px] font-semibold text-app-text-secondary">
+                Saving resource
+              </span>
+            </div>
+          </div>
+        )}
+      <div className={`h-full overflow-auto space-y-3 p-3.5 ${saving ? "pointer-events-none opacity-[0.45]" : ""}`}>
         {formError && (
           <div className="flex items-start gap-2 rounded-xl border border-app-error/30 bg-app-error-bg px-3 py-2.5 text-[12px] text-app-error">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -450,6 +491,7 @@ export default function ResourceEditor({
             </TextButton>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

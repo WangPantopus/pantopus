@@ -2,23 +2,24 @@
 
 // F4 — Find a Time · Setup. The household composes a request: title, who's
 // needed (required vs optional), collective vs round-robin, duration and a date
-// window. "Find times" hands the config up to the page, which calls
-// GET /find-a-time (home alias) and swaps in the suggested-slots step (F5).
-// Times come from each member's personal availability — this never edits anyone's
-// calendar; it only overlaps free/busy.
+// window. Submit is triggered by the page-level "Next" top-bar button via the
+// exposed onSubmit prop. Times come from each member's personal availability —
+// this never edits anyone's calendar; it only overlaps free/busy.
 
 import { useMemo, useState } from "react";
 import {
   CalendarRange,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CircleAlert,
   Info,
   Layers,
   Lock,
+  Minus,
+  Plus,
   Repeat,
-  Search,
   UserCheck,
   Users,
   type LucideIcon,
@@ -26,7 +27,6 @@ import {
 import clsx from "clsx";
 import type { FindATimeMode } from "@pantopus/types";
 import ErrorState from "@/components/ui/ErrorState";
-import { pillarTokens } from "@/components/scheduling/pillarTokens";
 import MemberAvatar from "./MemberAvatar";
 import Segmented from "./Segmented";
 import { rangeLabel } from "./format";
@@ -44,8 +44,6 @@ export interface FindATimeConfig {
 
 type Role = "required" | "optional";
 
-const tk = pillarTokens("home");
-
 function Overline({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-app-home">
@@ -59,6 +57,51 @@ function Card({ children }: { children: React.ReactNode }) {
     <section className="rounded-2xl border border-app-border bg-app-surface p-4">
       {children}
     </section>
+  );
+}
+
+// ----- Sub-components --------------------------------------------------------
+
+/** A +/- stepper. min/max enforced; step defaults to 5. */
+function Stepper({
+  value,
+  min,
+  max,
+  step = 5,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (n: number) => void;
+}) {
+  const dec = () => onChange(Math.max(min, value - step));
+  const inc = () => onChange(Math.min(max, value + step));
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <button
+        type="button"
+        onClick={dec}
+        disabled={value <= min}
+        aria-label="Decrease"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-secondary transition hover:bg-app-hover disabled:opacity-40"
+      >
+        <Minus className="h-4 w-4" aria-hidden />
+      </button>
+      <span className="min-w-[56px] text-center text-sm font-bold text-app-text">
+        {value} min
+      </span>
+      <button
+        type="button"
+        onClick={inc}
+        disabled={value >= max}
+        aria-label="Increase"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-secondary transition hover:bg-app-hover disabled:opacity-40"
+      >
+        <Plus className="h-4 w-4" aria-hidden />
+      </button>
+    </div>
   );
 }
 
@@ -76,28 +119,30 @@ export default function FindATimeSetup({
   membersLoading,
   membersError,
   onRetryMembers,
-  submitting,
   defaultFrom,
   defaultTo,
   onSubmit,
+  submitRef,
 }: {
   members: MemberView[];
   membersLoading: boolean;
   membersError: string | null;
   onRetryMembers: () => void;
-  submitting: boolean;
   defaultFrom: string;
   defaultTo: string;
   onSubmit: (config: FindATimeConfig) => void;
+  /** Imperative handle: page calls submitRef.current?.() to trigger validation + submit */
+  submitRef?: React.MutableRefObject<(() => void) | null>;
 }) {
   const [title, setTitle] = useState("");
   const [roles, setRoles] = useState<Record<string, Role>>({});
   const [mode, setMode] = useState<FindATimeMode>("collective");
   const [rrRule, setRrRule] = useState("fair");
   const [duration, setDuration] = useState("30");
-  const [customDuration, setCustomDuration] = useState("45");
+  const [customDurationMin, setCustomDurationMin] = useState(45);
   const [fromKey, setFromKey] = useState(defaultFrom);
   const [toKey, setToKey] = useState(defaultTo);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [explain, setExplain] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
@@ -123,7 +168,7 @@ export default function FindATimeSetup({
   const badRange = !fromKey || !toKey || toKey < fromKey;
   const durationMin =
     duration === "custom"
-      ? Math.max(5, parseInt(customDuration, 10) || 30)
+      ? Math.max(5, customDurationMin)
       : parseInt(duration, 10);
 
   const setRole = (id: string, role: Role) =>
@@ -144,6 +189,9 @@ export default function FindATimeSetup({
       toKey,
     });
   };
+
+  // Expose submit via ref so the page-level "Next" button can trigger it.
+  if (submitRef) submitRef.current = submit;
 
   return (
     <div className="space-y-4">
@@ -407,54 +455,73 @@ export default function FindATimeSetup({
           ariaLabel="Duration"
         />
         {duration === "custom" && (
-          <div className="mt-3 flex items-center gap-2">
-            <input
-              type="number"
-              min={5}
-              step={5}
-              value={customDuration}
-              onChange={(e) => setCustomDuration(e.target.value)}
-              aria-label="Custom duration in minutes"
-              className="w-24 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-app-home"
-            />
-            <span className="text-sm text-app-text-secondary">minutes</span>
-          </div>
+          <Stepper
+            value={customDurationMin}
+            min={5}
+            max={480}
+            step={5}
+            onChange={setCustomDurationMin}
+          />
         )}
       </Card>
 
-      {/* Date window */}
+      {/* Date window — tappable row (design: DateWindow chevron-right, no raw inputs visible) */}
       <Card>
         <Overline>Date window</Overline>
-        <div className="flex items-center gap-2.5 rounded-lg border border-app-border bg-app-surface px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setDatePickerOpen((v) => !v)}
+          aria-expanded={datePickerOpen}
+          className={clsx(
+            "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left",
+            showErrors && badRange
+              ? "border-app-error bg-app-error-bg"
+              : "border-app-border bg-app-surface hover:bg-app-hover",
+          )}
+        >
           <CalendarRange
-            className="h-4 w-4 flex-shrink-0 text-app-home"
+            className={clsx(
+              "h-4 w-4 flex-shrink-0",
+              showErrors && badRange ? "text-app-error" : "text-app-home",
+            )}
             aria-hidden
           />
-          <span className="flex-1 text-xs font-semibold text-app-text">
+          <span
+            className={clsx(
+              "flex-1 text-xs font-semibold",
+              showErrors && badRange ? "text-app-error" : "text-app-text",
+            )}
+          >
             {rangeLabel(fromKey, toKey)}
           </span>
-        </div>
-        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-          <label className="block text-[11px] font-semibold text-app-text-secondary">
-            From
-            <input
-              type="date"
-              value={fromKey}
-              onChange={(e) => setFromKey(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-xs text-app-text outline-none focus:border-app-home"
-            />
-          </label>
-          <label className="block text-[11px] font-semibold text-app-text-secondary">
-            To
-            <input
-              type="date"
-              value={toKey}
-              min={fromKey}
-              onChange={(e) => setToKey(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-xs text-app-text outline-none focus:border-app-home"
-            />
-          </label>
-        </div>
+          <ChevronRight
+            className="h-4 w-4 flex-shrink-0 text-app-text-muted"
+            aria-hidden
+          />
+        </button>
+        {datePickerOpen && (
+          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+            <label className="block text-[11px] font-semibold text-app-text-secondary">
+              From
+              <input
+                type="date"
+                value={fromKey}
+                onChange={(e) => setFromKey(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-xs text-app-text outline-none focus:border-app-home"
+              />
+            </label>
+            <label className="block text-[11px] font-semibold text-app-text-secondary">
+              To
+              <input
+                type="date"
+                value={toKey}
+                min={fromKey}
+                onChange={(e) => setToKey(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-app-border bg-app-surface px-2.5 py-2 text-xs text-app-text outline-none focus:border-app-home"
+              />
+            </label>
+          </div>
+        )}
         {showErrors && badRange && (
           <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-app-error">
             <CircleAlert className="h-3 w-3" aria-hidden /> Pick an end date on
@@ -462,21 +529,6 @@ export default function FindATimeSetup({
           </p>
         )}
       </Card>
-
-      {/* Submit */}
-      <button
-        type="button"
-        onClick={submit}
-        disabled={submitting || membersLoading || members.length === 0}
-        className={clsx(
-          "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold shadow-sm transition disabled:opacity-60",
-          tk.bg,
-          tk.textOn,
-        )}
-      >
-        <Search className="h-4 w-4" aria-hidden />
-        {submitting ? "Finding times…" : "Find times"}
-      </button>
     </div>
   );
 }

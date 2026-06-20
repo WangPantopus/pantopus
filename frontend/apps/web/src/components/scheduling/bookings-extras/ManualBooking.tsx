@@ -33,7 +33,7 @@ import {
   pillarTokens,
   type Pillar,
 } from "@/components/scheduling/pillarTokens";
-import { Field, InlineError, TextInput } from "./ui";
+import { Field, InlineError, TextInput, ToggleRow } from "./ui";
 import { durationLabel, fmtDateTime } from "./format";
 import DoubleBookWarning from "./DoubleBookWarning";
 
@@ -129,6 +129,9 @@ export default function ManualBooking({
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<SlotConflict | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  // Step 4 toggles (designed in onbehalf-frames.jsx Frame 5).
+  const [skipApproval, setSkipApproval] = useState(true);
+  const [skipNotifications, setSkipNotifications] = useState(false);
 
   const selectedEventType = useMemo(
     () => eventTypes.find((e) => e.id === eventTypeId) ?? null,
@@ -189,16 +192,20 @@ export default function ManualBooking({
           </p>
         </div>
         <div className="flex w-full max-w-xs flex-col gap-2">
+          {/* Primary CTA: "View booking" per design (onbehalf-frames.jsx:270) */}
           <button
             type="button"
-            onClick={() => onBackToBookings?.()}
+            onClick={() => {
+              if (createdId && onCreated) onCreated(createdId);
+              else onBackToBookings?.();
+            }}
             className={clsx(
               "w-full rounded-xl px-5 py-2.5 text-sm font-semibold transition",
               tk.bg,
               tk.textOn,
             )}
           >
-            Back to bookings
+            View booking
           </button>
           <button
             type="button"
@@ -216,15 +223,6 @@ export default function ManualBooking({
             Book another
           </button>
         </div>
-        {createdId && onCreated && (
-          <button
-            type="button"
-            onClick={() => onCreated(createdId)}
-            className={clsx("text-xs font-semibold hover:underline", tk.text)}
-          >
-            View this booking
-          </button>
-        )}
       </div>
     );
   }
@@ -407,11 +405,23 @@ export default function ManualBooking({
               </div>
             ))}
           </dl>
-          {selectedEventType.requires_approval && (
-            <p className="mt-3 rounded-lg bg-app-info-bg px-3 py-2 text-xs font-medium text-app-info">
-              This event type requires approval — the booking starts as pending.
-            </p>
-          )}
+          {/* Skip approval + Skip notifications toggles (design Frame 5) */}
+          <div className="mt-3 flex flex-col gap-2.5">
+            <ToggleRow
+              label="Skip approval"
+              sub="Confirm the booking now"
+              checked={skipApproval}
+              onChange={setSkipApproval}
+              pillar={pillar}
+            />
+            <ToggleRow
+              label="Skip notifications"
+              sub="Don't notify the invitee"
+              checked={skipNotifications}
+              onChange={setSkipNotifications}
+              pillar={pillar}
+            />
+          </div>
           {error && (
             <div className="mt-4">
               <InlineError message={error} />

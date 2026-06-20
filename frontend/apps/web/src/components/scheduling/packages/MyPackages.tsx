@@ -88,10 +88,10 @@ export default function MyPackages() {
           action={
             <button
               type="button"
-              onClick={() => router.push("/app/scheduling/my-bookings")}
+              onClick={() => router.push("/app/scheduling")}
               className="rounded-xl border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-app-hover"
             >
-              Browse your bookings
+              Browse services
             </button>
           }
         />
@@ -123,12 +123,28 @@ function CreditCard({
   const ownerType = creditOwnerType(credit);
   const tk = pillarTokens(pillarForOwner(ownerType));
   const spent = progress.state === "used";
+  // Owner name: 'Personal provider' for personal, matches iOS/Android parity.
   const ownerName =
     ownerType === "business"
-      ? "Business"
+      ? "Business provider"
       : ownerType === "home"
-        ? "Home"
-        : "Host";
+        ? "Home provider"
+        : "Personal provider";
+
+  // Purchased date label — expiry date not available in contract; show purchase date.
+  const purchasedLabel = (() => {
+    const raw = credit.purchased_at;
+    if (!raw) return null;
+    try {
+      return new Date(raw).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <div
@@ -182,13 +198,20 @@ function CreditCard({
           aria-label="Sessions remaining"
         >
           <div
-            className={clsx(
-              "h-full rounded-full",
-              spent ? "bg-app-border-strong" : tk.bg,
-            )}
-            style={{ width: `${spent ? 100 : progress.pct}%` }}
+            className={clsx("h-full rounded-full")}
+            style={{
+              width: `${spent ? 100 : progress.pct}%`,
+              // Design: meter is always personal-sky for active; border-strong for spent.
+              backgroundColor: spent ? "var(--color-app-border-strong)" : "#0284c7",
+            }}
           />
         </div>
+
+        {purchasedLabel && (
+          <p className="mt-1.5 text-[10.5px] text-app-text-muted">
+            {spent ? `Ended (purchased ${purchasedLabel})` : `Purchased ${purchasedLabel}`}
+          </p>
+        )}
 
         {spent ? (
           <button

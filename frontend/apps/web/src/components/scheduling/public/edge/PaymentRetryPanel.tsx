@@ -15,6 +15,7 @@ import {
   CalendarSearch,
   RotateCcw,
   ShieldCheck,
+  BadgeCheck,
   Lock,
   X,
 } from "lucide-react";
@@ -174,14 +175,42 @@ export default function PaymentRetryPanel({
           tone="success"
           icon={CheckCircle2}
           title="Payment went through"
-          body="Your card worked. Taking you to your booking."
+          body="Your second card worked. Taking you to your booking."
         />
+
+        {/* Amount chip — BadgeCheck capsule (design: success-toned capsule) */}
         {amountCents != null && (
-          <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-app-success">
-            <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-            Paid {money(amountCents, currency)} · receipt on its way
-          </p>
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-app-success-light bg-app-success-bg px-3 py-2">
+            <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-app-success" aria-hidden />
+            <span className="text-[11.5px] font-bold text-app-success">
+              Paid {money(amountCents, currency)} · receipt on its way
+            </span>
+          </div>
         )}
+
+        {/* Auto-advance progress bar + pulsing indicator (design Frame 4) */}
+        <div className="flex flex-col items-center gap-2 pt-0.5">
+          {/* 70%-wide track, 62%-fill success bar */}
+          <div
+            className="h-[5px] overflow-hidden rounded-full bg-app-surface-sunken"
+            style={{ width: "70%" }}
+          >
+            <div
+              className="h-full rounded-full bg-app-success"
+              style={{ width: "62%" }}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-success"
+              aria-hidden
+            />
+            <span className="text-[11px] font-semibold text-app-text-muted">
+              Confirming your booking
+            </span>
+          </div>
+        </div>
+
         <p className="flex items-center justify-center gap-1.5 text-xs text-app-text-muted">
           <Lock className="h-3 w-3" aria-hidden />
           Payments secured by Stripe

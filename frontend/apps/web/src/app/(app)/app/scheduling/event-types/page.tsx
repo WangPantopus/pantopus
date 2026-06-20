@@ -293,7 +293,6 @@ export default function EventTypesPage() {
         <AllHidden
           filter={filter}
           onViewHidden={() => setFilter("hidden")}
-          onCreate={() => router.push(NEW_PATH)}
         />
       )}
 
@@ -375,11 +374,9 @@ function EmptyState({
 function AllHidden({
   filter,
   onViewHidden,
-  onCreate,
 }: {
   filter: "active" | "hidden";
   onViewHidden: () => void;
-  onCreate: () => void;
 }) {
   if (filter === "hidden") {
     return (
@@ -407,24 +404,14 @@ function AllHidden({
       <p className="mb-5 max-w-xs text-sm text-app-text-secondary">
         Switch to Hidden to bring one back, or create a new event type.
       </p>
-      <div className="flex items-center gap-2.5">
-        <button
-          type="button"
-          onClick={onViewHidden}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-4 py-2 text-[13px] font-semibold text-primary-700 transition hover:bg-app-hover"
-        >
-          View hidden
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={onCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-primary-700"
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          New
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onViewHidden}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-4 py-2 text-[13px] font-semibold text-primary-700 transition hover:bg-app-hover"
+      >
+        View hidden
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+      </button>
     </div>
   );
 }

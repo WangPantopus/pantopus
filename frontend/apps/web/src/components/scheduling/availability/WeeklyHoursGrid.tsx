@@ -6,12 +6,17 @@
 // row's hours onto chosen days. All controls stay product/personal sky.
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Clock, Copy, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Clock, Copy, Plus, X } from "lucide-react";
 import clsx from "clsx";
 import { Toggle } from "./primitives";
-import { dayName, WEEK_ORDER_MON_FIRST } from "./format";
+import { dayName, to12h, WEEK_ORDER_MON_FIRST } from "./format";
 import { DEFAULT_BLOCK, type DayModel, type DayBlock } from "./serialize";
 
+/**
+ * TimeBlockRow — Design: a labeled button (clock + "9:00 AM – 5:00 PM" + chevron-down)
+ * that opens an inline expanded editor with the actual time inputs. Matches the
+ * weekly-hours-frames.jsx TimeRangeButton idiom on web without a native time-range picker.
+ */
 function TimeBlockRow({
   block,
   removable,
@@ -25,43 +30,78 @@ function TimeBlockRow({
   onChange: (next: DayBlock) => void;
   onRemove: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const invalid = block.start && block.end && block.end <= block.start;
+  const rangeText =
+    block.start && block.end
+      ? `${to12h(block.start)} – ${to12h(block.end)}`
+      : "Set time range";
+
   return (
-    <div className="flex items-center gap-2">
-      <div
-        className={clsx(
-          "flex flex-1 items-center gap-2 rounded-lg border bg-app-surface px-2.5 py-1.5 shadow-sm",
-          invalid ? "border-app-error" : "border-app-border",
-        )}
-      >
-        <Clock className="h-3.5 w-3.5 shrink-0 text-app-personal" aria-hidden />
-        <input
-          type="time"
-          aria-label="Start time"
-          disabled={disabled}
-          value={block.start}
-          onChange={(e) => onChange({ ...block, start: e.target.value })}
-          className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
-        />
-        <span className="text-app-text-muted">–</span>
-        <input
-          type="time"
-          aria-label="End time"
-          disabled={disabled}
-          value={block.end}
-          onChange={(e) => onChange({ ...block, end: e.target.value })}
-          className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
-        />
-      </div>
-      {removable && !disabled && (
+    <div className="flex flex-col gap-0">
+      <div className="flex items-center gap-2">
+        {/* Labeled time-range button per design's TimeRangeButton */}
         <button
           type="button"
-          aria-label="Remove time block"
-          onClick={onRemove}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-app-text-muted hover:bg-app-hover hover:text-app-text"
+          aria-label={`Time block: ${rangeText}. Edit time range.`}
+          disabled={disabled}
+          onClick={() => !disabled && setExpanded((v) => !v)}
+          className={clsx(
+            "flex flex-1 items-center gap-2 rounded-lg border bg-app-surface px-2.5 py-2 text-left shadow-sm transition",
+            invalid
+              ? "border-app-error"
+              : expanded
+                ? "border-app-personal"
+                : "border-app-border hover:border-app-personal/50",
+            disabled && "cursor-default opacity-70",
+          )}
         >
-          <X className="h-4 w-4" aria-hidden />
+          <Clock
+            className="h-3.5 w-3.5 shrink-0 text-app-personal"
+            aria-hidden
+          />
+          <span className="flex-1 text-[13px] font-semibold tabular-nums text-app-text">
+            {rangeText}
+          </span>
+          <ChevronDown
+            className={clsx(
+              "h-3.5 w-3.5 text-app-text-muted transition-transform",
+              expanded && "rotate-180",
+            )}
+            aria-hidden
+          />
         </button>
+        {removable && !disabled && (
+          <button
+            type="button"
+            aria-label="Remove time block"
+            onClick={onRemove}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-app-text-muted hover:bg-app-hover hover:text-app-text"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        )}
+      </div>
+
+      {/* Inline time inputs — shown when the labeled button is expanded */}
+      {expanded && !disabled && (
+        <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-app-personal/40 bg-app-surface px-2.5 py-1.5">
+          <input
+            type="time"
+            aria-label="Start time"
+            value={block.start}
+            onChange={(e) => onChange({ ...block, start: e.target.value })}
+            className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
+          />
+          <span className="text-app-text-muted">–</span>
+          <input
+            type="time"
+            aria-label="End time"
+            value={block.end}
+            onChange={(e) => onChange({ ...block, end: e.target.value })}
+            className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
+          />
+        </div>
       )}
     </div>
   );

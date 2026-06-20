@@ -182,7 +182,7 @@ export default function PackageList({ owner }: { owner: SchedulingOwnerRef }) {
             </button>
           </div>
 
-          {phase === "ready" && packages.length > 0 && (
+          {phase === "ready" && (
             <div className="mt-4 flex gap-1 rounded-[10px] bg-app-surface-sunken p-1">
               {(["active", "archived"] as const).map((f) => {
                 const on = filter === f;
@@ -253,14 +253,6 @@ export default function PackageList({ owner }: { owner: SchedulingOwnerRef }) {
 
         {phase === "ready" && packages.length > 0 && (
           <div className="flex flex-col gap-3">
-            {needsPayouts && filter === "active" && (
-              <StripeGate
-                compact
-                title="Connect payouts to start selling"
-                body="Your packages are saved, but buyers can't purchase until payouts are set up."
-              />
-            )}
-
             {shown.length === 0 ? (
               <p className="px-1 py-10 text-center text-sm text-app-text-secondary">
                 {filter === "archived"
@@ -272,17 +264,20 @@ export default function PackageList({ owner }: { owner: SchedulingOwnerRef }) {
                 <SectionOverline pillar={pillar}>
                   {filter === "active" ? "On sale" : "Archived"}
                 </SectionOverline>
-                {shown.map((pkg) => (
-                  <PackageRow
-                    key={pkg.id}
-                    pkg={pkg}
-                    busy={busyId === pkg.id}
-                    onEdit={() => router.push(`${BASE}/${pkg.id}/edit`)}
-                    onDuplicate={() => duplicate(pkg)}
-                    onArchive={() => archive(pkg)}
-                    onRestore={() => restore(pkg)}
-                  />
-                ))}
+                <div className="overflow-hidden rounded-[14px] border border-app-border bg-app-surface shadow-sm">
+                  {shown.map((pkg, i) => (
+                    <PackageRow
+                      key={pkg.id}
+                      pkg={pkg}
+                      busy={busyId === pkg.id}
+                      last={i === shown.length - 1}
+                      onEdit={() => router.push(`${BASE}/${pkg.id}/edit`)}
+                      onDuplicate={() => duplicate(pkg)}
+                      onArchive={() => archive(pkg)}
+                      onRestore={() => restore(pkg)}
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -295,6 +290,7 @@ export default function PackageList({ owner }: { owner: SchedulingOwnerRef }) {
 function PackageRow({
   pkg,
   busy,
+  last,
   onEdit,
   onDuplicate,
   onArchive,
@@ -302,6 +298,7 @@ function PackageRow({
 }: {
   pkg: Package;
   busy: boolean;
+  last?: boolean;
   onEdit: () => void;
   onDuplicate: () => void;
   onArchive: () => void;
@@ -329,7 +326,8 @@ function PackageRow({
   return (
     <div
       className={clsx(
-        "relative flex items-center gap-3 rounded-[14px] border border-app-border bg-app-surface p-3 shadow-sm transition",
+        "relative flex items-center gap-3 p-3 transition",
+        !last && "border-b border-app-border",
         busy && "opacity-60",
         archived && "opacity-75",
       )}

@@ -97,9 +97,25 @@ export default function BookingDetailView({
         <Banner tone="neutral" icon={CircleSlash}>
           Cancelled
           {booking.cancel_reason ? ` · ${booking.cancel_reason}` : ""}
-          {booking.refund_issued ? " · refund issued" : ""}
         </Banner>
       )}
+      {/* Dedicated Refund card for cancelled bookings (design Frame 4) */}
+      {booking.status === "cancelled" && booking.refund_issued && (
+        <SectionCard overline="Refund" icon={Receipt} accentClass="text-app-text-muted">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-app-text-secondary">
+              Refunded to card
+            </span>
+            <span className="text-sm font-bold text-app-success tabular-nums">
+              Refunded
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-app-text-muted">
+            Full refund issued · within free-cancellation window
+          </p>
+        </SectionCard>
+      )}
+
       {booking.status === "declined" && (
         <Banner tone="neutral" icon={CircleSlash}>
           Request declined

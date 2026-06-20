@@ -260,14 +260,22 @@ export default function VisitDetail({
       {/* Header */}
       <Card className="flex flex-col gap-2.5">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-app-home text-[15px] font-bold text-white">
+          {/* Avatar: teal gradient — linear-gradient(135deg, #2dd4bf, #0d9488) */}
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white"
+            style={{ background: "linear-gradient(135deg, #2dd4bf, #0d9488)" }}
+          >
             {(event.title || "V").slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[16px] font-bold tracking-tight text-app-text">
               {event.title}
             </div>
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-app-home-bg px-2 py-0.5 text-[10px] font-bold text-app-home">
+            {/* Type chip: teal-100 bg / teal-700 text — distinct from Home green */}
+            <span
+              className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{ background: "#ccfbf1", color: "#0f766e" }}
+            >
               <TypeIcon className="h-2.5 w-2.5" />
               {typeLabel}
             </span>

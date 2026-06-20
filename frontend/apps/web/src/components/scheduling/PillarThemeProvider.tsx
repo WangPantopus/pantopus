@@ -38,3 +38,12 @@ export function usePillar(): Pillar {
 export function usePillarTokens(): PillarTokens {
   return pillarTokens(useContext(PillarContext));
 }
+
+/**
+ * The active owner's pillar accent (color class + soft bg + ring + raw hex),
+ * derived from PillarThemeProvider context. This is the canonical way an
+ * invitee-facing surface reads its accent — never hardcode a pillar color.
+ * For host-side operational CTAs (Approve / primary dock / FAB) use the fixed
+ * PRIMARY_BLUE / PRIMARY_BLUE_CLS from pillarTokens instead.
+ */
+export const useOwnerAccent = usePillarTokens;

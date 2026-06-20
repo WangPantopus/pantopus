@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Pencil,
   Send,
   Star,
   UserCheck,
@@ -187,6 +186,7 @@ export default function SuggestedSlots({
   windowLabel: string;
   tz: string;
   onChangeTz: () => void;
+  /** Edit is handled by the page's top-bar button; kept for API compat */
   onEdit: () => void;
   onBook: (slot: BookingSlot) => void;
   onSendProposal: () => void;
@@ -267,25 +267,17 @@ export default function SuggestedSlots({
               />
             ))}
           </div>
+          {/* Sticky footer: design shows a single full-width SecondaryBtn "Send proposal to members" */}
           <div className="sticky bottom-0 -mx-1 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent pb-1 pt-3">
-            <div className="flex gap-2.5">
-              <button
-                type="button"
-                onClick={onEdit}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-app-border bg-app-surface px-4 py-3 text-sm font-bold text-app-text-secondary hover:bg-app-hover"
-              >
-                <Pencil className="h-4 w-4" aria-hidden /> Edit
-              </button>
-              <button
-                type="button"
-                onClick={onSendProposal}
-                disabled={sending}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-app-home bg-app-surface px-4 py-3 text-sm font-bold text-app-home transition hover:bg-app-home-bg disabled:opacity-60"
-              >
-                <Send className="h-4 w-4" aria-hidden />
-                {sending ? "Sending…" : "Send proposal to members"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onSendProposal}
+              disabled={sending}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-app-home bg-app-surface px-4 py-3 text-sm font-bold text-app-home transition hover:bg-app-home-bg disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" aria-hidden />
+              {sending ? "Sending…" : "Send proposal to members"}
+            </button>
           </div>
         </>
       )}

@@ -8,6 +8,7 @@
 
 "use client";
 
+import Link from "next/link";
 import {
   AlertCircle,
   CheckCircle2,
@@ -302,6 +303,17 @@ interface IntakeFormProps {
   onPatch: (patch: Partial<IntakeValues>) => void;
   onAnswer: (key: string, value: AnswerValue) => void;
   disabled?: boolean;
+  /** When true, replace editable name/email fields with a "Booking as" read-only chip. */
+  isPrefilled?: boolean;
+  /** Prefilled invitee name (shown in BookingAsChip). */
+  prefilledName?: string;
+  /** Prefilled invitee email (shown in BookingAsChip). */
+  prefilledEmail?: string;
+  /** When true, show the "You have an account. Open in app…" info banner below the email field. */
+  hasExistingAccount?: boolean;
+  /** Pillar accent for "Not you?" link and other accent-colored elements. */
+  accentText?: string;
+  onSwitchAccount?: () => void;
 }
 
 export default function IntakeForm({
@@ -311,6 +323,12 @@ export default function IntakeForm({
   onPatch,
   onAnswer,
   disabled,
+  isPrefilled = false,
+  prefilledName,
+  prefilledEmail,
+  hasExistingAccount = false,
+  accentText = "text-app-info",
+  onSwitchAccount,
 }: IntakeFormProps) {
   const guestsExpanded = values.guests.length > 0;
 
@@ -327,72 +345,148 @@ export default function IntakeForm({
     onPatch({ guests: [...values.guests, ""] });
   };
 
+  // "A few questions" section is always shown: phone (required) is the first field
+  // there per design spec (intake-booking-frames.jsx:263-289 — HostQuestions
+  // places phone first, then schema-driven questions). "Your info" has no phone.
+  const hasQuestionSection = true;
+
   return (
     <div className="space-y-3.5">
-      {/* Your info */}
+      {/* Your info — either editable fields or prefilled "Booking as" chip */}
       <section>
         <Overline>Your info</Overline>
-        <div className="space-y-3">
-          <div className="flex gap-2.5">
-            <div className="flex-1">
-              <TextField
-                id="intake-first"
-                label="First name"
-                required
-                value={values.firstName}
-                onChange={(v) => onPatch({ firstName: v })}
-                placeholder="Maya"
-                error={errors.firstName}
-                valid={!errors.firstName && values.firstName.trim().length > 0}
-                disabled={disabled}
-              />
+        {isPrefilled && prefilledName ? (
+          // BookingAsChip — replaces editable fields when the user is signed in.
+          // Mirrors intake-booking-frames.jsx:424-446.
+          <div className="flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface px-3 py-2.5 shadow-sm">
+            <span
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+              style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}
+              aria-hidden
+            >
+              {prefilledName
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12.5px] font-bold text-app-text">
+                Booking as {prefilledName}
+              </p>
+              {prefilledEmail && (
+                <p className="truncate text-[11px] text-app-text-secondary">
+                  {prefilledEmail}
+                </p>
+              )}
             </div>
-            <div className="flex-1">
-              <TextField
-                id="intake-last"
-                label="Last name"
-                required
-                value={values.lastName}
-                onChange={(v) => onPatch({ lastName: v })}
-                placeholder="Chen"
-                error={errors.lastName}
-                valid={!errors.lastName && values.lastName.trim().length > 0}
-                disabled={disabled}
-              />
-            </div>
+            {onSwitchAccount && (
+              <button
+                type="button"
+                onClick={onSwitchAccount}
+                className={clsx(
+                  "shrink-0 text-[11px] font-bold",
+                  accentText,
+                )}
+              >
+                Not you?
+              </button>
+            )}
           </div>
-          <TextField
-            id="intake-email"
-            label="Email"
-            required
-            type="email"
-            value={values.email}
-            onChange={(v) => onPatch({ email: v })}
-            placeholder="you@email.com"
-            error={errors.email}
-            valid={!errors.email && isValidEmail(values.email)}
-            helper="We'll only email you about this booking."
-            disabled={disabled}
-          />
-          <TextField
-            id="intake-phone"
-            label="Phone number"
-            type="tel"
-            leading="+1"
-            value={values.phone}
-            onChange={(v) => onPatch({ phone: v })}
-            placeholder="(555) 000-0000"
-            helper="For a text reminder before your booking."
-            disabled={disabled}
-          />
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex gap-2.5">
+              <div className="flex-1">
+                <TextField
+                  id="intake-first"
+                  label="First name"
+                  required
+                  value={values.firstName}
+                  onChange={(v) => onPatch({ firstName: v })}
+                  placeholder="Maya"
+                  error={errors.firstName}
+                  valid={!errors.firstName && values.firstName.trim().length > 0}
+                  disabled={disabled}
+                />
+              </div>
+              <div className="flex-1">
+                <TextField
+                  id="intake-last"
+                  label="Last name"
+                  required
+                  value={values.lastName}
+                  onChange={(v) => onPatch({ lastName: v })}
+                  placeholder="Chen"
+                  error={errors.lastName}
+                  valid={!errors.lastName && values.lastName.trim().length > 0}
+                  disabled={disabled}
+                />
+              </div>
+            </div>
+            <TextField
+              id="intake-email"
+              label="Email"
+              required
+              type="email"
+              value={values.email}
+              onChange={(v) => onPatch({ email: v })}
+              placeholder="you@email.com"
+              error={errors.email}
+              valid={!errors.email && isValidEmail(values.email)}
+              helper="We'll only email you about this booking."
+              disabled={disabled}
+            />
+            {/* Existing-account info banner (Frame 4) — shown when the email
+                matches an existing Pantopus account, before the user signs in.
+                Design: intake-booking-frames.jsx:354-368. */}
+            {hasExistingAccount && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-app-info-light bg-app-info-bg px-3 py-2.5">
+                <AlertCircle
+                  className="mt-0.5 h-[15px] w-[15px] shrink-0 text-app-info"
+                  aria-hidden
+                />
+                <p className="text-[11.5px] leading-4 text-app-text-strong">
+                  You have an account.{" "}
+                  <Link
+                    href="/app"
+                    className={clsx("font-bold underline decoration-app-info/40", accentText)}
+                  >
+                    Open in app
+                  </Link>{" "}
+                  to use your saved details.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
-      {/* Host questions (dynamic) */}
-      {questions.length > 0 && (
+      {/* A few questions — always shown; phone is the first field here per design */}
+      {hasQuestionSection && (
         <section>
           <Overline>A few questions</Overline>
           <div className="space-y-3">
+            {/* Phone number is the first question-section field per design
+                (HostQuestions in intake-booking-frames.jsx:263-289). */}
+            <TextField
+              id="intake-phone"
+              label="Phone number"
+              required
+              type="tel"
+              leading="+1"
+              value={values.phone}
+              onChange={(v) => onPatch({ phone: v })}
+              placeholder="(555) 000-0000"
+              error={errors.phone}
+              helper={
+                !errors.phone
+                  ? "For a text reminder before your booking."
+                  : undefined
+              }
+              valid={!errors.phone && values.phone.trim().length > 0}
+              disabled={disabled}
+            />
             {questions.map((q, i) => {
               const key = questionKey(q, i);
               return (

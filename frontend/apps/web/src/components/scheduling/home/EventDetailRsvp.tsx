@@ -11,12 +11,16 @@ import {
   Check,
   CloudOff,
   Hand,
+  HelpCircle,
   MapPin,
+  Minus,
   Pencil,
   RotateCw,
   Tag,
   Repeat,
   Trash2,
+  WifiOff,
+  X as XIcon,
 } from "lucide-react";
 import type { RsvpStatus } from "@pantopus/types";
 import BottomSheet from "@/components/ui/BottomSheet";
@@ -66,6 +70,19 @@ export default function EventDetailRsvp({
   const [editOpen, setEditOpen] = useState(false);
   const [rsvpSaving, setRsvpSaving] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -199,8 +216,25 @@ export default function EventDetailRsvp({
     }
   };
 
+  const rsvpEnabled = isOnline && !rsvpSaving;
+
   return (
     <div className="pb-24">
+      {/* offline banner */}
+      {!isOnline && (
+        <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <div className="text-[12px] font-bold text-amber-800">
+              You&apos;re offline
+            </div>
+            <div className="mt-0.5 text-[11.5px] leading-[15px] text-amber-700">
+              RSVP buttons are disabled until you reconnect.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* header */}
       <div className="px-1 pb-1 pt-3">
         <h2 className="text-[21px] font-bold leading-7 tracking-tight text-app-text">
@@ -284,22 +318,19 @@ export default function EventDetailRsvp({
         {/* your RSVP */}
         {showRsvp && (
           <Card highlight={!recorded && event.request_rsvp}>
-            <Overline accent>Your RSVP</Overline>
+            <Overline accent={isOnline}>Your RSVP</Overline>
             {recorded ? (
               <div className="flex items-center gap-2.5 py-0.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-success-bg">
-                  <Check
-                    className="h-4 w-4 text-app-success"
-                    strokeWidth={2.6}
-                  />
-                </div>
+                {myStatus && (
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${RSVP_META[myStatus].recordedHalo}`}
+                  >
+                    <RsvpRecordedIcon status={myStatus} />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="text-[13.5px] font-bold text-app-text">
-                    {myStatus === "going"
-                      ? "You're going"
-                      : myStatus === "maybe"
-                        ? "You replied Maybe"
-                        : "You can't make it"}
+                    {myStatus ? RSVP_META[myStatus].recordedTitle : ""}
                   </div>
                   <div className="mt-0.5 text-[11px] text-app-text-secondary">
                     Everyone can see your reply
@@ -313,13 +344,13 @@ export default function EventDetailRsvp({
                 </button>
               </div>
             ) : (
-              <div className="mt-1.5 space-y-2">
+              <div className={`mt-1.5 space-y-2 ${!isOnline ? "opacity-50 pointer-events-none" : ""}`}>
                 <RsvpSegmented
                   value={myStatus}
-                  disabled={rsvpSaving}
+                  disabled={!rsvpEnabled}
                   onPick={submitRsvp}
                 />
-                {event.request_rsvp && myStatus === null && (
+                {event.request_rsvp && myStatus === null && isOnline && (
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold text-app-home">
                     <Hand className="h-3 w-3" /> Tap to let everyone know
                   </div>
@@ -333,7 +364,7 @@ export default function EventDetailRsvp({
         {event.description && (
           <Card>
             <Overline>Notes</Overline>
-            <p className="mt-1 text-[12.5px] leading-[18px] text-app-text-secondary">
+            <p className="mt-1 text-[12.5px] leading-[18px] text-app-text">
               {event.description}
             </p>
           </Card>
@@ -404,6 +435,7 @@ function Overline({
   accent,
 }: {
   children: React.ReactNode;
+  /** true = home-green accent; false/undefined = secondary text */
   accent?: boolean;
 }) {
   return (
@@ -453,9 +485,35 @@ function RsvpPill({ status }: { status: RsvpStatus }) {
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${meta.cls}`}
     >
+      <RsvpIcon icon={meta.icon} />
       {meta.label}
     </span>
   );
+}
+
+/** 11×11 inline icon for RSVP pills — matches the design's data-lucide glyph set. */
+function RsvpIcon({
+  icon,
+}: {
+  icon: "check" | "help-circle" | "x" | "minus";
+}) {
+  const cls = "h-[11px] w-[11px]";
+  if (icon === "check") return <Check className={cls} strokeWidth={2.6} />;
+  if (icon === "help-circle") return <HelpCircle className={cls} strokeWidth={2.6} />;
+  if (icon === "x") return <XIcon className={cls} strokeWidth={2.6} />;
+  return <Minus className={cls} strokeWidth={2.6} />;
+}
+
+/** Icon inside the recorded-RSVP halo circle. */
+function RsvpRecordedIcon({ status }: { status: RsvpStatus }) {
+  const icon = RSVP_META[status].recordedIcon;
+  const cls = "h-4 w-4";
+  if (icon === "check") return <Check className={cls} strokeWidth={2.6} />;
+  if (icon === "help-circle")
+    return <HelpCircle className={cls} strokeWidth={2.6} />;
+  if (icon === "x") return <XIcon className={cls} strokeWidth={2.6} />;
+  // "minus" — pending/no-reply recorded state
+  return <Minus className={cls} strokeWidth={2.6} />;
 }
 function RsvpSegmented({
   value,

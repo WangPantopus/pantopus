@@ -1,13 +1,15 @@
 // Pure who's-free grid logic (no React) so the slot→cell intersection is
 // unit-testable. GET /whos-free only returns FREE windows, so a cell is:
-//   free    — a free slot overlaps the bucket/day
-//   busy    — the member is known but has no free slot there
-//   unknown — the member isn't in the response (hasn't shared free/busy)
+//   free      — a free slot overlaps the bucket/day
+//   busy      — the member is known but has no free slot there
+//   tentative — member has a tentative/maybe event there (reserved for future API)
+//   off       — outside the member's working hours (reserved for future API)
+//   unknown   — the member isn't in the response (hasn't shared free/busy)
 
 import type { BookingSlot } from "@pantopus/types";
 import { parseLocal } from "./format";
 
-export type CellState = "free" | "busy" | "unknown";
+export type CellState = "free" | "busy" | "tentative" | "off" | "unknown";
 
 // Day-view time buckets: 8a–8p in 2-hour columns.
 export const BUCKETS = [8, 10, 12, 14, 16, 18];

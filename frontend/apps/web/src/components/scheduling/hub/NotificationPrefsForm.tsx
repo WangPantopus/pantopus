@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, Lock } from "lucide-react";
+import { BellOff, Check, Lock } from "lucide-react";
 import * as api from "@pantopus/api";
 import type {
   NotificationPreferences,
@@ -120,12 +120,30 @@ function MatrixRow({
   channels,
   pillar,
   onToggle,
+  isAttendeeGroup,
+  paused,
 }: {
   row: RowDef;
   channels: Channels;
   pillar: Pillar;
   onToggle: (chan: "push" | "email") => void;
+  isAttendeeGroup?: boolean;
+  paused?: boolean;
 }) {
+  // P chip: attendee rows → always disabled (no push for attendees per design)
+  const pState: "on" | "off" | "disabled" =
+    paused || isAttendeeGroup ? "disabled" : channels.push ? "on" : "off";
+  // E chip: locked rows (booking_confirmation) → 'locked'; else normal on/off
+  const eState: "on" | "off" | "locked" | "disabled" = paused
+    ? "disabled"
+    : row.lockedEmail
+      ? "locked"
+      : channels.email
+        ? "on"
+        : "off";
+  // S chip: always disabled (coming soon); design shows no lock badge on rows
+  const sState = "disabled" as const;
+
   return (
     <div className="flex items-center gap-2 px-4 py-2.5">
       <div className="min-w-0 flex-1">
@@ -138,17 +156,17 @@ function MatrixRow({
       </div>
       <ChannelChip
         letter="P"
-        state={channels.push ? "on" : "off"}
+        state={pState}
         pillar={pillar}
-        onClick={() => onToggle("push")}
+        onClick={pState === "on" || pState === "off" ? () => onToggle("push") : undefined}
       />
       <ChannelChip
         letter="E"
-        state={row.lockedEmail ? "on" : channels.email ? "on" : "off"}
+        state={eState}
         pillar={pillar}
-        onClick={row.lockedEmail ? undefined : () => onToggle("email")}
+        onClick={eState === "on" || eState === "off" ? () => onToggle("email") : undefined}
       />
-      <ChannelChip letter="S" state="locked" pillar={pillar} />
+      <ChannelChip letter="S" state={sState} pillar={pillar} />
     </div>
   );
 }
@@ -161,6 +179,8 @@ function MatrixCard({
   prefs,
   pillar,
   onChange,
+  isAttendeeGroup,
+  paused,
   children,
 }: {
   group: Group;
@@ -170,10 +190,12 @@ function MatrixCard({
   prefs: Prefs;
   pillar: Pillar;
   onChange: (next: Prefs) => void;
+  isAttendeeGroup?: boolean;
+  paused?: boolean;
   children?: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className={paused ? "opacity-[0.55]" : undefined}>
       <div className="overflow-hidden rounded-xl border border-app-border bg-app-surface">
         <ChannelHeader label={title} pillar={pillar} />
         <div className="divide-y divide-app-border-subtle">
@@ -185,7 +207,10 @@ function MatrixCard({
                 row={row}
                 channels={channels}
                 pillar={pillar}
+                isAttendeeGroup={isAttendeeGroup}
+                paused={paused}
                 onToggle={(chan) =>
+                  !paused &&
                   onChange(
                     writeChannels(prefs, group, row.key, {
                       ...channels,
@@ -206,6 +231,61 @@ function MatrixCard({
   );
 }
 
+/** A4 design PauseBanner — shown when scheduling notifications are paused. */
+function PauseBanner({ onResume }: { onResume?: () => void }) {
+  return (
+    <div className="mb-1 rounded-xl border border-app-warning-light bg-app-warning-bg p-3.5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-warning-light text-app-warning">
+          <BellOff className="h-4 w-4" aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-semibold leading-[18px] text-app-warning">
+            Notifications paused
+          </p>
+          <p className="mt-0.5 text-[11.5px] leading-[15px] text-app-warning">
+            Emergency alerts still come through
+          </p>
+        </div>
+        {onResume && (
+          <button
+            type="button"
+            onClick={onResume}
+            className="shrink-0 rounded-full border border-app-warning-light bg-white px-3 py-[5px] text-xs font-semibold text-app-warning"
+          >
+            Resume
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A4 design PushOffNotice — shown when OS-level push permission is off. */
+function PushOffNotice() {
+  return (
+    <div className="mb-1 rounded-[10px] border border-app-error-light bg-app-error-bg p-[10px_12px]">
+      <div className="flex items-center gap-[10px]">
+        <BellOff
+          className="h-[15px] w-[15px] shrink-0 text-app-error"
+          aria-hidden
+        />
+        <p className="min-w-0 flex-1 text-xs leading-4 text-app-text">
+          Push is off for Pantopus. Turn it on in Settings to get booking
+          alerts.
+        </p>
+        <button
+          type="button"
+          className="shrink-0 rounded-full border border-app-error-light bg-white px-3 py-[5px] text-[11.5px] font-semibold text-app-error"
+          onClick={() => window.open("app-settings:") }
+        >
+          Settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function NotificationPrefsForm() {
   const owner: SchedulingOwnerRef = useSchedulingOwner();
   const pillar = pillarForOwner(owner.ownerType);
@@ -213,6 +293,9 @@ export default function NotificationPrefsForm() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // paused: scheduling notifications muted by host; pushOff: OS-level push denied
+  const [paused, setPaused] = useState(false);
+  const [pushOff, setPushOff] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -221,7 +304,14 @@ export default function NotificationPrefsForm() {
     try {
       const { prefs: loaded } =
         await api.scheduling.getNotificationPreferences(owner);
-      setPrefs((loaded ?? {}) as Prefs);
+      const raw = (loaded ?? {}) as Prefs;
+      setPrefs(raw);
+      // Read paused + push_off flags if the API surfaces them (keys round-tripped)
+      const sched = (raw.scheduling && typeof raw.scheduling === "object"
+        ? raw.scheduling
+        : {}) as Record<string, unknown>;
+      setPaused(sched.paused === true);
+      setPushOff(sched.push_off === true);
     } catch (err) {
       setError(decodeError(err).message);
     } finally {
@@ -297,6 +387,17 @@ export default function NotificationPrefsForm() {
         )}
       </div>
 
+      {/* A4 design banners: paused state (amber) + push-off state (red) */}
+      {paused && (
+        <PauseBanner
+          onResume={() => {
+            // Optimistically clear local paused flag; real clear is server-side
+            setPaused(false);
+          }}
+        />
+      )}
+      {pushOff && <PushOffNotice />}
+
       <Overline>Scheduling &amp; bookings</Overline>
 
       <MatrixCard
@@ -306,9 +407,10 @@ export default function NotificationPrefsForm() {
         helper="Only you see these. Pick the channel for each event."
         prefs={prefs}
         pillar={pillar}
+        paused={paused}
         onChange={persist}
       >
-        <div className="border-t border-app-border-subtle px-3.5 py-3">
+        <div className={clsx("border-t border-app-border-subtle px-3.5 py-3", paused && "opacity-[0.55]")}>
           <p className="mb-2.5 text-[12.5px] font-semibold text-app-text-strong">
             Send reminders
           </p>
@@ -320,7 +422,9 @@ export default function NotificationPrefsForm() {
                 <button
                   key={m}
                   type="button"
+                  disabled={paused}
                   onClick={() =>
+                    !paused &&
                     persist(
                       writeReminders(
                         prefs,
@@ -332,12 +436,14 @@ export default function NotificationPrefsForm() {
                   }
                   className={clsx(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
-                    active
-                      ? clsx(tk.bg, tk.border, "text-white")
-                      : "border-app-border-strong bg-app-surface text-app-text-strong hover:bg-app-hover",
+                    paused
+                      ? "cursor-default border-app-border bg-app-surface-sunken text-app-text-muted"
+                      : active
+                        ? clsx(tk.bg, tk.border, "text-white")
+                        : "border-app-border-strong bg-app-surface text-app-text-strong hover:bg-app-hover",
                   )}
                 >
-                  {active && (
+                  {active && !paused && (
                     <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
                   )}
                   {reminderLabel(m)}
@@ -355,6 +461,8 @@ export default function NotificationPrefsForm() {
         helper="Attendees always get a confirmation — you choose the rest."
         prefs={prefs}
         pillar={pillar}
+        isAttendeeGroup
+        paused={paused}
         onChange={persist}
       />
 

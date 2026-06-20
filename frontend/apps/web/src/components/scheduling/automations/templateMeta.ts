@@ -136,10 +136,12 @@ export function templateToForm(t: MessageTemplate): TemplateForm {
   };
 }
 
-/** API input — only send a subject for channels that use one. */
+/** API input — only send a subject for channels that use one. Name falls back to channel label when blank. */
 export function formToTemplateInput(form: TemplateForm) {
+  const resolvedName =
+    form.name.trim() || channelMeta(form.channel).label;
   return {
-    name: form.name.trim(),
+    name: resolvedName,
     channel: form.channel,
     subject: channelMeta(form.channel).needsSubject
       ? form.subject.trim()
@@ -153,8 +155,8 @@ export function formToTemplateInput(form: TemplateForm) {
 export function validateTemplate(form: TemplateForm): Record<string, string> {
   const errors: Record<string, string> = {};
   const name = form.name.trim();
-  if (!name) errors.name = "Give this template a name.";
-  else if (name.length > 200)
+  // Name is optional — blank falls back to the channel label server-side.
+  if (name.length > 200)
     errors.name = "Keep the name under 200 characters.";
   const body = form.body.trim();
   if (!body) errors.body = "Add a message body.";

@@ -32,6 +32,7 @@ function Cell({
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   const base = "relative h-7 rounded-md";
+
   if (state === "free") {
     return (
       <button
@@ -47,32 +48,72 @@ function Cell({
       </button>
     );
   }
+
+  // busy — solid neutral (#f3f4f6 per design)
+  if (state === "busy") {
+    return <div className={clsx(base, "bg-[#f3f4f6]")} />;
+  }
+
+  // tentative — amber (#fef3c7 per design)
+  if (state === "tentative") {
+    return <div className={clsx(base, "bg-[#fef3c7]")} />;
+  }
+
+  // off-hours — light with 45° hatch pattern (#f9fafb + diagonal stripe per design)
+  if (state === "off") {
+    return (
+      <div
+        className={clsx(base)}
+        style={{
+          background: "#f9fafb",
+          backgroundImage:
+            "repeating-linear-gradient(45deg, transparent, transparent 3px, #e8eaed 3px, #e8eaed 4px)",
+        }}
+      />
+    );
+  }
+
+  // unknown — diagonal hatch (different stripe color per design)
   if (state === "unknown") {
     return (
       <div
-        className={clsx(
-          base,
-          "flex items-center justify-center bg-app-surface-muted",
-        )}
+        className={clsx(base, "flex items-center justify-center")}
+        style={{
+          background: "#f1f3f5",
+          backgroundImage:
+            "repeating-linear-gradient(45deg, #e2e5e9, #e2e5e9 3px, #f1f3f5 3px, #f1f3f5 6px)",
+        }}
       >
         <span className="text-[10px] font-bold text-app-text-muted">?</span>
       </div>
     );
   }
+
   return <div className={clsx(base, "bg-app-surface-muted/60")} />;
 }
 
-function Legend() {
-  const items: Array<[CellState, string]> = [
-    ["free", "Free"],
-    ["busy", "Busy"],
-    ["unknown", "Unknown"],
-  ];
+function Legend({ hasOptedOut }: { hasOptedOut?: boolean }) {
+  // Design: standard frame shows Free/Busy/Tentative/Off-hours.
+  //         Opted-out frame replaces Off-hours with Unknown.
+  const items: Array<[CellState, string]> = hasOptedOut
+    ? [
+        ["free", "Free"],
+        ["busy", "Busy"],
+        ["tentative", "Tentative"],
+        ["unknown", "Unknown"],
+      ]
+    : [
+        ["free", "Free"],
+        ["busy", "Busy"],
+        ["tentative", "Tentative"],
+        ["off", "Off-hours"],
+      ];
+
   return (
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-app-border pt-3">
       {items.map(([s, label]) => (
         <div key={s} className="flex items-center gap-1.5">
-          <div className="h-3.5 w-3.5">
+          <div className="h-3.5 w-3.5 overflow-hidden rounded-[3px]">
             <Cell state={s} />
           </div>
           <span className="text-[11px] font-semibold text-app-text-secondary">
@@ -215,7 +256,7 @@ export default function WhosFreeGrid({
         })}
       </div>
 
-      <Legend />
+      <Legend hasOptedOut={members.some((m) => !known.has(m.userId))} />
 
       {popover && (
         <>

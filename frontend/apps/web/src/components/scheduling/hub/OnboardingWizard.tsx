@@ -174,6 +174,37 @@ function Actions({ children }: { children: React.ReactNode }) {
   return <div className="flex gap-2.5 pt-1">{children}</div>;
 }
 
+/**
+ * A12-biz ApproveExplainer card — design BizConfirm: violet-accent 30×30 rounded
+ * square + UserCheck icon, full body including "24 hours" text.
+ */
+function ApproveExplainer({ pillar }: { pillar: Pillar }) {
+  const tk = pillarTokens(pillar);
+  return (
+    <div
+      className={clsx(
+        "flex items-start gap-3 rounded-xl border p-4",
+        tk.border,
+        tk.bgSoft,
+      )}
+    >
+      <div
+        className={clsx(
+          "flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg",
+          tk.bg,
+          tk.textOn,
+        )}
+      >
+        <UserCheck className="h-4 w-4" aria-hidden />
+      </div>
+      <p className="text-[12px] leading-4 text-app-text-strong">
+        Requests land in your queue. The slot is held for 24 hours and the
+        client is notified once you confirm.
+      </p>
+    </div>
+  );
+}
+
 function ComposedNote({ pillar, body }: { pillar: Pillar; body: string }) {
   const tk = pillarTokens(pillar);
   return (
@@ -194,6 +225,135 @@ function ComposedNote({ pillar, body }: { pillar: Pillar; body: string }) {
         <CheckCircle2 className="h-4 w-4" aria-hidden />
       </div>
       <p className="text-[12px] leading-4 text-app-text-strong">{body}</p>
+    </div>
+  );
+}
+
+/**
+ * A12-biz TeamList — design BizTeam: overline "Team seats" + seat counter,
+ * gradient avatars, RoleChip, "Seated · bookable" / "Not seated" sub-labels.
+ * Used in place of generic MemberPicker for the Business onboarding team step.
+ */
+function BizTeamList({
+  members,
+  selected,
+  onToggle,
+  pillar,
+  inviteHref,
+}: {
+  members: MemberView[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  pillar: Pillar;
+  inviteHref: string;
+}) {
+  const tk = pillarTokens(pillar);
+  const seatedCount = members.filter((m) => selected.has(m.userId)).length;
+  const totalCount = members.length;
+
+  // Role label normalization
+  const roleLabel = (raw: string): string => {
+    const r = raw.toLowerCase();
+    if (r.includes("owner")) return "Owner";
+    if (r.includes("front")) return "Front desk";
+    if (r.includes("stylist")) return "Stylist";
+    if (r.includes("admin")) return "Admin";
+    return raw || "Member";
+  };
+
+  // Gradient avatar colors per index (cycles through a set of nice gradients)
+  const GRADS = [
+    "linear-gradient(135deg, #a78bfa, #7c3aed)",
+    "linear-gradient(135deg, #f472b6, #db2777)",
+    "linear-gradient(135deg, #38bdf8, #0284c7)",
+    "linear-gradient(135deg, #fbbf24, #d97706)",
+    "linear-gradient(135deg, #34d399, #059669)",
+    "linear-gradient(135deg, #fb923c, #ea580c)",
+  ];
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-app-text-secondary">
+          Team seats
+        </p>
+        <span
+          className={clsx(
+            "font-mono text-[11px] font-bold tabular-nums",
+            tk.text,
+          )}
+        >
+          {seatedCount} of {totalCount} seats used
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-sm">
+        {members.map((m, i) => {
+          const isSeated = selected.has(m.userId);
+          const role = roleLabel(m.sub);
+          const isOwner = role === "Owner";
+          return (
+            <div
+              key={m.userId}
+              className="flex items-center gap-3 border-b border-app-border px-3.5 py-[11px] last:border-b-0"
+            >
+              {/* Gradient avatar */}
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                style={{ background: GRADS[i % GRADS.length] }}
+              >
+                {initials(m.name)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[14px] font-semibold leading-5 text-app-text">
+                    {m.name}
+                  </p>
+                  {/* RoleChip */}
+                  <span
+                    className={clsx(
+                      "shrink-0 rounded-full px-[7px] py-[2px] text-[9.5px] font-bold uppercase tracking-[0.04em]",
+                      isOwner
+                        ? clsx(tk.bgSoft, tk.text)
+                        : "bg-app-surface-sunken text-app-text-strong",
+                    )}
+                  >
+                    {role}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
+                  {isSeated ? "Seated · bookable" : "Not seated"}
+                </p>
+              </div>
+              <Toggle
+                on={isSeated}
+                pillar={pillar}
+                onChange={() => onToggle(m.userId)}
+                label={m.name}
+              />
+            </div>
+          );
+        })}
+        <a
+          href={inviteHref}
+          className="flex items-center gap-3 border-t border-app-border px-3.5 py-[11px] hover:bg-app-hover"
+        >
+          <span
+            className={clsx(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed",
+              tk.border,
+              tk.bgSoft,
+              tk.text,
+            )}
+          >
+            <UserPlus className="h-[17px] w-[17px]" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={clsx("text-[14px] font-bold", tk.text)}>
+              Invite teammate
+            </p>
+          </div>
+        </a>
+      </div>
     </div>
   );
 }
@@ -455,10 +615,10 @@ function HomeOnboarding({
         <SuccessHero
           pillar={pillar}
           title="Your family link is live"
-          sub="Share it and people can book any free member during their own hours."
+          sub="Share it and people can book any free member during their own hours. Bookings show up on the family schedule."
           slug={slug}
-          primaryLabel="Go to scheduling"
-          onPrimary={() => router.push("/app/scheduling")}
+          primaryLabel="Share link"
+          onPrimary={() => router.push("/app/scheduling/booking-page")}
           secondaryLabel="Members"
           secondaryIcon={Users}
           onSecondary={() => router.push(`/app/homes/${homeId}`)}
@@ -613,8 +773,8 @@ function BusinessOnboarding({
           title="You’re taking bookings"
           sub="Your link is live with one service and your seated team. You approve each booking before it’s confirmed."
           slug={ownedSlug}
-          primaryLabel="Go to scheduling"
-          onPrimary={() => router.push("/app/scheduling")}
+          primaryLabel="Share link"
+          onPrimary={() => router.push("/app/scheduling/booking-page")}
           secondaryLabel="Add service"
           secondaryIcon={Plus}
           onSecondary={() => router.push("/app/scheduling/event-types")}
@@ -731,25 +891,23 @@ function BusinessOnboarding({
                 ))}
               </select>
             </label>
-            {paid && (
-              <label className="flex-1">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-app-text-secondary">
-                  Price
+            <label className="flex-1">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-app-text-secondary">
+                Price
+              </span>
+              <div className="flex items-center gap-1 rounded-lg border border-app-border bg-app-surface px-3 py-2.5">
+                <span className="text-sm font-semibold text-app-text-secondary">
+                  $
                 </span>
-                <div className="flex items-center gap-1 rounded-lg border border-app-border bg-app-surface px-3 py-2.5">
-                  <span className="text-sm font-semibold text-app-text-secondary">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full bg-transparent text-sm font-semibold text-app-text outline-none"
-                  />
-                </div>
-              </label>
-            )}
+                <input
+                  type="number"
+                  min={0}
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                  className="w-full bg-transparent text-sm font-semibold text-app-text outline-none"
+                />
+              </div>
+            </label>
           </div>
           <Actions>
             <Ghost onClick={() => setStep(3)}>Use defaults</Ghost>
@@ -767,7 +925,7 @@ function BusinessOnboarding({
             sub="Seated teammates can take bookings. Front-desk roles manage the calendar without being booked."
           />
           {team.length > 0 ? (
-            <MemberPicker
+            <BizTeamList
               members={team}
               selected={seated}
               onToggle={(id) =>
@@ -815,10 +973,7 @@ function BusinessOnboarding({
             ]}
           />
           {confirmMode === "approve" && (
-            <ComposedNote
-              pillar={pillar}
-              body="Requests land in your queue. The slot is held and the client is notified once you confirm."
-            />
+            <ApproveExplainer pillar={pillar} />
           )}
           <Actions>
             <Primary
