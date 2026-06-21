@@ -184,7 +184,7 @@ final class BeaconProfileViewModelTests: XCTestCase {
         // target_tier_rank 2 (the DB enum never carries "tier_or_above").
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.visitorFollowingJSON),
-            .status(200, body: #"{"posts":[{"id":"g1","body":"members only","created_at":"2026-06-19T10:00:00.000Z","visibility":"followers","target_tier_rank":2}]}"#),
+            .status(200, body: Self.gatedPostJSON),
             .status(200, body: Self.tiersJSON)
         ]
         let vm = BeaconProfileViewModel(mode: .visitor(handle: "mariak"), client: makeAPI())
@@ -198,6 +198,8 @@ final class BeaconProfileViewModelTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+    // JSON fixtures mirror the on-wire shape verbatim, so lines run long.
+    // swiftlint:disable line_length
 
     private static let ownerPersonaJSON = #"""
     {"persona":{"id":"p1","handle":"mariak","displayName":"Maria K.","avatarUrl":null,"bannerUrl":null,"bio":"Sourdough scientist.","category":"creator","audienceLabel":"followers","audienceMode":"open","followerCount":1200,"postCount":47,"broadcastEnabled":true,"publicLinks":[{"label":"Site","url":"https://example.com"}]},"channel":{"id":"c1","title":"Maria","status":"active"}}
@@ -219,7 +221,12 @@ final class BeaconProfileViewModelTests: XCTestCase {
     {"posts":[{"id":"lp1","visibility":"tier_or_above","target_tier_rank":2,"locked":true,"teaser":"Subscribe to read the full recipe…","created_at":"2026-06-19T10:00:00.000Z"}]}
     """#
 
+    private static let gatedPostJSON = #"""
+    {"posts":[{"id":"g1","body":"members only","created_at":"2026-06-19T10:00:00.000Z","visibility":"followers","target_tier_rank":2}]}
+    """#
+
     private static let tiersJSON = #"""
     {"tiers":[{"id":"t1","rank":1,"name":"Bronze","description":"Recipes + timing charts","priceCents":400,"currency":"usd"}]}
     """#
+    // swiftlint:enable line_length
 }

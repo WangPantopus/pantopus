@@ -23,7 +23,7 @@ import Foundation
 import Logging
 import Observation
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 /// Which Beacon, and from whose vantage point.
 public enum BeaconProfileMode: Sendable, Equatable, Hashable {
@@ -448,7 +448,7 @@ public final class BeaconProfileViewModel {
     }
 
     private func titleCase(_ value: String) -> String {
-        value.split(whereSeparator: { $0 == "_" || $0 == " " })
+        value.split { $0 == "_" || $0 == " " }
             .map { $0.prefix(1).uppercased() + $0.dropFirst() }
             .joined(separator: " ")
     }
@@ -515,12 +515,22 @@ extension BeaconProfileContent {
             return ProfileStatCell(id: stat.id, value: beaconCompactCount(next), label: stat.label)
         }
         return BeaconProfileContent(
-            personaId: personaId, channelId: channelId, isOwner: isOwner,
-            handle: handle, displayName: displayName, header: header,
-            stats: updated, bio: bio, categoryLabel: categoryLabel,
-            audienceLabel: audienceLabel, audienceModeLabel: audienceModeLabel,
-            links: links, posts: posts, tiers: tiers,
-            broadcastEnabled: broadcastEnabled, shareURL: shareURL,
+            personaId: personaId,
+            channelId: channelId,
+            isOwner: isOwner,
+            handle: handle,
+            displayName: displayName,
+            header: header,
+            stats: updated,
+            bio: bio,
+            categoryLabel: categoryLabel,
+            audienceLabel: audienceLabel,
+            audienceModeLabel: audienceModeLabel,
+            links: links,
+            posts: posts,
+            tiers: tiers,
+            broadcastEnabled: broadcastEnabled,
+            shareURL: shareURL,
             followerCount: next
         )
     }

@@ -61,14 +61,15 @@ public struct BeaconProfileView: View {
                 get: { viewModel.showFollowHandshake },
                 set: { viewModel.showFollowHandshake = $0 }
             ),
-            onDismiss: { Task { await viewModel.refresh() } }
-        ) {
-            PrivacyHandshakeWizardView(
-                viewModel: PrivacyHandshakeViewModel(personaHandle: viewModel.loadedHandle) {
-                    Task { @MainActor in viewModel.showFollowHandshake = false }
-                }
-            )
-        }
+            onDismiss: { Task { await viewModel.refresh() } },
+            content: {
+                PrivacyHandshakeWizardView(
+                    viewModel: PrivacyHandshakeViewModel(personaHandle: viewModel.loadedHandle) {
+                        Task { @MainActor in viewModel.showFollowHandshake = false }
+                    }
+                )
+            }
+        )
         .accessibilityIdentifier("beaconProfile")
         .task { await viewModel.load() }
     }
@@ -129,10 +130,9 @@ public struct BeaconProfileView: View {
             body: {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
                     if payload.isOwner {
-                        BeaconOwnerAnalyticsStrip(
-                            followerStat: payload.stats.first?.value ?? "—",
-                            onTap: { onOpenInsights() }
-                        )
+                        BeaconOwnerAnalyticsStrip(followerStat: payload.stats.first?.value ?? "—") {
+                            onOpenInsights()
+                        }
                         .padding(.horizontal, Spacing.s4)
 
                         if payload.broadcastEnabled {
@@ -145,9 +145,8 @@ public struct BeaconProfileView: View {
 
                     BeaconProfileTabStrip(
                         tabs: tabs(for: payload),
-                        selected: viewModel.selectedTab,
-                        onSelect: { viewModel.selectedTab = $0 }
-                    )
+                        selected: viewModel.selectedTab
+                    ) { viewModel.selectedTab = $0 }
                     .padding(.horizontal, Spacing.s4)
 
                     tabContent(payload)
