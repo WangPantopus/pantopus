@@ -133,8 +133,9 @@ class WeeklyHoursEditorViewModel
                                     // Locked = schedule tracks the device zone (mirrors iOS
                                     // lockTimezone = timezoneId == deviceZone). A blank/absent
                                     // tz is treated as auto-tracking the device.
-                                    lockTimezone = schedule.timezone.isNullOrBlank() ||
-                                        schedule.timezone == ZoneId.systemDefault().id,
+                                    lockTimezone =
+                                        schedule.timezone.isNullOrBlank() ||
+                                            schedule.timezone == ZoneId.systemDefault().id,
                                     days = days,
                                 ),
                             )

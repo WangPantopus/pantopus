@@ -494,11 +494,3 @@ private extension EventTypeListViewModel {
         )
     }
 }
-
-/// Identifiable wrapper so the booking link can drive a `.sheet(item:)`.
-struct ShareLinkItem: Identifiable {
-    let link: String
-    var id: String {
-        link
-    }
-}

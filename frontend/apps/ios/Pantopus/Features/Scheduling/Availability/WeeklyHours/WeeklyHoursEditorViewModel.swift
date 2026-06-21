@@ -249,7 +249,7 @@ final class WeeklyHoursEditorViewModel {
         do {
             let response: EventTypesResponse = try await client.request(SchedulingEndpoints.getEventTypes(owner: .personal))
             let active = response.eventTypes.filter { $0.isActive ?? true }
-            let target = active.min(by: { ($0.sortOrder ?? .max) < ($1.sortOrder ?? .max) })
+            let target = active.min { ($0.sortOrder ?? .max) < ($1.sortOrder ?? .max) }
                 ?? response.eventTypes.first
             if let target {
                 push(.bookingLimits(owner: .personal, eventTypeId: target.id))
