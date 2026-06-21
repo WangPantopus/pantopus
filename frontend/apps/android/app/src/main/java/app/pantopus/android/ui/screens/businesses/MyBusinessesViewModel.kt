@@ -2,23 +2,14 @@
 
 package app.pantopus.android.ui.screens.businesses
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.businesses.BusinessMembership
 import app.pantopus.android.data.api.models.businesses.BusinessProfileDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.businesses.BusinessesRepository
-import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
-import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
-import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
-import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
-import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
-import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,21 +17,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 /**
- * ViewModel for My businesses — wraps `GET /api/businesses/my-businesses`.
+ * ViewModel for My businesses (A08) — wraps `GET /api/businesses/my-businesses`.
  *
- * T6.3f / P14 row anatomy (avatar-first, no tabs):
- *   leading  → 44dp business-violet avatar w/ verified badge when
- *              `profile.is_published == true`
- *   title    → business.name (or username fallback)
- *   subtitle → `<Category> · <Role>` (Owner / Manager / Staff)
- *   body     → "<city>, <state>" — or "Online only" when blank
- *   trailing → chevron (tap → business dashboard)
- *
- * Plus a business-tinted intro banner and a `.SecondaryCreate` FAB
- * tinted `FabTint.Business`.
+ * Projects the enriched response (stats / team / verification) into
+ * [BusinessCard]s for the bespoke A08 row. Mirrors the iOS
+ * `MyBusinessesViewModel`. The "Primary" badge from the design is omitted
+ * (no primary-business concept exists in the backend).
  */
 @HiltViewModel
 class MyBusinessesViewModel
@@ -48,128 +34,170 @@ class MyBusinessesViewModel
     constructor(
         private val repo: BusinessesRepository,
     ) : ViewModel() {
-        private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
-        val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
-
-        private val _banner = MutableStateFlow<BannerConfig?>(null)
-        val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
+        private val _state = MutableStateFlow<MyBusinessesUiState>(MyBusinessesUiState.Loading)
+        val state: StateFlow<MyBusinessesUiState> = _state.asStateFlow()
 
         private var onOpenBusiness: (String) -> Unit = {}
-        private var onRegister: () -> Unit = {}
+        var onRegister: () -> Unit = {}
+            private set
+        var onClaim: () -> Unit = {}
+            private set
 
         fun configureNavigation(
             onOpenBusiness: (String) -> Unit,
             onRegister: () -> Unit,
+            onClaim: () -> Unit,
         ) {
             this.onOpenBusiness = onOpenBusiness
             this.onRegister = onRegister
+            this.onClaim = onClaim
         }
 
+        fun openBusiness(id: String) = onOpenBusiness(id)
+
         fun load() {
-            if (_state.value is ListOfRowsUiState.Loaded) return
+            if (_state.value is MyBusinessesUiState.Loaded) return
             refresh()
         }
 
         fun refresh() {
-            _state.value = ListOfRowsUiState.Loading
-            _banner.value = null
+            _state.value = MyBusinessesUiState.Loading
             viewModelScope.launch {
                 when (val result = repo.myBusinesses()) {
-                    is NetworkResult.Success -> applySuccess(result.data.businesses)
-                    is NetworkResult.Failure -> _state.value = ListOfRowsUiState.Error(result.error.message)
+                    is NetworkResult.Success -> {
+                        val cards = result.data.businesses.map(::cardFor)
+                        _state.value =
+                            if (cards.isEmpty()) {
+                                MyBusinessesUiState.Empty
+                            } else {
+                                MyBusinessesUiState.Loaded(cards)
+                            }
+                    }
+                    is NetworkResult.Failure ->
+                        _state.value = MyBusinessesUiState.Error(result.error.message)
                 }
             }
         }
 
-        private fun applySuccess(memberships: List<BusinessMembership>) {
-            if (memberships.isEmpty()) {
-                _state.value =
-                    ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.Building2,
-                        headline = "No businesses yet",
-                        subcopy =
-                            "Create a business profile to take quotes inside Pantopus and earn the violet verified mark.",
-                        ctaTitle = "Register a business",
-                        onCta = onRegister,
-                    )
-                return
-            }
-            val rows = memberships.map(::rowFor)
-            _state.value =
-                ListOfRowsUiState.Loaded(
-                    sections = listOf(RowSection(id = "my-businesses", rows = rows)),
-                    hasMore = false,
-                )
-            _banner.value =
-                BannerConfig(
-                    icon = PantopusIcon.Building2,
-                    title = if (rows.size == 1) "1 verified business" else "${rows.size} verified businesses",
-                    subtitle = "Tap any business to manage its inbox, gigs, and reviews",
-                    tint = BannerCtaTint.Business,
-                )
-        }
-
-        private fun rowFor(membership: BusinessMembership): RowModel {
-            val title =
-                membership.business.name?.takeIf { it.isNotEmpty() }
-                    ?: membership.business.username?.takeIf { it.isNotEmpty() }
+        private fun cardFor(m: BusinessMembership): BusinessCard {
+            val name =
+                m.business.name?.takeIf { it.isNotEmpty() }
+                    ?: m.business.username?.takeIf { it.isNotEmpty() }
                     ?: "Untitled business"
-            val category = categoryLabel(membership.profile)
-            val role = roleLabel(membership.roleBase)
-            val subtitle =
-                listOfNotNull(category, role)
-                    .joinToString(" · ")
-                    .takeIf { it.isNotEmpty() }
-            val locality =
-                listOfNotNull(membership.business.city, membership.business.state)
+            val category = categoryStyle(m.profile)
+            val place =
+                listOfNotNull(m.business.city, m.business.state)
                     .filter { it.isNotEmpty() }
                     .joinToString(", ")
-                    .takeIf { it.isNotEmpty() }
-            val body = locality ?: "Online only"
-            val bodyIcon = if (locality != null) PantopusIcon.MapPin else PantopusIcon.Info
-
-            return RowModel(
-                id = membership.businessUserId,
-                title = title,
-                subtitle = subtitle,
-                template = RowTemplate.AvatarKebab,
-                leading =
-                    RowLeading.AvatarWithBadge(
-                        name = title,
-                        imageUrl = membership.business.profilePictureUrl,
-                        background =
-                            AvatarBackground.Gradient(
-                                GradientPair(
-                                    start = PantopusColors.business,
-                                    end = PantopusColors.business,
-                                ),
-                            ),
-                        size = AvatarBadgeSize.Large,
-                        verified = membership.profile?.isPublished == true,
-                    ),
-                trailing = RowTrailing.Chevron,
-                onTap = { onOpenBusiness(membership.businessUserId) },
-                body = body,
-                bodyIcon = bodyIcon,
+            val verified = isVerified(m.profile?.identityVerificationTier)
+            val rating = m.business.averageRating
+            val reviews = m.business.reviewCount ?: 0
+            return BusinessCard(
+                id = m.businessUserId,
+                name = name,
+                category = category,
+                locality = place.ifEmpty { "Online only" },
+                localityIsPlaceholder = place.isEmpty(),
+                logoUrl = m.business.profilePictureUrl,
+                role = roleStyle(m.roleBase),
+                teamCount = m.team?.count ?: 0,
+                teamInitials = (m.team?.members ?: emptyList()).take(3).map { it.initials?.takeIf { s -> s.isNotEmpty() } ?: "?" },
+                verified = verified,
+                pending = !verified,
+                openChats = m.stats?.openChats ?: 0,
+                bookingsThisWeek = m.stats?.bookingsThisWeek ?: 0,
+                // Locale.US so the decimal separator matches iOS ("4.9", never "4,9").
+                ratingText = if (rating != null && reviews > 0) String.format(Locale.US, "%.1f", rating) else "New",
+                reviewCount = reviews,
             )
         }
 
-        private fun categoryLabel(profile: BusinessProfileDto?): String? {
-            val first = profile?.categories?.firstOrNull()?.takeIf { it.isNotEmpty() }
-            if (first != null) return first.replace('_', ' ').replaceFirstChar { it.uppercase() }
-            val bizType = profile?.businessType?.takeIf { it.isNotEmpty() }
-            return bizType?.replace('_', ' ')?.replaceFirstChar { it.uppercase() }
+        private fun categoryStyle(profile: BusinessProfileDto?): CategoryStyle {
+            val raw =
+                profile?.categories?.firstOrNull { it.isNotEmpty() }
+                    ?: profile?.businessType
+            val key = raw?.lowercase().orEmpty()
+            // Mirror Swift String.capitalized: lowercase each word, upcase its first letter.
+            val label =
+                raw?.replace('_', ' ')
+                    ?.split(' ')
+                    ?.joinToString(" ") { word -> word.lowercase().replaceFirstChar { c -> c.uppercase() } }
+                    ?.takeIf { it.isNotEmpty() }
+            return when {
+                key.contains("handy") || key.contains("repair") || key.contains("contractor") ->
+                    CategoryStyle(label, PantopusIcon.Hammer, PantopusColors.warning)
+                key.contains("pet") || key.contains("dog") || key.contains("vet") ->
+                    CategoryStyle(label, PantopusIcon.PawPrint, PantopusColors.error)
+                key.contains("tutor") || key.contains("educat") || key.contains("class") || key.contains("school") ->
+                    CategoryStyle(label, PantopusIcon.GraduationCap, PantopusColors.personal)
+                key.contains("clean") ->
+                    CategoryStyle(label, PantopusIcon.Sparkles, PantopusColors.success)
+                else ->
+                    CategoryStyle(label, PantopusIcon.Building2, PantopusColors.business)
+            }
         }
 
-        private fun roleLabel(roleBase: String?): String? =
-            when (roleBase) {
-                "owner" -> "Owner"
-                "admin" -> "Admin"
-                "manager" -> "Manager"
-                "staff" -> "Staff"
-                "viewer" -> "Viewer"
-                "editor" -> "Editor"
-                null, "" -> null
-                else -> roleBase.replaceFirstChar { it.uppercase() }
+        private fun roleStyle(roleBase: String?): RoleStyle? =
+            when (roleBase?.lowercase()?.takeIf { it.isNotEmpty() }) {
+                "owner" -> RoleStyle("Owner", PantopusIcon.Crown, StatusChipVariant.Business)
+                "admin" -> RoleStyle("Admin", PantopusIcon.ShieldCheck, StatusChipVariant.Business)
+                "manager" -> RoleStyle("Manager", PantopusIcon.Briefcase, StatusChipVariant.Personal)
+                "editor" -> RoleStyle("Editor", PantopusIcon.Briefcase, StatusChipVariant.Personal)
+                "staff" -> RoleStyle("Staff", PantopusIcon.User, StatusChipVariant.Neutral)
+                "viewer" -> RoleStyle("Viewer", PantopusIcon.User, StatusChipVariant.Neutral)
+                null -> null
+                // Mirror iOS: lowercase then capitalize (role.capitalized over a lowercased base).
+                else -> RoleStyle(roleBase!!.lowercase().replaceFirstChar { it.uppercase() }, PantopusIcon.User, StatusChipVariant.Neutral)
             }
+
+        companion object {
+            /** Anything above `bi0_unverified` (and non-null) earns the verified mark. */
+            fun isVerified(tier: String?): Boolean = !tier.isNullOrEmpty() && tier != "bi0_unverified"
+        }
     }
+
+/** Bespoke A08 render states. Mirrors iOS `MyBusinessesViewModel.ViewState`. */
+sealed interface MyBusinessesUiState {
+    data object Loading : MyBusinessesUiState
+
+    data class Loaded(val cards: List<BusinessCard>) : MyBusinessesUiState
+
+    data object Empty : MyBusinessesUiState
+
+    data class Error(val message: String) : MyBusinessesUiState
+}
+
+/** Fully-projected display row for the A08 business card. */
+data class BusinessCard(
+    val id: String,
+    val name: String,
+    val category: CategoryStyle,
+    val locality: String,
+    val localityIsPlaceholder: Boolean,
+    val logoUrl: String?,
+    val role: RoleStyle?,
+    val teamCount: Int,
+    val teamInitials: List<String>,
+    val verified: Boolean,
+    val pending: Boolean,
+    val openChats: Int,
+    val bookingsThisWeek: Int,
+    val ratingText: String,
+    val reviewCount: Int,
+) {
+    val categoryLabel: String? get() = category.label
+}
+
+/** Role chip styling. */
+data class RoleStyle(
+    val label: String,
+    val icon: PantopusIcon,
+    val variant: StatusChipVariant,
+)
+
+/** Logo-tile color + glyph + category label (token-only, no hex). */
+data class CategoryStyle(
+    val label: String?,
+    val icon: PantopusIcon,
+    val color: Color,
+)

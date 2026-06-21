@@ -99,6 +99,10 @@ public enum HubRoute: Hashable {
     /// FAB / empty-state CTA and from the `pantopus://businesses/new`
     /// deep link.
     case createBusiness
+    /// A08 — My businesses index. Reached from the Hub nav-drawer's
+    /// "My Businesses" row (previously fell back to the NotYetAvailable
+    /// placeholder).
+    case myBusinesses
     case pulsePost(postId: String)
     /// Bills list for a home (T5.2.2 / P13).
     case homeBills(homeId: String)
@@ -526,7 +530,7 @@ public struct HubTabRoot: View {
         switch destination {
         // Personal
         case .myHomes: return .myHomes
-        case .myBusinesses: return .placeholder(label: "My Businesses")
+        case .myBusinesses: return .myBusinesses
         case .connections: return .connections
         case .mailbox: return .mailboxRoot
         case .profileAndPrivacy: return .privacySettings
@@ -867,6 +871,16 @@ public struct HubTabRoot: View {
                 viewModel: MyHomesListViewModel(
                     onOpenHome: { homeId in Task { @MainActor in push(.homeDashboard(homeId: homeId)) } },
                     onAddHome: { Task { @MainActor in push(.addHome) } }
+                )
+            )
+        case .myBusinesses:
+            MyBusinessesView(
+                viewModel: MyBusinessesViewModel(
+                    onOpenBusiness: { businessId in
+                        Task { @MainActor in push(.businessOwner(businessId: businessId)) }
+                    },
+                    onRegister: { Task { @MainActor in push(.createBusiness) } },
+                    onClaim: { Task { @MainActor in push(.discoverBusinesses) } }
                 )
             )
         case .myClaims:

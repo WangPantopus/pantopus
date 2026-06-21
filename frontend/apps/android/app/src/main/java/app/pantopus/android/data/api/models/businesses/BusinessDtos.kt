@@ -21,6 +21,8 @@ data class BusinessUserDto(
     @Json(name = "account_type") val accountType: String? = null,
     val city: String? = null,
     val state: String? = null,
+    @Json(name = "average_rating") val averageRating: Double? = null,
+    @Json(name = "review_count") val reviewCount: Int? = null,
 )
 
 /**
@@ -37,6 +39,31 @@ data class BusinessProfileDto(
     @Json(name = "logo_file_id") val logoFileId: String? = null,
     @Json(name = "banner_file_id") val bannerFileId: String? = null,
     val description: String? = null,
+    // bi0_unverified … bi4_authority. Anything above bi0_unverified earns
+    // the violet verified mark; bi0_unverified reads as pending.
+    @Json(name = "identity_verification_tier") val identityVerificationTier: String? = null,
+)
+
+/** Per-business stats band — `stats` block on each membership row. */
+@JsonClass(generateAdapter = true)
+data class BusinessStatsDto(
+    @Json(name = "open_chats") val openChats: Int = 0,
+    @Json(name = "bookings_this_week") val bookingsThisWeek: Int = 0,
+)
+
+/** One member chip in the team stack. `initials` is always present. */
+@JsonClass(generateAdapter = true)
+data class BusinessTeamChipDto(
+    val name: String? = null,
+    val initials: String? = null,
+    @Json(name = "avatar_file_id") val avatarFileId: String? = null,
+)
+
+/** Team summary — `team` block on each membership row. */
+@JsonClass(generateAdapter = true)
+data class BusinessTeamSummaryDto(
+    val count: Int = 0,
+    val members: List<BusinessTeamChipDto> = emptyList(),
 )
 
 /**
@@ -53,6 +80,8 @@ data class BusinessMembership(
     @Json(name = "business_user_id") val businessUserId: String,
     val business: BusinessUserDto,
     val profile: BusinessProfileDto? = null,
+    val stats: BusinessStatsDto? = null,
+    val team: BusinessTeamSummaryDto? = null,
 )
 
 /** `GET /api/businesses/my-businesses` envelope. */

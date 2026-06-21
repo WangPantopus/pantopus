@@ -1906,6 +1906,11 @@ public struct YouTabRoot: View {
                     },
                     onRegister: {
                         Task { @MainActor in path.append(.createBusiness) }
+                    },
+                    onClaim: {
+                        // The You tab has no Discover-businesses route; the
+                        // claim affordance falls back to the create flow.
+                        Task { @MainActor in path.append(.createBusiness) }
                     }
                 )
             )

@@ -694,7 +694,7 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
       const bizIds = seats.map(s => s.business_user_id);
       const { data: bizUsers } = await supabaseAdmin
         .from('User')
-        .select('id, username, name, email, profile_picture_url, account_type, city, state')
+        .select('id, username, name, email, profile_picture_url, account_type, city, state, average_rating, review_count')
         .in('id', bizIds);
       const bizMap = {};
       for (const u of (bizUsers || [])) bizMap[u.id] = u;
@@ -718,7 +718,7 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
           joined_at,
           business_user_id,
           business:business_user_id (
-            id, username, name, email, profile_picture_url, account_type, city, state
+            id, username, name, email, profile_picture_url, account_type, city, state, average_rating, review_count
           )
         `)
         .eq('user_id', userId)
@@ -738,7 +738,7 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
     if (businessIds.length > 0) {
       const { data: profileData } = await supabaseAdmin
         .from('BusinessProfile')
-        .select('business_user_id, business_type, categories, is_published, logo_file_id, banner_file_id, description')
+        .select('business_user_id, business_type, categories, is_published, logo_file_id, banner_file_id, description, identity_verification_tier')
         .in('business_user_id', businessIds);
       profiles = profileData || [];
     }
@@ -748,9 +748,71 @@ router.get('/my-businesses', verifyToken, async (req, res) => {
       profileMap[p.business_user_id] = p;
     }
 
+    // ── Per-business signals for the My businesses cards ────────────────
+    //   team             → active seat count + up to 3 member chips
+    //   stats.open_chats → the business's own unread, active conversations
+    //   stats.bookings_this_week → incoming BusinessBooking rows (last 7d)
+    const initialsFrom = (name) => {
+      if (!name || typeof name !== 'string') return '?';
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 0) return '?';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
+
+    const teamMap = {};
+    const chatMap = {};
+    const bookingMap = {};
+    if (businessIds.length > 0) {
+      const weekAgoISO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const [seatRows, chatRows, bookingRows] = await Promise.all([
+        supabaseAdmin
+          .from('BusinessSeat')
+          .select('business_user_id, display_name, display_avatar_file_id')
+          .in('business_user_id', businessIds)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true }),
+        supabaseAdmin
+          .from('ChatParticipant')
+          .select('user_id')
+          .in('user_id', businessIds)
+          .eq('is_active', true)
+          .gt('unread_count', 0),
+        supabaseAdmin
+          .from('BusinessBooking')
+          .select('business_user_id')
+          .in('business_user_id', businessIds)
+          .gte('created_at', weekAgoISO),
+      ]);
+
+      for (const seat of (seatRows.data || [])) {
+        const team = teamMap[seat.business_user_id]
+          || (teamMap[seat.business_user_id] = { count: 0, members: [] });
+        team.count += 1;
+        if (team.members.length < 3) {
+          team.members.push({
+            name: seat.display_name || null,
+            initials: initialsFrom(seat.display_name),
+            avatar_file_id: seat.display_avatar_file_id || null,
+          });
+        }
+      }
+      for (const row of (chatRows.data || [])) {
+        chatMap[row.user_id] = (chatMap[row.user_id] || 0) + 1;
+      }
+      for (const row of (bookingRows.data || [])) {
+        bookingMap[row.business_user_id] = (bookingMap[row.business_user_id] || 0) + 1;
+      }
+    }
+
     const businesses = (memberships || []).map(m => ({
       ...m,
       profile: profileMap[m.business_user_id] || null,
+      team: teamMap[m.business_user_id] || { count: 0, members: [] },
+      stats: {
+        open_chats: chatMap[m.business_user_id] || 0,
+        bookings_this_week: bookingMap[m.business_user_id] || 0,
+      },
     }));
 
     res.json({ businesses });
@@ -2656,39 +2718,36 @@ router.post('/:businessId/catalog/:itemId/request', verifyToken, async (req, res
       .eq('business_user_id', businessId)
       .single();
 
-    // Create gig as booking request
-    const gigData = {
-      title: item.name,
-      description: item.description || `Booking request for ${item.name}`,
-      price: item.price_cents ? item.price_cents / 100 : 0,
+    // Persist the booking request. item_name / price_cents are frozen on the
+    // row so the booking stays self-describing if the catalog item changes.
+    const bookingData = {
+      business_user_id: businessId,
       requester_id: actorUserId,
-      worker_id: businessId,
-      status: 'pending_acceptance',
-      source: 'catalog_booking',
-      pay_type: 'fixed',
       catalog_item_id: itemId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      item_name: item.name,
+      price_cents: item.price_cents ?? null,
+      note: typeof req.body?.note === 'string' ? req.body.note.slice(0, 1000) : null,
+      status: 'pending',
     };
 
-    const { data: gig, error: gigErr } = await supabaseAdmin
-      .from('Gig')
-      .insert(gigData)
+    const { data: booking, error: bookingErr } = await supabaseAdmin
+      .from('BusinessBooking')
+      .insert(bookingData)
       .select('id')
       .single();
 
-    if (gigErr) {
-      logger.error('Failed to create booking gig', { error: gigErr.message, businessId, itemId });
+    if (bookingErr) {
+      logger.error('Failed to create booking', { error: bookingErr.message, businessId, itemId });
       return res.status(500).json({ error: 'Failed to create booking request' });
     }
 
-    await writeAuditLog(businessId, actorUserId, 'catalog_booking_request', 'Gig', gig.id, {
+    await writeAuditLog(businessId, actorUserId, 'catalog_booking_request', 'BusinessBooking', booking.id, {
       item_id: itemId,
       item_name: item.name,
     });
 
     res.status(201).json({
-      gig_id: gig.id,
+      booking_id: booking.id,
       item_name: item.name,
       business_name: bizUser?.name || 'Business',
       avg_response_minutes: profile?.avg_response_minutes || null,
@@ -2696,6 +2755,49 @@ router.post('/:businessId/catalog/:itemId/request', verifyToken, async (req, res
   } catch (err) {
     logger.error('Catalog booking request error', { error: err.message });
     res.status(500).json({ error: 'Failed to create booking request' });
+  }
+});
+
+/**
+ * GET /:businessId/bookings — Incoming booking requests for a business.
+ * Owner read path for the bookings pipeline. Any team member with access can
+ * read; results newest-first.
+ * Query: ?status=pending|accepted|declined|cancelled|completed (optional)
+ *        ?limit (default 50, max 100)
+ */
+router.get('/:businessId/bookings', verifyToken, async (req, res) => {
+  try {
+    const { businessId } = req.params;
+    const userId = req.user.id;
+
+    const access = await checkBusinessPermission(businessId, userId);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this business' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    let query = supabaseAdmin
+      .from('BusinessBooking')
+      .select('id, requester_id, catalog_item_id, item_name, price_cents, note, status, created_at')
+      .eq('business_user_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    const validStatuses = ['pending', 'accepted', 'declined', 'cancelled', 'completed'];
+    if (req.query.status && validStatuses.includes(req.query.status)) {
+      query = query.eq('status', req.query.status);
+    }
+
+    const { data: bookings, error } = await query;
+    if (error) {
+      logger.error('Error fetching business bookings', { error: error.message, businessId });
+      return res.status(500).json({ error: 'Failed to fetch bookings' });
+    }
+
+    res.json({ bookings: bookings || [] });
+  } catch (err) {
+    logger.error('Business bookings error', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch bookings' });
   }
 });
 
