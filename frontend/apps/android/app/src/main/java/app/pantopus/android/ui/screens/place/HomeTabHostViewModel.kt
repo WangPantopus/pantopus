@@ -16,10 +16,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Decides what the Home tab lands on (W3): the Place dashboard when the
- * user has a primary home, else the classic Hub. Resolves the primary
- * home from `/api/homes/my-homes` (the authoritative `is_primary_owner`
- * source). Mirrors the iOS `HubTabRoot.primaryHomeId()` auto-land.
+ * Decides what the Home tab lands on (W3): the Place dashboard (Your Place)
+ * when the user has a primary home, else an add-a-place empty state.
+ * Resolves the primary home from `/api/homes/my-homes` (the authoritative
+ * `is_primary_owner` source). Mirrors the iOS `HubTabRoot` Home landing.
  */
 @HiltViewModel
 class HomeTabHostViewModel
@@ -47,10 +47,10 @@ class HomeTabHostViewModel
                             val homes = result.data.homes
                             val primary =
                                 homes.firstOrNull { it.isPrimaryOwner == true } ?: homes.firstOrNull()
-                            if (primary != null) HomeLanding.PlaceDashboard(primary.id) else HomeLanding.Hub
+                            if (primary != null) HomeLanding.PlaceDashboard(primary.id) else HomeLanding.NoHome
                         }
-                        // On failure, fall back to the always-safe Hub surface.
-                        is NetworkResult.Failure -> HomeLanding.Hub
+                        // On failure, fall back to the add-a-place empty state.
+                        is NetworkResult.Failure -> HomeLanding.NoHome
                     }
             }
         }
@@ -77,5 +77,5 @@ sealed interface HomeLanding {
 
     data class PlaceDashboard(val homeId: String) : HomeLanding
 
-    data object Hub : HomeLanding
+    data object NoHome : HomeLanding
 }

@@ -23,6 +23,7 @@ public enum MarketplaceRoute: Hashable {
 /// NavigationStack wrapper for the Marketplace tab.
 public struct MarketplaceTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<MarketplaceRoute>()
     @State private var router = DeepLinkRouter.shared
     @State private var systemSheet: SystemSheetRequest?
@@ -47,7 +48,8 @@ public struct MarketplaceTabRoot: View {
                     path.append(.listingDetail(listingId: listingId))
                 },
                 onCompose: { path.append(.composeListing) },
-                onBack: nil
+                onBack: nil,
+                onMenu: { rootTabs.showNavDrawer = true }
             )
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MarketplaceRoute.self) { route in

@@ -22,13 +22,17 @@ public struct FeedView: View {
     private let onCompose: @MainActor (PulseIntent) -> Void
     private let onEmptyCTA: (@MainActor () -> Void)?
     private let onBack: (@MainActor () -> Void)?
+    /// Set when this is a tab root — renders the leading menu hamburger that
+    /// opens the global navigation drawer. Mutually exclusive with `onBack`.
+    private let onMenu: (@MainActor () -> Void)?
 
     init(
         viewModel: PulseFeedViewModel? = nil,
         onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor (PulseIntent) -> Void = { _ in },
         onEmptyCTA: (@MainActor () -> Void)? = nil,
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onMenu: (@MainActor () -> Void)? = nil
     ) {
         // Swift 5.10 crashes while lowering PulseFeedViewModel() in a default-argument thunk.
         _viewModel = State(initialValue: viewModel ?? PulseFeedViewModel())
@@ -36,6 +40,7 @@ public struct FeedView: View {
         self.onCompose = onCompose
         self.onEmptyCTA = onEmptyCTA
         self.onBack = onBack
+        self.onMenu = onMenu
     }
 
     public var body: some View {
@@ -89,6 +94,9 @@ public struct FeedView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("pulseBackButton")
+            } else if let onMenu {
+                DrawerMenuButton(action: onMenu)
+                    .padding(.trailing, Spacing.s1)
             }
             Text(viewModel.surface.title)
                 .font(.system(size: 22, weight: .bold))

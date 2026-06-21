@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -365,7 +366,12 @@ fun NavigationDrawer(
             modifier =
                 Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    // Inset the scrollable rows past the system navigation bar so
+                    // the last items (Settings / Help & Support) are never hidden
+                    // under the gesture pill. The drawer sheet already renders
+                    // above the app's bottom tab bar (it's a modal sheet).
+                    .navigationBarsPadding(),
         ) {
             context.sections().forEach { section ->
                 DrawerSection(section = section, onSelect = onSelect)

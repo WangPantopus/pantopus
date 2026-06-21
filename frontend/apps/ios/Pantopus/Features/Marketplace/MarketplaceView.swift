@@ -15,17 +15,22 @@ public struct MarketplaceView: View {
     private let onOpenListing: @MainActor (String) -> Void
     private let onCompose: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
+    /// Set when this is a tab root — renders the leading menu hamburger that
+    /// opens the global navigation drawer. Mutually exclusive with `onBack`.
+    private let onMenu: (@MainActor () -> Void)?
 
     init(
         viewModel: MarketplaceViewModel = MarketplaceViewModel(),
         onOpenListing: @escaping @MainActor (String) -> Void = { _ in },
         onCompose: @escaping @MainActor () -> Void = {},
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onMenu: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenListing = onOpenListing
         self.onCompose = onCompose
         self.onBack = onBack
+        self.onMenu = onMenu
     }
 
     /// Cold first load — per the A08 loading frame, the search bar and
@@ -75,6 +80,8 @@ public struct MarketplaceView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("marketplaceBackButton")
+            } else if let onMenu {
+                DrawerMenuButton(action: onMenu)
             }
             Text("Marketplace")
                 .font(.system(size: 22, weight: .bold))

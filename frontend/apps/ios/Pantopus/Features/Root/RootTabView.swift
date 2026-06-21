@@ -57,23 +57,42 @@ public final class RootTabModel {
     public var selected: RootTab = .home
     /// Unread Messages count rendered as the tab badge. Wired to live data in P8.
     public var messagesBadge: Int = 0
+    /// Global navigation drawer presentation. Every tab's top-left menu
+    /// button flips this; the drawer overlays the entire `RootTabView`, so a
+    /// single instance serves all five tabs.
+    public var showNavDrawer = false
+    /// A Hub-stack route requested from the global drawer. `HubTabRoot`
+    /// drains it (after the Home tab is selected) and pushes it onto its
+    /// own NavigationStack — the drawer's destinations all resolve there.
+    var pendingDrawerRoute: HubRoute?
+    /// Bumped when the drawer asks to reset the Home stack back to the
+    /// Your Place root. `HubTabRoot` observes the change and clears its path.
+    var hubResetToken = 0
     public init() {}
 }
 
 /// Root tab container for signed-in users. Each tab hosts its own
 /// NavigationStack so deep navigation within a tab survives tab switches.
 public struct RootTabView: View {
+    @Environment(AuthManager.self) private var auth
     @State private var model = RootTabModel()
     private let chatBadgeStore = ChatBadgeStore.shared
     @State private var router = DeepLinkRouter.shared
     @State private var pendingInviteToken: String?
-    @State private var showProfile = false
+    /// Identity Center presented when the global drawer's context pill is
+    /// tapped (LAUNCHER / Option A switching path).
+    @State private var navDrawerIdentityCenter = false
 
     public init() {}
 
+    private var currentUserName: String {
+        if case let .signedIn(user) = auth.state { return user.displayName ?? "" }
+        return ""
+    }
+
     public var body: some View {
         TabView(selection: tabBinding) {
-            HubTabRoot { showProfile = true }
+            HubTabRoot()
                 .tabItem { tabLabel(.home) }
                 .tag(RootTab.home)
 
@@ -96,6 +115,13 @@ public struct RootTabView: View {
         }
         .tint(Theme.Color.primary600)
         .environment(model)
+        .overlay { navigationDrawerOverlay }
+        .sheet(isPresented: $navDrawerIdentityCenter) {
+            // `onBack` is not the trailing parameter of `IdentityCenterView`,
+            // so the argument label must stay explicit here.
+            // swiftlint:disable:next trailing_closure
+            IdentityCenterView(onBack: { navDrawerIdentityCenter = false })
+        }
         .task {
             await chatBadgeStore.start()
             model.messagesBadge = chatBadgeStore.unreadMessages
@@ -108,9 +134,6 @@ public struct RootTabView: View {
         }
         .task {
             consumeInviteDeepLinkIfNeeded(pending: router.pending)
-        }
-        .fullScreenCover(isPresented: $showProfile) {
-            YouTabRoot()
         }
         .fullScreenCover(
             item: Binding<InviteSheetToken?>(
@@ -126,6 +149,38 @@ public struct RootTabView: View {
                 )
             )
         }
+    }
+
+    /// The global navigation drawer. Lifted out of the Home tab so it
+    /// overlays *every* tab — the top-left menu button on any screen flips
+    /// `model.showNavDrawer`. Drawer rows resolve to `HubRoute`s, so a
+    /// selection switches to the Home tab and hands the route to
+    /// `HubTabRoot` (which owns the stack those destinations render in).
+    private var navigationDrawerOverlay: some View {
+        NavigationDrawerView(
+            viewModel: NavigationDrawerViewModel(context: .personal(name: currentUserName)),
+            isPresented: drawerBinding,
+            onSelect: { destination in
+                guard let route = HubTabRoot.route(
+                    forDrawer: destination,
+                    context: .personal(name: "")
+                ) else { return }
+                model.selected = .home
+                model.pendingDrawerRoute = route
+            },
+            onOpenIdentityCenter: { navDrawerIdentityCenter = true },
+            onBackToHub: {
+                model.selected = .home
+                model.hubResetToken += 1
+            }
+        )
+    }
+
+    private var drawerBinding: Binding<Bool> {
+        Binding(
+            get: { model.showNavDrawer },
+            set: { model.showNavDrawer = $0 }
+        )
     }
 
     private func consumeInviteDeepLinkIfNeeded(pending: DeepLinkRouter.Destination?) {

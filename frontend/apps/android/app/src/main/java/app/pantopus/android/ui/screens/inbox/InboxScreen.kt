@@ -17,10 +17,14 @@ fun InboxScreen(
     onOpenConversation: (ConversationRowContent) -> Unit = {},
     onCompose: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
+    // Set when this is a tab root — renders the leading menu hamburger that
+    // opens the global navigation drawer.
+    onMenu: (() -> Unit)? = null,
 ) {
     ChatListScreen(
         onOpenConversation = onOpenConversation,
         onCompose = onCompose,
         onOpenSearch = onOpenSearch,
+        onMenu = onMenu,
     )
 }

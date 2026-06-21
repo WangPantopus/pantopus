@@ -53,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.components.DrawerMenuButton
 import app.pantopus.android.ui.screens.feed.pulse.PulseFeedUiState
 import app.pantopus.android.ui.screens.feed.pulse.PulseFeedViewModel
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
@@ -78,6 +79,9 @@ fun FeedScreen(
     onCompose: (PulseIntent) -> Unit = {},
     onEmptyCta: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    // Set when this is a tab root — renders the leading menu hamburger that
+    // opens the global navigation drawer. Mutually exclusive with onBack.
+    onMenu: (() -> Unit)? = null,
     viewModel: PulseFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -99,6 +103,7 @@ fun FeedScreen(
             TopBar(
                 title = surface.title,
                 onBack = onBack,
+                onMenu = onMenu,
                 onSearchTap = {
                     showsSearch = !showsSearch
                     if (!showsSearch) viewModel.setSearchText("")
@@ -205,6 +210,7 @@ fun FeedScreen(
 private fun TopBar(
     title: String,
     onBack: (() -> Unit)?,
+    onMenu: (() -> Unit)? = null,
     onSearchTap: (() -> Unit)? = null,
     onFilterTap: (() -> Unit)? = null,
 ) {
@@ -232,6 +238,9 @@ private fun TopBar(
                         tint = PantopusColors.appText,
                     )
                 }
+                Spacer(modifier = Modifier.size(8.dp))
+            } else if (onMenu != null) {
+                DrawerMenuButton(onClick = onMenu)
                 Spacer(modifier = Modifier.size(8.dp))
             }
             Text(

@@ -17,9 +17,19 @@ struct PlaceDashboardView: View {
     @State private var viewModel: PlaceDashboardViewModel
     @State private var showSwitcher = false
     @State private var showVerify = false
+    /// Leading-edge controls. As the Home tab root, `onMenu` opens the global
+    /// navigation drawer; pushed by the place-switcher, `onBack` pops instead.
+    private let onMenu: (@MainActor () -> Void)?
+    private let onBack: (@MainActor () -> Void)?
 
-    init(viewModel: PlaceDashboardViewModel) {
+    init(
+        viewModel: PlaceDashboardViewModel,
+        onMenu: (@MainActor () -> Void)? = nil,
+        onBack: (@MainActor () -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.onMenu = onMenu
+        self.onBack = onBack
     }
 
     private var verifyAddress: String {
@@ -128,6 +138,7 @@ struct PlaceDashboardView: View {
 
     private func header(intel: PlaceIntelligence, isVerified: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
+            leadingControl
             VStack(alignment: .leading, spacing: 5) {
                 Text("Your Place")
                     .font(.system(size: 28, weight: .bold))
@@ -152,6 +163,23 @@ struct PlaceDashboardView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Switch place")
+        }
+    }
+
+    /// Leading control in the header — the menu hamburger at the tab root,
+    /// or a back chevron when pushed by the place-switcher.
+    @ViewBuilder
+    private var leadingControl: some View {
+        if let onMenu {
+            DrawerMenuButton(action: onMenu)
+        } else if let onBack {
+            Button(action: onBack) {
+                Icon(.chevronLeft, size: 22, color: Theme.Color.appText)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+            .accessibilityIdentifier("placeBackButton")
         }
     }
 

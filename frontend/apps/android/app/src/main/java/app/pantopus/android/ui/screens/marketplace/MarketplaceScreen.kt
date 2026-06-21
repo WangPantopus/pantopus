@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.DrawerMenuButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -82,6 +83,9 @@ fun MarketplaceScreen(
     onOpenListing: (String) -> Unit = {},
     onCompose: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    // Set when this is a tab root — renders the leading menu hamburger that
+    // opens the global navigation drawer. Mutually exclusive with onBack.
+    onMenu: (() -> Unit)? = null,
     viewModel: MarketplaceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,7 +111,7 @@ fun MarketplaceScreen(
                 .testTag("marketplace"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            MarketTopBar(onBack = onBack)
+            MarketTopBar(onBack = onBack, onMenu = onMenu)
             if (isInitialLoading) {
                 MarketplaceChromeSkeleton()
             } else {
@@ -158,7 +162,10 @@ fun MarketplaceScreen(
 // MARK: - Chrome
 
 @Composable
-private fun MarketTopBar(onBack: (() -> Unit)?) {
+private fun MarketTopBar(
+    onBack: (() -> Unit)?,
+    onMenu: (() -> Unit)? = null,
+) {
     Row(
         modifier =
             Modifier
@@ -183,6 +190,10 @@ private fun MarketTopBar(onBack: (() -> Unit)?) {
                     tint = PantopusColors.appText,
                 )
             }
+            Spacer(modifier = Modifier.size(Spacing.s1))
+        } else if (onMenu != null) {
+            DrawerMenuButton(onClick = onMenu)
+            Spacer(modifier = Modifier.size(Spacing.s1))
         }
         Text(
             text = "Marketplace",

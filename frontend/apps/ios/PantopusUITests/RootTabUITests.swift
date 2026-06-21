@@ -93,11 +93,16 @@ final class RootTabUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No conversations yet"].waitForExistence(timeout: 5))
     }
 
-    func testTapHomeAvatarShowsProfile() throws {
+    func testHomeMenuButtonOpensDrawer() throws {
         guard let app = launchSignedIn() else {
             throw XCTSkip("Signed-in launch env not honoured.")
         }
-        app.buttons["hubAvatarButton"].firstMatch.tap()
-        XCTAssertTrue(app.scrollViews["meScreen"].waitForExistence(timeout: 5))
+        // The Home tab now roots on Your Place; its top-left menu button opens
+        // the global navigation drawer (lifted to the root so it overlays every
+        // tab, above the bottom bar).
+        let menu = app.buttons["navMenuButton"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(app.buttons["navDrawer.contextPill"].waitForExistence(timeout: 5))
     }
 }
