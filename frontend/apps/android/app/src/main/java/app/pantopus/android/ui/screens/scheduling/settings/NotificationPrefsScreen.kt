@@ -18,7 +18,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +73,8 @@ private fun NotifBody(
 ) {
     val accent = data.pillar.accent
     val accentBg = data.pillar.accentBg
+    // Presentational SMS-coming-soon tooltip toggle — mirrors iOS model.showSmsHint.
+    var showSmsHint by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = Spacing.s6)) {
         if (data.paused) NotifPauseBanner()
         if (data.pushOff) NotifPushOffNotice(onOpenSettings = onOpenSettings)
@@ -81,6 +85,8 @@ private fun NotifBody(
             disabled = data.paused,
             accent = accent,
             accentBg = accentBg,
+            smsHint = showSmsHint,
+            onSmsTap = { showSmsHint = !showSmsHint },
         ) {
             data.notifyMe.forEachIndexed { index, row ->
                 NotifMatrixRow(

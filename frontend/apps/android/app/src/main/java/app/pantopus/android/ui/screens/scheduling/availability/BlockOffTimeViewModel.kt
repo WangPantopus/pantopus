@@ -41,14 +41,31 @@ data class BlockOffForm(
     val saving: Boolean = false,
     val conflict: BlockConflict? = null,
 ) {
+    // Weekday-specific, with the design's "· Ends never. Tap to add an end date."
+    // tail (mirrors block-time-frames.jsx RepeatCard + iOS repeatCaption).
     val repeatCaption: String?
-        get() =
-            when (repeat) {
+        get() {
+            val tail = "· Ends never. Tap to add an end date."
+            return when (repeat) {
                 BlockRepeat.None -> null
-                BlockRepeat.Daily -> "Repeats every day. Tap to change."
-                BlockRepeat.Weekly -> "Repeats every ${weekdayFull(date.dayOfWeek.toBackendWeekday())}. Tap to change."
-                BlockRepeat.Monthly -> "Repeats monthly on day ${date.dayOfMonth}. Tap to change."
+                BlockRepeat.Daily -> "Repeats every day $tail"
+                BlockRepeat.Weekly -> "Repeats every ${weekdayFull(date.dayOfWeek.toBackendWeekday())} $tail"
+                BlockRepeat.Monthly -> "Repeats monthly on day ${date.dayOfMonth} $tail"
             }
+        }
+
+    /** A timed block needs a positive window; all-day blocks are always valid (mirrors iOS). */
+    val isValid: Boolean
+        get() {
+            if (allDay) return true
+            val (startHour, startMin) = parseHourMinute(start)
+            val (endHour, endMin) = parseHourMinute(end)
+            return startHour * MIN_PER_HOUR + startMin < endHour * MIN_PER_HOUR + endMin
+        }
+
+    private companion object {
+        const val MIN_PER_HOUR = 60
+    }
 }
 
 sealed interface BlockOffEvent {

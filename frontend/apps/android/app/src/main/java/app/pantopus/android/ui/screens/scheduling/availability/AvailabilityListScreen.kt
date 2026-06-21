@@ -31,7 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -106,7 +109,7 @@ fun AvailabilityListScreen(
                         headline = "You don't have a schedule yet",
                         subcopy = "Set the hours you're open to bookings. Your home and business pages build from this.",
                         ctaTitle = "Add working hours",
-                        onCta = viewModel::addSchedule,
+                        onCta = viewModel::createDefaultSchedule,
                     )
                 is AvailabilityListUiState.Error ->
                     ErrorState(message = s.message, onRetry = viewModel::refresh)
@@ -237,7 +240,18 @@ private fun ScheduleCard(
                 if (row.isDefault) DefaultPill()
             }
             Text(
-                text = "${row.summary} · ${row.timezone}",
+                // Summary in fg-secondary; only append " · TZ" (tz bolded) when
+                // the timezone is non-blank, so a blank tz leaves no dangling " · ".
+                text =
+                    buildAnnotatedString {
+                        append(row.summary)
+                        if (row.timezone.isNotBlank()) {
+                            append("  ·  ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)) {
+                                append(row.timezone)
+                            }
+                        }
+                    },
                 color = PantopusColors.appTextSecondary,
                 fontSize = 11.5.sp,
                 modifier = Modifier.padding(top = Spacing.s1),

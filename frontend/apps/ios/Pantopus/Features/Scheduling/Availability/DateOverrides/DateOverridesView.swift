@@ -19,6 +19,7 @@ import SwiftUI
 // swiftlint:disable:next type_body_length
 struct DateOverridesView: View {
     @State private var viewModel: DateOverridesViewModel
+    @State private var showCustomHoursPicker = false
     @Environment(\.dismiss) private var dismiss
 
     init(viewModel: DateOverridesViewModel) {
@@ -35,6 +36,14 @@ struct DateOverridesView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .accessibilityIdentifier("scheduling.dateOverrides")
+        .sheet(isPresented: $showCustomHoursPicker) {
+            TimeRangePickerSheet(
+                range: TimeRange(start: viewModel.customStart, end: viewModel.customEnd)
+            ) { start, end in
+                viewModel.customStart = start
+                viewModel.customEnd = end
+            }
+        }
         .alert("Couldn't save", isPresented: errorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -319,18 +328,17 @@ struct DateOverridesView: View {
         .pantopusShadow(.sm)
     }
 
+    /// A single labeled time-range button (clock · "10:00 AM – 2:00 PM" · chevron)
+    /// that opens a picker sheet — mirrors the design's TimeRangeButton and
+    /// Android's A3TimeRangeButton (replaces the two inline DatePickers).
     private var customHoursRow: some View {
-        HStack(spacing: Spacing.s2) {
-            DatePicker("Start", selection: customStartBinding, displayedComponents: .hourAndMinute)
-                .labelsHidden()
-                .accessibilityLabel("Custom start time")
-            Text("–")
-                .foregroundStyle(Theme.Color.appTextMuted)
-            DatePicker("End", selection: customEndBinding, displayedComponents: .hourAndMinute)
-                .labelsHidden()
-                .accessibilityLabel("Custom end time")
-            Spacer()
-        }
+        AvailabilityTimeRangeButton(
+            label: TimeRange(start: viewModel.customStart, end: viewModel.customEnd).display,
+            isValid: TimeRange(start: viewModel.customStart, end: viewModel.customEnd).isValid,
+            onTap: { showCustomHoursPicker = true },
+            onRemove: nil
+        )
+        .accessibilityIdentifier("scheduling.dateOverrides.customHoursButton")
     }
 
     private var primaryCTA: some View {
@@ -697,20 +705,6 @@ struct DateOverridesView: View {
     }
 
     // MARK: Bindings
-
-    private var customStartBinding: Binding<Date> {
-        Binding(
-            get: { viewModel.customStart.referenceDate() },
-            set: { viewModel.customStart = TimeOfDay(from: $0) }
-        )
-    }
-
-    private var customEndBinding: Binding<Date> {
-        Binding(
-            get: { viewModel.customEnd.referenceDate() },
-            set: { viewModel.customEnd = TimeOfDay(from: $0) }
-        )
-    }
 
     private var holidaysBinding: Binding<Bool> {
         Binding(

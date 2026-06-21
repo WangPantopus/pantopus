@@ -127,7 +127,7 @@ private fun LimitsBody(
         )
         StepperRow(
             label = "Max per day",
-            value = if (form.maxPerDay == 0) "No limit" else form.maxPerDay.toString(),
+            value = form.maxPerDay.toString(),
             unit = null,
             caption = "Most bookings you'll take in a day.",
             onMinus = { viewModel.changeMaxPerDay(-1) },
@@ -146,8 +146,8 @@ private fun LimitsBody(
         )
         StepperRow(
             label = "Per-person limit",
-            value = if (form.perPerson == 0) "No limit" else form.perPerson.toString(),
-            unit = if (form.perPerson <= 1) null else "bookings",
+            value = form.perPerson.toString(),
+            unit = if (form.perPerson == 1) "booking" else "bookings",
             caption = "How many one person can hold at once.",
             onMinus = { viewModel.changePerPerson(-1) },
             onPlus = { viewModel.changePerPerson(1) },

@@ -240,10 +240,25 @@ final class WeeklyHoursEditorViewModel {
 
     // MARK: Cross-screen
 
-    /// Booking limits live on the event type — hand off to the services list
-    /// so the user can pick the service whose limits to adjust (I2 / B7).
-    func openBookingLimits() {
-        push(.eventTypeList(owner: .personal))
+    /// Booking limits live on the event type. The design's LinksCard reaches B7
+    /// directly (and Android routes straight to BookingLimits), so resolve the
+    /// personal default event type and push `.bookingLimits` for it. If the user
+    /// has no event types yet, fall back to the services list so they can create
+    /// one first.
+    func openBookingLimits() async {
+        do {
+            let response: EventTypesResponse = try await client.request(SchedulingEndpoints.getEventTypes(owner: .personal))
+            let active = response.eventTypes.filter { $0.isActive ?? true }
+            let target = active.min(by: { ($0.sortOrder ?? .max) < ($1.sortOrder ?? .max) })
+                ?? response.eventTypes.first
+            if let target {
+                push(.bookingLimits(owner: .personal, eventTypeId: target.id))
+            } else {
+                push(.eventTypeList(owner: .personal))
+            }
+        } catch {
+            push(.eventTypeList(owner: .personal))
+        }
     }
 
     func makeDateOverridesViewModel() -> DateOverridesViewModel {
@@ -251,7 +266,11 @@ final class WeeklyHoursEditorViewModel {
     }
 
     func makeBlockOffViewModel() -> BlockOffTimeViewModel {
-        BlockOffTimeViewModel(client: client)
+        BlockOffTimeViewModel(client: client) { [weak self] bookingId in
+            guard let self else { return }
+            self.activeSheet = nil
+            self.push(.bookingDetail(owner: .personal, bookingId: bookingId))
+        }
     }
 
     // MARK: Save

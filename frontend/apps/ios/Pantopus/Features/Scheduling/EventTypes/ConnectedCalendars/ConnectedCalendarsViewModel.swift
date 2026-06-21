@@ -34,6 +34,20 @@ struct CalendarProvider: Identifiable, Hashable {
         CalendarProvider(id: "apple", name: "Apple Calendar", shortName: "Apple", icon: .calendar),
         CalendarProvider(id: "outlook", name: "Outlook", shortName: "Outlook", icon: .calendarRange)
     ]
+
+    /// Per-provider brand tint for the glyph (design `ProviderTile` `p.color`:
+    /// Google `#1a73e8`, Apple `#1d1d1f`, Outlook `#0f6cbd`). Mapped to the
+    /// closest existing semantic tokens so no raw hex reaches a Color and the
+    /// tile reads brand-differentiated rather than uniform grey. See sharedTodos
+    /// — dedicated `calendarGoogle/Apple/Outlook` tokens give the exact hues.
+    var brandColor: Color {
+        switch id {
+        case "google": Theme.Color.info
+        case "apple": Theme.Color.appText
+        case "outlook": Theme.Color.primary700
+        default: Theme.Color.appTextSecondary
+        }
+    }
 }
 
 @Observable

@@ -69,7 +69,7 @@ class EventTypesSnapshotTest {
         ContentBody(
             state = state,
             onOpen = noop, onCreate = {}, onTemplate = noopInt, onToggle = noopToggle,
-            onCopy = noop, onShare = noop, onDuplicate = noop, onHide = noop, onDelete = noop, onViewHidden = {},
+            onCopy = noop, onShare = noop, onDuplicate = noop, onDelete = noop, onViewHidden = {},
         )
     }
 

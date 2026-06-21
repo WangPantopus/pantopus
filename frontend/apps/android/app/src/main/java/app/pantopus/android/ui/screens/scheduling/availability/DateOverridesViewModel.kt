@@ -92,6 +92,17 @@ class DateOverridesViewModel
         private val _events = Channel<DateOverridesEvent>(Channel.BUFFERED)
         val events = _events.receiveAsFlow()
 
+        /** The override set as last loaded/saved — overrides persist only on Done
+         *  (`save()`), so back-without-Done would silently discard. This baseline
+         *  lets the screen guard a dirty back-press. */
+        private var baselineOverrides: List<OverrideItem> = emptyList()
+
+        /** True when the working overrides differ from the last persisted set. */
+        fun isDirty(): Boolean {
+            val current = (_state.value as? DateOverridesUiState.Content)?.form?.overrides ?: return false
+            return current.sortedBy { it.date } != baselineOverrides.sortedBy { it.date }
+        }
+
         fun load() {
             _state.value = DateOverridesUiState.Loading
             viewModelScope.launch {
@@ -109,6 +120,7 @@ class DateOverridesViewModel
                                     )
                                 }
                                 .sortedBy { it.date }
+                        baselineOverrides = overrides
                         val today = LocalDate.now()
                         _state.value =
                             DateOverridesUiState.Content(
@@ -220,7 +232,10 @@ class DateOverridesViewModel
                         form.overrides.map { OverrideInput(it.date, it.isUnavailable, it.start, it.end) },
                     )
                 when (val result = repo.setOverrides(form.scheduleId, body)) {
-                    is NetworkResult.Success -> _events.send(DateOverridesEvent.Saved)
+                    is NetworkResult.Success -> {
+                        baselineOverrides = form.overrides
+                        _events.send(DateOverridesEvent.Saved)
+                    }
                     is NetworkResult.Failure -> {
                         _state.value = DateOverridesUiState.Content(form.copy(saving = false))
                         _events.send(DateOverridesEvent.Toast(errors.decode(result.error).displayMessage()))

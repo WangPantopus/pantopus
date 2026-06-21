@@ -146,7 +146,7 @@ fun ConnectedCalendarsScreen(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
                 PantopusIconImage(
-                    icon = PantopusIcon.CalendarCog,
+                    icon = PantopusIcon.CalendarSync,
                     contentDescription = null,
                     size = 15.dp,
                     tint = PantopusColors.primary300,
@@ -215,7 +215,7 @@ internal fun ComingSoon() {
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.CalendarCog,
+                icon = PantopusIcon.CalendarSync,
                 contentDescription = null,
                 size = 26.dp,
                 tint = PantopusColors.primary600,
@@ -363,12 +363,15 @@ private fun ConnectedRow(
     RowCard {
         AccountHeader(provider = provider, account = calendar.externalAccount, kind = CalendarPillKind.SYNCED)
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
+        // v1 contract is read-only — render these as display-only (mirrors iOS
+        // `.disabled(true)`) so they don't read as live, no-op switches.
         EtToggleRow(
             icon = PantopusIcon.Search,
             label = "Check for conflicts",
             sub = "Block times when you're busy elsewhere",
             checked = calendar.checkConflicts != false,
             onToggle = {},
+            enabled = false,
         )
         EtToggleRow(
             icon = PantopusIcon.CalendarPlus,
@@ -376,6 +379,7 @@ private fun ConnectedRow(
             sub = "New bookings show up here",
             checked = calendar.writeTarget != false,
             onToggle = {},
+            enabled = false,
             last = true,
         )
         Row(
@@ -507,7 +511,7 @@ private fun DeniedRow(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     PantopusIconImage(
-                        icon = PantopusIcon.SlidersHorizontal,
+                        icon = PantopusIcon.Settings,
                         contentDescription = null,
                         size = 13.dp,
                         tint = PantopusColors.primary600,

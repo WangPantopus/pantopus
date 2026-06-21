@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.availability
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,7 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +56,14 @@ fun DateOverridesScreen(
     var showTimeEditor by remember { mutableStateOf(false) }
     var rangeStep by remember { mutableStateOf(0) }
     var rangeStart by remember { mutableStateOf<LocalDate?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    // Overrides persist only on Done (save()); guard a dirty back-press so
+    // edits aren't silently discarded (parity with iOS, which persists each edit).
+    val attemptBack = {
+        if (viewModel.isDirty()) showDiscardDialog = true else onBack()
+    }
+    BackHandler(enabled = true) { attemptBack() }
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(Unit) {
@@ -66,7 +78,7 @@ fun DateOverridesScreen(
     Column(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         AvailabilityTopBar(
             title = "Date overrides",
-            onBack = onBack,
+            onBack = attemptBack,
             trailing = {
                 val saving = (state as? DateOverridesUiState.Content)?.form?.saving == true
                 TopBarTextAction(label = "Done", enabled = !saving, onClick = viewModel::save)
@@ -124,6 +136,20 @@ fun DateOverridesScreen(
                 rangeStep = 0
                 rangeStart = null
             },
+        )
+    }
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            text = { Text("Your date overrides haven't been saved. Tap Done to keep them.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onBack()
+                }) { Text("Discard", color = PantopusColors.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDiscardDialog = false }) { Text("Keep editing") } },
         )
     }
 }
@@ -206,7 +232,11 @@ private fun PickerBlock(
         )
         if (custom) {
             FieldLabel("Hours for this day")
-            A3TimeRangeButton(text = formatRange12(form.customStart, form.customEnd), onClick = onEditCustomHours)
+            A3TimeRangeButton(
+                text = formatRange12(form.customStart, form.customEnd),
+                onClick = onEditCustomHours,
+                modifier = Modifier.testTag("scheduling.dateOverrides.customHoursButton"),
+            )
         } else {
             Text("People can't book you on this date.", color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
         }

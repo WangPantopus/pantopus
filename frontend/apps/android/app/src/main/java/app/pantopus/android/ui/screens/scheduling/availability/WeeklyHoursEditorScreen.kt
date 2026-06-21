@@ -135,7 +135,7 @@ fun WeeklyHoursEditorScreen(
                         }
                         NameCard(name = form.name, enabled = !form.saving, onNameChange = viewModel::setName)
                         TimezoneCard(
-                            label = form.timezoneLabel,
+                            label = form.timezoneDisplay,
                             locked = form.lockTimezone,
                             enabled = !form.saving,
                             onPick = { showTz = true },

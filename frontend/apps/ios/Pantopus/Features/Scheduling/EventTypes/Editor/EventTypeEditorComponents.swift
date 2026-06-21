@@ -42,6 +42,90 @@ struct EventTypeColorPicker: View {
     }
 }
 
+/// Bordered text input box (design `TextInput`, event-editor-shell.jsx) — a
+/// 1.5px-bordered, radius-8 surface holding the field, with an optional caption
+/// label above and an error tint on the border. Mirrors Android's `EtTextField`
+/// so the Basics fields read as boxed inputs rather than bare list rows.
+struct BorderedTextField<Field: View>: View {
+    var label: String?
+    var isError: Bool = false
+    @ViewBuilder let field: () -> Field
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            if let label {
+                Text(label)
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+            }
+            field()
+                .font(Theme.Font.body)
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.horizontal, Spacing.s3)
+                .padding(.vertical, Spacing.s2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isError ? Theme.Color.error : Theme.Color.appBorder, lineWidth: 1.5)
+                )
+        }
+    }
+}
+
+/// Sunken-track segmented control (design `Segmented`, event-editor-shell.jsx) —
+/// a sunken pill track holding equal-width segments; the selected segment is a
+/// white surface card with a soft shadow and a product-blue bold label, idle
+/// labels are fg3. Generic over a `Hashable` option so the editor can drive it
+/// with `EventLocationMode`, `EventAssignmentMode`, `CollectMode`, `DurationMode`,
+/// or a currency string. Mirrors Android's `EtSegmented`.
+struct EventTypeSegmented<Option: Hashable>: View {
+    let options: [Option]
+    @Binding var selection: Option
+    let label: (Option) -> String
+    var accessibilityID: String?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(options, id: \.self) { option in
+                segment(option)
+            }
+        }
+        .padding(3)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .accessibilityIdentifier(accessibilityID ?? "")
+    }
+
+    private func segment(_ option: Option) -> some View {
+        let on = option == selection
+        return Button { selection = option } label: {
+            Text(label(option))
+                .font(.system(size: 12, weight: on ? .bold : .semibold))
+                .foregroundStyle(on ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                .background(selectedBackground(on))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func selectedBackground(_ on: Bool) -> some View {
+        if on {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Theme.Color.appSurface)
+                .pantopusShadow(.sm)
+        } else {
+            Color.clear
+        }
+    }
+}
+
 /// A selectable duration chip used in multiple-duration mode. A small "Default"
 /// marker rides on the one the booker gets by default.
 struct DurationChip: View {
@@ -307,9 +391,11 @@ struct EventTypeSaveBar: View {
     }
 }
 
-/// Stripe-not-connected inline card — the design's violet-tinted `StripeCard`
-/// with a credit-card tile, the connect copy, and a full-width sky
-/// "Connect Stripe" button carrying an external-link glyph.
+/// Stripe-not-connected inline card — the design's Stripe-branded `StripeCard`
+/// (stripeBg `#f5f4ff` surface, `#e0ddff` border, `#635bff` tile) with a
+/// credit-card tile, the connect copy, and a full-width sky "Connect Stripe"
+/// button carrying an external-link glyph. Uses the dedicated Stripe brand mark
+/// token rather than the business pillar violet.
 struct StripeConnectCard: View {
     let action: () -> Void
 
@@ -318,7 +404,7 @@ struct StripeConnectCard: View {
             HStack(alignment: .top, spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
-                        .fill(Theme.Color.business)
+                        .fill(Theme.Color.stripeBrand)
                         .frame(width: 30, height: 30)
                     Icon(.creditCard, size: 15, strokeWidth: 2.2, color: Theme.Color.appTextInverse)
                 }
@@ -349,11 +435,14 @@ struct StripeConnectCard: View {
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.businessBg)
+        // Stripe brand tint (design stripeBg `#f5f4ff`) + brand-purple border
+        // (`#e0ddff`), both derived from the Stripe brand mark token so no raw
+        // hex reaches a Color initialiser.
+        .background(Theme.Color.stripeBrand.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.business.opacity(0.2), lineWidth: 1)
+                .stroke(Theme.Color.stripeBrand.opacity(0.22), lineWidth: 1)
         )
     }
 }

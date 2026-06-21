@@ -78,7 +78,8 @@ internal fun eventDotColor(
     }
 
 // ─── Dimensions (off-scale design values stay raw; on-scale use tokens) ─────
-private val TOP_BAR_HEIGHT = 56.dp
+// Design `event-types-frames.jsx` TopBar height:46 (matches iOS .frame(height: 46)).
+private val TOP_BAR_HEIGHT = 46.dp
 private val ICON_BUTTON = 36.dp
 private val TOGGLE_W = 36.dp
 private val TOGGLE_H = 20.dp

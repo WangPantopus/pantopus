@@ -807,7 +807,15 @@ fun A3ConflictCard(
                 size = 10.dp,
                 tint = PantopusColors.appTextInverse,
             )
-            Text("BOOKING OVERLAP", color = PantopusColors.appTextInverse, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            // Canonical source string is sentence-case "Booking overlap" (design +
+            // iOS); the overline style uppercases it for display.
+            Text(
+                "Booking overlap".uppercase(),
+                color = PantopusColors.appTextInverse,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.4.sp,
+            )
         }
         Text(message, color = PantopusColors.appTextStrong, fontSize = 12.sp)
         if (onViewBooking != null) {

@@ -109,6 +109,7 @@ fun MonthCalendar(
                                 day = day,
                                 selected = date == selectedDate,
                                 marked = date in markedDates,
+                                isToday = date == LocalDate.now(),
                                 onClick = { onSelect(date) },
                             )
                         }
@@ -124,6 +125,7 @@ private fun DayCell(
     day: Int,
     selected: Boolean,
     marked: Boolean,
+    isToday: Boolean,
     onClick: () -> Unit,
 ) {
     Box(
@@ -137,9 +139,15 @@ private fun DayCell(
     ) {
         Text(
             day.toString(),
-            color = if (selected) PantopusColors.appTextInverse else PantopusColors.appText,
+            // Tint today's number primary600 when not the selected day (mirrors iOS).
+            color =
+                when {
+                    selected -> PantopusColors.appTextInverse
+                    isToday -> PantopusColors.primary600
+                    else -> PantopusColors.appText
+                },
             fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (selected || isToday) FontWeight.Bold else FontWeight.Medium,
         )
         if (marked && !selected) {
             Box(

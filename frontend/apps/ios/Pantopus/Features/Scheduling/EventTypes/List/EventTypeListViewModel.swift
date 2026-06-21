@@ -68,6 +68,10 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     var shareItem: ShareLinkItem?
     /// Brief "Link copied" affordance.
     var showCopiedToast = false
+    /// False when the resolved owner can't edit this catalog (403 / forbidden) —
+    /// drives the read-only lock banner + disabled +/toggles/overflow (design
+    /// `event-types-frames.jsx` FrameGated).
+    private(set) var canEdit = true
 
     // MARK: Dependencies + data
 
@@ -179,6 +183,7 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         if showLoading { state = .loading }
         do {
             let response: EventTypesResponse = try await client.request(SchedulingEndpoints.getEventTypes(owner: owner))
+            canEdit = true
             eventTypes = response.eventTypes
             // The booking-page slug powers per-row copy/share; a failure here is
             // non-fatal (`try?`) — the list still loads, links just stay disabled.
@@ -189,8 +194,19 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
             pageSlug = page?.page.slug
             rebuild()
         } catch let error as SchedulingError {
-            state = .error(message: error.userMessage ?? "Couldn't load your event types.")
+            if case .forbidden = error {
+                // Gated owner (403): render the read-only catalog with a lock banner
+                // instead of a full-screen error (design FrameGated). The list endpoint
+                // returns no rows on 403, so the banner sits above whatever loaded.
+                canEdit = false
+                eventTypes = []
+                rebuild()
+            } else {
+                canEdit = true
+                state = .error(message: error.userMessage ?? "Couldn't load your event types.")
+            }
         } catch {
+            canEdit = true
             state = .error(message: "Couldn't load your event types.")
         }
     }
@@ -374,6 +390,14 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
 
 private extension EventTypeListViewModel {
     func rebuild() {
+        // Gated owner: skip the create/empty CTAs — the read-only rows (possibly
+        // empty) render under the lock banner instead (design FrameGated).
+        if !canEdit {
+            let visible = tab == .active ? activeTypes : hiddenTypes
+            let rows = visible.map(row(for:))
+            state = .loaded(sections: [RowSection(id: tab.rawValue, rows: rows, style: .card)], hasMore: false)
+            return
+        }
         guard !eventTypes.isEmpty else {
             state = .empty(emptyAllContent)
             return

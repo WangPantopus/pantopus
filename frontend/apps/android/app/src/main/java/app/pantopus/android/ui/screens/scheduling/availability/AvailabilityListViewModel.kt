@@ -136,6 +136,24 @@ class AvailabilityListViewModel
             }
         }
 
+        /** Empty-state CTA — seed a default Mon–Fri 9–5 "Working hours" schedule
+         *  (name + rules), so "Add working hours" produces working hours rather
+         *  than an empty editor (parity with iOS createDefaultSchedule). */
+        fun createDefaultSchedule() {
+            viewModelScope.launch {
+                val body = CreateScheduleRequest(name = "Working hours", timezone = defaultTimezone(), isDefault = true)
+                when (val result = repo.createSchedule(body)) {
+                    is NetworkResult.Success -> {
+                        val newId = result.data.schedule.id
+                        val rules = WEEKDAYS_MON_FRI.map { RuleInput(it, DEFAULT_START, DEFAULT_END) }
+                        repo.setRules(newId, RulesRequest(rules))
+                        load()
+                    }
+                    is NetworkResult.Failure -> emitToast(result.error.toMessage())
+                }
+            }
+        }
+
         fun setAsDefault(scheduleId: String) {
             viewModelScope.launch {
                 when (val result = repo.updateSchedule(scheduleId, UpdateScheduleRequest(isDefault = true))) {
@@ -239,6 +257,9 @@ class AvailabilityListViewModel
 
         private companion object {
             const val CODE_CANNOT_DELETE_DEFAULT = "CANNOT_DELETE_DEFAULT"
+            const val DEFAULT_START = "09:00"
+            const val DEFAULT_END = "17:00"
+            val WEEKDAYS_MON_FRI = listOf(1, 2, 3, 4, 5)
         }
     }
 

@@ -63,6 +63,9 @@ fun quarterHourOptions(): List<Pair<String, String>> =
 
 private val TIME_LIST_HEIGHT = 240.dp
 
+/** Mon–Fri (backend weekday indices) — the copy sheet pre-checks these minus the source day. */
+private val COPY_DEFAULT_WEEKDAYS = setOf(1, 2, 3, 4, 5)
+
 /**
  * Edit a single open window: two scrollable time columns (Start | End) with a
  * confirm action. Used by the weekly-hours editor and date-override custom hours.
@@ -203,7 +206,9 @@ fun CopyToDaysSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val targets = remember { WEEKDAY_DISPLAY_ORDER.filter { it != sourceWeekday } }
-    var checked by remember { mutableStateOf(setOf<Int>()) }
+    // Pre-check Mon–Fri minus the source day (mirrors design + iOS), so the
+    // default "Copy to N days" is non-zero.
+    var checked by remember { mutableStateOf(COPY_DEFAULT_WEEKDAYS - sourceWeekday) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, modifier = modifier) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s2)) {
             Text("Copy to other days", color = PantopusColors.appText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -251,7 +256,8 @@ fun CopyToDaysSheet(
                 }
             }
             A3PrimaryButton(
-                label = if (checked.isEmpty()) "Copy" else "Copy to ${checked.size} days",
+                // Always "Copy to N days" (design label); disabled at 0.
+                label = "Copy to ${checked.size} days",
                 onClick = { onConfirm(checked) },
                 enabled = checked.isNotEmpty(),
                 modifier = Modifier.padding(vertical = Spacing.s3),

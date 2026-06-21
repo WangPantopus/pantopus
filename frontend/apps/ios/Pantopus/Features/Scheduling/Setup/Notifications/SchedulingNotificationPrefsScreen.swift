@@ -438,6 +438,7 @@ struct NotifCategoryCard<Content: View>: View {
                 .frame(width: 22)
                 .contentShape(Rectangle())
                 .onTapGesture { onSmsTap?() }
+                .accessibilityIdentifier("notifSmsHeader")
             }
         }
         .padding(.horizontal, Spacing.s4)
@@ -463,6 +464,7 @@ struct NotifCategoryCard<Content: View>: View {
                     .offset(x: -14, y: 4)
             }
             .pantopusShadow(.lg)
+            .accessibilityIdentifier("notifSmsTooltip")
             .accessibilityHidden(true)
     }
 }

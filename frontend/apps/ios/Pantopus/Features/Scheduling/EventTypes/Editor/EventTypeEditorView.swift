@@ -107,15 +107,14 @@ struct EventTypeEditorView: View {
 
     private var identityPill: some View {
         let theme = viewModel.owner.theme
-        return HStack(spacing: Spacing.s1) {
-            Icon(theme.icon, size: 12, color: theme.accent)
-            Text(theme.title)
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
+        return HStack(spacing: 5) {
+            Icon(theme.icon, size: 11, strokeWidth: 2.4, color: theme.accent)
+            Text(theme.title.uppercased())
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(theme.accent)
         }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, Spacing.s1)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
         .background(theme.accentBg)
         .clipShape(Capsule())
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -131,26 +130,24 @@ struct EventTypeEditorView: View {
     private var basicsGroup: some View {
         PillarFieldGroup("Basics", accent: accent) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                TextField("Name (e.g. Intro call)", text: Binding(
-                    get: { viewModel.name },
-                    set: { viewModel.updateName($0) }
-                ))
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appText)
-                .accessibilityIdentifier("scheduling.eventType.nameField")
+                BorderedTextField(label: "Name", isError: viewModel.nameError != nil || viewModel.slugError != nil) {
+                    TextField("Name (e.g. Intro call)", text: Binding(
+                        get: { viewModel.name },
+                        set: { viewModel.updateName($0) }
+                    ))
+                    .accessibilityIdentifier("scheduling.eventType.nameField")
+                }
                 if let nameError = viewModel.nameError {
                     fieldError(nameError)
                 } else if let slugError = viewModel.slugError {
                     fieldError(slugError)
                 }
             }
-            Divider().background(Theme.Color.appBorderSubtle)
-            TextField("Description (optional)", text: $viewModel.detailDescription, axis: .vertical)
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appText)
-                .lineLimit(2...4)
-                .accessibilityIdentifier("scheduling.eventType.descriptionField")
-            Divider().background(Theme.Color.appBorderSubtle)
+            BorderedTextField(label: "Description") {
+                TextField("Description (optional)", text: $viewModel.detailDescription, axis: .vertical)
+                    .lineLimit(2...4)
+                    .accessibilityIdentifier("scheduling.eventType.descriptionField")
+            }
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 Text("Colour")
                     .pantopusTextStyle(.caption)
@@ -164,15 +161,15 @@ struct EventTypeEditorView: View {
 
     private var durationGroup: some View {
         PillarFieldGroup("Duration", accent: accent) {
-            Picker("Duration mode", selection: Binding(
-                get: { viewModel.durationMode },
-                set: { viewModel.setDurationMode($0) }
-            )) {
-                Text("Single").tag(DurationMode.single)
-                Text("Multiple").tag(DurationMode.multiple)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("scheduling.eventType.durationMode")
+            EventTypeSegmented(
+                options: [DurationMode.single, .multiple],
+                selection: Binding(
+                    get: { viewModel.durationMode },
+                    set: { viewModel.setDurationMode($0) }
+                ),
+                label: { $0 == .single ? "Single" : "Multiple" },
+                accessibilityID: "scheduling.eventType.durationMode"
+            )
             if viewModel.durationMode == .single {
                 singleDuration
             } else {
@@ -226,13 +223,12 @@ struct EventTypeEditorView: View {
 
     private var locationGroup: some View {
         PillarFieldGroup("Location", accent: accent) {
-            Picker("Location", selection: $viewModel.location) {
-                ForEach(locationOptions) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("scheduling.eventType.location")
+            EventTypeSegmented(
+                options: locationOptions,
+                selection: $viewModel.location,
+                label: { $0.label },
+                accessibilityID: "scheduling.eventType.location"
+            )
             if let field = viewModel.location.detailField {
                 TextField(field.placeholder, text: $viewModel.locationDetail)
                     .font(Theme.Font.body)
@@ -259,13 +255,16 @@ struct EventTypeEditorView: View {
 
     private var assignmentGroup: some View {
         PillarFieldGroup("Assignment", accent: accent) {
-            Picker("Assignment", selection: $viewModel.assignment) {
-                ForEach(EventAssignmentMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("scheduling.eventType.assignment")
+            // Design `AssignmentCard` segment is 3 options — Anyone / Specific /
+            // Collective — mapped to backend modes (round_robin / one_on_one /
+            // collective), matching Android's ASSIGNMENT_OPTIONS. The backend
+            // `group` mode is not surfaced in this segment (design omits it).
+            EventTypeSegmented(
+                options: EventAssignmentMode.segmentOptions,
+                selection: $viewModel.assignment,
+                label: { $0.segmentLabel },
+                accessibilityID: "scheduling.eventType.assignment"
+            )
             if viewModel.assignment == .collective {
                 collectiveControls
             } else {
@@ -418,13 +417,13 @@ struct EventTypeEditorView: View {
                         Text("Currency")
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                        Picker("Currency", selection: $viewModel.currency) {
-                            Text("USD").tag("USD")
-                            Text("EUR").tag("EUR")
-                        }
-                        .pickerStyle(.segmented)
+                        EventTypeSegmented(
+                            options: ["USD", "EUR"],
+                            selection: $viewModel.currency,
+                            label: { $0 },
+                            accessibilityID: "scheduling.eventType.currency"
+                        )
                         .frame(maxWidth: 130)
-                        .accessibilityIdentifier("scheduling.eventType.currency")
                     }
                 }
                 // Design `PricingCard` "Collect" segmented — Full amount / Deposit.
@@ -432,13 +431,12 @@ struct EventTypeEditorView: View {
                     Text("Collect")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
-                    Picker("Collect", selection: $viewModel.collectMode) {
-                        ForEach(CollectMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("scheduling.eventType.collect")
+                    EventTypeSegmented(
+                        options: CollectMode.allCases,
+                        selection: $viewModel.collectMode,
+                        label: { $0.label },
+                        accessibilityID: "scheduling.eventType.collect"
+                    )
                 }
             }
         }
@@ -491,7 +489,8 @@ struct EventTypeEditorView: View {
     }
 
     private var locationOptions: [EventLocationMode] {
-        var options: [EventLocationMode] = [.video, .phone, .inPerson, .custom]
+        // Design `LocationCard` order: In person / Phone / Video / Custom (matches Android).
+        var options: [EventLocationMode] = [.inPerson, .phone, .video, .custom]
         if viewModel.location == .ask { options.append(.ask) }
         return options
     }

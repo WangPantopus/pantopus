@@ -169,6 +169,24 @@ enum EventAssignmentMode: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The three modes the editor's Assignment segment surfaces, in design
+    /// `AssignmentCard` order (Anyone / Specific / Collective). The backend
+    /// `group` mode is intentionally excluded — the design segment omits it.
+    static var segmentOptions: [EventAssignmentMode] {
+        [.roundRobin, .oneOnOne, .collective]
+    }
+
+    /// Design-facing label for the Assignment segment (Anyone / Specific /
+    /// Collective), mirroring Android's ASSIGNMENT_OPTIONS labels.
+    var segmentLabel: String {
+        switch self {
+        case .roundRobin: "Anyone"
+        case .oneOnOne: "Specific"
+        case .collective: "Collective"
+        case .group: "Group"
+        }
+    }
+
     var caption: String {
         switch self {
         case .oneOnOne: "One host meets one person."

@@ -28,10 +28,12 @@ struct SchedulingHubScreen: View {
             SetupTopBar(
                 title: "Scheduling",
                 leading: .none,
-                // Settings are owner-only — a non-editor gets no trailing action
-                // rather than an `.info` glyph that silently opens owner settings.
-                trailingIcon: model.canEdit ? .moreHorizontal : nil,
-                trailingLabel: "Scheduling settings",
+                // Owners get the `.moreHorizontal` settings affordance; a non-editor
+                // sees the design's `.info` glyph (scheduling-hub-frames FramePermission
+                // right={info}, mirrored on Android) as a view-only indicator — inert,
+                // since the body already carries the view-only explainer banner.
+                trailingIcon: model.canEdit ? .moreHorizontal : .info,
+                trailingLabel: model.canEdit ? "Scheduling settings" : "View-only access",
                 onTrailing: model.canEdit ? { model.openSettings() } : nil
             )
             SetupIdentityPills(active: model.owner) { choice in

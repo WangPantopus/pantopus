@@ -125,11 +125,12 @@ struct ConnectedCalendarsView: View {
                 if viewModel.isComingSoon {
                     comingSoonHero
                     providerRows
-                    helper
                 } else {
                     connectedAccounts
-                    providerRows
+                    // Design FrameNone/FrameConnecting: the conflict-check helper sits
+                    // above the provider connect rows (not in the coming-soon hero).
                     helper
+                    providerRows
                 }
             }
             .padding(.vertical, Spacing.s4)
@@ -276,7 +277,7 @@ struct ConnectedCalendarsView: View {
             provider.icon,
             size: 19,
             strokeWidth: 2,
-            color: muted ? Theme.Color.appTextMuted : Theme.Color.appTextSecondary
+            color: muted ? Theme.Color.appTextMuted : provider.brandColor
         )
         .frame(width: 38, height: 38)
         .background(Theme.Color.appSurface)
@@ -545,15 +546,12 @@ struct ConnectedCalendarsView: View {
 
     // MARK: Helper
 
-    @ViewBuilder
     private var helper: some View {
-        if viewModel.isComingSoon {
-            Text("Connect a calendar to check for conflicts and add bookings automatically.")
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.s5)
-        }
+        Text("Connect a calendar to check for conflicts and add bookings automatically.")
+            .pantopusTextStyle(.caption)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s5)
     }
 
     private var loadingSkeleton: some View {

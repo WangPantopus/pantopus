@@ -383,7 +383,7 @@ class SchedulingHubViewModel
             rows +=
                 HubManageItem(
                     id = "eventTypes",
-                    icon = PantopusIcon.Grid3x3,
+                    icon = PantopusIcon.LayoutGrid,
                     label = "Event types",
                     value = if (activeCount == 1) "1 active" else "$activeCount active",
                     route = SchedulingRoutes.EVENT_TYPE_LIST,
@@ -409,7 +409,7 @@ class SchedulingHubViewModel
             rows +=
                 HubManageItem(
                     id = "calendars",
-                    icon = PantopusIcon.CalendarCog,
+                    icon = PantopusIcon.CalendarSync,
                     label = "Connected calendars",
                     value = connectedCalendarsValue(calendars),
                     route = SchedulingRoutes.CONNECTED_CALENDARS,
@@ -429,7 +429,7 @@ class SchedulingHubViewModel
                 rows +=
                     HubManageItem(
                         id = "settings",
-                        icon = PantopusIcon.SlidersHorizontal,
+                        icon = PantopusIcon.Settings,
                         label = "Settings",
                         value = null,
                         route = SchedulingRoutes.SETTINGS,

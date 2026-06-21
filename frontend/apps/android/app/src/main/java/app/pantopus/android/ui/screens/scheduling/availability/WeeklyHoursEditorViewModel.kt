@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import javax.inject.Inject
 
 /** One contiguous open window within a day, as `"HH:MM"` start/end. */
@@ -60,6 +61,10 @@ data class WeeklyHoursForm(
 
     /** Design Frame 4: show the "Set hours" / composition-gap hero state. */
     val isUnset: Boolean get() = allDaysOff && !isDirty
+
+    /** "Pacific Time · auto" when the schedule tracks the device zone; just the
+     *  city otherwise (mirrors iOS timezoneDisplay). */
+    val timezoneDisplay: String get() = if (lockTimezone) "$timezoneLabel · auto" else timezoneLabel
 }
 
 @Immutable
@@ -125,7 +130,11 @@ class WeeklyHoursEditorViewModel
                                     name = schedule.name?.ifBlank { "Working hours" } ?: "Working hours",
                                     timezoneId = schedule.timezone.orEmpty(),
                                     timezoneLabel = friendlyTimezone(schedule.timezone),
-                                    lockTimezone = false,
+                                    // Locked = schedule tracks the device zone (mirrors iOS
+                                    // lockTimezone = timezoneId == deviceZone). A blank/absent
+                                    // tz is treated as auto-tracking the device.
+                                    lockTimezone = schedule.timezone.isNullOrBlank() ||
+                                        schedule.timezone == ZoneId.systemDefault().id,
                                     days = days,
                                 ),
                             )
@@ -156,9 +165,22 @@ class WeeklyHoursEditorViewModel
         fun setTimezone(
             id: String,
             label: String,
-        ) = mutateForm { it.copy(timezoneId = id, timezoneLabel = label) }
+        ) = mutateForm {
+            // Re-derive lock from whether the picked zone is the device zone
+            // (mirrors iOS changeTimezone).
+            it.copy(timezoneId = id, timezoneLabel = label, lockTimezone = id == ZoneId.systemDefault().id)
+        }
 
-        fun toggleLockTimezone(on: Boolean) = mutateForm { it.copy(lockTimezone = on) }
+        fun toggleLockTimezone(on: Boolean) =
+            mutateForm {
+                // Locking snaps back to the device zone (mirrors iOS setLockTimezone).
+                if (on) {
+                    val deviceId = ZoneId.systemDefault().id
+                    it.copy(lockTimezone = true, timezoneId = deviceId, timezoneLabel = friendlyTimezone(deviceId))
+                } else {
+                    it.copy(lockTimezone = false)
+                }
+            }
 
         fun toggleDay(
             weekday: Int,

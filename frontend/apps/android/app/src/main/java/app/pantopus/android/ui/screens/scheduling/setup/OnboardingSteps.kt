@@ -18,10 +18,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -557,7 +563,7 @@ internal fun OnboardingServicePicker(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp)) {
-            DurationStepperChips(duration, pillar, onDuration, Modifier.weight(1f))
+            DurationDropdownField(duration, onDuration, Modifier.weight(1f))
             PriceField(priceText, onPrice, Modifier.weight(1f))
         }
     }
@@ -599,33 +605,53 @@ private fun ServiceTile(
 }
 
 @Composable
-private fun DurationStepperChips(
+private fun DurationDropdownField(
     duration: Int,
-    pillar: SchedulingPillar,
     onDuration: (Int) -> Unit,
     modifier: Modifier,
 ) {
+    // Single dropdown field ("30 min ▾") per onboarding-business-frames.jsx and the
+    // iOS durationField Menu — not a four-chip stepper group.
     val options = listOf(15, 30, 45, 60)
-    Column(modifier = modifier.testTag("onboardingDuration"), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         SetupOverline("Duration")
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            options.forEach { m ->
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(Radii.sm))
-                            .background(if (m == duration) pillar.accent else PantopusColors.appSurfaceSunken)
-                            .clickable { onDuration(m) }
-                            .padding(vertical = Spacing.s1 + 2.dp)
-                            .testTag("onboardingDuration_$m"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "$m",
-                        color = if (m == duration) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
+        Box {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                        .clickable { expanded = true }
+                        .padding(horizontal = Spacing.s3, vertical = 10.dp)
+                        .testTag("onboardingDuration"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "$duration min",
+                    color = PantopusColors.appText,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.5.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronDown,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { m ->
+                    DropdownMenuItem(
+                        text = { Text("$m min") },
+                        onClick = {
+                            onDuration(m)
+                            expanded = false
+                        },
+                        modifier = Modifier.testTag("onboardingDuration_$m"),
                     )
                 }
             }

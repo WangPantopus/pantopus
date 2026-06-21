@@ -34,7 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -144,9 +144,9 @@ internal fun HubEmptyState(
         Spacer(Modifier.height(Spacing.s5))
         // Dashed "not set up" destination preview rows.
         listOf(
-            PantopusIcon.Grid3x3 to "Event types",
+            PantopusIcon.LayoutGrid to "Event types",
             PantopusIcon.Clock to "Availability",
-            PantopusIcon.CalendarCog to "Connected calendars",
+            PantopusIcon.CalendarSync to "Connected calendars",
         ).forEach { (icon, label) ->
             Row(
                 modifier =
@@ -211,12 +211,93 @@ internal fun HubErrorState(
     }
 }
 
+private val SKELETON_LINK_CARD_H = 252.dp
+private val SKELETON_PAUSE_H = 60.dp
+private val SKELETON_AVATAR = 40.dp
+
+/**
+ * Hand-rolled hub skeleton mirroring the loaded geometry (and iOS
+ * SchedulingHubSkeleton): a tall booking-link card, the pause row, an agenda
+ * header + two booking rows, and a four-row Manage group — not uniform cards.
+ */
 @Composable
 internal fun HubSkeleton() {
-    SchedulingLoadingSkeleton(
+    Column(
         modifier = Modifier.fillMaxWidth().testTag(HubTags.SKELETON),
-        rows = 4,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Spacer(Modifier.height(Spacing.s2))
+        SkeletonBlock(height = SKELETON_LINK_CARD_H)
+        SkeletonBlock(height = SKELETON_PAUSE_H)
+        Spacer(Modifier.height(Spacing.s1))
+        Shimmer(width = 130.dp, height = 11.dp, cornerRadius = Radii.xs)
+        repeat(2) { SkeletonBookingRow() }
+        Spacer(Modifier.height(Spacing.s1))
+        Shimmer(width = 80.dp, height = 11.dp, cornerRadius = Radii.xs)
+        SkeletonManageGroup()
+    }
+}
+
+@Composable
+private fun SkeletonBlock(height: androidx.compose.ui.unit.Dp) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(CARD_RADIUS))
+                .background(PantopusColors.appSurfaceSunken),
     )
+}
+
+@Composable
+private fun SkeletonBookingRow() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(CARD_RADIUS))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(CARD_RADIUS))
+                .padding(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(modifier = Modifier.size(SKELETON_AVATAR).clip(RoundedCornerShape(Radii.md)).background(PantopusColors.appSurfaceSunken))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Shimmer(width = 180.dp, height = 11.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 110.dp, height = 9.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 140.dp, height = 9.dp, cornerRadius = Radii.xs)
+        }
+    }
+}
+
+@Composable
+private fun SkeletonManageGroup() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(CARD_RADIUS))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(CARD_RADIUS)),
+    ) {
+        repeat(4) { idx ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurfaceSunken))
+                Shimmer(width = 120.dp, height = 11.dp, cornerRadius = Radii.xs)
+                Spacer(Modifier.weight(1f))
+                Shimmer(width = 48.dp, height = 10.dp, cornerRadius = Radii.xs)
+            }
+            if (idx < 3) {
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(start = 14.dp).background(PantopusColors.appBorderSubtle))
+            }
+        }
+    }
 }
 
 /** Rounded dashed outline (1dp) — the "not set up" destination preview stroke. */

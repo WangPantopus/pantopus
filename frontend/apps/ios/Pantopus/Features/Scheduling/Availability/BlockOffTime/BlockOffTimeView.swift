@@ -156,7 +156,7 @@ struct BlockOffTimeView: View {
                 }
                 .disabled(viewModel.isSaving)
                 .accessibilityIdentifier("scheduling.blockOff.repeatsField")
-                if let caption = viewModel.repeats.caption {
+                if let caption = viewModel.repeatCaption {
                     Text(caption)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)

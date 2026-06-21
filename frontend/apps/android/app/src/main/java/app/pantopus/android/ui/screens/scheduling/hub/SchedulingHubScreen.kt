@@ -123,7 +123,6 @@ fun SchedulingHubScreen(
                                 onToggle = { accepting -> viewModel.setPaused(!accepting) },
                                 onNavigate = onNavigate,
                                 onSeeAllBookings = { onNavigate(viewModel.bookingsRoute()) },
-                                onInsights = { onNavigate(viewModel.bookingsRoute()) },
                             )
                     }
                 }
@@ -202,7 +201,9 @@ private fun HubPillBand(
                 listOf(
                     IdentityOption("personal", "Personal", PantopusIcon.User, SchedulingPillar.Personal.accent),
                     IdentityOption("home", "Home", PantopusIcon.Home, SchedulingPillar.Home.accent),
-                    IdentityOption("business", "Business", PantopusIcon.Briefcase, SchedulingPillar.Business.accent),
+                    // Hub identity pill uses the storefront glyph per scheduling-hub-frames.jsx
+                    // (PILLAR.business.icon == 'store'); mirrors iOS SetupKit's hub-pill override.
+                    IdentityOption("business", "Business", PantopusIcon.Store, SchedulingPillar.Business.accent),
                 ),
             activeId =
                 when (pillar) {
@@ -233,26 +234,16 @@ private fun HubLoadedBody(
     onToggle: (Boolean) -> Unit,
     onNavigate: (String) -> Unit,
     onSeeAllBookings: () -> Unit,
-    onInsights: () -> Unit,
 ) {
     Spacer(Modifier.height(Spacing.s4))
     if (!state.canEdit) {
         ViewOnlyBanner()
         Spacer(Modifier.height(Spacing.s3))
     }
-    val summaryContent =
-        when {
-            state.summaryFailed -> SummaryCardContent.Error
-            state.summary == null || state.summary.isEmpty -> SummaryCardContent.Empty
-            else -> SummaryCardContent.Data(state.summary)
-        }
-    SummaryCard(
-        content = summaryContent,
-        pillar = state.pillar,
-        onShare = onShare,
-        onRetry = { },
-        onInsights = onInsights,
-    )
+    // Design FrameDefault (scheduling-hub-frames.jsx) and iOS loadedBody render no
+    // analytics/summary card in the hub — booking-link card is the hero element.
+    // SummaryCard remains a standalone composable (snapshot-covered) for reuse on
+    // the insights surface, but is intentionally absent here.
     if (state.isComposed) {
         Spacer(Modifier.height(Spacing.s3))
         val lead = state.displayName.trim().firstOrNull()?.uppercase() ?: "Y"

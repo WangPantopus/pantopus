@@ -125,9 +125,15 @@ struct EventTypeListView: View {
                 .accessibilityLabel("Back")
                 Spacer()
                 Button { viewModel.createNew() } label: {
-                    Icon(.plus, size: 21, strokeWidth: 2.4, color: Theme.Color.primary600)
-                        .frame(width: 32, height: 32)
+                    Icon(
+                        .plus,
+                        size: 21,
+                        strokeWidth: 2.4,
+                        color: viewModel.canEdit ? Theme.Color.primary600 : Theme.Color.appTextMuted
+                    )
+                    .frame(width: 32, height: 32)
                 }
+                .disabled(!viewModel.canEdit)
                 .accessibilityLabel("New event type")
                 .accessibilityIdentifier("scheduling.eventTypes.create")
             }
@@ -189,6 +195,9 @@ struct EventTypeListView: View {
     private var rowsList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s2) {
+                if !viewModel.canEdit {
+                    GatedLockBanner()
+                }
                 Text(viewModel.sectionOverline.uppercased())
                     .font(.system(size: 9.5, weight: .bold))
                     .tracking(0.7)
@@ -201,6 +210,7 @@ struct EventTypeListView: View {
                         meta: viewModel.rowMeta(for: eventType),
                         isHidden: viewModel.isHidden(eventType),
                         isSecret: viewModel.isSecret(eventType),
+                        canEdit: viewModel.canEdit,
                         onTap: { viewModel.openEventType(eventType) },
                         onToggle: { Task { await viewModel.toggleHidden(eventType) } },
                         onMenu: { viewModel.menuTarget = eventType }
@@ -334,6 +344,7 @@ private struct EventTypeRowCard: View {
     let meta: String
     let isHidden: Bool
     let isSecret: Bool
+    var canEdit: Bool = true
     let onTap: () -> Void
     let onToggle: () -> Void
     let onMenu: () -> Void
@@ -363,14 +374,17 @@ private struct EventTypeRowCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             EventTypeToggle(on: !isHidden, action: onToggle)
+                .disabled(!canEdit)
+                .opacity(canEdit ? 1 : 0.5)
                 .accessibilityIdentifier("scheduling.eventTypes.toggle.\(eventType.id)")
             Button(action: onMenu) {
-                Icon(.ellipsisVertical, size: 17, color: Theme.Color.appTextSecondary)
+                Icon(.ellipsisVertical, size: 17, color: canEdit ? Theme.Color.appTextSecondary : Theme.Color.appTextMuted)
                     .frame(width: 26, height: 26)
                     // Report this button's frame so the floating popover can
                     // position itself right-anchored below the tapped button.
                     .anchorPreference(key: OverflowAnchorKey.self, value: .bounds) { [eventType.id: $0] }
             }
+            .disabled(!canEdit)
             .accessibilityLabel("More")
         }
         .padding(.horizontal, 11)
@@ -407,6 +421,29 @@ private struct EventTypeToggle: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Gated lock banner
+
+/// Read-only lock banner shown above the catalog when the resolved owner lacks
+/// edit rights (403 / forbidden — design `event-types-frames.jsx` FrameGated).
+/// Pairs with the disabled +, per-row toggles and overflow.
+private struct GatedLockBanner: View {
+    var body: some View {
+        HStack(spacing: 9) {
+            Icon(.lock, size: 15, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+            Text("Only owners can edit this catalog.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .background(Theme.Color.appSurfaceSunken)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.Color.appBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityIdentifier("scheduling.eventTypes.lockBanner")
     }
 }
 

@@ -200,7 +200,7 @@ fun usPublicHolidays(year: Int): List<Pair<LocalDate, String>> {
         LocalDate.of(year, 6, 19) to "Juneteenth",
         LocalDate.of(year, 7, 4) to "Independence Day",
         nth(9, DayOfWeek.MONDAY, 1) to "Labor Day",
-        nth(10, DayOfWeek.MONDAY, 2) to "Columbus Day",
+        nth(10, DayOfWeek.MONDAY, 2) to "Indigenous Peoples' Day",
         LocalDate.of(year, 11, 11) to "Veterans Day",
         nth(11, DayOfWeek.THURSDAY, 4) to "Thanksgiving",
         LocalDate.of(year, 12, 25) to "Christmas Day",

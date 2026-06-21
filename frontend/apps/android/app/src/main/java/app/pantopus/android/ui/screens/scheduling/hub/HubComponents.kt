@@ -655,7 +655,11 @@ internal fun HubFooterCta(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(PantopusColors.appSurface)
+                // Design FooterCTA is a translucent blurred bar (rgba(255,255,255,0.94) +
+                // backdrop-filter) and iOS uses .ultraThinMaterial; Compose has no cheap
+                // backdrop blur, so approximate with a translucent surface so content
+                // peeks through beneath the pinned CTA.
+                .background(PantopusColors.appSurface.copy(alpha = 0.94f))
                 .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s6),
     ) {
         Row(

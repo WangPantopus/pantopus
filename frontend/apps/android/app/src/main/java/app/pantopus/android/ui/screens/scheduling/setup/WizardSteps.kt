@@ -48,15 +48,18 @@ private val LOCATION_CHOICES =
 
 private val DURATIONS = listOf(15, 30, 45, 60)
 
+// Monday-first to match the design WeekdayGrid (scheduling-setup-frames.jsx) and
+// iOS WizardHoursGrid; the leading Int is the backend weekday index (0 = Sunday),
+// so toggles + `wizardDay_<weekday>` test tags stay stable regardless of order.
 private val DAY_LABELS =
     listOf(
-        0 to "Sunday",
         1 to "Monday",
         2 to "Tuesday",
         3 to "Wednesday",
         4 to "Thursday",
         5 to "Friday",
         6 to "Saturday",
+        0 to "Sunday",
     )
 
 @Composable

@@ -59,7 +59,7 @@ fun BlockOffTimeScreen(
                 if (form.saving) {
                     Text("Saving", color = PantopusColors.appTextMuted, fontSize = 15.sp)
                 } else {
-                    TopBarTextAction(label = "Save", enabled = true, onClick = viewModel::save)
+                    TopBarTextAction(label = "Save", enabled = form.isValid, onClick = viewModel::save)
                 }
             },
         )
@@ -161,6 +161,13 @@ private fun DetailsCard(
                     FieldLabel("Ends")
                     A3FieldButton(icon = PantopusIcon.Clock, value = formatTime12(form.end), enabled = enabled, onClick = onEnd)
                 }
+            }
+            if (!form.isValid) {
+                Text(
+                    "End must be after start.",
+                    color = PantopusColors.error,
+                    fontSize = 12.sp,
+                )
             }
         }
     }

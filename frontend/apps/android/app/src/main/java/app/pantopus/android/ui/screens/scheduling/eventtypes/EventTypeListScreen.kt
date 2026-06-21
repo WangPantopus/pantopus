@@ -69,6 +69,7 @@ object EventTypeListTags {
     const val CREATE = "eventTypesCreate"
     const val ROW_PREFIX = "eventTypeRow_"
     const val TOGGLE_PREFIX = "eventTypeToggle_"
+    const val LOCK_BANNER = "eventTypesLockBanner"
 }
 
 @Composable
@@ -84,6 +85,7 @@ fun EventTypeListScreen(
     val copyRequest by viewModel.copyRequest.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val navRequest by viewModel.navRequest.collectAsStateWithLifecycle()
+    val deletePrompt by viewModel.deletePrompt.collectAsStateWithLifecycle()
     val deactivatePrompt by viewModel.deactivatePrompt.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
@@ -163,14 +165,23 @@ fun EventTypeListScreen(
                             onCopy = viewModel::copyLink,
                             onShare = viewModel::share,
                             onDuplicate = viewModel::duplicate,
-                            onHide = viewModel::hide,
-                            onDelete = viewModel::delete,
+                            onDelete = viewModel::requestDelete,
                             onViewHidden = { viewModel.selectTab(EventTypeTab.Hidden) },
                         )
                 }
             }
         }
         toastText?.let { Toast(text = it, modifier = Modifier.align(Alignment.TopCenter)) }
+    }
+
+    deletePrompt?.let { row ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDelete,
+            title = { Text("Delete event type?") },
+            text = { Text("“${row.name}” will be removed. This can't be undone.") },
+            confirmButton = { TextButton(onClick = viewModel::confirmDelete) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = viewModel::dismissDelete) { Text("Cancel") } },
+        )
     }
 
     deactivatePrompt?.let { row ->
@@ -280,11 +291,10 @@ internal fun ContentBody(
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onDuplicate: (String) -> Unit,
-    onHide: (String) -> Unit,
     onDelete: (String) -> Unit,
     onViewHidden: () -> Unit,
 ) {
-    if (state.rows.isEmpty()) {
+    if (state.rows.isEmpty() && state.canEdit) {
         when {
             state.activeCount == 0 && state.hiddenCount == 0 ->
                 EventTypesEmptyTemplates(onCreate = onCreate, onTemplate = onTemplate)
@@ -303,6 +313,9 @@ internal fun ContentBody(
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
+        if (!state.canEdit) {
+            GatedLockBanner()
+        }
         EtSectionOverline(
             text = if (state.pillar == SchedulingPillar.Business) "Bookable services" else "Your event types",
             accent = state.pillar.accent,
@@ -317,11 +330,45 @@ internal fun ContentBody(
                 onCopy = { onCopy(row.id) },
                 onShare = { onShare(row.id) },
                 onDuplicate = { onDuplicate(row.id) },
-                onHide = { onHide(row.id) },
                 onDelete = { onDelete(row.id) },
             )
         }
         Spacer(Modifier.height(Spacing.s6))
+    }
+}
+
+/**
+ * Read-only lock banner shown above the catalog when the resolved owner lacks
+ * edit rights (design `event-types-frames.jsx` FrameGated). Pairs with the
+ * disabled +, per-row toggles and overflow.
+ */
+@Composable
+private fun GatedLockBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(ROW_RADIUS))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(ROW_RADIUS))
+                .testTag(EventTypeListTags.LOCK_BANNER)
+                .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Lock,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = "Only owners can edit this catalog.",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -334,7 +381,6 @@ private fun EventTypeRowCard(
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onDuplicate: () -> Unit,
-    onHide: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -414,9 +460,16 @@ private fun EventTypeRowCard(
                     menuOpen = false
                     onShare()
                 }
-                OverflowItem(PantopusIcon.EyeOff, "Hide") {
-                    menuOpen = false
-                    onHide()
+                if (row.isActive) {
+                    OverflowItem(PantopusIcon.EyeOff, "Hide") {
+                        menuOpen = false
+                        onToggle(false)
+                    }
+                } else {
+                    OverflowItem(PantopusIcon.Eye, "Make active") {
+                        menuOpen = false
+                        onToggle(true)
+                    }
                 }
                 HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
                 OverflowItem(PantopusIcon.Trash2, "Delete", danger = true) {
@@ -563,9 +616,9 @@ private fun EventTypesAllHidden(onViewHidden: () -> Unit) {
 @Composable
 private fun EventTypesNothingHidden() {
     CalmEmpty(
-        icon = PantopusIcon.EyeOff,
+        icon = PantopusIcon.Eye,
         headline = "Nothing hidden",
-        subcopy = "Event types you hide will show up here.",
+        subcopy = "Hidden event types stay off your booking page. Hide one from its menu.",
     )
 }
 
@@ -653,7 +706,7 @@ private fun Toast(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 15.dp, tint = PantopusColors.success)
+        PantopusIconImage(icon = PantopusIcon.Check, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextInverse)
         Text(text = text, color = PantopusColors.appTextInverse, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
     }
 }

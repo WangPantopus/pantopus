@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -224,155 +222,160 @@ private fun EditorContent(
                 )
             }
 
-            // Availability link-out (A3)
-            EtCard(overline = "Availability", accent = accent) {
-                EtLinkRow(icon = PantopusIcon.CalendarClock, label = "Schedule", value = "Working hours", onClick = {
-                    onNavigate(viewModel.availabilityRoute())
-                }, last = true)
-            }
-
-            // Business assignment + pricing
-            if (state.pillar == SchedulingPillar.Business) {
-                EtCard(overline = "Assignment", accent = accent) {
-                    EtSegmented(
-                        options = ASSIGNMENT_OPTIONS.map { it.first },
-                        selected = ASSIGNMENT_OPTIONS.firstOrNull { it.second == form.assignmentMode }?.first ?: "Anyone",
-                        onSelect = {
-                                label ->
-                            ASSIGNMENT_OPTIONS.firstOrNull { it.first == label }?.let { viewModel.onAssignmentMode(it.second) }
-                        },
-                        small = true,
-                    )
-                    Text(
-                        text = assignmentBlurb(form.assignmentMode),
-                        fontSize = 11.sp,
-                        color = PantopusColors.appTextSecondary,
-                    )
-                    // Design FrameCollective: collective mode reveals Required-hosts stepper
-                    // ("2 of 3 · must be available") + member avatar stack below it.
-                    // `required_hosts` count is not yet in the DTO/VM — stepper shown as
-                    // placeholder geometry (disabled, dash value) until backend adds the field.
-                    if (form.assignmentMode == "collective") {
-                        CollectiveModeControls()
-                    }
+            // Advanced / Controls / Links (and Availability + business cards) are
+            // hidden on create — design FrameCreate shows only Basics/Duration/Location
+            // until the type is saved (mirrors iOS `isEditing` gating).
+            if (!state.isCreate) {
+                // Availability link-out (A3)
+                EtCard(overline = "Availability", accent = accent) {
+                    EtLinkRow(icon = PantopusIcon.CalendarClock, label = "Schedule", value = "Working hours", onClick = {
+                        onNavigate(viewModel.availabilityRoute())
+                    }, last = true)
                 }
-                if (state.paidEnabled) {
-                    PricingCard(state = state, viewModel = viewModel, onNavigate = onNavigate)
-                }
-            }
 
-            // Advanced (collapsible)
-            EtCard(
-                overline = "Advanced",
-                accent = accent,
-                trailing = {
-                    Box(modifier = Modifier.clip(RoundedCornerShape(Radii.md)).clickable(onClick = viewModel::toggleAdvanced)) {
-                        PantopusIconImage(
-                            icon = if (state.advancedOpen) PantopusIcon.ChevronUp else PantopusIcon.ChevronDown,
-                            contentDescription = if (state.advancedOpen) "Collapse" else "Expand",
-                            size = ICON_16,
-                            tint = PantopusColors.appTextMuted,
-                        )
-                    }
-                },
-            ) {
-                if (state.advancedOpen) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                        LabeledStepper(
-                            modifier =
-                                Modifier.weight(
-                                    1f,
-                                ),
-                            label = "Buffer before",
-                            value = "${form.bufferBeforeMin}",
-                            unit = "min",
-                            onMinus = {
-                                viewModel.onBufferBeforeStep(-5)
+                // Business assignment + pricing
+                if (state.pillar == SchedulingPillar.Business) {
+                    EtCard(overline = "Assignment", accent = accent) {
+                        EtSegmented(
+                            options = ASSIGNMENT_OPTIONS.map { it.first },
+                            selected = ASSIGNMENT_OPTIONS.firstOrNull { it.second == form.assignmentMode }?.first ?: "Anyone",
+                            onSelect = {
+                                    label ->
+                                ASSIGNMENT_OPTIONS.firstOrNull { it.first == label }?.let { viewModel.onAssignmentMode(it.second) }
                             },
-                            onPlus = { viewModel.onBufferBeforeStep(5) },
+                            small = true,
+                        )
+                        Text(
+                            text = assignmentBlurb(form.assignmentMode),
+                            fontSize = 11.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                        // Design FrameCollective: collective mode reveals Required-hosts stepper
+                        // ("2 of 3 · must be available") + member avatar stack below it.
+                        // `required_hosts` count is not yet in the DTO/VM — stepper shown as
+                        // placeholder geometry (disabled, dash value) until backend adds the field.
+                        if (form.assignmentMode == "collective") {
+                            CollectiveModeControls()
+                        }
+                    }
+                    if (state.paidEnabled) {
+                        PricingCard(state = state, viewModel = viewModel, onNavigate = onNavigate)
+                    }
+                }
+
+                // Advanced (collapsible)
+                EtCard(
+                    overline = "Advanced",
+                    accent = accent,
+                    trailing = {
+                        Box(modifier = Modifier.clip(RoundedCornerShape(Radii.md)).clickable(onClick = viewModel::toggleAdvanced)) {
+                            PantopusIconImage(
+                                icon = if (state.advancedOpen) PantopusIcon.ChevronUp else PantopusIcon.ChevronDown,
+                                contentDescription = if (state.advancedOpen) "Collapse" else "Expand",
+                                size = ICON_16,
+                                tint = PantopusColors.appTextMuted,
+                            )
+                        }
+                    },
+                ) {
+                    if (state.advancedOpen) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                            LabeledStepper(
+                                modifier =
+                                    Modifier.weight(
+                                        1f,
+                                    ),
+                                label = "Buffer before",
+                                value = "${form.bufferBeforeMin}",
+                                unit = "min",
+                                onMinus = {
+                                    viewModel.onBufferBeforeStep(-5)
+                                },
+                                onPlus = { viewModel.onBufferBeforeStep(5) },
+                            )
+                            LabeledStepper(
+                                modifier =
+                                    Modifier.weight(
+                                        1f,
+                                    ),
+                                label = "Buffer after",
+                                value = "${form.bufferAfterMin}",
+                                unit = "min",
+                                onMinus = {
+                                    viewModel.onBufferAfterStep(-5)
+                                },
+                                onPlus = { viewModel.onBufferAfterStep(5) },
+                            )
+                        }
+                        LabeledStepper(
+                            label = "Minimum notice",
+                            value = "${form.minNoticeMin / 60}",
+                            unit = "hrs",
+                            onMinus = { viewModel.onNoticeStep(-1) },
+                            onPlus = { viewModel.onNoticeStep(1) },
                         )
                         LabeledStepper(
-                            modifier =
-                                Modifier.weight(
-                                    1f,
-                                ),
-                            label = "Buffer after",
-                            value = "${form.bufferAfterMin}",
-                            unit = "min",
-                            onMinus = {
-                                viewModel.onBufferAfterStep(-5)
-                            },
-                            onPlus = { viewModel.onBufferAfterStep(5) },
+                            label = "Booking horizon",
+                            value = "${form.maxHorizonDays}",
+                            unit = "days",
+                            onMinus = { viewModel.onHorizonStep(-1) },
+                            onPlus = { viewModel.onHorizonStep(1) },
+                        )
+                        val capUnit = if (form.dailyCap != null) "/day" else null
+                        LabeledStepper(
+                            label = "Per-day cap",
+                            value = form.dailyCap?.toString() ?: "Off",
+                            unit = capUnit,
+                            onMinus = { viewModel.onDailyCapStep(-1) },
+                            onPlus = { viewModel.onDailyCapStep(1) },
                         )
                     }
-                    LabeledStepper(
-                        label = "Minimum notice",
-                        value = "${form.minNoticeMin / 60}",
-                        unit = "hrs",
-                        onMinus = { viewModel.onNoticeStep(-1) },
-                        onPlus = { viewModel.onNoticeStep(1) },
+                }
+
+                // Controls
+                EtCard(accent = accent) {
+                    EtToggleRow(
+                        icon = PantopusIcon.UserCheck,
+                        label = "Require approval",
+                        sub = "Approve each booking before it's confirmed",
+                        checked = form.requiresApproval,
+                        onToggle = viewModel::onRequiresApproval,
                     )
-                    LabeledStepper(
-                        label = "Booking horizon",
-                        value = "${form.maxHorizonDays}",
-                        unit = "days",
-                        onMinus = { viewModel.onHorizonStep(-1) },
-                        onPlus = { viewModel.onHorizonStep(1) },
+                    EtToggleRow(
+                        icon = PantopusIcon.EyeOff,
+                        label = "Unlisted (link only)",
+                        sub = "Hidden from your public page",
+                        checked = form.visibilitySecret,
+                        onToggle = viewModel::onVisibilitySecret,
                     )
-                    val capUnit = if (form.dailyCap != null) "/day" else null
-                    LabeledStepper(
-                        label = "Per-day cap",
-                        value = form.dailyCap?.toString() ?: "Off",
-                        unit = capUnit,
-                        onMinus = { viewModel.onDailyCapStep(-1) },
-                        onPlus = { viewModel.onDailyCapStep(1) },
+                    EtToggleRow(
+                        icon = PantopusIcon.CheckCircle,
+                        label = "Active",
+                        sub = "People can book this right now",
+                        checked = form.isActive,
+                        onToggle = viewModel::onActive,
+                        last = true,
                     )
                 }
-            }
 
-            // Controls
-            EtCard(accent = accent) {
-                EtToggleRow(
-                    icon = PantopusIcon.UserCheck,
-                    label = "Require approval",
-                    sub = "Approve each booking before it's confirmed",
-                    checked = form.requiresApproval,
-                    onToggle = viewModel::onRequiresApproval,
-                )
-                EtToggleRow(
-                    icon = PantopusIcon.EyeOff,
-                    label = "Unlisted (link only)",
-                    sub = "Hidden from your public page",
-                    checked = form.visibilitySecret,
-                    onToggle = viewModel::onVisibilitySecret,
-                )
-                EtToggleRow(
-                    icon = PantopusIcon.CheckCircle,
-                    label = "Active",
-                    sub = "People can book this right now",
-                    checked = form.isActive,
-                    onToggle = viewModel::onActive,
-                    last = true,
-                )
-            }
-
-            // Links
-            EtCard(accent = accent) {
-                EtLinkRow(
-                    icon = PantopusIcon.ListChecks,
-                    label = "Intake questions",
-                    value =
-                        state.questionCount?.let {
-                            if (it == 1) "1 question" else "$it questions"
-                        } ?: "Add questions",
-                    onClick = { onNavigate(viewModel.intakeRoute()) },
-                )
-                EtLinkRow(icon = PantopusIcon.Gauge, label = "Booking limits", value = bookingLimitsSummary(form), onClick = {
-                    onNavigate(viewModel.bookingLimitsRoute())
-                })
-                EtLinkRow(icon = PantopusIcon.BellRing, label = "Reminders", value = "Default", onClick = {
-                    onNavigate(viewModel.remindersRoute())
-                }, last = true)
+                // Links
+                EtCard(accent = accent) {
+                    EtLinkRow(
+                        icon = PantopusIcon.ListChecks,
+                        label = "Intake questions",
+                        value =
+                            state.questionCount?.let {
+                                if (it == 1) "1 question" else "$it questions"
+                            } ?: "Add questions",
+                        onClick = { onNavigate(viewModel.intakeRoute()) },
+                    )
+                    EtLinkRow(icon = PantopusIcon.Gauge, label = "Booking limits", value = bookingLimitsSummary(form), onClick = {
+                        onNavigate(viewModel.bookingLimitsRoute())
+                    })
+                    EtLinkRow(icon = PantopusIcon.BellRing, label = "Reminders", value = "Default", onClick = {
+                        onNavigate(viewModel.remindersRoute())
+                    }, last = true)
+                }
             }
         }
     }
@@ -380,74 +383,37 @@ private fun EditorContent(
 
 /**
  * Design FrameCollective: when assignment mode is "collective" the Assignment
- * card reveals a "Required hosts" stepper and a member avatar stack below the
- * blurb caption. The `required_hosts` count field is not yet in the DTO or
- * EditorForm — the stepper is shown as a read-only placeholder (disabled, value
- * "—") until the backend exposes the field. The member avatar stack renders
- * placeholder initial-circles matching the design geometry (3 overlapping 28dp
- * circles with gradient fills); real member data is not surfaced in the editor
- * VM yet.
+ * card would reveal a "Required hosts" stepper + member avatar stack. The
+ * `required_hosts` count and the per-event member roster are not yet in the
+ * DTO/EditorForm (and the iOS `requiredHosts` field is likewise local-only with
+ * no wire backing), so instead of rendering a dead disabled stepper and faked
+ * avatar placeholders, we surface a clear coming-soon note until the backend
+ * exposes the field.
  */
 @Composable
 private fun CollectiveModeControls() {
-    // Required-hosts row
-    Column {
-        EtFieldLabel(text = "Required hosts")
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            EtStepper(
-                value = "—",
-                unit = null,
-                onDecrement = {},
-                onIncrement = {},
-                enabled = false,
-            )
-            Text(
-                text = "must be available",
-                fontSize = 11.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-    }
-    // Member avatar stack — placeholder geometry (design MemberAvatars, 3 circles).
-    // No member data in editor VM; overlapping initial-circles approximate the design.
-    CollectiveMemberAvatars()
-}
-
-// Placeholder avatar initials matching the design MEMBERS gradient palette,
-// mapped to the equivalent design tokens (business violet / party pink / sky).
-private val COLLECTIVE_AVATAR_BG_FIRST = PantopusColors.business // business violet
-private val COLLECTIVE_AVATAR_BG_SECOND = PantopusColors.categoryParty // pink
-private val COLLECTIVE_AVATAR_BG_THIRD_DIM = PantopusColors.personal // sky (dimmed via alpha)
-
-@Composable
-private fun CollectiveMemberAvatars() {
-    // Three overlapping circles (-12dp offset each) with initials — design placeholder.
-    val avatars =
-        listOf(
-            COLLECTIVE_AVATAR_BG_FIRST to "SR",
-            COLLECTIVE_AVATAR_BG_SECOND to "PN",
-            COLLECTIVE_AVATAR_BG_THIRD_DIM to "ML",
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Users,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.appTextSecondary,
         )
-    Box(modifier = Modifier.height(28.dp).fillMaxWidth()) {
-        avatars.forEachIndexed { idx, (bg, initials) ->
-            Box(
-                modifier =
-                    Modifier
-                        .padding(start = (idx * 16).dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(bg.copy(alpha = if (idx == 2) 0.55f else 1f))
-                        .border(1.5.dp, PantopusColors.appSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = initials,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextInverse,
-                )
-            }
-        }
+        Text(
+            text = "Required hosts and member selection are coming soon.",
+            fontSize = 11.sp,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

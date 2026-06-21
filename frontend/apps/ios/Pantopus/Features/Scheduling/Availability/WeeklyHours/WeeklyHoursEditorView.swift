@@ -223,7 +223,7 @@ struct WeeklyHoursEditorView: View {
                 icon: .slidersHorizontal,
                 title: "Booking limits & notice rules",
                 subtitle: "Defaults"
-            ) { viewModel.openBookingLimits() }
+            ) { Task { await viewModel.openBookingLimits() } }
         }
     }
 

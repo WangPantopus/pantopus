@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.scheduling.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -24,14 +29,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
+import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 @Composable
@@ -51,8 +61,7 @@ fun SchedulingSettingsRootScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             SettingsTopBar(title = "Booking settings", onBack = onBack)
             when (val s = state) {
-                SchedulingSettingsUiState.Loading ->
-                    SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth().padding(Spacing.s4), rows = 5)
+                SchedulingSettingsUiState.Loading -> SettingsSkeleton()
                 is SchedulingSettingsUiState.Error -> SettingsError(message = s.message, onRetry = viewModel::refresh)
                 is SchedulingSettingsUiState.Loaded ->
                     SettingsBody(
@@ -225,18 +234,75 @@ private fun SettingsError(
     message: String,
     onRetry: () -> Unit,
 ) {
+    // Mirrors iOS SettingsErrorView / the standard scheduling error pattern: a
+    // centered cloud-off hero in a sunken circle, headline + body, and a bordered
+    // "Try again" capsule with a refresh icon (not a bare text button).
     Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.s4),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.s8),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(Modifier.height(64.dp))
-        PantopusIconImage(icon = PantopusIcon.CloudOff, contentDescription = null, size = 28.dp, tint = PantopusColors.appTextSecondary)
-        Spacer(Modifier.height(Spacing.s3))
-        Text("Couldn't load settings", style = PantopusTextStyle.h3, color = PantopusColors.appText)
-        Spacer(Modifier.height(Spacing.s2))
-        Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary)
+        Box(
+            modifier = Modifier.size(64.dp).clip(CircleShape).background(PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.CloudOff,
+                contentDescription = null,
+                size = 28.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+        }
         Spacer(Modifier.height(Spacing.s4))
-        TextButton(onClick = onRetry) { Text("Try again", color = PantopusColors.primary600) }
+        Text("Couldn't load settings", style = PantopusTextStyle.h3, color = PantopusColors.appText, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(Spacing.s2))
+        Text(message, style = PantopusTextStyle.small, color = PantopusColors.appTextSecondary, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(Spacing.s4))
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                    .clickable(onClick = onRetry)
+                    .padding(horizontal = Spacing.s4, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 2.dp),
+        ) {
+            PantopusIconImage(icon = PantopusIcon.RefreshCw, contentDescription = null, size = 14.dp, tint = PantopusColors.appTextStrong)
+            Text("Try again", color = PantopusColors.appTextStrong, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        }
+    }
+}
+
+private val SETTINGS_SKELETON_CARD_H = 140.dp
+
+/**
+ * Loading skeleton mirroring the grouped-card geometry (and iOS SettingsSkeleton):
+ * an overline shimmer + a 140-tall card, repeated for the Automation / Defaults /
+ * Payments groups — not uniform identical cards.
+ */
+@Composable
+private fun SettingsSkeleton() {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+    ) {
+        repeat(3) {
+            Shimmer(
+                width = 110.dp,
+                height = 11.dp,
+                cornerRadius = Radii.xs,
+                modifier = Modifier.padding(start = Spacing.s4, end = Spacing.s4, top = 18.dp, bottom = Spacing.s2),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.s3)
+                        .height(SETTINGS_SKELETON_CARD_H)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurfaceSunken),
+            )
+        }
     }
 }
 

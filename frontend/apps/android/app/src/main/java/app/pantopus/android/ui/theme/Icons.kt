@@ -90,6 +90,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
@@ -108,6 +109,7 @@ import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.Grain
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Healing
@@ -194,6 +196,7 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Sell
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -203,6 +206,7 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Support
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
@@ -306,6 +310,7 @@ enum class PantopusIcon(
     MapPin("map-pin"),
     Pencil("pencil"),
     Briefcase("briefcase"),
+    Store("store"),
     Gavel("gavel"),
     SlidersHorizontal("sliders-horizontal"),
     MessageCircle("message-circle"),
@@ -325,6 +330,7 @@ enum class PantopusIcon(
     PlayCircle("play-circle"),
     GripVertical("grip-vertical"),
     Grid3x3("grid-3x3"),
+    LayoutGrid("layout-grid"),
     Square("square"),
 
     // T5.2.1 — Pets species iconography. Material doesn't ship dog / cat /
@@ -583,6 +589,8 @@ enum class PantopusIcon(
     // Analytics row's icon tile; `calendar-cog` paints the Edit-dates row.
     BarChart3("bar-chart-3"),
     CalendarCog("calendar-cog"),
+    CalendarSync("calendar-sync"),
+    Settings("settings"),
 
     // A13.15 Disambiguate — `user-check` backs the "This is me" quick-action
     // chip; `forward` backs "Route to…"; `keyboard` + `undo-2` back the
@@ -760,6 +768,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.MapPin -> IconSource.Material(Icons.Filled.LocationOn)
         PantopusIcon.Pencil -> IconSource.Material(Icons.Filled.Edit)
         PantopusIcon.Briefcase -> IconSource.Material(Icons.Filled.Work)
+        PantopusIcon.Store -> IconSource.Material(Icons.Filled.Storefront)
         PantopusIcon.Gavel -> IconSource.Material(Icons.Filled.Gavel)
         PantopusIcon.SlidersHorizontal -> IconSource.Material(Icons.Filled.Tune)
         PantopusIcon.MessageCircle -> IconSource.Material(Icons.AutoMirrored.Filled.Chat)
@@ -779,6 +788,7 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.PlayCircle -> IconSource.Material(Icons.Filled.PlayCircle)
         PantopusIcon.GripVertical -> IconSource.Material(Icons.Filled.DragIndicator)
         PantopusIcon.Grid3x3 -> IconSource.Material(Icons.Filled.Dashboard)
+        PantopusIcon.LayoutGrid -> IconSource.Material(Icons.Filled.GridView)
         PantopusIcon.Square -> IconSource.Material(Icons.Filled.CropSquare)
         PantopusIcon.Dog -> IconSource.Material(Icons.Filled.Pets)
         PantopusIcon.Cat -> IconSource.Material(Icons.Filled.Pets)
@@ -1031,6 +1041,8 @@ internal fun PantopusIcon.source(): IconSource =
         // calendar-cog glyph.
         PantopusIcon.BarChart3 -> IconSource.Material(Icons.Filled.BarChart)
         PantopusIcon.CalendarCog -> IconSource.Material(Icons.Filled.EditCalendar)
+        PantopusIcon.CalendarSync -> IconSource.Material(Icons.Filled.EventRepeat)
+        PantopusIcon.Settings -> IconSource.Material(Icons.Filled.Settings)
         // A13.15 Disambiguate. `HowToReg` is Material's person-with-check
         // (user-check); `forward` reuses the automirrored ArrowForward
         // (route-to glyph); `Keyboard` maps directly; `undo-2` reuses the

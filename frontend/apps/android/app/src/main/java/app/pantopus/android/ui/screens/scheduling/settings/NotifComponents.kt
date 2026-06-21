@@ -107,6 +107,8 @@ internal fun NotifCategoryCard(
     disabled: Boolean,
     accent: androidx.compose.ui.graphics.Color,
     accentBg: androidx.compose.ui.graphics.Color,
+    smsHint: Boolean = false,
+    onSmsTap: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3)) {
@@ -119,37 +121,51 @@ internal fun NotifCategoryCard(
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                     .alpha(if (disabled) 0.55f else 1f),
         ) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(accentBg)
-                        .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    label.uppercase(java.util.Locale.US),
-                    color = accent,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.5.sp,
-                    letterSpacing = 0.06.em,
-                    modifier = Modifier.weight(1f),
-                )
-                ColumnLetter("P")
-                ColumnLetter("E")
+            Box {
                 Row(
-                    modifier = Modifier.width(22.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(accentBg)
+                            .padding(start = 16.dp, end = 16.dp, top = 9.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "S",
-                        color = PantopusColors.appTextMuted,
-                        fontFamily = FontFamily.Monospace,
+                        label.uppercase(java.util.Locale.US),
+                        color = accent,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
+                        fontSize = 10.5.sp,
+                        letterSpacing = 0.06.em,
+                        modifier = Modifier.weight(1f),
                     )
-                    PantopusIconImage(icon = PantopusIcon.Lock, contentDescription = null, size = 8.dp, tint = PantopusColors.appTextMuted)
+                    ColumnLetter("P")
+                    ColumnLetter("E")
+                    Row(
+                        modifier =
+                            Modifier
+                                .width(22.dp)
+                                .then(if (onSmsTap != null) Modifier.clickable(onClick = onSmsTap) else Modifier)
+                                .testTag("notifSmsHeader"),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "S",
+                            color = PantopusColors.appTextMuted,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                        )
+                        PantopusIconImage(
+                            icon = PantopusIcon.Lock,
+                            contentDescription = null,
+                            size = 8.dp,
+                            tint = PantopusColors.appTextMuted,
+                        )
+                    }
+                }
+                if (smsHint) {
+                    SmsTooltip(modifier = Modifier.align(Alignment.TopEnd).padding(end = 10.dp).offset(y = (-18).dp))
                 }
             }
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
@@ -162,6 +178,23 @@ internal fun NotifCategoryCard(
             modifier = Modifier.padding(start = Spacing.s1, top = Spacing.s2),
         )
     }
+}
+
+/** "SMS coming soon" tooltip — mirrors the iOS smsTooltip floated above the S column. */
+@Composable
+private fun SmsTooltip(modifier: Modifier = Modifier) {
+    Text(
+        "SMS coming soon",
+        color = PantopusColors.appTextInverse,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 10.sp,
+        modifier =
+            modifier
+                .testTag("notifSmsTooltip")
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(PantopusColors.appText)
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+    )
 }
 
 @Composable

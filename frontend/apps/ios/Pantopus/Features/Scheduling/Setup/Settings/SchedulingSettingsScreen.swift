@@ -164,7 +164,9 @@ struct SchedulingSettingsScreen: View {
         SettingsGroup(title: "Team", accent: accent) {
             SettingsRow(
                 label: "Team & seats",
-                sub: "Manage members & booking seats",
+                // Member/seat count sub-copy per scheduling-settings-frames.jsx TeamGroup
+                // (mirrored on Android SchedulingSettingsRootScreen).
+                sub: "4 members · 2 booking seats",
                 trailing: .chevron
             ) { model.openTeam() }
             SettingsDivider()

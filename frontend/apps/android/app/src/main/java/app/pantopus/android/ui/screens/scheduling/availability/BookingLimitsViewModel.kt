@@ -126,8 +126,10 @@ class BookingLimitsViewModel
                 selectedId = id,
                 minNoticeHours = (minNoticeMin ?: DEFAULT_NOTICE_MIN) / MIN_PER_HOUR,
                 bookUpToDays = maxHorizonDays ?: DEFAULT_HORIZON_DAYS,
-                maxPerDay = dailyCap ?: 0,
-                perPerson = perBookerCap ?: 0,
+                // Caps are positive integers (design + iOS clamp to min 1; no
+                // "No limit" affordance). A null backend cap seeds the default.
+                maxPerDay = (dailyCap ?: DEFAULT_DAILY_CAP).coerceAtLeast(MIN_CAP),
+                perPerson = (perBookerCap ?: DEFAULT_PER_PERSON).coerceAtLeast(MIN_CAP),
                 startInterval = StartInterval.fromMinutes(slotIntervalMin),
             )
 
@@ -145,9 +147,9 @@ class BookingLimitsViewModel
 
         fun changeBookUpTo(delta: Int) = mutate { it.copy(bookUpToDays = (it.bookUpToDays + delta).coerceIn(0, MAX_HORIZON_DAYS)) }
 
-        fun changeMaxPerDay(delta: Int) = mutate { it.copy(maxPerDay = (it.maxPerDay + delta).coerceIn(0, MAX_CAP)) }
+        fun changeMaxPerDay(delta: Int) = mutate { it.copy(maxPerDay = (it.maxPerDay + delta).coerceIn(MIN_CAP, MAX_CAP)) }
 
-        fun changePerPerson(delta: Int) = mutate { it.copy(perPerson = (it.perPerson + delta).coerceIn(0, MAX_PER_PERSON)) }
+        fun changePerPerson(delta: Int) = mutate { it.copy(perPerson = (it.perPerson + delta).coerceIn(MIN_CAP, MAX_PER_PERSON)) }
 
         fun setStartInterval(interval: StartInterval) = mutate { it.copy(startInterval = interval) }
 
@@ -180,6 +182,9 @@ class BookingLimitsViewModel
             const val DEFAULT_HORIZON_DAYS = 60
             const val MAX_NOTICE_HOURS = 168
             const val MAX_HORIZON_DAYS = 365
+            const val MIN_CAP = 1
+            const val DEFAULT_DAILY_CAP = 8
+            const val DEFAULT_PER_PERSON = 2
             const val MAX_CAP = 50
             const val MAX_PER_PERSON = 20
         }

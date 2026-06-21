@@ -63,6 +63,10 @@ class EventTypeListViewModel
         private val _copyRequest = MutableStateFlow<String?>(null)
         val copyRequest: StateFlow<String?> = _copyRequest.asStateFlow()
 
+        /** When non-null, the row pending a destructive delete-confirm dialog (mirrors iOS `.alert`). */
+        private val _deletePrompt = MutableStateFlow<EventTypeRowUi?>(null)
+        val deletePrompt: StateFlow<EventTypeRowUi?> = _deletePrompt.asStateFlow()
+
         /** When non-null, the row whose delete hit `HAS_UPCOMING_BOOKINGS` → offer deactivate. */
         private val _deactivatePrompt = MutableStateFlow<EventTypeRowUi?>(null)
         val deactivatePrompt: StateFlow<EventTypeRowUi?> = _deactivatePrompt.asStateFlow()
@@ -153,8 +157,17 @@ class EventTypeListViewModel
                 }
                 is NetworkResult.Failure -> {
                     val decoded = errors.decode(result.error)
-                    canEdit = decoded !is SchedulingError.Secret
-                    _state.value = EventTypeListUiState.Error(decoded.listMessage())
+                    if (decoded is SchedulingError.Secret) {
+                        // Gated owner (403): render the read-only catalog with a lock banner
+                        // instead of a full-screen Error (design FrameGated). The list endpoint
+                        // returns no rows on 403, so the banner sits above whatever loaded.
+                        canEdit = false
+                        allTypes = emptyList()
+                        rebuild()
+                    } else {
+                        canEdit = true
+                        _state.value = EventTypeListUiState.Error(decoded.listMessage())
+                    }
                 }
             }
         }
@@ -198,8 +211,6 @@ class EventTypeListViewModel
             }
         }
 
-        fun hide(id: String) = toggleActive(id, active = false)
-
         fun duplicate(id: String) {
             val src = allTypes.firstOrNull { it.id == id } ?: return
             viewModelScope.launch {
@@ -226,7 +237,25 @@ class EventTypeListViewModel
             }
         }
 
-        fun delete(id: String) {
+        /** Row tap on "Delete" → open the destructive-confirm dialog first (mirrors iOS). */
+        fun requestDelete(id: String) {
+            if (!canEdit) return
+            val target = allTypes.firstOrNull { it.id == id } ?: return
+            _deletePrompt.value = target.toRowUi(_pillar.value)
+        }
+
+        fun dismissDelete() {
+            _deletePrompt.value = null
+        }
+
+        /** Confirm path from the delete-confirm dialog — run the actual delete. */
+        fun confirmDelete() {
+            val id = _deletePrompt.value?.id ?: return
+            _deletePrompt.value = null
+            delete(id)
+        }
+
+        private fun delete(id: String) {
             if (!canEdit) return
             val target = allTypes.firstOrNull { it.id == id } ?: return
             viewModelScope.launch {
