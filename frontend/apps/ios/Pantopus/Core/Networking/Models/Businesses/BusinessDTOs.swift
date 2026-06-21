@@ -23,12 +23,18 @@ public struct BusinessUserDTO: Decodable, Sendable, Hashable, Identifiable {
     public let accountType: String?
     public let city: String?
     public let state: String?
+    /// Trigger-maintained average star rating (`User.average_rating`).
+    public let averageRating: Double?
+    /// Trigger-maintained review tally (`User.review_count`).
+    public let reviewCount: Int?
 
     private enum CodingKeys: String, CodingKey {
         case id, username, name, email
         case profilePictureURL = "profile_picture_url"
         case accountType = "account_type"
         case city, state
+        case averageRating = "average_rating"
+        case reviewCount = "review_count"
     }
 }
 
@@ -43,6 +49,9 @@ public struct BusinessProfileDTO: Decodable, Sendable, Hashable {
     public let logoFileId: String?
     public let bannerFileId: String?
     public let description: String?
+    /// `bi0_unverified` … `bi4_authority`. Anything above `bi0_unverified`
+    /// earns the violet verified mark; `bi0_unverified` reads as pending.
+    public let identityVerificationTier: String?
 
     private enum CodingKeys: String, CodingKey {
         case businessUserId = "business_user_id"
@@ -52,6 +61,72 @@ public struct BusinessProfileDTO: Decodable, Sendable, Hashable {
         case logoFileId = "logo_file_id"
         case bannerFileId = "banner_file_id"
         case description
+        case identityVerificationTier = "identity_verification_tier"
+    }
+}
+
+/// Per-business stats band signals — `stats` block on each membership row.
+public struct BusinessStatsDTO: Decodable, Sendable, Hashable {
+    /// The business's own unread, active conversations.
+    public let openChats: Int
+    /// Incoming `BusinessBooking` rows created in the trailing 7 days.
+    public let bookingsThisWeek: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case openChats = "open_chats"
+        case bookingsThisWeek = "bookings_this_week"
+    }
+
+    public init(openChats: Int, bookingsThisWeek: Int) {
+        self.openChats = openChats
+        self.bookingsThisWeek = bookingsThisWeek
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        openChats = try c.decodeIfPresent(Int.self, forKey: .openChats) ?? 0
+        bookingsThisWeek = try c.decodeIfPresent(Int.self, forKey: .bookingsThisWeek) ?? 0
+    }
+}
+
+/// One member chip in the team stack. `initials` is always present; `name`
+/// and `avatarFileId` are best-effort.
+public struct BusinessTeamChipDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let name: String?
+    public let initials: String?
+    public let avatarFileId: String?
+
+    /// Stable-enough id for ForEach (initials + name).
+    public var id: String {
+        "\(initials ?? "?")-\(name ?? "")"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, initials
+        case avatarFileId = "avatar_file_id"
+    }
+}
+
+/// Team summary — `team` block on each membership row.
+public struct BusinessTeamSummaryDTO: Decodable, Sendable, Hashable {
+    /// Total active seats at the business.
+    public let count: Int
+    /// Up to 3 member chips for the stacked-avatar strip.
+    public let members: [BusinessTeamChipDTO]
+
+    public init(count: Int, members: [BusinessTeamChipDTO]) {
+        self.count = count
+        self.members = members
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        count = try c.decodeIfPresent(Int.self, forKey: .count) ?? 0
+        members = try c.decodeIfPresent([BusinessTeamChipDTO].self, forKey: .members) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case count, members
     }
 }
 
@@ -72,6 +147,10 @@ public struct BusinessMembership: Decodable, Sendable, Hashable, Identifiable {
     public let business: BusinessUserDTO
     /// Optional rich profile (categories, description, is_published).
     public let profile: BusinessProfileDTO?
+    /// Stats band: open chats · bookings this week. Defaults to zeros.
+    public let stats: BusinessStatsDTO?
+    /// Team summary: count + up to 3 member chips. Defaults to empty.
+    public let team: BusinessTeamSummaryDTO?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -81,6 +160,8 @@ public struct BusinessMembership: Decodable, Sendable, Hashable, Identifiable {
         case businessUserId = "business_user_id"
         case business
         case profile
+        case stats
+        case team
     }
 }
 

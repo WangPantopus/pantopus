@@ -1134,7 +1134,7 @@ export async function purchaseCatalogItem(
 export async function requestCatalogBooking(
   businessId: string,
   itemId: string,
-): Promise<{ gig_id: string; item_name: string; business_name: string; avg_response_minutes: number | null }> {
+): Promise<{ booking_id: string; item_name: string; business_name: string; avg_response_minutes: number | null }> {
   return post(`/api/businesses/${businessId}/catalog/${itemId}/request`, {});
 }
 

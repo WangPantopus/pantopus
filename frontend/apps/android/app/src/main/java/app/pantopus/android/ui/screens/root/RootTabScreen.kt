@@ -1927,6 +1927,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         // B3.2 — an owned business opens its owner dashboard (A10.7).
                         onOpenBusiness = { businessId -> navController.navigate(ChildRoutes.businessOwner(businessId)) },
                         onRegister = { navController.navigate(ChildRoutes.CREATE_BUSINESS) },
+                        onClaim = { navController.navigate(ChildRoutes.DISCOVER_BUSINESSES) },
                         onBack = { navController.popBackStack() },
                     )
                 }
