@@ -28,7 +28,10 @@ import app.pantopus.android.data.api.models.homes.GetHomeTasksResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
+import app.pantopus.android.data.api.models.homes.HomeEventDetailResponse
 import app.pantopus.android.data.api.models.homes.HomeEventResponse
+import app.pantopus.android.data.api.models.homes.HomeEventRsvpRequest
+import app.pantopus.android.data.api.models.homes.HomeEventRsvpResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
@@ -166,6 +169,20 @@ open class HomesRepository
             homeId: String,
             eventId: String,
         ): NetworkResult<Unit> = safeApiCall { api.deleteHomeEvent(homeId, eventId) }
+
+        /** `GET /api/homes/:id/events/:eventId` — event detail + RSVP attendees. */
+        open suspend fun getHomeEvent(
+            homeId: String,
+            eventId: String,
+        ): NetworkResult<HomeEventDetailResponse> = safeApiCall { api.getHomeEvent(homeId, eventId) }
+
+        /** `POST /api/homes/:id/events/:eventId/rsvp` — upsert the caller's RSVP
+         *  (`going` | `maybe` | `declined` | `pending`). */
+        open suspend fun rsvpHomeEvent(
+            homeId: String,
+            eventId: String,
+            status: String,
+        ): NetworkResult<HomeEventRsvpResponse> = safeApiCall { api.rsvpHomeEvent(homeId, eventId, HomeEventRsvpRequest(status)) }
         // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
         /** `GET /api/homes/:id/emergencies`. */

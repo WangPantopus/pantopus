@@ -116,11 +116,12 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(personal.stats.count, 3)
         XCTAssertEqual(personal.stats.first { $0.id == "trust" }?.value, "Verified")
         XCTAssertEqual(personal.stats.first { $0.id == "reputation" }?.value, "4.9")
-        XCTAssertEqual(personal.actionTiles.count, 7)
-        // T6.2b action grid is { posts, bids, gigs, offers, listings, connections, support trains }.
+        XCTAssertEqual(personal.actionTiles.count, 8)
+        // T6.2b action grid is { posts, bids, gigs, offers, listings, connections,
+        // support trains }; Calendarly appended a scheduling tile.
         XCTAssertEqual(
             personal.actionTiles.map(\.routeKey),
-            ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections", "me.supportTrains"]
+            ["me.posts", "me.bids", "me.gigs", "me.offers", "me.listings", "me.connections", "me.supportTrains", "me.scheduling"]
         )
         // T6.2b — sections grouped as Profile & Privacy, Activity, Help & Legal
         // (+ Debug appended in DEBUG builds; assert by header prefix).
@@ -135,11 +136,12 @@ final class MeViewModelTests: XCTestCase {
         XCTAssertEqual(home.identity, .home)
         XCTAssertEqual(home.displayName, "412 Birch Ln")
         XCTAssertFalse(home.isUnbound)
-        // T6.2b/T6.3b home action grid adds maintenance after bills.
-        XCTAssertEqual(home.actionTiles.count, 7)
+        // T6.2b/T6.3b home action grid adds maintenance after bills;
+        // Calendarly appended a scheduling tile.
+        XCTAssertEqual(home.actionTiles.count, 8)
         XCTAssertEqual(
             home.actionTiles.map(\.routeKey),
-            ["me.bills", "me.maintenance", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs"]
+            ["me.bills", "me.maintenance", "me.pets", "me.members", "me.polls", "me.calendar", "me.docs", "me.home.scheduling"]
         )
         // Home tiles carry the primary home id so the host can build
         // BillsListView / PetsListView without re-introspecting the VM.

@@ -305,6 +305,8 @@ public enum YouRoute: Hashable {
     /// A18.4 — Persistent "waiting for approval" room.
     /// `pantopus://homes/:id/waiting-room`.
     case waitingRoom(homeId: String)
+    /// Calendarly scheduling sub-routes (Foundation I0b).
+    case scheduling(SchedulingRoute)
     #if DEBUG
     case statusWaiting
     case ceremonialMail
@@ -606,6 +608,20 @@ public struct YouTabRoot: View {
             } else {
                 path.append(.placeholder(label: tile.label))
             }
+        case "me.scheduling":
+            path.append(.scheduling(.hub(owner: .personal)))
+        case "me.home.scheduling":
+            if let homeId = tile.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.scheduling(.hub(owner: .home(homeId: homeId))))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
+        case "me.business.scheduling":
+            if let businessId = tile.routeArgs["businessId"], !businessId.isEmpty {
+                path.append(.scheduling(.hub(owner: .business(id: businessId))))
+            } else {
+                path.append(.placeholder(label: tile.label))
+            }
         default:
             path.append(.placeholder(label: tile.label))
         }
@@ -717,6 +733,19 @@ public struct YouTabRoot: View {
         case "me.settings":
             path.append(.settings)
             return
+        case "me.scheduling":
+            path.append(.scheduling(.hub(owner: .personal)))
+            return
+        case "me.home.scheduling":
+            if let homeId = row.routeArgs["homeId"], !homeId.isEmpty {
+                path.append(.scheduling(.hub(owner: .home(homeId: homeId))))
+                return
+            }
+        case "me.business.scheduling":
+            if let businessId = row.routeArgs["businessId"], !businessId.isEmpty {
+                path.append(.scheduling(.hub(owner: .business(id: businessId))))
+                return
+            }
         default:
             break
         }
@@ -2210,6 +2239,8 @@ public struct YouTabRoot: View {
             ) {
                 pop()
             }
+        case let .scheduling(route):
+            SchedulingRouter.destination(for: route, owner: .personal) { path.append(.scheduling($0)) }
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(

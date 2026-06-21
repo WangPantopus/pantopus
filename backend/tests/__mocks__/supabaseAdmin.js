@@ -549,6 +549,17 @@ function createQueryBuilder(tableName) {
               || (normalized && String(existing.handle_normalized || '').toLowerCase() === normalized)
             ));
         };
+        // BookingPage has a UNIQUE index on lower(slug) (migration 159:
+        // BookingPage_slug_unique); (owner_type, owner_id) is only indexed, not
+        // unique — mirror that so ensurePage's slug-collision retry is testable.
+        const findBookingPageSlugCollision = (row) => {
+          if (storageTable !== 'BookingPage') return null;
+          if (!row.slug) return null;
+          const slug = String(row.slug).toLowerCase();
+          return table.find((existing) =>
+            existing.id !== row.id
+            && String(existing.slug || '').toLowerCase() === slug);
+        };
 
         const inserted = [];
         for (const rawRow of insertPayload) {
@@ -594,6 +605,12 @@ function createQueryBuilder(tableName) {
             return { data: null, error: {
               code: '23505',
               message: 'duplicate key value violates unique constraint "AudienceIdentity_handle_normalized_key"',
+            } };
+          }
+          if (findBookingPageSlugCollision(row)) {
+            return { data: null, error: {
+              code: '23505',
+              message: 'duplicate key value violates unique constraint "BookingPage_slug_unique"',
             } };
           }
 

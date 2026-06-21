@@ -52,6 +52,8 @@ import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
+import app.pantopus.android.data.api.services.SchedulingApi
+import app.pantopus.android.data.api.services.SchedulingPublicApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.TransactionReviewsApi
@@ -71,6 +73,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.sentry.android.okhttp.SentryOkHttpInterceptor
 import okhttp3.Cache
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -85,6 +88,9 @@ private const val HTTP_CACHE_DIR = "pantopus-http"
 private const val HTTP_CACHE_SIZE_BYTES = 10L * 1024 * 1024
 private const val CONNECT_TIMEOUT_SECONDS = 15L
 private const val READ_WRITE_TIMEOUT_SECONDS = 30L
+
+/** Qualifier for the unauthenticated client serving Calendarly `/api/public/…`. */
+private const val PUBLIC_SCHEDULING = "publicScheduling"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -189,11 +195,73 @@ object NetworkModule {
             .writeTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()
 
+    /**
+     * Dedicated **unauthenticated** client for Calendarly's public booking
+     * surface (`/api/public/…`). The default [provideOkHttpClient] always
+     * installs [app.pantopus.android.data.auth.AuthInterceptor], which would
+     * attach a stale/absent `Authorization` header (and trigger sign-out on a
+     * 401) on the signed-out invitee flow. This client omits it entirely while
+     * keeping retry/logging/Sentry; a platform header is added for parity.
+     */
+    @Provides
+    @Singleton
+    @Named(PUBLIC_SCHEDULING)
+    fun providePublicSchedulingOkHttpClient(
+        retryInterceptor: RetryInterceptor,
+        cache: Cache,
+    ): OkHttpClient {
+        val logging =
+            HttpLoggingInterceptor().apply {
+                level =
+                    if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BODY
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+            }
+        val platformHeader =
+            Interceptor { chain ->
+                chain.proceed(
+                    chain.request().newBuilder().header("X-Client-Platform", "android").build(),
+                )
+            }
+        return OkHttpClient
+            .Builder()
+            .cache(cache)
+            .addInterceptor(platformHeader)
+            .addInterceptor(retryInterceptor)
+            .addInterceptor(logging)
+            .addInterceptor(SentryOkHttpInterceptor())
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+    }
+
     @Provides
     @Singleton
     @Named("authRefresh")
     fun provideRefreshRetrofit(
         @Named("authRefresh") client: OkHttpClient,
+        moshi: Moshi,
+    ): Retrofit =
+        Retrofit
+            .Builder()
+            .baseUrl(BuildConfig.PANTOPUS_API_BASE_URL.trimEnd('/') + "/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    /**
+     * Retrofit for the public client. Same backend origin as the authed one
+     * (the `/api/public/…` paths live on `PANTOPUS_API_BASE_URL`) but a
+     * SEPARATE, auth-free client.
+     */
+    @Provides
+    @Singleton
+    @Named(PUBLIC_SCHEDULING)
+    fun providePublicSchedulingRetrofit(
+        @Named(PUBLIC_SCHEDULING) client: OkHttpClient,
         moshi: Moshi,
     ): Retrofit =
         Retrofit
@@ -211,6 +279,14 @@ object NetworkModule {
     ): AuthApi = retrofit.create(AuthApi::class.java)
 
     // Per-feature interfaces — new code should depend on these directly.
+
+    @Provides @Singleton
+    fun provideSchedulingApi(retrofit: Retrofit): SchedulingApi = retrofit.create(SchedulingApi::class.java)
+
+    @Provides @Singleton
+    fun provideSchedulingPublicApi(
+        @Named(PUBLIC_SCHEDULING) retrofit: Retrofit,
+    ): SchedulingPublicApi = retrofit.create(SchedulingPublicApi::class.java)
 
     @Provides @Singleton
     fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)

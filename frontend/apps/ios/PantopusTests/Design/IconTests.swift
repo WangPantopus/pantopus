@@ -101,7 +101,21 @@ final class IconTests: XCTestCase {
         "factory", "file-search", "flower-2", "hard-hat", "layers",
         "layout-grid", "life-buoy", "locate-fixed", "map-pin-off", "maximize",
         "mic", "repeat-2", "square-pen", "sunrise", "sunset", "test-tube",
-        "trash", "triangle-alert", "vote", "waves", "zap-off"
+        "trash", "triangle-alert", "vote", "waves", "zap-off",
+        // Calendarly (scheduling) — booking / event-type / availability /
+        // payments / automations design suite glyphs.
+        "store", "qr-code", "settings", "settings-2", "workflow", "moon",
+        "calendar-sync", "calendar-off", "calendar-x", "calendar-check-2",
+        "calendar-range", "search-x", "ticket", "ticket-check", "shield-plus",
+        "user-x", "rotate-ccw", "rotate-cw", "package-open", "tent-tree",
+        "share-2", "bell-plus", "percent", "scissors", "scale", "coffee",
+        "bed-double", "house", "move", "ellipsis", "ellipsis-vertical",
+        "circle-alert", "circle-check", "check-circle-2", "clock-alert",
+        "pause-circle", "list-ordered", "loader-circle", "message-square-text",
+        "layout-template", "panel-bottom", "square-mouse-pointer",
+        "text-cursor-input", "hand-pointer", "wand-2",
+        // Calendarly — second batch surfaced during per-screen parity sweep.
+        "arrow-right-circle", "link-2-off", "calendar-search", "git-merge"
     ]
 
     func testInventoryMatches() {

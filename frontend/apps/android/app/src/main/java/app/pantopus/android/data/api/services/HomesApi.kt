@@ -29,7 +29,10 @@ import app.pantopus.android.data.api.models.homes.HomeAccessSecretResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretsResponse
 import app.pantopus.android.data.api.models.homes.HomeBillResponse
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
+import app.pantopus.android.data.api.models.homes.HomeEventDetailResponse
 import app.pantopus.android.data.api.models.homes.HomeEventResponse
+import app.pantopus.android.data.api.models.homes.HomeEventRsvpRequest
+import app.pantopus.android.data.api.models.homes.HomeEventRsvpResponse
 import app.pantopus.android.data.api.models.homes.HomeMaintenanceResponse
 import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
@@ -246,6 +249,23 @@ interface HomesApi {
         @Path("id") homeId: String,
         @Path("eventId") eventId: String,
     )
+
+    /** `GET /api/homes/:id/events/:eventId` — route
+     *  `backend/routes/home.js:5205`. Event detail + per-user RSVP attendees. */
+    @GET("api/homes/{id}/events/{eventId}")
+    suspend fun getHomeEvent(
+        @Path("id") homeId: String,
+        @Path("eventId") eventId: String,
+    ): HomeEventDetailResponse
+
+    /** `POST /api/homes/:id/events/:eventId/rsvp` — route
+     *  `backend/routes/home.js:5231`. Upserts the caller's RSVP. */
+    @POST("api/homes/{id}/events/{eventId}/rsvp")
+    suspend fun rsvpHomeEvent(
+        @Path("id") homeId: String,
+        @Path("eventId") eventId: String,
+        @Body body: HomeEventRsvpRequest,
+    ): HomeEventRsvpResponse
     // ─── Emergency info (T6.4b / P17) ─────────────────────────
 
     /** `GET /api/homes/:id/emergencies` — route `backend/routes/home.js:5406`. */

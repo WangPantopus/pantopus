@@ -41,6 +41,11 @@ public extension Theme.Color {
 
     /// Success base — `#059669`.
     static let success = SwiftUI.Color("Semantic/Success", bundle: Theme.bundle)
+    /// Success dark — `#047857`. Emerald-700; the darker confirmed-stat value
+    /// shade specified in roster-frames.jsx (SUCCESS_DK). Use for high-emphasis
+    /// success numerals (e.g. Confirmed seat count) where the lighter #059669
+    /// reads too lightly against a sunken-surface stat cell.
+    static let successDk = SwiftUI.Color("Semantic/SuccessDk", bundle: Theme.bundle)
     /// Success light tint — `#D1FAE5`.
     static let successLight = SwiftUI.Color("Semantic/SuccessLight", bundle: Theme.bundle)
     /// Success background — `#F0FDF4`.
@@ -153,6 +158,14 @@ public extension Theme.Color {
     /// a warning state, and the lighter amber reads better against white
     /// review cards.
     static let star = SwiftUI.Color("Accent/Star", bundle: Theme.bundle)
+
+    // MARK: - Brand marks (third-party)
+
+    /// Stripe brand purple — `#635bff`. The canonical Stripe wordmark / badge
+    /// color. Used on the payments-setup Stripe connect disc + "Powered by
+    /// Stripe" badges (G5/G6). NOT the business pillar violet (`#7C3AED`) — a
+    /// brand mark keeps its own color even on a pillar-accented surface.
+    static let stripeBrand = SwiftUI.Color("Brand/Stripe", bundle: Theme.bundle)
 
     // MARK: - App shell / neutrals
 

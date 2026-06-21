@@ -20,6 +20,7 @@ import app.pantopus.android.data.api.models.homes.UpdateHomeEventRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormValidator
@@ -73,6 +74,17 @@ enum class AddEventRecurrence(val rawValue: String) {
                 Yearly -> "Repeats yearly"
             }
 
+    /** Compact label rendered in the segmented control. */
+    val segmentedLabel: String
+        get() =
+            when (this) {
+                None -> "No"
+                Daily -> "Daily"
+                Weekly -> "Weekly"
+                Monthly -> "Monthly"
+                Yearly -> "Yearly"
+            }
+
     /** Serialize to an iCal RRULE. [None] → null. */
     val rrule: String?
         get() =
@@ -85,6 +97,9 @@ enum class AddEventRecurrence(val rawValue: String) {
             }
 
     companion object {
+        /** The four options surfaced in the picker (matches design + iOS). */
+        val pickerOptions: List<AddEventRecurrence> = listOf(None, Daily, Weekly, Monthly)
+
         /** Best-effort inverse for prefilling on edit. */
         fun from(rrule: String?): AddEventRecurrence {
             val upper = rrule?.uppercase(Locale.ROOT).orEmpty()
@@ -101,29 +116,20 @@ enum class AddEventRecurrence(val rawValue: String) {
 }
 
 /**
- * Reminder lead-time. The picker shape matches the design spec; the
- * granularity is UI-only — the wire boolean (`alerts_enabled`) only
- * records whether any reminder is set, not the minute count.
+ * Reminder lead-time offset, in minutes-before-start. Multi-select; the
+ * wire sends a `reminders` array (minutes) + a derived `alerts_enabled`
+ * boolean. Mirrors iOS `AddEventReminderOffset`.
  */
-enum class AddEventReminder(val rawValue: String) {
-    None("none"),
-    FiveMin("5min"),
-    FifteenMin("15min"),
-    OneHour("1hour"),
-    OneDay("1day"),
+enum class AddEventReminderOffset(val minutes: Int, val label: String) {
+    AtTime(0, "At time"),
+    TenMin(10, "10 min"),
+    OneHour(60, "1 hour"),
+    OneDay(1440, "1 day"),
     ;
 
-    val label: String
-        get() =
-            when (this) {
-                None -> "None"
-                FiveMin -> "5 minutes before"
-                FifteenMin -> "15 minutes before"
-                OneHour -> "1 hour before"
-                OneDay -> "1 day before"
-            }
-
-    val alertsEnabled: Boolean get() = this != None
+    companion object {
+        fun fromMinutes(minutes: Int): AddEventReminderOffset? = entries.firstOrNull { it.minutes == minutes }
+    }
 }
 
 /** Attendee row surfaced in the multi-pick. */
@@ -155,7 +161,8 @@ data class AddEventUiState(
     val startDate: ZonedDateTime,
     val endDate: ZonedDateTime? = null,
     val recurrence: AddEventRecurrence = AddEventRecurrence.None,
-    val reminder: AddEventReminder = AddEventReminder.None,
+    val reminderOffsets: Set<AddEventReminderOffset> = setOf(AddEventReminderOffset.TenMin),
+    val requestRsvp: Boolean = false,
     val attendees: List<AddEventAttendee> = emptyList(),
     val selectedAttendeeIds: Set<String> = emptySet(),
     val isEditing: Boolean = false,
@@ -163,23 +170,22 @@ data class AddEventUiState(
     val isSaving: Boolean = false,
     val toast: AddEventToast? = null,
     val commit: AddEventCommit? = null,
-    /** Snapshot of the original values for dirty tracking on edit. */
     val baseline: AddEventBaseline,
 ) {
     val aggregate: FormAggregate
         get() = FormAggregate.from(AddEventField.entries.mapNotNull { fields[it] })
 
     val title: String
-        get() = if (isEditing) "Edit event" else "Add event"
+        get() = if (isEditing) "Edit event" else "New event"
 
     val commitLabel: String
-        get() = if (isEditing) "Save" else "Add"
+        get() = "Save"
 
     /** End-date inline error when end < start. */
     val endError: String?
         get() =
             if (endDate != null && endDate.isBefore(startDate)) {
-                "End must be on or after start."
+                "End time is before the start time"
             } else {
                 null
             }
@@ -199,10 +205,10 @@ data class AddEventUiState(
             if (category != baseline.category) return true
             if (allDay != baseline.allDay) return true
             if (startDate.toInstant() != baseline.start.toInstant()) return true
-            val baselineEnd = baseline.end?.toInstant()
-            if (endDate?.toInstant() != baselineEnd) return true
+            if (endDate?.toInstant() != baseline.end?.toInstant()) return true
             if (recurrence != baseline.recurrence) return true
-            if (reminder != baseline.reminder) return true
+            if (reminderOffsets != baseline.reminderOffsets) return true
+            if (requestRsvp != baseline.requestRsvp) return true
             if (selectedAttendeeIds != baseline.attendees) return true
             return false
         }
@@ -215,7 +221,8 @@ data class AddEventBaseline(
     val start: ZonedDateTime,
     val end: ZonedDateTime?,
     val recurrence: AddEventRecurrence,
-    val reminder: AddEventReminder,
+    val reminderOffsets: Set<AddEventReminderOffset>,
+    val requestRsvp: Boolean,
     val attendees: Set<String>,
 )
 
@@ -224,16 +231,18 @@ class AddEventFormViewModel
     internal constructor(
         private val repo: HomesRepository,
         private val membersRepo: HomeMembersRepository,
+        private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
-        private val zone: ZoneId = ZoneId.systemDefault(),
+        private val zone: ZoneId = ZoneId.of("UTC"),
     ) : ViewModel() {
         @Inject
         constructor(
             repo: HomesRepository,
             membersRepo: HomeMembersRepository,
+            networkMonitor: NetworkMonitor,
             savedStateHandle: SavedStateHandle,
-        ) : this(repo, membersRepo, savedStateHandle, Instant::now, ZoneId.systemDefault())
+        ) : this(repo, membersRepo, networkMonitor, savedStateHandle, Instant::now, ZoneId.of("UTC"))
 
         private val homeId: String =
             requireNotNull(savedStateHandle[ADD_EVENT_HOME_ID_KEY]) {
@@ -243,10 +252,11 @@ class AddEventFormViewModel
         private val prefilledCategoryRaw: String? =
             savedStateHandle.get<String>(ADD_EVENT_PREFILLED_CATEGORY_KEY)
 
+        val isOnline: StateFlow<Boolean> get() = networkMonitor.isOnline
+
         private val _state: MutableStateFlow<AddEventUiState>
         val state: StateFlow<AddEventUiState>
 
-        /** Source event for edit mode; hydrated from `/api/homes/:id/events`. */
         private var editingSource: CalendarEventDto? = null
 
         init {
@@ -258,20 +268,23 @@ class AddEventFormViewModel
                 } else {
                     CalendarEventCategory.Generic
                 }
+            val defaultEnd = defaultStart.plusHours(1)
             val baseline =
                 AddEventBaseline(
                     category = CalendarEventCategory.Generic,
                     allDay = false,
                     start = defaultStart,
-                    end = null,
+                    end = defaultEnd,
                     recurrence = AddEventRecurrence.None,
-                    reminder = AddEventReminder.None,
+                    reminderOffsets = setOf(AddEventReminderOffset.TenMin),
+                    requestRsvp = false,
                     attendees = emptySet(),
                 )
             _state =
                 MutableStateFlow(
                     AddEventUiState(
                         startDate = defaultStart,
+                        endDate = defaultEnd,
                         category = initialCategory,
                         isEditing = isEditing,
                         baseline = baseline,
@@ -292,14 +305,12 @@ class AddEventFormViewModel
         }
 
         private suspend fun fetchEditingSource(): CalendarEventDto? {
-            val result = repo.getHomeEvents(homeId)
+            val result = repo.getHomeEvent(homeId, editingEventId!!)
             return when (result) {
-                is NetworkResult.Success -> result.data.events.firstOrNull { it.id == editingEventId }
+                is NetworkResult.Success -> result.data.event
                 is NetworkResult.Failure -> {
                     _state.update {
-                        it.copy(
-                            toast = AddEventToast("Couldn't load this event.", isError = true),
-                        )
+                        it.copy(toast = AddEventToast("Couldn't load this event.", isError = true))
                     }
                     null
                 }
@@ -331,7 +342,14 @@ class AddEventFormViewModel
             val allDay = isAllDayHeuristic(start, end, source.endAt)
             val category = CalendarEventCategory.from(source.eventType)
             val recurrence = AddEventRecurrence.from(source.recurrenceRule)
-            val reminder = if (source.alertsEnabled == true) AddEventReminder.FifteenMin else AddEventReminder.None
+            val reminders =
+                when {
+                    source.reminders != null ->
+                        source.reminders.mapNotNull { AddEventReminderOffset.fromMinutes(it) }.toSet()
+                    source.alertsEnabled == true -> setOf(AddEventReminderOffset.TenMin)
+                    else -> emptySet()
+                }
+            val requestRsvp = source.requestRsvp == true
             val attendees = source.assignedTo?.toSet().orEmpty()
 
             val titleError = titleValidator.validate(source.title)
@@ -368,7 +386,8 @@ class AddEventFormViewModel
                     start = start,
                     end = end,
                     recurrence = recurrence,
-                    reminder = reminder,
+                    reminderOffsets = reminders,
+                    requestRsvp = requestRsvp,
                     attendees = attendees,
                 )
             _state.update {
@@ -379,7 +398,8 @@ class AddEventFormViewModel
                     startDate = start,
                     endDate = end,
                     recurrence = recurrence,
-                    reminder = reminder,
+                    reminderOffsets = reminders,
+                    requestRsvp = requestRsvp,
                     selectedAttendeeIds = attendees,
                     baseline = baseline,
                 )
@@ -415,7 +435,7 @@ class AddEventFormViewModel
                 } else {
                     val time = LocalTime.of(9, 0)
                     val snapped = LocalDateTime.of(current.startDate.toLocalDate(), time).atZone(zone)
-                    current.copy(allDay = false, startDate = snapped)
+                    current.copy(allDay = false, startDate = snapped, endDate = snapped.plusHours(1))
                 }
             }
         }
@@ -432,18 +452,6 @@ class AddEventFormViewModel
             }
         }
 
-        fun setEndEnabled(enabled: Boolean) {
-            _state.update { current ->
-                if (enabled && current.endDate == null) {
-                    current.copy(endDate = current.startDate.plusHours(1))
-                } else if (!enabled) {
-                    current.copy(endDate = null)
-                } else {
-                    current
-                }
-            }
-        }
-
         fun setEndDate(end: ZonedDateTime) {
             _state.update { it.copy(endDate = end) }
         }
@@ -452,8 +460,20 @@ class AddEventFormViewModel
             _state.update { it.copy(recurrence = option) }
         }
 
-        fun setReminder(option: AddEventReminder) {
-            _state.update { it.copy(reminder = option) }
+        fun toggleReminder(offset: AddEventReminderOffset) {
+            _state.update { current ->
+                val updated =
+                    if (offset in current.reminderOffsets) {
+                        current.reminderOffsets - offset
+                    } else {
+                        current.reminderOffsets + offset
+                    }
+                current.copy(reminderOffsets = updated)
+            }
+        }
+
+        fun setRequestRsvp(enabled: Boolean) {
+            _state.update { it.copy(requestRsvp = enabled) }
         }
 
         fun toggleAttendee(userId: String) {
@@ -479,6 +499,12 @@ class AddEventFormViewModel
             if (firstInvalid != null || _state.value.endError != null) {
                 _state.update {
                     it.copy(toast = AddEventToast("Fix the highlighted field.", isError = true))
+                }
+                return
+            }
+            if (!networkMonitor.isOnline.value) {
+                _state.update {
+                    it.copy(toast = AddEventToast("You're offline. Try again when you're back online.", isError = true))
                 }
                 return
             }
@@ -508,11 +534,7 @@ class AddEventFormViewModel
                     _state.update {
                         it.copy(
                             isSaving = false,
-                            toast =
-                                AddEventToast(
-                                    result.error.message ?: "Couldn't add this event.",
-                                    isError = true,
-                                ),
+                            toast = AddEventToast(result.error.message ?: "Couldn't add this event.", isError = true),
                         )
                     }
             }
@@ -536,11 +558,7 @@ class AddEventFormViewModel
                     _state.update {
                         it.copy(
                             isSaving = false,
-                            toast =
-                                AddEventToast(
-                                    result.error.message ?: "Couldn't update this event.",
-                                    isError = true,
-                                ),
+                            toast = AddEventToast(result.error.message ?: "Couldn't update this event.", isError = true),
                         )
                     }
             }
@@ -574,7 +592,9 @@ class AddEventFormViewModel
                 locationNotes = location,
                 recurrenceRule = snapshot.recurrence.rrule,
                 assignedTo = attendees.ifEmpty { null },
-                alertsEnabled = snapshot.reminder.alertsEnabled,
+                alertsEnabled = snapshot.reminderOffsets.isNotEmpty(),
+                requestRsvp = snapshot.requestRsvp,
+                reminders = remindersWire(snapshot).ifEmpty { null },
             )
         }
 
@@ -584,8 +604,7 @@ class AddEventFormViewModel
             val notes = snapshot.fields[AddEventField.Notes]?.value?.trim().orEmpty()
             val attendees = sortedAttendeeIds(snapshot)
             // Empty strings explicitly clear the corresponding columns —
-            // backend writes through whatever's in the body (see
-            // home.js:5090 allow-list).
+            // backend writes through whatever's in the body (home.js allow-list).
             return UpdateHomeEventRequest(
                 eventType = snapshot.category.rawValue,
                 title = title,
@@ -595,9 +614,13 @@ class AddEventFormViewModel
                 locationNotes = location,
                 recurrenceRule = snapshot.recurrence.rrule.orEmpty(),
                 assignedTo = attendees,
-                alertsEnabled = snapshot.reminder.alertsEnabled,
+                alertsEnabled = snapshot.reminderOffsets.isNotEmpty(),
+                requestRsvp = snapshot.requestRsvp,
+                reminders = remindersWire(snapshot),
             )
         }
+
+        private fun remindersWire(snapshot: AddEventUiState): List<Int> = snapshot.reminderOffsets.map { it.minutes }.sorted()
 
         private fun sortedAttendeeIds(snapshot: AddEventUiState): List<String> =
             snapshot.attendees.map { it.id }.filter { it in snapshot.selectedAttendeeIds }
@@ -615,7 +638,7 @@ class AddEventFormViewModel
             internal val titleValidator: FormValidator =
                 FormValidator.all(
                     listOf(
-                        FormValidator.required("Title"),
+                        FormValidator.required("Add a title to save this event"),
                         FormValidator.maxLength(120),
                     ),
                 )
@@ -642,7 +665,7 @@ class AddEventFormViewModel
                 endIso: String?,
             ): Boolean = start.hour == 0 && start.minute == 0 && start.second == 0 && end == null && endIso == null
 
-            /** ISO-8601 with timezone offset. Round-trips with the iOS shape. */
+            /** ISO-8601 (UTC instant). Round-trips with the iOS shape. */
             internal fun iso8601(
                 date: ZonedDateTime,
                 allDay: Boolean,

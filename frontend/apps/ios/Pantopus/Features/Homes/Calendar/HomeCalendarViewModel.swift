@@ -104,6 +104,43 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// User-selected day filter. `nil` means "show full agenda".
     private var selectedIsoDate: String?
 
+    // MARK: - I10 (Home calendar & RSVP) additions
+
+    /// Rich agenda the bespoke design renders (time-led rows + assignee
+    /// avatar stacks + booking-union rows). Built alongside `state`'s
+    /// RowSections (which stay for the existing projection tests).
+    private(set) var agendaSections: [HomeAgendaSection] = []
+    /// Empty-state kind for the bespoke agenda (nil when rows exist).
+    private(set) var agendaEmpty: AgendaEmpty?
+    /// Household members keyed by user id — drives avatar stacks + filters.
+    private(set) var members: [String: HomeMember] = [:]
+    /// Members in roster order, for the filter chip row.
+    private(set) var memberOrder: [HomeMember] = []
+    /// The active member-filter chip. Mutated via `selectFilter` /
+    /// `clearMemberFilter` (which re-project the agenda).
+    private(set) var memberFilter: MemberFilter = .all
+    /// FAB "create" menu sheet.
+    var isCreateMenuPresented = false
+    /// Locally-presented cross-stream scheduling screen (booking detail E2,
+    /// who's-free F7, find-a-time F4, …) — we can't push through HubTabRoot.
+    var presentedRoute: PresentedHomeRoute?
+    /// Signed-in member id (for the "Mine" filter) — resolved in `load()`.
+    private var resolvedUserId: String?
+
+    /// Member-filter chip selection.
+    public enum MemberFilter: Hashable {
+        case all
+        case mine
+        case member(id: String, name: String)
+    }
+
+    /// Bespoke-agenda empty-state kind.
+    public enum AgendaEmpty: Equatable {
+        case firstRun
+        case filteredMember(name: String)
+        case filteredDay
+    }
+
     init(
         homeId: String,
         homeSubtitle: String? = nil,
@@ -186,11 +223,21 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     // MARK: - Fetching
 
     private func fetch() async {
+        if resolvedUserId == nil { resolvedUserId = Self.signedInUserId() }
         do {
             let response: GetHomeEventsResponse = try await api.request(
                 HomesEndpoints.homeEvents(homeId: homeId)
             )
             events = response.events
+            // Members are best-effort (sequential so the events stub is
+            // consumed first in tests). Avatar stacks + filter chips degrade
+            // gracefully when the roster can't be fetched.
+            let occupants: OccupantsResponse? = try? await api.request(
+                HomesEndpoints.listOccupants(homeId: homeId)
+            )
+            if let occupants {
+                applyMembers(occupants.occupants)
+            }
             rebuild()
         } catch {
             events = []
@@ -204,6 +251,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     // MARK: - State projection
 
     private func rebuild() {
+        rebuildAgenda()
         var cal = calendar
         cal.timeZone = timeZone
         let nowDate = now()
@@ -280,7 +328,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         let dowFmt = DateFormatter()
         dowFmt.locale = Locale(identifier: "en_US_POSIX")
         dowFmt.timeZone = cal.timeZone
-        dowFmt.dateFormat = "EEE"
+        // Narrow weekday — single initial ("S M T W T F S"), matching the
+        // home-shell `MonthStrip` (NOT the 3-letter `EEE` abbreviation).
+        dowFmt.dateFormat = "EEEEE"
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
         dayFmt.timeZone = cal.timeZone
@@ -668,5 +718,131 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         if upper.contains("FREQ=MONTHLY") { return "Repeats monthly" }
         if upper.contains("FREQ=DAILY") { return "Repeats daily" }
         return "Repeats"
+    }
+
+    // MARK: - I10 agenda projection + navigation
+
+    /// Build the member lookup + ordered roster from the occupants list.
+    private func applyMembers(_ occupants: [OccupantDTO]) {
+        var lookup: [String: HomeMember] = [:]
+        var order: [HomeMember] = []
+        for occupant in occupants where occupant.isActive {
+            let trimmed = occupant.displayName?.trimmingCharacters(in: .whitespaces) ?? ""
+            let name = trimmed.isEmpty ? (occupant.username ?? "Member") : trimmed
+            let member = HomeMember(
+                id: occupant.userId,
+                name: name,
+                isYou: occupant.userId == resolvedUserId
+            )
+            lookup[occupant.userId] = member
+            order.append(member)
+        }
+        members = lookup
+        memberOrder = order
+    }
+
+    /// Rebuild the bespoke agenda from the current events + member + day
+    /// filters. Runs alongside the RowSection projection in `rebuild()`.
+    func rebuildAgenda() {
+        var cal = calendar
+        cal.timeZone = timeZone
+        let onlyUser: String? = switch memberFilter {
+        case .all: nil
+        case .mine: resolvedUserId
+        case let .member(id, _): id
+        }
+        let sections = HomeAgendaBuilder.sections(
+            events: events,
+            members: members,
+            now: now(),
+            calendar: cal,
+            timeZone: timeZone,
+            selectedIsoDate: selectedIsoDate,
+            onlyUserId: onlyUser
+        )
+        agendaSections = sections
+        if !sections.isEmpty {
+            agendaEmpty = nil
+        } else if events.isEmpty {
+            agendaEmpty = .firstRun
+        } else if case let .member(_, name) = memberFilter {
+            agendaEmpty = .filteredMember(name: name)
+        } else if memberFilter == .mine {
+            agendaEmpty = .filteredMember(name: "you")
+        } else if selectedIsoDate != nil {
+            agendaEmpty = .filteredDay
+        } else {
+            agendaEmpty = .firstRun
+        }
+    }
+
+    /// The filter chips: All · Mine · <each member>.
+    var filterChips: [MemberFilter] {
+        var chips: [MemberFilter] = [.all, .mine]
+        chips.append(contentsOf: memberOrder.map { .member(id: $0.id, name: $0.name) })
+        return chips
+    }
+
+    func selectFilter(_ filter: MemberFilter) {
+        memberFilter = filter
+        rebuildAgenda()
+    }
+
+    func clearMemberFilter() {
+        memberFilter = .all
+        rebuildAgenda()
+    }
+
+    /// Tap an agenda row: booking-union rows deep-link to the Scheduling
+    /// Booking Detail (E2) via the router; normal events open the home detail.
+    func openAgendaItem(_ item: HomeAgendaItem) {
+        if item.isBooking, let bookingId = item.bookingId {
+            presentedRoute = PresentedHomeRoute(
+                .bookingDetail(owner: .home(homeId: homeId), bookingId: bookingId)
+            )
+        } else {
+            onOpenEvent(item.eventId ?? item.id)
+        }
+    }
+
+    /// Home id exposed for the local cross-stream route presenter's owner
+    /// context. (The `homeId` stored prop stays private.)
+    var homeIdForRouting: String {
+        homeId
+    }
+
+    func openWhosFree() {
+        presentedRoute = PresentedHomeRoute(
+            .whosFree(homeId: homeId, tz: TimeZone.current.identifier)
+        )
+    }
+
+    func openCreateMenu() {
+        isCreateMenuPresented = true
+    }
+
+    /// Handle a create-menu selection. "Add event" reuses the host's
+    /// `onAddEvent`; the rest fan out to other-stream screens, presented
+    /// locally through the router.
+    func selectCreateAction(_ action: HomeCreateAction) {
+        isCreateMenuPresented = false
+        switch action {
+        case .addEvent:
+            onAddEvent()
+        case .findATime:
+            presentedRoute = PresentedHomeRoute(.findATimeSetup(homeId: homeId))
+        case .bookResource:
+            presentedRoute = PresentedHomeRoute(.resourceList(homeId: homeId))
+        case .scheduleVisit:
+            presentedRoute = PresentedHomeRoute(.scheduleVisit(homeId: homeId))
+        }
+    }
+
+    /// The signed-in member id, for the "Mine" filter.
+    static func signedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 }
