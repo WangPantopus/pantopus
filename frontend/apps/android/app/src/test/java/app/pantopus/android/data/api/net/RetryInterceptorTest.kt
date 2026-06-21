@@ -1,13 +1,16 @@
 package app.pantopus.android.data.api.net
 
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 /**
  * Drives a real OkHttp stack through a [MockWebServer] to verify that the
@@ -93,6 +96,49 @@ class RetryInterceptorTest {
         assertEquals(503, response.code)
         assertEquals(1, server.requestCount)
         response.close()
+    }
+
+    @Test
+    fun non_retriable_ioexception_is_not_retried() {
+        var attempts = 0
+        val throwing =
+            Interceptor {
+                attempts++
+                throw NonRetriableIOException("transient refresh; do not retry")
+            }
+        val c =
+            OkHttpClient
+                .Builder()
+                .addInterceptor(RetryInterceptor(maxRetries = 2, baseDelayMs = 1, maxDelayMs = 5, sleep = {}))
+                .addInterceptor(throwing)
+                .build()
+
+        assertThrows(NonRetriableIOException::class.java) {
+            c.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
+        }
+        assertEquals("Marker exception must be attempted exactly once", 1, attempts)
+    }
+
+    @Test
+    fun plain_ioexception_on_get_is_retried() {
+        var attempts = 0
+        val throwing =
+            Interceptor {
+                attempts++
+                throw IOException("transient network")
+            }
+        val c =
+            OkHttpClient
+                .Builder()
+                .addInterceptor(RetryInterceptor(maxRetries = 2, baseDelayMs = 1, maxDelayMs = 5, sleep = {}))
+                .addInterceptor(throwing)
+                .build()
+
+        assertThrows(IOException::class.java) {
+            c.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
+        }
+        // Contrast with the marker case: a plain IOException IS retried (1 + 2).
+        assertEquals(3, attempts)
     }
 
     @Test

@@ -104,6 +104,21 @@ final class AuthManager {
     private let apiClient: APIClient
     private let logger = Logger(label: "app.pantopus.ios.AuthManager")
 
+    /// In-flight refresh, shared by all concurrent callers (single-flight).
+    /// The backend rotates refresh tokens and treats a replayed refresh
+    /// token as theft (`TOKEN_REUSE`), so two simultaneous refreshes would
+    /// force a logout — we must coalesce them into one round-trip.
+    private var refreshTask: Task<RefreshOutcome, Never>?
+
+    /// Outcome of a token refresh. Only `.authRejected` should sign the user
+    /// out — a `.transient` failure (offline/timeout/5xx) must keep the
+    /// session so a flaky network can't log the user out.
+    enum RefreshOutcome: Equatable {
+        case rotated
+        case authRejected
+        case transient
+    }
+
     init(
         store: any SecureStore = KeychainStore(),
         apiClient: APIClient = .shared
@@ -115,25 +130,72 @@ final class AuthManager {
     // MARK: - Session restore
 
     func restoreSession() async {
-        if let token = store.get(SecureStoreKey.accessToken) {
-            accessToken = token
-            // Best-effort hydration of the current user. If this fails with
-            // 401, handleUnauthorized will flip us to signedOut.
-            do {
-                let response: ProfileResponse = try await apiClient.request(UsersEndpoints.profile())
-                let user = UserDTO(from: response.user)
-                state = .signedIn(user)
-                Observability.shared.identify(userId: user.id, email: user.email)
-                Analytics.identify(userId: user.id)
-                SocketClient.shared.connect(token: token)
-                logger.info("Session restored", metadata: ["userId": .string(user.id)])
-            } catch {
-                logger.info("Session restore failed, signing out", metadata: ["error": .string("\(error)")])
-                await signOut()
-            }
-        } else {
+        guard let token = store.get(SecureStoreKey.accessToken), !token.isEmpty else {
             state = .signedOut
+            return
         }
+        accessToken = token
+        let cached = loadCachedUser()
+        // Best-effort hydration of the current user. A 401 here is recovered
+        // transparently by APIClient's silent refresh; if even the refresh
+        // fails it surfaces as `.unauthorized` and we sign out for real.
+        do {
+            let response: ProfileResponse = try await apiClient.request(UsersEndpoints.profile())
+            let user = UserDTO(from: response.user)
+            persistCachedUser(user)
+            finishSignedIn(user, token: accessToken ?? token)
+            logger.info("Session restored", metadata: ["userId": .string(user.id)])
+        } catch let error as APIError {
+            switch error {
+            case .unauthorized:
+                // The token is genuinely stale and refresh could not renew it.
+                logger.info("Session restore unauthorized — signing out")
+                await signOut()
+            default:
+                // Transient failure (offline, timeout, 5xx). Do NOT wipe the
+                // session — keep the user signed in against their cached
+                // identity and let each screen retry. Matches YouTube/Gmail,
+                // which never sign you out over a flaky connection.
+                if let cached {
+                    logger.info("Session restore deferred (offline) — using cached identity")
+                    finishSignedIn(cached, token: token)
+                } else {
+                    logger.info("Session restore deferred (offline) — no cached identity, tokens preserved")
+                    state = .signedOut
+                }
+            }
+        } catch {
+            // Non-APIError (e.g. decoding) — treat as transient, never wipe.
+            if let cached {
+                finishSignedIn(cached, token: token)
+            } else {
+                state = .signedOut
+            }
+        }
+    }
+
+    /// Apply the side effects of a confirmed signed-in session: publish
+    /// state, identify analytics, and (re)connect the realtime socket.
+    private func finishSignedIn(_ user: UserDTO, token: String) {
+        state = .signedIn(user)
+        Observability.shared.identify(userId: user.id, email: user.email)
+        Analytics.identify(userId: user.id)
+        SocketClient.shared.connect(token: token)
+    }
+
+    /// Persist a JSON snapshot of the session user so a future cold launch
+    /// can render the signed-in shell before (or without) a network round-trip.
+    private func persistCachedUser(_ user: UserDTO) {
+        guard let data = try? JSONEncoder().encode(user),
+              let json = String(data: data, encoding: .utf8) else { return }
+        try? store.set(json, for: SecureStoreKey.cachedUser)
+    }
+
+    /// Load the cached session user, if any.
+    private func loadCachedUser() -> UserDTO? {
+        guard let json = store.get(SecureStoreKey.cachedUser),
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(UserDTO.self, from: data)
     }
 
     // MARK: - Sign in
@@ -153,6 +215,7 @@ final class AuthManager {
             try store.set(response.user.id, for: SecureStoreKey.userId)
 
             let user = UserDTO(from: response.user)
+            persistCachedUser(user)
             state = .signedIn(user)
             Observability.shared.identify(userId: response.user.id, email: response.user.email)
             Analytics.identify(userId: response.user.id)
@@ -293,39 +356,97 @@ final class AuthManager {
 
     // MARK: - Refresh session
 
+    /// Single-flight access-token refresh. Concurrent callers (e.g. several
+    /// requests that 401 at once) share one in-flight network round-trip —
+    /// essential because the backend rotates refresh tokens and rejects a
+    /// replayed one as theft (`TOKEN_REUSE`). Returns a classified outcome so
+    /// the caller can tell a genuine auth rejection (sign out) from a
+    /// transient failure (keep the session). Does **not** sign out itself.
+    @discardableResult
+    func refreshIfPossible() async -> RefreshOutcome {
+        if let task = refreshTask {
+            return await task.value
+        }
+        let task = Task { await performRefresh() }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return await task.value
+    }
+
     /// `POST /api/users/refresh` (route `backend/routes/users.js:1910`). On
-    /// success, persists the new access token and updates `accessToken`.
-    /// On failure (incl. TOKEN_REUSE), signs the user out.
-    func refreshSession() async throws {
-        let stored = store.get(SecureStoreKey.refreshToken)
+    /// success, persists the rotated access + refresh tokens and reconnects
+    /// the socket. Classifies failures: a 401/4xx from the refresh endpoint is
+    /// `.authRejected` (refresh token expired/replayed); anything else
+    /// (offline, timeout, 5xx) is `.transient` and must not sign the user out.
+    private func performRefresh() async -> RefreshOutcome {
+        guard let stored = store.get(SecureStoreKey.refreshToken), !stored.isEmpty else {
+            return .authRejected
+        }
         do {
             let response: RefreshResponse = try await apiClient.request(
                 AuthEndpoints.refresh(refreshToken: stored)
             )
-            if let access = response.accessToken {
-                try store.set(access, for: SecureStoreKey.accessToken)
-                accessToken = access
-                SocketClient.shared.connect(token: access)
-            }
-            if let refresh = response.refreshToken {
+            guard let access = response.accessToken, !access.isEmpty else { return .authRejected }
+            try store.set(access, for: SecureStoreKey.accessToken)
+            accessToken = access
+            if let refresh = response.refreshToken, !refresh.isEmpty {
                 try store.set(refresh, for: SecureStoreKey.refreshToken)
             }
-            logger.info("Session refreshed")
-        } catch let apiError as APIError {
-            logger.warning("Refresh failed, signing out", metadata: ["error": .string("\(apiError)")])
-            await signOut()
-            throw Self.mapGenericAuthError(apiError)
+            SocketClient.shared.connect(token: access)
+            logger.info("Access token refreshed")
+            return .rotated
+        } catch let error as APIError {
+            switch error {
+            case .unauthorized:
+                // Refresh token expired / replayed (TOKEN_REUSE) — sign out.
+                logger.warning("Refresh rejected by server")
+                return .authRejected
+            case let .clientError(status, _):
+                // 400 = malformed/missing refresh token → unrecoverable. 429
+                // (rate-limited) and any other 4xx → transient, keep session.
+                return status == 400 ? .authRejected : .transient
+            default:
+                // .forbidden, .server (5xx), .transport, decoding, etc.
+                logger.warning("Refresh failed transiently", metadata: ["error": .string("\(error)")])
+                return .transient
+            }
+        } catch {
+            // Genuinely unexpected (e.g. decoding) — log + report, but keep the
+            // session (transient) rather than punishing the user for our bug.
+            logger.warning("Refresh failed unexpectedly", metadata: ["error": .string("\(error)")])
+            Observability.shared.capture(error)
+            return .transient
         }
+    }
+
+    /// Imperative refresh used by call sites that want to force a token
+    /// rotation and treat failure as a hard sign-out (e.g. tests, explicit
+    /// "reconnect" affordances). Routes through the single-flight path.
+    func refreshSession() async throws {
+        if await refreshIfPossible() == .rotated {
+            return
+        }
+        logger.warning("Refresh failed, signing out")
+        await signOut()
+        throw AuthError.invalidCredentials
     }
 
     // MARK: - Sign out
 
     func signOut() async {
+        // Whether a real session existed before this call. Several concurrent
+        // 401s can each reach here after one coalesced refresh fails; only the
+        // first should fire the disconnect/analytics side effects. (signOut has
+        // no suspension points, so the @MainActor serializes these reads/writes
+        // — the second caller sees `hadSession == false`.)
+        let hadSession = accessToken != nil || store.get(SecureStoreKey.accessToken) != nil
         try? store.delete(SecureStoreKey.accessToken)
         try? store.delete(SecureStoreKey.refreshToken)
         try? store.delete(SecureStoreKey.userId)
+        try? store.delete(SecureStoreKey.cachedUser)
         accessToken = nil
         state = .signedOut
+        guard hadSession else { return }
         SocketClient.shared.disconnect()
         Observability.shared.identify(userId: nil)
         Analytics.identify(userId: nil)
@@ -334,106 +455,13 @@ final class AuthManager {
 
     // MARK: - 401 handling
 
+    /// Terminal 401 handler: invoked by the networking layer only after a
+    /// silent refresh has already failed. Clears the session.
     func handleUnauthorized() async {
-        // Extension point: try refresh-token flow here. For now, sign out.
-        logger.warning("Handling 401 — signing out")
+        logger.warning("Handling 401 after failed refresh — signing out")
         await signOut()
     }
 
-    // MARK: - Error mapping
-
-    private static func mapSignInError(_ error: APIError) -> AuthError {
-        switch error {
-        case .unauthorized: .invalidCredentials
-        case let .clientError(status, body): mapByStatus(status: status, body: body)
-        case let .server(status, body): .serverError(extractMessage(from: body) ?? "Server error \(status).")
-        case .transport: .networkError
-        default: .unknown
-        }
-    }
-
-    private static func mapRegisterError(_ error: APIError) -> AuthError {
-        switch error {
-        case let .clientError(status, body):
-            if status == 429 { return .rateLimited }
-            let raw = body ?? ""
-            if raw.range(of: "already registered", options: .caseInsensitive) != nil
-                || raw.range(of: "Email already", options: .caseInsensitive) != nil {
-                return .emailAlreadyExists
-            }
-            if raw.range(of: "password", options: .caseInsensitive) != nil {
-                return .weakPassword
-            }
-            return .serverError(extractMessage(from: body) ?? raw)
-        case let .server(status, body):
-            return .serverError(extractMessage(from: body) ?? "Server error \(status).")
-        case .transport: return .networkError
-        default: return .unknown
-        }
-    }
-
-    private static func mapResetPasswordError(_ error: APIError) -> AuthError {
-        switch error {
-        case let .clientError(status, body):
-            if status == 429 { return .rateLimited }
-            let raw = body ?? ""
-            if raw.range(of: "password", options: .caseInsensitive) != nil
-                && raw.range(of: "Invalid or expired", options: .caseInsensitive) == nil {
-                return .weakPassword
-            }
-            return .serverError(extractMessage(from: body) ?? raw)
-        case let .server(status, body):
-            return .serverError(extractMessage(from: body) ?? "Server error \(status).")
-        case .transport: return .networkError
-        default: return .unknown
-        }
-    }
-
-    private static func mapVerifyEmailError(_ error: APIError) -> AuthError {
-        switch error {
-        case let .clientError(status, body):
-            if status == 429 { return .rateLimited }
-            return .serverError(extractMessage(from: body) ?? body ?? "")
-        case let .server(status, body):
-            return .serverError(extractMessage(from: body) ?? "Server error \(status).")
-        case .transport: return .networkError
-        default: return .unknown
-        }
-    }
-
-    private static func mapGenericAuthError(_ error: APIError) -> AuthError {
-        switch error {
-        case .unauthorized: .invalidCredentials
-        case let .clientError(status, body): mapByStatus(status: status, body: body)
-        case let .server(status, body): .serverError(extractMessage(from: body) ?? "Server error \(status).")
-        case .transport: .networkError
-        default: .unknown
-        }
-    }
-
-    private static func mapByStatus(status: Int, body: String?) -> AuthError {
-        switch status {
-        case 429: .rateLimited
-        case 401: .invalidCredentials
-        default: .serverError(extractMessage(from: body) ?? body ?? "Request failed (\(status)).")
-        }
-    }
-
-    private static func extractMessage(from body: String?) -> String? {
-        guard let body, let data = body.data(using: .utf8) else { return nil }
-        let decoded = try? JSONDecoder().decode(AuthErrorBody.self, from: data)
-        return decoded?.error
-    }
-
-    private static let iso8601DateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        return formatter
-    }()
-
-    private static func iso8601Date(_ date: Date) -> String {
-        iso8601DateFormatter.string(from: date)
-    }
 }
 
 // MARK: - Preview helper

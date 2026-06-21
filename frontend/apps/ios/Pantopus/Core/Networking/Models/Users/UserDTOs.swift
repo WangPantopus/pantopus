@@ -16,7 +16,7 @@ import Foundation
 /// role check `requireAdmin` enforces server-side at
 /// `backend/middleware/verifyToken.js:128`. Used to gate admin-only entry
 /// points (e.g. Review claims) in the Settings menu.
-public struct UserDTO: Decodable, Sendable, Hashable, Identifiable {
+public struct UserDTO: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let email: String
     public let username: String

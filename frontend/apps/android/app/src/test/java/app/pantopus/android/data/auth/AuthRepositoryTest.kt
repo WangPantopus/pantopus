@@ -21,6 +21,7 @@ import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.observability.Observability
 import app.pantopus.android.data.realtime.SocketManager
+import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -34,9 +35,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryTest {
+    private val userAdapter = Moshi.Builder().build().adapter(UserDto::class.java)
+
     private val sessionUser =
         UserDto(
             id = "u_1",
@@ -114,10 +118,13 @@ class AuthRepositoryTest {
     private fun buildRepo(
         api: ApiService = mockk(relaxed = true),
         authApi: AuthApi = mockk(relaxed = true),
+        // Refresh uses the dedicated @Named("authRefresh") client in production;
+        // default it to the same mock so existing `authApi.refresh` stubs apply.
+        refreshApi: AuthApi = authApi,
         storage: TokenStorage = mockk(relaxed = true),
         obs: Observability = mockk(relaxed = true),
         socketManager: SocketManager = mockk(relaxed = true),
-    ) = AuthRepository(api, authApi, storage, obs, socketManager)
+    ) = AuthRepository(api, authApi, refreshApi, storage, obs, socketManager)
 
     private fun httpException(
         code: Int,
@@ -218,13 +225,50 @@ class AuthRepositoryTest {
             val storage = mockk<TokenStorage>(relaxed = true)
 
             coEvery { storage.accessToken() } returns "expired"
-            coEvery { api.me() } throws RuntimeException("401")
+            // A genuine 401 that even the silent refresh couldn't recover.
+            coEvery { api.me() } throws httpException(401, "{\"error\":\"Invalid or expired token\"}")
 
             val repo = buildRepo(api = api, storage = storage)
             repo.restore()
 
             coVerify { storage.clear() }
             assertEquals(AuthRepository.State.SignedOut, repo.state.value)
+        }
+
+    @Test
+    fun `restore while offline keeps the cached session instead of wiping it`() =
+        runTest {
+            val api = mockk<ApiService>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            val obs = mockk<Observability>(relaxed = true)
+
+            coEvery { storage.accessToken() } returns "at"
+            coEvery { storage.userJson() } returns userAdapter.toJson(sessionUser)
+            // Network unreachable at launch — must NOT log the user out.
+            coEvery { api.me() } throws IOException("offline")
+
+            val repo = buildRepo(api = api, storage = storage, obs = obs)
+            repo.restore()
+
+            assertEquals(AuthRepository.State.SignedIn(sessionUser), repo.state.value)
+            coVerify(exactly = 0) { storage.clear() }
+        }
+
+    @Test
+    fun `restore while offline with no cached user preserves tokens and shows signed out`() =
+        runTest {
+            val api = mockk<ApiService>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+
+            coEvery { storage.accessToken() } returns "at"
+            coEvery { storage.userJson() } returns null
+            coEvery { api.me() } throws IOException("offline")
+
+            val repo = buildRepo(api = api, storage = storage)
+            repo.restore()
+
+            assertEquals(AuthRepository.State.SignedOut, repo.state.value)
+            coVerify(exactly = 0) { storage.clear() }
         }
 
     // ───────────────────────── T6.1a additions ─────────────────────────
@@ -440,5 +484,144 @@ class AuthRepositoryTest {
             }
             assertEquals(AuthRepository.State.SignedOut, repo.state.value)
             coVerify { storage.clear() }
+        }
+
+    @Test
+    fun `refreshAccessToken returns rotated token and persists it`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "rt-current"
+            coEvery { authApi.refresh(any()) } returns
+                RefreshResponse(
+                    ok = true,
+                    accessToken = "new-at",
+                    refreshToken = "new-rt",
+                    expiresIn = 3600,
+                    expiresAt = 1_800_000_000,
+                )
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+            val token = repo.refreshAccessToken()
+
+            assertEquals("new-at", token)
+            coVerify { storage.updateTokens(accessToken = "new-at", refreshToken = "new-rt") }
+            // Must NOT sign out on the happy path.
+            coVerify(exactly = 0) { storage.clear() }
+        }
+
+    @Test
+    fun `refreshAccessToken returns null without signing out on failure`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "stale"
+            coEvery { authApi.refresh(any()) } throws httpException(401, "{\"error\":\"Session expired\"}")
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+            val token = repo.refreshAccessToken()
+
+            assertEquals(null, token)
+            // The caller (TokenAuthenticator) decides — refresh itself never wipes.
+            coVerify(exactly = 0) { storage.clear() }
+            coVerify(exactly = 0) { storage.updateTokens(any(), any()) }
+        }
+
+    @Test
+    fun `refreshAccessToken returns null when no refresh token is stored`() =
+        runTest {
+            val authApi = mockk<AuthApi>(relaxed = true)
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns null
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+            val token = repo.refreshAccessToken()
+
+            assertEquals(null, token)
+            coVerify(exactly = 0) { authApi.refresh(any()) }
+        }
+
+    @Test
+    fun `refreshTokens classifies a 401 as AuthRejected`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "stale"
+            coEvery { authApi.refresh(any()) } throws httpException(401, "{\"error\":\"Session expired\"}")
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+
+            assertEquals(AuthRepository.RefreshOutcome.AuthRejected, repo.refreshTokens())
+            coVerify(exactly = 0) { storage.clear() }
+            coVerify(exactly = 0) { storage.updateTokens(any(), any()) }
+        }
+
+    @Test
+    fun `refreshTokens classifies a network error as Transient (no sign-out)`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "rt"
+            coEvery { authApi.refresh(any()) } throws IOException("timeout")
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+
+            assertEquals(AuthRepository.RefreshOutcome.Transient, repo.refreshTokens())
+            // A flaky network must NOT wipe tokens or update them.
+            coVerify(exactly = 0) { storage.clear() }
+            coVerify(exactly = 0) { storage.updateTokens(any(), any()) }
+        }
+
+    @Test
+    fun `refreshTokens classifies a 5xx as Transient`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "rt"
+            coEvery { authApi.refresh(any()) } throws httpException(503, "{\"error\":\"unavailable\"}")
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+
+            assertEquals(AuthRepository.RefreshOutcome.Transient, repo.refreshTokens())
+            coVerify(exactly = 0) { storage.clear() }
+        }
+
+    @Test
+    fun `refreshTokens returns Rotated and persists on success`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+            coEvery { storage.refreshToken() } returns "rt-current"
+            coEvery { authApi.refresh(any()) } returns
+                RefreshResponse(
+                    ok = true,
+                    accessToken = "new-at",
+                    refreshToken = "new-rt",
+                    expiresIn = 3600,
+                    expiresAt = 1_800_000_000,
+                )
+
+            val repo = buildRepo(authApi = authApi, storage = storage)
+
+            assertEquals(AuthRepository.RefreshOutcome.Rotated("new-at"), repo.refreshTokens())
+            coVerify { storage.updateTokens(accessToken = "new-at", refreshToken = "new-rt") }
+        }
+
+    @Test
+    fun `restore keeps the session on HTTP 403 (valid token, forbidden action)`() =
+        runTest {
+            val api = mockk<ApiService>()
+            val storage = mockk<TokenStorage>(relaxed = true)
+
+            coEvery { storage.accessToken() } returns "at"
+            coEvery { storage.userJson() } returns userAdapter.toJson(sessionUser)
+            // 403 = authorization decision on a still-valid token; must NOT wipe.
+            coEvery { api.me() } throws httpException(403, "{\"error\":\"forbidden\"}")
+
+            val repo = buildRepo(api = api, storage = storage)
+            repo.restore()
+
+            assertEquals(AuthRepository.State.SignedIn(sessionUser), repo.state.value)
+            coVerify(exactly = 0) { storage.clear() }
         }
 }

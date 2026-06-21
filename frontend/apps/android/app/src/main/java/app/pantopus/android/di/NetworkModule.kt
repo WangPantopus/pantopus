@@ -60,6 +60,7 @@ import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.api.services.WalletApi
 import app.pantopus.android.data.auth.AuthInterceptor
+import app.pantopus.android.data.auth.TokenAuthenticator
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapters.Rfc3339DateJsonAdapter
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -77,6 +78,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 private const val HTTP_CACHE_DIR = "pantopus-http"
@@ -129,6 +131,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
         retryInterceptor: RetryInterceptor,
         cache: Cache,
     ): OkHttpClient {
@@ -145,6 +148,8 @@ object NetworkModule {
             .Builder()
             .cache(cache)
             .addInterceptor(authInterceptor)
+            // Silent token refresh + replay on 401 (OkHttp-driven retry).
+            .authenticator(tokenAuthenticator)
             .addInterceptor(retryInterceptor)
             .addInterceptor(logging)
             .addInterceptor(SentryOkHttpInterceptor())
@@ -166,6 +171,44 @@ object NetworkModule {
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
+
+    // Dedicated refresh stack — a separate OkHttp client (its own dispatcher,
+    // NO AuthInterceptor / TokenAuthenticator). TokenAuthenticator runs the
+    // refresh from inside an OkHttp dispatcher thread; routing it through the
+    // main client risks a deadlock when a burst of concurrent 401s pins every
+    // per-host slot. A separate dispatcher always has a free slot, and omitting
+    // the authenticator guarantees no refresh-of-the-refresh recursion.
+    @Provides
+    @Singleton
+    @Named("authRefresh")
+    fun provideRefreshOkHttpClient(): OkHttpClient =
+        OkHttpClient
+            .Builder()
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+
+    @Provides
+    @Singleton
+    @Named("authRefresh")
+    fun provideRefreshRetrofit(
+        @Named("authRefresh") client: OkHttpClient,
+        moshi: Moshi,
+    ): Retrofit =
+        Retrofit
+            .Builder()
+            .baseUrl(BuildConfig.PANTOPUS_API_BASE_URL.trimEnd('/') + "/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    @Provides
+    @Singleton
+    @Named("authRefresh")
+    fun provideRefreshAuthApi(
+        @Named("authRefresh") retrofit: Retrofit,
+    ): AuthApi = retrofit.create(AuthApi::class.java)
 
     // Per-feature interfaces — new code should depend on these directly.
 

@@ -7,11 +7,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * OkHttp interceptor that attaches `Authorization: Bearer <token>` on every
- * request. Also fires `AuthRepository.signOut()` when the server returns 401.
+ * OkHttp interceptor that attaches `Authorization: Bearer <token>` and the
+ * `X-Client-Platform` header on every request.
+ *
+ * Recovery from a 401 (silent token refresh + replay) is handled by
+ * [TokenAuthenticator], which OkHttp invokes automatically — keeping this
+ * interceptor a pure header-stamping step.
  *
  * Using runBlocking here is pragmatic: OkHttp interceptors are synchronous.
- * Reads from DataStore are fast (in-memory cached) and bounded to the
+ * Reads from EncryptedSharedPreferences are fast (cached) and bounded to the
  * OkHttp dispatcher thread.
  */
 @Singleton
@@ -19,7 +23,6 @@ class AuthInterceptor
     @Inject
     constructor(
         private val tokenStorage: TokenStorage,
-        private val authRepositoryProvider: dagger.Lazy<AuthRepository>,
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request =
@@ -34,10 +37,6 @@ class AuthInterceptor
                         header("X-Client-Platform", "android")
                     }.build()
 
-            val response = chain.proceed(request)
-            if (response.code == 401) {
-                runBlocking { authRepositoryProvider.get().signOut() }
-            }
-            return response
+            return chain.proceed(request)
         }
     }

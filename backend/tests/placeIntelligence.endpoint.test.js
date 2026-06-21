@@ -102,6 +102,14 @@ function sectionsById(body) {
   return map;
 }
 
+// This is an integration-shaped suite: each test exercises the full route +
+// service + serializer over the in-memory mocks. Even with every external
+// provider mocked, composing all sections runs ~2–5s per test, which sits
+// right at Jest's 5s default and flakes on slower CI runners. Give the suite
+// generous headroom — this only raises the failure threshold (it can't make a
+// passing test fail or change any behavior).
+jest.setTimeout(30000);
+
 describe('GET /api/homes/:id/intelligence', () => {
   let app;
   const savedAttomKey = process.env.ATTOM_API_KEY;

@@ -54,6 +54,54 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Send a multipart POST, transparently refreshing the access token and
+    /// replaying once on a 401 (mirrors `APIClient`). Returns the raw body +
+    /// HTTP response so each caller keeps its own status-code mapping. If a
+    /// 401 survives the refresh, the user is signed out before returning so
+    /// the caller's `case 401` maps to `.unauthorized` uniformly.
+    private func performUpload(
+        to url: URL,
+        boundary: String,
+        body: Data
+    ) async throws -> (Data, HTTPURLResponse) {
+        func makeRequest(token: String?) -> URLRequest {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            return request
+        }
+
+        let token = await AuthManager.shared.accessToken
+        var (data, response) = try await session.upload(for: makeRequest(token: token), from: body)
+        guard var http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+
+        if http.statusCode == 401 {
+            switch await AuthManager.shared.refreshIfPossible() {
+            case .rotated:
+                let refreshed = await AuthManager.shared.accessToken
+                (data, response) = try await session.upload(for: makeRequest(token: refreshed), from: body)
+                guard let retryHTTP = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+                http = retryHTTP
+                // If the replay still 401s, the just-rotated token is rejected.
+                if http.statusCode == 401 {
+                    await AuthManager.shared.handleUnauthorized()
+                }
+            case .authRejected:
+                await AuthManager.shared.handleUnauthorized()
+            case .transient:
+                // Network/server blip during refresh — don't sign out. Surface a
+                // transport error (parity with APIClient) instead of a
+                // misleading "session expired" 401, so the caller can retry.
+                throw APIError.transport(underlying: URLError(.networkConnectionLost))
+            }
+        }
+        return (data, http)
+    }
+
     /// Upload a single file to `POST /api/files/upload`. Optional form
     /// fields are sent alongside the file. Token is read from
     /// `AuthManager.shared`; if nil, the request goes out without an
@@ -63,23 +111,10 @@ public final class MultipartUploader: @unchecked Sendable {
         _ file: MultipartFile,
         formFields: [String: String] = [:]
     ) async throws -> FileUploadResponse {
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/files/upload")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, file: file, fields: formFields)
-        let (data, response) = try await session.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             do {
@@ -90,7 +125,6 @@ public final class MultipartUploader: @unchecked Sendable {
                 throw APIError.decoding(underlying: error)
             }
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "File is too large.")
@@ -113,23 +147,10 @@ public final class MultipartUploader: @unchecked Sendable {
         guard !files.isEmpty else {
             throw APIError.clientError(status: 400, message: "No files provided")
         }
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/upload/post-media/\(postId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, files: files)
-        let (data, response) = try await session.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             do {
@@ -140,7 +161,6 @@ public final class MultipartUploader: @unchecked Sendable {
                 throw APIError.decoding(underlying: error)
             }
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "File is too large.")
@@ -165,23 +185,10 @@ public final class MultipartUploader: @unchecked Sendable {
         guard !files.isEmpty else {
             throw APIError.clientError(status: 400, message: "No files provided")
         }
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/upload/listing-media/\(listingId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, files: files)
-        let (data, response) = try await session.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             do {
@@ -191,7 +198,6 @@ public final class MultipartUploader: @unchecked Sendable {
                 throw APIError.decoding(underlying: error)
             }
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "File is too large.")
@@ -214,23 +220,10 @@ public final class MultipartUploader: @unchecked Sendable {
         guard !files.isEmpty else {
             throw APIError.clientError(status: 400, message: "No files provided")
         }
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/upload/chat-media/\(roomId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, files: files)
-        let (data, response) = try await session.upload(for: request, from: body)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             do {
@@ -241,7 +234,6 @@ public final class MultipartUploader: @unchecked Sendable {
                 throw APIError.decoding(underlying: error)
             }
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "File is too large.")
@@ -259,20 +251,10 @@ public final class MultipartUploader: @unchecked Sendable {
     /// (multipart, field name `audio`, ≤25MB — Whisper's cap). Route
     /// `backend/routes/ai.js:387`.
     public func transcribeAudio(_ file: MultipartFile) async throws -> AITranscriptionResponse {
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/ai/transcribe")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, file: file)
-        let (data, response) = try await session.upload(for: request, from: body)
-        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             do {
@@ -282,7 +264,6 @@ public final class MultipartUploader: @unchecked Sendable {
                 throw APIError.decoding(underlying: error)
             }
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "Audio file exceeds the 25MB limit.")
@@ -298,25 +279,14 @@ public final class MultipartUploader: @unchecked Sendable {
         guard !files.isEmpty else {
             throw APIError.clientError(status: 400, message: "No files provided")
         }
-        let token = await AuthManager.shared.accessToken
         let boundary = "PantopusBoundary-\(UUID().uuidString)"
         let url = environment.apiBaseURL.appendingPathComponent("/api/upload/ai-media")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
         let body = Self.buildBody(boundary: boundary, files: files)
-        let (data, response) = try await session.upload(for: request, from: body)
-        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
         switch http.statusCode {
         case 200..<300:
             return try JSONDecoder().decode(AIMediaUploadResponse.self, from: data)
         case 401:
-            await AuthManager.shared.handleUnauthorized()
             throw APIError.unauthorized
         case 400..<500:
             throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))

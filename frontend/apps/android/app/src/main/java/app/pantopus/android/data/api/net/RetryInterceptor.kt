@@ -45,6 +45,11 @@ class RetryInterceptor(
                 }
                 lastResponse = response
                 lastIoException = null
+            } catch (error: NonRetriableIOException) {
+                // e.g. a transient token-refresh failure surfaced by
+                // TokenAuthenticator — must propagate as-is. Retrying would
+                // re-drive the refresh and risk a TOKEN_REUSE logout.
+                throw error
             } catch (error: IOException) {
                 if (attempt >= maxRetries) throw error
                 lastIoException = error
