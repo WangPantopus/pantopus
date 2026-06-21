@@ -21,7 +21,9 @@ struct BeaconProfileTabStrip: View {
         let tab: BeaconProfileTab
         let label: String
         let count: Int?
-        var id: BeaconProfileTab { tab }
+        var id: BeaconProfileTab {
+            tab
+        }
     }
 
     let tabs: [Tab]

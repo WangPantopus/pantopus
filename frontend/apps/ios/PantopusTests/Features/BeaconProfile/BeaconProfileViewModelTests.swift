@@ -198,6 +198,7 @@ final class BeaconProfileViewModelTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
     // JSON fixtures mirror the on-wire shape verbatim, so lines run long.
     // swiftlint:disable line_length
 

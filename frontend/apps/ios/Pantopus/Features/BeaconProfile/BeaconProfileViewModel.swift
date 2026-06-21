@@ -75,7 +75,10 @@ public struct BeaconTier: Sendable, Equatable, Hashable, Identifiable {
 
 /// One labelled link on the About tab.
 public struct BeaconLink: Sendable, Equatable, Hashable, Identifiable {
-    public var id: String { "\(label)|\(url)" }
+    public var id: String {
+        "\(label)|\(url)"
+    }
+
     public let label: String
     public let url: String
 }
@@ -500,7 +503,7 @@ private extension String {
 /// follower bump (1_234 → "1.2K", 3_400_000 → "3.4M").
 func beaconCompactCount(_ value: Int) -> String {
     if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
-    if value >= 1_000 { return String(format: "%.1fK", Double(value) / 1_000) }
+    if value >= 1000 { return String(format: "%.1fK", Double(value) / 1000) }
     return "\(value)"
 }
 

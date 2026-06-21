@@ -147,7 +147,7 @@ public struct BeaconProfileView: View {
                         tabs: tabs(for: payload),
                         selected: viewModel.selectedTab
                     ) { viewModel.selectedTab = $0 }
-                    .padding(.horizontal, Spacing.s4)
+                        .padding(.horizontal, Spacing.s4)
 
                     tabContent(payload)
                 }
