@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.api.services.BeaconProfileApi
 import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.BusinessDiscoveryApi
 import app.pantopus.android.data.api.services.BusinessTeamApi
@@ -305,6 +306,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAudienceProfileApi(retrofit: Retrofit): AudienceProfileApi = retrofit.create(AudienceProfileApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideBeaconProfileApi(retrofit: Retrofit): BeaconProfileApi = retrofit.create(BeaconProfileApi::class.java)
 
     @Provides
     @Singleton

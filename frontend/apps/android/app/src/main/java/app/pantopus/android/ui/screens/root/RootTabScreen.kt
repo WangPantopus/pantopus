@@ -52,6 +52,8 @@ import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.Broadca
 import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.ComposeBroadcastScreen
 import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaSampleData
 import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaScreen
+import app.pantopus.android.ui.screens.beacon_profile.BEACON_HANDLE_KEY
+import app.pantopus.android.ui.screens.beacon_profile.BeaconProfileScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
@@ -792,6 +794,18 @@ private object ChildRoutes {
 
     /** Public Profile management / Creator audience dashboard (T3.3). */
     const val AUDIENCE_PROFILE = "audience-profile"
+
+    /** A21.1 — "My Beacon": the signed-in user's own public Beacon profile
+     *  (owner role). Reached from the navigation drawer. No handle arg ⇒
+     *  the VM resolves the owner via `GET /personas/me`. */
+    const val MY_BEACON = "my-beacon"
+
+    /** A21.1 — another user's public Beacon profile by handle (visitor role).
+     *  Reached from the Following list. `{handle}` must match
+     *  [BEACON_HANDLE_KEY] so the VM reads it from the SavedStateHandle. */
+    const val BEACON_PROFILE = "beacon/{$BEACON_HANDLE_KEY}"
+
+    fun beaconProfile(handle: String): String = "beacon/${java.net.URLEncoder.encode(handle, "UTF-8")}"
 
     /** A22.2 "Your audience" — creator member management (pending requests
      *  + tier-grouped members). Pushed from the Audience Profile Followers
@@ -2997,7 +3011,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     FollowingScreen(
                         onBack = { navController.popBackStack() },
                         onDiscover = { navController.navigate(ChildRoutes.DISCOVER_HUB) },
-                        onOpenPersona = { navController.navigate(ChildRoutes.placeholder("Beacon")) },
+                        onOpenPersona = { handle -> navController.navigate(ChildRoutes.beaconProfile(handle)) },
                     )
                 }
                 composable(ChildRoutes.MARKETPLACE) {
@@ -4135,6 +4149,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onSent = { navController.popBackStack() },
                     )
                 }
+                composable(ChildRoutes.MY_BEACON) {
+                    BeaconProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onEditPersona = { personaId -> navController.navigate(ChildRoutes.editPersona(personaId)) },
+                        onComposeBroadcast = { personaId -> navController.navigate(ChildRoutes.composeBroadcast(personaId)) },
+                        onOpenInsights = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
+                        onCreateBeacon = { navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID)) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.BEACON_PROFILE,
+                    arguments = listOf(navArgument(BEACON_HANDLE_KEY) { type = NavType.StringType }),
+                ) {
+                    BeaconProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onEditPersona = { personaId -> navController.navigate(ChildRoutes.editPersona(personaId)) },
+                        onComposeBroadcast = { personaId -> navController.navigate(ChildRoutes.composeBroadcast(personaId)) },
+                        onFollowHandshake = { handle -> navController.navigate(ChildRoutes.privacyHandshake(handle)) },
+                    )
+                }
                 composable(ChildRoutes.ADD_HOME) {
                     AddHomeWizardScreen(
                         onDismiss = { navController.popBackStack() },
@@ -4285,7 +4319,7 @@ private fun routeForDrawer(destination: NavigationDrawerDestination): String =
         NavigationDrawerDestination.BeaconUpdates -> ChildRoutes.BEACONS_FEED
         NavigationDrawerDestination.Search -> ChildRoutes.GIG_SEARCH
         NavigationDrawerDestination.DiscoverNeighbors -> ChildRoutes.placeholder("Discover Neighbors")
-        NavigationDrawerDestination.MyBeacon -> ChildRoutes.placeholder("My Beacon")
+        NavigationDrawerDestination.MyBeacon -> ChildRoutes.MY_BEACON
         NavigationDrawerDestination.MyListings -> ChildRoutes.MY_LISTINGS
         NavigationDrawerDestination.MyPulse -> ChildRoutes.MY_POSTS
         NavigationDrawerDestination.MyTasks -> ChildRoutes.MY_TASKS
