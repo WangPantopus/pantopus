@@ -168,27 +168,56 @@ final class APIClient: @unchecked Sendable {
     // MARK: - Retry loop
 
     private func executeWithRetry(_ endpoint: Endpoint) async throws -> Data {
-        let request = try await buildRequest(for: endpoint)
         let shouldRetry = endpoint.method.isIdempotent
         var attempt = 0
-        var lastError: APIError = .retriesExhausted
+        // One silent token refresh per request. On a 401 for an authenticated
+        // call we ask AuthManager to refresh (single-flight) and replay once
+        // with the new token; only if that fails do we sign out. Refresh is
+        // attempted regardless of HTTP method — a 401 is rejected at the auth
+        // middleware before any side effect, so replaying is safe.
+        var didAttemptRefresh = false
         while true {
+            // Rebuild each iteration so a refreshed access token is picked up.
+            let request = try await buildRequest(for: endpoint)
             do {
                 return try await executeOnce(request, endpoint: endpoint)
             } catch let error as APIError {
-                lastError = error
-                if !shouldRetry || !error.isTransient || attempt >= retryPolicy.maxRetries {
+                switch error {
+                case .unauthorized where endpoint.authenticated && !didAttemptRefresh:
+                    didAttemptRefresh = true
+                    switch await AuthManager.shared.refreshIfPossible() {
+                    case .rotated:
+                        continue
+                    case .authRejected:
+                        // Refresh token expired/revoked — end the session.
+                        await AuthManager.shared.handleUnauthorized()
+                        throw error
+                    case .transient:
+                        // Couldn't refresh due to a network/server blip. Do NOT
+                        // sign out — surface a transport error so callers (and
+                        // session restore) keep the session and can retry.
+                        throw APIError.transport(underlying: URLError(.networkConnectionLost))
+                    }
+                case .unauthorized:
+                    // Unauthenticated endpoint (login/refresh/…) or refresh
+                    // already tried and the replay still 401'd.
+                    if endpoint.authenticated {
+                        await AuthManager.shared.handleUnauthorized()
+                    }
                     throw error
+                default:
+                    if !shouldRetry || !error.isTransient || attempt >= retryPolicy.maxRetries {
+                        throw error
+                    }
+                    attempt += 1
+                    let delay = retryPolicy.delay(forAttempt: attempt)
+                    logger.info(
+                        "Retry \(attempt)/\(self.retryPolicy.maxRetries) after \(Int(delay * 1000))ms for \(endpoint.path)"
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
-                attempt += 1
-                let delay = retryPolicy.delay(forAttempt: attempt)
-                logger.info(
-                    "Retry \(attempt)/\(self.retryPolicy.maxRetries) after \(Int(delay * 1000))ms for \(endpoint.path)"
-                )
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
-        throw lastError
     }
 
     private func executeOnce(_ request: URLRequest, endpoint: Endpoint) async throws -> Data {
@@ -211,7 +240,7 @@ final class APIClient: @unchecked Sendable {
         case 200..<300, 304:
             return data
         case 401:
-            await AuthManager.shared.handleUnauthorized()
+            // Refresh + sign-out decisions are made in executeWithRetry.
             throw APIError.unauthorized
         case 403: throw APIError.forbidden
         case 404: throw APIError.notFound

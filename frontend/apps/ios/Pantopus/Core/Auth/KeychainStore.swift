@@ -45,4 +45,9 @@ enum SecureStoreKey {
     static let accessToken = "accessToken"
     static let refreshToken = "refreshToken"
     static let userId = "userId"
+    /// JSON snapshot of the last-known `UserDTO`. Lets the app render a
+    /// signed-in shell on launch when the network is unreachable, instead
+    /// of bouncing the user to the login screen (offline-first parity with
+    /// YouTube / Gmail).
+    static let cachedUser = "cachedUser"
 }

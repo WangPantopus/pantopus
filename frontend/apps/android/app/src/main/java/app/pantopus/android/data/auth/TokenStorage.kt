@@ -66,6 +66,7 @@ class TokenStorage
             const val ACCESS = "access_token"
             const val REFRESH = "refresh_token"
             const val USER_ID = "user_id"
+            const val USER_JSON = "user_json"
             const val V2_MIGRATED = "v2_migrated"
         }
 
@@ -150,6 +151,19 @@ class TokenStorage
 
         suspend fun refreshToken(): String? = withPrefs { it.getString(Keys.REFRESH, null) }
 
+        /**
+         * JSON snapshot of the last-known session user. Lets a cold launch
+         * render the signed-in shell when the network is unreachable instead
+         * of bouncing to login (offline-first parity with YouTube / Gmail).
+         */
+        suspend fun userJson(): String? = withPrefs { it.getString(Keys.USER_JSON, null) }
+
+        suspend fun saveUserJson(json: String) {
+            withPrefs { prefs ->
+                prefs.edit().putString(Keys.USER_JSON, json).commit()
+            }
+        }
+
         suspend fun save(
             accessToken: String,
             refreshToken: String?,
@@ -199,6 +213,7 @@ class TokenStorage
                         remove(Keys.ACCESS)
                         remove(Keys.REFRESH)
                         remove(Keys.USER_ID)
+                        remove(Keys.USER_JSON)
                     }.commit()
             }
             _accessTokenFlow.value = null

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -94,10 +95,33 @@ class AuthRepository
     constructor(
         private val api: ApiService,
         private val authApi: AuthApi,
+        // Refresh runs on a DEDICATED OkHttp client (its own dispatcher, no
+        // AuthInterceptor / TokenAuthenticator). This is critical: the
+        // authenticator calls refresh from inside an OkHttp dispatcher thread,
+        // and using the main client there can deadlock — a burst of >=5
+        // concurrent same-host 401s pins every per-host slot, so a refresh on
+        // the same client could never get a slot. See TokenAuthenticator.
+        @Named("authRefresh") private val refreshApi: AuthApi,
         private val tokenStorage: TokenStorage,
         private val observability: Observability,
         private val socketManager: SocketManager,
     ) {
+        /**
+         * Outcome of a token refresh. The distinction matters: only
+         * [AuthRejected] should ever sign the user out — a [Transient] failure
+         * (offline/timeout/5xx) must keep the session so a flaky network can't
+         * log the user out (parity with YouTube/Gmail).
+         */
+        sealed interface RefreshOutcome {
+            data class Rotated(
+                val accessToken: String,
+            ) : RefreshOutcome
+
+            data object AuthRejected : RefreshOutcome
+
+            data object Transient : RefreshOutcome
+        }
+
         /** Session state for the current user. */
         sealed interface State {
             /** Initial state before [restore] runs. */
@@ -116,27 +140,72 @@ class AuthRepository
         val state: StateFlow<State> = _state.asStateFlow()
 
         private val errorBodyAdapter = Moshi.Builder().build().adapter(AuthErrorBody::class.java)
+        private val userAdapter = Moshi.Builder().build().adapter(UserDto::class.java)
 
         /** Called once at app start to hydrate session from persisted tokens. */
         suspend fun restore() {
             val token = tokenStorage.accessToken()
-            if (token == null) {
+            if (token.isNullOrBlank()) {
                 _state.value = State.SignedOut
                 return
             }
+            val cached = loadCachedUser()
             try {
+                // A 401 here is recovered transparently by TokenAuthenticator's
+                // silent refresh; we only land in catch if even refresh failed.
                 val profile = api.me().user
                 val user = profile.toSessionUser()
-                observability.identify(userId = user.id, email = user.email)
-                Analytics.identify(userId = user.id)
-                socketManager.connect(token)
-                _state.value = State.SignedIn(user)
+                persistCachedUser(user)
+                finishSignedIn(user, tokenStorage.accessToken() ?: token)
             } catch (t: Throwable) {
-                tokenStorage.clear()
-                socketManager.disconnect()
-                _state.value = State.SignedOut
+                if (t is kotlin.coroutines.cancellation.CancellationException) throw t
+                // Only a 401 means the token itself is rejected. A 403 is an
+                // authorization decision on a VALID token (backend `verifyToken`
+                // emits 401 for token problems, 403 for forbidden actions), so
+                // 403 must NOT wipe the session. Mirrors iOS.
+                val authFailure = t is HttpException && t.code() == 401
+                when {
+                    authFailure -> {
+                        // Token genuinely rejected and refresh couldn't renew
+                        // it — clear and require a fresh sign-in.
+                        tokenStorage.clear()
+                        socketManager.disconnect()
+                        _state.value = State.SignedOut
+                    }
+                    cached != null -> {
+                        // Transient/offline error — keep the user signed in
+                        // against the cached identity and let screens retry.
+                        // Never wipe a session over a flaky connection.
+                        finishSignedIn(cached, token)
+                    }
+                    else -> {
+                        // No cached identity to fall back on; preserve tokens
+                        // for the next launch but show signed-out for now.
+                        _state.value = State.SignedOut
+                    }
+                }
             }
         }
+
+        /** Publish a confirmed signed-in session + its side effects. */
+        private fun finishSignedIn(
+            user: UserDto,
+            token: String,
+        ) {
+            observability.identify(userId = user.id, email = user.email)
+            Analytics.identify(userId = user.id)
+            socketManager.connect(token)
+            _state.value = State.SignedIn(user)
+        }
+
+        private suspend fun persistCachedUser(user: UserDto) {
+            runCatching { tokenStorage.saveUserJson(userAdapter.toJson(user)) }
+        }
+
+        private suspend fun loadCachedUser(): UserDto? =
+            tokenStorage.userJson()?.let { json ->
+                runCatching { userAdapter.fromJson(json) }.getOrNull()
+            }
 
         /** Sign the user in against `POST /api/users/login`. */
         suspend fun signIn(
@@ -151,6 +220,7 @@ class AuthRepository
                     refreshToken = response.refreshToken,
                     userId = response.user.id,
                 )
+                persistCachedUser(user)
                 observability.identify(userId = user.id, email = user.email)
                 Analytics.identify(userId = user.id)
                 observability.track("auth.signed_in")
@@ -272,25 +342,64 @@ class AuthRepository
         }
 
         /**
-         * `POST /api/users/refresh` (route `backend/routes/users.js:1910`).
-         * On success, rotates the stored access (and optionally refresh)
-         * token in place. The stored userId is not touched. On failure,
-         * signs out and rethrows.
+         * `POST /api/users/refresh` (route `backend/routes/users.js:1910`) via
+         * the DEDICATED [refreshApi] client. On success rotates the stored
+         * access (+ optional refresh) token in place and reconnects the socket.
+         * The stored userId is never touched. Classifies the result so the
+         * caller can tell a genuine auth rejection (sign out) from a transient
+         * failure (keep the session). This is what [TokenAuthenticator] calls.
          */
-        suspend fun refreshSession() {
+        suspend fun refreshTokens(): RefreshOutcome {
             val stored = tokenStorage.refreshToken()
-            try {
-                val response = authApi.refresh(RefreshRequest(refreshToken = stored))
-                if (!response.accessToken.isNullOrEmpty()) {
+            if (stored.isNullOrBlank()) return RefreshOutcome.AuthRejected
+            return try {
+                val response = refreshApi.refresh(RefreshRequest(refreshToken = stored))
+                val newAccess = response.accessToken
+                if (newAccess.isNullOrBlank()) {
+                    RefreshOutcome.AuthRejected
+                } else {
                     tokenStorage.updateTokens(
-                        accessToken = response.accessToken,
+                        accessToken = newAccess,
                         refreshToken = response.refreshToken,
                     )
-                    socketManager.connect(response.accessToken)
+                    socketManager.connect(newAccess)
+                    RefreshOutcome.Rotated(newAccess)
                 }
             } catch (t: Throwable) {
+                if (t is kotlin.coroutines.cancellation.CancellationException) throw t
+                when {
+                    // Refresh token expired / replayed (TOKEN_REUSE) / malformed
+                    // — the only cases that justify a sign-out. Routine 7-day
+                    // expiry lands here; do NOT report it to Sentry as an error.
+                    t is HttpException && (t.code() == 401 || t.code() == 400) -> RefreshOutcome.AuthRejected
+                    // Server hiccup or rate-limit — transient, keep the session.
+                    t is HttpException -> RefreshOutcome.Transient
+                    // Offline / timeout / DNS — transient, keep the session.
+                    t is IOException -> RefreshOutcome.Transient
+                    // Genuinely unexpected (e.g. decode bug). Log it but keep the
+                    // session rather than punishing the user for our bug.
+                    else -> {
+                        observability.capture(t)
+                        RefreshOutcome.Transient
+                    }
+                }
+            }
+        }
+
+        /**
+         * Thin wrapper returning just the rotated access token (or null on any
+         * non-rotation). Used by tests and any caller that only needs the token.
+         */
+        suspend fun refreshAccessToken(): String? = (refreshTokens() as? RefreshOutcome.Rotated)?.accessToken
+
+        /**
+         * Imperative refresh for call sites that treat a failed refresh as a
+         * hard sign-out. Delegates to [refreshTokens].
+         */
+        suspend fun refreshSession() {
+            if (refreshTokens() !is RefreshOutcome.Rotated) {
                 signOut()
-                throw mapGenericError(t)
+                throw AuthError.InvalidCredentials
             }
         }
 
