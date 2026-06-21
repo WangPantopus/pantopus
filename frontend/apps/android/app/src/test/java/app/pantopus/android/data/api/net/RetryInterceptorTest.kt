@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import java.io.IOException
@@ -112,11 +113,8 @@ class RetryInterceptorTest {
                 .addInterceptor(throwing)
                 .build()
 
-        try {
+        assertThrows(NonRetriableIOException::class.java) {
             c.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
-            throw AssertionError("Expected NonRetriableIOException")
-        } catch (e: NonRetriableIOException) {
-            // expected
         }
         assertEquals("Marker exception must be attempted exactly once", 1, attempts)
     }
@@ -136,11 +134,8 @@ class RetryInterceptorTest {
                 .addInterceptor(throwing)
                 .build()
 
-        try {
+        assertThrows(IOException::class.java) {
             c.newCall(Request.Builder().url(server.url("/x")).get().build()).execute()
-            throw AssertionError("Expected IOException")
-        } catch (e: IOException) {
-            // expected
         }
         // Contrast with the marker case: a plain IOException IS retried (1 + 2).
         assertEquals(3, attempts)

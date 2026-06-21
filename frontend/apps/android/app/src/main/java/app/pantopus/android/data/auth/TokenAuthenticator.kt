@@ -37,19 +37,17 @@ class TokenAuthenticator
             route: Route?,
             response: Response,
         ): Request? {
-            // Never try to refresh the refresh call itself — that would recurse.
-            if (response.request.url.encodedPath.endsWith("/api/users/refresh")) {
-                return null
-            }
-
-            // Only attempt recovery for requests that actually carried a token
-            // (skip login / register / public reads — their 401 is terminal).
             val failedToken =
                 response.request
                     .header("Authorization")
                     ?.removePrefix("Bearer ")
                     ?.trim()
-            if (failedToken.isNullOrBlank()) return null
+
+            // Give up (return null, no refresh) when this IS the refresh call
+            // itself (would recurse) or the request carried no bearer (login /
+            // register / public reads — their 401 is terminal, nothing to renew).
+            val isRefreshCall = response.request.url.encodedPath.endsWith("/api/users/refresh")
+            if (isRefreshCall || failedToken.isNullOrBlank()) return null
 
             synchronized(lock) {
                 // Bail out of pathological loops: if we've already retried this
@@ -87,8 +85,7 @@ class TokenAuthenticator
             }
         }
 
-        private fun Request.withBearer(token: String): Request =
-            newBuilder().header("Authorization", "Bearer $token").build()
+        private fun Request.withBearer(token: String): Request = newBuilder().header("Authorization", "Bearer $token").build()
 
         private fun responseCount(response: Response): Int {
             var count = 1

@@ -27,6 +27,7 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Account type chosen at registration. Maps to the backend `account_type`
@@ -157,32 +158,32 @@ class AuthRepository
                 val user = profile.toSessionUser()
                 persistCachedUser(user)
                 finishSignedIn(user, tokenStorage.accessToken() ?: token)
-            } catch (t: Throwable) {
-                if (t is kotlin.coroutines.cancellation.CancellationException) throw t
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: HttpException) {
                 // Only a 401 means the token itself is rejected. A 403 is an
-                // authorization decision on a VALID token (backend `verifyToken`
+                // authorization decision on a VALID token (backend verifyToken
                 // emits 401 for token problems, 403 for forbidden actions), so
                 // 403 must NOT wipe the session. Mirrors iOS.
-                val authFailure = t is HttpException && t.code() == 401
-                when {
-                    authFailure -> {
-                        // Token genuinely rejected and refresh couldn't renew
-                        // it — clear and require a fresh sign-in.
-                        tokenStorage.clear()
-                        socketManager.disconnect()
-                        _state.value = State.SignedOut
-                    }
-                    cached != null -> {
-                        // Transient/offline error — keep the user signed in
-                        // against the cached identity and let screens retry.
-                        // Never wipe a session over a flaky connection.
-                        finishSignedIn(cached, token)
-                    }
-                    else -> {
-                        // No cached identity to fall back on; preserve tokens
-                        // for the next launch but show signed-out for now.
-                        _state.value = State.SignedOut
-                    }
+                if (e.code() == 401) {
+                    // Token genuinely rejected and refresh couldn't renew it —
+                    // clear and require a fresh sign-in.
+                    tokenStorage.clear()
+                    socketManager.disconnect()
+                    _state.value = State.SignedOut
+                } else if (cached != null) {
+                    // 403/5xx on a valid token — keep the cached session.
+                    finishSignedIn(cached, token)
+                } else {
+                    _state.value = State.SignedOut
+                }
+            } catch (t: Throwable) {
+                // Transient/offline error (IOException, etc.) — never wipe a
+                // session over a flaky connection; keep the cached identity.
+                if (cached != null) {
+                    finishSignedIn(cached, token)
+                } else {
+                    _state.value = State.SignedOut
                 }
             }
         }
@@ -365,24 +366,22 @@ class AuthRepository
                     socketManager.connect(newAccess)
                     RefreshOutcome.Rotated(newAccess)
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: HttpException) {
+                // Refresh token expired / replayed (TOKEN_REUSE) / malformed (401,
+                // 400) is the only case that justifies a sign-out. Routine 7-day
+                // expiry lands here; do NOT report it to Sentry as an error. Any
+                // other status (403/429/5xx) is a server hiccup — keep the session.
+                if (e.code() == 401 || e.code() == 400) RefreshOutcome.AuthRejected else RefreshOutcome.Transient
+            } catch (ignored: IOException) {
+                // Offline / timeout / DNS — transient, keep the session.
+                RefreshOutcome.Transient
             } catch (t: Throwable) {
-                if (t is kotlin.coroutines.cancellation.CancellationException) throw t
-                when {
-                    // Refresh token expired / replayed (TOKEN_REUSE) / malformed
-                    // — the only cases that justify a sign-out. Routine 7-day
-                    // expiry lands here; do NOT report it to Sentry as an error.
-                    t is HttpException && (t.code() == 401 || t.code() == 400) -> RefreshOutcome.AuthRejected
-                    // Server hiccup or rate-limit — transient, keep the session.
-                    t is HttpException -> RefreshOutcome.Transient
-                    // Offline / timeout / DNS — transient, keep the session.
-                    t is IOException -> RefreshOutcome.Transient
-                    // Genuinely unexpected (e.g. decode bug). Log it but keep the
-                    // session rather than punishing the user for our bug.
-                    else -> {
-                        observability.capture(t)
-                        RefreshOutcome.Transient
-                    }
-                }
+                // Genuinely unexpected (e.g. decode bug). Log it but keep the
+                // session rather than punishing the user for our bug.
+                observability.capture(t)
+                RefreshOutcome.Transient
             }
         }
 
