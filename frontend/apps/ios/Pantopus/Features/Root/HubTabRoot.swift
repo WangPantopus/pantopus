@@ -136,6 +136,18 @@ public enum HubRoute: Hashable {
     /// A03.2 — Beacon Updates feed (`surface=personas`). Reached from the
     /// AudienceProfile entry and the `pantopus://beacons` deep link.
     case beaconsFeed
+    /// A21.1 — "My Beacon": the signed-in user's own public Beacon profile
+    /// (owner role). Reached from the navigation drawer.
+    case myBeacon
+    /// A21.1 — another user's public Beacon profile by handle (visitor
+    /// role). Reached from the Following list + beacon deep links.
+    case beaconProfile(handle: String)
+    /// A13.12 — create / edit the persona behind a Beacon.
+    case editPersona(personaId: String)
+    /// A7 — broadcast composer for a persona's primary channel.
+    case composeBroadcast(personaId: String)
+    /// T3.3 — owner audience dashboard (insights / followers / DM threads).
+    case beaconInsights
     /// Compose post target — placeholder until the compose flow ships.
     case composePost(intent: String)
     /// P3.5 — Edit an existing Pulse post. Re-uses the compose flow in
@@ -533,7 +545,7 @@ public struct HubTabRoot: View {
         case .beaconUpdates: return .beaconsFeed
         case .search: return .gigSearch
         case .discoverNeighbors: return .discoverHub
-        case .myBeacon: return .placeholder(label: "My Beacon")
+        case .myBeacon: return .myBeacon
         case .myListings: return .marketplace
         case .myPulse: return .myPosts
         case .myTasks: return .placeholder(label: "My Tasks")
@@ -1541,6 +1553,51 @@ public struct HubTabRoot: View {
                 },
                 onDiscover: { Task { @MainActor in push(.discoverHub) } },
                 onBack: { Task { @MainActor in pop() } }
+            )
+        case .myBeacon:
+            BeaconProfileView(
+                mode: .owner,
+                onBack: { Task { @MainActor in pop() } },
+                onEditPersona: { personaId in
+                    Task { @MainActor in push(.editPersona(personaId: personaId)) }
+                },
+                onComposeBroadcast: { personaId in
+                    Task { @MainActor in push(.composeBroadcast(personaId: personaId)) }
+                },
+                onOpenInsights: { Task { @MainActor in push(.beaconInsights) } },
+                onCreateBeacon: {
+                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                },
+                onOpenLink: { url in UIApplication.shared.open(url) }
+            )
+        case let .beaconProfile(handle):
+            BeaconProfileView(
+                mode: .visitor(handle: handle),
+                onBack: { Task { @MainActor in pop() } },
+                onOpenLink: { url in UIApplication.shared.open(url) }
+            )
+        case let .editPersona(personaId):
+            EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case let .composeBroadcast(personaId):
+            ComposeBroadcastView(
+                viewModel: .live(personaId: personaId) {
+                    if !path.isEmpty { path.removeLast() }
+                }
+            ) {
+                if !path.isEmpty { path.removeLast() }
+            }
+        case .beaconInsights:
+            AudienceProfileView(
+                onBack: { Task { @MainActor in pop() } },
+                onComposeBroadcast: { personaId in
+                    Task { @MainActor in push(.composeBroadcast(personaId: personaId)) }
+                },
+                onOpenEditPersona: {
+                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                },
+                onOpenBeacons: { Task { @MainActor in push(.beaconsFeed) } }
             )
         case let .composePost(intent):
             PulseComposeFlowView(

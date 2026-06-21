@@ -11,6 +11,7 @@
 // swiftlint:disable cyclomatic_complexity file_length function_body_length type_body_length
 
 import SwiftUI
+import UIKit
 
 // swiftlint:disable multiple_closures_with_trailing_closure
 
@@ -130,6 +131,9 @@ public enum YouRoute: Hashable {
     /// A03.2 — Beacon Updates feed (`surface=personas`), reached from the
     /// Audience Profile "Beacon Updates" entry row.
     case beaconsFeed
+    /// A21.1 — another user's public Beacon profile by handle (visitor
+    /// role). Reached from the Following list row tap.
+    case beaconProfile(handle: String)
     /// §1A① — "Following": the Beacons the signed-in user follows, reached
     /// from the Audience Profile "Following" entry row.
     case following
@@ -1450,10 +1454,22 @@ public struct YouTabRoot: View {
                     onDiscover: {
                         Task { @MainActor in path.append(.placeholder(label: "Discover beacons")) }
                     },
-                    onOpenPersona: { _ in
-                        Task { @MainActor in path.append(.placeholder(label: "Beacon")) }
+                    onOpenPersona: { handle in
+                        Task { @MainActor in path.append(.beaconProfile(handle: handle)) }
                     }
                 )
+            )
+        case let .beaconProfile(handle):
+            BeaconProfileView(
+                mode: .visitor(handle: handle),
+                onBack: { Task { @MainActor in pop() } },
+                onEditPersona: { personaId in
+                    Task { @MainActor in path.append(.editPersona(personaId: personaId)) }
+                },
+                onComposeBroadcast: { personaId in
+                    Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
+                },
+                onOpenLink: { url in UIApplication.shared.open(url) }
             )
         case let .explore(focus):
             ExploreMapView(
