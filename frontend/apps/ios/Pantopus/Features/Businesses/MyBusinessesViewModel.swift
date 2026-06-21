@@ -232,5 +232,7 @@ struct CategoryStyle: Hashable {
 }
 
 private extension String {
-    var nonEmpty: String? { isEmpty ? nil : self }
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

@@ -25,7 +25,7 @@ struct MyBusinessesEmptyView: View {
     private let proofs: [Proof] = [
         Proof(icon: .idCard, title: "EIN / Tax ID", sub: "IRS-issued · verified within 1 business day"),
         Proof(icon: .fileText, title: "State registration certificate", sub: "Upload Articles of Incorporation or DBA"),
-        Proof(icon: .creditCard, title: "Linked payment processor", sub: "Stripe, Square, or Toast · instant"),
+        Proof(icon: .creditCard, title: "Linked payment processor", sub: "Stripe, Square, or Toast · instant")
     ]
 
     var body: some View {

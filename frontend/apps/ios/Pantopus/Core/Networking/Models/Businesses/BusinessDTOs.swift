@@ -97,7 +97,9 @@ public struct BusinessTeamChipDTO: Decodable, Sendable, Hashable, Identifiable {
     public let avatarFileId: String?
 
     /// Stable-enough id for ForEach (initials + name).
-    public var id: String { "\(initials ?? "?")-\(name ?? "")" }
+    public var id: String {
+        "\(initials ?? "?")-\(name ?? "")"
+    }
 
     private enum CodingKeys: String, CodingKey {
         case name, initials
