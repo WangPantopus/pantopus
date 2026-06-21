@@ -19,6 +19,7 @@ public enum PulseRoute: Hashable {
 /// NavigationStack wrapper for the Pulse tab.
 public struct PulseTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<PulseRoute>()
     @State private var router = DeepLinkRouter.shared
 
@@ -38,7 +39,8 @@ public struct PulseTabRoot: View {
                 onCompose: { intent in
                     path.append(.compose(intent: intent.rawValue))
                 },
-                onBack: nil
+                onBack: nil,
+                onMenu: { rootTabs.showNavDrawer = true }
             )
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: PulseRoute.self) { route in

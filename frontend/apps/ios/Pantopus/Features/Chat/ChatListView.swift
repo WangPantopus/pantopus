@@ -17,22 +17,27 @@ public struct ChatListView: View {
     private let onOpenConversation: @MainActor (ConversationRowContent) -> Void
     private let onCompose: @MainActor () -> Void
     private let onOpenSearch: @MainActor () -> Void
+    /// Set when this is a tab root — renders the leading menu hamburger that
+    /// opens the global navigation drawer.
+    private let onMenu: (@MainActor () -> Void)?
 
     init(
         viewModel: ChatListViewModel = ChatListViewModel(),
         onOpenConversation: @escaping @MainActor (ConversationRowContent) -> Void = { _ in },
         onCompose: @escaping @MainActor () -> Void = {},
-        onOpenSearch: @escaping @MainActor () -> Void = {}
+        onOpenSearch: @escaping @MainActor () -> Void = {},
+        onMenu: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenConversation = onOpenConversation
         self.onCompose = onCompose
         self.onOpenSearch = onOpenSearch
+        self.onMenu = onMenu
     }
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
-            ChatListTopBar(onCompose: onCompose)
+            ChatListTopBar(onCompose: onCompose, onMenu: onMenu)
             ChatListSearchBar(skeleton: viewModel.state.isLoading) {
                 onOpenSearch()
             }
@@ -181,9 +186,13 @@ private extension ChatListState {
 
 private struct ChatListTopBar: View {
     let onCompose: @MainActor () -> Void
+    var onMenu: (@MainActor () -> Void)?
 
     var body: some View {
         HStack {
+            if let onMenu {
+                DrawerMenuButton(action: onMenu)
+            }
             Text("Chat")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)

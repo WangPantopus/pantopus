@@ -31,6 +31,7 @@ public enum TasksRoute: Hashable {
 /// NavigationStack wrapper for the Tasks tab.
 public struct TasksTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<TasksRoute>()
     @State private var router = DeepLinkRouter.shared
     @State private var systemSheet: SystemSheetRequest?
@@ -61,7 +62,8 @@ public struct TasksTabRoot: View {
                     path.append(.tasksMap(categoryKey: category.rawValue))
                 },
                 onOpenSearch: { path.append(.gigSearch) },
-                onBack: nil
+                onBack: nil,
+                onMenu: { rootTabs.showNavDrawer = true }
             )
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: TasksRoute.self) { route in

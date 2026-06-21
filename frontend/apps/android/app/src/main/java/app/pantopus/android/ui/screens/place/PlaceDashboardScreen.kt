@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -39,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.place.PlaceGroupBlock
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceTier
+import app.pantopus.android.ui.components.DrawerMenuButton
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.place.components.PlaceGroupLabel
@@ -74,6 +76,10 @@ fun PlaceDashboardScreen(
     onOpenPulse: () -> Unit,
     onComposeMessage: (address: String) -> Unit,
     onOpenInbox: () -> Unit,
+    // Leading-edge controls. As the Home tab root, onMenu opens the global
+    // navigation drawer; pushed by the place-switcher, onBack pops instead.
+    onMenu: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: PlaceDashboardViewModel = hiltViewModel(key = "place-$homeId"),
 ) {
@@ -97,6 +103,8 @@ fun PlaceDashboardScreen(
                     onOpenPulse = onOpenPulse,
                     onComposeMessage = onComposeMessage,
                     onOpenInbox = onOpenInbox,
+                    onMenu = onMenu,
+                    onBack = onBack,
                 )
         }
     }
@@ -139,6 +147,8 @@ internal fun PlaceDashboardContent(
     onOpenPulse: () -> Unit = {},
     onComposeMessage: (address: String) -> Unit = {},
     onOpenInbox: () -> Unit = {},
+    onMenu: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     val isVerified = intel.tier == PlaceTier.T4
     val isClaimed = intel.tier == PlaceTier.T3
@@ -150,6 +160,8 @@ internal fun PlaceDashboardContent(
                 label = intel.place.label,
                 isVerified = isVerified,
                 onOpenAvatar = onOpenAvatar,
+                onMenu = onMenu,
+                onBack = onBack,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
             )
         }
@@ -286,8 +298,30 @@ private fun PlaceDashboardHeader(
     isVerified: Boolean,
     onOpenAvatar: () -> Unit,
     modifier: Modifier = Modifier,
+    onMenu: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (onMenu != null) {
+            DrawerMenuButton(onClick = onMenu)
+        } else if (onBack != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack)
+                        .testTag("placeBackButton"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronLeft,
+                    contentDescription = "Back",
+                    size = 22.dp,
+                    tint = PantopusColors.appText,
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
                 text = "Your Place",

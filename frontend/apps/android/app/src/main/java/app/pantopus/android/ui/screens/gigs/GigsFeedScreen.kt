@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.DrawerMenuButton
 import app.pantopus.android.ui.screens.shared.feed.FeedComposeFAB
 import app.pantopus.android.ui.screens.shared.feed.FeedSkeletonCard
 import app.pantopus.android.ui.theme.PantopusColors
@@ -73,6 +74,9 @@ fun GigsFeedScreen(
     onOpenMap: (GigsCategory) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    // Set when this is a tab root — renders the leading menu hamburger that
+    // opens the global navigation drawer. Mutually exclusive with onBack.
+    onMenu: (() -> Unit)? = null,
     viewModel: GigsFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -111,7 +115,7 @@ fun GigsFeedScreen(
                 .testTag("gigsFeed"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            GigsTopBar(onBack = onBack, onOpenMap = { onOpenMap(activeCategory) })
+            GigsTopBar(onBack = onBack, onMenu = onMenu, onOpenMap = { onOpenMap(activeCategory) })
             GigsSearchBar(onOpenSearch = onOpenSearch)
             GigsCategoryChipRow(
                 active = activeCategory,
@@ -229,6 +233,7 @@ private const val TOAST_DISMISS_DELAY_MS = 5_000L
 private fun GigsTopBar(
     onBack: (() -> Unit)?,
     onOpenMap: () -> Unit,
+    onMenu: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -256,6 +261,10 @@ private fun GigsTopBar(
                     tint = PantopusColors.appText,
                 )
             }
+            Spacer(modifier = Modifier.size(Spacing.s1))
+        } else if (onMenu != null) {
+            DrawerMenuButton(onClick = onMenu)
+            Spacer(modifier = Modifier.size(Spacing.s1))
         }
         Text(
             text = "Gigs",

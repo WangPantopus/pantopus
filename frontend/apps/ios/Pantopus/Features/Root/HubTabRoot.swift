@@ -365,8 +365,10 @@ public struct HubTabRoot: View {
     @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<HubRoute>()
     @State private var router = DeepLinkRouter.shared
-    /// W3 — guards the one-shot Place auto-land so it fires at most once.
-    @State private var didAutoLandPlace = false
+    /// W3 — the Home tab roots on Your Place. Resolve the primary home once
+    /// (loading → place / noHome); the old Hub launcher has been retired in
+    /// favour of the Place dashboard.
+    @State private var placeLanding: PlaceLanding = .loading
     /// P6.6 — share / mail system sheet driven by "Share listing",
     /// "Share train", and "Invite a business".
     @State private var systemSheet: SystemSheetRequest?
@@ -375,31 +377,20 @@ public struct HubTabRoot: View {
     @State private var modalRoute: HubModalRoute?
     /// P6.6 — "Find people" → contacts picker → invite share.
     @State private var showFindPeople = false
-    /// §1C-b — context-aware navigation drawer, opened from the Hub menu
-    /// button (repurposed from "open Settings"). Settings now lives as a row
-    /// inside the drawer.
-    @State private var showNavDrawer = false
     @State private var savedPlaceMapFocus: ExploreMapFocus?
-    /// Identity Center presented when the drawer's context pill is tapped
-    /// (LAUNCHER / Option A switching path).
-    @State private var navDrawerIdentityCenter = false
-    #if DEBUG
-    @State private var debugSheet: HubRoute?
-    #endif
 
-    private let onOpenProfile: @MainActor () -> Void
+    public init() {}
 
-    public init(onOpenProfile: @escaping @MainActor () -> Void = {}) {
-        self.onOpenProfile = onOpenProfile
+    /// Landing state for the Home tab root — Your Place when the resident has
+    /// a primary home, otherwise an add-a-place empty state.
+    private enum PlaceLanding: Equatable {
+        case loading
+        case place(homeId: String)
+        case noHome
     }
 
     private var currentUserId: String {
         if case let .signedIn(user) = auth.state { return user.id }
-        return ""
-    }
-
-    private var currentUserName: String {
-        if case let .signedIn(user) = auth.state { return user.displayName ?? "" }
         return ""
     }
 
@@ -464,72 +455,106 @@ public struct HubTabRoot: View {
 
     public var body: some View {
         NavigationStack(path: navigationPathBinding) {
-            hub
-                .navigationTitle("Hub")
+            homeRoot
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: HubRoute.self) { route in
                     destination(for: route) { path.append($0) }
                 }
-            #if DEBUG
-                .sheet(item: $debugSheet) { route in
-                    destination(for: route) { _ in }
-                }
-            #endif
         }
         .onChange(of: router.pending) { _, pending in
             consumeDeepLinkIfNeeded(pending: pending)
         }
         .onAppear {
             consumeDeepLinkIfNeeded(pending: router.pending)
+            drainPendingDrawerRoute()
         }
         .task {
             consumeDeepLinkIfNeeded(pending: router.pending)
         }
-        .task {
-            // W3 — land the Home tab on the Place dashboard when the user
-            // has a primary home. One-shot at an empty stack so we never
-            // fight the user's navigation or an inbound deep link; Hub
-            // stays the stack root (reachable via back-swipe) and the
-            // no-home fallback.
-            guard path.isEmpty, router.pending == nil, !didAutoLandPlace else { return }
-            // W6 — save the place a stranger looked up before signing up
-            // (one-shot), then land on it.
-            await Self.savePendingPlaceIfNeeded()
-            if let homeId = await Self.primaryHomeId() {
-                didAutoLandPlace = true
-                path.append(.placeDashboard(homeId: homeId))
-            }
+        // The global drawer (hosted in `RootTabView`) resolves a row tap to a
+        // `HubRoute` and parks it here; drain it onto our own stack so the
+        // Home tab renders the destination.
+        .onChange(of: rootTabs.pendingDrawerRoute) { _, route in
+            drainPendingDrawerRoute(route)
+        }
+        .onChange(of: rootTabs.hubResetToken) { _, _ in
+            path.removeAll { _ in true }
         }
         .fullScreenCover(item: $modalRoute) { item in
             destination(for: item.route) { path.append($0) }
         }
         .sheet(item: $systemSheet) { request in request.makeView() }
         .findPeopleSheet(isPresented: $showFindPeople)
-        .overlay { navigationDrawerOverlay }
-        .sheet(isPresented: $navDrawerIdentityCenter) {
-            // `onBack` is not the trailing parameter of `IdentityCenterView`,
-            // so the argument label must stay explicit here.
-            // swiftlint:disable:next trailing_closure
-            IdentityCenterView(onBack: { navDrawerIdentityCenter = false })
+    }
+
+    /// The Home tab root — Your Place once a primary home resolves, otherwise
+    /// an add-a-place empty state. Both carry the top-left menu button that
+    /// opens the global navigation drawer.
+    @ViewBuilder
+    private var homeRoot: some View {
+        Group {
+            switch placeLanding {
+            case .loading:
+                PlaceDashboardSkeleton()
+                    .background(Theme.Color.appBg)
+            case let .place(homeId):
+                PlaceDashboardView(
+                    viewModel: placeDashboardViewModel(homeId: homeId) { path.append($0) },
+                    onMenu: { rootTabs.showNavDrawer = true }
+                )
+            case .noHome:
+                HomeNoPlaceView(
+                    onAddHome: { path.append(.addHome) },
+                    onOpenMenu: { rootTabs.showNavDrawer = true }
+                )
+            }
+        }
+        .task { await resolveHomeLanding() }
+    }
+
+    /// W3 / W6 — resolve the Home tab's landing once: best-effort save of a
+    /// stranger's looked-up place, then pick Your Place vs. the empty state.
+    private func resolveHomeLanding() async {
+        guard placeLanding == .loading else { return }
+        await Self.savePendingPlaceIfNeeded()
+        if let homeId = await Self.primaryHomeId() {
+            placeLanding = .place(homeId: homeId)
+        } else {
+            placeLanding = .noHome
         }
     }
 
-    /// §1C-b — the context-aware navigation drawer. The Hub menu is always the
-    /// personal context (home / business dashboards adopt the drawer with their
-    /// own context); the pill opens the Identity Center and rows push existing
-    /// routes via `route(forDrawer:)`.
-    private var navigationDrawerOverlay: some View {
-        NavigationDrawerView(
-            viewModel: NavigationDrawerViewModel(context: .personal(name: currentUserName)),
-            isPresented: $showNavDrawer,
-            onSelect: { destination in
-                if let route = Self.route(forDrawer: destination, context: .personal(name: "")) {
-                    path.append(route)
-                }
+    /// Build the Place dashboard view-model with its navigation callbacks
+    /// wired to push onto the Home stack. Shared by the tab root and the
+    /// `.placeDashboard` push (the place-switcher re-lands on another home).
+    private func placeDashboardViewModel(
+        homeId: String,
+        push: @escaping @MainActor @Sendable (HubRoute) -> Void
+    ) -> PlaceDashboardViewModel {
+        PlaceDashboardViewModel(
+            homeId: homeId,
+            onOpenDetail: { group in push(.placeDetail(homeId: homeId, group: group)) },
+            onOpenPulse: { push(.placePulse(homeId: homeId)) },
+            onSelectHome: { id in push(.placeDashboard(homeId: id)) },
+            onAddPlace: { push(.addHome) },
+            onStartVerify: { method, address in
+                push(.placeVerifyStatus(homeId: homeId, method: method, address: address))
             },
-            onOpenIdentityCenter: { navDrawerIdentityCenter = true },
-            onBackToHub: { Task { @MainActor in path.removeAll { _ in true } } }
+            onComposeMessage: { address in
+                push(.neighborCompose(homeId: homeId, address: address, recipient: nil))
+            },
+            onOpenInbox: { push(.neighborInbox) },
+            onOpenHubHome: {}
         )
+    }
+
+    /// Drain a drawer-requested route onto the Home stack. Called both on a
+    /// `pendingDrawerRoute` change and on appear (a route may have been parked
+    /// before this tab existed).
+    private func drainPendingDrawerRoute(_ route: HubRoute? = nil) {
+        guard let pending = route ?? rootTabs.pendingDrawerRoute else { return }
+        path.append(pending)
+        rootTabs.pendingDrawerRoute = nil
     }
 
     /// Maps a drawer destination onto an existing `HubRoute`. Destinations with
@@ -747,33 +772,6 @@ public struct HubTabRoot: View {
         }
     }
 
-    private var hub: some View {
-        HubView { intent in
-            switch intent {
-            case .openNotifications: path.append(.notifications)
-            case .openMenu: showNavDrawer = true
-            case .startVerification: path.append(.addHome)
-            case .action(.addHome): path.append(.addHome)
-            case .action(.scanMail): path.append(.mailboxRoot)
-            case .action(.postTask): path.append(.quickPostGig(category: GigsCategory.all.rawValue))
-            case .action(.snapAndSell): path.append(.composeListing)
-            case .pillar(.mail): path.append(.mailboxRoot)
-            case .pillar(.pulse): rootTabs.selected = .pulse
-            case .pillar(.gigs): rootTabs.selected = .tasks
-            case .pillar(.marketplace): rootTabs.selected = .marketplace
-            case .openProfile: onOpenProfile()
-            case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
-            case .openDiscoverHub: path.append(.discoverHub)
-            case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
-            // `openToday` taps the weather/today card → full Today briefing
-            // (A10.3 — weather, air, daylight, and neighbourhood signals).
-            case .openToday: path.append(.todayDetail)
-            case .openRecentActivity: path.append(.recentActivity)
-            }
-        }
-        .overlay(alignment: .topLeading) { debugTapTarget }
-    }
-
     /// Project an `InboxConversationDestination.Mode` onto the
     /// `ChatThreadMode` consumed by `ChatConversationViewModel`. Mirrors
     /// the helper of the same name on `InboxTabRoot` so the chat shell
@@ -809,41 +807,6 @@ public struct HubTabRoot: View {
         }
     }
 
-    /// Dispatch a discovery card tap to the matching detail route.
-    private static func route(forDiscovery item: DiscoveryCardContent) -> HubRoute {
-        switch item.kind {
-        case .post: .pulsePost(postId: item.id)
-        case .person: .publicProfile(userId: item.id)
-        case .gig: .gigDetail(gigId: item.id)
-        case .business: .businessProfile(businessId: item.id)
-        case .unknown: .placeholder(label: item.title)
-        }
-    }
-
-    /// Backend `jumpBackIn` items carry a canonical web route (e.g.
-    /// `/app/mailbox?scope=home&homeId=…`, `/app/homes/<id>/dashboard`,
-    /// `/app/chat`, `/gigs/new`). Map that onto a native destination;
-    /// fall back to a labeled placeholder when nothing matches.
-    private static func route(forJumpBackIn item: JumpBackItem) -> HubRoute {
-        let path = item.route
-        if path.hasPrefix("/app/mailbox") {
-            return .mailboxRoot
-        }
-        if let homeId = Self.homeId(in: path) {
-            return .homeDashboard(homeId: homeId)
-        }
-        if path.hasPrefix("/app/chat") {
-            return .placeholder(label: "Messages")
-        }
-        if path.hasPrefix("/gigs/new") {
-            return .composeGig(category: GigsCategory.all.rawValue)
-        }
-        if path.hasPrefix("/gigs") {
-            return .gigsFeed
-        }
-        return .placeholder(label: item.title)
-    }
-
     /// Two-letter initials derived from a display name. Falls back to
     /// `··` when the input has no alphanumeric content so the chat header's
     /// avatar still renders.
@@ -851,33 +814,6 @@ public struct HubTabRoot: View {
         let parts = name.split(separator: " ").prefix(2)
         let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
         return joined.isEmpty ? "··" : joined
-    }
-
-    /// Extracts `<id>` from `/app/homes/<id>/dashboard`. Returns `nil`
-    /// when the prefix doesn't match.
-    private static func homeId(in route: String) -> String? {
-        let prefix = "/app/homes/"
-        guard route.hasPrefix(prefix) else { return nil }
-        let after = route.dropFirst(prefix.count)
-        let segment = after.split(separator: "/").first.map(String.init)
-        return segment?.isEmpty == false ? segment : nil
-    }
-
-    /// 44pt invisible 5-tap target in the top-leading safe area — the
-    /// production hub hides its nav bar so there's no visible title to
-    /// tap. Hidden from accessibility so VoiceOver users can't trip
-    /// the debug menu by accident. No-op in release.
-    @ViewBuilder
-    private var debugTapTarget: some View {
-        #if DEBUG
-        Color.clear
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
-            .onTapGesture(count: 5) { debugSheet = .tokenGallery }
-            .accessibilityHidden(true)
-        #else
-        EmptyView()
-        #endif
     }
 
     @ViewBuilder
@@ -2344,22 +2280,11 @@ public struct HubTabRoot: View {
                 path.append(.homeDashboard(homeId: homeId))
             }
         case let .placeDashboard(homeId):
+            // Pushed by the place-switcher to re-land on another home, so it
+            // carries a back button rather than the root's menu button.
             PlaceDashboardView(
-                viewModel: PlaceDashboardViewModel(
-                    homeId: homeId,
-                    onOpenDetail: { group in push(.placeDetail(homeId: homeId, group: group)) },
-                    onOpenPulse: { push(.placePulse(homeId: homeId)) },
-                    onSelectHome: { id in push(.placeDashboard(homeId: id)) },
-                    onAddPlace: { push(.addHome) },
-                    onStartVerify: { method, address in
-                        push(.placeVerifyStatus(homeId: homeId, method: method, address: address))
-                    },
-                    onComposeMessage: { address in
-                        push(.neighborCompose(homeId: homeId, address: address, recipient: nil))
-                    },
-                    onOpenInbox: { push(.neighborInbox) },
-                    onOpenHubHome: {}
-                )
+                viewModel: placeDashboardViewModel(homeId: homeId, push: push),
+                onBack: { pop() }
             )
         case let .placeDetail(homeId, group):
             PlaceDetailView(
@@ -2511,6 +2436,37 @@ extension HubRoute: Identifiable {
     }
 }
 #endif
+
+/// The Home tab's add-a-place empty state, shown to residents who have not
+/// claimed an address yet (it replaces the retired Hub launcher as the
+/// no-home landing). Carries the same top-left menu button as Your Place so
+/// the global drawer stays reachable.
+private struct HomeNoPlaceView: View {
+    let onAddHome: @MainActor () -> Void
+    let onOpenMenu: @MainActor () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.s0) {
+            HStack {
+                DrawerMenuButton(action: onOpenMenu)
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s2)
+
+            EmptyState(
+                icon: .home,
+                headline: "Add your place",
+                subcopy: "Claim your address to unlock Your Place — your neighborhood pulse, "
+                    + "verified neighbors, and home tools.",
+                cta: .init(title: "Add a place") { await onAddHome() }
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.appBg)
+        .accessibilityIdentifier("homeNoPlace")
+    }
+}
 
 /// Small wrapper that injects the `openURL` environment action into the
 /// Business Profile screen so the "Visit" button can punch out to Safari

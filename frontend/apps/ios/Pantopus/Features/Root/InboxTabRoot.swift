@@ -74,6 +74,7 @@ public struct InboxConversationDestination: Hashable, Sendable {
 /// NavigationStack wrapper for the Inbox tab.
 public struct InboxTabRoot: View {
     @Environment(AuthManager.self) private var auth
+    @Environment(RootTabModel.self) private var rootTabs
     @State private var path = RouteStack<InboxRoute>()
     @State private var router = DeepLinkRouter.shared
     /// P6.6 — "Invite to Pantopus" opens the system share sheet with the
@@ -89,7 +90,8 @@ public struct InboxTabRoot: View {
                     path.append(.conversation(destination(from: row)))
                 },
                 onCompose: { path.append(.compose) },
-                onOpenSearch: { path.append(.search) }
+                onOpenSearch: { path.append(.search) },
+                onMenu: { rootTabs.showNavDrawer = true }
             )
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: InboxRoute.self) { route in

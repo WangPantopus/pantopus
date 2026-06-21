@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.DrawerMenuButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -56,6 +57,7 @@ fun ChatListScreen(
     onOpenConversation: (ConversationRowContent) -> Unit = {},
     onCompose: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
+    onMenu: (() -> Unit)? = null,
     viewModel: ChatListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -74,7 +76,7 @@ fun ChatListScreen(
                 .background(PantopusColors.appSurface)
                 .testTag("chatList"),
     ) {
-        TopBar(onCompose = onCompose)
+        TopBar(onCompose = onCompose, onMenu = onMenu)
         SearchBar(skeleton = state is ChatListUiState.Loading, onTap = onOpenSearch)
         FilterTabs(
             active = activeFilter,
@@ -98,7 +100,10 @@ fun ChatListScreen(
 }
 
 @Composable
-private fun TopBar(onCompose: () -> Unit) {
+private fun TopBar(
+    onCompose: () -> Unit,
+    onMenu: (() -> Unit)? = null,
+) {
     Row(
         modifier =
             Modifier
@@ -107,6 +112,10 @@ private fun TopBar(onCompose: () -> Unit) {
                 .padding(start = Spacing.s4, end = Spacing.s2, top = 10.dp, bottom = Spacing.s1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onMenu != null) {
+            DrawerMenuButton(onClick = onMenu)
+            Spacer(modifier = Modifier.size(Spacing.s1))
+        }
         Text(
             text = "Chat",
             fontSize = 22.sp,

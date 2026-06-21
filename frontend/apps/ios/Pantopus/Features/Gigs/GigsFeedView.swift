@@ -22,6 +22,9 @@ public struct GigsFeedView: View {
     private let onOpenMap: @MainActor (GigsCategory) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
+    /// Set when this is a tab root — renders the leading menu hamburger that
+    /// opens the global navigation drawer. Mutually exclusive with `onBack`.
+    private let onMenu: (@MainActor () -> Void)?
 
     /// Two inits instead of a single `viewModel: GigsFeedViewModel =
     /// GigsFeedViewModel()` default: the Xcode 16.4 / Swift 6.1.2 compiler
@@ -36,7 +39,8 @@ public struct GigsFeedView: View {
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onMenu: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenGig = onOpenGig
@@ -44,6 +48,7 @@ public struct GigsFeedView: View {
         self.onOpenMap = onOpenMap
         self.onOpenSearch = onOpenSearch
         self.onBack = onBack
+        self.onMenu = onMenu
     }
 
     init(
@@ -51,7 +56,8 @@ public struct GigsFeedView: View {
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onMenu: (@MainActor () -> Void)? = nil
     ) {
         self.init(
             viewModel: GigsFeedViewModel(),
@@ -59,7 +65,8 @@ public struct GigsFeedView: View {
             onCompose: onCompose,
             onOpenMap: onOpenMap,
             onOpenSearch: onOpenSearch,
-            onBack: onBack
+            onBack: onBack,
+            onMenu: onMenu
         )
     }
 
@@ -288,6 +295,8 @@ public struct GigsFeedView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("gigsBackButton")
+            } else if let onMenu {
+                DrawerMenuButton(action: onMenu)
             }
             Text("Gigs")
                 .font(.system(size: 22, weight: .bold))
