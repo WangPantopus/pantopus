@@ -225,6 +225,14 @@ public enum HubRoute: Hashable {
     /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
     /// the You / Me action grid or from Hub's marketplace pillar shelf.
     case myBids
+    /// My tasks — the poster's side of the gigs marketplace (T5.3.2 /
+    /// V2 canonical). Reached from the navigation drawer's "My Tasks"
+    /// item. Inverse of `.myBids`.
+    case myTasks
+    /// Edit an existing posted gig — flips the QuickPost composer into
+    /// edit mode (`GET /api/gigs/:id` prefill → `PATCH`). Pushed from a
+    /// My tasks row's "Edit" footer action.
+    case editGig(gigId: String)
     /// T5.3.4 — per-listing offers panel reached from a listing detail
     /// "View offers" affordance (only the listing's owner sees it).
     case listingOffers(listingId: String, title: String?)
@@ -548,7 +556,7 @@ public struct HubTabRoot: View {
         case .myBeacon: return .myBeacon
         case .myListings: return .marketplace
         case .myPulse: return .myPosts
-        case .myTasks: return .placeholder(label: "My Tasks")
+        case .myTasks: return .myTasks
         case .myBids: return .myBids
         case .offersAndBids: return .placeholder(label: "Offers & Bids")
         case .postTask: return .quickPostGig(category: GigsCategory.all.rawValue)
@@ -2003,6 +2011,47 @@ public struct HubTabRoot: View {
                     // inside the screen (P3.4) — no router wiring needed.
                 )
             )
+        case .myTasks:
+            MyTasksView(
+                viewModel: MyTasksViewModel(
+                    onOpenTask: { dto in
+                        Task { @MainActor in push(.gigDetail(gigId: dto.id)) }
+                    },
+                    onOpenBids: { dto in
+                        // Bids live inside the owner's gig detail (the
+                        // "Review bids" section). Android mirrors this.
+                        Task { @MainActor in push(.gigDetail(gigId: dto.id)) }
+                    },
+                    onEditTask: { dto in
+                        Task { @MainActor in push(.editGig(gigId: dto.id)) }
+                    },
+                    onMessageWorker: { dto in
+                        Task { @MainActor in push(.gigDetail(gigId: dto.id)) }
+                    },
+                    onLeaveReview: { dto in
+                        Task { @MainActor in push(.gigDetail(gigId: dto.id)) }
+                    },
+                    onPostTask: {
+                        Task { @MainActor in push(.composeGig(category: GigsCategory.all.rawValue)) }
+                    },
+                    onRepost: { _ in
+                        Task { @MainActor in push(.composeGig(category: GigsCategory.all.rawValue)) }
+                    }
+                )
+            )
+        case let .editGig(gigId):
+            PostGigV1View(
+                viewModel: PostGigV1ViewModel(editGigId: gigId),
+                onClose: pop
+            ) { savedGigId in
+                // Replace the editor with the gig's detail so Back lands
+                // on My tasks, not the editor we just left.
+                path.removeAll { route in
+                    if case .editGig = route { return true }
+                    return false
+                }
+                path.append(.gigDetail(gigId: savedGigId))
+            }
         case let .chatConversation(dest):
             ChatConversationView(
                 viewModel: ChatConversationViewModel(
