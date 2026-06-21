@@ -121,9 +121,10 @@ final class BeaconProfileViewModelTests: XCTestCase {
 
     func testFollowerCountBumpKeepsCompactedValue() async {
         SequencedURLProtocol.sequence = [
-            .status(200, body: Self.visitorNotFollowingJSON),
+            .status(200, body: Self.visitorFollowingJSON),
             .status(200, body: Self.postsJSON),
-            .status(200, body: Self.tiersJSON)
+            .status(200, body: Self.tiersJSON),
+            .status(200, body: #"{"message":"unfollowed"}"#)
         ]
         let vm = BeaconProfileViewModel(mode: .visitor(handle: "mariak"), client: makeAPI())
         await vm.load()
@@ -135,16 +136,47 @@ final class BeaconProfileViewModelTests: XCTestCase {
         // 1200 followers renders compacted, NOT as a raw integer.
         XCTAssertEqual(before.stats.first?.value, "1.2K")
 
-        // A successful follow bumps the raw count and re-compacts — it must
-        // NOT collapse "1.2K" into "13" (the pre-fix regression).
-        vm.handshakeCompleted()
+        // Unfollow recomputes from the raw count and re-compacts — it must
+        // NOT collapse "1.2K" into "11" (the pre-fix regression).
+        await vm.unfollow()
         guard case let .loaded(after) = vm.state else {
-            XCTFail("Expected .loaded after follow")
+            XCTFail("Expected .loaded after unfollow")
             return
         }
-        XCTAssertEqual(vm.followStatus, .active)
-        XCTAssertEqual(after.followerCount, 1201)
+        XCTAssertEqual(vm.followStatus, .none)
+        XCTAssertEqual(after.followerCount, 1199)
         XCTAssertEqual(after.stats.first?.value, "1.2K")
+    }
+
+    func testCredentialDrivesVerification() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.verifiedPersonaJSON),
+            .status(200, body: Self.postsJSON),
+            .status(200, body: Self.tiersJSON)
+        ]
+        let verified = BeaconProfileViewModel(mode: .visitor(handle: "mariak"), client: makeAPI())
+        await verified.load()
+        guard case let .loaded(v) = verified.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertTrue(v.header.isVerified)
+        XCTAssertEqual(v.header.tierLabel, "Persona · Verified")
+
+        // No credential ⇒ unverified + "New" (the owner fixture has no credential).
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.ownerPersonaJSON),
+            .status(200, body: Self.postsJSON),
+            .status(200, body: Self.tiersJSON)
+        ]
+        let unverified = BeaconProfileViewModel(mode: .owner, client: makeAPI())
+        await unverified.load()
+        guard case let .loaded(u) = unverified.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertFalse(u.header.isVerified)
+        XCTAssertEqual(u.header.tierLabel, "Persona · New")
     }
 
     func testTierRankDrivesVisibilityWithoutTierString() async {
@@ -175,8 +207,8 @@ final class BeaconProfileViewModelTests: XCTestCase {
     {"persona":{"id":"p1","handle":"mariak","displayName":"Maria K.","bio":"bio","category":"creator","audienceLabel":"followers","audienceMode":"open","followerCount":1200,"postCount":47,"broadcastEnabled":true,"viewer":{"isOwner":false,"isFollowing":true,"followStatus":"active","notificationLevel":"all"}},"channel":null}
     """#
 
-    private static let visitorNotFollowingJSON = #"""
-    {"persona":{"id":"p1","handle":"mariak","displayName":"Maria K.","bio":"bio","category":"creator","audienceLabel":"followers","audienceMode":"open","followerCount":1200,"postCount":47,"broadcastEnabled":true,"viewer":{"isOwner":false,"isFollowing":false,"followStatus":"none","notificationLevel":"all"}},"channel":null}
+    private static let verifiedPersonaJSON = #"""
+    {"persona":{"id":"p1","handle":"mariak","displayName":"Maria K.","bio":"bio","category":"creator","audienceLabel":"followers","audienceMode":"open","followerCount":1200,"postCount":47,"broadcastEnabled":true,"credential":{"status":"verified","label":"Verified"},"viewer":{"isOwner":false,"isFollowing":false,"followStatus":"none","notificationLevel":"all"}},"channel":null}
     """#
 
     private static let postsJSON = #"""

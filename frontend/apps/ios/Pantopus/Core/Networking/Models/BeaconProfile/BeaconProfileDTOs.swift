@@ -11,11 +11,11 @@
 //    - `GET /api/personas/:handle`   — a visitor viewing someone's Beacon.
 //      Route `backend/routes/personas.js:1028`.
 //
-//  Both return `{ persona, channel }`. The `viewer` sub-object is present
-//  on the `:handle` shape (carries follow status + ownership) and absent
-//  on `me` (the caller is always the owner there). Every field is optional
-//  so both envelopes decode through the same type. Backend renames at the
-//  serializer boundary; the UI renames again at the VM boundary.
+//  Both return `{ persona, channel }`. The serializer always emits the
+//  `viewer` sub-object — on `/me` it carries `isOwner: true`; on `/:handle`
+//  it carries the visitor's follow status + ownership. Every field is
+//  optional so both envelopes decode through the same type. Backend renames
+//  at the serializer boundary; the UI renames again at the VM boundary.
 //
 //  Tokens-only / snake_case → camelCase per `CLAUDE.md`.
 //
@@ -50,10 +50,11 @@ public struct BeaconPersonaDTO: Decodable, Sendable, Hashable, Identifiable {
     public let broadcastEnabled: Bool?
     public let createdAt: String?
     public let publicLinks: [BeaconPublicLinkDTO]?
+    public let credential: BeaconCredentialDTO?
     public let viewer: BeaconViewerDTO?
 
     enum CodingKeys: String, CodingKey {
-        case id, handle, bio, category, viewer
+        case id, handle, bio, category, viewer, credential
         case displayName, avatarUrl, bannerUrl
         case audienceLabel, audienceMode
         case followerCount, postCount
@@ -78,6 +79,7 @@ public struct BeaconPersonaDTO: Decodable, Sendable, Hashable, Identifiable {
         postCount = try c.decodeIfPresent(Int.self, forKey: .postCount)
         broadcastEnabled = try c.decodeIfPresent(Bool.self, forKey: .broadcastEnabled)
         publicLinks = try c.decodeIfPresent([BeaconPublicLinkDTO].self, forKey: .publicLinks)
+        credential = try c.decodeIfPresent(BeaconCredentialDTO.self, forKey: .credential)
         viewer = try c.decodeIfPresent(BeaconViewerDTO.self, forKey: .viewer)
         // Accept either `createdAt` (serializer) or `created_at` (raw row).
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
@@ -85,14 +87,22 @@ public struct BeaconPersonaDTO: Decodable, Sendable, Hashable, Identifiable {
     }
 }
 
-/// Caller's relationship to the persona. Present on the `:handle` shape,
-/// nil on `me`. `isOwner` drives the owner vs visitor chrome split.
+/// Caller's relationship to the persona. `isOwner` drives the owner vs
+/// visitor chrome split (true on `/me`, reflects the visitor on `/:handle`).
 public struct BeaconViewerDTO: Decodable, Sendable, Hashable {
     public let isOwner: Bool?
     public let isFollowing: Bool?
     public let followStatus: String?
     public let relationshipType: String?
     public let notificationLevel: String?
+}
+
+/// Verification credential. `status == "verified"` drives the verified
+/// check dot + the gold "Persona · Verified" tier chip; otherwise the chip
+/// reads "Persona · New".
+public struct BeaconCredentialDTO: Decodable, Sendable, Hashable {
+    public let status: String?
+    public let label: String?
 }
 
 /// One labelled external link the owner exposes on the About tab.

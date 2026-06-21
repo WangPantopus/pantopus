@@ -15,8 +15,8 @@ import com.squareup.moshi.JsonClass
  *  - `GET /api/personas/:handle` — a visitor viewing someone's Beacon.
  *    Route `backend/routes/personas.js:1028`.
  *
- * The `viewer` block is present on the `:handle` shape (follow status +
- * ownership) and absent on `me`. Mirrors iOS `BeaconProfileDTOs.swift`.
+ * The serializer always emits the `viewer` block — `isOwner: true` on `me`,
+ * the visitor's follow status on `:handle`. Mirrors iOS `BeaconProfileDTOs.swift`.
  */
 @JsonClass(generateAdapter = true)
 data class BeaconPersonaResponse(
@@ -40,6 +40,7 @@ data class BeaconPersonaDto(
     val broadcastEnabled: Boolean? = null,
     val createdAt: String? = null,
     val publicLinks: List<BeaconPublicLinkDto>? = null,
+    val credential: BeaconCredentialDto? = null,
     val viewer: BeaconViewerDto? = null,
 )
 
@@ -50,6 +51,17 @@ data class BeaconViewerDto(
     val followStatus: String? = null,
     val relationshipType: String? = null,
     val notificationLevel: String? = null,
+)
+
+/**
+ * Verification credential. `status == "verified"` drives the verified check
+ * dot + the gold "Persona · Verified" tier chip; otherwise the chip reads
+ * "Persona · New".
+ */
+@JsonClass(generateAdapter = true)
+data class BeaconCredentialDto(
+    val status: String? = null,
+    val label: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

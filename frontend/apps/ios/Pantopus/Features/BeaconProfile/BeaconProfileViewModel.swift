@@ -275,17 +275,6 @@ public final class BeaconProfileViewModel {
         showFollowHandshake = true
     }
 
-    /// Called by the host when the handshake wizard reports success.
-    public func handshakeCompleted() {
-        showFollowHandshake = false
-        followStatus = .active
-        notificationsEnabled = true
-        toastMessage = "Following"
-        if case let .loaded(content) = state {
-            state = .loaded(content.bumpingFollowers(by: 1))
-        }
-    }
-
     public func unfollow() async {
         guard !isOwner, !followBusy, followStatus != .none, !loadedPersonaId.isEmpty else { return }
         followBusy = true
@@ -353,15 +342,16 @@ public final class BeaconProfileViewModel {
         let displayName = persona.displayName ?? persona.handle ?? "Beacon"
         let handle = persona.handle ?? ""
         let audienceLabel = (persona.audienceLabel ?? "followers").capitalizedFirst
+        let isVerified = persona.credential?.status == "verified"
 
         let header = PublicProfileHeader(
             displayName: displayName,
             handle: handle.isEmpty ? nil : handle,
             locality: nil,
             avatarURL: persona.avatarUrl.flatMap(URL.init(string:)),
-            isVerified: true,
+            isVerified: isVerified,
             identityBadges: [],
-            tierLabel: tierLabel(for: persona),
+            tierLabel: isVerified ? "Persona · Verified" : "Persona · New",
             isVerifiedNeighbor: false
         )
 
@@ -390,20 +380,13 @@ public final class BeaconProfileViewModel {
     }
 
     private func buildStats(persona: BeaconPersonaDTO) -> [ProfileStatCell] {
-        var stats: [ProfileStatCell] = [
+        // Two real stats only — the design's third cell ("Member" / "Mo.
+        // revenue") has no field on the persona serializer, so it is omitted
+        // rather than fabricated.
+        [
             ProfileStatCell(id: "beacons", value: beaconCompactCount(persona.followerCount ?? 0), label: "Beacons"),
             ProfileStatCell(id: "broadcasts", value: beaconCompactCount(persona.postCount ?? 0), label: "Broadcasts")
         ]
-        if let member = memberSince(persona.createdAt) {
-            stats.append(ProfileStatCell(id: "member", value: member, label: "Member"))
-        }
-        return stats
-    }
-
-    private func tierLabel(for persona: BeaconPersonaDTO) -> String {
-        // New Beacons (no broadcasts) read "Persona · New"; established
-        // ones read "Persona · Verified" per the A21 frames.
-        (persona.postCount ?? 0) > 0 ? "Persona · Verified" : "Persona · New"
     }
 
     private func project(post: BeaconPostDTO) -> PublicProfilePost {
@@ -468,13 +451,6 @@ public final class BeaconProfileViewModel {
         value.split(whereSeparator: { $0 == "_" || $0 == " " })
             .map { $0.prefix(1).uppercased() + $0.dropFirst() }
             .joined(separator: " ")
-    }
-
-    private func memberSince(_ iso: String?) -> String? {
-        guard let date = Self.parseDate(iso) else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM yy"
-        return formatter.string(from: date)
     }
 
     private func timeAgo(_ iso: String?) -> String {

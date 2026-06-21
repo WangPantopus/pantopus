@@ -21,11 +21,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.DateFormat
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.util.Date
 import javax.inject.Inject
 
 /** Nav-arg key for the visitor handle. Absent ⇒ owner ("My Beacon"). */
@@ -236,15 +235,16 @@ class BeaconProfileViewModel
             val displayName = persona.displayName ?: persona.handle ?: "Beacon"
             val handle = persona.handle.orEmpty()
             val audienceLabel = (persona.audienceLabel ?: "followers").replaceFirstChar { it.uppercase() }
+            val isVerified = persona.credential?.status == "verified"
             val header =
                 PublicProfileHeader(
                     displayName = displayName,
                     handle = handle.takeIf { it.isNotEmpty() },
                     locality = null,
                     avatarUrl = persona.avatarUrl,
-                    isVerified = true,
+                    isVerified = isVerified,
                     identityBadges = emptyList(),
-                    tierLabel = tierLabel(persona),
+                    tierLabel = if (isVerified) "Persona · Verified" else "Persona · New",
                     isVerifiedNeighbor = false,
                 )
             return BeaconProfileContent(
@@ -273,18 +273,14 @@ class BeaconProfileViewModel
             )
         }
 
-        private fun buildStats(persona: BeaconPersonaDto): List<ProfileStatCell> {
-            val stats =
-                mutableListOf(
-                    ProfileStatCell(id = "beacons", value = compactCount(persona.followerCount ?: 0), label = "Beacons"),
-                    ProfileStatCell(id = "broadcasts", value = compactCount(persona.postCount ?: 0), label = "Broadcasts"),
-                )
-            memberSince(persona.createdAt)?.let { stats += ProfileStatCell(id = "member", value = it, label = "Member") }
-            return stats
-        }
-
-        private fun tierLabel(persona: BeaconPersonaDto): String =
-            if ((persona.postCount ?: 0) > 0) "Persona · Verified" else "Persona · New"
+        // Two real stats only — the design's third cell ("Member" / "Mo.
+        // revenue") has no field on the persona serializer, so it is omitted
+        // rather than fabricated.
+        private fun buildStats(persona: BeaconPersonaDto): List<ProfileStatCell> =
+            listOf(
+                ProfileStatCell(id = "beacons", value = compactCount(persona.followerCount ?: 0), label = "Beacons"),
+                ProfileStatCell(id = "broadcasts", value = compactCount(persona.postCount ?: 0), label = "Broadcasts"),
+            )
 
         private fun project(post: BeaconPostDto): PublicProfilePost {
             val locked = !isOwner && (post.locked ?: false)
@@ -356,11 +352,6 @@ class BeaconProfileViewModel
                 else -> "$value"
             }
 
-        private fun memberSince(iso: String?): String? {
-            val instant = parseInstant(iso) ?: return null
-            return DateTimeFormatter.ofPattern("MMM yy", Locale.US).format(instant.atZone(ZoneId.systemDefault()))
-        }
-
         private fun timeAgo(iso: String?): String {
             val instant = parseInstant(iso) ?: return ""
             val seconds = Duration.between(instant, Instant.now()).seconds
@@ -370,7 +361,9 @@ class BeaconProfileViewModel
                 seconds < 86_400 -> "${seconds / 3_600}h ago"
                 seconds < 172_800 -> "Yesterday"
                 seconds < 604_800 -> "${seconds / 86_400}d ago"
-                else -> instant.atZone(ZoneId.systemDefault()).toLocalDate().toString()
+                // Localized medium date ("Jun 19, 2026") — parity with iOS's
+                // DateFormatter dateStyle = .medium (was ISO yyyy-MM-dd).
+                else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date.from(instant))
             }
         }
 

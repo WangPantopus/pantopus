@@ -120,7 +120,9 @@ fun BeaconProfileScreen(
                     onFollow = { viewModel.follow() },
                     onUnfollow = { viewModel.unfollow() },
                     onUnlock = { viewModel.showSubscribeToast() },
-                    onOpenLink = { uriHandler.openUri(it) },
+                    // runCatching: openUri throws if no activity can handle the
+                    // URI (mirrors iOS UIApplication.open's silent no-op).
+                    onOpenLink = { runCatching { uriHandler.openUri(it) } },
                 )
         }
         toast?.let { message ->
@@ -161,7 +163,7 @@ internal fun BeaconProfileLoadedFrame(
             if (content.isOwner) {
                 ContentDetailTopBarAction(PantopusIcon.SlidersHorizontal, "Edit Beacon") { onEditPersona() }
             } else {
-                ContentDetailTopBarAction(PantopusIcon.Share, "Share Beacon") { onOpenLink(content.shareUrl) }
+                ContentDetailTopBarAction(PantopusIcon.MoreHorizontal, "More") { onOpenLink(content.shareUrl) }
             },
         header = {
             Box(

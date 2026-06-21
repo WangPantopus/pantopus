@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.audience.BroadcastChannelDto
 import app.pantopus.android.data.api.models.audience.PersonaTierDto
 import app.pantopus.android.data.api.models.audience.PersonaTiersResponse
 import app.pantopus.android.data.api.models.beacon.BeaconActionEcho
+import app.pantopus.android.data.api.models.beacon.BeaconCredentialDto
 import app.pantopus.android.data.api.models.beacon.BeaconPersonaDto
 import app.pantopus.android.data.api.models.beacon.BeaconPersonaResponse
 import app.pantopus.android.data.api.models.beacon.BeaconPostDto
@@ -47,20 +48,23 @@ class BeaconProfileViewModelTest {
 
     private fun visitorVm(handle: String = "mariak") = BeaconProfileViewModel(repo, SavedStateHandle(mapOf(BEACON_HANDLE_KEY to handle)))
 
-    private fun persona(viewer: BeaconViewerDto? = null) =
-        BeaconPersonaDto(
-            id = "p1",
-            handle = "mariak",
-            displayName = "Maria K.",
-            bio = "Sourdough scientist.",
-            category = "creator",
-            audienceLabel = "followers",
-            audienceMode = "open",
-            followerCount = 1200,
-            postCount = 47,
-            broadcastEnabled = true,
-            viewer = viewer,
-        )
+    private fun persona(
+        viewer: BeaconViewerDto? = null,
+        credential: BeaconCredentialDto? = null,
+    ) = BeaconPersonaDto(
+        id = "p1",
+        handle = "mariak",
+        displayName = "Maria K.",
+        bio = "Sourdough scientist.",
+        category = "creator",
+        audienceLabel = "followers",
+        audienceMode = "open",
+        followerCount = 1200,
+        postCount = 47,
+        broadcastEnabled = true,
+        credential = credential,
+        viewer = viewer,
+    )
 
     private val posts =
         listOf(
@@ -218,5 +222,26 @@ class BeaconProfileViewModelTest {
 
             val content = (vm.state.value as BeaconProfileUiState.Loaded).content
             assertEquals(PublicProfilePost.Visibility.Silver, content.posts.first().visibility)
+        }
+
+    @Test fun `credential drives verification`() =
+        runTest {
+            coEvery { repo.posts("mariak") } returns NetworkResult.Success(BeaconPostsResponse(emptyList()))
+            coEvery { repo.tiers("mariak") } returns NetworkResult.Success(PersonaTiersResponse(emptyList()))
+
+            coEvery { repo.persona("mariak") } returns
+                NetworkResult.Success(BeaconPersonaResponse(persona(credential = BeaconCredentialDto(status = "verified"))))
+            val verified = visitorVm()
+            verified.load()
+            val v = (verified.state.value as BeaconProfileUiState.Loaded).content
+            assertTrue(v.header.isVerified)
+            assertEquals("Persona · Verified", v.header.tierLabel)
+
+            coEvery { repo.persona("mariak") } returns NetworkResult.Success(BeaconPersonaResponse(persona()))
+            val unverified = visitorVm()
+            unverified.load()
+            val u = (unverified.state.value as BeaconProfileUiState.Loaded).content
+            assertFalse(u.header.isVerified)
+            assertEquals("Persona · New", u.header.tierLabel)
         }
 }

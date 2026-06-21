@@ -95,8 +95,8 @@ public struct BeaconProfileView: View {
             title: nil,
             onBack: onBack,
             topBarAction: ContentDetailTopBarAction(
-                icon: payload.isOwner ? .slidersHorizontal : .share,
-                accessibilityLabel: payload.isOwner ? "Edit Beacon" : "Share Beacon"
+                icon: payload.isOwner ? .slidersHorizontal : .moreHorizontal,
+                accessibilityLabel: payload.isOwner ? "Edit Beacon" : "More"
             ) {
                 Task { @MainActor in
                     if payload.isOwner {
