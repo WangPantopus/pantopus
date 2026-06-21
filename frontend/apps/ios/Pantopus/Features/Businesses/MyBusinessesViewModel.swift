@@ -207,7 +207,7 @@ struct CategoryStyle: Hashable {
     let fill: Color
 
     static func resolve(categories: [String]?, businessType: String?) -> CategoryStyle {
-        let raw = categories?.first(where: { !$0.isEmpty })
+        let raw = categories?.first { !$0.isEmpty }
             ?? businessType
         let key = raw?.lowercased() ?? ""
         let label = raw?
