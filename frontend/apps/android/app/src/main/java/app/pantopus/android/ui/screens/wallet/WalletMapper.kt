@@ -53,7 +53,7 @@ object WalletMapper {
         now: Instant = Instant.now(),
     ): WalletActivityItem {
         val instant = parseInstant(tx.createdAt)
-        val direction = direction(tx.type)
+        val direction = direction(tx)
         return WalletActivityItem(
             id = tx.id,
             day = dayLabel(instant, zone, now),
@@ -67,6 +67,20 @@ object WalletMapper {
             isFee = tx.type == "cancellation_fee",
         )
     }
+
+    /**
+     * Prefer the row's own `direction` — it is NOT NULL on the table and
+     * constrained to `credit | debit`, so it is right even for types this client
+     * has never seen. The [type] heuristic below defaults to `In`, which would
+     * render an unrecognised debit (a refund the user owes, a new fee type) as
+     * money coming in. Mirrors iOS `WalletViewModel.direction(for:)`.
+     */
+    fun direction(tx: WalletTransactionDto): ActivityDirection =
+        when (tx.direction?.lowercase()) {
+            "debit" -> ActivityDirection.Out
+            "credit" -> ActivityDirection.In
+            else -> direction(tx.type)
+        }
 
     fun direction(type: String): ActivityDirection =
         when (type) {
@@ -125,7 +139,7 @@ object WalletMapper {
     ): List<WalletTransactionDto> {
         val nowDate = now.atZone(zone).toLocalDate()
         return transactions.filter { tx ->
-            if (direction(tx.type) != ActivityDirection.In) return@filter false
+            if (direction(tx) != ActivityDirection.In) return@filter false
             val instant = parseInstant(tx.createdAt) ?: return@filter false
             val date = instant.atZone(zone).toLocalDate()
             date.year == nowDate.year && date.monthValue == nowDate.monthValue

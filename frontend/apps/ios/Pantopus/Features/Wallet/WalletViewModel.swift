@@ -277,7 +277,7 @@ public final class WalletViewModel {
         now: Date = Date()
     ) -> WalletActivityItem {
         let date = parseDate(tx.createdAt)
-        let direction = direction(for: tx.type)
+        let direction = direction(for: tx)
         return WalletActivityItem(
             id: tx.id,
             day: dayLabel(date, calendar: calendar, now: now),
@@ -296,6 +296,19 @@ public final class WalletViewModel {
 
     /// Outbound for withdrawals, sent tips/payments, and fees; inbound for
     /// everything else (deposits, gig/tip income, refunds, adjustments).
+    /// Prefer the row's own `direction` — it is `NOT NULL` on the table and
+    /// constrained to `credit | debit`, so it is right even for types this
+    /// client has never seen. The `type` heuristic below defaults to `.in`,
+    /// which would render an unrecognised debit (a refund the user owes, a new
+    /// fee type) as money coming in.
+    static func direction(for transaction: WalletTransactionDTO) -> ActivityDirection {
+        switch transaction.direction?.lowercased() {
+        case "debit": return .out
+        case "credit": return .in
+        default: return direction(for: transaction.type)
+        }
+    }
+
     static func direction(for type: String) -> ActivityDirection {
         switch type {
         case "withdrawal", "gig_payment", "tip_sent", "transfer_out", "cancellation_fee":
@@ -378,7 +391,7 @@ public final class WalletViewModel {
         now: Date
     ) -> [WalletTransactionDTO] {
         transactions.filter { tx in
-            guard direction(for: tx.type) == .in, let date = parseDate(tx.createdAt) else { return false }
+            guard direction(for: tx) == .in, let date = parseDate(tx.createdAt) else { return false }
             return calendar.isDate(date, equalTo: now, toGranularity: .month)
         }
     }

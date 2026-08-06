@@ -195,7 +195,12 @@ class ChatConversationSnapshotTest {
                         context = ChatConversationSampleData.creatorContext,
                         onOpenAudienceProfile = {},
                     )
-                    CreatorQuotaMeter(quota = ChatConversationSampleData.creatorContext.quota)
+                    // `quota` is nullable since the live creator path leaves it
+                    // unset; the design fixture always carries one, so unwrap it
+                    // the same way the screen does.
+                    ChatConversationSampleData.creatorContext.quota?.let { quota ->
+                        CreatorQuotaMeter(quota = quota)
+                    }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         PopulatedFrame(
                             rows = ChatConversationSampleData.creatorThreadRows,

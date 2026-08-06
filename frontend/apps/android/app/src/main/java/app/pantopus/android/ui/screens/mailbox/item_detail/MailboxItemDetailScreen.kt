@@ -250,50 +250,91 @@ private fun CategoryBody(
     // Category first, payload second — mirrors iOS `categoryBody(for:)`. Every
     // branch that can't render its bespoke body (package enrichment missing, a
     // payload that failed to decode) falls through to the generic readable
-    // body, so no known category ever renders an empty surface.
-    val category = content.category
+    // body, so no known category ever renders an empty surface. Split across
+    // two dispatchers purely to keep each under detekt's complexity ceiling.
     val payload = content.payload
-    when {
-        category == MailItemCategory.Package && content.packageInfo != null ->
-            PackageBody(
-                content = content.packageInfo,
-                isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
-                isReceiveLoading = ctaFlags.primaryLoading,
-                isReceived = ctaFlags.primaryCompleted,
-                onReceiveAtDoor = onReceiveAtDoor,
-            )
-        category == MailItemCategory.Coupon && payload is MailboxCategoryPayload.Coupon ->
-            CouponBody(coupon = payload.detail)
-        category == MailItemCategory.Booklet && payload is MailboxCategoryPayload.Booklet ->
-            BookletBody(booklet = payload.detail)
-        category == MailItemCategory.Certified && payload is MailboxCategoryPayload.Certified ->
-            CertifiedBody(
-                certified = payload.detail,
-                onViewTerms = onViewTerms,
-            )
-        category == MailItemCategory.Community && payload is MailboxCategoryPayload.Community ->
-            CommunityBody(
-                community = payload.detail,
-                authorName = content.sender.displayName,
-                authorInitials = content.sender.initials,
-            )
-        category == MailItemCategory.Gig && payload is MailboxCategoryPayload.Gig ->
-            GigBody(
-                gig = payload.detail,
-                onAccept = onAcceptGig,
-            )
-        category == MailItemCategory.Memory && payload is MailboxCategoryPayload.Memory ->
-            MemoryBody(
-                memory = payload.detail,
-                isSaved = payload.detail.isSaved,
-            )
-        else ->
-            GenericMailBody(
-                content =
-                    content.genericBody
-                        ?: GenericMailBodyContent(category = category),
-            )
+    when (content.category) {
+        MailItemCategory.Package ->
+            if (content.packageInfo != null) {
+                PackageBody(
+                    content = content.packageInfo,
+                    isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
+                    isReceiveLoading = ctaFlags.primaryLoading,
+                    isReceived = ctaFlags.primaryCompleted,
+                    onReceiveAtDoor = onReceiveAtDoor,
+                )
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Coupon ->
+            if (payload is MailboxCategoryPayload.Coupon) {
+                CouponBody(coupon = payload.detail)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Booklet ->
+            if (payload is MailboxCategoryPayload.Booklet) {
+                BookletBody(booklet = payload.detail)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Certified ->
+            if (payload is MailboxCategoryPayload.Certified) {
+                CertifiedBody(certified = payload.detail, onViewTerms = onViewTerms)
+            } else {
+                GenericCategoryBody(content)
+            }
+        else -> SocialCategoryBody(content = content, onAcceptGig = onAcceptGig)
     }
+}
+
+/**
+ * Second half of the [CategoryBody] dispatch: the person-authored categories
+ * (community / gig / memory) plus the generic fallback for every other case.
+ */
+@Composable
+private fun SocialCategoryBody(
+    content: MailboxItemDetailContent,
+    onAcceptGig: () -> Unit,
+) {
+    val payload = content.payload
+    when (content.category) {
+        MailItemCategory.Community ->
+            if (payload is MailboxCategoryPayload.Community) {
+                CommunityBody(
+                    community = payload.detail,
+                    authorName = content.sender.displayName,
+                    authorInitials = content.sender.initials,
+                )
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Gig ->
+            if (payload is MailboxCategoryPayload.Gig) {
+                GigBody(gig = payload.detail, onAccept = onAcceptGig)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Memory ->
+            if (payload is MailboxCategoryPayload.Memory) {
+                MemoryBody(memory = payload.detail, isSaved = payload.detail.isSaved)
+            } else {
+                GenericCategoryBody(content)
+            }
+        else -> GenericCategoryBody(content)
+    }
+}
+
+/**
+ * Generic readable body for any category without a bespoke layout, or whose
+ * bespoke payload is missing. Falls back to the category explainer so no known
+ * category ever renders an empty surface. Mirrors iOS `genericBody(for:)`.
+ */
+@Composable
+private fun GenericCategoryBody(content: MailboxItemDetailContent) {
+    GenericMailBody(
+        content = content.genericBody ?: GenericMailBodyContent(category = content.category),
+    )
 }
 
 private fun formatCertifiedDeadline(iso: String?): String? {

@@ -95,9 +95,11 @@ class InvoiceDetailViewModel
 
         /**
          * Short summary handed to the paid dock's Share action (system
-         * share sheet). Mirrors the iOS string exactly.
+         * share sheet). Mirrors the iOS string exactly. The amount comes from
+         * the same constant the hero / dock / line-item total render, so the
+         * shared text can never quote a figure the invoice doesn't show.
          */
-        fun shareSummary(): String = "Invoice ${invoiceId.uppercase()} · Paid $642.85 via Pantopus Pay"
+        fun shareSummary(): String = "Invoice ${invoiceId.uppercase()} · Paid ${Projection.TOTAL_VALUE} via Pantopus Pay"
 
         /** Tapped "Pay" — create the PaymentIntent, then ask the screen to present the sheet. */
         fun pay() {
@@ -150,6 +152,13 @@ class InvoiceDetailViewModel
         }
 
         object Projection {
+            /**
+             * Single source of truth for this invoice's total. Hero price,
+             * dock CTA, line-item total, and `shareSummary` all read it so
+             * they cannot drift.
+             */
+            const val TOTAL_VALUE = "$642.85"
+
             /** A09.4 · due state. */
             fun fixture(invoiceId: String): ContentDetailContent =
                 ContentDetailContent(
@@ -165,7 +174,7 @@ class InvoiceDetailViewModel
                         ContentDetailHero(
                             title = "Holiday lighting · install + takedown",
                             monoId = "${invoiceId.uppercase()} · issued Dec 4 · due Dec 18",
-                            priceLine = "$642.85",
+                            priceLine = TOTAL_VALUE,
                             priceCaption = "total · USD",
                         ),
                     modules =
@@ -185,7 +194,11 @@ class InvoiceDetailViewModel
                     dock =
                         ContentDetailDock(
                             secondary = null,
-                            primary = ContentDetailDockButton(label = "Pay $642.85", icon = PantopusIcon.CreditCard),
+                            primary =
+                                ContentDetailDockButton(
+                                    label = "Pay $TOTAL_VALUE",
+                                    icon = PantopusIcon.CreditCard,
+                                ),
                         ),
                 )
 
@@ -204,7 +217,7 @@ class InvoiceDetailViewModel
                         ContentDetailHero(
                             title = "Holiday lighting · install + takedown",
                             monoId = "${invoiceId.uppercase()} · issued Dec 4 · paid Dec 14",
-                            priceLine = "$642.85",
+                            priceLine = TOTAL_VALUE,
                             priceTone = ContentDetailHero.PriceTone.Success,
                             priceTrailingLabel = "paid in full",
                             priceCheckDisc = true,
@@ -273,7 +286,7 @@ class InvoiceDetailViewModel
                             ContentDetailSummaryRow("tax", "Tax (5.7%)", "$33.60"),
                         ),
                     totalLabel = totalLabel,
-                    totalValue = "$642.85",
+                    totalValue = TOTAL_VALUE,
                     totalTone = totalTone,
                 )
 

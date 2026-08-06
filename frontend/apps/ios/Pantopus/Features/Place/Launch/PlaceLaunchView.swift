@@ -29,10 +29,17 @@ struct PlaceLaunchHost: View {
         // Workstream 1.4 — RN AuthGate parity: a deferred protected (or
         // auth-owned) deep link auto-presents the existing Sign-in cover
         // without replacing the Place funnel underneath.
+        //
+        // The trigger is `DeepLinkRouter.prefersLoginPresentation`, NOT the
+        // presence of a stashed link. The stash survives process death for
+        // 24h, so keying off it would force Sign-in over the Place funnel on
+        // every launch after a link the user chose not to sign in for. A link
+        // that arrives during this process — including the one that
+        // cold-started the app — always sets the flag before this host
+        // appears, and the stash is still replayed by the sign-in transition
+        // in `RootView`. Identical on Android (`PantopusNavHost`'s
+        // `PlaceLaunchHost`).
         .onAppear {
-            if PendingDeepLinkStore.peek() != nil {
-                showAuth = true
-            }
             presentLoginIfRequested()
         }
         .onChange(of: deepLink.prefersLoginPresentation) { _, _ in

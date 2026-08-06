@@ -42,8 +42,15 @@ data class WalletTransactionDto(
      *  tip_sent | refund | adjustment | transfer_in | transfer_out |
      *  cancellation_fee`. */
     val type: String,
-    /** Positive integer cents; direction is derived from [type]. */
+    /** Positive integer cents; the sign comes from [direction]. */
     val amount: Long,
+    /**
+     * `credit | debit` — authoritative. `NOT NULL` with a CHECK constraint on
+     * `WalletTransaction` (backend/database/schema.sql:4526,4541) and returned by
+     * `select('*')` in `walletService.getTransactions`. Nullable here only so an
+     * older payload still decodes; callers fall back to the [type] heuristic.
+     */
+    val direction: String? = null,
     val description: String? = null,
     val currency: String? = null,
     /** `completed | pending | failed | reversed`. */

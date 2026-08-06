@@ -389,8 +389,7 @@ class EditBusinessPageViewModel
             return null
         }
 
-        private fun offlineBlock(): SaveBlock? =
-            if (networkMonitor.isOnline.value) null else SaveBlock.Toast(OFFLINE_MESSAGE)
+        private fun offlineBlock(): SaveBlock? = if (networkMonitor.isOnline.value) null else SaveBlock.Toast(OFFLINE_MESSAGE)
 
         private fun applySaveBlock(
             content: EditBusinessPageContent,

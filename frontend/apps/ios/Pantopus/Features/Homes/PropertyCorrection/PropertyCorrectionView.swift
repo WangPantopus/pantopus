@@ -69,9 +69,11 @@ public struct PropertyCorrectionView: View {
                 PantopusTextField(
                     "Details",
                     text: $note,
-                    placeholder: "Describe the correct value and any context…"
+                    placeholder: "Describe the correct value and any context…",
+                    // Lands on the field itself so it matches Android's
+                    // `fieldTestTag` rather than the wrapping stack.
+                    identifier: "propertyCorrection_note"
                 )
-                .accessibilityIdentifier("propertyCorrection_note")
             }
         }
         .padding(Spacing.s4)

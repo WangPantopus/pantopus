@@ -152,56 +152,65 @@ fun CancelClaimScreen(
             onClose = onBack,
             onCommit = viewModel::submit,
         ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(PantopusColors.appBg)
-                        .padding(Spacing.s4),
-                verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-            ) {
-                if (submitError != null) {
-                    Text(
-                        text = submitError.orEmpty(),
-                        color = PantopusColors.error,
-                        fontSize = 14.sp,
-                        modifier = Modifier.testTag("cancelClaimError"),
-                    )
-                }
-                when (val current = state) {
-                    is CancelClaimUiState.Loading ->
-                        Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.lg)
-                    is CancelClaimUiState.Error ->
-                        Text(
-                            text = current.message,
-                            color = PantopusColors.error,
-                            fontSize = 14.sp,
-                            modifier = Modifier.testTag("cancelClaimLoadError"),
-                        )
-                    is CancelClaimUiState.NoClaim ->
-                        Text(
-                            text = "No open ownership claim for this home.",
-                            fontSize = 14.sp,
-                            color = PantopusColors.appTextSecondary,
-                        )
-                    is CancelClaimUiState.Ready, is CancelClaimUiState.Submitting -> {
-                        Text(
-                            text = "Cancel this ownership claim?",
-                            modifier = Modifier.semantics { heading() },
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PantopusColors.appText,
-                        )
-                        Text(
-                            text =
-                                "Your pending claim will be withdrawn. You can start a new claim " +
-                                    "later if you still need to verify ownership.",
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = PantopusColors.appTextSecondary,
-                        )
-                    }
-                }
+            CancelClaimBody(state = state, submitError = submitError)
+        }
+    }
+}
+
+/** Confirmation copy / load states rendered inside the [FormShell] scroll. */
+@Composable
+private fun CancelClaimBody(
+    state: CancelClaimUiState,
+    submitError: String?,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PantopusColors.appBg)
+                .padding(Spacing.s4),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        if (submitError != null) {
+            Text(
+                text = submitError,
+                color = PantopusColors.error,
+                fontSize = 14.sp,
+                modifier = Modifier.testTag("cancelClaimError"),
+            )
+        }
+        when (state) {
+            is CancelClaimUiState.Loading ->
+                Shimmer(width = 320.dp, height = 120.dp, cornerRadius = Radii.lg)
+            is CancelClaimUiState.Error ->
+                Text(
+                    text = state.message,
+                    color = PantopusColors.error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.testTag("cancelClaimLoadError"),
+                )
+            is CancelClaimUiState.NoClaim ->
+                Text(
+                    text = "No open ownership claim for this home.",
+                    fontSize = 14.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            is CancelClaimUiState.Ready, is CancelClaimUiState.Submitting -> {
+                Text(
+                    text = "Cancel this ownership claim?",
+                    modifier = Modifier.semantics { heading() },
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    text =
+                        "Your pending claim will be withdrawn. You can start a new claim " +
+                            "later if you still need to verify ownership.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
             }
         }
     }

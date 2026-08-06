@@ -57,9 +57,15 @@ public struct WalletTransactionDTO: Decodable, Sendable, Hashable, Identifiable 
     /// tip_sent | refund | adjustment | transfer_in | transfer_out |
     /// cancellation_fee`.
     public let type: String
-    /// Positive integer cents (the DB enforces `amount > 0`); direction is
-    /// derived from `type`.
+    /// Positive integer cents (the DB enforces `amount > 0`); the sign comes
+    /// from `direction`.
     public let amount: Int
+    /// `credit | debit` — authoritative, `NOT NULL` with a CHECK constraint on
+    /// `WalletTransaction` (backend/database/schema.sql:4526,4541) and returned
+    /// by `select('*')` in `walletService.getTransactions`. Optional here only
+    /// so an older payload still decodes; callers fall back to the `type`
+    /// heuristic when it is absent.
+    public let direction: String?
     public let description: String?
     public let currency: String?
     /// One of `completed | pending | failed | reversed`.
@@ -71,6 +77,7 @@ public struct WalletTransactionDTO: Decodable, Sendable, Hashable, Identifiable 
         case id
         case type
         case amount
+        case direction
         case description
         case currency
         case status

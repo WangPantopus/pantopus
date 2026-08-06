@@ -86,12 +86,18 @@ public final class InvoiceDetailViewModel {
     }
 
     /// Short summary handed to the paid dock's Share action (system share
-    /// sheet). Mirrors the Android string exactly.
+    /// sheet). Mirrors the Android string exactly. The amount comes from the
+    /// same constant the hero / dock / line-item total render, so the shared
+    /// text can never quote a figure the invoice doesn't show.
     public var shareSummary: String {
-        "Invoice \(invoiceId.uppercased()) · Paid $642.85 via Pantopus Pay"
+        "Invoice \(invoiceId.uppercased()) · Paid \(Self.totalValue) via Pantopus Pay"
     }
 
     // MARK: - Fixtures
+
+    /// Single source of truth for this invoice's total. Hero price, dock CTA,
+    /// line-item total, and `shareSummary` all read it so they cannot drift.
+    static let totalValue = "$642.85"
 
     /// A09.4 · due state.
     static func fixture(invoiceId: String) -> ContentDetailContent {
@@ -101,7 +107,7 @@ public final class InvoiceDetailViewModel {
             hero: ContentDetailHero(
                 title: "Holiday lighting · install + takedown",
                 monoId: "\(invoiceId.uppercased()) · issued Dec 4 · due Dec 18",
-                priceLine: "$642.85",
+                priceLine: totalValue,
                 priceCaption: "total · USD"
             ),
             modules: [
@@ -116,7 +122,7 @@ public final class InvoiceDetailViewModel {
             ],
             dock: ContentDetailDock(
                 secondary: nil,
-                primary: ContentDetailDockButton(label: "Pay $642.85", icon: .creditCard)
+                primary: ContentDetailDockButton(label: "Pay \(totalValue)", icon: .creditCard)
             )
         )
     }
@@ -129,7 +135,7 @@ public final class InvoiceDetailViewModel {
             hero: ContentDetailHero(
                 title: "Holiday lighting · install + takedown",
                 monoId: "\(invoiceId.uppercased()) · issued Dec 4 · paid Dec 14",
-                priceLine: "$642.85",
+                priceLine: totalValue,
                 priceCaption: nil,
                 priceTone: .success,
                 priceTrailingLabel: "paid in full",
@@ -182,7 +188,7 @@ public final class InvoiceDetailViewModel {
                 ContentDetailSummaryRow(label: "Tax (5.7%)", value: "$33.60")
             ],
             totalLabel: totalLabel,
-            totalValue: "$642.85",
+            totalValue: totalValue,
             totalTone: totalTone
         ))
     }
