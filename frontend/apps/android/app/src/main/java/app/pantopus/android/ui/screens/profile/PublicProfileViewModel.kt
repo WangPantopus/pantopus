@@ -5,11 +5,13 @@ package app.pantopus.android.ui.screens.profile
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.posts.MyPostDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
 import app.pantopus.android.ui.components.IdentityPillar
@@ -41,6 +43,16 @@ const val PUBLIC_PROFILE_USER_ID_KEY = "userId"
  * carries a verified residency.
  */
 enum class PublicProfileKind { Persona, Local }
+
+/**
+ * A21.2 — the two-tab strip on the Local Beacon profile archetype
+ * (Posts · About). Separate from [ProfileTab] so the persona path keeps
+ * its own four-tab body untouched.
+ */
+enum class LocalProfileTab(val label: String) {
+    Posts("Posts"),
+    About("About"),
+}
 
 /**
  * One post rendered beneath the stats/tabs body. Persona profiles
@@ -128,6 +140,7 @@ class PublicProfileViewModel
         private val relationships: RelationshipsRepository,
         private val blocks: BlocksRepository,
         private val authRepository: AuthRepository,
+        private val posts: PostsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val userId: String =
@@ -146,6 +159,11 @@ class PublicProfileViewModel
         // [selectedTab] so the persona path is untouched.
         private val _selectedNeighborTab = MutableStateFlow(NeighborProfileTab.About)
         val selectedNeighborTab: StateFlow<NeighborProfileTab> = _selectedNeighborTab.asStateFlow()
+
+        // A21.2 — selected tab on the Local Beacon profile archetype
+        // (Posts · About). Switching is local; no refetch.
+        private val _selectedLocalTab = MutableStateFlow(LocalProfileTab.Posts)
+        val selectedLocalTab: StateFlow<LocalProfileTab> = _selectedLocalTab.asStateFlow()
 
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
@@ -177,6 +195,10 @@ class PublicProfileViewModel
 
         fun selectNeighborTab(tab: NeighborProfileTab) {
             _selectedNeighborTab.value = tab
+        }
+
+        fun selectLocalTab(tab: LocalProfileTab) {
+            _selectedLocalTab.value = tab
         }
 
         fun dismissToast() {
@@ -285,7 +307,18 @@ class PublicProfileViewModel
         private suspend fun fetch() {
             when (val result = repo.publicProfile(userId)) {
                 is NetworkResult.Success -> {
-                    _state.value = PublicProfileUiState.Loaded(build(result.data))
+                    val profile = result.data
+                    val kind = derivedKind(profile)
+                    // A21.2 — the Local archetype renders a real neighbourhood
+                    // post feed, so pull the author's posts the way the RN
+                    // `PostsTab` does (`GET /api/posts/user/:id`). Persona
+                    // profiles keep an empty list on purpose: that endpoint
+                    // returns plain posts, not tier-gated broadcasts, and
+                    // feeding them into the broadcast card would invent a
+                    // visibility chip the API never sent.
+                    val feed =
+                        if (kind == PublicProfileKind.Local) loadUserPosts(profile.id) else emptyList()
+                    _state.value = PublicProfileUiState.Loaded(build(profile, kind, feed))
                 }
                 is NetworkResult.Failure -> {
                     _state.value = PublicProfileUiState.Error(friendlyMessage(result.error))
@@ -293,8 +326,37 @@ class PublicProfileViewModel
             }
         }
 
-        private fun build(profile: PublicProfileDto): PublicProfileContent {
-            val kind = derivedKind(profile)
+        /**
+         * A21.2 — the Local profile's post feed. Mirrors the RN
+         * `components/profile/PostsTab` fetch. Failures degrade to an empty
+         * feed (which renders the design's "Quiet for now" state) rather
+         * than failing the whole profile.
+         */
+        private suspend fun loadUserPosts(id: String): List<PublicProfilePost> =
+            when (val result = posts.userPosts(id)) {
+                is NetworkResult.Success -> result.data.posts.map { project(it) }
+                is NetworkResult.Failure -> emptyList()
+            }
+
+        private fun project(post: MyPostDto): PublicProfilePost =
+            PublicProfilePost(
+                id = post.id,
+                body = post.content?.takeIf { it.isNotEmpty() } ?: post.title.orEmpty(),
+                timeAgo = relativeTimestamp(post.createdAt),
+                locality = post.locationName,
+                reactions = post.likeCount,
+                replies = post.commentCount,
+                visibility = null,
+                isLocked = false,
+                targetTierRank = null,
+                intent = intentForPostType(post.postType),
+            )
+
+        private fun build(
+            profile: PublicProfileDto,
+            kind: PublicProfileKind,
+            feed: List<PublicProfilePost>,
+        ): PublicProfileContent {
             val header =
                 PublicProfileHeader(
                     displayName = profile.displayName,
@@ -309,7 +371,8 @@ class PublicProfileViewModel
             val stats = buildStatCells(profile)
             val reviewCards = buildReviewCards(profile)
 
-            val neighbor = if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards) else null
+            val neighbor =
+                if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards, feed) else null
             val signedInId = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
             val isOwner = signedInId != null && signedInId == profile.id
             // A Beacon (`PublicPersona.handle`) lives in a different namespace
@@ -333,6 +396,7 @@ class PublicProfileViewModel
                         skills = profile.skills,
                         reviews = reviewCards,
                     ),
+                posts = feed,
                 neighbor = neighbor,
                 isOwner = isOwner,
                 personaHandle = personaHandle,
@@ -399,6 +463,7 @@ class PublicProfileViewModel
         private fun buildNeighbor(
             profile: PublicProfileDto,
             reviews: List<ProfileReviewCard>,
+            feed: List<PublicProfilePost>,
         ): NeighborProfileContent {
             val reviewCount = profile.reviewCount ?: reviews.size
             val isNew = reviewCount == 0
@@ -455,7 +520,7 @@ class PublicProfileViewModel
                 reviewCount = reviewCount,
                 mutuals = if (isNew) neighborMutuals(profile) else null,
                 welcome = welcome,
-                posts = emptyList(),
+                posts = feed,
                 isNewNeighbor = isNew,
                 primaryCtaLabel = if (isNew) "Say hi" else "Message",
             )
@@ -588,6 +653,22 @@ class PublicProfileViewModel
         private companion object {
             /** Reviews are 1–5 stars; anything the API returns is clamped to it. */
             const val MAX_REVIEW_RATING = 5
+
+            /**
+             * Maps the backend `post_type` onto the design's intent chip.
+             * Types with no honest counterpart (general, recommendation,
+             * lost & found, local update…) render with no chip rather than
+             * borrowing a misleading label. Mirrors iOS
+             * `PublicProfileViewModel.intent(forPostType:)`.
+             */
+            fun intentForPostType(type: String?): PublicProfilePost.Intent? =
+                when (type.orEmpty()) {
+                    "service_offer", "deal" -> PublicProfilePost.Intent.Offer
+                    "alert", "heads_up" -> PublicProfilePost.Intent.Alert
+                    "event" -> PublicProfilePost.Intent.Event
+                    "ask_local", "ask" -> PublicProfilePost.Intent.Ask
+                    else -> null
+                }
 
             /**
              * Shown instead of silently no-op'ing when this profile carries no

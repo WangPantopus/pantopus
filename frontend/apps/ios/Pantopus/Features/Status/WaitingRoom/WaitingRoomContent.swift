@@ -118,6 +118,10 @@ public enum WaitingRoomPhase: Sendable, Hashable {
     case loading
     case loaded
     case notice(WaitingRoomNotice)
+    /// The claim resolved in the claimant's favour — render the A18.2
+    /// "You're the owner" frame instead of a dead-end notice. The payload is
+    /// built from the real claim row, so every date it prints is API-sourced.
+    case approved(StatusWaitingContent)
 }
 
 /// Snapshot the `WaitingRoomView` renders. Reuses the shared `StatusHalo`,

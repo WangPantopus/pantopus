@@ -10,6 +10,7 @@ import app.pantopus.android.core.security.AppLockManager
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
+import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.ui.components.ChannelGlyph
 import app.pantopus.android.ui.components.FuzzStop
 import app.pantopus.android.ui.components.ToastKind
@@ -59,6 +60,7 @@ class SettingsIndexViewModel
     constructor(
         private val auth: AuthRepository,
         private val privacy: PrivacyRepository,
+        private val profile: ProfileRepository,
     ) : ViewModel() {
         val title: String = "Settings"
 
@@ -72,7 +74,22 @@ class SettingsIndexViewModel
         val navigation: StateFlow<SettingsRoute?> = _navigation.asStateFlow()
 
         private var blockCount: Int = 0
-        private var verified: Boolean = true
+
+        /**
+         * Tri-state on purpose. `null` = we could not read the account's
+         * real verification state, and an unknown state must never render
+         * the success chip — an unverified account seeing "Verified" on
+         * its own Settings row is a trust bug, so `null` falls back to a
+         * plain chevron.
+         */
+        private var verified: Boolean? = null
+
+        /**
+         * Raw `User.profile_visibility` (`public | registered | private`).
+         * `null` when unread — the row then ships without a subtext rather
+         * than asserting a preference the user may not hold.
+         */
+        private var profileVisibility: String? = null
         private var stripeConnected: Boolean? = null
         private var isAdmin: Boolean = false
 
@@ -80,6 +97,8 @@ class SettingsIndexViewModel
             _state.value = GroupedListUiState.Loading
             val state = auth.state.value
             if (state is AuthRepository.State.SignedIn) {
+                // The session `UserDto` carries no verification flag, so the
+                // chip is fetched below rather than guessed from the email.
                 _footerCaption.value = "${state.user.email} · ID ${state.user.id.take(8)}"
                 isAdmin = state.user.isAdmin
             }
@@ -87,6 +106,20 @@ class SettingsIndexViewModel
                 when (val blocks = privacy.blocks()) {
                     is NetworkResult.Success -> blockCount = blocks.data.blocks.size
                     else -> Unit
+                }
+                // Real verification state — `GET /api/users/profile` →
+                // `user.verified` (`backend/routes/users.js:1962`). Same
+                // field the Verification Center sub-screen reports; on
+                // failure we stay `null` (unknown).
+                when (val result = profile.ownProfile()) {
+                    is NetworkResult.Success -> {
+                        verified = result.data.user.verified
+                        profileVisibility = result.data.user.profileVisibility
+                    }
+                    is NetworkResult.Failure -> {
+                        verified = null
+                        profileVisibility = null
+                    }
                 }
                 rebuild()
             }
@@ -121,10 +154,10 @@ class SettingsIndexViewModel
 
         private fun rebuild() {
             val verificationChip: RowControl =
-                if (verified) {
-                    RowControl.ChipStatus("Verified", RowControl.ChipTone.Success, includesChevron = true)
-                } else {
-                    RowControl.Chevron
+                when (verified) {
+                    true -> RowControl.ChipStatus("Verified", RowControl.ChipTone.Success, includesChevron = true)
+                    false -> RowControl.ChipStatus("Unverified", RowControl.ChipTone.Warning, includesChevron = true)
+                    null -> RowControl.Chevron
                 }
             val stripeChip: RowControl =
                 if (stripeConnected == true) {
@@ -167,7 +200,7 @@ class SettingsIndexViewModel
                                     GroupedListRow(
                                         id = "visibility",
                                         label = "Visibility preferences",
-                                        subtext = "Verified connections only",
+                                        subtext = visibilitySubtext(profileVisibility),
                                         control = RowControl.Chevron,
                                     ),
                                     GroupedListRow(id = "export", label = "Data export", control = RowControl.Chevron),
@@ -253,6 +286,21 @@ class SettingsIndexViewModel
                     )
                 }
             _state.value = GroupedListUiState.Loaded(groups = groups)
+        }
+
+        companion object {
+            /**
+             * Human label for `User.profile_visibility`. Unknown / unread
+             * values return `null` so the row omits the subtext rather than
+             * claiming a setting the account may not have.
+             */
+            fun visibilitySubtext(raw: String?): String? =
+                when (raw?.lowercase()) {
+                    "public" -> "Anyone"
+                    "registered" -> "Signed-in neighbors"
+                    "private" -> "Only you"
+                    else -> null
+                }
         }
     }
 

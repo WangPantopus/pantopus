@@ -34,6 +34,25 @@ public enum PublicProfileKind: String, Sendable, Equatable, Hashable {
     case local
 }
 
+/// A21.2 — the two-tab strip on the Local Beacon profile archetype
+/// (Posts · About). Separate from `ProfileTab` so the persona path keeps
+/// its own four-tab body untouched.
+public enum LocalProfileTab: String, Sendable, Equatable, Hashable, CaseIterable, Identifiable {
+    case posts
+    case about
+
+    public var id: String {
+        rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .posts: "Posts"
+        case .about: "About"
+        }
+    }
+}
+
 /// One post rendered beneath the stats/tabs body. Persona profiles
 /// carry creator-economy broadcasts (with tier visibility chip and the
 /// optional locked-paywall overlay); Local profiles carry Pulse-style
@@ -188,6 +207,10 @@ public final class PublicProfileViewModel {
     /// `selectedTab` so the persona path is untouched.
     public var selectedNeighborTab: NeighborProfileTab = .about
 
+    /// A21.2 — selected tab on the Local Beacon profile archetype
+    /// (Posts · About). Switching is local; no refetch.
+    public var selectedLocalTab: LocalProfileTab = .posts
+
     /// Connect button state — toggles between `idle` → `inFlight` →
     /// `succeeded` after a successful `POST /api/relationships/requests`.
     public private(set) var connectState: PublicProfileActionState = .idle
@@ -339,7 +362,15 @@ public final class PublicProfileViewModel {
                 PublicProfileEndpoints.profile(id: userId),
                 as: PublicProfile.self
             )
-            state = .loaded(build(from: profile))
+            let kind = derivedKind(from: profile)
+            // A21.2 — the Local archetype renders a real neighbourhood post
+            // feed, so pull the author's posts the way the RN `PostsTab`
+            // does (`GET /api/posts/user/:id`). Persona profiles keep an
+            // empty list on purpose: that endpoint returns plain posts, not
+            // tier-gated broadcasts, and feeding them into the broadcast
+            // card would invent a visibility chip the API never sent.
+            let posts = kind == .local ? await loadUserPosts(id: profile.id) : []
+            state = .loaded(build(from: profile, kind: kind, posts: posts))
         } catch let error as APIError {
             logger.warning("Profile load failed: \(error)")
             state = .error(message: friendlyMessage(for: error))
@@ -349,8 +380,57 @@ public final class PublicProfileViewModel {
         }
     }
 
-    private func build(from profile: PublicProfile) -> PublicProfileContent {
-        let kind = derivedKind(from: profile)
+    /// A21.2 — the Local profile's post feed. Mirrors the RN
+    /// `components/profile/PostsTab` fetch. Failures degrade to an empty
+    /// feed (which renders the design's "Quiet for now" state) rather than
+    /// failing the whole profile.
+    private func loadUserPosts(id: String) async -> [PublicProfilePost] {
+        do {
+            let response = try await client.request(
+                PostsEndpoints.userPosts(userId: id),
+                as: MyPostsResponse.self
+            )
+            return response.posts.map { project(post: $0) }
+        } catch {
+            logger.debug("Profile posts load failed: \(error)")
+            return []
+        }
+    }
+
+    private func project(post: MyPostDTO) -> PublicProfilePost {
+        PublicProfilePost(
+            id: post.id,
+            body: post.content.isEmpty ? (post.title ?? "") : post.content,
+            timeAgo: relativeTimestamp(post.createdAt),
+            locality: post.locationName,
+            reactions: post.likeCount,
+            replies: post.commentCount,
+            visibility: nil,
+            isLocked: false,
+            targetTierRank: nil,
+            intent: Self.intent(forPostType: post.postType)
+        )
+    }
+
+    /// Maps the backend `post_type` onto the design's intent chip. Types
+    /// with no honest counterpart (general, recommendation, lost & found,
+    /// local update…) render with no chip rather than borrowing a
+    /// misleading label.
+    static func intent(forPostType type: String?) -> PublicProfilePost.Intent? {
+        switch type ?? "" {
+        case "service_offer", "deal": .offer
+        case "alert", "heads_up": .alert
+        case "event": .event
+        case "ask_local", "ask": .ask
+        default: nil
+        }
+    }
+
+    private func build(
+        from profile: PublicProfile,
+        kind: PublicProfileKind,
+        posts: [PublicProfilePost]
+    ) -> PublicProfileContent {
         let header = PublicProfileHeader(
             displayName: profile.displayName,
             handle: profile.username.isEmpty ? nil : profile.username,
@@ -404,7 +484,9 @@ public final class PublicProfileViewModel {
             reviews: reviewCards
         )
 
-        let neighbor = kind == .local ? buildNeighbor(from: profile, reviews: reviewCards) : nil
+        let neighbor = kind == .local
+            ? buildNeighbor(from: profile, reviews: reviewCards, posts: posts)
+            : nil
         let isOwner = currentUserId.map { $0 == profile.id } ?? false
         // A Beacon (`PublicPersona.handle`) lives in a different namespace
         // from `User.username` — persona handles are generated independently
@@ -420,7 +502,7 @@ public final class PublicProfileViewModel {
             kind: kind,
             header: header,
             stats: statsContent,
-            posts: [],
+            posts: posts,
             neighbor: neighbor,
             isOwner: isOwner,
             personaHandle: personaHandle
@@ -432,7 +514,11 @@ public final class PublicProfileViewModel {
     /// detail, mutual neighbors, response time) are synthesised
     /// deterministically; the empty-review path drives the new-neighbor
     /// degraded frame.
-    private func buildNeighbor(from profile: PublicProfile, reviews: [ProfileReviewCard]) -> NeighborProfileContent {
+    private func buildNeighbor(
+        from profile: PublicProfile,
+        reviews: [ProfileReviewCard],
+        posts: [PublicProfilePost]
+    ) -> NeighborProfileContent {
         let reviewCount = profile.reviewCount ?? reviews.count
         let isNew = reviewCount == 0
         let rating = profile.averageRating ?? 0
@@ -484,7 +570,7 @@ public final class PublicProfileViewModel {
             reviewCount: reviewCount,
             mutuals: isNew ? neighborMutuals(for: profile) : nil,
             welcome: welcome,
-            posts: [],
+            posts: posts,
             isNewNeighbor: isNew,
             primaryCtaLabel: isNew ? "Say hi" : "Message"
         )

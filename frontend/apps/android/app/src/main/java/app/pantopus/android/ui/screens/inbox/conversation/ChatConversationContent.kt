@@ -17,12 +17,27 @@ enum class ChatConversationMode { Dm, AiAssistant, CreatorThread, FanThread }
 /** Creator-side context rendered above a creator/fan DM thread. */
 @Immutable
 data class ChatCreatorThreadContext(
-    val personaName: String,
-    val audienceSummary: String,
+    /**
+     * The persona whose creator inbox this thread belongs to. `null` when
+     * the caller hasn't resolved it — the audience strip then shows the
+     * generic "Creator inbox" label rather than a placeholder name.
+     */
+    val personaName: String? = null,
+    /**
+     * Reach / engagement line under the strip title. `null` unless the
+     * caller has real audience analytics for this persona; there is no
+     * per-thread analytics payload on the wire, so it normally stays null.
+     */
+    val audienceSummary: String? = null,
     val fanTierName: String,
     /** Tier rank (1=Free, 2=Bronze, 3=Silver, 4=Gold). */
     val fanTierRank: Int,
-    val fanSubtitle: String,
+    /**
+     * Header sub-line ("Member since …"). `null` when the membership join
+     * date / distance isn't known — the header then drops the line instead
+     * of inventing one.
+     */
+    val fanSubtitle: String? = null,
     /**
      * `null` when the backend hasn't reported a reply allowance for this
      * thread. There is no creator-side weekly reply quota on the wire yet
@@ -30,36 +45,61 @@ data class ChatCreatorThreadContext(
      * its lock stay hidden instead of showing invented counts.
      */
     val quota: ChatCreatorQuota? = null,
-) {
     /**
-     * Tier the creator would invite this fan up to — derived from the fan's
-     * current rank rather than hardcoded.
+     * The real, creator-authored tier this fan can be invited up to. `null`
+     * when the caller hasn't loaded the persona's tier ladder — the A15.4
+     * upgrade card is then omitted rather than pitching an invented tier
+     * name or invented perks.
      */
-    val upgradeTierName: String
-        get() =
-            when {
-                fanTierRank < TIER_RANK_BRONZE -> "Bronze"
-                fanTierRank == TIER_RANK_BRONZE -> "Silver"
-                else -> "Gold"
-            }
-
+    val upgradeOffer: ChatCreatorUpgradeOffer? = null,
+) {
     companion object {
-        private const val TIER_RANK_BRONZE = 2
+        private const val TIER_RANK_FREE = 1
 
+        /**
+         * Context for a creator thread where only the fan's tier is known.
+         * Everything else stays null — the persona name, the audience
+         * summary, the membership sub-line and the upgrade ladder all need
+         * data the creator-inbox row does not carry, and inventing them
+         * would ship one creator's copy to every creator.
+         */
         fun defaults(
-            fanTierName: String = "Bronze",
-            fanTierRank: Int = TIER_RANK_BRONZE,
+            fanTierName: String = "Free",
+            fanTierRank: Int = TIER_RANK_FREE,
         ): ChatCreatorThreadContext =
             ChatCreatorThreadContext(
-                personaName = "The Sourdough Diary",
-                audienceSummary = "Reach: 2,340 · Engagement up 12% this week",
                 fanTierName = fanTierName,
                 fanTierRank = fanTierRank,
-                fanSubtitle = if (fanTierRank <= 1) "Free member" else "Member since Aug · 0.4 mi",
-                quota = null,
             )
     }
 }
+
+/**
+ * A15.4 upgrade-fan card payload. Every string here is creator-authored
+ * tier data (`GET /api/personas/:handle/tiers` — name / description /
+ * price) or derived from the tier's published policy fields. Nothing in
+ * this type may be synthesised by the UI.
+ */
+@Immutable
+data class ChatCreatorUpgradeOffer(
+    /** The tier's own name, exactly as the creator published it. */
+    val tierName: String,
+    /** Formatted price, e.g. "$15/mo". `null` when the tier has no price. */
+    val priceLabel: String? = null,
+    /** The tier's creator-authored description; `null` hides the body. */
+    val summary: String? = null,
+    /**
+     * Perk lines built from the tier's published policy fields
+     * (`msgThreadsPerPeriod`, `replyPolicy`, `creatorCanInitiateDm`).
+     * Empty hides the perk block.
+     */
+    val perks: List<String> = emptyList(),
+    /**
+     * False until a creator→fan upgrade-offer endpoint exists. The send
+     * action renders disabled with an honest note while this is false.
+     */
+    val canSendOffer: Boolean = false,
+)
 
 @Immutable
 data class ChatCreatorQuota(
@@ -74,6 +114,19 @@ data class ChatCreatorQuota(
     val isMaxed: Boolean
         get() = used >= total
 }
+
+/**
+ * A15.5 `.openers .op` — a suggested first message on the empty fan
+ * thread. Tapping one fills the composer. [id] doubles as the test tag
+ * suffix so iOS and Android address the same rows.
+ */
+@Immutable
+data class FanOpener(
+    val id: String,
+    val icon: PantopusIcon,
+    val label: String,
+    val title: String,
+)
 
 class ChatCreatorThreadChrome(
     val context: ChatCreatorThreadContext,

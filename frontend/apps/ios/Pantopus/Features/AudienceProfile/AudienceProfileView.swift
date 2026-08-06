@@ -21,10 +21,10 @@ public struct AudienceProfileView: View {
     private let onOpenBroadcast: @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void
     private let onOpenSetup: @MainActor () -> Void
     private let onOpenCreatorInbox: @MainActor () -> Void
-    /// A.10.8 — "You're a member" footer entry point into the fan-side
-    /// membership detail. Wave A direct-link until the Memberships index
-    /// list ships.
-    private let onOpenMembership: @MainActor (String) -> Void
+    /// A.10.8 — reserved entry point into the fan-side membership detail.
+    /// Nothing on this owner-facing hub can supply a real membership
+    /// today, so no row calls it — the host keeps passing it so the route
+    /// stays wired.
     /// A.7 (A22.2) — Push the full-screen Compose Broadcast surface. The
     /// inline composer below stays a lightweight quick-post; this is the
     /// canonical broadcast composer.
@@ -50,7 +50,6 @@ public struct AudienceProfileView: View {
         onOpenBroadcast: @escaping @MainActor (UpdateCardContent, [TierBreakdownContent.TierSegment]) -> Void = { _, _ in },
         onOpenSetup: @escaping @MainActor () -> Void = {},
         onOpenCreatorInbox: @escaping @MainActor () -> Void = {},
-        onOpenMembership: @escaping @MainActor (String) -> Void = { _ in },
         onComposeBroadcast: @escaping @MainActor (String) -> Void = { _ in },
         onOpenEditPersona: @escaping @MainActor () -> Void = {},
         onOpenFollowing: (@MainActor () -> Void)? = nil,
@@ -64,7 +63,6 @@ public struct AudienceProfileView: View {
         self.onOpenBroadcast = onOpenBroadcast
         self.onOpenSetup = onOpenSetup
         self.onOpenCreatorInbox = onOpenCreatorInbox
-        self.onOpenMembership = onOpenMembership
         self.onComposeBroadcast = onComposeBroadcast
         self.onOpenEditPersona = onOpenEditPersona
         self.onOpenBeacons = onOpenBeacons
@@ -308,13 +306,18 @@ public struct AudienceProfileView: View {
             tabContent(loaded)
             beaconsFooter
             followingFooter
-            memberFooter
+            // The "You're a member of <persona>, <tier> tier" footer is
+            // gone: it rendered `MembershipSampleData.audienceFooter`, a
+            // fixture persona ("Lara Chen · Silver"), to every viewer of
+            // their own beacon hub. `/api/personas/me` carries no
+            // viewer-membership payload, so there is nothing real to put
+            // here — see the report for the endpoint gap.
         }
         .accessibilityIdentifier("audienceProfileContent")
     }
 
     /// A03.2 — entry into the Beacon Updates feed (broadcasts from beacons
-    /// the user follows). Mirrors `memberFooter`'s row recipe.
+    /// the user follows). Mirrors `followingFooter`'s row recipe.
     private var beaconsFooter: some View {
         Button(action: onOpenBeacons) {
             HStack(spacing: Spacing.s2) {
@@ -382,47 +385,6 @@ public struct AudienceProfileView: View {
             .accessibilityLabel("Following. Beacons you follow. Open.")
             .accessibilityIdentifier("audienceProfileFollowingEntry")
         }
-    }
-
-    /// "You're a member" footer — the Wave A direct-link entry point into
-    /// the fan-side Membership detail (A10.8). The standalone Memberships
-    /// index list lands in a follow-up; until then this footer is the
-    /// single tap from a creator's profile to managing your tier.
-    private var memberFooter: some View {
-        let footer = MembershipSampleData.audienceFooter
-        return Button {
-            onOpenMembership(footer.personaId)
-        } label: {
-            HStack(spacing: Spacing.s2) {
-                Icon(.crown, size: 16, color: Theme.Color.primary600)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("You're a member")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("\(footer.personaName) · \(footer.tierName) tier")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-                Spacer(minLength: Spacing.s0)
-                Text("Manage")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.primary700)
-                Icon(.chevronRight, size: 14, color: Theme.Color.primary600)
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.vertical, 10)
-            .frame(minHeight: 44)
-            .background(Theme.Color.appSurface)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "You're a member of \(footer.personaName), \(footer.tierName) tier. Manage membership."
-        )
-        .accessibilityIdentifier("audienceProfileMemberFooter")
     }
 
     private func statusLine(_ header: AudienceHeaderContent) -> some View {

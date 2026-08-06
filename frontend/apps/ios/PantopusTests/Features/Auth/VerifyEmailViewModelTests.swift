@@ -87,6 +87,19 @@ final class VerifyEmailViewModelTests: XCTestCase {
         XCTAssertNil(vm.cooldownRemaining(now: t0.addingTimeInterval(40)))
     }
 
+    // MARK: - A18.1 countdown label
+
+    func test_countdownLabel_renders_minutes_and_zero_padded_seconds() {
+        // Design frame reads "Resend in 0:42"; the label must round up so a
+        // 29.4s remainder never renders as "0:29" while the button is still
+        // disabled.
+        XCTAssertEqual(VerifyEmailView.countdownLabel(42), "0:42")
+        XCTAssertEqual(VerifyEmailView.countdownLabel(29.4), "0:30")
+        XCTAssertEqual(VerifyEmailView.countdownLabel(5), "0:05")
+        XCTAssertEqual(VerifyEmailView.countdownLabel(65), "1:05")
+        XCTAssertEqual(VerifyEmailView.countdownLabel(0), "0:00")
+    }
+
     // MARK: - Resend error path
 
     func test_resend_surface_rate_limited_error() async {

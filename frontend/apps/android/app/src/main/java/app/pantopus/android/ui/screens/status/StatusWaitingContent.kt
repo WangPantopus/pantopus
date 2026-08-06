@@ -97,14 +97,24 @@ data class StatusWaitingContent(
 
         /**
          * A18.2 — right after a claim POST (`approved == false`) or revisited
-         * once it resolves (`approved == true`). Timeline dates mirror the
-         * design sample frames pending backend date wiring.
+         * once it resolves (`approved == true`).
+         *
+         * [submittedOn] / [decidedOn] are pre-formatted captions built from
+         * the claim's real `created_at` / `updated_at`. They are **optional on
+         * purpose**: the design frames show sample dates, but the app must
+         * never print a date it can't source from the API, so a null argument
+         * drops the caption (and the date fragment of the pill) rather than
+         * inventing one.
          */
         fun claimSubmitted(
             homeName: String? = null,
             approved: Boolean = false,
+            submittedOn: String? = null,
+            decidedOn: String? = null,
         ): StatusWaitingContent {
             val chip = homeName?.takeIf { it.isNotBlank() }
+            val submittedCaption = submittedOn?.takeIf { it.isNotBlank() }
+            val decidedCaption = decidedOn?.takeIf { it.isNotBlank() }
             if (approved) {
                 return StatusWaitingContent(
                     halo = StatusHalo(tone = HaloCircleTone.Success, icon = PantopusIcon.BadgeCheck),
@@ -114,19 +124,19 @@ data class StatusWaitingContent(
                     addressChip = chip,
                     statusPill =
                         StatusWaitingPill(
-                            text = "Approved · 3 days ago",
+                            text = decidedCaption?.let { "Approved · $it" } ?: "Approved",
                             icon = PantopusIcon.CheckCircle,
                             tone = StatusPillTone.Success,
                         ),
                     timeline =
                         listOf(
-                            StatusTimelineStage("submitted", "Submitted", "Oct 10", StatusStepState.Done),
-                            StatusTimelineStage("review", "Under review", "Oct 11", StatusStepState.Done),
-                            StatusTimelineStage("decision", "Approved", "Oct 14", StatusStepState.Done),
+                            StatusTimelineStage("submitted", "Submitted", submittedCaption, StatusStepState.Done),
+                            StatusTimelineStage("review", "Under review", state = StatusStepState.Done),
+                            StatusTimelineStage("decision", "Approved", decidedCaption, StatusStepState.Done),
                         ),
                     primaryCta =
                         StatusCta(label = "Open your home", actionKey = "open_home", icon = PantopusIcon.ArrowRight),
-                    secondaryCta = StatusCta(label = "See your Home badge", actionKey = "view_badge"),
+                    secondaryCta = StatusCta(label = "View claim", actionKey = "view_claim"),
                 )
             }
             return StatusWaitingContent(
@@ -136,13 +146,13 @@ data class StatusWaitingContent(
                 addressChip = chip,
                 statusPill =
                     StatusWaitingPill(
-                        text = "Decision expected by Oct 17",
+                        text = "Decision usually within 3 business days",
                         icon = PantopusIcon.CalendarClock,
                         tone = StatusPillTone.Success,
                     ),
                 timeline =
                     listOf(
-                        StatusTimelineStage("submitted", "Submitted", "Oct 10", StatusStepState.Done),
+                        StatusTimelineStage("submitted", "Submitted", submittedCaption, StatusStepState.Done),
                         StatusTimelineStage("review", "Under review", state = StatusStepState.Pending),
                         StatusTimelineStage("decision", "Decision", state = StatusStepState.Pending),
                     ),
@@ -159,14 +169,22 @@ data class StatusWaitingContent(
          * (`confirmed == false`) or the landlord signed off and Pantopus is
          * doing the final review (`confirmed == true`). Primary CTA is "Back
          * to home" (the user can't speed this up), inverting A18.2.
+         *
+         * [submittedOn] / [confirmedOn] are pre-formatted captions built from
+         * the real lease-request timestamps; null drops the caption rather
+         * than printing one of the design's sample dates.
          */
         fun verificationSubmitted(
             homeName: String? = null,
             landlordEmail: String,
             landlordName: String? = null,
             confirmed: Boolean = false,
+            submittedOn: String? = null,
+            confirmedOn: String? = null,
         ): StatusWaitingContent {
             val chip = homeName?.takeIf { it.isNotBlank() }
+            val submittedCaption = submittedOn?.takeIf { it.isNotBlank() }
+            val confirmedCaption = confirmedOn?.takeIf { it.isNotBlank() }
             val backToHome = StatusCta(label = "Back to home", actionKey = "back_to_home", icon = PantopusIcon.Home)
             val viewStatus = StatusCta(label = "View status", actionKey = "view_status")
             if (confirmed) {
@@ -181,14 +199,19 @@ data class StatusWaitingContent(
                     addressChip = chip,
                     statusPill =
                         StatusWaitingPill(
-                            text = "Decision expected today",
+                            text = "Final review in progress",
                             icon = PantopusIcon.CalendarClock,
                             tone = StatusPillTone.Primary,
                         ),
                     timeline =
                         listOf(
-                            StatusTimelineStage("lease", "Lease + ID", "Oct 10", StatusStepState.Done),
-                            StatusTimelineStage("landlord", "Landlord confirms", "Oct 11", StatusStepState.Done),
+                            StatusTimelineStage("lease", "Lease + ID", submittedCaption, StatusStepState.Done),
+                            StatusTimelineStage(
+                                "landlord",
+                                "Landlord confirms",
+                                confirmedCaption,
+                                StatusStepState.Done,
+                            ),
                             StatusTimelineStage("verified", "Verified", "In review", StatusStepState.Current),
                         ),
                     primaryCta = backToHome,
@@ -210,7 +233,7 @@ data class StatusWaitingContent(
                     ),
                 timeline =
                     listOf(
-                        StatusTimelineStage("lease", "Lease + ID", "Oct 10", StatusStepState.Done),
+                        StatusTimelineStage("lease", "Lease + ID", submittedCaption, StatusStepState.Done),
                         StatusTimelineStage("landlord", "Landlord confirms", state = StatusStepState.Pending),
                         StatusTimelineStage("verified", "Verified", state = StatusStepState.Pending),
                     ),

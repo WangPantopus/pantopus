@@ -10,11 +10,15 @@ import app.pantopus.android.data.api.models.homes.OwnershipClaimDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.status.StatusCta
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /** Nav key carrying the home id into the A18.4 waiting room. */
@@ -93,20 +97,25 @@ class WaitingRoomViewModel
             }
             claimId = claim.id
             if (claim.status != UNDER_REVIEW_STATUS) {
+                if (claim.status in APPROVED_STATUSES) {
+                    // A18.2 "You're the owner". Dates come straight off the
+                    // claim row — never the design's sample dates.
+                    _phase.value =
+                        WaitingRoomPhase.Approved(
+                            StatusWaitingContent.claimSubmitted(
+                                homeName = resolvedAddress(),
+                                approved = true,
+                                submittedOn = dayCaption(claim.createdAt),
+                                decidedOn = dayCaption(claim.updatedAt),
+                            ),
+                        )
+                    return
+                }
                 _phase.value = WaitingRoomPhase.Notice(WaitingRoomNotice.ClaimDecided)
                 return
             }
             val ref = claim.id.take(CLAIM_REF_LENGTH).uppercase()
-            val address =
-                when (val addressResult = homesRepo.detail(homeId)) {
-                    is NetworkResult.Success ->
-                        listOfNotNull(
-                            addressResult.data.home.address,
-                            addressResult.data.home.city,
-                            addressResult.data.home.state,
-                        ).joinToString(" · ").ifBlank { "Your home" }
-                    is NetworkResult.Failure -> "Your home"
-                }
+            val address = resolvedAddress()
             _content.value =
                 if (seedState == WaitingRoomState.MoreInfoRequested) {
                     WaitingRoomContent.moreInfoRequested(address = address, claimRef = ref)
@@ -115,6 +124,21 @@ class WaitingRoomViewModel
                 }
             _phase.value = WaitingRoomPhase.Loaded
         }
+
+        /**
+         * Best-effort street address for this home. Falls back to the generic
+         * "Your home" label rather than inventing an address.
+         */
+        private suspend fun resolvedAddress(): String =
+            when (val addressResult = homesRepo.detail(homeId)) {
+                is NetworkResult.Success ->
+                    listOfNotNull(
+                        addressResult.data.home.address,
+                        addressResult.data.home.city,
+                        addressResult.data.home.state,
+                    ).joinToString(" · ").ifBlank { "Your home" }
+                is NetworkResult.Failure -> "Your home"
+            }
 
         fun openNotifications() {
             _navEvent.value = WaitingRoomNav.Notifications
@@ -131,6 +155,8 @@ class WaitingRoomViewModel
         fun handlePrimary(cta: StatusCta) {
             when (cta.actionKey) {
                 "view_claim" -> claimId?.let { _navEvent.value = WaitingRoomNav.ViewClaim(it) }
+                // A18.2 approved frame's primary CTA ("Open your home").
+                "open_home" -> _navEvent.value = WaitingRoomNav.BackToHome(homeId)
                 else -> log("dock.${cta.actionKey}")
             }
         }
@@ -138,6 +164,8 @@ class WaitingRoomViewModel
         fun handleSecondary(cta: StatusCta) {
             when (cta.actionKey) {
                 "back_to_home" -> _navEvent.value = WaitingRoomNav.BackToHome(homeId)
+                // A18.2 approved frame's ghost CTA ("View claim").
+                "view_claim" -> claimId?.let { _navEvent.value = WaitingRoomNav.ViewClaim(it) }
                 else -> log("dock.${cta.actionKey}")
             }
         }
@@ -158,6 +186,23 @@ class WaitingRoomViewModel
              * can return (`approved` / `rejected` / `revoked`) is terminal.
              */
             private const val UNDER_REVIEW_STATUS = "under_review"
+
+            /**
+             * Terminal statuses that mean the claimant won. `maskClaimState`
+             * (`backend/routes/homeOwnership.js:2107`) emits `approved`; the
+             * extra synonyms mirror `MyClaimsListViewModel.statusText`.
+             */
+            private val APPROVED_STATUSES = setOf("approved", "verified", "complete")
+
+            /** "Oct 14"-style caption for a backend ISO-8601 timestamp. */
+            private val DAY_CAPTION: DateTimeFormatter =
+                DateTimeFormatter.ofPattern("MMM d").withZone(ZoneId.systemDefault())
+
+            /**
+             * Returns null when the string doesn't parse so the caller omits
+             * the caption instead of printing a placeholder.
+             */
+            fun dayCaption(iso: String): String? = runCatching { DAY_CAPTION.format(Instant.parse(iso)) }.getOrNull()
 
             /** Optional query param selecting the more-info frame. */
             const val WAITING_ROOM_STATE_KEY = "state"

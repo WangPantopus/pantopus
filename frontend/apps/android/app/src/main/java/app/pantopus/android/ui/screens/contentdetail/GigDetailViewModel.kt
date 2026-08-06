@@ -477,6 +477,7 @@ class GigDetailViewModel
                         canTip,
                         uid,
                         canInstantAccept,
+                        Projection.ownerPanelHandlesBids(gig, viewerIsOwner),
                     ),
                 )
         }
@@ -1320,13 +1321,25 @@ class GigDetailViewModel
                 canTip: Boolean = false,
                 viewerUserId: String? = null,
                 canInstantAccept: Boolean = false,
+                suppressBidsModule: Boolean = false,
             ): ContentDetailContent {
                 return if (shouldProjectTaskV2(gig)) {
-                    projectTaskV2(gig, bids, canMarkDelivered, canTip, viewerUserId, canInstantAccept)
+                    projectTaskV2(gig, bids, canMarkDelivered, canTip, viewerUserId, canInstantAccept, suppressBidsModule)
                 } else {
-                    projectGigV1(gig, bids, canTip, viewerUserId)
+                    projectGigV1(gig, bids, canTip, viewerUserId, suppressBidsModule)
                 }
             }
+
+            /**
+             * The interactive owner bids panel (scroll footer, see
+             * [app.pantopus.android.ui.screens.contentdetail.GigLifecycleSections])
+             * supersedes the read-only "N bids" module — without this the
+             * owner of an open gig sees the same bid list twice.
+             */
+            fun ownerPanelHandlesBids(
+                gig: GigDto,
+                viewerIsOwner: Boolean,
+            ): Boolean = viewerIsOwner && gig.status?.lowercase() == "open"
 
             fun posterCounterparty(
                 gig: GigDto,
@@ -1374,14 +1387,12 @@ class GigDetailViewModel
                 canTip: Boolean = false,
                 viewerUserId: String? = null,
                 canInstantAccept: Boolean = false,
+                suppressBidsModule: Boolean = false,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
                 // Phase 5 — the owner of an open task gets the interactive
                 // bids panel (scroll footer) instead of the read-only module.
-                val ownerOfOpenGig =
-                    viewerUserId != null && viewerUserId == gig.userId &&
-                        gig.status?.lowercase() == "open"
                 val metaPieces =
                     listOfNotNull(
                         distanceLabel(gig.distanceMiles),
@@ -1451,7 +1462,7 @@ class GigDetailViewModel
                                     ),
                             ),
                         )
-                        if (ownerOfOpenGig) {
+                        if (suppressBidsModule) {
                             // Owner sees the interactive panel below — skip
                             // both the read-only module and the bidder callout.
                         } else if (bidCount > 0 && bids.isNotEmpty()) {
@@ -1637,13 +1648,14 @@ class GigDetailViewModel
                 bids: List<GigBidDto>,
                 canTip: Boolean = false,
                 viewerUserId: String? = null,
+                suppressBidsModule: Boolean = false,
             ): ContentDetailContent {
                 val awarded = isAwarded(gig)
                 val bidCount = gig.bidCount ?: bids.size
                 val metaPieces =
                     listOfNotNull(
                         distanceLabel(gig.distanceMiles),
-                        gig.scheduledStart?.takeIf { it.isNotEmpty() },
+                        gig.scheduledStart?.takeIf { it.isNotEmpty() }?.let { formatScheduledStart(it) },
                     )
                 val priceLine = gig.price?.let { priceLabel(it, gig.payType) }
                 val hero =
@@ -1675,7 +1687,7 @@ class GigDetailViewModel
                             add(ContentDetailModule.Description(id = "desc", title = "Description", icon = null, body = it))
                         }
                         locationMapModule(gig)?.let { add(it) }
-                        if (bids.isNotEmpty()) {
+                        if (bids.isNotEmpty() && !suppressBidsModule) {
                             add(
                                 ContentDetailModule.Bids(
                                     id = "bids",

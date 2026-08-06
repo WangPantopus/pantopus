@@ -37,7 +37,15 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     private let onNavigate: @MainActor (SettingsRoute) -> Void
     private var footer: String?
     private var stripeConnected: Bool?
-    private var verified: Bool = false
+    /// Tri-state on purpose. `nil` = we could not read the account's real
+    /// verification state, and an unknown state must never render the
+    /// success chip — an unverified account seeing "Verified" on its own
+    /// Settings row is a trust bug, so `nil` falls back to a plain chevron.
+    private var verified: Bool?
+    /// Raw `User.profile_visibility` (`public | registered | private`).
+    /// `nil` when unread — the row then ships without a subtext rather
+    /// than asserting a preference the user may not hold.
+    private var profileVisibility: String?
     private var blockCount: Int = 0
     private var isAdmin: Bool = false
 
@@ -53,15 +61,26 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
 
     public func load() async {
         state = .loading
-        // Identity + footer from auth state.
+        // Identity + footer from auth state. The session `UserDTO` carries
+        // no verification flag, so the chip is fetched below rather than
+        // guessed from the email.
         if case let .signedIn(user) = auth.state {
-            verified = user.email.contains("@") // best signal we have without /me re-fetch
             footer = "\(user.email) · ID \(String(user.id.prefix(8)))"
             isAdmin = user.isAdmin
         }
         // Block count (best-effort).
         if let blocks: PrivacyBlocksResponse = try? await api.request(PrivacyEndpoints.blocks) {
             blockCount = blocks.blocks.count
+        }
+        // Real verification state — `GET /api/users/profile` → `user.verified`
+        // (`backend/routes/users.js:1962`). Same field the Verification
+        // Center sub-screen reports; on failure we stay `nil` (unknown).
+        if let profile: ProfileResponse = try? await api.request(UsersEndpoints.profile()) {
+            verified = profile.user.verified
+            profileVisibility = profile.user.profileVisibility
+        } else {
+            verified = nil
+            profileVisibility = nil
         }
         rebuild()
     }
@@ -80,10 +99,14 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     }
 
     private func accountGroup() -> GroupedListGroup {
-        let verificationChip: RowControl =
-            verified
-                ? .chipStatus(label: "Verified", tone: .success, includesChevron: true)
-                : .chevron
+        let verificationChip: RowControl
+        if verified == true {
+            verificationChip = .chipStatus(label: "Verified", tone: .success, includesChevron: true)
+        } else if verified == false {
+            verificationChip = .chipStatus(label: "Unverified", tone: .warning, includesChevron: true)
+        } else {
+            verificationChip = .chevron
+        }
         return GroupedListGroup(
             id: "account",
             overline: "Account",
@@ -109,7 +132,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                 GroupedListRow(
                     id: "visibility",
                     label: "Visibility preferences",
-                    subtext: "Verified connections only",
+                    subtext: Self.visibilitySubtext(profileVisibility),
                     control: .chevron
                 ),
                 GroupedListRow(id: "export", label: "Data export", control: .chevron)
@@ -214,6 +237,18 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     public func toggleRow(_: String, isOn _: Bool) async {}
     public func selectRadio(_: String) async {}
     public func setSlider(_: String, index _: Int) async {}
+
+    /// Human label for `User.profile_visibility`. Unknown / unread values
+    /// return `nil` so the row omits the subtext rather than claiming a
+    /// setting the account may not have.
+    static func visibilitySubtext(_ raw: String?) -> String? {
+        switch (raw ?? "").lowercased() {
+        case "public": "Anyone"
+        case "registered": "Signed-in neighbors"
+        case "private": "Only you"
+        default: nil
+        }
+    }
 
     private static func versionString() -> String {
         let dict = Bundle.main.infoDictionary

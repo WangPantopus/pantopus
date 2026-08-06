@@ -392,6 +392,50 @@ class ContentDetailProjectionTest {
             soldAt = null,
         )
 
+    @Test fun gig_v1_hero_formats_scheduled_start_instead_of_the_raw_iso_string() {
+        val gig =
+            baseGig.copy(
+                title = "Dog walk · 45 min",
+                isV2 = false,
+                status = "open",
+                scheduledStart = "2026-04-25T14:00:00.000Z",
+            )
+        val meta = GigDetailViewModel.Projection.project(gig, emptyList()).hero.meta
+        assertNotNull(meta)
+        assertFalse("Hero must not leak the raw ISO timestamp", meta!!.contains("2026-04-25T14:00:00.000Z"))
+        assertTrue("Hero must use the 'EEE MMM d · h:mm a' frame format", meta.contains("·"))
+    }
+
+    @Test fun gig_v1_owner_of_an_open_gig_gets_no_read_only_bids_module() {
+        val gig = baseGig.copy(title = "Dog walk", isV2 = false, status = "open", bidCount = 1)
+        val bids = listOf(bid("b1", "u1", 20.0, "Tomás G."))
+        val ownerContent =
+            GigDetailViewModel.Projection.project(
+                gig,
+                bids,
+                viewerUserId = "owner",
+                suppressBidsModule = GigDetailViewModel.Projection.ownerPanelHandlesBids(gig, viewerIsOwner = true),
+            )
+        assertTrue(
+            "Owner sees the interactive panel — the module would duplicate the list",
+            ownerContent.modules.filterIsInstance<ContentDetailModule.Bids>().isEmpty(),
+        )
+        val bidderContent =
+            GigDetailViewModel.Projection.project(
+                gig,
+                bids,
+                viewerUserId = "bidder",
+                suppressBidsModule = GigDetailViewModel.Projection.ownerPanelHandlesBids(gig, viewerIsOwner = false),
+            )
+        assertTrue(bidderContent.modules.filterIsInstance<ContentDetailModule.Bids>().isNotEmpty())
+    }
+
+    @Test fun owner_panel_handles_bids_only_while_the_gig_is_open() {
+        assertTrue(GigDetailViewModel.Projection.ownerPanelHandlesBids(baseGig.copy(status = "open"), true))
+        assertFalse(GigDetailViewModel.Projection.ownerPanelHandlesBids(baseGig.copy(status = "open"), false))
+        assertFalse(GigDetailViewModel.Projection.ownerPanelHandlesBids(baseGig.copy(status = "accepted"), true))
+    }
+
     private fun bid(
         id: String,
         userId: String,

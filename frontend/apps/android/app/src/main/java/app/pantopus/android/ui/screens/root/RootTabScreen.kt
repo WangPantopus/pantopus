@@ -307,6 +307,8 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
+import app.pantopus.android.ui.screens.status.StatusWaitingScreen
 import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomNav
 import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
@@ -1498,6 +1500,15 @@ private object ChildRoutes {
     const val WAITING_ROOM = "homes/{$WAITING_ROOM_HOME_ID_KEY}/waiting-room"
 
     fun waitingRoom(homeId: String): String = "homes/$homeId/waiting-room"
+
+    /**
+     * A18 — claim status / waiting surface for a single ownership claim,
+     * opened from a My Claims row. Mirrors iOS `HubRoute.claimStatus`.
+     */
+    const val CLAIM_STATUS_CLAIM_ID_KEY = "claimId"
+    const val CLAIM_STATUS = "homes/claims/{$CLAIM_STATUS_CLAIM_ID_KEY}/status"
+
+    fun claimStatus(claimId: String): String = "homes/claims/$claimId/status"
 }
 
 /**
@@ -3759,9 +3770,6 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenCreatorInbox = {
                             navController.navigate(ChildRoutes.CREATOR_INBOX)
                         },
-                        onOpenMembership = { personaId ->
-                            navController.navigate(ChildRoutes.membershipDetail(personaId))
-                        },
                         onComposeBroadcast = { personaId ->
                             navController.navigate(ChildRoutes.composeBroadcast(personaId))
                         },
@@ -4426,10 +4434,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 composable(ChildRoutes.MY_CLAIMS) {
                     MyClaimsListScreen(
                         onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
-                        onOpenClaim = { _ ->
-                            navController.navigate(ChildRoutes.placeholder("Claim status"))
+                        onOpenClaim = { claimId ->
+                            navController.navigate(ChildRoutes.claimStatus(claimId))
                         },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CLAIM_STATUS,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.CLAIM_STATUS_CLAIM_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    // Mirrors iOS `HubTabRoot`/`YouTabRoot` `.claimStatus`:
+                    // the A18 "Under review" frame, not a placeholder. The
+                    // backend masks every in-flight claim to `under_review`
+                    // (`backend/routes/homeOwnership.js:2107`), so there is no
+                    // per-claim detail beyond what the list row already shows.
+                    val claimId = entry.arguments?.getString(ChildRoutes.CLAIM_STATUS_CLAIM_ID_KEY).orEmpty()
+                    StatusWaitingScreen(
+                        content = StatusWaitingContent.underReview(homeName = null),
+                        onAction = { card -> if (card.id == "addEvidence") navController.popBackStack() },
+                        onPrimary = { navController.popBackStack() },
+                        onSecondary = { if (claimId.isNotEmpty()) navController.popBackStack() },
                     )
                 }
                 if (BuildConfig.DEBUG) {

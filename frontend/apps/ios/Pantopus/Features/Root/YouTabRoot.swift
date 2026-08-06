@@ -1443,9 +1443,6 @@ public struct YouTabRoot: View {
                 onOpenCreatorInbox: {
                     Task { @MainActor in path.append(.creatorInbox) }
                 },
-                onOpenMembership: { personaId in
-                    Task { @MainActor in path.append(.membershipDetail(personaId: personaId)) }
-                },
                 onComposeBroadcast: { personaId in
                     Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
                 },

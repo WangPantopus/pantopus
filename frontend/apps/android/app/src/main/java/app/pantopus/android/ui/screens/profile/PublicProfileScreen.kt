@@ -72,7 +72,7 @@ fun PublicProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
-    val selectedNeighborTab by viewModel.selectedNeighborTab.collectAsStateWithLifecycle()
+    val selectedLocalTab by viewModel.selectedLocalTab.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val connectState by viewModel.connectState.collectAsStateWithLifecycle()
@@ -115,16 +115,15 @@ fun PublicProfileScreen(
                 val content = s.content
                 val neighbor = content.neighbor
                 if (content.kind == PublicProfileKind.Local && neighbor != null) {
-                    NeighborProfileLayout(
-                        content = neighbor,
-                        selectedTab = selectedNeighborTab,
+                    LocalProfileLoadedFrame(
+                        content = content,
+                        neighbor = neighbor,
+                        selectedTab = selectedLocalTab,
                         connectState = connectState,
                         onBack = onBack,
-                        onSelectTab = { viewModel.selectNeighborTab(it) },
+                        onSelectTab = { viewModel.selectLocalTab(it) },
                         onMessage = { onOpenMessages(content.profile) },
                         onConnect = { viewModel.connect() },
-                        onReport = { showReportSheet = true },
-                        onBlock = { viewModel.block() },
                         onOverflow = { viewModel.setShowOverflow(true) },
                     )
                 } else {
@@ -327,6 +326,102 @@ internal fun PublicProfileLoadedFrame(
                             else -> onFollow
                         },
                 )
+            }
+        },
+    )
+}
+
+/**
+ * A21.2 — the designed Local Beacon profile archetype: green Home banner,
+ * overlapping [BeaconIdentityBlock] with Connect + Message, a Posts ·
+ * About tab strip, and the local post feed (or the "Quiet for now" empty
+ * state) beneath it. `internal` so Paparazzi can render it without Hilt.
+ *
+ * Mirrors iOS `PublicProfileView.localLayout`.
+ */
+@Composable
+internal fun LocalProfileLoadedFrame(
+    content: PublicProfileContent,
+    neighbor: NeighborProfileContent,
+    selectedTab: LocalProfileTab,
+    connectState: PublicProfileActionState,
+    onBack: () -> Unit,
+    onSelectTab: (LocalProfileTab) -> Unit,
+    onMessage: () -> Unit,
+    onConnect: () -> Unit,
+    onOverflow: () -> Unit,
+) {
+    ContentDetailShell(
+        title = null,
+        onBack = onBack,
+        topBarAction =
+            ContentDetailTopBarAction(
+                icon = PantopusIcon.MoreHorizontal,
+                contentDescription = "More",
+                onClick = onOverflow,
+            ),
+        header = {
+            // Box stacks the 120dp banner with the identity block pulled
+            // down to overlap the banner's lower 40dp (banner − overlap).
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("publicProfileLocalHeader"),
+            ) {
+                PublicProfileBanner(kind = PublicProfileKind.Local)
+                Box(modifier = Modifier.padding(top = 80.dp)) {
+                    BeaconIdentityBlock(
+                        identity = BeaconIdentity.Home,
+                        name = content.header.displayName,
+                        handle = content.header.handle,
+                        tierLabel = null,
+                        isVerifiedNeighbor = content.header.isVerifiedNeighbor,
+                        locality = content.header.locality,
+                        bio = content.stats.bio,
+                        isVerified = content.header.isVerified,
+                        avatarUrl = content.header.avatarUrl,
+                        stats = content.stats.stats,
+                    ) {
+                        val requested = connectState is PublicProfileActionState.Succeeded
+                        BeaconHeaderGhostButton(
+                            icon = PantopusIcon.UserPlus,
+                            actionLabel = if (requested) "Requested" else "Connect",
+                            onClick = onConnect,
+                            title = if (requested) "Requested" else "Connect",
+                        )
+                        BeaconHeaderPrimaryButton(
+                            title = "Message",
+                            icon = PantopusIcon.MessageSquare,
+                            onClick = onMessage,
+                        )
+                    }
+                }
+            }
+        },
+        body = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+                    LocalProfileTabStrip(
+                        postCount = content.posts.size.takeIf { it > 0 },
+                        selected = selectedTab,
+                        onSelect = onSelectTab,
+                    )
+                }
+                when (selectedTab) {
+                    LocalProfileTab.Posts ->
+                        PublicProfilePostsFeed(
+                            kind = PublicProfileKind.Local,
+                            posts = content.posts,
+                            onUnlock = {},
+                            onEmptyCta = onMessage,
+                            localName = content.header.displayName,
+                        )
+                    LocalProfileTab.About ->
+                        Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+                            LocalProfileAboutSection(content = neighbor)
+                        }
+                }
             }
         },
     )

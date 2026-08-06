@@ -89,8 +89,10 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
     var proposeChangeSheetVisible by remember { mutableStateOf(false) }
 
     val gig = viewModel.gigSnapshot()
+    // Single source of truth with the projection: whenever this panel
+    // renders, the read-only "N bids" module is suppressed above it.
     val ownerSeesBidsPanel =
-        viewModel.viewerIsOwner() && gig?.status?.lowercase() == "open"
+        gig != null && GigDetailViewModel.Projection.ownerPanelHandlesBids(gig, viewModel.viewerIsOwner())
 
     if (ownerSeesBidsPanel) {
         GigOwnerBidsPanel(

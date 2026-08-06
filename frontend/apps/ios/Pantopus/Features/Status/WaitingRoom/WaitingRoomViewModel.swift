@@ -39,6 +39,10 @@ public final class WaitingRoomViewModel {
     /// while a claim is still in flight — every other value it can return
     /// (`approved` / `rejected` / `revoked`) is terminal.
     private static let underReviewStatus = "under_review"
+    /// Terminal statuses that mean the claimant won. `maskClaimState`
+    /// (`backend/routes/homeOwnership.js:2107`) emits `approved`; the extra
+    /// synonyms mirror `MyClaimsListViewModel.statusText`.
+    private static let approvedStatuses: Set<String> = ["approved", "verified", "complete"]
     /// Claim reference shown in the waiting room = first 8 chars of the id.
     private static let claimRefLength = 8
 
@@ -82,18 +86,25 @@ public final class WaitingRoomViewModel {
             }
             claimId = claim.id
             guard claim.status == Self.underReviewStatus else {
+                if Self.approvedStatuses.contains(claim.status) {
+                    // A18.2 "You're the owner". Dates come straight off the
+                    // claim row — never the design's sample dates.
+                    let approvedAddress = await resolvedAddress()
+                    let approvedContent = StatusWaitingContent.claimSubmitted(
+                        homeName: approvedAddress,
+                        approved: true,
+                        submittedOn: Self.dayCaption(claim.createdAt),
+                        decidedOn: Self.dayCaption(claim.updatedAt)
+                    )
+                    phase = .approved(approvedContent)
+                    return
+                }
                 phase = .notice(.claimDecided)
                 return
             }
             let ref = String(claim.id.prefix(Self.claimRefLength)).uppercased()
 
-            var address = "Your home"
-            if let detail: HomeDetailResponse = try? await api.request(HomesEndpoints.detail(homeId: homeId)) {
-                let home = detail.home.base
-                let parts = [home.address, home.city, home.state].compactMap { $0 }
-                let joined = parts.joined(separator: " · ")
-                if !joined.isEmpty { address = joined }
-            }
+            let address = await resolvedAddress()
 
             content =
                 seedState == .moreInfoRequested
@@ -104,6 +115,33 @@ public final class WaitingRoomViewModel {
             logger.warning("waitingRoom.load failed: \(error.localizedDescription)")
             phase = .notice(.loadFailed)
         }
+    }
+
+    /// Best-effort street address for this home. Falls back to the generic
+    /// "Your home" label rather than inventing an address.
+    private func resolvedAddress() async -> String {
+        guard let detail: HomeDetailResponse = try? await api.request(HomesEndpoints.detail(homeId: homeId)) else {
+            return "Your home"
+        }
+        let home = detail.home.base
+        let joined = [home.address, home.city, home.state]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+        return joined.isEmpty ? "Your home" : joined
+    }
+
+    /// "Oct 14"-style caption for an ISO-8601 backend timestamp. Returns nil
+    /// when the string doesn't parse so the caller omits the caption instead
+    /// of printing a placeholder.
+    static func dayCaption(_ iso: String) -> String? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = fractional.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 
     public func openNotifications() {
@@ -129,6 +167,9 @@ public final class WaitingRoomViewModel {
             if let claimId {
                 pendingNav = .viewClaim(claimId: claimId)
             }
+        // A18.2 approved frame's primary CTA ("Open your home").
+        case "open_home":
+            pendingNav = .backToHome(homeId: homeId)
         default:
             log("dock.\(cta.actionKey)")
         }
@@ -138,6 +179,11 @@ public final class WaitingRoomViewModel {
         switch cta.actionKey {
         case "back_to_home":
             pendingNav = .backToHome(homeId: homeId)
+        // A18.2 approved frame's ghost CTA ("View claim").
+        case "view_claim":
+            if let claimId {
+                pendingNav = .viewClaim(claimId: claimId)
+            }
         default:
             log("dock.\(cta.actionKey)")
         }

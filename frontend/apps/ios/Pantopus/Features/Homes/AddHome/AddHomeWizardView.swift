@@ -194,7 +194,10 @@ private struct SuccessStep: View {
         // Re-use the T3.6 Status / Waiting screen so the home-added
         // terminal shares its chrome with the claim-submitted and
         // check-your-email frames.
-        StatusWaitingView(
+        // Dock-less body — `WizardShell` owns the sticky CTA dock here, so the
+        // full `StatusWaitingView` would render a second stacked pair. Mirrors
+        // Android's `AddHomeWizardScreen` using `StatusWaitingBody`.
+        StatusWaitingBodyView(
             content: .claimSubmitted(homeName: nil)
                 .withHeadline("Home added")
                 .withSubcopy("We'll email you when verification completes.")

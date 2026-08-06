@@ -126,6 +126,34 @@ final class PublicProfileViewModelTests: XCTestCase {
     }
     """
 
+    /// A21.2 — `GET /api/posts/user/:id` payload used to hydrate the
+    /// Local archetype's post feed.
+    private static let userPosts = """
+    {
+      "posts": [
+        {
+          "id": "p1",
+          "user_id": "u3",
+          "content": "Free pile on the curb.",
+          "post_type": "service_offer",
+          "created_at": "2025-01-01T00:00:00.000Z",
+          "like_count": 28,
+          "comment_count": 12,
+          "location_name": "88 Beech St"
+        },
+        {
+          "id": "p2",
+          "user_id": "u3",
+          "content": "Water main flagged on Beech.",
+          "post_type": "recommendation",
+          "created_at": "2025-01-01T00:00:00.000Z",
+          "like_count": 47,
+          "comment_count": 18
+        }
+      ]
+    }
+    """
+
     // MARK: - Load
 
     func testLoadHappyPath() async {
@@ -266,6 +294,79 @@ final class PublicProfileViewModelTests: XCTestCase {
         XCTAssertEqual(content.kind, .local)
         XCTAssertTrue(content.header.isVerifiedNeighbor)
         XCTAssertNil(content.header.tierLabel)
+    }
+
+    // MARK: - A21.2 — the Local archetype's post feed
+
+    func testLocalProfileProjectsUserPostsOntoTheFeed() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileLocalNeighbor),
+            .status(200, body: Self.userPosts)
+        ]
+        let vm = PublicProfileViewModel(userId: "u3", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(content.posts.count, 2)
+        let first = content.posts[0]
+        XCTAssertEqual(first.body, "Free pile on the curb.")
+        XCTAssertEqual(first.locality, "88 Beech St")
+        XCTAssertEqual(first.reactions, 28)
+        XCTAssertEqual(first.replies, 12)
+        XCTAssertEqual(first.intent, .offer)
+        // Never invent a tier chip for a plain neighbourhood post.
+        XCTAssertNil(first.visibility)
+        XCTAssertFalse(first.isLocked)
+        // A post type with no honest chip renders without one.
+        XCTAssertNil(content.posts[1].intent)
+        // The neighbour projection sees the same feed.
+        XCTAssertEqual(content.neighbor?.posts.count, 2)
+    }
+
+    func testLocalProfilePostFailureDegradesToEmptyFeed() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileLocalNeighbor),
+            .status(500, body: "{\"error\":\"boom\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u3", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertTrue(content.posts.isEmpty)
+        XCTAssertEqual(content.kind, .local)
+    }
+
+    func testPersonaProfileDoesNotFetchUserPosts() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertTrue(content.posts.isEmpty)
+        let hitPostsEndpoint = SequencedURLProtocol.capturedRequests.contains {
+            $0.url?.path.hasPrefix("/api/posts/user/") ?? false
+        }
+        XCTAssertFalse(hitPostsEndpoint, "Persona profiles must not fetch the local post feed.")
+    }
+
+    func testLocalTabDefaultsToPostsAndSwitchesWithoutRefetch() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileLocalNeighbor),
+            .status(200, body: Self.userPosts)
+        ]
+        let vm = PublicProfileViewModel(userId: "u3", client: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.selectedLocalTab, .posts)
+        let requestCount = SequencedURLProtocol.capturedRequests.count
+        vm.selectedLocalTab = .about
+        XCTAssertEqual(vm.selectedLocalTab, .about)
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.count, requestCount)
     }
 
     // MARK: - WS3.1 — Follow opens the privacy handshake (Stripe tiers)

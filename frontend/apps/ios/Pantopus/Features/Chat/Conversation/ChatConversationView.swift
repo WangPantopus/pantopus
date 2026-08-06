@@ -37,6 +37,9 @@ public struct ChatConversationView: View {
     @State private var gigPickerPresented = false
     @State private var listingPickerPresented = false
     @State private var upgradePromptPresented = false
+    /// A15.4 — "Not now" on the upgrade-fan card hides it for the rest of
+    /// this visit. There is no server-side dismissal to persist to yet.
+    @State private var upgradeCardDismissed = false
     @State private var detailsPresented = false
     @State private var emojiPickerPresented = false
     @State private var isSelecting = false
@@ -128,16 +131,20 @@ public struct ChatConversationView: View {
                             fanName: firstWord(viewModel.counterparty.displayName),
                             total: quota.total
                         )
-                        CreatorUpgradeFanCard(
-                            fanName: firstWord(viewModel.counterparty.displayName),
-                            tierName: resolvedCreatorContext.fanTierName,
-                            upgradeTierName: resolvedCreatorContext.upgradeTierName
-                        )
+                        if let offer = resolvedCreatorContext.upgradeOffer, !upgradeCardDismissed {
+                            CreatorUpgradeFanCard(
+                                fanName: firstWord(viewModel.counterparty.displayName),
+                                currentTierName: resolvedCreatorContext.fanTierName,
+                                offer: offer
+                            ) {
+                                upgradeCardDismissed = true
+                            }
+                        }
                     }
                 }
             }
-            if mode == .fanThread {
-                FanMembershipStripe(entitlement: activeFanEntitlement) {
+            if mode == .fanThread, let entitlement = viewModel.fanEntitlement {
+                FanMembershipStripe(entitlement: entitlement) {
                     upgradePromptPresented = true
                 }
             }
@@ -158,8 +165,8 @@ public struct ChatConversationView: View {
                     viewModel.removeQueuedAttachment(id: id)
                 }
             }
-            if mode == .fanThread {
-                FanQuotaGate(entitlement: activeFanEntitlement) {
+            if mode == .fanThread, let entitlement = viewModel.fanEntitlement {
+                FanQuotaGate(entitlement: entitlement) {
                     upgradePromptPresented = true
                 }
             }
@@ -177,7 +184,9 @@ public struct ChatConversationView: View {
                     ),
                     placeholder: composerPlaceholder,
                     canSend: viewModel.canSend && !isCreatorQuotaLocked,
-                    showsSendCost: mode == .fanThread && !isFanReplyLocked,
+                    // The "−1" send-cost badge is a claim about the fan's
+                    // quota — only shown once the allowance is known.
+                    showsSendCost: mode == .fanThread && viewModel.fanEntitlement != nil && !isFanReplyLocked,
                     isLockedAction: isFanReplyLocked || isCreatorQuotaLocked,
                     isStreaming: viewModel.isAIStreaming,
                     onAttach: { attachmentsPresented = true },
@@ -185,11 +194,10 @@ public struct ChatConversationView: View {
                     onSend: { sendOrPromptForUpgrade() },
                     onStop: { viewModel.cancelAIStream() }
                 )
-                if isCreatorQuotaLocked, let quota = resolvedCreatorContext.quota {
+                if isCreatorQuotaLocked {
                     CreatorQuotaLockRow(
                         tierName: resolvedCreatorContext.fanTierName,
-                        fanName: firstWord(viewModel.counterparty.displayName),
-                        resetCopy: quota.resetCopy
+                        fanName: firstWord(viewModel.counterparty.displayName)
                     )
                 }
             }
@@ -245,8 +253,10 @@ public struct ChatConversationView: View {
             handlePickedDocuments(result)
         }
         .sheet(isPresented: $upgradePromptPresented) {
-            FanTierUpgradePromptSheet(entitlement: activeFanEntitlement)
-                .presentationDetents([.medium])
+            if let entitlement = viewModel.fanEntitlement {
+                FanTierUpgradePromptSheet(entitlement: entitlement)
+                    .presentationDetents([.medium])
+            }
         }
         .sheet(isPresented: $detailsPresented) {
             ChatConversationDetailsSheet(viewModel: viewModel) {
@@ -371,12 +381,12 @@ public struct ChatConversationView: View {
         if isCreatorQuotaLocked, let quota = resolvedCreatorContext.quota {
             return "Out of replies until \(quota.resetCopy.replacingOccurrences(of: "Resets ", with: ""))"
         }
-        if mode == .fanThread {
+        if mode == .fanThread, let entitlement = viewModel.fanEntitlement {
             let first = firstWord(viewModel.counterparty.displayName)
-            if let required = activeFanEntitlement.requiredReplyTier {
+            if let required = entitlement.requiredReplyTier {
                 return "Upgrade to \(required) to reply…"
             }
-            return "Message \(first)… (uses 1 of \(activeFanEntitlement.messageLimit))"
+            return "Message \(first)… (uses 1 of \(entitlement.messageLimit))"
         }
         switch viewModel.counterparty {
         case let .person(name, _, _, _, _): return "Message \(firstWord(name))…"
@@ -385,18 +395,12 @@ public struct ChatConversationView: View {
         }
     }
 
-    private var activeFanEntitlement: ChatFanEntitlement {
-        viewModel.fanEntitlement ?? ChatFanEntitlement(
-            currentTier: "Bronze",
-            renewsOn: "Apr 12",
-            messagesLeft: 3,
-            messageLimit: 5,
-            resetCopy: "Resets May 1"
-        )
-    }
-
+    /// Only locked once the backend has actually reported the fan's
+    /// allowance. An unknown entitlement leaves the composer open rather
+    /// than guessing a cap.
     private var isFanReplyLocked: Bool {
-        mode == .fanThread && !activeFanEntitlement.canReply
+        guard mode == .fanThread, let entitlement = viewModel.fanEntitlement else { return false }
+        return !entitlement.canReply
     }
 
     private var isCreatorQuotaLocked: Bool {
@@ -596,23 +600,26 @@ public struct ChatConversationView: View {
         .accessibilityIdentifier("chatConversationEmpty")
     }
 
+    /// A15.5 empty fan thread. The design's "Auto-welcome · free" card is
+    /// intentionally absent: personas have no welcome-message field on the
+    /// wire (`backend/routes/personaDms.js` / `serializeMembershipForFan`),
+    /// and the design's literal fixture ("Welcome to the Diary, Maria." —
+    /// "— Wynn") would ship one creator's name to every fan.
     private var fanEmptyFrame: some View {
         ScrollView {
             VStack(spacing: 18) {
-                FanAutoWelcomeCard()
                 VStack(spacing: Spacing.s3) {
                     Text("Start a conversation")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
-                    Text(
-                        "You can message \(firstWord(viewModel.counterparty.displayName)) directly. " +
-                            "Each send uses one of your monthly \(activeFanEntitlement.currentTier) replies."
-                    )
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-                    FanQuotaHero(entitlement: activeFanEntitlement)
+                    Text(fanEmptyBody)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 280)
+                    if let entitlement = viewModel.fanEntitlement {
+                        FanQuotaHero(entitlement: entitlement)
+                    }
                     FanOpeners { label in
                         viewModel.composerText = label
                     }
@@ -625,6 +632,14 @@ public struct ChatConversationView: View {
             .padding(.bottom, Spacing.s4)
         }
         .accessibilityIdentifier("chatConversationFanEmpty")
+    }
+
+    private var fanEmptyBody: String {
+        let name = firstWord(viewModel.counterparty.displayName)
+        guard let tier = viewModel.fanEntitlement?.currentTier else {
+            return "You can message \(name) directly."
+        }
+        return "You can message \(name) directly. Each send uses one of your monthly \(tier) replies."
     }
 
     /// A15 `.empty .sug` — full-width white suggestion cards. Tapping one
@@ -859,10 +874,9 @@ extension ChatConversationView {
                     // blank space past the real content and made every
                     // scrollTo land short.
                     VStack(spacing: Spacing.s0) {
-                        if mode == .fanThread {
-                            FanAutoWelcomeCard()
-                                .padding(.bottom, Spacing.s3)
-                        }
+                        // A15.5's "Auto-welcome · free" card is omitted:
+                        // no persona welcome-message exists on the wire,
+                        // and the design's copy is fixture identity.
                         if mode == .aiAssistant {
                             // A15.3 — the welcome card stays pinned at the top
                             // of the populated AI thread.
@@ -1257,49 +1271,6 @@ private struct FanQuotaGate: View {
     }
 }
 
-private struct FanAutoWelcomeCard: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s1) {
-                Icon(.sparkles, size: 9, strokeWidth: 2.8, color: Theme.Color.business)
-                Text("AUTO-WELCOME · FREE")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .tracking(0.6)
-                    .foregroundStyle(Theme.Color.business)
-            }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Theme.Color.businessBg)
-            .clipShape(Capsule())
-
-            Text("Welcome to the Diary, Maria.")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-            Text(
-                "First message is on me — ask anything bread-related, share a bake, " +
-                    "or just say hi. I read everything personally on Sunday evenings."
-            )
-            .font(.system(size: 12.5))
-            .lineSpacing(4)
-            .foregroundStyle(Theme.Color.appTextStrong)
-            Text("— Wynn")
-                .font(.system(size: 12, weight: .medium))
-                .italic()
-                .foregroundStyle(Theme.Color.appTextSecondary)
-        }
-        .padding(Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
-        .shadow(color: Theme.Color.appText.opacity(0.06), radius: 6, x: 0, y: 2)
-        .accessibilityIdentifier("chatFanAutoWelcome")
-    }
-}
-
 private struct FanQuotaHero: View {
     let entitlement: ChatFanEntitlement
 
@@ -1334,24 +1305,28 @@ private struct FanQuotaHero: View {
 private struct FanOpeners: View {
     let onSelect: @MainActor (String) -> Void
 
+    /// Persona-neutral openers. The design's copy is sourdough-specific
+    /// fixture text; there is no per-persona suggested-prompt payload on
+    /// the wire, so these stay generic rather than pretending to know what
+    /// this creator is about.
     private let openers: [FanOpener] = [
         FanOpener(
-            id: "recipe",
+            id: "question",
             icon: .helpCircle,
-            label: "Recipe question",
-            title: "Why does my crumb come out tight on day 2?"
+            label: "Ask a question",
+            title: "I have a question about"
         ),
         FanOpener(
             id: "photo",
             icon: .image,
-            label: "Share a bake",
-            title: "Send a photo for feedback"
+            label: "Share something",
+            title: "Sending a photo for your feedback"
         ),
         FanOpener(
-            id: "workshop",
-            icon: .calendar,
-            label: "Workshops",
-            title: "When's the next hands-on session?"
+            id: "hello",
+            icon: .messageSquare,
+            label: "Say hi",
+            title: "Just joined — happy to be here!"
         )
     ]
 
@@ -1714,16 +1689,20 @@ private struct ChatCreatorAudienceStrip: View {
                     .background(Theme.Color.business)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Creator inbox · \(context.personaName)")
+                    Text(context.personaName.map { "Creator inbox · \($0)" } ?? "Creator inbox")
                         .font(.system(size: 11.5, weight: .bold))
                         .tracking(0.4)
                         .foregroundStyle(Theme.Color.business)
                         .textCase(.uppercase)
                         .lineLimit(1)
-                    Text(context.audienceSummary)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .lineLimit(1)
+                    // Reach / engagement line only when the caller has real
+                    // analytics — there is no per-thread analytics payload.
+                    if let summary = context.audienceSummary {
+                        Text(summary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: Spacing.s0)
                 Icon(.chevronRight, size: 16, strokeWidth: 2.4, color: Theme.Color.business)
@@ -1826,40 +1805,134 @@ private struct CreatorQuotaExhaustedPill: View {
     }
 }
 
+/// A15.4 `.upgrade-card` — head, optional creator-authored body, perk
+/// rows, and the "Not now" / "Send offer" pair. Every string comes from
+/// `ChatCreatorUpgradeOffer` (real tier data); nothing is synthesised
+/// here, and the whole card is omitted upstream when the offer is nil.
 private struct CreatorUpgradeFanCard: View {
     let fanName: String
-    let tierName: String
-    let upgradeTierName: String
+    let currentTierName: String
+    let offer: ChatCreatorUpgradeOffer
+    let onDismiss: @MainActor () -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.s2) {
-            Icon(.crown, size: 14, strokeWidth: 2.2, color: Theme.Color.warning)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Invite \(fanName) to \(upgradeTierName)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Text("Unlimited replies · they keep \(tierName) perks")
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            head
+            if let summary = offer.summary {
+                Text(summary)
+                    .font(.system(size: 12))
+                    .lineSpacing(5)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !offer.perks.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.s1) {
+                    ForEach(offer.perks, id: \.self) { perk in
+                        HStack(spacing: 6) {
+                            Icon(.check, size: 12, strokeWidth: 2.5, color: Theme.Color.success)
+                            Text(perk)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Theme.Color.appTextStrong)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+                .accessibilityIdentifier("chatCreatorUpgradeFanPerks")
+            }
+            actions
+            if !offer.canSendOffer {
+                Text("Sending upgrade offers isn't available yet.")
                     .font(.system(size: 10.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .accessibilityIdentifier("chatCreatorUpgradeFanCardUnavailable")
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.warningLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s3)
+        .accessibilityIdentifier("chatCreatorUpgradeFanCard")
+    }
+
+    private var head: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.crown, size: 15, strokeWidth: 2.4, color: Theme.Color.warning)
+                .frame(width: 30, height: 30)
+                .background(Theme.Color.warningLight)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Invite \(fanName) to \(offer.tierName)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: Spacing.s0)
         }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .padding(.horizontal, Spacing.s3)
-        .accessibilityIdentifier("chatCreatorUpgradeFanCard")
+    }
+
+    /// Price plus the fan's current tier — both known values, no perk claim.
+    private var subtitle: String? {
+        guard let price = offer.priceLabel else { return nil }
+        return "\(price) · currently on \(currentTierName)"
+    }
+
+    private var actions: some View {
+        HStack(spacing: 6) {
+            Button(action: onDismiss) {
+                Text("Not now")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Theme.Color.appSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chatCreatorUpgradeFanDismiss")
+            // Enabled only once a creator→fan upgrade-offer endpoint
+            // exists; there is none on the wire today.
+            Button {} label: {
+                HStack(spacing: 5) {
+                    Icon(.send, size: 13, strokeWidth: 2.5, color: Theme.Color.appTextInverse)
+                    Text("Send offer")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(offer.canSendOffer ? Theme.Color.warning : Theme.Color.appTextMuted)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .opacity(offer.canSendOffer ? 1 : 0.6)
+            }
+            .buttonStyle(.plain)
+            .disabled(!offer.canSendOffer)
+            .accessibilityIdentifier("chatCreatorUpgradeFanSend")
+        }
     }
 }
 
+/// A15.4 `.lock-row` — sits under the composer while the creator's weekly
+/// reply allowance for this fan is spent.
 private struct CreatorQuotaLockRow: View {
     let tierName: String
     let fanName: String
-    let resetCopy: String
 
     var body: some View {
         HStack(spacing: Spacing.s1) {

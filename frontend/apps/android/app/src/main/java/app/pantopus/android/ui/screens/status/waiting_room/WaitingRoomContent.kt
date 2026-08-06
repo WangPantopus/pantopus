@@ -9,6 +9,7 @@ import app.pantopus.android.ui.screens.status.StatusHalo
 import app.pantopus.android.ui.screens.status.StatusPillTone
 import app.pantopus.android.ui.screens.status.StatusStepState
 import app.pantopus.android.ui.screens.status.StatusTimelineStage
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import app.pantopus.android.ui.screens.status.StatusWaitingPill
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -102,6 +103,13 @@ sealed interface WaitingRoomPhase {
     data object Loaded : WaitingRoomPhase
 
     data class Notice(val notice: WaitingRoomNotice) : WaitingRoomPhase
+
+    /**
+     * The claim resolved in the claimant's favour — render the A18.2
+     * "You're the owner" frame instead of a dead-end notice. The payload is
+     * built from the real claim row, so every date it prints is API-sourced.
+     */
+    data class Approved(val content: StatusWaitingContent) : WaitingRoomPhase
 }
 
 /** Snapshot the `WaitingRoomScreen` renders. */

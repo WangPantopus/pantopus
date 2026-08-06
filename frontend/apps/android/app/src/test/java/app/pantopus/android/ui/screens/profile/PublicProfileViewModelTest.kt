@@ -3,6 +3,8 @@
 package app.pantopus.android.ui.screens.profile
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.posts.MyPostDto
+import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
 import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
@@ -10,6 +12,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileTab
@@ -36,9 +39,14 @@ class PublicProfileViewModelTest {
     private val relationships: RelationshipsRepository = mockk()
     private val blocks: BlocksRepository = mockk()
     private val authRepository: AuthRepository = mockk(relaxed = true)
+    private val posts: PostsRepository = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Local-kind profiles pull `GET /api/posts/user/:id`; default the
+        // stub to an empty feed and let individual tests override it.
+        coEvery { posts.userPosts(any(), any()) } returns
+            NetworkResult.Success(MyPostsResponse(emptyList()))
     }
 
     @After fun tearDown() {
@@ -51,6 +59,7 @@ class PublicProfileViewModelTest {
             relationships = relationships,
             blocks = blocks,
             authRepository = authRepository,
+            posts = posts,
             savedStateHandle = SavedStateHandle(mapOf(PUBLIC_PROFILE_USER_ID_KEY to "u1")),
         )
 
@@ -213,6 +222,89 @@ class PublicProfileViewModelTest {
             assertFalse(vm.showFollowHandshake.value)
             assertEquals("", vm.loadedPersonaHandle())
             assertEquals("Following isn't available from this profile yet.", vm.toastMessage.value)
+        }
+
+    // A21.2 — the Local archetype's post feed
+
+    @Test fun local_profile_projects_user_posts_onto_the_feed() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns
+                NetworkResult.Success(profile(residency = mapOf("verified" to true)))
+            coEvery { posts.userPosts("u1", any()) } returns
+                NetworkResult.Success(
+                    MyPostsResponse(
+                        listOf(
+                            MyPostDto(
+                                id = "p1",
+                                userId = "u1",
+                                content = "Free pile on the curb.",
+                                postType = "service_offer",
+                                createdAt = "2025-01-01T00:00:00.000Z",
+                                likeCount = 28,
+                                commentCount = 12,
+                                locationName = "88 Beech St",
+                            ),
+                            MyPostDto(
+                                id = "p2",
+                                userId = "u1",
+                                content = "Water main flagged on Beech.",
+                                postType = "recommendation",
+                                createdAt = "2025-01-01T00:00:00.000Z",
+                            ),
+                        ),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as PublicProfileUiState.Loaded
+            assertEquals(2, loaded.content.posts.size)
+            val first = loaded.content.posts.first()
+            assertEquals("Free pile on the curb.", first.body)
+            assertEquals("88 Beech St", first.locality)
+            assertEquals(28, first.reactions)
+            assertEquals(12, first.replies)
+            assertEquals(PublicProfilePost.Intent.Offer, first.intent)
+            // Never invent a tier chip for a plain neighbourhood post.
+            assertEquals(null, first.visibility)
+            assertFalse(first.isLocked)
+            // A post type with no honest chip renders without one.
+            assertEquals(null, loaded.content.posts[1].intent)
+            // The neighbour projection sees the same feed.
+            assertEquals(2, loaded.content.neighbor?.posts?.size)
+        }
+
+    @Test fun local_profile_post_failure_degrades_to_empty_feed() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns
+                NetworkResult.Success(profile(residency = mapOf("verified" to true)))
+            coEvery { posts.userPosts("u1", any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val vm = makeVm()
+            vm.load()
+            val loaded = vm.state.value as PublicProfileUiState.Loaded
+            assertTrue(loaded.content.posts.isEmpty())
+            assertEquals(PublicProfileKind.Local, loaded.content.kind)
+        }
+
+    @Test fun persona_profile_does_not_fetch_user_posts() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile(residency = null))
+            val vm = makeVm()
+            vm.load()
+            coVerify(exactly = 0) { posts.userPosts(any(), any()) }
+            assertTrue((vm.state.value as PublicProfileUiState.Loaded).content.posts.isEmpty())
+        }
+
+    @Test fun local_tab_defaults_to_posts_and_switches_without_refetch() =
+        runTest {
+            coEvery { repo.publicProfile("u1") } returns
+                NetworkResult.Success(profile(residency = mapOf("verified" to true)))
+            val vm = makeVm()
+            vm.load()
+            assertEquals(LocalProfileTab.Posts, vm.selectedLocalTab.value)
+            vm.selectLocalTab(LocalProfileTab.About)
+            assertEquals(LocalProfileTab.About, vm.selectedLocalTab.value)
+            coVerify(exactly = 1) { repo.publicProfile("u1") }
         }
 
     @Test fun unlock_broadcast_without_beacon_handle_stays_closed() =

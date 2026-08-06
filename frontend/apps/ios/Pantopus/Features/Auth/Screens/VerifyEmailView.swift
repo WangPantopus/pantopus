@@ -2,20 +2,22 @@
 //  VerifyEmailView.swift
 //  Pantopus
 //
-//  T6.1c P5 — Verify email (auth-frames.jsx frame 5). Surfaced
-//  post-signup as a full screen (current backend behaviour — see the
-//  Q4 + backend-gap discussion in `docs/mobile/auth-backend-contracts.md`)
-//  and also as the destination of the verification email's deep link
-//  (`pantopus://auth/verify-email?token=…`). When a `token` is supplied
-//  the view-model fires `AuthManager.verifyEmail` on appear; without one
-//  it renders the soft-gate "we sent you a link" surface with a resend
-//  CTA.
+//  A18.1 "Verify Email Sent" — the post-signup surface. Renders the
+//  designed `StatusWaitingContent.checkYourEmail` frame (halo + headline +
+//  status pill + Open Mail / Resend / Use a different email stack +
+//  footnote) rather than the older bespoke mail-disc layout it replaced.
 //
-//  Per Q4 (soft-gate decision) the "I'll do this later" tertiary link is
-//  visible — the backend's current hard-gate behaviour is documented in
-//  the backend-gap section of the contracts doc and tracked separately.
+//  The verification email's deep link lands on `VerifyEmailLandingView`
+//  (§1B-2), so in production this screen is always reached with
+//  `token == nil`. The token path is kept because the route still accepts
+//  one: when present the view-model fires `AuthManager.verifyEmail` on
+//  appear and the banner reports progress.
+//
+//  Per Q4 (soft-gate decision) `softGate` shows the design's back control
+//  so the user can leave without verifying; hard-gate hosts pass `false`.
 //
 
+import Combine
 import SwiftUI
 import UIKit
 
@@ -23,6 +25,9 @@ struct VerifyEmailView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel: VerifyEmailViewModel
     @State private var showChangeEmailSheet: Bool = false
+    /// Heartbeat for the wall-clock resend countdown.
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     let onDone: () -> Void
     let onChangeEmail: ((String) -> Void)?
 
@@ -32,12 +37,12 @@ struct VerifyEmailView: View {
     ///   - token: Hashed Supabase OTP from the verification link.
     ///     When non-nil, the screen auto-verifies on appear.
     ///   - softGate: When true (Q4 = soft-gate, the active decision) shows
-    ///     the "I'll do this later" tertiary link. Hard-gate hosts pass
-    ///     `false` to hide it.
+    ///     the A18.1 back control so the user can leave without verifying.
+    ///     Hard-gate hosts pass `false` to hide it.
     ///   - onDone: Tapped when the user either completes verification or
-    ///     bails via "I'll do this later". Host pops the auth stack.
-    ///   - onChangeEmail: Optional handoff for the "Wrong email? Change it"
-    ///     row — host should route back to the create-account flow.
+    ///     backs out of the surface. Host pops the auth stack.
+    ///   - onChangeEmail: Optional handoff for "Use a different email" —
+    ///     host should route back to the create-account flow.
     init(
         email: String? = nil,
         token: String? = nil,
@@ -58,34 +63,25 @@ struct VerifyEmailView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            ScrollView {
-                VStack(spacing: Spacing.s5) {
-                    Spacer(minLength: Spacing.s10)
-                    illustration
-                    headlineBlock
-                    if let banner = bannerCopy {
-                        Text(banner.text)
-                            .pantopusTextStyle(.caption)
-                            .foregroundStyle(banner.color)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, Spacing.s4)
-                            .padding(.vertical, Spacing.s2)
-                            .background(banner.background)
-                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                            .accessibilityIdentifier("verifyEmailBanner")
-                    }
-                    Spacer(minLength: Spacing.s10)
-                }
-                .padding(.horizontal, Spacing.s5)
-                .frame(maxWidth: .infinity)
-            }
-            actionStack
+            topBar
+            if let banner = bannerCopy { bannerLine(banner) }
+            StatusWaitingView(
+                content: statusContent,
+                onStackAction: handleStackAction
+            )
         }
         .background(Theme.Color.appSurface)
         .navigationBarHidden(true)
         .accessibilityIdentifier("verifyEmailScreen")
         .task {
             await viewModel.verifyOnAppearIfNeeded(using: auth)
+        }
+        .onReceive(ticker) { tick in
+            // The resend cooldown is wall-clock based, so the disabled
+            // button's "Resend in m:ss" label needs a heartbeat to redraw.
+            if viewModel.cooldownRemaining(now: tick) != nil || viewModel.cooldownRemaining(now: now) != nil {
+                now = tick
+            }
         }
         .onChange(of: viewModel.didComplete) { _, complete in
             if complete { onDone() }
@@ -102,33 +98,60 @@ struct VerifyEmailView: View {
         }
     }
 
-    private var illustration: some View {
+    /// A18.1's back-chevron + title bar. The chevron is the soft-gate exit
+    /// ("verify later"); hard-gate hosts pass `softGate: false` and it hides.
+    private var topBar: some View {
         ZStack {
-            Circle()
-                .fill(Theme.Color.primary50)
-                .frame(width: 140, height: 140)
-            Icon(.mailbox, size: 80, color: Theme.Color.primary500)
-        }
-        .accessibilityHidden(true)
-        .accessibilityIdentifier("verifyEmailIllustration")
-    }
-
-    private var headlineBlock: some View {
-        VStack(spacing: Spacing.s2) {
-            Text("Verify your email")
-                .pantopusTextStyle(.h2)
+            Text("Check your email")
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
-            Text(bodyText)
-                .pantopusTextStyle(.small)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
+            HStack {
+                if viewModel.softGate {
+                    Button(action: onDone) {
+                        Icon(.chevronLeft, size: 20, strokeWidth: 2.2, color: Theme.Color.appText)
+                            .frame(width: 36, height: 36)
+                    }
+                    .accessibilityLabel("Back")
+                    .accessibilityIdentifier("verifyEmailBackButton")
+                }
+                Spacer()
+                Color.clear.frame(width: 36, height: 36)
+            }
+            .padding(.horizontal, 10)
         }
+        .frame(height: 52)
+        .background(Theme.Color.appSurface)
     }
 
-    private var bodyText: String {
-        let address = viewModel.email ?? "your email"
-        return "We sent a verification link to \(address). Click it to unlock all features."
+    /// The A18.1 frame. `resent` flips the pill to the green "New link sent"
+    /// confirmation and swaps Resend for the disabled countdown variant.
+    private var statusContent: StatusWaitingContent {
+        let remaining = viewModel.cooldownRemaining(now: now)
+        return .checkYourEmail(
+            email: viewModel.email,
+            resent: remaining != nil,
+            resendCountdown: Self.countdownLabel(remaining ?? 0)
+        )
+    }
+
+    /// "0:42" — minutes:seconds, matching the design frame.
+    static func countdownLabel(_ remaining: TimeInterval) -> String {
+        let total = max(0, Int(remaining.rounded(.up)))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    private func handleStackAction(_ button: StatusActionButton) {
+        switch button.actionKey {
+        case "open_mail":
+            openMailApp()
+        case "resend_email":
+            resend()
+        case "change_email":
+            showChangeEmailSheet = true
+        default:
+            break
+        }
     }
 
     private struct BannerCopy {
@@ -137,6 +160,20 @@ struct VerifyEmailView: View {
         let background: SwiftUI.Color
     }
 
+    private func bannerLine(_ banner: BannerCopy) -> some View {
+        Text(banner.text)
+            .pantopusTextStyle(.caption)
+            .foregroundStyle(banner.color)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .frame(maxWidth: .infinity)
+            .background(banner.background)
+            .accessibilityIdentifier("verifyEmailBanner")
+    }
+
+    /// Only states the A18.1 frame can't express itself: the deep-link
+    /// verify progress and any error. "Resent" is covered by the pill.
     private var bannerCopy: BannerCopy? {
         if viewModel.isVerifying {
             return BannerCopy(
@@ -159,86 +196,7 @@ struct VerifyEmailView: View {
                 background: Theme.Color.errorBg
             )
         }
-        if viewModel.didResend {
-            return BannerCopy(
-                text: "Verification email sent.",
-                color: Theme.Color.primary700,
-                background: Theme.Color.primary50
-            )
-        }
         return nil
-    }
-
-    private var actionStack: some View {
-        VStack(spacing: Spacing.s2) {
-            Button(action: openMailApp) {
-                Text("Open mail app")
-                    .pantopusTextStyle(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-            }
-            .background(Theme.Color.primary600)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .accessibilityIdentifier("verifyEmailOpenMailButton")
-
-            Button(action: resend) {
-                Group {
-                    if viewModel.isResending {
-                        ProgressView().tint(Theme.Color.appText)
-                    } else {
-                        Text(resendLabel)
-                            .pantopusTextStyle(.body)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(viewModel.canResend ? Theme.Color.appText : Theme.Color.appTextMuted)
-                    }
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .background(Theme.Color.appSurface)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-            .disabled(!viewModel.canResend)
-            .accessibilityIdentifier("verifyEmailResendButton")
-
-            if viewModel.softGate {
-                Button(action: onDone) {
-                    Text("I'll do this later")
-                        .pantopusTextStyle(.small)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.primary600)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                }
-                .accessibilityIdentifier("verifyEmailDoLaterButton")
-            }
-
-            Button(
-                action: { showChangeEmailSheet = true },
-                label: {
-                    Text("Wrong email? Change it")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 32)
-                }
-            )
-            .accessibilityIdentifier("verifyEmailChangeEmailButton")
-        }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s3)
-        .background(Theme.Color.appSurface)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-        }
-    }
-
-    private var resendLabel: String {
-        if let remaining = viewModel.cooldownRemaining(now: Date()), remaining > 0 {
-            return "Resend in \(Int(remaining))s"
-        }
-        return "Resend email"
     }
 
     private func resend() {

@@ -17,7 +17,10 @@ struct ClaimSuccessStep: View {
     }
 
     var body: some View {
-        StatusWaitingView(content: .claimSubmitted(homeName: homeName))
+        // Dock-less body: `WizardShell` already supplies the sticky CTA dock,
+        // so the full `StatusWaitingView` would stack a second one. Mirrors
+        // Android's `ClaimOwnershipWizardScreen` using `StatusWaitingBody`.
+        StatusWaitingBodyView(content: .claimSubmitted(homeName: homeName))
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

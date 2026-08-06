@@ -44,6 +44,7 @@ import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.status.StatusCta
 import app.pantopus.android.ui.screens.status.StatusPillView
 import app.pantopus.android.ui.screens.status.StatusTimeline
+import app.pantopus.android.ui.screens.status.StatusWaitingScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -128,6 +129,16 @@ fun WaitingRoomScreen(
                     notice = phase.notice,
                     modifier = Modifier.weight(1f),
                     onCta = { if (phase.notice.isRetry) onRetry() else onBack() },
+                )
+            is WaitingRoomPhase.Approved ->
+                // A18.2 "You're the owner". `StatusWaitingScreen` carries its
+                // own sticky dock, so no extra chrome is added here.
+                StatusWaitingScreen(
+                    content = phase.content,
+                    onPrimary = onPrimary,
+                    onSecondary = onSecondary,
+                    modifier = Modifier.weight(1f),
+                    rootTestTag = "waitingRoomApproved",
                 )
             is WaitingRoomPhase.Loaded -> {
                 LoadedFrame(

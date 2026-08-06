@@ -49,6 +49,15 @@ public struct WaitingRoomView: View {
                         onBack()
                     }
                 }
+            case let .approved(content):
+                // A18.2 "You're the owner". `StatusWaitingView` carries its
+                // own sticky dock, so no extra chrome is added here.
+                StatusWaitingView(
+                    content: content,
+                    onPrimary: { viewModel.handlePrimary($0) },
+                    onSecondary: { viewModel.handleSecondary($0) }
+                )
+                .accessibilityIdentifier("waitingRoomApproved")
             case .loaded:
                 loadedFrame
             }

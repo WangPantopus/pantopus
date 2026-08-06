@@ -170,6 +170,9 @@ fun ChatConversationScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showFanUpgradePrompt by remember { mutableStateOf(false) }
+    // A15.4 — "Not now" on the upgrade-fan card hides it for the rest of
+    // this visit. There is no server-side dismissal to persist to yet.
+    var upgradeCardDismissed by remember { mutableStateOf(false) }
     var actionTarget by remember { mutableStateOf<ChatBubbleContent?>(null) }
     var showAttachSheet by remember { mutableStateOf(false) }
     var showGigPicker by remember { mutableStateOf(false) }
@@ -265,9 +268,11 @@ fun ChatConversationScreen(
             if (granted) launchCamera()
         }
     val conversationMode = chrome.mode
-    val resolvedFanEntitlement = chrome.fanEntitlement ?: ChatConversationSampleData.fanEntitlement
+    // No fixture fallback: an unreported allowance hides the fan chrome
+    // rather than showing another member's tier / renewal / quota.
+    val fanEntitlement = chrome.fanEntitlement
     val isFanThread = conversationMode == ChatConversationMode.FanThread
-    val isFanReplyLocked = isFanThread && !resolvedFanEntitlement.canReply
+    val isFanReplyLocked = isFanThread && fanEntitlement != null && !fanEntitlement.canReply
 
     LaunchedEffect(Unit) {
         viewModel.configure(
@@ -325,17 +330,21 @@ fun ChatConversationScreen(
                             fanName = activeCounterparty.displayName.firstWord(),
                             total = quota.total,
                         )
-                        CreatorUpgradeFanCard(
-                            fanName = activeCounterparty.displayName.firstWord(),
-                            tierName = resolvedCreatorContext.fanTierName,
-                            upgradeTierName = resolvedCreatorContext.upgradeTierName,
-                        )
+                        val offer = resolvedCreatorContext.upgradeOffer
+                        if (offer != null && !upgradeCardDismissed) {
+                            CreatorUpgradeFanCard(
+                                fanName = activeCounterparty.displayName.firstWord(),
+                                currentTierName = resolvedCreatorContext.fanTierName,
+                                offer = offer,
+                                onDismiss = { upgradeCardDismissed = true },
+                            )
+                        }
                     }
                 }
             }
-            if (isFanThread) {
+            if (isFanThread && fanEntitlement != null) {
                 FanMembershipStripe(
-                    entitlement = resolvedFanEntitlement,
+                    entitlement = fanEntitlement,
                     onManage = { showFanUpgradePrompt = true },
                 )
             }
@@ -356,7 +365,7 @@ fun ChatConversationScreen(
                             emptyChips = viewModel.emptyChips,
                             onChipTap = viewModel::tapPrompt,
                             conversationMode = conversationMode,
-                            fanEntitlement = resolvedFanEntitlement,
+                            fanEntitlement = fanEntitlement,
                             onCapabilityTap = viewModel::sendCapabilityPrompt,
                         )
                     is ChatConversationUiState.Loaded ->
@@ -405,9 +414,9 @@ fun ChatConversationScreen(
                     onRemove = viewModel::removeQueuedAttachment,
                 )
             }
-            if (isFanThread) {
+            if (isFanThread && fanEntitlement != null) {
                 FanQuotaGate(
-                    entitlement = resolvedFanEntitlement,
+                    entitlement = fanEntitlement,
                     onUpgrade = { showFanUpgradePrompt = true },
                 )
             }
@@ -427,7 +436,13 @@ fun ChatConversationScreen(
                 )
                 Composer(
                     text = composerText,
-                    placeholder = composerPlaceholder(conversationMode, activeCounterparty, resolvedFanEntitlement),
+                    placeholder =
+                        composerPlaceholder(
+                            conversationMode = conversationMode,
+                            c = activeCounterparty,
+                            fanEntitlement = fanEntitlement,
+                            creatorQuota = if (isCreatorQuotaLocked) resolvedCreatorContext.quota else null,
+                        ),
                     // Attachment-only sends are valid — the VM substitutes
                     // "Attachment" text and sends as `file` (iOS parity).
                     canSend =
@@ -435,7 +450,9 @@ fun ChatConversationScreen(
                             !isSending &&
                             !isAiStreaming &&
                             !isCreatorQuotaLocked,
-                    showsSendCost = isFanThread && !isFanReplyLocked,
+                    // The "−1" send-cost badge is a claim about the fan's
+                    // quota — only shown once the allowance is known.
+                    showsSendCost = isFanThread && fanEntitlement != null && !isFanReplyLocked,
                     isLockedAction = isFanReplyLocked || isCreatorQuotaLocked,
                     isAiStreaming = isAiStreaming,
                     onTextChange = viewModel::setComposerText,
@@ -450,6 +467,12 @@ fun ChatConversationScreen(
                     onEmoji = { showEmojiSheet = true },
                     onStopAiStream = viewModel::cancelAiStream,
                 )
+                if (isCreatorQuotaLocked) {
+                    CreatorQuotaLockRow(
+                        tierName = resolvedCreatorContext.fanTierName,
+                        fanName = activeCounterparty.displayName.firstWord(),
+                    )
+                }
             }
         }
 
@@ -502,14 +525,14 @@ fun ChatConversationScreen(
             )
         }
 
-        if (showFanUpgradePrompt) {
+        if (showFanUpgradePrompt && fanEntitlement != null) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
                 onDismissRequest = { showFanUpgradePrompt = false },
                 sheetState = sheetState,
                 containerColor = PantopusColors.appSurface,
             ) {
-                FanTierUpgradePromptSheet(entitlement = resolvedFanEntitlement)
+                FanTierUpgradePromptSheet(entitlement = fanEntitlement)
             }
         }
         actionTarget?.let { target ->
@@ -644,14 +667,22 @@ fun ChatConversationScreen(
     }
 }
 
+/**
+ * A15.4 / A15.5 composer placeholder. [creatorQuota] is non-null only when
+ * the creator's weekly reply allowance for this fan is exhausted, which
+ * swaps the placeholder for the locked copy (iOS parity).
+ */
 private fun composerPlaceholder(
     conversationMode: ChatConversationMode,
     c: ChatCounterparty,
-    fanEntitlement: ChatFanEntitlement = ChatConversationSampleData.fanEntitlement,
+    fanEntitlement: ChatFanEntitlement? = null,
+    creatorQuota: ChatCreatorQuota? = null,
 ): String =
     when {
         conversationMode == ChatConversationMode.AiAssistant -> "Ask Pantopus AI…"
-        conversationMode == ChatConversationMode.FanThread -> {
+        creatorQuota != null ->
+            "Out of replies until ${creatorQuota.resetCopy.replace("Resets ", "")}"
+        conversationMode == ChatConversationMode.FanThread && fanEntitlement != null -> {
             val required = fanEntitlement.requiredReplyTier
             if (required != null) {
                 "Upgrade to $required to reply…"
@@ -749,7 +780,9 @@ internal fun ChatHeader(
             val presence =
                 when {
                     isFanThread -> presenceFor(counterparty, isFanThread = true)
-                    isCreator -> (creatorContext.fanTierRank > 1) to creatorContext.fanSubtitle
+                    // Drops the sub-line entirely when the membership
+                    // detail isn't known rather than inventing one.
+                    isCreator -> creatorContext.fanSubtitle?.let { (creatorContext.fanTierRank > 1) to it }
                     else -> presenceFor(counterparty)
                 }
             presence?.let { (online, text) ->
@@ -991,20 +1024,24 @@ internal fun CreatorAudienceStrip(
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
-                text = "CREATOR INBOX · ${context.personaName.uppercase()}",
+                text = context.personaName?.let { "CREATOR INBOX · ${it.uppercase()}" } ?: "CREATOR INBOX",
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.business,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = context.audienceSummary,
-                fontSize = 11.sp,
-                color = PantopusColors.appTextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Reach / engagement line only when the caller has real
+            // analytics — there is no per-thread analytics payload.
+            context.audienceSummary?.let { summary ->
+                Text(
+                    text = summary,
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         PantopusIconImage(
             icon = PantopusIcon.ChevronRight,
@@ -1095,7 +1132,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
 }
 
 @Composable
-private fun CreatorQuotaExhaustedPill(
+internal fun CreatorQuotaExhaustedPill(
     tierName: String,
     fanName: String,
     total: Int,
@@ -1126,45 +1163,209 @@ private fun CreatorQuotaExhaustedPill(
     }
 }
 
+/**
+ * A15.4 `.upgrade-card` — head, optional creator-authored body, perk rows,
+ * and the "Not now" / "Send offer" pair. Every string comes from
+ * [ChatCreatorUpgradeOffer] (real tier data); nothing is synthesised here,
+ * and the whole card is omitted upstream when the offer is null.
+ */
 @Composable
-private fun CreatorUpgradeFanCard(
+internal fun CreatorUpgradeFanCard(
     fanName: String,
+    currentTierName: String,
+    offer: ChatCreatorUpgradeOffer,
+    onDismiss: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.warningBg)
+                .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.xl))
+                .padding(14.dp)
+                .testTag("chatCreatorUpgradeFanCard"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        CreatorUpgradeFanCardHead(fanName = fanName, currentTierName = currentTierName, offer = offer)
+        offer.summary?.let { summary ->
+            Text(
+                text = summary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = PantopusColors.appTextStrong,
+            )
+        }
+        if (offer.perks.isNotEmpty()) {
+            Column(
+                modifier = Modifier.testTag("chatCreatorUpgradeFanPerks"),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                offer.perks.forEach { perk ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Check,
+                            contentDescription = null,
+                            size = 12.dp,
+                            strokeWidth = 2.5f,
+                            tint = PantopusColors.success,
+                        )
+                        Text(text = perk, fontSize = 11.5.sp, color = PantopusColors.appTextStrong)
+                    }
+                }
+            }
+        }
+        CreatorUpgradeFanCardActions(canSendOffer = offer.canSendOffer, onDismiss = onDismiss)
+        if (!offer.canSendOffer) {
+            Text(
+                text = "Sending upgrade offers isn't available yet.",
+                fontSize = 10.5.sp,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.testTag("chatCreatorUpgradeFanCardUnavailable"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreatorUpgradeFanCardHead(
+    fanName: String,
+    currentTierName: String,
+    offer: ChatCreatorUpgradeOffer,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.warningLight),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Crown,
+                contentDescription = null,
+                size = 15.dp,
+                strokeWidth = 2.4f,
+                tint = PantopusColors.warning,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = "Invite $fanName to ${offer.tierName}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            // Price plus the fan's current tier — both known values, no
+            // perk claim.
+            offer.priceLabel?.let { price ->
+                Text(
+                    text = "$price · currently on $currentTierName",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreatorUpgradeFanCardActions(
+    canSendOffer: Boolean,
+    onDismiss: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .clickable(onClick = onDismiss)
+                    .testTag("chatCreatorUpgradeFanDismiss"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Not now",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextStrong,
+            )
+        }
+        // Enabled only once a creator→fan upgrade-offer endpoint exists;
+        // there is none on the wire today.
+        Row(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (canSendOffer) PantopusColors.warning else PantopusColors.appTextMuted)
+                    .alpha(if (canSendOffer) 1f else 0.6f)
+                    .clickable(enabled = canSendOffer) {}
+                    .testTag("chatCreatorUpgradeFanSend"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Send,
+                contentDescription = null,
+                size = 13.dp,
+                strokeWidth = 2.5f,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(
+                text = "Send offer",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+    }
+}
+
+/**
+ * A15.4 `.lock-row` — sits under the composer while the creator's weekly
+ * reply allowance for this fan is spent (iOS parity).
+ */
+@Composable
+internal fun CreatorQuotaLockRow(
     tierName: String,
-    upgradeTierName: String,
+    fanName: String,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .padding(Spacing.s3)
-                .testTag("chatCreatorUpgradeFanCard"),
+                .padding(horizontal = Spacing.s3)
+                .padding(bottom = Spacing.s2)
+                .testTag("chatCreatorQuotaLockRow"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
         PantopusIconImage(
-            icon = PantopusIcon.Crown,
+            icon = PantopusIcon.AlertTriangle,
             contentDescription = null,
-            size = 14.dp,
-            strokeWidth = 2.2f,
+            size = 11.dp,
+            strokeWidth = 2.4f,
             tint = PantopusColors.warning,
         )
-        Column {
-            Text(
-                text = "Invite $fanName to $upgradeTierName",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appText,
-            )
-            Text(
-                text = "Unlimited replies · they keep $tierName perks",
-                fontSize = 10.5.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
+        Text(
+            text = "$tierName cap reached. Upgrade $fanName or wait for the reset.",
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 
@@ -1572,7 +1773,7 @@ internal fun EmptyFrame(
     emptyChips: List<ChatPromptChip>,
     onChipTap: (ChatPromptChip) -> Unit,
     conversationMode: ChatConversationMode = ChatConversationMode.Dm,
-    fanEntitlement: ChatFanEntitlement = ChatConversationSampleData.fanEntitlement,
+    fanEntitlement: ChatFanEntitlement? = null,
     onCapabilityTap: (ChatPromptChip) -> Unit = {},
 ) {
     val isAi = conversationMode == ChatConversationMode.AiAssistant || counterparty is ChatCounterparty.Ai
@@ -1654,10 +1855,17 @@ private fun PersonEmptyFrame(
     }
 }
 
+/**
+ * A15.5 empty fan thread. The design's "Auto-welcome · free" card is
+ * intentionally absent: personas have no welcome-message field on the wire
+ * (`backend/routes/personaDms.js` / `serializeMembershipForFan`), and the
+ * design's literal fixture ("Welcome to the Diary, Maria." — "— Wynn")
+ * would ship one creator's name to every fan.
+ */
 @Composable
 private fun FanEmptyFrame(
     counterparty: ChatCounterparty,
-    entitlement: ChatFanEntitlement,
+    entitlement: ChatFanEntitlement?,
     onOpenerTap: (String) -> Unit,
 ) {
     Column(
@@ -1670,7 +1878,6 @@ private fun FanEmptyFrame(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        FanAutoWelcomeCard()
         Text(
             text = "Start a conversation",
             fontSize = 20.sp,
@@ -1678,67 +1885,18 @@ private fun FanEmptyFrame(
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
+        val name = counterparty.displayName.firstWord()
         Text(
             text =
-                "You can message ${counterparty.displayName.firstWord()} directly. " +
-                    "Each send uses one of your monthly ${entitlement.currentTier} replies.",
+                entitlement?.let {
+                    "You can message $name directly. " +
+                        "Each send uses one of your monthly ${it.currentTier} replies."
+                } ?: "You can message $name directly.",
             fontSize = 12.5.sp,
             color = PantopusColors.appTextSecondary,
         )
-        FanQuotaHero(entitlement)
+        entitlement?.let { FanQuotaHero(it) }
         FanOpeners(onOpenerTap = onOpenerTap)
-    }
-}
-
-@Composable
-private fun FanAutoWelcomeCard(modifier: Modifier = Modifier) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.xl))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                .padding(Spacing.s3)
-                .testTag("chatFanAutoWelcome"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(Radii.pill))
-                    .background(PantopusColors.businessBg)
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-        ) {
-            PantopusIconImage(icon = PantopusIcon.Sparkles, contentDescription = null, size = 9.dp, tint = PantopusColors.business)
-            Text(
-                text = "AUTO-WELCOME · FREE",
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.business,
-            )
-        }
-        Text(
-            text = "Welcome to the Diary, Maria.",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = PantopusColors.appText,
-        )
-        Text(
-            text =
-                "First message is on me — ask anything bread-related, share a bake, " +
-                    "or just say hi. I read everything personally on Sunday evenings.",
-            fontSize = 12.5.sp,
-            color = PantopusColors.appTextStrong,
-        )
-        Text(
-            text = "— Wynn",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = PantopusColors.appTextSecondary,
-        )
     }
 }
 
@@ -1769,17 +1927,21 @@ private fun FanQuotaHero(entitlement: ChatFanEntitlement) {
 
 @Composable
 private fun FanOpeners(onOpenerTap: (String) -> Unit) {
+    // Persona-neutral openers. The design's copy is sourdough-specific
+    // fixture text; there is no per-persona suggested-prompt payload on the
+    // wire, so these stay generic rather than pretending to know what this
+    // creator is about.
     val openers =
         listOf(
-            Triple(PantopusIcon.HelpCircle, "Recipe question", "Why does my crumb come out tight on day 2?"),
-            Triple(PantopusIcon.Image, "Share a bake", "Send a photo for feedback"),
-            Triple(PantopusIcon.Calendar, "Workshops", "When's the next hands-on session?"),
+            FanOpener("question", PantopusIcon.HelpCircle, "Ask a question", "I have a question about"),
+            FanOpener("photo", PantopusIcon.Image, "Share something", "Sending a photo for your feedback"),
+            FanOpener("hello", PantopusIcon.MessageSquare, "Say hi", "Just joined — happy to be here!"),
         )
     Column(
         modifier = Modifier.fillMaxWidth().testTag("chatFanOpeners"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        openers.forEachIndexed { index, opener ->
+        openers.forEach { opener ->
             Row(
                 modifier =
                     Modifier
@@ -1788,9 +1950,9 @@ private fun FanOpeners(onOpenerTap: (String) -> Unit) {
                         .clip(RoundedCornerShape(Radii.lg))
                         .background(PantopusColors.appSurface)
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                        .clickable { onOpenerTap(opener.third) }
+                        .clickable { onOpenerTap(opener.title) }
                         .padding(horizontal = Spacing.s3)
-                        .testTag("chatFanOpener_$index"),
+                        .testTag("chatFanOpener_${opener.id}"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -1802,17 +1964,17 @@ private fun FanOpeners(onOpenerTap: (String) -> Unit) {
                             .background(PantopusColors.businessBg),
                     contentAlignment = Alignment.Center,
                 ) {
-                    PantopusIconImage(icon = opener.first, contentDescription = null, size = 14.dp, tint = PantopusColors.business)
+                    PantopusIconImage(icon = opener.icon, contentDescription = null, size = 14.dp, tint = PantopusColors.business)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = opener.second.uppercase(),
+                        text = opener.label.uppercase(),
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = PantopusColors.appTextMuted,
                     )
                     Text(
-                        text = opener.third,
+                        text = opener.title,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Medium,
                         color = PantopusColors.appText,
@@ -2132,9 +2294,7 @@ internal fun PopulatedFrame(
     // Leading non-row items (pagination spacer + any pinned welcome card)
     // offset row indices inside the LazyColumn.
     val headerCount =
-        1 +
-            (if (conversationMode == ChatConversationMode.FanThread) 1 else 0) +
-            (if (conversationMode == ChatConversationMode.AiAssistant && aiPrompts.isNotEmpty()) 1 else 0)
+        1 + (if (conversationMode == ChatConversationMode.AiAssistant && aiPrompts.isNotEmpty()) 1 else 0)
     // Set once the first non-empty projection has been positioned — gates
     // the load-older trigger so it can't fire while the list still sits at
     // the top pre-scroll.
@@ -2190,11 +2350,9 @@ internal fun PopulatedFrame(
         item(key = "chat_pagination_top_spacer") {
             Spacer(modifier = Modifier.size(1.dp))
         }
-        if (conversationMode == ChatConversationMode.FanThread) {
-            item(key = "fan_auto_welcome") {
-                FanAutoWelcomeCard(modifier = Modifier.padding(bottom = Spacing.s3))
-            }
-        }
+        // A15.5's "Auto-welcome · free" card is omitted: no persona
+        // welcome-message exists on the wire, and the design's copy is
+        // fixture identity.
         // A15.3: the `.ai-welcome` capability card doubles as the AI
         // thread's pinned system message at the top of the timeline.
         if (conversationMode == ChatConversationMode.AiAssistant && aiPrompts.isNotEmpty()) {

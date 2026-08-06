@@ -24,6 +24,30 @@ enum ChatConversationSampleData {
         fanSubtitle: "Member since Aug · 0.4 mi",
         quota: ChatCreatorQuota(used: 12, total: 30, resetCopy: "Resets Monday")
     )
+
+    /// Quota-exhausted creator thread (A15.4 secondary frame) — the state
+    /// that renders the exhausted pill, the upgrade card and the locked
+    /// composer.
+    static let creatorMaxedContext = ChatCreatorThreadContext(
+        personaName: "The Sourdough Diary",
+        audienceSummary: "Reach: 2,340 · Engagement up 12% this week",
+        fanTierName: "Bronze",
+        fanTierRank: 2,
+        fanSubtitle: "Member since Aug · 0.4 mi",
+        quota: ChatCreatorQuota(used: 5, total: 5, resetCopy: "Resets Monday 12:00 AM"),
+        upgradeOffer: creatorUpgradeOffer
+    )
+
+    /// Shape of a real tier read: name / price / description come straight
+    /// from `GET /api/personas/:handle/tiers`, perks from that tier's
+    /// published policy fields.
+    static let creatorUpgradeOffer = ChatCreatorUpgradeOffer(
+        tierName: "Gold",
+        priceLabel: "$15/mo",
+        summary: "Unlimited threads with a same-week reply promise.",
+        perks: ["Unlimited message threads", "Replies within 3 days", "Creator can start threads"],
+        canSendOffer: false
+    )
     static let dmCounterparty = ChatCounterparty.person(
         name: "Jamal T.",
         initials: "JT",

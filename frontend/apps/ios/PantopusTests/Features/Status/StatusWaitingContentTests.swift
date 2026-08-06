@@ -20,7 +20,8 @@ final class StatusWaitingContentTests: XCTestCase {
         XCTAssertEqual(content.headline, "Claim submitted")
         XCTAssertEqual(content.addressChip, "418 Linden Ave")
         XCTAssertEqual(content.statusPill?.tone, .success)
-        XCTAssertEqual(content.statusPill?.text, "Decision expected by Oct 17")
+        XCTAssertEqual(content.statusPill?.text, "Decision usually within 3 business days")
+        XCTAssertNil(content.timeline[0].sub, "no submitted date supplied → no caption")
         XCTAssertEqual(content.timeline.count, 3)
         XCTAssertEqual(content.timeline.map(\.state), [.done, .pending, .pending])
         XCTAssertEqual(content.primaryCta?.actionKey, "view_status")
@@ -41,10 +42,21 @@ final class StatusWaitingContentTests: XCTestCase {
         XCTAssertEqual(content.halo.icon, .badgeCheck)
         XCTAssertEqual(content.headline, "You're the owner")
         XCTAssertEqual(content.statusPill?.tone, .success)
-        XCTAssertEqual(content.statusPill?.text, "Approved · 3 days ago")
+        XCTAssertEqual(content.statusPill?.text, "Approved")
         XCTAssertEqual(content.timeline.map(\.state), [.done, .done, .done])
         XCTAssertEqual(content.primaryCta?.label, "Open your home")
-        XCTAssertEqual(content.secondaryCta?.label, "See your Home badge")
+        XCTAssertEqual(content.secondaryCta?.label, "View claim")
+    }
+
+    func testClaimApprovedUsesSuppliedDatesInsteadOfSamples() {
+        let content = StatusWaitingContent.claimSubmitted(
+            homeName: "418 Linden Ave",
+            approved: true,
+            submittedOn: "Mar 2",
+            decidedOn: "Mar 6"
+        )
+        XCTAssertEqual(content.statusPill?.text, "Approved · Mar 6")
+        XCTAssertEqual(content.timeline.map(\.sub), ["Mar 2", nil, "Mar 6"])
     }
 
     // MARK: - A18.3 Verification submitted
@@ -81,7 +93,7 @@ final class StatusWaitingContentTests: XCTestCase {
         XCTAssertEqual(content.headline, "Landlord confirmed")
         XCTAssertEqual(content.bodyEmphasis, "Rashida Osman")
         XCTAssertEqual(content.statusPill?.tone, .primary)
-        XCTAssertEqual(content.statusPill?.text, "Decision expected today")
+        XCTAssertEqual(content.statusPill?.text, "Final review in progress")
         XCTAssertEqual(content.timeline.map(\.state), [.done, .done, .current])
         // Primary CTA stays "Back to home" across both states.
         XCTAssertEqual(content.primaryCta?.label, "Back to home")

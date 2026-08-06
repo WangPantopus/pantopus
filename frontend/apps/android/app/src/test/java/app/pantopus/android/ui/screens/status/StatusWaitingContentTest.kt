@@ -26,7 +26,8 @@ class StatusWaitingContentTest {
         assertEquals("Claim submitted", content.headline)
         assertEquals("418 Linden Ave", content.addressChip)
         assertEquals(StatusPillTone.Success, content.statusPill?.tone)
-        assertEquals("Decision expected by Oct 17", content.statusPill?.text)
+        assertEquals("Decision usually within 3 business days", content.statusPill?.text)
+        assertNull(content.timeline[0].sub)
         assertEquals(3, content.timeline.size)
         assertEquals(
             listOf(StatusStepState.Done, StatusStepState.Pending, StatusStepState.Pending),
@@ -50,13 +51,26 @@ class StatusWaitingContentTest {
         assertEquals(PantopusIcon.BadgeCheck, content.halo.icon)
         assertEquals("You're the owner", content.headline)
         assertEquals(StatusPillTone.Success, content.statusPill?.tone)
-        assertEquals("Approved · 3 days ago", content.statusPill?.text)
+        assertEquals("Approved", content.statusPill?.text)
         assertEquals(
             listOf(StatusStepState.Done, StatusStepState.Done, StatusStepState.Done),
             content.timeline.map { it.state },
         )
         assertEquals("Open your home", content.primaryCta?.label)
-        assertEquals("See your Home badge", content.secondaryCta?.label)
+        assertEquals("View claim", content.secondaryCta?.label)
+    }
+
+    @Test
+    fun claimApproved_uses_supplied_dates_instead_of_samples() {
+        val content =
+            StatusWaitingContent.claimSubmitted(
+                homeName = "418 Linden Ave",
+                approved = true,
+                submittedOn = "Mar 2",
+                decidedOn = "Mar 6",
+            )
+        assertEquals("Approved · Mar 6", content.statusPill?.text)
+        assertEquals(listOf("Mar 2", null, "Mar 6"), content.timeline.map { it.sub })
     }
 
     // ── A18.3 Verification submitted ──────────────────────────────────────
@@ -100,7 +114,7 @@ class StatusWaitingContentTest {
         assertEquals("Landlord confirmed", content.headline)
         assertEquals("Rashida Osman", content.bodyEmphasis)
         assertEquals(StatusPillTone.Primary, content.statusPill?.tone)
-        assertEquals("Decision expected today", content.statusPill?.text)
+        assertEquals("Final review in progress", content.statusPill?.text)
         assertEquals(
             listOf(StatusStepState.Done, StatusStepState.Done, StatusStepState.Current),
             content.timeline.map { it.state },

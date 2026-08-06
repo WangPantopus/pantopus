@@ -220,6 +220,49 @@ class ChatConversationSnapshotTest {
         }
     }
 
+    /**
+     * A15.4 secondary frame — quota exhausted: warning pill, full
+     * upgrade-fan card (head / body / perks / actions) and the locked
+     * composer with its lock row.
+     */
+    @Test
+    fun chat_conversation_creator_thread_quota_exhausted() {
+        val context = ChatConversationSampleData.creatorMaxedContext
+        paparazzi.snapshot {
+            Frame {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    CreatorAudienceStrip(context = context, onOpenAudienceProfile = {})
+                    context.quota?.let { quota ->
+                        CreatorQuotaMeter(quota = quota)
+                        CreatorQuotaExhaustedPill(
+                            tierName = context.fanTierName,
+                            fanName = "Priya",
+                            total = quota.total,
+                        )
+                    }
+                    context.upgradeOffer?.let { offer ->
+                        CreatorUpgradeFanCard(
+                            fanName = "Priya",
+                            currentTierName = context.fanTierName,
+                            offer = offer,
+                            onDismiss = {},
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth())
+                    Composer(
+                        text = "",
+                        placeholder = "Out of replies until Monday 12:00 AM",
+                        canSend = false,
+                        isLockedAction = true,
+                        onTextChange = {},
+                        onSend = {},
+                    )
+                    CreatorQuotaLockRow(tierName = context.fanTierName, fanName = "Priya")
+                }
+            }
+        }
+    }
+
     @Test
     fun chat_conversation_populated_with_day_divider_and_grouped_bubbles() {
         paparazzi.snapshot {

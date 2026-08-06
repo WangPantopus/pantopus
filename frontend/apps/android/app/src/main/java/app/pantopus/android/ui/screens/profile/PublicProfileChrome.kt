@@ -367,11 +367,18 @@ fun PublicProfilePostsFeed(
     posts: List<PublicProfilePost>,
     onUnlock: (PublicProfilePost) -> Unit,
     onEmptyCta: () -> Unit = {},
+    /**
+     * A21.2 — the profile owner's display name, so the Local empty state
+     * can name the neighbour ("… — Priya just moved in."). `null` falls
+     * back to the un-personalised copy.
+     */
+    localName: String? = null,
 ) {
     if (posts.isEmpty()) {
         BeaconPostsEmptyState(
             kind = kind,
             onCta = onEmptyCta,
+            localName = localName,
             modifier = Modifier.padding(horizontal = Spacing.s4),
         )
     } else {
@@ -408,6 +415,7 @@ fun PublicProfilePostsFeed(
 private fun BeaconPostsEmptyState(
     kind: PublicProfileKind,
     onCta: () -> Unit,
+    localName: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val persona = kind == PublicProfileKind.Persona
@@ -415,11 +423,16 @@ private fun BeaconPostsEmptyState(
     val accent = if (persona) PantopusColors.primary600 else PantopusColors.home
     val icon = if (persona) PantopusIcon.RadioTower else PantopusIcon.Home
     val headline = if (persona) "No broadcasts yet" else "Quiet for now"
+    // A21.2 names the neighbour when we know them ("No posts yet — Priya
+    // just moved in. …"); without a name we fall back to the neutral
+    // sentence rather than printing an empty gap.
+    val firstName = localName?.split(" ")?.firstOrNull()?.takeIf { it.isNotEmpty() }
     val body =
-        if (persona) {
-            "Be the first to follow — you'll get a ping the moment they go live."
-        } else {
-            "No posts yet — say hi or send a message to break the ice."
+        when {
+            persona -> "Be the first to follow — you'll get a ping the moment they go live."
+            firstName != null ->
+                "No posts yet — $firstName just moved in. Say hi or send a message to break the ice."
+            else -> "No posts yet — say hi or send a message to break the ice."
         }
     val ctaLabel = if (persona) "Follow" else "Send a message"
     val ctaIcon = if (persona) PantopusIcon.Plus else PantopusIcon.MessageSquare
@@ -489,6 +502,115 @@ private fun BeaconPostsEmptyState(
                 color = PantopusColors.appTextInverse,
             )
         }
+    }
+}
+
+// MARK: - A21.2 Local tab strip
+
+/**
+ * Underline-active two-tab strip for the Local Beacon profile archetype
+ * (Posts · About). Mirrors the design's `TabStrip` — and iOS
+ * `LocalProfileTabStrip` — so both platforms read identically.
+ */
+@Composable
+fun LocalProfileTabStrip(
+    postCount: Int?,
+    selected: LocalProfileTab,
+    onSelect: (LocalProfileTab) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().testTag("publicProfileLocalTabStrip")) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s6)) {
+            LocalProfileTab.entries.forEach { tab ->
+                val active = tab == selected
+                Column(
+                    modifier =
+                        Modifier
+                            .clickable { onSelect(tab) }
+                            .testTag("publicProfileLocalTab_${tab.name.lowercase()}")
+                            .semantics { contentDescription = tab.label },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = Spacing.s2),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        Text(
+                            text = tab.label,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (active) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+                        )
+                        if (tab == LocalProfileTab.Posts && postCount != null) {
+                            Text(
+                                text = "$postCount",
+                                fontSize = 10.5.sp,
+                                color = PantopusColors.appTextMuted,
+                            )
+                        }
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(if (active) PantopusColors.primary600 else Color.Transparent),
+                    )
+                }
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorder),
+        )
+    }
+}
+
+// MARK: - A21.2 Local About tab
+
+/**
+ * About tab of the Local Beacon profile. Carries the neighbourhood
+ * substance the older four-tab neighbour layout spread across
+ * About / Reviews / Verifications, so nothing is lost when the designed
+ * two-tab archetype takes over.
+ */
+@Composable
+fun LocalProfileAboutSection(content: NeighborProfileContent) {
+    Column(modifier = Modifier.fillMaxWidth().testTag("publicProfileLocalAbout")) {
+        NeighborSectionTitle("Bio")
+        Text(
+            text = content.bio ?: "No bio yet",
+            fontSize = 13.5.sp,
+            color = if (content.bio == null) PantopusColors.appTextSecondary else PantopusColors.appTextStrong,
+            lineHeight = 20.sp,
+        )
+        if (content.skills.isNotEmpty()) {
+            NeighborSectionTitle("Helps with")
+            NeighborSkillChips(content.skills)
+        }
+        NeighborSectionTitle("Verifications")
+        NeighborVerificationLedger(content.verifications)
+        if (content.reviews.isEmpty()) {
+            NeighborSectionTitle("Reviews")
+            NeighborReviewsEmptyCard(content.hero.name)
+        } else {
+            NeighborSectionTitle("Reviews", action = "${content.reviewCount}")
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                content.reviews.forEach { NeighborReviewCard(it) }
+            }
+        }
+        content.mutuals?.let {
+            NeighborSectionTitle("Neighbors in common")
+            NeighborMutualsStrip(it)
+        }
+        content.welcome?.let {
+            Spacer(Modifier.height(Spacing.s3))
+            NeighborWelcomeCard(it)
+        }
+        Spacer(Modifier.height(Spacing.s5))
     }
 }
 

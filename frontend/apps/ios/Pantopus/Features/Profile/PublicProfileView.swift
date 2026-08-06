@@ -146,22 +146,83 @@ public struct PublicProfileView: View {
     @ViewBuilder
     private func loadedLayout(_ payload: PublicProfileContent) -> some View {
         if payload.kind == .local, let neighbor = payload.neighbor {
-            NeighborProfileLayout(
-                content: neighbor,
-                selectedTab: Binding(
-                    get: { viewModel.selectedNeighborTab },
-                    set: { viewModel.selectedNeighborTab = $0 }
-                ),
-                connectState: viewModel.connectState,
-                onBack: onBack,
-                onMessage: { onOpenMessages(payload.profile) },
-                onConnect: { Task { await viewModel.connect() } },
-                onReport: { showReportSheet = true },
-                onBlock: { Task { await viewModel.block() } },
-                onOverflow: { viewModel.showOverflow = true }
-            )
+            localLayout(payload, neighbor: neighbor)
         } else {
             personaLayout(payload)
+        }
+    }
+
+    // MARK: - A21.2 Local Beacon profile
+
+    /// The designed Local archetype: green Home banner, overlapping
+    /// `BeaconIdentityBlock` with Connect + Message, a Posts · About tab
+    /// strip, and the `LocalPostCard` feed (or the "Quiet for now" empty
+    /// state) beneath it.
+    private func localLayout(
+        _ payload: PublicProfileContent,
+        neighbor: NeighborProfileContent
+    ) -> some View {
+        ContentDetailShell(
+            title: nil,
+            onBack: onBack,
+            topBarAction: ContentDetailTopBarAction(
+                icon: .moreHorizontal,
+                accessibilityLabel: "More"
+            ) {
+                Task { @MainActor in viewModel.showOverflow = true }
+            },
+            header: {
+                VStack(spacing: Spacing.s0) {
+                    PublicProfileBanner(kind: .local)
+                    BeaconIdentityBlock(
+                        identity: .home,
+                        name: payload.header.displayName,
+                        handle: payload.header.handle,
+                        tierLabel: nil,
+                        isVerifiedNeighbor: payload.header.isVerifiedNeighbor,
+                        locality: payload.header.locality,
+                        bio: payload.stats.bio,
+                        isVerified: payload.header.isVerified,
+                        avatarURL: payload.header.avatarURL,
+                        stats: payload.stats.stats
+                    ) {
+                        identityActions(for: payload)
+                    }
+                }
+                .accessibilityIdentifier("publicProfileLocalHeader")
+            },
+            body: {
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    LocalProfileTabStrip(
+                        postCount: payload.posts.isEmpty ? nil : payload.posts.count,
+                        selected: viewModel.selectedLocalTab
+                    ) { viewModel.selectedLocalTab = $0 }
+                        .padding(.horizontal, Spacing.s4)
+
+                    localTabContent(payload, neighbor: neighbor)
+                }
+                .padding(.top, Spacing.s4)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func localTabContent(
+        _ payload: PublicProfileContent,
+        neighbor: NeighborProfileContent
+    ) -> some View {
+        switch viewModel.selectedLocalTab {
+        case .posts:
+            PublicProfilePostsFeed(
+                kind: .local,
+                posts: payload.posts,
+                onUnlock: { _ in },
+                onEmptyCTA: { onOpenMessages(payload.profile) },
+                localName: payload.header.displayName
+            )
+        case .about:
+            LocalProfileAboutSection(content: neighbor)
+                .padding(.horizontal, Spacing.s4)
         }
     }
 
