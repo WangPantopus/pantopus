@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroPayoutFooter
 import app.pantopus.android.ui.components.ToastController
@@ -109,6 +110,8 @@ fun PaymentsScreen(
             }
         }
     }
+
+    SecureScreenEffect()
 
     Box(modifier = Modifier.fillMaxSize()) {
         PaymentsScreenContent(

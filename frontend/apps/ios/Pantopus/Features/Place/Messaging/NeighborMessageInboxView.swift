@@ -87,7 +87,7 @@ private struct InboxRow: View {
                     }
                     Spacer(minLength: 0)
                     Text(neighborRelativeTime(message.createdAt))
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextMuted)
                 }
                 Text(message.body)

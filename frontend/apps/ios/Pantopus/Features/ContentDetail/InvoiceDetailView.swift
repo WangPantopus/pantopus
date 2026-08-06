@@ -7,8 +7,8 @@
 //  Stripe PaymentSheet via the view-model's `CheckoutCoordinator`:
 //  PaymentSheet (presented by the SDK over the current screen) collects the
 //  card + handles SCA/3-D Secure, and the result drives a success / declined /
-//  canceled toast. We never mark the invoice paid here — the VM re-reads
-//  server state on success.
+//  canceled toast. On success the VM re-projects into the paid frame
+//  (A09.4), whose dock swaps to Share + Download receipt.
 //
 
 import SwiftUI
@@ -17,6 +17,7 @@ public struct InvoiceDetailView: View {
     @State private var viewModel: InvoiceDetailViewModel
     @State private var toast: ToastMessage?
     @State private var isPaying = false
+    @State private var shareItem: ShareTextItem?
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -32,7 +33,9 @@ public struct InvoiceDetailView: View {
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { pay() },
-            onSecondaryAction: nil,
+            // Only the paid dock carries a secondary button ("Share") —
+            // the due dock's secondary slot is nil.
+            onSecondaryAction: { shareItem = ShareTextItem(text: viewModel.shareSummary) },
             onRetry: { Task { await viewModel.load() } },
             onMessageCounterparty: nil
         )
@@ -43,6 +46,9 @@ public struct InvoiceDetailView: View {
         .overlay(alignment: .bottom) { toastOverlay }
         .onChange(of: viewModel.paymentStatus) { _, status in
             handle(status)
+        }
+        .sheet(item: $shareItem) { item in
+            SystemShareSheet(items: [item.text])
         }
     }
 
@@ -91,4 +97,9 @@ public struct InvoiceDetailView: View {
         case .neutral: "checkout.cancel"
         }
     }
+}
+
+private struct ShareTextItem: Identifiable {
+    let id = UUID()
+    let text: String
 }

@@ -430,7 +430,7 @@ private fun RowItem(
                 .heightIn(min = 48.dp)
                 .then(if (isTriad) Modifier else Modifier.clickable(onClick = onClickRow))
                 .padding(horizontal = Spacing.s4, vertical = 14.dp)
-                .testTag("groupedListRow_${row.id}"),
+                .testTag(row.testTag ?: "groupedListRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {

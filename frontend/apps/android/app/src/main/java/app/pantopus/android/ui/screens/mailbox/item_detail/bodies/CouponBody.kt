@@ -14,6 +14,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +24,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -36,7 +39,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -72,6 +77,16 @@ fun CouponBody(
     modifier: Modifier = Modifier,
     state: CouponBodyState = CouponBodyState.Unused,
     barcodeInitiallyExpanded: Boolean = false,
+    // "Similar offers near you" rail entries. There is no backend feed for
+    // these yet, so the live detail screen passes none and the rail stays
+    // hidden — inventing nearby businesses would read as real recommendations.
+    // Previews / snapshots pass the fixtures to keep the design covered.
+    similarOffers: List<MailItemSampleData.SimilarOffer> = emptyList(),
+    // Real wallet reminder / at-arrival settings for the redeemed pass. Null
+    // until the wallet integration lands; the chips render without a detail
+    // line rather than claiming a reminder or geofence the user never set.
+    walletReminderDetail: String? = null,
+    walletArrivalDetail: String? = null,
 ) {
     val context = LocalContext.current
     val merchant =
@@ -117,6 +132,17 @@ fun CouponBody(
                 )
         }
 
+        if (state == CouponBodyState.Redeemed) {
+            WalletPreviewCard(
+                merchant = merchant,
+                headline = coupon.headline,
+                code = code,
+                expiresAt = coupon.expiresAt,
+                reminderDetail = walletReminderDetail,
+                arrivalDetail = walletArrivalDetail,
+            )
+        }
+
         if (!coupon.terms.isNullOrBlank() || !coupon.finePrint.isNullOrBlank()) {
             FinePrintCard(terms = coupon.terms, finePrint = coupon.finePrint)
         }
@@ -147,6 +173,449 @@ fun CouponBody(
                     message = "The in-store barcode is no longer available for scanning.",
                     tone = InactiveTone.Error,
                 )
+        }
+
+        if (similarOffers.isNotEmpty()) {
+            SimilarOffersRail(offers = similarOffers)
+        }
+    }
+}
+
+/**
+ * Wallet-pass preview shown once the coupon is redeemed/added
+ * (coupon.jsx WalletPreview): "In your wallet" header with the Active
+ * dot, a pass-styled tile (brand chip + headline + code/expiry
+ * columns), and the reminder / at-arrival helper chips.
+ */
+@Composable
+private fun WalletPreviewCard(
+    merchant: String,
+    headline: String,
+    code: String?,
+    expiresAt: String?,
+    /** Null when the user has no reminder / at-arrival setting to show. */
+    reminderDetail: String?,
+    arrivalDetail: String?,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .testTag("couponWalletPreview"),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "IN YOUR WALLET",
+                modifier = Modifier.weight(1f).semantics { heading() },
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.success),
+                )
+                Text(
+                    text = "Active",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.success,
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+        Column(
+            modifier = Modifier.padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            WalletPassTile(merchant = merchant, headline = headline, code = code, expiresAt = expiresAt)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                WalletAction(
+                    icon = PantopusIcon.Bell,
+                    label = "Remind me",
+                    detail = reminderDetail,
+                    modifier = Modifier.weight(1f),
+                )
+                WalletAction(
+                    icon = PantopusIcon.MapPin,
+                    label = "At-arrival",
+                    detail = arrivalDetail,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalletPassTile(
+    merchant: String,
+    headline: String,
+    code: String?,
+    expiresAt: String?,
+) {
+    val initials =
+        merchant.split(" ").take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }
+            .joinToString("")
+            .uppercase()
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(PantopusColors.warmAmber, PantopusColors.warning),
+                    ),
+                ),
+    ) {
+        // Decorative concentric arcs, per the JSX pass artwork.
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 22.dp, y = 22.dp)
+                    .size(96.dp)
+                    .alpha(0.12f)
+                    .border(2.dp, PantopusColors.appTextInverse, CircleShape),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 8.dp, y = 8.dp)
+                    .size(68.dp)
+                    .alpha(0.12f)
+                    .border(2.dp, PantopusColors.appTextInverse, CircleShape),
+        )
+        Column(
+            modifier = Modifier.padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(22.dp)
+                            .clip(RoundedCornerShape(Radii.sm))
+                            .background(PantopusColors.appTextInverse.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = initials,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = PantopusColors.appTextInverse,
+                    )
+                }
+                Text(
+                    text = merchant,
+                    modifier = Modifier.weight(1f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appTextInverse,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "PASS",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = PantopusColors.appTextInverse.copy(alpha = 0.75f),
+                )
+            }
+            Text(
+                text = headline,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                color = PantopusColors.appTextInverse,
+                lineHeight = 25.sp,
+            )
+            Row(
+                modifier = Modifier.padding(top = Spacing.s1),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                if (code != null) {
+                    WalletPassFact(label = "CODE", value = code, mono = true)
+                }
+                WalletPassFact(label = "EXPIRES", value = expiresAt ?: "No expiry", mono = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalletPassFact(
+    label: String,
+    value: String,
+    mono: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.7.sp,
+            color = PantopusColors.appTextInverse.copy(alpha = 0.75f),
+        )
+        Text(
+            text = value,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = if (mono) FontFamily.Monospace else null,
+            letterSpacing = if (mono) 0.6.sp else 0.sp,
+            color = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+@Composable
+private fun WalletAction(
+    icon: PantopusIcon,
+    label: String,
+    detail: String?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(horizontal = 10.dp, vertical = Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(26.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(7.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 13.dp,
+                tint = PantopusColors.primary700,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    fontSize = 10.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Similar-offers rail (coupon.jsx SimilarOffers): header + horizontal
+ * strip of mini ticket cards. Decorative — driven by
+ * [MailItemSampleData.couponSimilarOffers] until the rail gets a
+ * backend feed.
+ */
+@Composable
+private fun SimilarOffersRail(offers: List<MailItemSampleData.SimilarOffer>) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("couponSimilarOffers"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = "Similar offers near you",
+                    modifier = Modifier.semantics { heading() },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    text = "From other verified neighbors and businesses",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    text = "See all",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.primary600,
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronRight,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            offers.forEachIndexed { index, offer ->
+                MiniCouponCard(offer = offer, paletteIndex = index)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniCouponCard(
+    offer: MailItemSampleData.SimilarOffer,
+    paletteIndex: Int,
+) {
+    // Per-card tone/tint pairs from the design's SIMILAR palette,
+    // mapped onto tokens: sky, magic violet, home green, error red.
+    val palette =
+        listOf(
+            PantopusColors.primary900 to PantopusColors.primary100,
+            PantopusColors.magic to PantopusColors.magicBg,
+            PantopusColors.homeDark to PantopusColors.homeBg,
+            PantopusColors.error to PantopusColors.errorBg,
+        )
+    val (tone, tint) = palette[paletteIndex % palette.size]
+    Column(
+        modifier =
+            Modifier
+                .width(168.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
+                .testTag("couponSimilarOffer_${offer.id}"),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(tint)
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(Radii.sm))
+                            .background(PantopusColors.appSurface)
+                            .border(1.dp, tone.copy(alpha = 0.2f), RoundedCornerShape(Radii.sm)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = offer.initials,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = tone,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(
+                        text = offer.brand,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = tone,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = offer.distance,
+                        fontSize = 9.sp,
+                        color = tone.copy(alpha = 0.7f),
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                Text(
+                    text = offer.amount,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = tone,
+                )
+                Text(
+                    text = offer.subline,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = tone.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderStrong))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Expires ${offer.expires}",
+                modifier = Modifier.weight(1f),
+                fontSize = 10.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = "Claim",
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.primary600,
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ArrowRight,
+                    contentDescription = null,
+                    size = 10.dp,
+                    tint = PantopusColors.primary600,
+                )
+            }
         }
     }
 }
@@ -476,6 +945,9 @@ private fun copyToClipboard(
 @Composable
 private fun CouponBodyPreview() {
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).padding(vertical = Spacing.s4)) {
-        CouponBody(coupon = MailItemSampleData.couponUnused)
+        CouponBody(
+            coupon = MailItemSampleData.couponUnused,
+            similarOffers = MailItemSampleData.couponSimilarOffers,
+        )
     }
 }

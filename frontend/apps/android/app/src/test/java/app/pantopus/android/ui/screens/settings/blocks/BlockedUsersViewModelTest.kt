@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.settings.PrivacyBlockDto
 import app.pantopus.android.data.api.models.settings.PrivacyBlocksResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowPillTone
@@ -30,6 +31,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class BlockedUsersViewModelTest {
     private val privacy: PrivacyRepository = mockk()
+    private val auth: AuthRepository = mockk(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -39,7 +41,7 @@ class BlockedUsersViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(): BlockedUsersViewModel = BlockedUsersViewModel(privacy)
+    private fun viewModel(): BlockedUsersViewModel = BlockedUsersViewModel(privacy, auth)
 
     private val twoBlocks =
         PrivacyBlocksResponse(

@@ -60,7 +60,7 @@ fun BeaconProfileScreen(
     onComposeBroadcast: (String) -> Unit = {},
     onOpenInsights: () -> Unit = {},
     onCreateBeacon: () -> Unit = {},
-    onFollowHandshake: (String) -> Unit = {},
+    onFollowHandshake: (String, Int?) -> Unit = { _, _ -> },
     viewModel: BeaconProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -68,6 +68,7 @@ fun BeaconProfileScreen(
     val followStatus by viewModel.followStatus.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showHandshake by viewModel.showFollowHandshake.collectAsStateWithLifecycle()
+    val handshakeTier by viewModel.handshakePreselectedTierRank.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
     // Refresh follow status when returning from the handshake route, mirroring
     // iOS's refresh-on-sheet-dismiss so a successful follow reflects on the CTA.
@@ -84,7 +85,7 @@ fun BeaconProfileScreen(
         val s = state
         if (showHandshake && s is BeaconProfileUiState.Loaded) {
             awaitingHandshakeReturn = true
-            onFollowHandshake(s.content.handle)
+            onFollowHandshake(s.content.handle, handshakeTier)
             viewModel.setShowFollowHandshake(false)
         }
     }
@@ -119,7 +120,7 @@ fun BeaconProfileScreen(
                     onOpenInsights = onOpenInsights,
                     onFollow = { viewModel.follow() },
                     onUnfollow = { viewModel.unfollow() },
-                    onUnlock = { viewModel.showSubscribeToast() },
+                    onUnlock = { tierRank -> viewModel.unlockBroadcast(tierRank) },
                     // runCatching: openUri throws if no activity can handle the
                     // URI (mirrors iOS UIApplication.open's silent no-op).
                     onOpenLink = { runCatching { uriHandler.openUri(it) } },
@@ -153,7 +154,7 @@ internal fun BeaconProfileLoadedFrame(
     onOpenInsights: () -> Unit,
     onFollow: () -> Unit,
     onUnfollow: () -> Unit,
-    onUnlock: () -> Unit,
+    onUnlock: (Int?) -> Unit,
     onOpenLink: (String) -> Unit,
 ) {
     ContentDetailShell(
@@ -235,7 +236,7 @@ internal fun BeaconProfileLoadedFrame(
                                 PublicProfilePostsFeed(
                                     kind = PublicProfileKind.Persona,
                                     posts = content.posts,
-                                    onUnlock = { onUnlock() },
+                                    onUnlock = { post -> onUnlock(post.targetTierRank) },
                                     onEmptyCta = { if (!content.isOwner) onFollow() },
                                 )
                             }

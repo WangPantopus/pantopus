@@ -30,13 +30,32 @@ struct GenericMailDetailLayout: View {
             aiElf: aiElf,
             attachments: attachments,
             hero: {
-                MailHeaderCard(content: content, onOpenProfile: onOpenSenderProfile)
+                GenericHeroCard(content: content)
             },
             keyFacts: {
-                KeyFactsCard(rows: content.keyFacts())
+                // On acknowledged items the activity timeline leads so the
+                // post-action signal lands above the fold (mail-detail.jsx).
+                VStack(spacing: Spacing.s3) {
+                    if content.isAcknowledged {
+                        ChainOfCustodyTimeline(
+                            title: "Activity",
+                            status: .custom(
+                                label: "On file",
+                                background: Theme.Color.successBg,
+                                foreground: Theme.Color.success
+                            ),
+                            events: ackTimelineEvents
+                        )
+                        .accessibilityIdentifier("mailDetail_ackTimeline")
+                    }
+                    KeyFactsCard(rows: content.keyFacts())
+                }
             },
             body: {
                 BodyCard(paragraphs: content.bodyParagraphs)
+            },
+            sender: {
+                SenderCard(content: content, onOpenProfile: onOpenSenderProfile)
             },
             actions: {
                 ActionsRow(
@@ -48,6 +67,33 @@ struct GenericMailDetailLayout: View {
             }
         )
         .accessibilityIdentifier("mailDetail_generic")
+    }
+
+    /// Acknowledgment timeline events per mail-detail.jsx TIMELINE —
+    /// synthesized from the projected content until the backend surfaces
+    /// per-item activity.
+    private var ackTimelineEvents: [ChainOfCustodyEvent] {
+        [
+            ChainOfCustodyEvent(
+                id: "ack",
+                icon: .badgeCheck,
+                label: "Acknowledged by you",
+                isComplete: true
+            ),
+            ChainOfCustodyEvent(
+                id: "delivered",
+                icon: .mailbox,
+                label: "Delivered to your Mailbox",
+                timestamp: content.createdAtLabel
+            ),
+            ChainOfCustodyEvent(
+                id: "tldr",
+                icon: .sparkles,
+                label: "Pantopus drafted plain-language TL;DR",
+                timestamp: content.createdAtLabel,
+                isPantopusEvent: true
+            )
+        ]
     }
 
     private var topBar: MailTopBarConfig {
@@ -89,7 +135,11 @@ struct GenericMailDetailLayout: View {
 
     private var aiElf: AIElfStripContent? {
         guard let summary = content.aiSummary, !summary.isEmpty else { return nil }
-        return AIElfStripContent(summary: summary)
+        return AIElfStripContent(
+            headline: content.isAcknowledged ? "What happens next" : "Pantopus read this for you",
+            summary: summary,
+            bullets: content.aiBullets
+        )
     }
 
     private var attachments: AttachmentsRowContent? {
@@ -120,19 +170,49 @@ struct GenericMailDetailLayout: View {
     }
 }
 
-// MARK: - Hero
+// MARK: - Hero (mail-detail.jsx HeroCard)
 
-private struct MailHeaderCard: View {
+/// A17.1 hero — accent strip + trust/category chips + uppercase sender +
+/// title + mono reference + optional acknowledged banner. Sender identity
+/// lives in the separate `SenderCard` slot below the body.
+private struct GenericHeroCard: View {
     let content: MailDetailContent
-    let onOpenProfile: (@MainActor (String) -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            senderRow
-            Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-            subjectRow
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(alignment: .center, spacing: Spacing.s1) {
+                MailSenderTrustChip(trust: content.trust)
+                CategoryBadge(category: content.category)
+                Spacer(minLength: Spacing.s0)
+                if let received = content.createdAtLabel {
+                    Text(received)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+            }
+            Text(content.senderDisplayName.uppercased())
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Text(content.title)
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .lineSpacing(1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("mailDetail_subjectRow")
+            if !content.referenceLabel.isEmpty {
+                Text(content.referenceLabel)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.top, 2)
+            }
+            if content.isAcknowledged {
+                acknowledgedBanner
+            }
         }
         .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.Color.appSurface)
         .overlay(alignment: .leading) {
             Rectangle()
@@ -144,86 +224,139 @@ private struct MailHeaderCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityIdentifier("mailDetail_genericHero")
     }
 
-    private var senderRow: some View {
-        HStack(alignment: .top, spacing: Spacing.s3) {
-            avatar
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                HStack(alignment: .firstTextBaseline, spacing: Spacing.s1) {
+    private var acknowledgedBanner: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.check, size: 13, color: Theme.Color.appTextInverse)
+                .frame(width: 20, height: 20)
+                .background(Theme.Color.success)
+                .clipShape(Circle())
+            (
+                Text("Acknowledged").bold()
+                    + Text(acknowledgedSuffix)
+                    .foregroundColor(Theme.Color.success.opacity(0.85))
+            )
+            .font(.system(size: 12))
+            .foregroundColor(Theme.Color.success)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.successBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Theme.Color.successLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.top, Spacing.s1)
+        .accessibilityIdentifier("mailDetail_ackBanner")
+    }
+
+    private var acknowledgedSuffix: String {
+        if let when = content.createdAtLabel, !when.isEmpty {
+            return " · \(when) by you"
+        }
+        return " · by you"
+    }
+}
+
+private struct MailSenderTrustChip: View {
+    let trust: MailTrust
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Icon(trust.icon, size: 11, color: trust.foreground)
+            Text(trust.label)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.3)
+                .foregroundStyle(trust.foreground)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(trust.background)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+        .accessibilityLabel("\(trust.label) sender")
+    }
+}
+
+private struct CategoryBadge: View {
+    let category: MailItemCategory
+
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(category.icon, size: 11, color: category.accent)
+            Text(category.label)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(category.accent)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 3)
+        .background(category.rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+    }
+}
+
+// MARK: - Sender (mail-detail.jsx SenderCard)
+
+/// Separate sender identity card below the body — avatar + name +
+/// dept + kind/proof chips. Kept out of the hero so acknowledged
+/// frames can lead with timeline + key facts above the fold.
+private struct SenderCard: View {
+    let content: MailDetailContent
+    let onOpenProfile: (@MainActor (String) -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("SENDER")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .center, spacing: Spacing.s3) {
+                avatar
+                VStack(alignment: .leading, spacing: 2) {
                     Text(content.senderDisplayName)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
-                    if let handle = content.senderMeta, !handle.isEmpty {
-                        Text(handle)
-                            .pantopusTextStyle(.caption)
+                    if let meta = content.senderMeta, !meta.isEmpty {
+                        Text(meta)
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.Color.appTextSecondary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
+                    HStack(spacing: Spacing.s1) {
+                        kindChip
+                        proofChip
+                    }
+                    .padding(.top, 4)
                 }
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    senderTypeChip
-                    Text(content.carrierLine)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .lineLimit(1)
+                Spacer(minLength: Spacing.s0)
+                if onOpenProfile != nil, content.senderUserId != nil {
+                    Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
                 }
             }
-            Spacer(minLength: Spacing.s0)
-            if let time = content.createdAtLabel {
-                Text(time)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                    .multilineTextAlignment(.trailing)
-            }
-            if onOpenProfile != nil, content.senderUserId != nil {
-                Icon(.chevronRight, size: 14, color: Theme.Color.appTextMuted)
-                    .padding(.top, 2)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if let onOpenProfile, let userId = content.senderUserId {
+                    onOpenProfile(userId)
+                }
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if let onOpenProfile, let userId = content.senderUserId {
-                onOpenProfile(userId)
-            }
-        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("mailDetail_senderCard")
-    }
-
-    private var subjectRow: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(alignment: .center, spacing: Spacing.s1) {
-                CategoryBadge(category: content.category)
-                Spacer(minLength: Spacing.s0)
-            }
-            Text(content.title)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Theme.Color.appText)
-                .lineSpacing(1)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-            if let excerpt = content.excerpt, !excerpt.isEmpty {
-                Text(excerpt)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            metaRow
-        }
-        .accessibilityIdentifier("mailDetail_subjectRow")
-    }
-
-    private var metaRow: some View {
-        HStack(spacing: Spacing.s1) {
-            MetaPill(text: content.referenceLabel, icon: .hash)
-            if let received = content.createdAtLabel {
-                MetaPill(text: received, icon: .clock)
-            }
-            MetaPill(text: content.readStatusLabel, icon: .mailOpen)
-        }
     }
 
     private var avatar: some View {
@@ -245,59 +378,28 @@ private struct MailHeaderCard: View {
             }
     }
 
-    private var senderTypeChip: some View {
+    private var kindChip: some View {
         HStack(spacing: 3) {
-            Icon(content.trust.icon, size: 9, color: content.trust.foreground)
+            Icon(.landmark, size: 9, color: Theme.Color.primary800)
             Text(content.senderTypeLabel)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(content.trust.foreground)
+                .foregroundStyle(Theme.Color.primary800)
                 .lineLimit(1)
         }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 3)
-        .background(content.trust.background)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Theme.Color.infoBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
-}
 
-private struct MetaPill: View {
-    let text: String
-    let icon: PantopusIcon
-
-    var body: some View {
-        HStack(spacing: 3) {
-            Icon(icon, size: 10, color: Theme.Color.appTextSecondary)
-            Text(text)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, Spacing.s1)
-        .background(Theme.Color.appSurfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
-    }
-}
-
-private struct CategoryBadge: View {
-    let category: MailItemCategory
-
-    var body: some View {
-        HStack(spacing: Spacing.s1) {
-            Icon(category.icon, size: 11, color: category.accent)
-            Text(category.label)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.4)
-                .foregroundStyle(category.accent)
-        }
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, 3)
-        .background(category.rowBackground)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.pill)
-                .stroke(category.rowBackground, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+    private var proofChip: some View {
+        Text(content.trust.label)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(Theme.Color.success)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Theme.Color.successBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
     }
 }
 

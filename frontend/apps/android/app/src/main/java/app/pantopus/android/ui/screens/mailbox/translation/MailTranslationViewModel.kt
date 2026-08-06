@@ -2,17 +2,24 @@
 
 package app.pantopus.android.ui.screens.mailbox.translation
 
+import android.content.Context
+import android.speech.tts.TextToSpeech
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
+
+/** Utterance id for the read-aloud job. */
+private const val TTS_UTTERANCE_ID = "mail-translation"
 
 /**
  * A17.13 — Translation view-model. Mirror of iOS `MailTranslationViewModel`.
@@ -28,6 +35,7 @@ import javax.inject.Inject
 class MailTranslationViewModel
     @Inject
     constructor(
+        @ApplicationContext private val appContext: Context,
         private val repo: MailboxRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
@@ -48,6 +56,16 @@ class MailTranslationViewModel
 
         private val _confirmInFlight = MutableStateFlow(false)
         val confirmInFlight: StateFlow<Boolean> = _confirmInFlight.asStateFlow()
+
+        /**
+         * One TTS engine for the lifetime of the screen. `onInit` fires on a
+         * binder thread, hence the volatile flags.
+         */
+        @Volatile private var tts: TextToSpeech? = null
+
+        @Volatile private var ttsReady: Boolean = false
+
+        @Volatile private var pendingUtterance: Pair<String, Locale>? = null
 
         /**
          * Load the (sample) translation. Real MT lands behind this seam
@@ -114,16 +132,97 @@ class MailTranslationViewModel
             }
         }
 
-        /**
-         * Stubbed text-to-speech affordance. Real audio is out of scope
-         * (B2.3); this surfaces a toast so the control is never a dead tap.
-         */
+        /** Read the selected column aloud via platform TTS. */
         fun listen(which: TranslationListenColumn) {
+            val current = _state.value as? MailTranslationUiState.Loaded ?: return
+            val text =
+                when (which) {
+                    TranslationListenColumn.Original ->
+                        current.content.paragraphs.joinToString("\n") { it.original }
+                    TranslationListenColumn.Translated ->
+                        current.content.paragraphs.joinToString("\n") { it.english }
+                }
+            if (text.isBlank()) {
+                _toast.value = "Nothing to read aloud yet."
+                return
+            }
+            val languageCode =
+                when (which) {
+                    TranslationListenColumn.Original -> current.content.languages.sourceCode
+                    TranslationListenColumn.Translated -> current.content.languages.targetCode
+                }
+            speak(text, localeFor(languageCode))
             _toast.value =
                 when (which) {
                     TranslationListenColumn.Original -> "Playing the original aloud…"
                     TranslationListenColumn.Translated -> "Playing the translation aloud…"
                 }
+        }
+
+        /**
+         * Speak through a single engine owned by the view-model. The previous
+         * shape built a second [TextToSpeech] *inside* the first one's `onInit`
+         * and spoke through it before it had initialised, so nothing ever
+         * played; utterances now queue until the one engine reports ready.
+         */
+        private fun speak(
+            text: String,
+            locale: Locale,
+        ) {
+            val engine = tts
+            if (engine != null && ttsReady) {
+                engine.applyLanguage(locale)
+                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, TTS_UTTERANCE_ID)
+                return
+            }
+            pendingUtterance = text to locale
+            // An engine already exists but is still initialising — the pending
+            // utterance above will be picked up by its onInit callback.
+            if (engine != null) return
+            tts =
+                TextToSpeech(appContext) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        ttsReady = true
+                        val pending = pendingUtterance
+                        pendingUtterance = null
+                        if (pending != null) {
+                            tts?.applyLanguage(pending.second)
+                            tts?.speak(pending.first, TextToSpeech.QUEUE_FLUSH, null, TTS_UTTERANCE_ID)
+                        }
+                    } else {
+                        ttsReady = false
+                        pendingUtterance = null
+                        _toast.value = "Couldn't play audio on this device."
+                    }
+                }
+        }
+
+        /**
+         * Resolve the locale for the column's language, falling back to the
+         * device default when the engine carries no voice for it. Mirrors the
+         * iOS voice lookup.
+         */
+        private fun localeFor(code: String): Locale {
+            val trimmed = code.trim()
+            if (trimmed.isEmpty()) return Locale.getDefault()
+            return runCatching { Locale.forLanguageTag(trimmed) }
+                .getOrNull()
+                ?.takeIf { it.language.isNotEmpty() }
+                ?: Locale.getDefault()
+        }
+
+        private fun TextToSpeech.applyLanguage(locale: Locale) {
+            val availability = runCatching { isLanguageAvailable(locale) }.getOrDefault(TextToSpeech.LANG_MISSING_DATA)
+            setLanguage(if (availability >= TextToSpeech.LANG_AVAILABLE) locale else Locale.getDefault())
+        }
+
+        override fun onCleared() {
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+            ttsReady = false
+            pendingUtterance = null
+            super.onCleared()
         }
 
         /** One-off toast for the stubbed overflow / chip affordances. */

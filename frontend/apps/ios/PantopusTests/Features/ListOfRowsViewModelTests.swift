@@ -113,25 +113,4 @@ final class ListOfRowsViewModelTests: XCTestCase {
         }
         XCTAssertEqual(content.icon, .mailbox)
     }
-
-    // MARK: - MailboxDrawersViewModel
-
-    func testMailboxDrawersHappyPath() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: """
-            {"drawers":[
-              {"drawer":"personal","display_name":"Personal","icon":"inbox",
-               "unread_count":3,"urgent_count":1,"last_item_at":null}
-            ]}
-            """)
-        ]
-        let vm = MailboxDrawersViewModel(api: makeAPI())
-        await vm.load()
-        guard case let .loaded(sections, _) = vm.state else {
-            XCTFail("Expected loaded state, got \(vm.state)")
-            return
-        }
-        XCTAssertEqual(sections.first?.rows.first?.title, "Personal")
-        XCTAssertEqual(sections.first?.rows.first?.subtitle, "3 unread · 1 urgent")
-    }
 }

@@ -106,7 +106,12 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                     subtext: blockCount > 0 ? "\(blockCount) \(blockCount == 1 ? "person" : "people")" : nil,
                     control: .chevron
                 ),
-                GroupedListRow(id: "visibility", label: "Profiles & Privacy", control: .chevron),
+                GroupedListRow(
+                    id: "visibility",
+                    label: "Visibility preferences",
+                    subtext: "Verified connections only",
+                    control: .chevron
+                ),
                 GroupedListRow(id: "export", label: "Data export", control: .chevron)
             ]
         )
@@ -152,7 +157,7 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
                 GroupedListRow(id: "legal", label: "Legal", control: .chevron),
                 GroupedListRow(
                     id: "about",
-                    label: "About",
+                    label: "About Pantopus",
                     subtext: Self.versionString(),
                     control: .chevron
                 )

@@ -17,6 +17,7 @@ import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.CreatePackageRequest
 import app.pantopus.android.data.api.models.homes.CreatePollRequest
+import app.pantopus.android.data.api.models.homes.DeleteOwnershipClaimResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeDocumentsResponse
@@ -36,6 +37,7 @@ import app.pantopus.android.data.api.models.homes.HomePollResponse
 import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
 import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
+import app.pantopus.android.data.api.models.homes.MoveOutResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.OwnersResponse
@@ -183,6 +185,25 @@ interface HomesApi {
      */
     @GET("api/homes/my-ownership-claims")
     suspend fun myOwnershipClaims(): MyOwnershipClaimsResponse
+
+    /**
+     * `POST /api/homes/:id/move-out` — route `backend/routes/home.js:3391`.
+     * Self-initiated leave for any occupant.
+     */
+    @POST("api/homes/{id}/move-out")
+    suspend fun moveOut(
+        @Path("id") homeId: String,
+    ): MoveOutResponse
+
+    /**
+     * `DELETE /api/homes/:id/ownership-claims/:claimId` — route
+     * `backend/routes/homeOwnership.js:603`.
+     */
+    @DELETE("api/homes/{id}/ownership-claims/{claimId}")
+    suspend fun deleteOwnershipClaim(
+        @Path("id") homeId: String,
+        @Path("claimId") claimId: String,
+    ): DeleteOwnershipClaimResponse
 
     /** `GET /api/homes/:id/bills` — route `backend/routes/home.js:4506`. */
     @GET("api/homes/{id}/bills")

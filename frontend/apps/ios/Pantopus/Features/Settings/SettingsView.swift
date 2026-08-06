@@ -31,6 +31,7 @@ public enum SettingsStackRoute: Hashable {
     /// setup · payout routing). Distinct from A10.10 Wallet
     /// (earnings-in) which lives under the Wallet tab.
     case payments
+    case dataExport
     /// One route intentionally parked until P8.5: data export wizard.
     /// See `docs/t6-open-questions-decisions.md` Q7.
     case placeholder(label: String)
@@ -116,7 +117,7 @@ public struct SettingsView: View {
             LegalContentView(document: doc) { popLast() }
         case let .placeholder(label):
             NotYetAvailableView(tabName: label, icon: .info)
-        case .blockedUsers, .password, .verification, .help, .about, .payments:
+        case .blockedUsers, .password, .verification, .help, .about, .payments, .dataExport:
             settingsDestination(for: route)
         }
     }
@@ -135,6 +136,8 @@ public struct SettingsView: View {
             AboutView { popLast() }
         case .payments:
             PaymentsView(onBack: { popLast() }, onOpenWallet: onOpenWallet)
+        case .dataExport:
+            DataExportView { popLast() }
         default:
             EmptyView()
         }
@@ -145,7 +148,7 @@ public struct SettingsView: View {
         case .notifications:
             NotificationSettingsView { popLast() }
         case .privacy:
-            PrivacyView { popLast() }
+            PrivacyView(viewModel: PrivacySettingsViewModel()) { popLast() }
         default:
             EmptyView()
         }
@@ -176,7 +179,7 @@ public struct SettingsView: View {
         case .password: .password
         case .verification: .verification
         // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
-        case .dataExport: .placeholder(label: "Data export")
+        case .dataExport: .dataExport
         // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
         // setup · payout routing). Distinct from A10.10 Wallet
         // (earnings-in), which the host still surfaces via

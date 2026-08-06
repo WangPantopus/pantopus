@@ -41,10 +41,16 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
+        <!-- singleTask: the browser OAuth redirect (pantopus://auth/callback)
+             must return to the RUNNING instance via onNewIntent instead of
+             stacking a second MainActivity and rebuilding the Compose tree.
+             It also re-fronts the app over Custom Tabs once the redirect
+             lands, which is what dismisses the browser after sign-in. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.Pantopus">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -60,7 +66,12 @@
                 <data android:scheme="https" android:host="www.pantopus.app" />
             </intent-filter>
 
-            <!-- Custom scheme: pantopus://... -->
+            <!-- Custom scheme: pantopus://... — including the browser OAuth
+                 callback pantopus://auth/callback, which MainActivity hands
+                 to OAuthSessionStore before the deep-link router sees it
+                 (mirrors iOS PantopusApp's isOAuthCallback guard). A second
+                 activity with a scheme+host+path filter would collide with
+                 this one and pop a disambiguation chooser. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

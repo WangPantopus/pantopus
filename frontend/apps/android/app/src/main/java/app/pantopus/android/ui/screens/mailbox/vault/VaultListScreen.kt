@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
@@ -37,6 +38,7 @@ fun VaultListScreen(
         )
         viewModel.load()
     }
+    SecureScreenEffect()
     ListOfRowsScreen(
         title = "Vault",
         subtitle = subtitle,

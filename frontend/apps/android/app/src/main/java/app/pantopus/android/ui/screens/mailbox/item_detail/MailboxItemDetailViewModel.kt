@@ -15,10 +15,12 @@ import app.pantopus.android.data.api.models.mailbox.v2.MailboxV2Item
 import app.pantopus.android.data.api.models.mailbox.v2.MemoryDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.PackageDetailResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.components.KeyFactRow
 import app.pantopus.android.ui.components.TimelineStep
 import app.pantopus.android.ui.components.TimelineStepState
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GenericMailBodyContent
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -145,6 +147,8 @@ data class MailboxItemDetailContent(
      * dedicated body decoder.
      */
     val payload: MailboxCategoryPayload = MailboxCategoryPayload.Other,
+    /** Readable body for categories without a bespoke body layout. */
+    val genericBody: GenericMailBodyContent? = null,
 )
 
 /** Observed state for the Mailbox Item Detail screen. */
@@ -431,7 +435,7 @@ class MailboxItemDetailViewModel
         private suspend fun fetch() {
             when (val result = repo.item(mailId)) {
                 is NetworkResult.Failure ->
-                    _state.value = MailboxItemDetailUiState.Error(result.error.message)
+                    _state.value = MailboxItemDetailUiState.Error(result.error.displayMessage("Couldn't load this item."))
                 is NetworkResult.Success -> {
                     val item = result.data.mail
                     val category = MailItemCategory.fromRaw(item.type)
@@ -764,7 +768,39 @@ class MailboxItemDetailViewModel
                 ctaEnabled = true,
                 isUnread = !item.viewed,
                 isArchived = item.archived,
+                genericBody = genericBody(item, category),
             )
+
+        private fun genericBody(
+            item: MailboxV2Item,
+            category: MailItemCategory,
+        ): GenericMailBodyContent =
+            GenericMailBodyContent(
+                category = category,
+                paragraphs = bodyParagraphs(item),
+                attachments = item.attachments.orEmpty(),
+                tags = item.tags,
+                actionLabel = actionLabel(item),
+            )
+
+        private fun bodyParagraphs(item: MailboxV2Item): List<String> {
+            val content = item.content?.trim()
+            val source =
+                content?.takeIf { it.isNotEmpty() }
+                    ?: item.previewText?.trim()?.takeIf { it.isNotEmpty() }
+            if (source.isNullOrEmpty()) return emptyList()
+            return source
+                .split("\n\n")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        }
+
+        private fun actionLabel(item: MailboxV2Item): String? =
+            when {
+                item.ackRequired == true -> "Acknowledge"
+                item.actionRequired == true -> "Action needed"
+                else -> null
+            }
 
         private fun projectPackage(
             item: MailboxV2Item,

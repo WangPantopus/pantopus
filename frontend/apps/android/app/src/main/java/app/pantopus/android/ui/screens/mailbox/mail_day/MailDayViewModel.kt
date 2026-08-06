@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.MailDayReviewedDto
 import app.pantopus.android.data.api.models.mailbox.v2.MailDayTodayResponse
 import app.pantopus.android.data.api.models.mailbox.v2.MailDayUnreviewedDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailday.MailDayRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,7 +57,7 @@ class MailDayViewModel
                 _state.value =
                     when (val result = repository.today()) {
                         is NetworkResult.Success -> project(result.data)
-                        is NetworkResult.Failure -> MailDayUiState.Error(result.error.message)
+                        is NetworkResult.Failure -> MailDayUiState.Error(result.error.displayMessage("Couldn't load Mail Day."))
                     }
             }
         }

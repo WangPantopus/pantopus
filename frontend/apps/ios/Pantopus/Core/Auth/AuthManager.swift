@@ -26,6 +26,11 @@ public enum AccountType: String, Sendable, Hashable, CaseIterable {
     }
 }
 
+public enum OAuthProvider: String, Sendable, Hashable, CaseIterable {
+    case google
+    case apple
+}
+
 /// Typed error surface for the auth flows. Mapping rules:
 ///
 /// - `invalidCredentials` — login 401 (wrong email/password).
@@ -100,9 +105,11 @@ final class AuthManager {
     private(set) var state: State = .unknown
     private(set) var accessToken: String?
 
-    private let store: any SecureStore
-    private let apiClient: APIClient
+    let store: any SecureStore
+    let apiClient: APIClient
     private let logger = Logger(label: "app.pantopus.ios.AuthManager")
+    /// Retained for the lifetime of an in-flight ASWebAuthenticationSession.
+    private(set) var oauthCoordinator: OAuthWebAuthenticationCoordinator?
 
     /// In-flight refresh, shared by all concurrent callers (single-flight).
     /// The backend rotates refresh tokens and treats a replayed refresh
@@ -125,6 +132,10 @@ final class AuthManager {
     ) {
         self.store = store
         self.apiClient = apiClient
+    }
+
+    func retainOAuthCoordinator(_ coordinator: OAuthWebAuthenticationCoordinator?) {
+        oauthCoordinator = coordinator
     }
 
     // MARK: - Session restore
@@ -205,28 +216,28 @@ final class AuthManager {
             let response: LoginResponse = try await apiClient.request(
                 AuthEndpoints.login(email: email, password: password)
             )
-            if let access = response.accessToken {
-                try store.set(access, for: SecureStoreKey.accessToken)
-                accessToken = access
-            }
-            if let refresh = response.refreshToken {
-                try store.set(refresh, for: SecureStoreKey.refreshToken)
-            }
-            try store.set(response.user.id, for: SecureStoreKey.userId)
-
-            let user = UserDTO(from: response.user)
-            persistCachedUser(user)
-            state = .signedIn(user)
-            Observability.shared.identify(userId: response.user.id, email: response.user.email)
-            Analytics.identify(userId: response.user.id)
-            Observability.shared.track("auth.signed_in")
-            if let access = accessToken {
-                SocketClient.shared.connect(token: access)
-            }
-            logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
+            try persistLoginResponse(response)
         } catch let apiError as APIError {
             throw Self.mapSignInError(apiError)
         }
+    }
+
+    func persistLoginResponse(_ response: LoginResponse) throws {
+        guard let access = response.accessToken, !access.isEmpty else {
+            throw AuthError.unknown
+        }
+        try store.set(access, for: SecureStoreKey.accessToken)
+        accessToken = access
+        if let refresh = response.refreshToken, !refresh.isEmpty {
+            try store.set(refresh, for: SecureStoreKey.refreshToken)
+        }
+        try store.set(response.user.id, for: SecureStoreKey.userId)
+
+        let user = UserDTO(from: response.user)
+        persistCachedUser(user)
+        finishSignedIn(user, token: access)
+        Observability.shared.track("auth.signed_in")
+        logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
     }
 
     // MARK: - Sign up
@@ -446,6 +457,9 @@ final class AuthManager {
         try? store.delete(SecureStoreKey.cachedUser)
         accessToken = nil
         state = .signedOut
+        // Workstream 1.4 — never resume a prior user's deferred destination.
+        PendingDeepLinkStore.clear()
+        DeepLinkRouter.shared.clearPending()
         guard hadSession else { return }
         SocketClient.shared.disconnect()
         Observability.shared.identify(userId: nil)
@@ -462,30 +476,4 @@ final class AuthManager {
         await signOut()
     }
 
-}
-
-// MARK: - Preview helper
-
-/// Preview-only in-memory secure store. Marked `@unchecked Sendable` since
-/// the underlying dictionary mutation is gated by an `NSLock`.
-private final class InMemoryStore: SecureStore, @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String: String] = [:]
-    func set(_ value: String, for key: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        storage[key] = value
-    }
-
-    func get(_ key: String) -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage[key]
-    }
-
-    func delete(_ key: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        storage.removeValue(forKey: key)
-    }
 }

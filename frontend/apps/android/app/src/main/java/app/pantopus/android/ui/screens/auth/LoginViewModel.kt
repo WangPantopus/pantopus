@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber")
+@file:Suppress("MagicNumber", "TooGenericExceptionCaught")
 
 package app.pantopus.android.ui.screens.auth
 
@@ -6,15 +6,26 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.auth.AuthError
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.auth.OAuthBrowserCommand
+import app.pantopus.android.data.auth.OAuthProvider
+import app.pantopus.android.data.auth.OAuthSessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @HiltViewModel
 class LoginViewModel
@@ -39,6 +50,25 @@ class LoginViewModel
         private val _uiState = MutableStateFlow(UiState())
         val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+        private val _browserAuth = Channel<OAuthBrowserCommand>(Channel.BUFFERED)
+        val browserAuth = _browserAuth.receiveAsFlow()
+
+        private var oauthOwnerId: String? = null
+        private var awaitingResumeAfterBrowser: Boolean = false
+
+        /**
+         * The host actually left the foreground after the browser command
+         * was issued. Custom Tabs (and the `ACTION_VIEW` fallback) always
+         * pause the host before covering it, so a resume that was *not*
+         * preceded by a pause is never the user backing out of the browser
+         * — it is the host being re-attached, and a `LifecycleEventObserver`
+         * added while the owner is already RESUMED replays ON_RESUME
+         * synchronously. Cancelling on that would consume the pending
+         * session and silently drop the real redirect.
+         */
+        private var hostLeftForeground: Boolean = false
+        private var cancelJob: Job? = null
+
         fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
 
         fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
@@ -58,6 +88,94 @@ class LoginViewModel
                         _uiState.update { it.copy(isLoading = false) }
                     }
             }
+        }
+
+        fun signInWithOAuth(provider: OAuthProvider) {
+            if (_uiState.value.isLoading) return
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            viewModelScope.launch {
+                val ownerId = UUID.randomUUID().toString()
+                oauthOwnerId = ownerId
+                val nonce = OAuthSessionStore.begin(ownerId)
+                try {
+                    val url = authRepository.oauthAuthorizationUrl(provider, nonce)
+                    awaitingResumeAfterBrowser = true
+                    _browserAuth.send(OAuthBrowserCommand.Open(url))
+                    val callback =
+                        OAuthSessionStore.callback
+                            .filterNotNull()
+                            .first { it.ownerId == ownerId }
+                    if (!OAuthSessionStore.claim(ownerId, callback)) {
+                        _uiState.update { it.copy(isLoading = false) }
+                        return@launch
+                    }
+                    when (callback) {
+                        is OAuthSessionStore.Callback.Cancelled -> Unit
+                        // Mirrors iOS `OAuthWebAuthenticationError.unableToStart`.
+                        is OAuthSessionStore.Callback.Malformed,
+                        is OAuthSessionStore.Callback.BrowserUnavailable,
+                        ->
+                            _uiState.update { it.copy(errorMessage = AuthError.Unknown) }
+                        // Attempt ended after a forged / unverifiable callback —
+                        // no code was ever exchanged. Mirrors the iOS
+                        // `rejectedCallback` -> `AuthError.serverError` mapping.
+                        is OAuthSessionStore.Callback.Rejected ->
+                            _uiState.update {
+                                it.copy(errorMessage = AuthError.ServerError(OAuthSessionStore.REJECTED_MESSAGE))
+                            }
+                        is OAuthSessionStore.Callback.Code ->
+                            authRepository.exchangeOAuthCode(callback.value)
+                        is OAuthSessionStore.Callback.Tokens ->
+                            authRepository.exchangeOAuthTokens(
+                                accessToken = callback.accessToken,
+                                refreshToken = callback.refreshToken,
+                            )
+                    }
+                    _uiState.update { it.copy(isLoading = false) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: AuthError) {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = e) }
+                } catch (t: Throwable) {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = mapLoginError(t)) }
+                } finally {
+                    awaitingResumeAfterBrowser = false
+                    hostLeftForeground = false
+                    cancelJob?.cancel()
+                    OAuthSessionStore.clear(ownerId)
+                    if (oauthOwnerId == ownerId) oauthOwnerId = null
+                }
+            }
+        }
+
+        /**
+         * Called when the host screen leaves the foreground — the browser
+         * is now in front. Arms [onHostResumed]'s back-out heuristic.
+         */
+        fun onHostPaused() {
+            if (!awaitingResumeAfterBrowser) return
+            hostLeftForeground = true
+        }
+
+        /**
+         * Called when the host screen resumes. After Custom Tabs returns
+         * without a callback, silently clear the loading state. Only a
+         * resume that follows a real [onHostPaused] counts — see
+         * [hostLeftForeground].
+         */
+        fun onHostResumed() {
+            if (!awaitingResumeAfterBrowser) return
+            if (!hostLeftForeground) return
+            hostLeftForeground = false
+            val owner = oauthOwnerId ?: return
+            cancelJob?.cancel()
+            cancelJob =
+                viewModelScope.launch {
+                    delay(400)
+                    if (OAuthSessionStore.cancelIfAwaiting(owner)) {
+                        awaitingResumeAfterBrowser = false
+                    }
+                }
         }
 
         /**

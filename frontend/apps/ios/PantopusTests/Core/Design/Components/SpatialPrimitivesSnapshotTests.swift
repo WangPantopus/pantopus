@@ -90,21 +90,21 @@ final class SpatialPrimitivesSnapshotTests: XCTestCase {
         }
     }
 
-    func testFuzzMap_building() {
-        assertRenders("FuzzMap building", size: Self.fuzzSize) {
-            FuzzMap(stop: .building)
-        }
-    }
-
     func testFuzzMap_block() {
         assertRenders("FuzzMap block", size: Self.fuzzSize) {
             FuzzMap(stop: .block)
         }
     }
 
-    func testFuzzMap_blockDefault() {
-        assertRenders("FuzzMap block default", size: Self.fuzzSize) {
-            FuzzMap(stop: .blockDefault)
+    func testFuzzMap_quarterMile() {
+        assertRenders("FuzzMap quarter mile", size: Self.fuzzSize) {
+            FuzzMap(stop: .quarterMile)
+        }
+    }
+
+    func testFuzzMap_halfMile() {
+        assertRenders("FuzzMap half mile", size: Self.fuzzSize) {
+            FuzzMap(stop: .halfMile)
         }
     }
 

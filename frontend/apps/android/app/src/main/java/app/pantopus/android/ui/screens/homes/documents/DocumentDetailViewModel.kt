@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeDocumentDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,7 +78,7 @@ class DocumentDetailViewModel
                             // Keep the prior payload visible on a transient network blip; surface a toast.
                             _toast.value = DocumentDetailToast(result.error.message, isError = true)
                         } else {
-                            _state.value = DocumentDetailUiState.Error(result.error.message)
+                            _state.value = DocumentDetailUiState.Error(result.error.displayMessage("Couldn't load this document."))
                         }
                     }
                 }

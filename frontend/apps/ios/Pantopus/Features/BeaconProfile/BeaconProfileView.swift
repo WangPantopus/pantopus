@@ -61,11 +61,20 @@ public struct BeaconProfileView: View {
                 get: { viewModel.showFollowHandshake },
                 set: { viewModel.showFollowHandshake = $0 }
             ),
-            onDismiss: { Task { await viewModel.refresh() } },
+            onDismiss: {
+                viewModel.clearHandshakeTier()
+                Task { await viewModel.refresh() }
+            },
             content: {
                 PrivacyHandshakeWizardView(
-                    viewModel: PrivacyHandshakeViewModel(personaHandle: viewModel.loadedHandle) {
-                        Task { @MainActor in viewModel.showFollowHandshake = false }
+                    viewModel: PrivacyHandshakeViewModel(
+                        personaHandle: viewModel.loadedHandle,
+                        preselectedTierRank: viewModel.handshakePreselectedTierRank
+                    ) {
+                        Task { @MainActor in
+                            viewModel.showFollowHandshake = false
+                            viewModel.clearHandshakeTier()
+                        }
                     }
                 )
             }
@@ -169,7 +178,7 @@ public struct BeaconProfileView: View {
                 PublicProfilePostsFeed(
                     kind: .persona,
                     posts: payload.posts,
-                    onUnlock: { _ in viewModel.toastMessage = "Subscribe flow coming soon" },
+                    onUnlock: { post in viewModel.unlockBroadcast(tierRank: post.targetTierRank) },
                     onEmptyCTA: { if !payload.isOwner { viewModel.follow() } }
                 )
             }

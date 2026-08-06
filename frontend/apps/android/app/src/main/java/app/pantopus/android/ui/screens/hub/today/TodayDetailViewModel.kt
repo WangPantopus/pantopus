@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.hub.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.hub.HubRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,7 +60,7 @@ class TodayDetailViewModel
                             }
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = TodayDetailUiState.Error(result.error.message)
+                        _state.value = TodayDetailUiState.Error(result.error.displayMessage("Couldn't load Today."))
                     }
                 }
             }

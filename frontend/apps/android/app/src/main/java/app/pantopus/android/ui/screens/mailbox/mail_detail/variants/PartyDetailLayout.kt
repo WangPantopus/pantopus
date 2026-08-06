@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
@@ -39,7 +41,6 @@ import app.pantopus.android.data.api.models.mailbox.v2.PartyDetailDto
 import app.pantopus.android.data.api.models.mailbox.v2.PartyElfBullet
 import app.pantopus.android.data.api.models.mailbox.v2.PartyRsvpStatus
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PartyBody
-import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.PartyDateTile
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.PartyHero
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.RsvpCluster
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
@@ -325,11 +326,7 @@ private fun EventDetailsCard(party: PartyDetailDto) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
             ) {
-                PartyDateTile(
-                    monthLabel = party.event.date.monthLabel,
-                    dayNumber = party.event.date.dayNumber,
-                    dayLabel = party.event.date.dayLabel,
-                )
+                PartyMap()
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
                         text = party.event.location,
@@ -348,6 +345,94 @@ private fun EventDetailsCard(party: PartyDetailDto) {
             VibeRows(party = party)
         }
     }
+}
+
+// Abstract mini-map preview (party.jsx PartyMap): four street-grid
+// blocks (one park-green) split by white roads, tiny house dots, and
+// a drop pin near the venue corner. Purely decorative — geometry
+// mirrors the design's 64×64 SVG.
+@Composable
+private fun PartyMap() {
+    Box(
+        modifier =
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
+                .testTag("partyEventDetails_miniMap"),
+    ) {
+        Box(Modifier.size(28.dp).background(PantopusColors.appBorderSubtle))
+        Box(
+            Modifier
+                .offset(x = 34.dp)
+                .size(width = 30.dp, height = 28.dp)
+                .background(PantopusColors.appBorderSubtle),
+        )
+        Box(
+            Modifier
+                .offset(y = 36.dp)
+                .size(28.dp)
+                .background(PantopusColors.appBorderSubtle),
+        )
+        Box(
+            Modifier
+                .offset(x = 34.dp, y = 36.dp)
+                .size(width = 30.dp, height = 28.dp)
+                .background(PantopusColors.successBg),
+        )
+        Box(
+            Modifier
+                .offset(x = 28.dp)
+                .size(width = 6.dp, height = 64.dp)
+                .background(PantopusColors.appSurface),
+        )
+        Box(
+            Modifier
+                .offset(y = 28.dp)
+                .size(width = 64.dp, height = 8.dp)
+                .background(PantopusColors.appSurface),
+        )
+        Box(
+            Modifier
+                .offset(x = 31.dp)
+                .size(width = 1.dp, height = 64.dp)
+                .background(PantopusColors.appBorder),
+        )
+        Box(
+            Modifier
+                .offset(y = 32.dp)
+                .size(width = 64.dp, height = 1.dp)
+                .background(PantopusColors.appBorder),
+        )
+        Box(Modifier.offset(x = 6.dp, y = 6.dp).size(6.dp).background(PantopusColors.appBorderStrong))
+        Box(Modifier.offset(x = 18.dp, y = 14.dp).size(6.dp).background(PantopusColors.appBorderStrong))
+        Box(Modifier.offset(x = 44.dp, y = 6.dp).size(6.dp).background(PantopusColors.appBorderStrong))
+        Box(Modifier.offset(x = 6.dp, y = 44.dp).size(6.dp).background(PantopusColors.appBorderStrong))
+        PartyMapPinDrop(modifier = Modifier.offset(x = 37.dp, y = 30.dp))
+    }
+}
+
+// Teardrop map pin — rounded square with one sharp corner, rotated so
+// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+@Composable
+private fun PartyMapPinDrop(modifier: Modifier = Modifier) {
+    val teardrop =
+        RoundedCornerShape(
+            topStart = 10.dp,
+            topEnd = 10.dp,
+            bottomEnd = 10.dp,
+            bottomStart = 0.dp,
+        )
+    Box(
+        modifier =
+            modifier
+                .size(20.dp)
+                .rotate(-45f)
+                .clip(teardrop)
+                .background(PantopusColors.categoryParty)
+                .border(2.dp, PantopusColors.appSurface, teardrop),
+    )
 }
 
 @Composable

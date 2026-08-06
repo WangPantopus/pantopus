@@ -44,17 +44,39 @@ class PrivacySnapshotTest {
 
     @Test
     fun privacy_defaults() {
-        val viewModel = PrivacySettingsViewModel().apply { load() }
+        val viewModel = privacyVm().apply { load() }
         paparazzi.snapshot { Frame { PrivacyFrame(viewModel) } }
     }
 
     @Test
     fun privacy_stealth() {
         val viewModel =
-            PrivacySettingsViewModel().apply {
+            privacyVm().apply {
                 setVariant(PrivacySettingsViewModel.Variant.Stealth)
             }
         paparazzi.snapshot { Frame { PrivacyFrame(viewModel) } }
+    }
+
+    private fun privacyVm(): PrivacySettingsViewModel {
+        val appLock =
+            io.mockk.mockk<app.pantopus.android.core.security.AppLockManager>(relaxed = true) {
+                io.mockk.every { preferenceEnabled } returns kotlinx.coroutines.flow.MutableStateFlow(false)
+                io.mockk.every { capability } returns
+                    kotlinx.coroutines.flow.MutableStateFlow(
+                        app.pantopus.android.core.security.AppLockManager.Capability.Available,
+                    )
+                io.mockk.every { biometricLabel } returns kotlinx.coroutines.flow.MutableStateFlow("Biometric")
+                io.mockk.every { lastError } returns kotlinx.coroutines.flow.MutableStateFlow(null)
+                io.mockk.every { isLocked } returns kotlinx.coroutines.flow.MutableStateFlow(false)
+            }
+        val auth =
+            io.mockk.mockk<app.pantopus.android.data.auth.AuthRepository>(relaxed = true) {
+                io.mockk.every { state } returns
+                    kotlinx.coroutines.flow.MutableStateFlow(
+                        app.pantopus.android.data.auth.AuthRepository.State.SignedOut,
+                    )
+            }
+        return PrivacySettingsViewModel(appLock, auth)
     }
 
     @Composable

@@ -19,7 +19,7 @@ public struct VacationHoldScope: Sendable, Hashable, Identifiable {
     public enum Kind: String, Sendable, Hashable {
         case mail
         case packages
-        case magicTask
+        case marketplacePickups
         case civic
     }
 

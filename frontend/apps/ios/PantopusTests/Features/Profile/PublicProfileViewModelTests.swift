@@ -268,29 +268,37 @@ final class PublicProfileViewModelTests: XCTestCase {
         XCTAssertNil(content.header.tierLabel)
     }
 
-    func testFollowMarksSucceededAndEmitsToast() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.profileWithReviews),
-            .status(201, body: "{\"message\":\"Connection request sent\"}")
-        ]
+    // MARK: - WS3.1 — Follow opens the privacy handshake (Stripe tiers)
+
+    /// `GET /api/users/id/:id` carries no Beacon handle, and `User.username`
+    /// is a different namespace from `PublicPersona.handle` — so the
+    /// handshake must not open against a handle we can't attribute.
+    func testFollowDoesNotUseUsernameAsBeaconHandle() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
         let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
         await vm.load()
-        await vm.follow()
-        XCTAssertEqual(vm.followState, .succeeded)
-        XCTAssertEqual(vm.toastMessage, "Following")
+        XCTAssertFalse(vm.showFollowHandshake)
+        vm.follow()
+        XCTAssertFalse(vm.showFollowHandshake)
+        XCTAssertEqual(vm.loadedPersonaHandle, "")
+        XCTAssertEqual(vm.toastMessage, PublicProfileViewModel.handshakeUnavailableMessage)
     }
 
-    func testFollowShowsErrorToastOnFailure() async {
-        SequencedURLProtocol.sequence = [
-            .status(200, body: Self.profileWithReviews),
-            .status(403, body: "{\"error\":\"forbidden\"}")
-        ]
+    func testUnlockBroadcastWithoutBeaconHandleStaysClosed() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
         let vm = PublicProfileViewModel(userId: "u1", client: makeAPI())
         await vm.load()
-        await vm.follow()
-        if case .failed = vm.followState { /* ok */ } else {
-            XCTFail("Expected .failed follow state")
-        }
-        XCTAssertNotNil(vm.toastMessage)
+        vm.unlockBroadcast(tierRank: 2)
+        XCTAssertFalse(vm.showFollowHandshake)
+        XCTAssertNil(vm.handshakePreselectedTierRank)
+        XCTAssertEqual(vm.toastMessage, PublicProfileViewModel.handshakeUnavailableMessage)
+    }
+
+    func testOwnerCannotOpenFollowHandshake() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "u1", client: makeAPI())
+        await vm.load()
+        vm.follow()
+        XCTAssertFalse(vm.showFollowHandshake)
     }
 }

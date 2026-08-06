@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
@@ -58,6 +59,8 @@ data class PublicProfilePost(
     val visibility: Visibility? = null,
     /** Persona-only — `true` when this broadcast is gated. */
     val isLocked: Boolean = false,
+    /** Persona-only — tier rank required to unlock. */
+    val targetTierRank: Int? = null,
     /** Local-only — `null` on Persona broadcasts. */
     val intent: Intent? = null,
 ) {
@@ -92,6 +95,8 @@ data class PublicProfileContent(
      * canonical neighbor layout. `null` for Persona.
      */
     val neighbor: NeighborProfileContent? = null,
+    val isOwner: Boolean = false,
+    val personaHandle: String? = null,
 )
 
 /** Observed UI state for the Public profile screen. */
@@ -122,6 +127,7 @@ class PublicProfileViewModel
         private val repo: ProfileRepository,
         private val relationships: RelationshipsRepository,
         private val blocks: BlocksRepository,
+        private val authRepository: AuthRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val userId: String =
@@ -151,14 +157,6 @@ class PublicProfileViewModel
         private val _blockState =
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
         val blockState: StateFlow<PublicProfileActionState> = _blockState.asStateFlow()
-
-        /**
-         * P6.5 — Follow button state for Persona profiles. Toggles
-         * `Idle` → `InFlight` → `Succeeded` once the request lands.
-         */
-        private val _followState =
-            MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
-        val followState: StateFlow<PublicProfileActionState> = _followState.asStateFlow()
 
         private val _showOverflow = MutableStateFlow(false)
         val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
@@ -194,16 +192,58 @@ class PublicProfileViewModel
             _showOverflow.value = show
         }
 
-        /**
-         * P6.5 — Surface the placeholder "Subscribe flow coming soon"
-         * toast when the visitor taps the locked-broadcast paywall
-         * overlay. The real subscribe-to-tier flow lands in a follow-up.
-         */
-        fun showSubscribeToast() {
-            _toastMessage.value = "Subscribe flow coming soon"
+        private val _showFollowHandshake = MutableStateFlow(false)
+        val showFollowHandshake: StateFlow<Boolean> = _showFollowHandshake.asStateFlow()
+
+        private val _handshakePreselectedTierRank = MutableStateFlow<Int?>(null)
+        val handshakePreselectedTierRank: StateFlow<Int?> = _handshakePreselectedTierRank.asStateFlow()
+
+        fun setShowFollowHandshake(show: Boolean) {
+            _showFollowHandshake.value = show
         }
 
-        /** Send a connection request via `POST /api/relationships/requests`. */
+        fun clearHandshakeTier() {
+            _handshakePreselectedTierRank.value = null
+        }
+
+        /**
+         * Persona follow — opens privacy handshake (Stripe Checkout for paid
+         * tiers). There is no in-flight/succeeded pose to track here: the
+         * handshake wizard owns the request and the resulting follow state,
+         * exactly as iOS `PublicProfileViewModel.follow()` does.
+         */
+        fun follow() {
+            if (!canOpenHandshake()) {
+                _toastMessage.value = HANDSHAKE_UNAVAILABLE_MESSAGE
+                return
+            }
+            _handshakePreselectedTierRank.value = null
+            _showFollowHandshake.value = true
+        }
+
+        /** Unlock a tier-gated broadcast on a Persona profile. */
+        fun unlockBroadcast(tierRank: Int?) {
+            if (!canOpenHandshake()) {
+                _toastMessage.value = HANDSHAKE_UNAVAILABLE_MESSAGE
+                return
+            }
+            _handshakePreselectedTierRank.value = tierRank
+            _showFollowHandshake.value = true
+        }
+
+        fun loadedPersonaHandle(): String {
+            val loaded = _state.value as? PublicProfileUiState.Loaded ?: return ""
+            return loaded.content.personaHandle.orEmpty()
+        }
+
+        private fun canOpenHandshake(): Boolean {
+            val loaded = _state.value as? PublicProfileUiState.Loaded ?: return false
+            val content = loaded.content
+            return content.kind == PublicProfileKind.Persona &&
+                !content.isOwner &&
+                !content.personaHandle.isNullOrBlank()
+        }
+
         fun connect() {
             if (_connectState.value is PublicProfileActionState.InFlight) return
             if (_connectState.value is PublicProfileActionState.Succeeded) return
@@ -217,30 +257,6 @@ class PublicProfileViewModel
                     is NetworkResult.Failure -> {
                         val message = friendlyMessage(result.error)
                         _connectState.value = PublicProfileActionState.Failed(message)
-                        _toastMessage.value = message
-                    }
-                }
-            }
-        }
-
-        /**
-         * P6.5 — Follow a Persona profile. Reuses the connection-request
-         * endpoint as the closest existing wire op; backend wires a
-         * dedicated `POST /api/follows/:userId` later if/when it ships.
-         */
-        fun follow() {
-            if (_followState.value is PublicProfileActionState.InFlight) return
-            if (_followState.value is PublicProfileActionState.Succeeded) return
-            _followState.value = PublicProfileActionState.InFlight
-            viewModelScope.launch {
-                when (val result = relationships.sendRequest(userId)) {
-                    is NetworkResult.Success -> {
-                        _followState.value = PublicProfileActionState.Succeeded
-                        _toastMessage.value = "Following"
-                    }
-                    is NetworkResult.Failure -> {
-                        val message = friendlyMessage(result.error)
-                        _followState.value = PublicProfileActionState.Failed(message)
                         _toastMessage.value = message
                     }
                 }
@@ -290,6 +306,45 @@ class PublicProfileViewModel
                     tierLabel = if (kind == PublicProfileKind.Persona) "Persona · Verified" else null,
                     isVerifiedNeighbor = kind == PublicProfileKind.Local,
                 )
+            val stats = buildStatCells(profile)
+            val reviewCards = buildReviewCards(profile)
+
+            val neighbor = if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards) else null
+            val signedInId = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+            val isOwner = signedInId != null && signedInId == profile.id
+            // A Beacon (`PublicPersona.handle`) lives in a different namespace
+            // from `User.username` — persona handles are generated
+            // independently (`identityProfiles.generateUniqueAudienceHandle`)
+            // and the persona serializer deliberately never exposes the owning
+            // user. Passing the username here would hand the privacy handshake
+            // a handle that can resolve to a *different* creator's Beacon, so
+            // it stays null until `GET /api/users/id/:id` carries an approved
+            // Beacon bridge.
+            val personaHandle: String? = null
+
+            return PublicProfileContent(
+                profile = profile,
+                kind = kind,
+                header = header,
+                stats =
+                    StatsTabsContent(
+                        stats = stats,
+                        bio = profile.bio,
+                        skills = profile.skills,
+                        reviews = reviewCards,
+                    ),
+                neighbor = neighbor,
+                isOwner = isOwner,
+                personaHandle = personaHandle,
+            )
+        }
+
+        /**
+         * Header stat cells — reviews / rating / gigs, whichever the DTO
+         * actually carries, falling back to a single placeholder cell so the
+         * strip never renders empty.
+         */
+        private fun buildStatCells(profile: PublicProfileDto): List<ProfileStatCell> {
             val stats = mutableListOf<ProfileStatCell>()
             val reviewCount = profile.reviewCount ?: 0
             if (reviewCount > 0 || profile.reviews.isNotEmpty()) {
@@ -320,35 +375,20 @@ class PublicProfileViewModel
             if (stats.isEmpty()) {
                 stats += ProfileStatCell(id = "placeholder", value = "—", label = "Activity")
             }
-
-            val reviewCards =
-                profile.reviews.map { r ->
-                    ProfileReviewCard(
-                        id = r.id ?: UUID.randomUUID().toString(),
-                        reviewerName = r.reviewerName ?: "Anonymous",
-                        reviewerAvatarUrl = r.reviewerAvatar,
-                        rating = r.rating.coerceIn(0, 5),
-                        body = r.content.orEmpty(),
-                        timestamp = relativeTimestamp(r.createdAt),
-                    )
-                }
-
-            val neighbor = if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards) else null
-
-            return PublicProfileContent(
-                profile = profile,
-                kind = kind,
-                header = header,
-                stats =
-                    StatsTabsContent(
-                        stats = stats,
-                        bio = profile.bio,
-                        skills = profile.skills,
-                        reviews = reviewCards,
-                    ),
-                neighbor = neighbor,
-            )
+            return stats
         }
+
+        private fun buildReviewCards(profile: PublicProfileDto): List<ProfileReviewCard> =
+            profile.reviews.map { r ->
+                ProfileReviewCard(
+                    id = r.id ?: UUID.randomUUID().toString(),
+                    reviewerName = r.reviewerName ?: "Anonymous",
+                    reviewerAvatarUrl = r.reviewerAvatar,
+                    rating = r.rating.coerceIn(0, MAX_REVIEW_RATING),
+                    body = r.content.orEmpty(),
+                    timestamp = relativeTimestamp(r.createdAt),
+                )
+            }
 
         /**
          * B.2 (A10.5) — project the live profile onto the canonical
@@ -544,4 +584,15 @@ class PublicProfileViewModel
                 is NetworkError.Transport -> "Check your connection and try again."
                 else -> "Something went wrong. Try again."
             }
+
+        private companion object {
+            /** Reviews are 1–5 stars; anything the API returns is clamped to it. */
+            const val MAX_REVIEW_RATING = 5
+
+            /**
+             * Shown instead of silently no-op'ing when this profile carries no
+             * resolvable Beacon handle. Mirrors the iOS string exactly.
+             */
+            const val HANDSHAKE_UNAVAILABLE_MESSAGE = "Following isn't available from this profile yet."
+        }
     }

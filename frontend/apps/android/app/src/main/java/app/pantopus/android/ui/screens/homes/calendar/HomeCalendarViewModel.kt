@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
@@ -159,7 +160,7 @@ class HomeCalendarViewModel
                         events = emptyList()
                         _banner.value = null
                         _monthStrip.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                     }
                 }
             }

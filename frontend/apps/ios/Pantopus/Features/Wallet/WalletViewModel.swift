@@ -241,9 +241,10 @@ public final class WalletViewModel {
     // MARK: - Mapping (pure — unit-test surface)
 
     /// Project the read-path DTOs into a `WalletContent`. The withdraw/payout
-    /// slots (payout method, tax docs) reuse the P3.2 visual placeholder —
-    /// they are wired in Phase 3 with Stripe Connect — and `holdState` stays
-    /// nil because the hold banner copy is Stripe-specific.
+    /// slots (payout method, tax docs) stay nil — they are wired in Phase 3
+    /// with Stripe Connect, and the screen hides those sections rather than
+    /// showing fixture bank details / YTD earnings. `holdState` stays nil
+    /// because the hold banner copy is Stripe-specific.
     public static func makeContent(
         balance: WalletBalanceResponse,
         transactions: [WalletTransactionDTO],
@@ -255,7 +256,6 @@ public final class WalletViewModel {
         let pendingCents = pending?.totalPendingCents ?? 0
         let pendingCount = (pending?.inReviewCount ?? 0) + (pending?.releasingSoonCount ?? 0)
         let activity = transactions.map { activityItem(from: $0, calendar: calendar, now: now) }
-        let placeholder = WalletSampleData.populated
         return WalletContent(
             available: centsToPlain(balance.wallet.balance),
             pending: centsToCurrency(pendingCents),
@@ -263,8 +263,8 @@ public final class WalletViewModel {
             monthValue: centsToCurrency(monthIncomeCents(transactions, calendar: calendar, now: now)),
             monthMeta: monthMeta(count: monthIncomeCount(transactions, calendar: calendar, now: now)),
             activity: activity,
-            payoutMethod: placeholder.payoutMethod,
-            taxDocs: placeholder.taxDocs,
+            payoutMethod: nil,
+            taxDocs: nil,
             holdState: nil,
             payoutsEnabled: payoutsEnabled
         )

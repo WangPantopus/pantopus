@@ -204,7 +204,7 @@ public struct BalanceHero: View {
     private func payoutFooterRow(_ footer: PayoutFooter) -> some View {
         HStack(alignment: .center) {
             Text(footer.nextPayoutLabel)
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Color.white.opacity(0.85))
                 .lineLimit(1)
             Spacer(minLength: Spacing.s2)

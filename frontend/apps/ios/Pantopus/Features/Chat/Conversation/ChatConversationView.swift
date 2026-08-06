@@ -120,7 +120,21 @@ public struct ChatConversationView: View {
                     context: resolvedCreatorContext,
                     onOpenAudienceProfile: onOpenAudienceProfile
                 )
-                ChatCreatorQuotaMeter(quota: resolvedCreatorContext.quota)
+                if let quota = resolvedCreatorContext.quota {
+                    ChatCreatorQuotaMeter(quota: quota)
+                    if quota.isMaxed {
+                        CreatorQuotaExhaustedPill(
+                            tierName: resolvedCreatorContext.fanTierName,
+                            fanName: firstWord(viewModel.counterparty.displayName),
+                            total: quota.total
+                        )
+                        CreatorUpgradeFanCard(
+                            fanName: firstWord(viewModel.counterparty.displayName),
+                            tierName: resolvedCreatorContext.fanTierName,
+                            upgradeTierName: resolvedCreatorContext.upgradeTierName
+                        )
+                    }
+                }
             }
             if mode == .fanThread {
                 FanMembershipStripe(entitlement: activeFanEntitlement) {
@@ -162,15 +176,22 @@ public struct ChatConversationView: View {
                         set: { viewModel.composerText = $0 }
                     ),
                     placeholder: composerPlaceholder,
-                    canSend: viewModel.canSend,
+                    canSend: viewModel.canSend && !isCreatorQuotaLocked,
                     showsSendCost: mode == .fanThread && !isFanReplyLocked,
-                    isLockedAction: isFanReplyLocked,
+                    isLockedAction: isFanReplyLocked || isCreatorQuotaLocked,
                     isStreaming: viewModel.isAIStreaming,
                     onAttach: { attachmentsPresented = true },
                     onEmoji: { emojiPickerPresented = true },
                     onSend: { sendOrPromptForUpgrade() },
                     onStop: { viewModel.cancelAIStream() }
                 )
+                if isCreatorQuotaLocked, let quota = resolvedCreatorContext.quota {
+                    CreatorQuotaLockRow(
+                        tierName: resolvedCreatorContext.fanTierName,
+                        fanName: firstWord(viewModel.counterparty.displayName),
+                        resetCopy: quota.resetCopy
+                    )
+                }
             }
         }
         .background(Theme.Color.appSurface)
@@ -347,6 +368,9 @@ public struct ChatConversationView: View {
 
     private var composerPlaceholder: String {
         if mode == .aiAssistant { return "Ask Pantopus AI…" }
+        if isCreatorQuotaLocked, let quota = resolvedCreatorContext.quota {
+            return "Out of replies until \(quota.resetCopy.replacingOccurrences(of: "Resets ", with: ""))"
+        }
         if mode == .fanThread {
             let first = firstWord(viewModel.counterparty.displayName)
             if let required = activeFanEntitlement.requiredReplyTier {
@@ -373,6 +397,10 @@ public struct ChatConversationView: View {
 
     private var isFanReplyLocked: Bool {
         mode == .fanThread && !activeFanEntitlement.canReply
+    }
+
+    private var isCreatorQuotaLocked: Bool {
+        mode == .creatorThread && (resolvedCreatorContext.quota?.isMaxed ?? false)
     }
 
     @ViewBuilder private var actionBanner: some View {
@@ -819,10 +847,7 @@ extension ChatConversationView {
     private static let scrollSpaceName = "chatConversationScroll"
 
     private func populatedFrame(_ rows: [ChatTimelineRow]) -> some View {
-        // TODO(ctx-strip): A15's pinned gig context strip needs gig
-        // title/price/schedule, which neither room nor person mode loads
-        // today (room mode only knows its id). Implement once the thread
-        // fetch carries gig context — no new endpoint from the view.
+        // Gig context strip is loaded by `ChatConversationViewModel.loadGigContextIfNeeded`.
         GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView {
@@ -1728,6 +1753,14 @@ private struct ChatCreatorQuotaMeter: View {
         return min(max(CGFloat(quota.used) / CGFloat(quota.total), 0), 1)
     }
 
+    private var fillColor: Color {
+        quota.isMaxed ? Theme.Color.error : Theme.Color.primary600
+    }
+
+    private var countColor: Color {
+        quota.isMaxed ? Theme.Color.error : Theme.Color.appText
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -1740,14 +1773,14 @@ private struct ChatCreatorQuotaMeter: View {
                 Spacer()
                 Text("\(quota.used) of \(quota.total) replies this week")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.Color.appText)
+                    .foregroundStyle(countColor)
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                         .fill(Theme.Color.appSurfaceSunken)
                     RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
-                        .fill(Theme.Color.primary600)
+                        .fill(fillColor)
                         .frame(width: proxy.size.width * progress)
                 }
             }
@@ -1765,7 +1798,79 @@ private struct ChatCreatorQuotaMeter: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
-        .accessibilityIdentifier("chatCreatorQuotaMeter")
+        .accessibilityIdentifier(quota.isMaxed ? "chatCreatorQuotaMeterMaxed" : "chatCreatorQuotaMeter")
+    }
+}
+
+private struct CreatorQuotaExhaustedPill: View {
+    let tierName: String
+    let fanName: String
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.alertTriangle, size: 12, strokeWidth: 2.4, color: Theme.Color.warning)
+            Text("You've used your \(total) weekly \(tierName) replies with \(fanName)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.warningBg)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.Color.warningLight).frame(height: 1)
+        }
+        .accessibilityIdentifier("chatCreatorQuotaExhaustedPill")
+    }
+}
+
+private struct CreatorUpgradeFanCard: View {
+    let fanName: String
+    let tierName: String
+    let upgradeTierName: String
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.crown, size: 14, strokeWidth: 2.2, color: Theme.Color.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Invite \(fanName) to \(upgradeTierName)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Unlimited replies · they keep \(tierName) perks")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Spacing.s3)
+        .accessibilityIdentifier("chatCreatorUpgradeFanCard")
+    }
+}
+
+private struct CreatorQuotaLockRow: View {
+    let tierName: String
+    let fanName: String
+    let resetCopy: String
+
+    var body: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.alertTriangle, size: 11, strokeWidth: 2.4, color: Theme.Color.warning)
+            Text("\(tierName) cap reached. Upgrade \(fanName) or wait for the reset.")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.bottom, Spacing.s2)
+        .accessibilityIdentifier("chatCreatorQuotaLockRow")
     }
 }
 

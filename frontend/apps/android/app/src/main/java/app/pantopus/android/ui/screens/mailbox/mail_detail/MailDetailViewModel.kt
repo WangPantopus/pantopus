@@ -19,6 +19,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.RecordsDetailDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
@@ -27,6 +28,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.decodePackageDetail
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfBullet
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -94,6 +96,8 @@ data class MailDetailContent(
     val bodyParagraphs: List<String>,
     val attachments: List<String>,
     val aiSummary: String?,
+    /** A17.1 — optional bullet list under the elf summary (`mail-detail.jsx` ELF.bullets). */
+    val aiBullets: List<AIElfBullet> = emptyList(),
     val ackRequired: Boolean,
     val isAcknowledged: Boolean,
     val isArchived: Boolean = false,
@@ -211,7 +215,7 @@ class MailDetailViewModel
                     is NetworkResult.Success ->
                         _state.value = MailDetailUiState.Loaded(project(result.data.mail))
                     is NetworkResult.Failure ->
-                        _state.value = MailDetailUiState.Error(result.error.message)
+                        _state.value = MailDetailUiState.Error(result.error.displayMessage("Couldn't load this item."))
                 }
             }
         }
@@ -318,7 +322,7 @@ class MailDetailViewModel
                         }
                     }
                     is NetworkResult.Failure ->
-                        _toast.value = result.error.message
+                        _toast.value = result.error.displayMessage("Couldn't load your vault folders.")
                 }
             }
         }
@@ -528,30 +532,93 @@ class MailDetailViewModel
         }
 
         /**
-         * A17.10 — File the archival record in its suggested vault folder.
-         * Stub: flips the local `isFiled` flag and toasts (the real
-         * vault-filing backend is out of scope for P6.6). The body
-         * prepends the Status row, swaps the hero stamp + retention
-         * banner, switches the elf copy, and reveals the related strip.
+         * A17.10 — File the archival record in its suggested vault folder
+         * via the same `POST …/vault/file` path as Save to vault.
          */
         fun fileRecordToVault() {
             val current = _state.value as? MailDetailUiState.Loaded ?: return
             val records = current.content.recordsDetail ?: return
             if (current.content.category != MailItemCategory.Records || records.isFiled) return
+            // Claim the in-flight flag synchronously — a second tap while the
+            // folders fetch is awaiting would otherwise POST /vault/file twice.
             if (_recordsFileInFlight.value) return
             _recordsFileInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    fileRecordToVaultInner(current.content, records)
+                } finally {
+                    _recordsFileInFlight.value = false
+                }
+            }
+        }
+
+        private suspend fun fileRecordToVaultInner(
+            content: MailDetailContent,
+            records: RecordsDetailDto,
+        ) {
+            if (_saveToVaultFolders.value.isEmpty()) {
+                when (val result = vaultRepo.folders(drawer = "personal")) {
+                    is NetworkResult.Success -> _saveToVaultFolders.value = result.data.folders
+                    is NetworkResult.Failure -> {
+                        _toast.value = result.error.displayMessage("Couldn't load your vault folders.")
+                        return
+                    }
+                }
+            }
+            val folderId = suggestedVaultFolderId(records)
+            if (folderId == null) {
+                // No vault folder matches the record's suggested trail — let
+                // the user pick rather than filing it somewhere arbitrary.
+                openSaveToVaultPicker()
+                return
+            }
             _state.value =
                 MailDetailUiState.Loaded(
-                    current.content.copy(
-                        recordsDetail =
-                            records.copy(
-                                isFiled = true,
-                                filedAtLabel = "Today 2:14 PM · retention 7y",
-                            ),
+                    content.copy(
+                        recordsDetail = records.copy(isFiled = true, filedAtLabel = filedAtStamp()),
                     ),
                 )
-            _toast.value = "Filed in Vault"
-            _recordsFileInFlight.value = false
+            when (val result = vaultRepo.file(mailId = mailId, folderId = folderId)) {
+                is NetworkResult.Success -> {
+                    val label = _saveToVaultFolders.value.firstOrNull { it.id == folderId }?.label
+                    _toast.value = label?.let { "Filed in $it" } ?: "Filed in Vault"
+                }
+                is NetworkResult.Failure -> {
+                    _state.value = MailDetailUiState.Loaded(content)
+                    _toast.value = result.error.displayMessage("Couldn't file to vault. Try again.")
+                }
+            }
+        }
+
+        /**
+         * Resolve the vault folder the record should be filed in by matching
+         * the payload's `vault_trail` crumbs against the user's real folders,
+         * most-specific crumb first. The `Mailbox` / `Vault` crumbs are
+         * chrome, not folders. Returns null when nothing matches — the caller
+         * opens the picker instead of guessing (no system folder is named
+         * "Records" or "Archive", so a label-contains heuristic silently filed
+         * every record into whichever folder happened to sort first).
+         */
+        private fun suggestedVaultFolderId(records: RecordsDetailDto): String? {
+            val folders = _saveToVaultFolders.value
+            if (folders.isEmpty()) return null
+            return records.vaultTrail
+                .asReversed()
+                .asSequence()
+                .map { it.label.trim() }
+                .filter { it.isNotEmpty() && !it.equals("Mailbox", true) && !it.equals("Vault", true) }
+                .mapNotNull { crumb -> folders.firstOrNull { it.label.equals(crumb, ignoreCase = true) } }
+                .firstOrNull()
+                ?.id
+        }
+
+        /**
+         * "Today 2:14 PM · retention 7y" — the optimistic filed-at stamp.
+         * Mirrors iOS `formatFiledAtNow()`.
+         */
+        private fun filedAtStamp(): String {
+            val formatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+            return "Today ${formatter.format(java.time.LocalTime.now())} · retention 7y"
         }
 
         private fun currentUnsavedMemoryContent(): Pair<MailDetailContent, MemoryDetailDto>? {
@@ -578,7 +645,7 @@ class MailDetailViewModel
                         _toast.value = folderLabel?.let { "Saved to $it" } ?: "Saved to vault"
                     }
                     is NetworkResult.Failure ->
-                        _toast.value = result.error.message
+                        _toast.value = result.error.displayMessage("Couldn't save to vault. Try again.")
                 }
                 _showsSaveToVaultPicker.value = false
                 _saveToVaultInFlight.value = false

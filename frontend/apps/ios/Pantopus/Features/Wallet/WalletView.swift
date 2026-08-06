@@ -48,6 +48,7 @@ public struct WalletView: View {
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("wallet")
+        .sensitiveScreen()
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .sheet(isPresented: $showWithdrawSheet) { withdrawSheet }
@@ -85,15 +86,19 @@ public struct WalletView: View {
                 section(overline: "Recent activity", action: "See all", onAction: onSeeAllActivity) {
                     ActivityList(items: content.activity)
                 }
-                section(overline: "Payout method") {
-                    PayoutMethodCard(
-                        method: content.payoutMethod,
-                        onManage: { Task { await viewModel.openDashboard() } },
-                        onReverify: { Task { await viewModel.setupPayouts() } }
-                    )
+                if let payoutMethod = content.payoutMethod {
+                    section(overline: "Payout method") {
+                        PayoutMethodCard(
+                            method: payoutMethod,
+                            onManage: { Task { await viewModel.openDashboard() } },
+                            onReverify: { Task { await viewModel.setupPayouts() } }
+                        )
+                    }
                 }
-                section(overline: "Taxes") {
-                    TaxDocsRow(docs: content.taxDocs, onTap: onOpenTaxDocs)
+                if let taxDocs = content.taxDocs {
+                    section(overline: "Taxes") {
+                        TaxDocsRow(docs: taxDocs, onTap: onOpenTaxDocs)
+                    }
                 }
                 Spacer().frame(height: bottomBarReservedHeight(for: content))
             }

@@ -16,7 +16,7 @@ public struct PrivacyView: View {
     private let onBack: @MainActor () -> Void
 
     public init(
-        viewModel: PrivacySettingsViewModel = PrivacySettingsViewModel(),
+        viewModel: PrivacySettingsViewModel,
         onBack: @escaping @MainActor () -> Void
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -26,6 +26,19 @@ public struct PrivacyView: View {
     public var body: some View {
         GroupedListView(dataSource: viewModel, onBack: onBack)
             .accessibilityIdentifier("privacySettings")
+            .overlay(alignment: .bottom) {
+                if let toast = viewModel.toast {
+                    ToastView(message: toast)
+                        .padding(.bottom, Spacing.s10)
+                        .accessibilityIdentifier("privacySettingsToast")
+                        .transition(.opacity)
+                        .task(id: toast.text) {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            viewModel.toast = nil
+                        }
+                }
+            }
+            .pantopusAnimation(.componentState, value: viewModel.toast?.text)
     }
 }
 

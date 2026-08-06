@@ -139,31 +139,6 @@ public final class VerificationCenterViewModel: GroupedListDataSource {
             )
         }
 
-        let phoneGroup = GroupedListGroup(
-            id: "phone",
-            overline: "Phone",
-            rows: [
-                GroupedListRow(
-                    id: "phone.status",
-                    label: "Phone number",
-                    subtext: "Coming soon",
-                    control: .chipStatus(label: "Not started", tone: .neutral, includesChevron: false)
-                )
-            ]
-        )
-        let homeGroup = GroupedListGroup(
-            id: "home",
-            overline: "Home address",
-            helper: "Postcards land in your mailbox 5–10 days after starting.",
-            rows: [
-                GroupedListRow(
-                    id: "home.status",
-                    label: "Address verification",
-                    subtext: "Coming soon",
-                    control: .chipStatus(label: "Not started", tone: .neutral, includesChevron: false)
-                )
-            ]
-        )
         let idGroup = GroupedListGroup(
             id: "photoid",
             overline: "Photo ID",
@@ -176,6 +151,6 @@ public final class VerificationCenterViewModel: GroupedListDataSource {
                 )
             ]
         )
-        state = .loaded([emailGroup, phoneGroup, homeGroup, idGroup])
+        state = .loaded([emailGroup, idGroup])
     }
 }

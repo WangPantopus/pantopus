@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -42,6 +44,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.data.api.models.mailbox.v2.CommunityAttendee
@@ -587,7 +590,7 @@ private fun WhereRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        MapChip(accent = accent)
+        MiniMap(accent = accent)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
             Text(
                 text = "WHERE",
@@ -767,24 +770,91 @@ private fun DateChip(
     }
 }
 
+// Abstract mini-map preview (community.jsx MiniMap): park block +
+// crossing paths + tree dots under a centered drop pin. Purely
+// decorative — geometry mirrors the design's 52×56 SVG.
 @Composable
-private fun MapChip(accent: Color) {
+private fun MiniMap(accent: Color) {
     Box(
         modifier =
             Modifier
                 .size(width = 52.dp, height = 56.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(PantopusColors.successBg)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp)),
-        contentAlignment = Alignment.Center,
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(10.dp))
+                .testTag("mailDetail_community_miniMap"),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.MapPin,
-            contentDescription = null,
-            size = 18.dp,
-            tint = accent,
+        Box(
+            Modifier
+                .offset(x = 6.dp, y = 14.dp)
+                .size(width = 40.dp, height = 28.dp)
+                .background(PantopusColors.successLight),
+        )
+        Box(
+            Modifier
+                .offset(y = 20.dp)
+                .size(width = 52.dp, height = 3.dp)
+                .background(PantopusColors.appSurface),
+        )
+        Box(
+            Modifier
+                .offset(x = 20.dp)
+                .size(width = 3.dp, height = 56.dp)
+                .background(PantopusColors.appSurface),
+        )
+        Box(
+            Modifier
+                .offset(x = 8.dp, y = 16.dp)
+                .size(4.dp)
+                .alpha(0.7f)
+                .background(PantopusColors.success, CircleShape),
+        )
+        Box(
+            Modifier
+                .offset(x = 36.dp, y = 34.dp)
+                .size(4.dp)
+                .alpha(0.7f)
+                .background(PantopusColors.success, CircleShape),
+        )
+        Box(
+            Modifier
+                .offset(x = 38.dp, y = 16.dp)
+                .size(3.dp)
+                .alpha(0.7f)
+                .background(PantopusColors.success, CircleShape),
+        )
+        MapPinDrop(
+            accent = accent,
+            pinSize = 18.dp,
+            modifier = Modifier.offset(x = 17.dp, y = 11.dp),
         )
     }
+}
+
+// Teardrop map pin — rounded square with one sharp corner, rotated so
+// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+@Composable
+private fun MapPinDrop(
+    accent: Color,
+    pinSize: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val teardrop =
+        RoundedCornerShape(
+            topStart = pinSize / 2,
+            topEnd = pinSize / 2,
+            bottomEnd = pinSize / 2,
+            bottomStart = 0.dp,
+        )
+    Box(
+        modifier =
+            modifier
+                .size(pinSize)
+                .rotate(-45f)
+                .clip(teardrop)
+                .background(accent)
+                .border(2.dp, PantopusColors.appSurface, teardrop),
+    )
 }
 
 // ─── Attendees strip ────────────────────────────────────

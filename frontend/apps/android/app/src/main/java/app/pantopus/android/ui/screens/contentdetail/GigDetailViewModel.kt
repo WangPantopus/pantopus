@@ -21,6 +21,7 @@ import app.pantopus.android.data.api.models.gigs.PlaceBidBody
 import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
@@ -28,6 +29,7 @@ import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.reviews.ReviewsRepository
 import app.pantopus.android.ui.screens.gigs.GigsCategory
+import app.pantopus.android.ui.screens.marketplace.ListingGradient
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -439,7 +441,7 @@ class GigDetailViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (showLoading) {
-                            _state.value = ContentDetailUiState.Error(result.error.message)
+                            _state.value = ContentDetailUiState.Error(result.error.displayMessage("Couldn't load detail."))
                         }
                     }
                 }
@@ -1428,6 +1430,7 @@ class GigDetailViewModel
                                 ),
                             )
                         }
+                        photoStripModule(gig)?.let { add(it) }
                         add(
                             ContentDetailModule.CapsuleRow(
                                 id = "trust",
@@ -1452,7 +1455,14 @@ class GigDetailViewModel
                             // Owner sees the interactive panel below — skip
                             // both the read-only module and the bidder callout.
                         } else if (bidCount > 0 && bids.isNotEmpty()) {
-                            add(ContentDetailModule.Bids(id = "bids", title = "$bidCount bids", bids = bids.map { projectBid(it) }))
+                            add(
+                                ContentDetailModule.Bids(
+                                    id = "bids",
+                                    title = "$bidCount bids",
+                                    sub = bidRangeSub(bids),
+                                    bids = bids.map { projectBid(it) },
+                                ),
+                            )
                         } else {
                             add(
                                 ContentDetailModule.Callout(
@@ -1517,6 +1527,44 @@ class GigDetailViewModel
                     dock = dock,
                 )
             }
+
+            /**
+             * A09.1 "Photos · N" strip when the gig carries uploaded
+             * attachments. Each tile renders the poster's real attachment;
+             * the deterministic gradient keyed off the URL is the loading /
+             * failure fallback.
+             */
+            private fun photoStripModule(gig: GigDto): ContentDetailModule.PhotoStrip? {
+                val attachments = gig.attachments?.takeIf { it.isNotEmpty() } ?: return null
+                return ContentDetailModule.PhotoStrip(
+                    id = "photos",
+                    title = "Photos",
+                    icon = PantopusIcon.Image,
+                    countLabel = "${attachments.size}",
+                    tiles =
+                        attachments.map { url ->
+                            ContentDetailPhotoTile(
+                                id = url,
+                                gradient = ListingGradient.from(url),
+                                icon = PantopusIcon.Image,
+                                imageUrl = url,
+                            )
+                        },
+                )
+            }
+
+            /**
+             * A09.1 bids subheader — "low $X · high $Y" once two or more
+             * live bids carry amounts; null otherwise.
+             */
+            private fun bidRangeSub(bids: List<GigBidDto>): String? {
+                val amounts = bids.mapNotNull { it.bidAmount ?: it.amount }
+                if (amounts.size < 2) return null
+                return "low ${bidAmountLabel(amounts.min())} · high ${bidAmountLabel(amounts.max())}"
+            }
+
+            private fun bidAmountLabel(amount: Double): String =
+                if (amount % 1.0 == 0.0) "$${amount.toInt()}" else String.format("$%.2f", amount)
 
             private fun locationModules(gig: GigDto): List<ContentDetailModule> {
                 val pickup = gig.pickupAddress?.takeIf { it.isNotEmpty() }
@@ -1706,8 +1754,7 @@ class GigDetailViewModel
                 val initials =
                     name.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
                 val amount = bid.bidAmount ?: bid.amount ?: 0.0
-                val amountLabel =
-                    if (amount % 1.0 == 0.0) "$${amount.toInt()}" else String.format("$%.2f", amount)
+                val amountLabel = bidAmountLabel(amount)
                 val won = acceptedBy != null && bid.userId == acceptedBy
                 val dimmed = acceptedBy != null && !won
                 return ContentDetailBidRow(

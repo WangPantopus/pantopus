@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
@@ -95,6 +96,8 @@ fun AccessCodesScreen(
             tint = FabTint.Home,
             onClick = { viewModel.startAddCode(category = null) },
         )
+
+    SecureScreenEffect()
 
     Box(
         modifier =

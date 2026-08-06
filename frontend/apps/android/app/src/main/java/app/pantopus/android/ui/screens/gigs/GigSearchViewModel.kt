@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.gigs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -122,7 +123,7 @@ class GigSearchViewModel
                         }
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = GigSearchUiState.Error(result.error.message)
+                    _state.value = GigSearchUiState.Error(result.error.displayMessage("Couldn't load search."))
                 }
             }
         }

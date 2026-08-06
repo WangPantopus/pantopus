@@ -205,7 +205,7 @@ private struct EquityCalculator: View {
                 PlaceDetailCard {
                     VStack(spacing: 10) {
                         Text(PlacePresentation.money(equity) ?? "—")
-                            .font(.system(size: 30, weight: .bold))
+                            .pantopusTextStyle(.h1)
                             .foregroundStyle(Theme.Color.home)
                         Text("Estimated equity")
                             .font(.system(size: 13, weight: .medium))
@@ -221,7 +221,7 @@ private struct EquityCalculator: View {
                 Icon(.lock, size: 12, strokeWidth: 2, color: Theme.Color.appTextMuted)
                 Text("Private to you — never shown to neighbors")
             }
-            .font(.system(size: 12))
+            .font(Theme.Font.caption)
             .foregroundStyle(Theme.Color.appTextMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
         }

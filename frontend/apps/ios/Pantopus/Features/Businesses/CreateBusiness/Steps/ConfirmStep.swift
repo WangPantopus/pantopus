@@ -2,59 +2,61 @@
 //  ConfirmStep.swift
 //  Pantopus
 //
-//  A12.10 step 4 — Confirm. Stub: design only ships frame 1+2 of the
-//  wizard today; a follow-on prompt replaces the body once design hands
-//  off step-4 frames.
+//  Create Business step 4 — review summary + Confirm CTA (wired in the
+//  wizard chrome via create-full).
 //
 
 import SwiftUI
 
 struct ConfirmStep: View {
+    @Bindable var viewModel: CreateBusinessWizardViewModel
+
     var body: some View {
         BusinessIdentityChip()
         HeadlineBlock(
-            "Confirm and publish",
-            subtitle: "Review before we publish. Design ships this step in a follow-on."
+            "Confirm and create",
+            subtitle: "Review the details below, then create your business."
         )
-        WizardStubPlaceholder(
-            icon: .checkCircle,
-            label: "Step 4 — Confirm",
-            subcopy: "Designed frames land in the next prompt."
-        )
-    }
-}
-
-// MARK: - Shared placeholder used by every stub step
-
-struct WizardStubPlaceholder: View {
-    let icon: PantopusIcon
-    let label: String
-    let subcopy: String
-
-    var body: some View {
-        VStack(spacing: Spacing.s3) {
-            ZStack {
-                Circle().fill(Theme.Color.businessBg)
-                    .frame(width: 48, height: 48)
-                Icon(icon, size: 22, strokeWidth: 2, color: Theme.Color.business)
-            }
-            Text(label)
-                .pantopusTextStyle(.body)
-                .foregroundStyle(Theme.Color.appText)
-            Text(subcopy)
-                .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
+        ReviewSummaryBlock(summaryRows)
+        if let submitError = viewModel.submitError, viewModel.currentStep == .confirm {
+            Text(submitError)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.error)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("createBusinessSubmitError")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Spacing.s4)
-        .padding(.vertical, Spacing.s6)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                .strokeBorder(Theme.Color.appBorder, lineWidth: 1)
+    }
+
+    private var summaryRows: [ReviewSummaryRow] {
+        var rows: [ReviewSummaryRow] = [
+            ReviewSummaryRow(label: "Category", value: viewModel.selectedCategoryId?.label ?? "—"),
+            ReviewSummaryRow(
+                label: "Name",
+                value: viewModel.businessName.trimmingCharacters(in: .whitespacesAndNewlines)
+            ),
+            ReviewSummaryRow(label: "Username", value: "@\(viewModel.cleanedUsername)"),
+            ReviewSummaryRow(
+                label: "Email",
+                value: viewModel.email.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        ]
+        let desc = viewModel.descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !desc.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Description", value: desc))
+        }
+        let locationValue: String = {
+            guard viewModel.hasLocation else { return "Not set" }
+            let street = viewModel.address.trimmingCharacters(in: .whitespacesAndNewlines)
+            let city = viewModel.city.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(street), \(city)"
+        }()
+        rows.append(ReviewSummaryRow(label: "Location", value: locationValue))
+        rows.append(
+            ReviewSummaryRow(
+                label: "Hours",
+                value: viewModel.hasLocation && !viewModel.hoursSkipped ? "Weekday defaults" : "Not set"
+            )
         )
-        .accessibilityIdentifier("createBusinessStubPlaceholder")
+        return rows
     }
 }

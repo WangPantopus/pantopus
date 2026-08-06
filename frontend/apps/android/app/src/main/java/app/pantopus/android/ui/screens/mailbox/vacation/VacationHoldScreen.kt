@@ -66,8 +66,9 @@ import java.util.Locale
  *
  * - active — sky-gradient [HoldStatusHero] with pulsing pill + days-
  *   left + 3-cell stats grid, a "Currently held" ledger via [HeldList],
- *   read-only forwarding + emergency cards, and the trailing slot in
- *   the top bar swaps `Save` for a neutral `End hold` text button.
+ *   read-only forwarding + emergency cards, a destructive "End hold
+ *   early" row at the bottom, and the trailing slot in the top bar
+ *   swaps `Save` for a muted `Edit` text button.
  */
 @Composable
 fun VacationHoldScreen(
@@ -124,7 +125,7 @@ private fun TopBar(
     viewModel: VacationHoldViewModel,
     mode: VacationHoldMode,
 ) {
-    val trailingLabel = if (mode is VacationHoldMode.Active) "End hold" else "Save"
+    val trailingLabel = if (mode is VacationHoldMode.Active) "Edit" else "Save"
     val trailingEnabled =
         when (mode) {
             is VacationHoldMode.Scheduling -> mode.draft.isValid
@@ -134,7 +135,7 @@ private fun TopBar(
         when (mode) {
             is VacationHoldMode.Scheduling ->
                 if (trailingEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted
-            is VacationHoldMode.Active -> PantopusColors.appText
+            is VacationHoldMode.Active -> PantopusColors.appTextSecondary
         }
 
     Box(
@@ -376,6 +377,15 @@ private fun ActiveBody(
             }
         }
 
+        VacationCard {
+            VacationDestructiveRow(
+                label = "End hold early",
+                sub = "Mail resumes tomorrow morning",
+                onTap = { viewModel.endHoldEarly() },
+                tag = "vacationHoldEndEarly",
+            )
+        }
+
         VacationMonoFooter(hold.activeSinceLabel)
     }
 }
@@ -440,6 +450,37 @@ private fun VacationMonoFooter(text: String) {
                 .padding(horizontal = Spacing.s4)
                 .padding(top = Spacing.s6, bottom = Spacing.s2),
     )
+}
+
+/** A14.8 — destructive card row ("End hold early") at the bottom of the active body. */
+@Composable
+private fun VacationDestructiveRow(
+    label: String,
+    sub: String,
+    onTap: () -> Unit,
+    tag: String,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onTap() }
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag(tag),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.error,
+        )
+        Text(
+            text = sub,
+            fontSize = 11.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
 }
 
 @Composable

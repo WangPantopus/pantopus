@@ -4,6 +4,9 @@ import app.pantopus.android.data.api.models.auth.AuthMessageResponse
 import app.pantopus.android.data.api.models.auth.ForgotPasswordRequest
 import app.pantopus.android.data.api.models.auth.LoginRequest
 import app.pantopus.android.data.api.models.auth.LoginResponse
+import app.pantopus.android.data.api.models.auth.OAuthCodeExchangeRequest
+import app.pantopus.android.data.api.models.auth.OAuthTokenExchangeRequest
+import app.pantopus.android.data.api.models.auth.OAuthUrlResponse
 import app.pantopus.android.data.api.models.auth.RefreshRequest
 import app.pantopus.android.data.api.models.auth.RefreshResponse
 import app.pantopus.android.data.api.models.auth.RegisterRequest
@@ -13,10 +16,37 @@ import app.pantopus.android.data.api.models.auth.ResetPasswordRequest
 import app.pantopus.android.data.api.models.auth.VerifyEmailRequest
 import app.pantopus.android.data.api.models.auth.VerifyEmailResponse
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /** Auth routes from `backend/routes/users.js`. */
 interface AuthApi {
+    /**
+     * `GET /api/users/oauth/:provider` — route `backend/routes/users.js:3715`.
+     *
+     * [redirectTo] must carry the per-attempt `app_nonce`; build it with
+     * `OAuthSessionStore.redirectUri(nonce)` so the callback can be verified.
+     */
+    @GET("api/users/oauth/{provider}")
+    suspend fun oauthUrl(
+        @Path("provider") provider: String,
+        @Query("redirectTo") redirectTo: String,
+    ): OAuthUrlResponse
+
+    /** `POST /api/users/oauth/callback` — route `backend/routes/users.js:3862`. */
+    @POST("api/users/oauth/callback")
+    suspend fun exchangeOAuthCode(
+        @Body body: OAuthCodeExchangeRequest,
+    ): LoginResponse
+
+    /** `POST /api/users/oauth/token` — route `backend/routes/users.js:3792`. */
+    @POST("api/users/oauth/token")
+    suspend fun exchangeOAuthToken(
+        @Body body: OAuthTokenExchangeRequest,
+    ): LoginResponse
+
     /** `POST /api/users/login` — route `backend/routes/users.js:1492`. */
     @POST("api/users/login")
     suspend fun login(

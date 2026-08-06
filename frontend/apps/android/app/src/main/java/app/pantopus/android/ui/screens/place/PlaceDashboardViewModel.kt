@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.place.PlaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +48,7 @@ class PlaceDashboardViewModel
             _state.value =
                 when (val result = repo.intelligence(id)) {
                     is NetworkResult.Success -> PlaceDashboardUiState.Loaded(result.data)
-                    is NetworkResult.Failure -> PlaceDashboardUiState.Error(result.error.message)
+                    is NetworkResult.Failure -> PlaceDashboardUiState.Error(result.error.displayMessage("Couldn't load your dashboard."))
                 }
         }
     }

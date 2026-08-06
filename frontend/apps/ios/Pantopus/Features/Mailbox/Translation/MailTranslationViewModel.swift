@@ -12,6 +12,7 @@
 //  exists, but a failure simply rolls the optimistic flip back.
 //
 
+import AVFoundation
 import Foundation
 import Observation
 
@@ -27,6 +28,10 @@ public final class MailTranslationViewModel {
     private let mailId: String
     private let api: APIClient
     private let seedConfirmed: Bool
+    /// Retained for the lifetime of the screen — a synthesizer created as a
+    /// local temporary deallocates the moment `listen` returns, which cancels
+    /// (or never starts) playback.
+    private let synthesizer = AVSpeechSynthesizer()
 
     init(
         mailId: String,
@@ -87,15 +92,51 @@ public final class MailTranslationViewModel {
         }
     }
 
-    /// Stubbed text-to-speech affordance. Real audio is out of scope (B2.3);
-    /// this surfaces a toast so the control is never a dead tap.
+    /// Read the selected column aloud via `AVSpeechSynthesizer`.
     public func listen(_ which: TranslationListenColumn) {
+        guard case let .loaded(content) = state else { return }
+        let text: String
+        let languageCode: String
+        switch which {
+        case .original:
+            text = content.paragraphs.map(\.original).joined(separator: "\n")
+            languageCode = content.languages.sourceCode
+        case .translated:
+            text = content.paragraphs.map(\.english).joined(separator: "\n")
+            languageCode = content.languages.targetCode
+        }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            toast = "Nothing to read aloud yet."
+            return
+        }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            toast = "Couldn't play audio on this device."
+            return
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = Self.voice(forLanguageCode: languageCode)
+        // Replace whatever is already playing rather than queueing behind it.
+        synthesizer.stopSpeaking(at: .immediate)
+        synthesizer.speak(utterance)
         switch which {
         case .original:
             toast = "Playing the original aloud…"
         case .translated:
             toast = "Playing the translation aloud…"
         }
+    }
+
+    /// Resolve the voice for the column's language, falling back to en-US when
+    /// the device carries no voice for it. Mirrors the Android locale lookup.
+    private static func voice(forLanguageCode code: String) -> AVSpeechSynthesisVoice? {
+        let normalized = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return AVSpeechSynthesisVoice(language: "en-US") }
+        return AVSpeechSynthesisVoice(language: normalized)
+            ?? AVSpeechSynthesisVoice(language: "en-US")
     }
 }
 

@@ -85,6 +85,18 @@ public enum HubRoute: Hashable {
     /// A14.2 (P5.1) — Per-home Security toggles. Reached from the
     /// per-home Settings `Privacy` row.
     case homeSecurity(homeId: String)
+    /// Leave this home (`POST /api/homes/:id/move-out`).
+    case leaveHome(homeId: String)
+    /// Cancel ownership claim (`DELETE …/ownership-claims/:claimId`).
+    case cancelClaim(homeId: String)
+    /// A14.1 — Home photos empty state → documents vault.
+    case homePhotos(homeId: String)
+    /// A14.1 — Trusted neighbors list.
+    case trustedNeighbors(homeId: String)
+    /// A14.1 — Per-home notification toggles.
+    case homeNotifications(homeId: String)
+    /// A13 — Request property correction form.
+    case propertyCorrection(homeId: String)
     case publicProfile(userId: String)
     /// P1.6 — Typed Business Profile screen. Pushed from DiscoverHub
     /// business cards, DiscoverBusinesses row taps, and any other
@@ -229,6 +241,8 @@ public enum HubRoute: Hashable {
     /// My bids — outgoing bids on neighbour gigs (T5.3.1). Reached from
     /// the You / Me action grid or from Hub's marketplace pillar shelf.
     case myBids
+    /// T5.2.4 — cross-listing Offers (incoming + outgoing).
+    case offers
     /// My tasks — the poster's side of the gigs marketplace (T5.3.2 /
     /// V2 canonical). Reached from the navigation drawer's "My Tasks"
     /// item. Inverse of `.myBids`.
@@ -259,6 +273,9 @@ public enum HubRoute: Hashable {
     case recentActivity
     /// Hub top-bar menu icon target. Replaced by Settings in T3.1.
     case menu
+    /// Drawer Help & Support → existing Help center (parity with You tab /
+    /// Settings → Help).
+    case helpCenter
     /// A14.6 — Settings → Payments deep-link target.
     case paymentsSettings
     /// A14.7 — Privacy preferences. Pushed from the A18.5 "View as"
@@ -330,6 +347,8 @@ public enum HubRoute: Hashable {
     /// Settings → "Payments & payouts" row and the
     /// `pantopus://wallet` deep link.
     case wallet
+    /// WS5.1 — full transaction history (`GET /api/wallet/transactions`).
+    case walletActivityList
 
     // MARK: - B1.6 batch-2 routing seam
 
@@ -347,6 +366,8 @@ public enum HubRoute: Hashable {
     case businessOwner(businessId: String)
     /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
     case businessTeam(businessId: String)
+    /// Locations & Hours list MVP. `pantopus://businesses/:id/locations`.
+    case businessLocations(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
     case viewAs
     /// A18.4 — Persistent "waiting for approval" room.
@@ -440,25 +461,45 @@ public struct HubTabRoot: View {
         case .address, .propertyDetails:
             path.append(.propertyDetails(homeId: homeId))
         case .photos:
-            path.append(.placeholder(label: "Photos"))
+            path.append(.homePhotos(homeId: homeId))
         case .documents:
             path.append(.homeDocs(homeId: homeId))
         case .accessCodes:
             path.append(.accessCodes(homeId: homeId, homeName: nil))
         case .trustedNeighbors:
-            path.append(.placeholder(label: "Trusted neighbors"))
+            path.append(.trustedNeighbors(homeId: homeId))
         case .security:
             path.append(.homeSecurity(homeId: homeId))
         case .people:
             path.append(.homeMembers(homeId: homeId))
         case .inviteLink:
-            path.append(.placeholder(label: "Invite link"))
+            modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
         case .homeNotifications:
-            path.append(.placeholder(label: "Home notifications"))
+            path.append(.homeNotifications(homeId: homeId))
         case .leaveHome:
-            path.append(.placeholder(label: "Leave home"))
+            path.append(.leaveHome(homeId: homeId))
         case .cancelClaim:
-            path.append(.placeholder(label: "Cancel claim"))
+            path.append(.cancelClaim(homeId: homeId))
+        }
+    }
+
+    @MainActor
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+        switch nav {
+        case .notifications:
+            path.append(.notifications)
+        case let .backToHome(id):
+            path.removeAll { route in
+                if case .waitingRoom = route { return true }
+                return false
+            }
+            path.append(.homeDashboard(homeId: id))
+        case .viewClaim:
+            path.append(.myClaims)
+        case let .updateEvidence(id, _):
+            path.append(.claimOwnership(homeId: id))
+        case let .cancelClaim(id):
+            path.append(.cancelClaim(homeId: id))
         }
     }
 
@@ -562,11 +603,11 @@ public struct HubTabRoot: View {
         case .myPulse: return .myPosts
         case .myTasks: return .myTasks
         case .myBids: return .myBids
-        case .offersAndBids: return .placeholder(label: "Offers & Bids")
+        case .offersAndBids: return .offers
         case .postTask: return .quickPostGig(category: GigsCategory.all.rawValue)
         case .walletAndPayments: return .wallet
         case .settings: return .menu
-        case .helpSupport: return .placeholder(label: "Help & Support")
+        case .helpSupport: return .helpCenter
         // Home
         case .homeProperty: return .propertyDetails(homeId: homeId)
         case .homeOverview: return .homeDashboard(homeId: homeId)
@@ -583,12 +624,12 @@ public struct HubTabRoot: View {
         // Business
         case .businessOverview: return .businessOwner(businessId: businessId)
         case .businessProfileRow: return .businessProfile(businessId: businessId)
-        case .businessLocations: return .placeholder(label: "Locations & Hours")
+        case .businessLocations: return .businessLocations(businessId: businessId)
         case .businessCatalog: return .placeholder(label: "Catalog")
         case .businessPages: return .editBusinessPage(businessId: businessId)
         case .businessPostTask: return .quickPostGig(category: GigsCategory.all.rawValue)
         case .businessChat: return .placeholder(label: "Business Chat")
-        case .businessTeam: return .placeholder(label: "Team")
+        case .businessTeam: return .businessTeam(businessId: businessId)
         case .businessReviews: return .placeholder(label: "Reviews")
         case .businessPayments: return .paymentsSettings
         case .businessSettings: return .placeholder(label: "Business Settings")
@@ -645,6 +686,9 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case let .user(id):
             path.append(.publicProfile(userId: id))
+            _ = router.consume()
+        case let .beaconProfile(handle):
+            path.append(.beaconProfile(handle: handle))
             _ = router.consume()
         case .connections:
             path.append(.connections)
@@ -764,7 +808,12 @@ public struct HubTabRoot: View {
             case .openProfile: onOpenProfile()
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
-            case let .jumpBackIn(item): path.append(Self.route(forJumpBackIn: item))
+            case let .jumpBackIn(item):
+                if item.route.hasPrefix("/app/chat") {
+                    rootTabs.selected = .messages
+                } else {
+                    path.append(Self.route(forJumpBackIn: item))
+                }
             // `openToday` taps the weather/today card → full Today briefing
             // (A10.3 — weather, air, daylight, and neighbourhood signals).
             case .openToday: path.append(.todayDetail)
@@ -833,6 +882,7 @@ public struct HubTabRoot: View {
             return .homeDashboard(homeId: homeId)
         }
         if path.hasPrefix("/app/chat") {
+            // Consumed in `hub` — switches to the Messages tab.
             return .placeholder(label: "Messages")
         }
         if path.hasPrefix("/gigs/new") {
@@ -1388,6 +1438,41 @@ public struct HubTabRoot: View {
             HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
                 pop()
             }
+        case let .leaveHome(homeId):
+            LeaveHomeView(
+                viewModel: LeaveHomeViewModel(homeId: homeId),
+                onBack: { pop() },
+                onLeft: {
+                    // Move-out revokes membership, so the dashboard for this
+                    // home now 403s — drop it along with the settings stack.
+                    path.removeAll { route in
+                        switch route {
+                        case .leaveHome(let id) where id == homeId: true
+                        case .homeSettings(let id) where id == homeId: true
+                        case .homeSecurity(let id) where id == homeId: true
+                        case .homeDashboard(let id) where id == homeId: true
+                        default: false
+                        }
+                    }
+                }
+            )
+        case let .cancelClaim(homeId):
+            CancelClaimView(
+                viewModel: CancelClaimViewModel(homeId: homeId),
+                onBack: { pop() },
+                onCancelled: { pop() }
+            )
+        case let .homePhotos(homeId):
+            HomePhotosView(
+                onBack: { pop() },
+                onOpenDocuments: { push(.homeDocs(homeId: homeId)) }
+            )
+        case let .trustedNeighbors(homeId):
+            TrustedNeighborsView(onBack: { pop() })
+        case let .homeNotifications(homeId):
+            HomeNotificationsView(homeId: homeId, onBack: { pop() })
+        case let .propertyCorrection(homeId):
+            PropertyCorrectionView(homeId: homeId) { pop() }
         case let .claimOwnership(homeId):
             ClaimOwnershipWizardView(
                 homeId: homeId,
@@ -1470,7 +1555,9 @@ public struct HubTabRoot: View {
             BusinessProfileDestination(
                 businessId: businessId,
                 onBack: { Task { @MainActor in pop() } },
-                onOpenMessages: { Task { @MainActor in push(.placeholder(label: "Messages")) } },
+                onOpenMessages: { destination in
+                    Task { @MainActor in push(.chatConversation(destination)) }
+                },
                 onShare: {
                     systemSheet = .share(
                         items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
@@ -1493,13 +1580,13 @@ public struct HubTabRoot: View {
             CreateBusinessWizardView(
                 onClose: { Task { @MainActor in pop() } },
                 onOpenBusiness: { businessId in
-                    // Replace the wizard with the business profile so Back
+                    // Replace the wizard with the owner dashboard so Back
                     // returns to wherever the wizard was launched from.
                     path.removeAll { route in
                         if case .createBusiness = route { return true }
                         return false
                     }
-                    path.append(.businessProfile(businessId: businessId))
+                    path.append(.businessOwner(businessId: businessId))
                 }
             )
         case let .pulsePost(postId):
@@ -2025,6 +2112,17 @@ public struct HubTabRoot: View {
                     // inside the screen (P3.4) — no router wiring needed.
                 )
             )
+        case .offers:
+            OffersView(
+                viewModel: OffersViewModel(
+                    onOpenOfferDetail: { dto in
+                        guard let gigId = dto.gigId ?? dto.gig?.id else { return }
+                        Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                    },
+                    onBrowseListings: { Task { @MainActor in push(.marketplace) } },
+                    onPostTask: { Task { @MainActor in push(.quickPostGig(category: GigsCategory.all.rawValue)) } }
+                )
+            )
         case .myTasks:
             MyTasksView(
                 viewModel: MyTasksViewModel(
@@ -2099,6 +2197,8 @@ public struct HubTabRoot: View {
                 },
                 onSignedOut: { Task { @MainActor in pop() } }
             )
+        case .helpCenter:
+            HelpCenterView { Task { @MainActor in pop() } }
         case .paymentsSettings:
             SettingsView(
                 initialRoute: .payments,
@@ -2165,7 +2265,7 @@ public struct HubTabRoot: View {
                 homeId: homeId,
                 onBack: { Task { @MainActor in pop() } },
                 onRequestCorrection: {
-                    Task { @MainActor in push(.placeholder(label: "Request correction")) }
+                    Task { @MainActor in push(.propertyCorrection(homeId: homeId)) }
                 }
             )
         case let .addGuest(homeId):
@@ -2259,9 +2359,14 @@ public struct HubTabRoot: View {
             // withdraw); only the navigation affordances stay as callbacks.
             WalletView(
                 onBack: pop,
-                onOpenHistory: { Task { @MainActor in push(.placeholder(label: "Wallet history")) } },
+                onOpenHistory: { Task { @MainActor in push(.walletActivityList) } },
                 onOpenTaxDocs: { Task { @MainActor in push(.placeholder(label: "Tax documents")) } },
-                onSeeAllActivity: { Task { @MainActor in push(.placeholder(label: "All activity")) } }
+                onSeeAllActivity: { Task { @MainActor in push(.walletActivityList) } }
+            )
+        case .walletActivityList:
+            WalletActivityListView(
+                viewModel: WalletActivityListViewModel(),
+                onBack: pop
             )
 
         // MARK: - B1.6 batch-2 routing seam
@@ -2322,6 +2427,8 @@ public struct HubTabRoot: View {
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)
+        case let .businessLocations(businessId):
+            BusinessLocationsView(businessId: businessId)
         case .viewAs:
             ViewAsView(
                 onBack: { Task { @MainActor in pop() } },
@@ -2329,13 +2436,13 @@ public struct HubTabRoot: View {
                 onEdit: { Task { @MainActor in push(.editProfile) } }
             )
         case .privacySettings:
-            PrivacyView { Task { @MainActor in pop() } }
+            PrivacyView(viewModel: PrivacySettingsViewModel()) { Task { @MainActor in pop() } }
         case let .waitingRoom(homeId):
             WaitingRoomView(
-                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active)
-            ) {
-                pop()
-            }
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active),
+                onBack: { pop() },
+                onNav: { nav in handleWaitingRoomNav(nav, homeId: homeId) }
+            )
         case .addHome:
             AddHomeWizardView { homeId in
                 // Replace the wizard with the dashboard so Back goes to
@@ -2519,7 +2626,7 @@ extension HubRoute: Identifiable {
 private struct BusinessProfileDestination: View {
     let businessId: String
     let onBack: @MainActor () -> Void
-    let onOpenMessages: @MainActor () -> Void
+    let onOpenMessages: @MainActor (InboxConversationDestination) -> Void
     let onShare: @MainActor () -> Void
     let onOpenReport: @MainActor () -> Void
     let onEdit: @MainActor () -> Void

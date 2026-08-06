@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.following.FollowingRowDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.following.FollowingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +76,7 @@ class FollowingViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = FollowingUiState.Error(result.error.message)
+                            _state.value = FollowingUiState.Error(result.error.displayMessage("Couldn't load followers."))
                         } else {
                             _toast.value = FollowingToast("Couldn't refresh.", isError = true)
                         }

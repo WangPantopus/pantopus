@@ -284,6 +284,8 @@ fun ChatConversationScreen(
         onDispose { viewModel.teardown() }
     }
     val resolvedCreatorContext = chrome.creatorThread?.context ?: ChatCreatorThreadContext.defaults()
+    val isCreatorThread = conversationMode == ChatConversationMode.CreatorThread
+    val isCreatorQuotaLocked = isCreatorThread && resolvedCreatorContext.quota?.isMaxed == true
 
     Box(
         modifier =
@@ -315,7 +317,21 @@ fun ChatConversationScreen(
                     context = resolvedCreatorContext,
                     onOpenAudienceProfile = chrome.creatorThread?.onOpenAudienceProfile ?: {},
                 )
-                CreatorQuotaMeter(quota = resolvedCreatorContext.quota)
+                resolvedCreatorContext.quota?.let { quota ->
+                    CreatorQuotaMeter(quota = quota)
+                    if (quota.isMaxed) {
+                        CreatorQuotaExhaustedPill(
+                            tierName = resolvedCreatorContext.fanTierName,
+                            fanName = activeCounterparty.displayName.firstWord(),
+                            total = quota.total,
+                        )
+                        CreatorUpgradeFanCard(
+                            fanName = activeCounterparty.displayName.firstWord(),
+                            tierName = resolvedCreatorContext.fanTierName,
+                            upgradeTierName = resolvedCreatorContext.upgradeTierName,
+                        )
+                    }
+                }
             }
             if (isFanThread) {
                 FanMembershipStripe(
@@ -414,9 +430,13 @@ fun ChatConversationScreen(
                     placeholder = composerPlaceholder(conversationMode, activeCounterparty, resolvedFanEntitlement),
                     // Attachment-only sends are valid — the VM substitutes
                     // "Attachment" text and sends as `file` (iOS parity).
-                    canSend = (composerText.isNotBlank() || queuedAttachments.isNotEmpty()) && !isSending && !isAiStreaming,
+                    canSend =
+                        (composerText.isNotBlank() || queuedAttachments.isNotEmpty()) &&
+                            !isSending &&
+                            !isAiStreaming &&
+                            !isCreatorQuotaLocked,
                     showsSendCost = isFanThread && !isFanReplyLocked,
-                    isLockedAction = isFanReplyLocked,
+                    isLockedAction = isFanReplyLocked || isCreatorQuotaLocked,
                     isAiStreaming = isAiStreaming,
                     onTextChange = viewModel::setComposerText,
                     onSend = {
@@ -1010,7 +1030,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                 .fillMaxWidth()
                 .background(PantopusColors.appSurface)
                 .padding(horizontal = 14.dp, vertical = 9.dp)
-                .testTag("chatCreatorQuotaMeter"),
+                .testTag(if (quota.isMaxed) "chatCreatorQuotaMeterMaxed" else "chatCreatorQuotaMeter"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1036,7 +1056,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                 text = "${quota.used} of ${quota.total} replies this week",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
+                color = if (quota.isMaxed) PantopusColors.error else PantopusColors.appText,
             )
         }
         Box(
@@ -1053,7 +1073,7 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
                         .fillMaxWidth(progress)
                         .height(4.dp)
                         .clip(RoundedCornerShape(Radii.xs))
-                        .background(PantopusColors.primary600),
+                        .background(if (quota.isMaxed) PantopusColors.error else PantopusColors.primary600),
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
@@ -1072,6 +1092,80 @@ internal fun CreatorQuotaMeter(quota: ChatCreatorQuota) {
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
+}
+
+@Composable
+private fun CreatorQuotaExhaustedPill(
+    tierName: String,
+    fanName: String,
+    total: Int,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.warningBg)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("chatCreatorQuotaExhaustedPill"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.AlertTriangle,
+            contentDescription = null,
+            size = 12.dp,
+            strokeWidth = 2.4f,
+            tint = PantopusColors.warning,
+        )
+        Text(
+            text = "You've used your $total weekly $tierName replies with $fanName",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+@Composable
+private fun CreatorUpgradeFanCard(
+    fanName: String,
+    tierName: String,
+    upgradeTierName: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("chatCreatorUpgradeFanCard"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Crown,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.warning,
+        )
+        Column {
+            Text(
+                text = "Invite $fanName to $upgradeTierName",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Unlimited replies · they keep $tierName perks",
+                fontSize = 10.5.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
 }
 
 @Composable

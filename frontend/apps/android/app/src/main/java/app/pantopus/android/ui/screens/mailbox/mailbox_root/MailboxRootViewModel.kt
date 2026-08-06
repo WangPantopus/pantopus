@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerMail
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.mailbox.MailboxListViewModel
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
@@ -277,7 +278,7 @@ class MailboxRootViewModel
                     hasMore = result.data.mail.size >= pageSize
                     applyLiveState(drawer, tab)
                 }
-                is NetworkResult.Failure -> _state.value = ListOfRowsUiState.Error(result.error.message)
+                is NetworkResult.Failure -> _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
             }
         }
 

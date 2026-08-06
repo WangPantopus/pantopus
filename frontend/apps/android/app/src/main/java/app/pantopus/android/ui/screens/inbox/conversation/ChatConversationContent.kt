@@ -23,12 +23,32 @@ data class ChatCreatorThreadContext(
     /** Tier rank (1=Free, 2=Bronze, 3=Silver, 4=Gold). */
     val fanTierRank: Int,
     val fanSubtitle: String,
-    val quota: ChatCreatorQuota,
+    /**
+     * `null` when the backend hasn't reported a reply allowance for this
+     * thread. There is no creator-side weekly reply quota on the wire yet
+     * (`backend/routes/personaDms.js` only meters the fan), so the meter and
+     * its lock stay hidden instead of showing invented counts.
+     */
+    val quota: ChatCreatorQuota? = null,
 ) {
+    /**
+     * Tier the creator would invite this fan up to — derived from the fan's
+     * current rank rather than hardcoded.
+     */
+    val upgradeTierName: String
+        get() =
+            when {
+                fanTierRank < TIER_RANK_BRONZE -> "Bronze"
+                fanTierRank == TIER_RANK_BRONZE -> "Silver"
+                else -> "Gold"
+            }
+
     companion object {
+        private const val TIER_RANK_BRONZE = 2
+
         fun defaults(
             fanTierName: String = "Bronze",
-            fanTierRank: Int = 2,
+            fanTierRank: Int = TIER_RANK_BRONZE,
         ): ChatCreatorThreadContext =
             ChatCreatorThreadContext(
                 personaName = "The Sourdough Diary",
@@ -36,7 +56,7 @@ data class ChatCreatorThreadContext(
                 fanTierName = fanTierName,
                 fanTierRank = fanTierRank,
                 fanSubtitle = if (fanTierRank <= 1) "Free member" else "Member since Aug · 0.4 mi",
-                quota = ChatCreatorQuota(used = 12, total = 30, resetCopy = "Resets Monday"),
+                quota = null,
             )
     }
 }
@@ -46,7 +66,14 @@ data class ChatCreatorQuota(
     val used: Int,
     val total: Int,
     val resetCopy: String,
-)
+) {
+    /**
+     * A [total] of zero means "no replies allowed", which is maxed — the
+     * unknown case is modelled by a null quota, not by a zero total.
+     */
+    val isMaxed: Boolean
+        get() = used >= total
+}
 
 class ChatCreatorThreadChrome(
     val context: ChatCreatorThreadContext,

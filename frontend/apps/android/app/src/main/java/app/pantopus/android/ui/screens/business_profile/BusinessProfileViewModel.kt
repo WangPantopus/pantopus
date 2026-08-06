@@ -10,11 +10,15 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.ui.screens.contentdetail.GigOpenChatEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -51,6 +55,11 @@ class BusinessProfileViewModel
         private val _showOverflow = MutableStateFlow(false)
         val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
 
+        private val _openChatEvents = MutableSharedFlow<GigOpenChatEvent>(extraBufferCapacity = 1)
+        val openChatEvents: SharedFlow<GigOpenChatEvent> = _openChatEvents.asSharedFlow()
+
+        private var isStartingInquiry = false
+
         fun load() {
             if (_state.value is BusinessProfileUiState.Loaded) return
             refresh()
@@ -85,6 +94,42 @@ class BusinessProfileViewModel
                         _toastMessage.value = message
                     }
                 }
+            }
+        }
+
+        /**
+         * Contact dock — `POST /api/businesses/:id/inbox/start`, then emit a
+         * one-shot chat open event. Mirrors RN/web `startBusinessInquiry`.
+         */
+        fun startInquiry() {
+            val loaded = _state.value as? BusinessProfileUiState.Loaded ?: return
+            if (isStartingInquiry) return
+            isStartingInquiry = true
+            val name = loaded.content.header.displayName
+            val handle = loaded.content.header.handle
+            val subject =
+                if (!handle.isNullOrEmpty()) {
+                    "Inquiry for @${handle.trimStart('@')}"
+                } else {
+                    "Inquiry for $name"
+                }
+            viewModelScope.launch {
+                when (val result = businesses.startInquiry(businessId, subject)) {
+                    is NetworkResult.Success -> {
+                        _openChatEvents.emit(
+                            GigOpenChatEvent(
+                                roomId = result.data.roomId,
+                                displayName = name,
+                                initials = initialsFromName(name),
+                                verified = loaded.content.header.isVerified,
+                            ),
+                        )
+                    }
+                    is NetworkResult.Failure -> {
+                        _toastMessage.value = friendlyMessage(result.error)
+                    }
+                }
+                isStartingInquiry = false
             }
         }
 
@@ -136,4 +181,15 @@ class BusinessProfileViewModel
                 is NetworkError.Transport -> "Check your connection and try again."
                 else -> "Something went wrong. Try again."
             }
+
+        private fun initialsFromName(name: String): String {
+            val joined =
+                name
+                    .split(" ")
+                    .take(2)
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .joinToString("")
+                    .uppercase()
+            return joined.ifEmpty { "··" }
+        }
     }

@@ -2,49 +2,60 @@
 //  WaitingRoomViewModel.swift
 //  Pantopus
 //
-//  Backs the A18.4 persistent waiting room. The room is re-entrant — it
-//  survives navigating away and back — so the view-model just projects a
-//  deterministic fixture for the requested state (`active` /
-//  `moreInfoRequested`). Real review-status polling is out of scope (B5.1);
-//  the backend was removed from the repo, so the two frames are seeded from
-//  `WaitingRoomContent`'s factories.
-//
-//  Actions (bell, View claim / Back to home, Update evidence, Cancel claim)
-//  are stubbed: they log and no-op, pending the review-status backend. The
-//  back-chevron is the only live navigation and is owned by the caller.
+//  Backs the A18.4 persistent waiting room. Loads the caller's pending
+//  ownership claim for `homeId` from `GET /api/homes/my-ownership-claims`
+//  and projects it into `WaitingRoomContent`. Actions surface navigation
+//  intents via `pendingNav` for the host to handle.
 //
 
 import Foundation
 import Logging
 import Observation
 
-/// Which canonical frame the room opens on.
+/// Which canonical frame the room opens on (seed / query param).
 public enum WaitingRoomState: String, Sendable, Hashable {
-    /// Active wait — `Under review`, info-toned pulsing halo.
     case active
-    /// More info requested · review paused — warning halo + reviewer note.
     case moreInfoRequested
+}
+
+/// Navigation intents surfaced to the host.
+public enum WaitingRoomNav: Sendable, Hashable {
+    case notifications
+    case backToHome(homeId: String)
+    case viewClaim(claimId: String)
+    case updateEvidence(homeId: String, claimId: String)
+    case cancelClaim(homeId: String)
 }
 
 @Observable
 @MainActor
 public final class WaitingRoomViewModel {
-    /// The home this room belongs to (`pantopus://homes/:id/waiting-room`).
     public let homeId: String
     public private(set) var content: WaitingRoomContent
+    public private(set) var phase: WaitingRoomPhase = .loading
+    public private(set) var pendingNav: WaitingRoomNav?
 
+    /// The only masked status `GET /api/homes/my-ownership-claims` returns
+    /// while a claim is still in flight — every other value it can return
+    /// (`approved` / `rejected` / `revoked`) is terminal.
+    private static let underReviewStatus = "under_review"
+    /// Claim reference shown in the waiting room = first 8 chars of the id.
+    private static let claimRefLength = 8
+
+    private let seedState: WaitingRoomState
+    private var claimId: String?
+    private let api: APIClient
     private let logger = Logger(label: "app.pantopus.ios.WaitingRoom")
 
-    /// - Parameters:
-    ///   - homeId: The home whose claim is under review.
-    ///   - state: Which frame to seed. Defaults to the active wait.
-    ///   - content: Optional override (tests / previews).
-    public init(
+    init(
         homeId: String,
         state: WaitingRoomState = .active,
-        content: WaitingRoomContent? = nil
+        content: WaitingRoomContent? = nil,
+        api: APIClient = .shared
     ) {
         self.homeId = homeId
+        seedState = state
+        self.api = api
         self.content = content ?? Self.content(for: state)
     }
 
@@ -55,27 +66,81 @@ public final class WaitingRoomViewModel {
         }
     }
 
-    // MARK: - Stubbed actions (no backend in B5.1)
+    public func consumeNav() {
+        pendingNav = nil
+    }
 
-    /// Top-bar notifications bell. Stub until the review-status surface lands.
+    public func refresh() async {
+        do {
+            let claimsResponse: MyOwnershipClaimsResponse = try await api.request(
+                HomesEndpoints.myOwnershipClaims()
+            )
+            guard let claim = claimsResponse.claims.first(where: { $0.homeId == homeId }) else {
+                claimId = nil
+                phase = .notice(.noClaim)
+                return
+            }
+            claimId = claim.id
+            guard claim.status == Self.underReviewStatus else {
+                phase = .notice(.claimDecided)
+                return
+            }
+            let ref = String(claim.id.prefix(Self.claimRefLength)).uppercased()
+
+            var address = "Your home"
+            if let detail: HomeDetailResponse = try? await api.request(HomesEndpoints.detail(homeId: homeId)) {
+                let home = detail.home.base
+                let parts = [home.address, home.city, home.state].compactMap { $0 }
+                let joined = parts.joined(separator: " · ")
+                if !joined.isEmpty { address = joined }
+            }
+
+            content =
+                seedState == .moreInfoRequested
+                    ? .moreInfoRequested(address: address, claimRef: ref)
+                    : .active(address: address, claimRef: ref)
+            phase = .loaded
+        } catch {
+            logger.warning("waitingRoom.load failed: \(error.localizedDescription)")
+            phase = .notice(.loadFailed)
+        }
+    }
+
     public func openNotifications() {
-        log("bell")
+        pendingNav = .notifications
     }
 
-    /// One of the 2-column "Manage this claim" actions fired.
     public func handleInlineAction(_ action: WaitingRoomInlineAction) {
-        log("inline.\(action.actionKey)")
+        switch action.actionKey {
+        case "update_evidence":
+            if let claimId {
+                pendingNav = .updateEvidence(homeId: homeId, claimId: claimId)
+            }
+        case "cancel_claim":
+            pendingNav = .cancelClaim(homeId: homeId)
+        default:
+            log("inline.\(action.actionKey)")
+        }
     }
 
-    /// Sticky-dock primary ("View claim"). Stub.
     public func handlePrimary(_ cta: StatusCTA) {
-        log("dock.\(cta.actionKey)")
+        switch cta.actionKey {
+        case "view_claim":
+            if let claimId {
+                pendingNav = .viewClaim(claimId: claimId)
+            }
+        default:
+            log("dock.\(cta.actionKey)")
+        }
     }
 
-    /// Sticky-dock secondary ("Back to home"). Stub — the caller may also
-    /// pop; this only records the tap.
     public func handleSecondary(_ cta: StatusCTA) {
-        log("dock.\(cta.actionKey)")
+        switch cta.actionKey {
+        case "back_to_home":
+            pendingNav = .backToHome(homeId: homeId)
+        default:
+            log("dock.\(cta.actionKey)")
+        }
     }
 
     private func log(_ action: String) {

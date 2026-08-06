@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -137,6 +138,12 @@ fun ListOfRowsScreen(
      * in the `actions` row.
      */
     extraTopBarAction: (@Composable () -> Unit)? = null,
+    /**
+     * A14.4 — optional monospaced caption rendered after the last
+     * section (the design's `MonoFooter`, e.g. "Maria Lewin · ID 8174").
+     * Null renders nothing — preserving every existing call site.
+     */
+    monoFooter: String? = null,
 ) {
     val pullState =
         rememberPullRefreshState(
@@ -216,7 +223,7 @@ fun ListOfRowsScreen(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
                 when (state) {
                     ListOfRowsUiState.Loading -> LoadingRows()
-                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, listingContext, onEndReached)
+                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, listingContext, monoFooter, onEndReached)
                     is ListOfRowsUiState.Empty ->
                         EmptyState(
                             icon = state.icon,
@@ -828,6 +835,7 @@ private fun LoadedList(
     state: ListOfRowsUiState.Loaded,
     banner: BannerConfig?,
     listingContext: ListingContextConfig?,
+    monoFooter: String?,
     onEndReached: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -885,6 +893,24 @@ private fun LoadedList(
                 ) {
                     CircularProgressIndicator(color = PantopusColors.primary600, strokeWidth = 2.dp)
                 }
+            }
+        }
+        if (monoFooter != null) {
+            // Same mono-footer treatment as GroupedListScreen / Payments
+            // so A14 settings screens read identically.
+            item(key = "monoFooter") {
+                Text(
+                    text = monoFooter,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = PantopusColors.appTextMuted,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 18.dp, start = Spacing.s4, end = Spacing.s4)
+                            .testTag("listOfRowsMonoFooter"),
+                )
             }
         }
     }

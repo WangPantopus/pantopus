@@ -7,11 +7,9 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
- * Steps the A12.10 Create Business wizard advances through. Step 1 is the
- * only step the new design ships frames for; steps 2-4 are stubs the
- * wizard still routes through so the progress rail reads as
- * `N of 4` all the way through. A follow-on prompt replaces the stub
- * step bodies once design hands off the remaining frames.
+ * Steps the A12.10 Create Business wizard advances through.
+ * - Step 1: designed A12.10 category picker
+ * - Steps 2–4: Form/Wizard token composition (basic info → location/hours → confirm)
  */
 enum class CreateBusinessStep {
     PickCategory,
@@ -45,55 +43,69 @@ enum class BusinessCategory(
     val label: String,
     val subcopy: String,
     val icon: PantopusIcon,
+    /** Backend `categories[]` slug for create-full. */
     val backendSlug: String,
+    /**
+     * Sensible `business_type` entity for create-full. Home maps to
+     * `home_service`; everything else defaults to `for_profit`.
+     */
+    val entityType: String,
 ) {
     Home(
         label = "Home services",
         subcopy = "Handyman · cleaning · moving",
         icon = PantopusIcon.Wrench,
         backendSlug = "home_services",
+        entityType = "home_service",
     ),
     Personal(
         label = "Personal services",
         subcopy = "Tutoring · childcare · pet care",
         icon = PantopusIcon.GraduationCap,
         backendSlug = "personal_services",
+        entityType = "for_profit",
     ),
     Tech(
         label = "Tech & repair",
         subcopy = "Devices · networks · break-fix",
         icon = PantopusIcon.Cpu,
         backendSlug = "tech_repair",
+        entityType = "for_profit",
     ),
     Delivery(
         label = "Delivery & errands",
         subcopy = "Last-mile · courier · grocery",
         icon = PantopusIcon.Truck,
         backendSlug = "delivery_errands",
+        entityType = "for_profit",
     ),
     Goods(
         label = "Goods & retail",
         subcopy = "Selling new or pre-loved items",
         icon = PantopusIcon.ShoppingBag,
         backendSlug = "goods_retail",
+        entityType = "for_profit",
     ),
     Rentals(
         label = "Rentals",
         subcopy = "Short or long-term · gear · vehicles",
         icon = PantopusIcon.KeyRound,
         backendSlug = "rentals",
+        entityType = "for_profit",
     ),
     Vehicles(
         label = "Vehicles & rideshare",
         subcopy = "Driving · towing · fleet",
         icon = PantopusIcon.Car,
         backendSlug = "vehicles_rideshare",
+        entityType = "for_profit",
     ),
     Other(
         label = "Something else",
         subcopy = "Tell us what you do",
         icon = PantopusIcon.Sparkles,
         backendSlug = "other",
+        entityType = "for_profit",
     ),
     ;
 
@@ -135,14 +147,51 @@ data class CategorySearchHit(
     val label: String,
 )
 
+/** Live username-availability state for the basic-info step. */
+sealed interface UsernameCheckStatus {
+    data object Idle : UsernameCheckStatus
+
+    data object Checking : UsernameCheckStatus
+
+    data object Available : UsernameCheckStatus
+
+    data class Unavailable(val reason: String?) : UsernameCheckStatus
+}
+
+/**
+ * One weekday row in the create-business hours editor (Sun=0 … Sat=6).
+ * Weekdays default to 09:00–17:00; weekends closed — matches RN.
+ */
+data class BusinessHoursDay(
+    val dayOfWeek: Int,
+    val openTime: String,
+    val closeTime: String,
+    val isClosed: Boolean,
+) {
+    val shortLabel: String
+        get() = SHORT_LABELS.getOrElse(dayOfWeek) { "?" }
+
+    companion object {
+        private val SHORT_LABELS = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+        fun defaultWeek(): List<BusinessHoursDay> =
+            (0..6).map { day ->
+                val weekday = day in 1..5
+                BusinessHoursDay(
+                    dayOfWeek = day,
+                    openTime = if (weekday) "09:00" else "",
+                    closeTime = if (weekday) "17:00" else "",
+                    isClosed = !weekday,
+                )
+            }
+    }
+}
+
 /** Outbound navigation events the screen reacts to. */
 sealed interface CreateBusinessOutboundEvent {
     /** Pop the wizard with no further navigation. */
     data object Dismiss : CreateBusinessOutboundEvent
 
-    /**
-     * Pop the wizard and route to the newly-created business profile.
-     * Used by the (still-stub) confirm step once it ships.
-     */
+    /** Pop the wizard and open the newly-created business dashboard. */
     data class OpenBusinessDashboard(val businessId: String) : CreateBusinessOutboundEvent
 }

@@ -95,7 +95,8 @@ import java.util.Locale
 @Composable
 fun BusinessProfileScreen(
     onBack: () -> Unit,
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (roomId: String, displayName: String, initials: String, verified: Boolean) -> Unit =
+        { _, _, _, _ -> },
     onShare: () -> Unit = {},
     onOpenReport: () -> Unit = {},
     onOpenWebsite: (String) -> Unit = {},
@@ -116,6 +117,11 @@ fun BusinessProfileScreen(
     LaunchedEffect(Unit) {
         viewModel.load()
         savedPlacesStore.loadIfNeeded()
+    }
+    LaunchedEffect(Unit) {
+        viewModel.openChatEvents.collect { event ->
+            onOpenMessages(event.roomId, event.displayName, event.initials, event.verified)
+        }
     }
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -159,7 +165,7 @@ fun BusinessProfileScreen(
                         onShare = onShare,
                         onMore = { viewModel.setShowOverflow(true) },
                         onToggleSavedPlace = { pending?.let(savedPlacesStore::toggle) },
-                        onContact = onOpenMessages,
+                        onContact = viewModel::startInquiry,
                         onBook = onBook,
                         onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
                     )

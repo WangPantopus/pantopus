@@ -28,15 +28,33 @@ public struct PublicProfileView: View {
     @State private var showReportSheet = false
     private let onBack: @MainActor () -> Void
     private let onOpenMessages: @MainActor (PublicProfile) -> Void
+    private let onEditPersona: @MainActor () -> Void
+    private let onOpenInsights: @MainActor () -> Void
+    private let onComposeBroadcast: @MainActor () -> Void
 
     public init(
         userId: String,
+        currentUserId: String? = nil,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in }
+        onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in },
+        onEditPersona: @escaping @MainActor () -> Void = {},
+        onOpenInsights: @escaping @MainActor () -> Void = {},
+        onComposeBroadcast: @escaping @MainActor () -> Void = {}
     ) {
-        _viewModel = State(initialValue: PublicProfileViewModel(userId: userId))
+        // No call site threads the signed-in id through, so fall back to the
+        // session when the caller doesn't supply one — otherwise `isOwner`
+        // (and the whole persona-owner chrome) is permanently false.
+        _viewModel = State(
+            initialValue: PublicProfileViewModel(
+                userId: userId,
+                currentUserId: currentUserId ?? PublicProfileViewModel.signedInUserId()
+            )
+        )
         self.onBack = onBack
         self.onOpenMessages = onOpenMessages
+        self.onEditPersona = onEditPersona
+        self.onOpenInsights = onOpenInsights
+        self.onComposeBroadcast = onComposeBroadcast
     }
 
     public var body: some View {
@@ -70,6 +88,29 @@ public struct PublicProfileView: View {
         .sheet(isPresented: $showReportSheet) {
             reportSheet
         }
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.showFollowHandshake },
+                set: { viewModel.showFollowHandshake = $0 }
+            ),
+            onDismiss: {
+                viewModel.clearHandshakeTier()
+                Task { await viewModel.refresh() }
+            },
+            content: {
+                PrivacyHandshakeWizardView(
+                    viewModel: PrivacyHandshakeViewModel(
+                        personaHandle: viewModel.loadedPersonaHandle,
+                        preselectedTierRank: viewModel.handshakePreselectedTierRank
+                    ) {
+                        Task { @MainActor in
+                            viewModel.showFollowHandshake = false
+                            viewModel.clearHandshakeTier()
+                        }
+                    }
+                )
+            }
+        )
         .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
     }
@@ -160,6 +201,11 @@ public struct PublicProfileView: View {
             },
             body: {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
+                    if payload.isOwner {
+                        BeaconOwnerAnalyticsStrip(followerStat: payload.stats.stats.first?.value ?? "—") {
+                            onOpenInsights()
+                        }
+                    }
                     StatsTabsBody(
                         content: payload.stats,
                         selectedTab: Binding(
@@ -176,7 +222,7 @@ public struct PublicProfileView: View {
                     PublicProfilePostsFeed(
                         kind: payload.kind,
                         posts: payload.posts,
-                        onUnlock: { _ in viewModel.toastMessage = "Subscribe flow coming soon" },
+                        onUnlock: { post in viewModel.unlockBroadcast(tierRank: post.targetTierRank) },
                         onEmptyCTA: { emptyCTAAction(for: payload) }
                     )
                 }
@@ -190,15 +236,20 @@ public struct PublicProfileView: View {
     private func identityActions(for payload: PublicProfileContent) -> some View {
         switch payload.kind {
         case .persona:
-            BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {
-                viewModel.showOverflow = true
-            }
-            BeaconHeaderPrimaryButton(
-                title: viewModel.followState == .succeeded ? "Following" : "Follow",
-                icon: .plus,
-                isProminent: viewModel.followState != .succeeded
-            ) {
-                Task { await viewModel.follow() }
+            if payload.isOwner {
+                BeaconHeaderGhostButton(icon: .barChart3, accessibilityLabel: "Insights") {
+                    onOpenInsights()
+                }
+                BeaconHeaderGhostButton(title: "Edit", icon: .pencil, accessibilityLabel: "Edit Persona") {
+                    onEditPersona()
+                }
+            } else {
+                BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {
+                    viewModel.showOverflow = true
+                }
+                BeaconHeaderPrimaryButton(title: "Follow", icon: .plus) {
+                    viewModel.follow()
+                }
             }
         case .local:
             BeaconHeaderGhostButton(
@@ -218,7 +269,11 @@ public struct PublicProfileView: View {
     private func emptyCTAAction(for payload: PublicProfileContent) {
         switch payload.kind {
         case .persona:
-            Task { await viewModel.follow() }
+            if payload.isOwner {
+                onComposeBroadcast()
+            } else {
+                viewModel.follow()
+            }
         case .local:
             onOpenMessages(payload.profile)
         }

@@ -142,12 +142,25 @@ public final class MailTaskViewModel {
         }
     }
 
-    /// Quick-snooze tap. Persistence is stubbed; surface a toast so QA can
-    /// verify the affordance fires.
+    /// Quick-snooze tap — pushes due date out one day via PATCH.
     public func snooze(optionId: String) {
         guard case let .loaded(content) = state,
               let option = content.snoozeOptions.first(where: { $0.id == optionId }) else { return }
         toast = "Snoozed · \(option.label)"
+        guard seed == nil else { return }
+        let due = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86_400))
+        Task {
+            let result = await client.perform(
+                MailboxV2Endpoints.updateP3Task(
+                    taskId: taskId,
+                    request: P3TaskUpdateRequest(status: nil, dueAt: due)
+                ),
+                as: P3TaskResponse.self
+            )
+            if case .failure = result {
+                toast = "Couldn't snooze — try again"
+            }
+        }
     }
 
     /// Open the snooze picker from the dock chip. Stubbed.
@@ -182,14 +195,19 @@ public final class MailTaskViewModel {
         toast = "Added to calendar"
     }
 
-    /// "View confirmation" dock chip (done frame) — stubbed.
+    /// "View confirmation" dock chip — opens the source mail when linked.
     public func viewConfirmation() {
-        toast = "Opening confirmation"
+        openSourceMail()
     }
 
-    /// Archive dock chip (done frame) — stubbed.
+    /// Archive dock chip. It only renders on the completed frame, and the
+    /// backend has no archived status for tasks (`PATCH /p3/tasks/:id` accepts
+    /// pending / in_progress / completed) — so archiving means "make sure it's
+    /// done, then put it away". `markDone()` no-ops when it already is; the
+    /// dismissal is what the user sees.
     public func archive() {
-        toast = "Archived"
+        markDone()
+        onBack()
     }
 
     // MARK: - DTO → projection

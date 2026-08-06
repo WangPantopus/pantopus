@@ -137,13 +137,16 @@ public struct RootTabView: View {
         case let .invite(token):
             pendingInviteToken = token
             _ = router.consume()
+        case let .joinInvite(code):
+            pendingInviteToken = code
+            _ = router.consume()
         case .feed, .post:
             model.selected = .pulse
         case .gig:
             model.selected = .tasks
         case .listing:
             model.selected = .marketplace
-        case .supportTrain, .supportTrainManage, .user,
+        case .supportTrain, .supportTrainManage, .user, .beaconProfile,
              .connections, .beacons, .discoverHub,
              .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,

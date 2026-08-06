@@ -37,6 +37,15 @@ struct SignUpView: View {
                     .accessibilityIdentifier("signUpErrorBanner")
             }
 
+            OAuthButtonGroup(
+                isLoading: viewModel.isSubmitting,
+                onGoogle: { signIn(with: .google) },
+                onApple: { signIn(with: .apple) },
+                googleIdentifier: "signUpGoogleButton",
+                appleIdentifier: "signUpAppleButton"
+            )
+            .padding(.horizontal, Spacing.s4)
+
             FormFieldGroup("Account") {
                 emailField
                 passwordField
@@ -273,6 +282,10 @@ struct SignUpView: View {
 
     private func submit() {
         Task { await viewModel.submit(using: auth) }
+    }
+
+    private func signIn(with provider: OAuthProvider) {
+        Task { await viewModel.signIn(with: provider, using: auth) }
     }
 
     private func state(for field: SignUpField) -> PantopusFieldState {

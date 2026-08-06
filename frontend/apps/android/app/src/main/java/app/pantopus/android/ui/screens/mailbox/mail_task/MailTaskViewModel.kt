@@ -181,11 +181,28 @@ class MailTaskViewModel
             }
         }
 
-        /** Quick-snooze tap. Persistence is stubbed; surface a toast. */
+        /** Quick-snooze tap — pushes due date out one day via PATCH. */
         fun snooze(optionId: String) {
             val current = _state.value as? MailTaskUiState.Loaded ?: return
             val option = current.content.snoozeOptions.firstOrNull { it.id == optionId } ?: return
             _toast.value = "Snoozed · ${option.label}"
+            snoozeByDays(1)
+        }
+
+        private fun snoozeByDays(days: Int) {
+            // Seeded preview / test path never writes, same as [persistStatus].
+            if (seed != null) return
+            viewModelScope.launch {
+                val due =
+                    java.time.Instant
+                        .now()
+                        .plus(java.time.Duration.ofDays(days.toLong()))
+                        .toString()
+                val result = repository.updateP3Task(taskId, P3TaskUpdateRequest(dueAt = due))
+                if (result is NetworkResult.Failure) {
+                    _toast.value = "Couldn't snooze — try again"
+                }
+            }
         }
 
         /** Open the snooze picker from the dock chip. Stubbed. */
@@ -224,14 +241,21 @@ class MailTaskViewModel
             _toast.value = "Added to calendar"
         }
 
-        /** "View confirmation" dock chip (done frame) — stubbed. */
+        /** "View confirmation" dock chip — opens the source mail when linked. */
         fun viewConfirmation() {
-            _toast.value = "Opening confirmation"
+            openSourceMail()
         }
 
-        /** Archive dock chip (done frame) — stubbed. */
+        /**
+         * Archive dock chip. It only renders on the completed frame, and the
+         * backend has no archived status for tasks (`PATCH /p3/tasks/:id`
+         * accepts pending / in_progress / completed) — so archiving means
+         * "make sure it's done, then put it away". [markDone] no-ops when it
+         * already is; the dismissal is what the user sees.
+         */
         fun archive() {
-            _toast.value = "Archived"
+            markDone()
+            onBack()
         }
 
         // MARK: - DTO → projection

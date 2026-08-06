@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.professional.ProfessionalRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -79,7 +80,7 @@ class ProfessionalProfileViewModel
                         recompute()
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = ProfessionalProfileUiState.Error(result.error.message)
+                        _state.value = ProfessionalProfileUiState.Error(result.error.displayMessage("Couldn't load this profile."))
                     }
                 }
             }

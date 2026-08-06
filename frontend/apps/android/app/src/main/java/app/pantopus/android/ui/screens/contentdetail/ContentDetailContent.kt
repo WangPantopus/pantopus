@@ -264,6 +264,11 @@ data class ContentDetailPhotoTile(
     val id: String,
     val gradient: ListingGradient,
     val icon: PantopusIcon,
+    /**
+     * Real attachment image. When set the tile renders the photo and falls
+     * back to the gradient + glyph while loading / on failure.
+     */
+    val imageUrl: String? = null,
 )
 
 @Immutable

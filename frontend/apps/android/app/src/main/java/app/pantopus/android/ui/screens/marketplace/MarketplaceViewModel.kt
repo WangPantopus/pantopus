@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.models.listings.ListingsNearbyResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
@@ -144,7 +145,7 @@ class MarketplaceViewModel
                             }
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = MarketplaceUiState.Error(result.error.message)
+                        _state.value = MarketplaceUiState.Error(result.error.displayMessage("Couldn't load Marketplace."))
                     }
                 }
             }

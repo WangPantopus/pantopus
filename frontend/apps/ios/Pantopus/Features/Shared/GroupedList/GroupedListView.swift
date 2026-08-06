@@ -282,13 +282,13 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             // the row label and lose the per-channel toggles; the chips
             // also own their own taps, so the row carries no tap gesture.
             rowBody
-                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityIdentifier(row.accessibilityIdentifier ?? "groupedListRow_\(row.id)")
                 .accessibilityElement(children: .contain)
         } else {
             rowBody
                 .contentShape(Rectangle())
                 .onTapGesture { handleTap(rowId: row.id, control: activeControl, destructive: row.destructive) }
-                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityIdentifier(row.accessibilityIdentifier ?? "groupedListRow_\(row.id)")
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(accessibilityLabel(row, control: activeControl))
                 .accessibilityAddTraits(accessibilityTraits(control: activeControl))

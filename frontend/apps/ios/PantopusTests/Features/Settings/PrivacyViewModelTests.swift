@@ -35,10 +35,13 @@ final class PrivacyViewModelTests: XCTestCase {
 
     // MARK: - Defaults frame
 
-    func testPopulatedProducesSixGroupsInDesignOrder() async {
+    func testPopulatedProducesSevenGroupsInDesignOrder() async {
         let vm = PrivacySettingsViewModel(variant: .populated)
         let groups = await loadedGroups(vm)
-        XCTAssertEqual(groups.map(\.id), ["visibility", "address", "fuzz", "activity", "data", "delete"])
+        XCTAssertEqual(
+            groups.map(\.id),
+            ["biometricSecurity", "visibility", "address", "fuzz", "activity", "data", "delete"]
+        )
         XCTAssertNil(vm.banner)
         XCTAssertFalse(vm.contentDimmed)
     }
@@ -57,11 +60,11 @@ final class PrivacyViewModelTests: XCTestCase {
         }
     }
 
-    func testFuzzGroupDefaultsToBlockDefault() async {
+    func testFuzzGroupDefaultsToHalfMile() async {
         let vm = PrivacySettingsViewModel(variant: .populated)
         let groups = await loadedGroups(vm)
         let fuzz = group(groups, "fuzz")
-        XCTAssertEqual(fuzz?.fuzz?.stop, .blockDefault)
+        XCTAssertEqual(fuzz?.fuzz?.stop, .halfMile)
         XCTAssertEqual(fuzz?.fuzz?.leadIn, "How exact your task and listing pins appear on the map.")
         XCTAssertTrue(fuzz?.rows.isEmpty ?? false)
     }

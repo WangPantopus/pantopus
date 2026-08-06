@@ -110,24 +110,12 @@ private fun TrailingView(
                 PaymentsChipView(label = trailing.label, tone = trailing.tone)
             }
         is PaymentsRowTrailing.GatedDash ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            Text(
+                text = "—",
+                color = PantopusColors.appTextMuted,
+                fontSize = 13.sp,
                 modifier = Modifier.testTag("paymentsRow_${rowIdentifier}_gated"),
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Lock,
-                    contentDescription = null,
-                    size = 14.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.appTextMuted,
-                )
-                Text(
-                    text = "—",
-                    color = PantopusColors.appTextMuted,
-                    fontSize = 13.sp,
-                )
-            }
+            )
     }
 }
 

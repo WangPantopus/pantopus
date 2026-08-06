@@ -77,7 +77,13 @@ fun BookletDetailLayout(
             attachments = makeAttachments(content = content),
             hero = { HeroCard(content = content) },
             keyFacts = { KeyFactsCard(rows = makeBookletKeyFacts(content, booklet)) },
-            body = { BookletPager(pages = booklet.pages, pageCount = booklet.pageCount) },
+            body = {
+                BookletPager(
+                    pages = booklet.pages,
+                    pageCount = booklet.pageCount,
+                    ocrTexts = booklet.ocrTexts,
+                )
+            },
             sender = { SenderCard(content = content, onOpenProfile = onOpenSenderProfile) },
             actions = { ActionsRow() },
         )

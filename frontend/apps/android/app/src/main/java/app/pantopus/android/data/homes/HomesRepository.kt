@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.models.homes.CreateHomeTaskRequest
 import app.pantopus.android.data.api.models.homes.CreateMaintenanceRequest
 import app.pantopus.android.data.api.models.homes.CreatePackageRequest
 import app.pantopus.android.data.api.models.homes.CreatePollRequest
+import app.pantopus.android.data.api.models.homes.DeleteOwnershipClaimResponse
 import app.pantopus.android.data.api.models.homes.FileUploadResponse
 import app.pantopus.android.data.api.models.homes.GetBillSplitsResponse
 import app.pantopus.android.data.api.models.homes.GetHomeBillsResponse
@@ -34,6 +35,7 @@ import app.pantopus.android.data.api.models.homes.HomePackageResponse
 import app.pantopus.android.data.api.models.homes.HomePollResponse
 import app.pantopus.android.data.api.models.homes.HomeTaskResponse
 import app.pantopus.android.data.api.models.homes.InviteOwnerRequest
+import app.pantopus.android.data.api.models.homes.MoveOutResponse
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
@@ -115,6 +117,15 @@ open class HomesRepository
 
         /** `GET /api/homes/my-ownership-claims`. */
         open suspend fun myOwnershipClaims(): NetworkResult<MyOwnershipClaimsResponse> = safeApiCall { api.myOwnershipClaims() }
+
+        /** `POST /api/homes/:id/move-out`. */
+        open suspend fun moveOut(homeId: String): NetworkResult<MoveOutResponse> = safeApiCall { api.moveOut(homeId) }
+
+        /** `DELETE /api/homes/:id/ownership-claims/:claimId`. */
+        open suspend fun deleteOwnershipClaim(
+            homeId: String,
+            claimId: String,
+        ): NetworkResult<DeleteOwnershipClaimResponse> = safeApiCall { api.deleteOwnershipClaim(homeId, claimId) }
 
         /** `GET /api/homes/:id/bills`. */
         open suspend fun getHomeBills(

@@ -119,8 +119,17 @@ data class WalletContent(
     val monthValue: String,
     val monthMeta: String,
     val activity: List<WalletActivityItem>,
-    val payoutMethod: WalletPayoutMethod,
-    val taxDocs: WalletTaxDocs,
+    /**
+     * `null` until a real payout method is known — the live read path has no
+     * Stripe payout-method feed yet, and the section is hidden rather than
+     * filled with fabricated bank details.
+     */
+    val payoutMethod: WalletPayoutMethod? = null,
+    /**
+     * `null` until real tax-document data is known — same rule as
+     * [payoutMethod]; never show invented YTD earnings.
+     */
+    val taxDocs: WalletTaxDocs? = null,
     /** Populated only in the [Hold] state. */
     val holdState: WalletHoldState? = null,
     /**

@@ -31,5 +31,6 @@ fun BlockedUsersScreen(
         onRefresh = viewModel::refresh,
         onEndReached = {},
         onBack = onBack,
+        monoFooter = viewModel.monoFooter,
     )
 }

@@ -128,6 +128,7 @@ fun FeedChipRow(
     activeId: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    skeleton: Boolean = false,
 ) {
     Box(
         modifier =
@@ -144,32 +145,40 @@ fun FeedChipRow(
                     .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            chips.forEach { chip ->
-                val active = chip.id == activeId
-                Box(
-                    modifier =
-                        Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(Radii.pill))
-                            .background(if (active) PantopusColors.primary600 else PantopusColors.appSurface)
-                            .then(
-                                if (active) {
-                                    Modifier
-                                } else {
-                                    Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
-                                },
-                            )
-                            .clickable { onSelect(chip.id) }
-                            .padding(horizontal = 14.dp)
-                            .testTag("feedChip_${chip.id}"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = chip.label,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
-                    )
+            if (skeleton) {
+                // A03 loading frame shimmers the chip row alongside the
+                // cards — widths echo the real chip labels (iOS parity).
+                listOf(50, 60, 92, 64, 96, 84).forEach { width ->
+                    Shimmer(width = width.dp, height = 28.dp, cornerRadius = Radii.pill)
+                }
+            } else {
+                chips.forEach { chip ->
+                    val active = chip.id == activeId
+                    Box(
+                        modifier =
+                            Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(if (active) PantopusColors.primary600 else PantopusColors.appSurface)
+                                .then(
+                                    if (active) {
+                                        Modifier
+                                    } else {
+                                        Modifier.border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                                    },
+                                )
+                                .clickable { onSelect(chip.id) }
+                                .padding(horizontal = 14.dp)
+                                .testTag("feedChip_${chip.id}"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = chip.label,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (active) PantopusColors.appTextInverse else PantopusColors.appTextStrong,
+                        )
+                    }
                 }
             }
         }

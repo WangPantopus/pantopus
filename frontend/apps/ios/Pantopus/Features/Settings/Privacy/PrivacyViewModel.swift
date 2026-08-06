@@ -22,6 +22,7 @@
 
 import Foundation
 import Observation
+import UIKit
 
 @Observable
 @MainActor
@@ -35,22 +36,31 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
     }
 
     public private(set) var state: GroupedListState = .loading
+    public var toast: ToastMessage?
 
     public private(set) var isStealth: Bool
     private var visibility: String
     private var address: String
     private var fuzz: FuzzStop
     private var activity: [String: Bool]
+    private let appLock: AppLockManager
+    private let auth: AuthManager
 
     public enum Variant: Sendable, Hashable { case populated, stealth }
 
-    public init(variant: Variant = .populated) {
+    init(
+        variant: Variant = .populated,
+        appLock: AppLockManager = .shared,
+        auth: AuthManager = .shared
+    ) {
         let stealth = (variant == .stealth)
         isStealth = stealth
         visibility = stealth ? "hidden" : "verified"
         address = stealth ? "hidden" : "street"
-        fuzz = stealth ? .neighborhood : .blockDefault
+        fuzz = stealth ? .neighborhood : .halfMile
         activity = Self.seedActivity(stealth: stealth)
+        self.appLock = appLock
+        self.auth = auth
     }
 
     // MARK: - GroupedListDataSource
@@ -66,15 +76,37 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
     }
 
     public func load() async {
+        appLock.configure(userID: signedInUserID)
+        appLock.refreshCapability()
         state = .loaded(groups())
     }
 
-    public func tapRow(_: String) async {
+    public func tapRow(_ rowId: String) async {
+        if rowId == "appLockOpenSettings",
+           let url = URL(string: UIApplication.openSettingsURLString) {
+            await UIApplication.shared.open(url)
+            return
+        }
         // Download / What we collect / Delete open dedicated flows in a
         // later prompt; no-op while those are out of scope.
     }
 
     public func toggleRow(_ rowId: String, isOn: Bool) async {
+        if rowId == "appLockToggle" {
+            let changed = await appLock.setEnabled(isOn)
+            if changed {
+                toast = ToastMessage(
+                    text: isOn
+                        ? "\(appLock.biometricLabel) protection is on."
+                        : "Biometric protection turned off.",
+                    kind: .success
+                )
+            } else if isOn {
+                toast = ToastMessage(text: "App lock setup was cancelled.", kind: .neutral)
+            }
+            state = .loaded(groups())
+            return
+        }
         guard activity[rowId] != nil else { return }
         activity[rowId] = isOn
         state = .loaded(groups())
@@ -103,6 +135,7 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
 
     private func groups() -> [GroupedListGroup] {
         [
+            biometricSecurityGroup(),
             visibilityGroup(),
             addressGroup(),
             fuzzGroup(),
@@ -110,6 +143,38 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
             dataGroup(),
             deleteGroup()
         ]
+    }
+
+    private func biometricSecurityGroup() -> GroupedListGroup {
+        GroupedListGroup(
+            id: Group.biometricSecurity,
+            overline: "BIOMETRIC SECURITY",
+            rows: [
+                GroupedListRow(
+                    id: "appLockToggle",
+                    label: "Require \(appLock.biometricLabel) for sensitive actions",
+                    subtext: "Protect payments, mailbox, and account changes with biometric verification.",
+                    control: .toggle(isOn: appLock.preferenceEnabled),
+                    accessibilityIdentifier: "appLockToggle"
+                ),
+                GroupedListRow(
+                    id: "appLockCapabilityStatus",
+                    label: "Current Capability",
+                    control: .chipStatus(
+                        label: appLock.capability.statusText,
+                        tone: appLock.capability == .available ? .success : .warning,
+                        includesChevron: false
+                    ),
+                    accessibilityIdentifier: "appLockCapabilityStatus"
+                ),
+                GroupedListRow(
+                    id: "appLockOpenSettings",
+                    label: "Open Device Settings",
+                    control: .chevron,
+                    accessibilityIdentifier: "appLockOpenSettings"
+                )
+            ]
+        )
     }
 
     private func visibilityGroup() -> GroupedListGroup {
@@ -219,12 +284,18 @@ public final class PrivacySettingsViewModel: GroupedListDataSource {
     // MARK: - Stable identifiers
 
     public enum Group {
+        public static let biometricSecurity = "biometricSecurity"
         public static let visibility = "visibility"
         public static let address = "address"
         public static let fuzz = "fuzz"
         public static let activity = "activity"
         public static let data = "data"
         public static let delete = "delete"
+    }
+
+    private var signedInUserID: String? {
+        guard case let .signedIn(user) = auth.state else { return nil }
+        return user.id
     }
 
     // MARK: - Seed data (parity contract — mirrored in Android)

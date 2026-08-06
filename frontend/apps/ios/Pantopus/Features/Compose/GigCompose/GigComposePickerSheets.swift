@@ -528,7 +528,7 @@ private struct PolicyOptionCard: View {
                         .font(.system(size: 14.5, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                     Text(policy.detail)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -619,7 +619,7 @@ private struct GigUrgencySheet: View {
                         .foregroundStyle(Theme.Color.appText)
                 }
                 Text("Pinned higher in the feed and flagged with an urgent badge.")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1047,7 +1047,7 @@ private struct GigWhereSheet: View {
                                     .font(.system(size: 14.5, weight: .semibold))
                                     .foregroundStyle(Theme.Color.appText)
                                 Text(mode.subcopy)
-                                    .font(.system(size: 12))
+                                    .pantopusTextStyle(.caption)
                                     .foregroundStyle(Theme.Color.appTextSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }

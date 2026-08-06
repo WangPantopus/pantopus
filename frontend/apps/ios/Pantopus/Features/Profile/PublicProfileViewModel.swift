@@ -64,6 +64,8 @@ public struct PublicProfilePost: Sendable, Hashable, Identifiable {
     /// Persona-only — `true` when this broadcast is gated behind a
     /// paid tier the visitor doesn't hold.
     public let isLocked: Bool
+    /// Persona-only — tier rank required to unlock (`target_tier_rank`).
+    public let targetTierRank: Int?
     /// Local-only — `nil` on Persona broadcasts.
     public let intent: Intent?
 
@@ -76,6 +78,7 @@ public struct PublicProfilePost: Sendable, Hashable, Identifiable {
         replies: Int = 0,
         visibility: Visibility? = nil,
         isLocked: Bool = false,
+        targetTierRank: Int? = nil,
         intent: Intent? = nil
     ) {
         self.id = id
@@ -86,6 +89,7 @@ public struct PublicProfilePost: Sendable, Hashable, Identifiable {
         self.replies = replies
         self.visibility = visibility
         self.isLocked = isLocked
+        self.targetTierRank = targetTierRank
         self.intent = intent
     }
 }
@@ -100,6 +104,10 @@ public struct PublicProfileContent: Sendable, Equatable, Hashable {
     /// B.2 (A10.5) — populated for `.local` profiles; drives the
     /// canonical neighbor layout. `nil` for `.persona`.
     public let neighbor: NeighborProfileContent?
+    /// Persona-only — `true` when the signed-in user owns this persona.
+    public let isOwner: Bool
+    /// Persona handle for the privacy handshake (`@username`).
+    public let personaHandle: String?
 
     public init(
         profile: PublicProfile,
@@ -107,7 +115,9 @@ public struct PublicProfileContent: Sendable, Equatable, Hashable {
         header: PublicProfileHeader,
         stats: StatsTabsContent,
         posts: [PublicProfilePost],
-        neighbor: NeighborProfileContent? = nil
+        neighbor: NeighborProfileContent? = nil,
+        isOwner: Bool = false,
+        personaHandle: String? = nil
     ) {
         self.profile = profile
         self.kind = kind
@@ -115,6 +125,8 @@ public struct PublicProfileContent: Sendable, Equatable, Hashable {
         self.stats = stats
         self.posts = posts
         self.neighbor = neighbor
+        self.isOwner = isOwner
+        self.personaHandle = personaHandle
     }
 }
 
@@ -184,10 +196,9 @@ public final class PublicProfileViewModel {
     /// `POST /api/users/:userId/block`.
     public private(set) var blockState: PublicProfileActionState = .idle
 
-    /// P6.5 — Follow button state for Persona profiles. Toggles
-    /// `idle` → `inFlight` → `succeeded` once the request lands; the
-    /// CTA reflects this via the `ActionRowCTA(kind:)` projection.
-    public private(set) var followState: PublicProfileActionState = .idle
+    /// Drives the privacy handshake sheet for Persona follow/unlock.
+    public var showFollowHandshake: Bool = false
+    public var handshakePreselectedTierRank: Int?
 
     /// Drives the overflow action sheet presentation.
     public var showOverflow: Bool = false
@@ -196,12 +207,28 @@ public final class PublicProfileViewModel {
     public var toastMessage: String?
 
     private let userId: String
+    private let currentUserId: String?
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.PublicProfile")
 
-    init(userId: String, client: APIClient = .shared) {
+    init(
+        userId: String,
+        currentUserId: String? = PublicProfileViewModel.signedInUserId(),
+        client: APIClient = .shared
+    ) {
         self.userId = userId
+        self.currentUserId = currentUserId
         self.client = client
+    }
+
+    /// The signed-in user, so `isOwner` (and the owner chrome behind it)
+    /// resolves without every call site threading the id through. Mirrors
+    /// Android, where the VM reads `AuthRepository.state`.
+    static func signedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 
     public func load() async {
@@ -238,31 +265,48 @@ public final class PublicProfileViewModel {
         }
     }
 
-    /// P6.5 — Follow a Persona profile. Reuses the connection-request
-    /// endpoint as the closest existing wire op; backend wires a real
-    /// `POST /api/follows/:userId` later if/when it ships. The visitor
-    /// sees the CTA flip to "Following" on success.
-    public func follow() async {
-        guard followState != .inFlight, followState != .succeeded else { return }
-        followState = .inFlight
-        let body = ConnectionRequestBody(addresseeId: userId)
-        do {
-            _ = try await client.request(
-                RelationshipsEndpoints.sendRequest(body: body),
-                as: ConnectionRequestResponse.self
-            )
-            followState = .succeeded
-            toastMessage = "Following"
-        } catch let error as APIError {
-            let message = friendlyMessage(for: error)
-            followState = .failed(message: message)
-            toastMessage = message
-            logger.warning("Follow failed: \(error)")
-        } catch {
-            followState = .failed(message: "Something went wrong")
-            toastMessage = "Couldn't follow this profile"
-            logger.warning("Follow failed: \(error)")
+    /// Persona follow — opens the privacy handshake wizard (Stripe
+    /// Checkout for paid tiers), mirroring BeaconProfile / RN follow.
+    public func follow() {
+        guard canOpenHandshake else {
+            toastMessage = Self.handshakeUnavailableMessage
+            return
         }
+        handshakePreselectedTierRank = nil
+        showFollowHandshake = true
+    }
+
+    /// Unlock a tier-gated broadcast on a Persona profile.
+    public func unlockBroadcast(tierRank: Int?) {
+        guard canOpenHandshake else {
+            toastMessage = Self.handshakeUnavailableMessage
+            return
+        }
+        handshakePreselectedTierRank = tierRank
+        showFollowHandshake = true
+    }
+
+    /// Shown instead of silently no-op'ing when this profile carries no
+    /// resolvable Beacon handle. Mirrors the Android string exactly.
+    static let handshakeUnavailableMessage = "Following isn't available from this profile yet."
+
+    public func clearHandshakeTier() {
+        handshakePreselectedTierRank = nil
+    }
+
+    private var canOpenHandshake: Bool {
+        guard case let .loaded(payload) = state,
+              payload.kind == .persona,
+              !payload.isOwner,
+              let handle = payload.personaHandle,
+              !handle.isEmpty else { return false }
+        return true
+    }
+
+    /// Handle for the privacy handshake sheet.
+    public var loadedPersonaHandle: String {
+        guard case let .loaded(payload) = state else { return "" }
+        return payload.personaHandle ?? ""
     }
 
     /// Block this user. Wraps `POST /api/users/:userId/block`
@@ -361,6 +405,15 @@ public final class PublicProfileViewModel {
         )
 
         let neighbor = kind == .local ? buildNeighbor(from: profile, reviews: reviewCards) : nil
+        let isOwner = currentUserId.map { $0 == profile.id } ?? false
+        // A Beacon (`PublicPersona.handle`) lives in a different namespace
+        // from `User.username` — persona handles are generated independently
+        // (`identityProfiles.generateUniqueAudienceHandle`) and the persona
+        // serializer deliberately never exposes the owning user. Passing the
+        // username here would hand the privacy handshake a handle that can
+        // resolve to a *different* creator's Beacon, so it stays nil until
+        // `GET /api/users/id/:id` carries an approved Beacon bridge.
+        let personaHandle: String? = nil
 
         return PublicProfileContent(
             profile: profile,
@@ -368,7 +421,9 @@ public final class PublicProfileViewModel {
             header: header,
             stats: statsContent,
             posts: [],
-            neighbor: neighbor
+            neighbor: neighbor,
+            isOwner: isOwner,
+            personaHandle: personaHandle
         )
     }
 

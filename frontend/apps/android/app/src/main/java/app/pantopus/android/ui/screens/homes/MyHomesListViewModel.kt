@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
@@ -73,7 +74,11 @@ class MyHomesListViewModel
             viewModelScope.launch {
                 when (val result = repo.myHomes()) {
                     is NetworkResult.Success -> applySuccess(result.data.homes)
-                    is NetworkResult.Failure -> _state.value = ListOfRowsUiState.Error(result.error.message)
+                    is NetworkResult.Failure ->
+                        _state.value =
+                            ListOfRowsUiState.Error(
+                                result.error.displayMessage("Couldn't load the list."),
+                            )
                 }
             }
         }

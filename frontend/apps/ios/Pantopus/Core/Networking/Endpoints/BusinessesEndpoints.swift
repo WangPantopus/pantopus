@@ -46,6 +46,16 @@ public enum BusinessesEndpoints {
         )
     }
 
+    /// `GET /api/businesses/:businessId/catalog/items` — the owner/staff
+    /// catalog list (requires `catalog.view`). Unlike
+    /// [publicBusiness(username:)] this answers before the profile is
+    /// published, so the editor's setup checklist can tick "Services" on a
+    /// business that has never been published.
+    /// Route `backend/routes/businesses.js:2386`.
+    public static func catalogItems(businessId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/businesses/\(businessId)/catalog/items")
+    }
+
     /// `GET /api/businesses/:businessId/dashboard` — the owner-scoped fetch.
     /// Returns the publish state, edit recency, and the onboarding checklist
     /// that backs the owner dashboard's profile-strength card. 403s for a
@@ -97,5 +107,93 @@ public enum BusinessesEndpoints {
     /// business. Route `backend/routes/businesses.js:3621`.
     public static func follow(businessId: String) -> Endpoint {
         Endpoint(method: .post, path: "/api/businesses/\(businessId)/follow")
+    }
+
+    /// `POST /api/businesses/:businessId/inbox/start` — open (or resume) a
+    /// direct inquiry chat with a business. Body `{ subject? }`; returns
+    /// `{ roomId, existing }`. Route `backend/routes/businesses.js:3939`.
+    public static func startInquiry(businessId: String, subject: String? = nil) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/businesses/\(businessId)/inbox/start",
+            body: StartBusinessInquiryBody(subject: subject)
+        )
+    }
+
+    /// `GET /api/businesses/:businessId/locations` — owner/staff list of
+    /// active locations. Route `backend/routes/businesses.js:1742`.
+    public static func locations(businessId: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/businesses/\(businessId)/locations")
+    }
+
+    /// `PATCH /api/businesses/:businessId` — update business profile fields
+    /// (`name`, `tagline`, `description`, contact, categories, …).
+    /// Route `backend/routes/businesses.js:1134`.
+    public static func updateBusiness(
+        businessId: String,
+        body: UpdateBusinessRequest
+    ) -> Endpoint {
+        Endpoint(method: .patch, path: "/api/businesses/\(businessId)", body: body)
+    }
+
+    /// `POST /api/businesses/:businessId/publish` — publish the business
+    /// profile. Route `backend/routes/businesses.js:1350`.
+    public static func publishBusiness(businessId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/businesses/\(businessId)/publish")
+    }
+
+    /// `GET /api/businesses/:businessId/locations/:locationId/hours` —
+    /// weekly hours for a location. Route `backend/routes/businesses.js:2084`.
+    public static func locationHours(businessId: String, locationId: String) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/businesses/\(businessId)/locations/\(locationId)/hours"
+        )
+    }
+
+    /// `PUT /api/businesses/:businessId/locations/:locationId/hours` — bulk
+    /// replace weekly hours. Route `backend/routes/businesses.js:2023`.
+    public static func setLocationHours(
+        businessId: String,
+        locationId: String,
+        body: SetBusinessHoursRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .put,
+            path: "/api/businesses/\(businessId)/locations/\(locationId)/hours",
+            body: body
+        )
+    }
+
+    /// `PATCH /api/businesses/:businessId/locations/:locationId` — update a
+    /// location row. Route `backend/routes/businesses.js:1776`.
+    public static func updateLocation(
+        businessId: String,
+        locationId: String,
+        body: UpdateBusinessLocationRequest
+    ) -> Endpoint {
+        Endpoint(
+            method: .patch,
+            path: "/api/businesses/\(businessId)/locations/\(locationId)",
+            body: body
+        )
+    }
+
+    /// `GET /api/businesses/check-username` — username availability check
+    /// (no auth). Returns `{ available, reason? }`.
+    /// Route `backend/routes/businesses.js:358`.
+    public static func checkUsername(username: String) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/businesses/check-username",
+            query: ["username": username],
+            authenticated: false
+        )
+    }
+
+    /// `POST /api/businesses/create-full` — atomic create with optional
+    /// location + hours. Route `backend/routes/businesses.js:554`.
+    public static func createBusinessFull(_ body: CreateBusinessFullRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/businesses/create-full", body: body)
     }
 }

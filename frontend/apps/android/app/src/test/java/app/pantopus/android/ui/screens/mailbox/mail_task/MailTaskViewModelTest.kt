@@ -5,9 +5,16 @@ package app.pantopus.android.ui.screens.mailbox.mail_task
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.mailbox.MailboxRepository
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -18,7 +25,21 @@ import org.junit.Test
  * integration; here the repository is a relaxed mock the seeded path
  * never touches. Mirrors iOS `MailTaskViewModelTests`. Pure JVM.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MailTaskViewModelTest {
+    // WS4.2 wired snooze / mark-done to real repository calls, so the
+    // view-model now launches on `viewModelScope` (Main). Without a test
+    // dispatcher the launch throws "Module with the Main dispatcher had
+    // failed to initialize", and the escaping exception also poisons the
+    // next test in the JVM.
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     private fun makeVm(seed: MailTaskSeed): MailTaskViewModel =
         MailTaskViewModel(
             repository = mockk<MailboxRepository>(relaxed = true),

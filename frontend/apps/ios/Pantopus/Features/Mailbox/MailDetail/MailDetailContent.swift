@@ -34,6 +34,10 @@ public struct MailDetailContent: Sendable {
     public let bodyParagraphs: [String]
     public let attachments: [String]
     public let aiSummary: String?
+    /// A17.1 — optional bullet list rendered below the elf summary
+    /// (`mail-detail.jsx` ELF.bullets). Empty for most items; sample
+    /// fixtures and future backend payloads may populate it.
+    public let aiBullets: [AIElfBullet]
     public let ackRequired: Bool
     public let isAcknowledged: Bool
     public let isArchived: Bool
@@ -67,6 +71,7 @@ public struct MailDetailContent: Sendable {
         bodyParagraphs: [String],
         attachments: [String],
         aiSummary: String?,
+        aiBullets: [AIElfBullet] = [],
         ackRequired: Bool,
         isAcknowledged: Bool,
         isArchived: Bool = false,
@@ -99,6 +104,7 @@ public struct MailDetailContent: Sendable {
         self.bodyParagraphs = bodyParagraphs
         self.attachments = attachments
         self.aiSummary = aiSummary
+        self.aiBullets = aiBullets
         self.ackRequired = ackRequired
         self.isAcknowledged = isAcknowledged
         self.isArchived = isArchived

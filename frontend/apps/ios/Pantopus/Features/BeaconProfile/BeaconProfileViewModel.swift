@@ -166,6 +166,8 @@ public final class BeaconProfileViewModel {
 
     /// Drives the visitor follow handshake sheet.
     public var showFollowHandshake: Bool = false
+    /// Pre-selects a paid tier when unlocking a locked broadcast.
+    public var handshakePreselectedTierRank: Int?
 
     private let mode: BeaconProfileMode
     private let client: APIClient
@@ -275,7 +277,20 @@ public final class BeaconProfileViewModel {
     /// Owner mode and already-following are no-ops.
     public func follow() {
         guard !isOwner, !followBusy, followStatus == .none else { return }
+        handshakePreselectedTierRank = nil
         showFollowHandshake = true
+    }
+
+    /// Visitor unlock on a tier-gated broadcast — opens the privacy
+    /// handshake with the post's target tier pre-selected.
+    public func unlockBroadcast(tierRank: Int?) {
+        guard !isOwner else { return }
+        handshakePreselectedTierRank = tierRank
+        showFollowHandshake = true
+    }
+
+    public func clearHandshakeTier() {
+        handshakePreselectedTierRank = nil
     }
 
     public func unfollow() async {
@@ -402,6 +417,7 @@ public final class BeaconProfileViewModel {
             replies: post.replies ?? 0,
             visibility: visibility(post.visibility, rank: post.targetTierRank),
             isLocked: !isOwner && (post.locked ?? false),
+            targetTierRank: post.targetTierRank,
             intent: nil
         )
     }

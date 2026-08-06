@@ -4,7 +4,7 @@
 //
 //  T6.1b Log-in screen redesigned against `auth-frames.jsx` frame 1
 //  (default) and frame 6 (inline error banner on submit failure). Per Q3
-//  the v1 surface is email-only — no phone field, no SSO row.
+//  the v1 surface is email-only, plus browser-based OAuth.
 //
 
 import SwiftUI
@@ -47,6 +47,16 @@ struct LoginView: View {
                             .padding(.bottom, Spacing.s3)
                             .accessibilityIdentifier("loginErrorBanner")
                     }
+
+                    OAuthButtonGroup(
+                        isLoading: viewModel.isLoading,
+                        onGoogle: { signIn(with: .google) },
+                        onApple: { signIn(with: .apple) },
+                        googleIdentifier: "loginGoogleButton",
+                        appleIdentifier: "loginAppleButton"
+                    )
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.bottom, Spacing.s5)
 
                     VStack(spacing: Spacing.s3) {
                         PantopusTextField(
@@ -211,6 +221,10 @@ struct LoginView: View {
     private func signIn() {
         Task { await viewModel.signIn(using: auth) }
     }
+
+    private func signIn(with provider: OAuthProvider) {
+        Task { await viewModel.signIn(with: provider, using: auth) }
+    }
 }
 
 // MARK: - Login subcomponents
@@ -335,6 +349,47 @@ struct AuthTrustFooter: View {
     }
 }
 
+struct OAuthButtonGroup: View {
+    let isLoading: Bool
+    let onGoogle: () -> Void
+    let onApple: () -> Void
+    let googleIdentifier: String
+    let appleIdentifier: String
+
+    var body: some View {
+        VStack(spacing: Spacing.s2) {
+            oauthButton(
+                title: "Continue with Google",
+                identifier: googleIdentifier,
+                action: onGoogle
+            )
+            oauthButton(
+                title: "Continue with Apple",
+                identifier: appleIdentifier,
+                action: onApple
+            )
+        }
+    }
+
+    private func oauthButton(title: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .pantopusTextStyle(.body)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.appText)
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorderStrong, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .disabled(isLoading)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
 @Observable
 @MainActor
 final class LoginViewModel {
@@ -371,6 +426,23 @@ final class LoginViewModel {
         defer { isLoading = false }
         do {
             try await auth.signIn(email: email.lowercased(), password: password)
+        } catch let error as AuthError {
+            errorMessage = error
+            Observability.shared.capture(error)
+        } catch {
+            errorMessage = .unknown
+            Observability.shared.capture(error)
+        }
+    }
+
+    func signIn(with provider: OAuthProvider, using auth: AuthManager) async {
+        clearError()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await auth.signIn(with: provider)
+        } catch OAuthWebAuthenticationError.cancelled {
+            return
         } catch let error as AuthError {
             errorMessage = error
             Observability.shared.capture(error)

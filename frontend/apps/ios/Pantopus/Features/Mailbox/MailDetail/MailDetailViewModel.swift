@@ -324,11 +324,7 @@ public final class MailDetailViewModel {
     }
 
     /// A17.10 — File the archival record straight to its suggested vault
-    /// folder. Stub: flips the local `isFiled` flag and surfaces a toast;
-    /// the real backend vault-filing route is out of scope for this PR
-    /// (per the task brief). When the route lands, swap the optimistic
-    /// flip for an awaited request and keep the rollback shape from the
-    /// other ceremonial variants.
+    /// folder via the same `POST …/vault/file` route as Save to vault.
     public func fileRecordToVault() async {
         guard case let .loaded(content) = state,
               content.category == .records,
@@ -337,14 +333,75 @@ public final class MailDetailViewModel {
               !recordsFileInFlight else { return }
         recordsFileInFlight = true
         defer { recordsFileInFlight = false }
+
+        if saveToVaultFolders.isEmpty {
+            do {
+                let response: VaultFoldersResponse = try await api.request(
+                    MailboxVaultEndpoints.folders(drawer: "personal")
+                )
+                saveToVaultFolders = response.folders
+            } catch {
+                toast = (error as? APIError)?.errorDescription
+                    ?? "Couldn't load your vault folders."
+                return
+            }
+        }
+        guard let folderId = Self.suggestedVaultFolderId(for: records, in: saveToVaultFolders) else {
+            // No vault folder matches the record's suggested trail — let the
+            // user pick rather than filing it somewhere arbitrary.
+            await openSaveToVaultPicker()
+            return
+        }
+
         let filedLabel = Self.formatFiledAtNow()
+        let previous = content
         let optimistic = MailDetailContent.replacingRecordsFiled(
             content,
             with: true,
             filedAtLabel: filedLabel
         )
         state = .loaded(optimistic)
-        toast = "Filed in Vault"
+
+        do {
+            let _: FileToVaultResponse = try await api.request(
+                MailboxVaultEndpoints.file(
+                    body: FileToVaultBody(mailId: mailId, folderId: folderId)
+                )
+            )
+            let folderLabel = saveToVaultFolders.first { $0.id == folderId }?.label
+            toast = folderLabel.map { "Filed in \($0)" } ?? "Filed in Vault"
+        } catch {
+            state = .loaded(previous)
+            toast = (error as? APIError)?.errorDescription
+                ?? "Couldn't file to vault. Try again."
+        }
+    }
+
+    /// Resolve the vault folder the record should be filed in by matching the
+    /// payload's `vault_trail` crumbs against the user's real folders,
+    /// most-specific crumb first. The `Mailbox` / `Vault` crumbs are chrome,
+    /// not folders. Returns nil when nothing matches — the caller opens the
+    /// picker instead of guessing (no system folder is named "Records" or
+    /// "Archive", so a label-contains heuristic silently filed every record
+    /// into whichever folder happened to sort first).
+    static func suggestedVaultFolderId(
+        for records: RecordsDetailDTO,
+        in folders: [VaultFolderDTO]
+    ) -> String? {
+        guard !folders.isEmpty else { return nil }
+        let crumbs = records.vaultTrail
+            .map { $0.label.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { label in
+                !label.isEmpty
+                    && label.caseInsensitiveCompare("Mailbox") != .orderedSame
+                    && label.caseInsensitiveCompare("Vault") != .orderedSame
+            }
+        for crumb in crumbs.reversed() {
+            if let match = folders.first(where: { $0.label.caseInsensitiveCompare(crumb) == .orderedSame }) {
+                return match.id
+            }
+        }
+        return nil
     }
 
     /// Format the "filed at" stamp for the optimistic local flip.

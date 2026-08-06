@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.OccupantsResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
@@ -131,7 +132,7 @@ class HomeSettingsViewModel
                         _state.value = GroupedListUiState.Loaded(groups())
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = GroupedListUiState.Error(result.error.message)
+                        _state.value = GroupedListUiState.Error(result.error.displayMessage("Couldn't load settings."))
                     }
                 }
             }

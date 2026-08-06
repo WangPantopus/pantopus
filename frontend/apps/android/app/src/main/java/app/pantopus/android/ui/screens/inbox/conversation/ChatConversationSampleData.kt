@@ -40,7 +40,20 @@ object ChatConversationSampleData {
             requiredReplyTier = "Silver",
         )
 
-    val creatorContext: ChatCreatorThreadContext = ChatCreatorThreadContext.defaults(fanTierName = "Bronze", fanTierRank = 2)
+    /**
+     * Design fixture — carries an explicit quota so previews / snapshots still
+     * exercise the meter. The live path leaves `quota` null (no creator-side
+     * reply allowance exists on the wire yet).
+     */
+    val creatorContext: ChatCreatorThreadContext =
+        ChatCreatorThreadContext(
+            personaName = "The Sourdough Diary",
+            audienceSummary = "Reach: 2,340 · Engagement up 12% this week",
+            fanTierName = "Bronze",
+            fanTierRank = 2,
+            fanSubtitle = "Member since Aug · 0.4 mi",
+            quota = ChatCreatorQuota(used = 12, total = 30, resetCopy = "Resets Monday"),
+        )
 
     val dmCounterparty =
         ChatCounterparty.Person(

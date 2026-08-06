@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.api.models.membership
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
@@ -60,4 +61,15 @@ data class MembershipTierDto(
     val msgThreadsPerPeriod: Int? = null,
     val creatorCanInitiateDm: Boolean? = null,
     val replyPolicy: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class MembershipTierChangeBody(
+    @Json(name = "tier_rank") val tierRank: Int,
+)
+
+@JsonClass(generateAdapter = true)
+data class MembershipRefundRequestBody(
+    val reason: String,
+    @Json(name = "thread_id") val threadId: String? = null,
 )

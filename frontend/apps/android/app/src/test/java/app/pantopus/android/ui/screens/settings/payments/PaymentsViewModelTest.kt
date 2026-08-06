@@ -97,9 +97,9 @@ class PaymentsViewModelTest {
 
             val activity = content.activity as PaymentsActivity.Stats
             assertEquals(3, activity.rows.size)
-            assertEquals("Lifetime", activity.rows[0].label)
-            assertEquals("Year to date", activity.rows[1].label)
-            assertEquals("Last payout", activity.rows[2].label)
+            assertEquals("Transactions", activity.rows[0].label)
+            assertEquals("Statements", activity.rows[1].label)
+            assertEquals("Disputes", activity.rows[2].label)
 
             assertTrue("Populated frame surfaces destructive card", content.canCloseAccount)
         }

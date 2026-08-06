@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ToastController
 import app.pantopus.android.ui.components.ToastHost
+import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
 import com.stripe.android.paymentsheet.rememberPaymentSheet
 
@@ -25,8 +26,9 @@ import com.stripe.android.paymentsheet.rememberPaymentSheet
  * PaymentSheet: the VM creates a PaymentIntent and emits
  * [InvoiceDetailEvent.PresentCheckout]; PaymentSheet (created in composition —
  * it registers an ActivityResult launcher) collects the card + handles SCA,
- * and the outcome drives a success / declined / canceled toast. We never mark
- * the invoice paid here — the VM re-reads server state on success.
+ * and the outcome drives a success / declined / canceled toast. On success
+ * the VM re-projects into the paid frame (A09.4), whose dock swaps to
+ * Share + Download receipt.
  */
 @Composable
 fun InvoiceDetailScreen(
@@ -79,7 +81,9 @@ fun InvoiceDetailScreen(
             state = state,
             onBack = onBack,
             onPrimaryAction = { viewModel.pay() },
-            onSecondaryAction = null,
+            // Only the paid dock carries a secondary button ("Share") —
+            // the due dock's secondary slot is null.
+            onSecondaryAction = { context.shareText(viewModel.shareSummary(), "Share invoice") },
             onRetry = { viewModel.load() },
             onMessageCounterparty = null,
         )

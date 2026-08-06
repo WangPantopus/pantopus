@@ -114,8 +114,29 @@ public struct EditBusinessPageView: View {
                 onDiscard: { viewModel.discardRequested() },
                 onSave: { Task { await viewModel.save() } },
                 onSaveDraft: { Task { await viewModel.saveDraft() } },
-                onPublish: { Task { await viewModel.publish() } }
+                onPublish: { Task { await viewModel.publish() } },
+                onFieldChange: { key, value in viewModel.update(key, to: value) },
+                onBeginDescription: { viewModel.beginDescriptionEditing() }
             )
+        case .empty:
+            VStack(spacing: Spacing.s0) {
+                EditBusinessTopBar(
+                    title: "Edit business page",
+                    rightLabel: "Preview",
+                    rightEnabled: false,
+                    onBack: onBack
+                ) {}
+                EmptyState(
+                    icon: .building2,
+                    headline: "Business not found",
+                    subcopy: "This business page isn't available to edit.",
+                    cta: EmptyState.CTA(title: "Try again") {
+                        await viewModel.refresh()
+                    }
+                )
+                .frame(maxHeight: .infinity)
+            }
+            .accessibilityIdentifier("editBusinessPage.empty")
         case let .error(message):
             VStack(spacing: Spacing.s0) {
                 EditBusinessTopBar(
@@ -152,6 +173,8 @@ public struct EditBusinessPageLoadedView: View {
     public let onSave: @MainActor () -> Void
     public let onSaveDraft: @MainActor () -> Void
     public let onPublish: @MainActor () -> Void
+    public let onFieldChange: @MainActor (EditBusinessPageFieldKey, String) -> Void
+    public let onBeginDescription: @MainActor () -> Void
 
     public init(
         content: EditBusinessPageContent,
@@ -160,7 +183,9 @@ public struct EditBusinessPageLoadedView: View {
         onDiscard: @escaping @MainActor () -> Void = {},
         onSave: @escaping @MainActor () -> Void = {},
         onSaveDraft: @escaping @MainActor () -> Void = {},
-        onPublish: @escaping @MainActor () -> Void = {}
+        onPublish: @escaping @MainActor () -> Void = {},
+        onFieldChange: @escaping @MainActor (EditBusinessPageFieldKey, String) -> Void = { _, _ in },
+        onBeginDescription: @escaping @MainActor () -> Void = {}
     ) {
         self.content = content
         self.onBack = onBack
@@ -169,6 +194,8 @@ public struct EditBusinessPageLoadedView: View {
         self.onSave = onSave
         self.onSaveDraft = onSaveDraft
         self.onPublish = onPublish
+        self.onFieldChange = onFieldChange
+        self.onBeginDescription = onBeginDescription
     }
 
     public var body: some View {
@@ -250,23 +277,27 @@ public struct EditBusinessPageLoadedView: View {
                     label: "Name",
                     required: true,
                     field: content.name,
-                    state: .valid
+                    state: .valid,
+                    onChange: { onFieldChange(.name, $0) }
                 )
                 BizField(
                     label: "Tagline",
                     hint: "Shows in search and on map pins",
-                    field: content.tagline
+                    field: content.tagline,
+                    onChange: { onFieldChange(.tagline, $0) }
                 )
                 HStack(spacing: Spacing.s3) {
                     BizField(
                         label: "Category",
                         required: content.categoryRequired,
                         field: content.category,
-                        trailing: .chevron
+                        trailing: .chevron,
+                        onChange: { onFieldChange(.category, $0) }
                     )
                     BizField(
                         label: "Price",
-                        field: content.price
+                        field: content.price,
+                        onChange: { onFieldChange(.price, $0) }
                     )
                     .frame(width: 110)
                 }
@@ -281,12 +312,17 @@ public struct EditBusinessPageLoadedView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     BizLabel(
                         label: "About",
+                        dirty: field.isDirty,
                         hint: "Markdown supported"
                     )
-                    BizTextarea(field: field, charLimit: limit)
+                    BizTextarea(
+                        field: field,
+                        charLimit: limit,
+                        onChange: { onFieldChange(.description, $0) }
+                    )
                 }
             case let .prompt(prompt):
-                PromptBlock(prompt: prompt)
+                PromptBlock(prompt: prompt, onTap: onBeginDescription)
             }
         }
     }
@@ -327,24 +363,28 @@ public struct EditBusinessPageLoadedView: View {
                     label: "Phone",
                     field: content.phone,
                     state: .valid,
-                    leading: "+1"
+                    leading: "+1",
+                    onChange: { onFieldChange(.phone, $0) }
                 )
                 BizField(
                     label: "Email",
                     field: content.email,
-                    state: .valid
+                    state: .valid,
+                    onChange: { onFieldChange(.email, $0) }
                 )
                 BizField(
                     label: "Website",
                     field: content.website,
-                    leading: "https://"
+                    leading: "https://",
+                    onChange: { onFieldChange(.website, $0) }
                 )
                 if let booking = content.bookingLink {
                     BizField(
                         label: "Booking link",
                         hint: "Public on profile",
                         field: booking,
-                        leading: "https://"
+                        leading: "https://",
+                        onChange: { onFieldChange(.bookingLink, $0) }
                     )
                 }
             }
@@ -359,8 +399,34 @@ public struct EditBusinessPageLoadedView: View {
                     required: true,
                     field: content.location.address,
                     state: content.location.error.map { .error($0) } ?? .valid,
-                    trailing: .mapPin
+                    trailing: .mapPin,
+                    identifier: "editBusinessPage.field.address",
+                    onChange: { onFieldChange(.address, $0) }
                 )
+                BizField(
+                    label: "City",
+                    required: true,
+                    field: content.location.city,
+                    state: .valid,
+                    identifier: "editBusinessPage.field.city",
+                    onChange: { onFieldChange(.city, $0) }
+                )
+                HStack(spacing: Spacing.s3) {
+                    BizField(
+                        label: "State",
+                        field: content.location.state,
+                        identifier: "editBusinessPage.field.state",
+                        onChange: { onFieldChange(.state, $0) }
+                    )
+                    BizField(
+                        label: "ZIP code",
+                        field: content.location.zip,
+                        keyboardType: .numberPad,
+                        identifier: "editBusinessPage.field.zip",
+                        onChange: { onFieldChange(.zip, $0) }
+                    )
+                    .frame(width: 110)
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     BizLabel(label: "Map", hint: "Drag the pin to refine")
                     EditBusinessMapPreview(
@@ -519,6 +585,9 @@ struct BizField: View {
     var state: BizFieldState = .default
     var leading: String?
     var trailing: BizFieldTrailing = .none
+    var keyboardType: UIKeyboardType = .default
+    var identifier: String?
+    var onChange: ((String) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -530,16 +599,20 @@ struct BizField: View {
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .padding(.leading, 10)
                 }
-                Text(field.current.isEmpty ? field.placeholder : field.current)
-                    .font(.system(size: 14))
-                    .foregroundStyle(
-                        field.current.isEmpty
-                            ? Theme.Color.appTextMuted
-                            : Theme.Color.appText
+                TextField(
+                    field.placeholder,
+                    text: Binding(
+                        get: { field.current },
+                        set: { onChange?($0) }
                     )
-                    .padding(.leading, leading == nil ? Spacing.s3 : 0)
-                    .padding(.vertical, 11)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                )
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.Color.appText)
+                .keyboardType(keyboardType)
+                .padding(.leading, leading == nil ? Spacing.s3 : 0)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(onChange == nil)
                 trailingIcon
             }
             .frame(minHeight: 44)
@@ -557,6 +630,7 @@ struct BizField: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(a11yLabel)
+        .accessibilityIdentifier(identifier ?? "")
     }
 
     @ViewBuilder private var trailingIcon: some View {
@@ -601,6 +675,7 @@ struct BizField: View {
 private struct BizTextarea: View {
     let field: EditBusinessPageField
     let charLimit: Int
+    var onChange: ((String) -> Void)?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -612,12 +687,16 @@ private struct BizTextarea: View {
                 )
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(field.current)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appText)
-                    .lineSpacing(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Spacer()
+                TextEditor(
+                    text: Binding(
+                        get: { field.current },
+                        set: { onChange?($0) }
+                    )
+                )
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appText)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 72, alignment: .topLeading)
                 HStack {
                     Spacer()
                     Text("\(field.current.count) / \(charLimit)")
@@ -637,42 +716,48 @@ private struct BizTextarea: View {
 
 private struct PromptBlock: View {
     let prompt: EditBusinessPagePrompt
+    var onTap: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: Spacing.s3) {
-            ZStack {
+        Button {
+            onTap?()
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(Theme.Color.businessBg)
+                        .frame(width: 36, height: 36)
+                    Icon(iconFor(prompt.iconKey), size: 18, color: Theme.Color.business)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(prompt.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(prompt.subtitle)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer()
+                Text(prompt.ctaLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Theme.Color.business)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            }
+            .padding(14)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(Theme.Color.businessBg)
-                    .frame(width: 36, height: 36)
-                Icon(iconFor(prompt.iconKey), size: 18, color: Theme.Color.business)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(prompt.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Text(prompt.subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-            Spacer()
-            Text(prompt.ctaLabel)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextInverse)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Theme.Color.business)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                    .strokeBorder(
+                        Theme.Color.appBorderStrong,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
+                    )
+            )
         }
-        .padding(14)
-        .background(Theme.Color.appSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .strokeBorder(
-                    Theme.Color.appBorderStrong,
-                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
-                )
-        )
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(prompt.title). \(prompt.subtitle)")
     }

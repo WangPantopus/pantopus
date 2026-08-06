@@ -2,12 +2,17 @@
 
 package app.pantopus.android.ui.screens.settings
 
+import app.pantopus.android.core.security.AppLockManager
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.ui.components.FuzzStop
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListBanner
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
 import app.pantopus.android.ui.screens.shared.grouped_list.RowControl
 import app.pantopus.android.ui.theme.PantopusIcon
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -22,18 +27,26 @@ import org.junit.Test
  * the helper-line parity contract (mirrored on iOS).
  */
 class PrivacyViewModelTest {
-    @Test fun populated_produces_six_groups_in_design_order() {
-        val groups = PrivacySettingsViewModel().loadedGroups()
+    @Test fun populated_produces_seven_groups_in_design_order() {
+        val groups = privacyVm().loadedGroups()
         assertEquals(
-            listOf("visibility", "address", "fuzz", "activity", "data", "delete"),
+            listOf(
+                "biometricSecurity",
+                "visibility",
+                "address",
+                "fuzz",
+                "activity",
+                "data",
+                "delete",
+            ),
             groups.map { it.id },
         )
-        val vm = PrivacySettingsViewModel().apply { load() }
+        val vm = privacyVm().apply { load() }
         assertNull(vm.banner.value)
     }
 
     @Test fun visibility_and_address_are_four_option_radio_cards() {
-        val groups = PrivacySettingsViewModel().loadedGroups()
+        val groups = privacyVm().loadedGroups()
         val visibility = groups.group("visibility")
         val address = groups.group("address")
         assertEquals(4, visibility?.rows?.size)
@@ -43,15 +56,15 @@ class PrivacyViewModelTest {
         visibility?.rows?.forEach { assertTrue("${it.id} radio", it.control is RowControl.Radio) }
     }
 
-    @Test fun fuzz_group_defaults_to_block_default() {
-        val fuzz = PrivacySettingsViewModel().loadedGroups().group("fuzz")
-        assertEquals(FuzzStop.BlockDefault, fuzz?.fuzz?.stop)
+    @Test fun fuzz_group_defaults_to_half_mile() {
+        val fuzz = privacyVm().loadedGroups().group("fuzz")
+        assertEquals(FuzzStop.HalfMile, fuzz?.fuzz?.stop)
         assertEquals("How exact your task and listing pins appear on the map.", fuzz?.fuzz?.leadIn)
         assertTrue(fuzz?.rows?.isEmpty() ?: false)
     }
 
     @Test fun activity_has_four_toggles_all_on() {
-        val activity = PrivacySettingsViewModel().loadedGroups().group("activity")
+        val activity = privacyVm().loadedGroups().group("activity")
         assertEquals(listOf("online", "recent", "nearby", "ratings"), activity?.rows?.map { it.id })
         activity?.rows?.forEach {
             val control = it.control
@@ -60,7 +73,7 @@ class PrivacyViewModelTest {
     }
 
     @Test fun data_rows_carry_leading_icons_and_delete_is_destructive() {
-        val groups = PrivacySettingsViewModel().loadedGroups()
+        val groups = privacyVm().loadedGroups()
         val data = groups.group("data")
         assertEquals(PantopusIcon.Download, data?.rows?.first { it.id == "downloadData" }?.leadingIcon)
         assertEquals(PantopusIcon.FileText, data?.rows?.first { it.id == "whatWeCollect" }?.leadingIcon)
@@ -70,14 +83,14 @@ class PrivacyViewModelTest {
     }
 
     @Test fun select_radio_updates_selection() {
-        val vm = PrivacySettingsViewModel()
+        val vm = privacyVm()
         vm.load()
         vm.onRadio("visibility.connections")
         assertEquals("visibility.connections", selectedRadioId(vm.groups().group("visibility")))
     }
 
     @Test fun toggle_activity_flips_local_state() {
-        val vm = PrivacySettingsViewModel()
+        val vm = privacyVm()
         vm.load()
         vm.onToggle("online", isOn = false)
         val control = vm.groups().group("activity")?.rows?.first { it.id == "online" }?.control
@@ -85,14 +98,14 @@ class PrivacyViewModelTest {
     }
 
     @Test fun set_fuzz_updates_stop() {
-        val vm = PrivacySettingsViewModel()
+        val vm = privacyVm()
         vm.load()
         vm.onSetFuzz(PrivacyCatalog.FUZZ, FuzzStop.Exact)
         assertEquals(FuzzStop.Exact, vm.groups().group("fuzz")?.fuzz?.stop)
     }
 
     @Test fun stealth_shows_banner_and_strictest_controls() {
-        val vm = PrivacySettingsViewModel()
+        val vm = privacyVm()
         vm.setVariant(PrivacySettingsViewModel.Variant.Stealth)
         val groups = vm.groups()
         val banner = vm.banner.value
@@ -112,11 +125,11 @@ class PrivacyViewModelTest {
     }
 
     @Test fun footer_default() {
-        assertEquals("Last updated · Mar 12, 2024", PrivacySettingsViewModel().footerCaption)
+        assertEquals("Last updated · Mar 12, 2024", privacyVm().footerCaption)
     }
 
     @Test fun helper_copy_matches_design() {
-        val populated = PrivacySettingsViewModel().loadedGroups()
+        val populated = privacyVm().loadedGroups()
         assertEquals(
             "Verified neighbors can find you and start a conversation.",
             populated.group("visibility")?.helper,
@@ -131,7 +144,7 @@ class PrivacyViewModelTest {
         )
         assertNull("Activity card has no helper", populated.group("activity")?.helper)
 
-        val stealthVm = PrivacySettingsViewModel().apply { setVariant(PrivacySettingsViewModel.Variant.Stealth) }
+        val stealthVm = privacyVm().apply { setVariant(PrivacySettingsViewModel.Variant.Stealth) }
         val stealth = stealthVm.groups()
         assertEquals(
             "Hidden — your profile won't show in search or recommendations.",
@@ -148,6 +161,22 @@ class PrivacyViewModelTest {
     }
 
     // MARK: - Helpers
+
+    private fun privacyVm(): PrivacySettingsViewModel {
+        val appLock =
+            mockk<AppLockManager>(relaxed = true) {
+                every { preferenceEnabled } returns MutableStateFlow(false)
+                every { capability } returns MutableStateFlow(AppLockManager.Capability.Available)
+                every { biometricLabel } returns MutableStateFlow("Biometric")
+                every { lastError } returns MutableStateFlow(null)
+                every { isLocked } returns MutableStateFlow(false)
+            }
+        val auth =
+            mockk<AuthRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(AuthRepository.State.SignedOut)
+            }
+        return PrivacySettingsViewModel(appLock, auth)
+    }
 
     private fun PrivacySettingsViewModel.loadedGroups(): List<GroupedListGroup> {
         load()

@@ -16,8 +16,9 @@ import java.util.Locale
 /**
  * P1-F — projects the read-path wallet DTOs onto [WalletContent]. Mirrors the
  * iOS `WalletViewModel` mapping. The withdraw/payout slots (payout method,
- * tax docs) reuse the P3.2 visual placeholder — they're wired in Phase 3 with
- * Stripe — and `holdState` stays null because the hold banner copy is
+ * tax docs) stay null — they're wired in Phase 3 with Stripe, and the screen
+ * hides those sections rather than showing fixture bank details / YTD
+ * earnings. `holdState` stays null because the hold banner copy is
  * Stripe-specific.
  */
 @Suppress("TooManyFunctions")
@@ -32,7 +33,6 @@ object WalletMapper {
     ): WalletContent {
         val pendingCents = pending?.totalPendingCents ?: 0L
         val pendingCount = (pending?.inReviewCount ?: 0) + (pending?.releasingSoonCount ?: 0)
-        val placeholder = WalletSampleData.populated
         return WalletContent(
             available = centsToPlain(balance.wallet.balance),
             pending = centsToCurrency(pendingCents),
@@ -40,8 +40,8 @@ object WalletMapper {
             monthValue = centsToCurrency(monthIncomeCents(transactions, zone, now)),
             monthMeta = monthMeta(monthIncomeRows(transactions, zone, now).size),
             activity = transactions.map { activityItem(it, zone, now) },
-            payoutMethod = placeholder.payoutMethod,
-            taxDocs = placeholder.taxDocs,
+            payoutMethod = null,
+            taxDocs = null,
             holdState = null,
             payoutsEnabled = payoutsEnabled,
         )

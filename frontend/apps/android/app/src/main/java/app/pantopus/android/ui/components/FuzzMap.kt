@@ -45,9 +45,9 @@ enum class FuzzStop(
     val label: String,
 ) {
     Exact(0.dp, "Exact"),
-    Building(18.dp, "Building"),
-    Block(42.dp, "Block"),
-    BlockDefault(62.dp, "Block (default)"),
+    Block(18.dp, "Block"),
+    QuarterMile(42.dp, "Quarter mile"),
+    HalfMile(62.dp, "Half mile"),
     Neighborhood(110.dp, "Neighborhood"),
 }
 

@@ -13,15 +13,35 @@ import XCTest
 @MainActor
 final class CouponBodySnapshotTests: XCTestCase {
     func test_coupon_unused_renders() {
-        assertRenders(CouponBody(coupon: MailItemSampleData.couponUnused, state: .unused))
+        assertRenders(
+            CouponBody(
+                coupon: MailItemSampleData.couponUnused,
+                state: .unused,
+                similarOffers: MailItemSampleData.couponSimilarOffers
+            )
+        )
     }
 
     func test_coupon_redeemed_renders() {
-        assertRenders(CouponBody(coupon: MailItemSampleData.couponRedeemed, state: .redeemed))
+        assertRenders(
+            CouponBody(
+                coupon: MailItemSampleData.couponRedeemed,
+                state: .redeemed,
+                similarOffers: MailItemSampleData.couponSimilarOffers,
+                walletReminderDetail: MailItemSampleData.couponWalletReminderDetail,
+                walletArrivalDetail: MailItemSampleData.couponWalletArrivalDetail
+            )
+        )
     }
 
     func test_coupon_expired_renders() {
-        assertRenders(CouponBody(coupon: MailItemSampleData.couponExpired, state: .expired))
+        assertRenders(
+            CouponBody(
+                coupon: MailItemSampleData.couponExpired,
+                state: .expired,
+                similarOffers: MailItemSampleData.couponSimilarOffers
+            )
+        )
     }
 
     func test_coupon_expanded_barcode_renders() {
@@ -29,9 +49,16 @@ final class CouponBodySnapshotTests: XCTestCase {
             CouponBody(
                 coupon: MailItemSampleData.couponUnused,
                 state: .unused,
-                barcodeInitiallyExpanded: true
+                barcodeInitiallyExpanded: true,
+                similarOffers: MailItemSampleData.couponSimilarOffers
             )
         )
+    }
+
+    /// The live body ships no fixtures — the invented "similar offers" rail
+    /// and the fake wallet reminder / geofence chips must stay hidden.
+    func test_coupon_liveBody_hidesFixtureDrivenRail() {
+        assertRenders(CouponBody(coupon: MailItemSampleData.couponRedeemed, state: .redeemed))
     }
 
     private func assertRenders(

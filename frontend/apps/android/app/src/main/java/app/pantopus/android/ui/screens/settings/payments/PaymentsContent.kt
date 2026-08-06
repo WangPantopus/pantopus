@@ -124,7 +124,7 @@ sealed interface PaymentsRowTrailing {
     @Immutable
     data class CtaChip(val label: String, val tone: PaymentsChipTone) : PaymentsRowTrailing
 
-    /** Lock glyph + em-dash — empty frame's payout-method / tax rows. */
+    /** Em-dash "—" value — empty frame's payout-method / tax rows. */
     data object GatedDash : PaymentsRowTrailing
 }
 

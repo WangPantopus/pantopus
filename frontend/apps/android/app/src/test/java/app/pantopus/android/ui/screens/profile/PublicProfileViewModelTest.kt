@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.profile.PublicProfileReview
 import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
@@ -34,6 +35,7 @@ class PublicProfileViewModelTest {
     private val repo: ProfileRepository = mockk()
     private val relationships: RelationshipsRepository = mockk()
     private val blocks: BlocksRepository = mockk()
+    private val authRepository: AuthRepository = mockk(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -48,6 +50,7 @@ class PublicProfileViewModelTest {
             repo = repo,
             relationships = relationships,
             blocks = blocks,
+            authRepository = authRepository,
             savedStateHandle = SavedStateHandle(mapOf(PUBLIC_PROFILE_USER_ID_KEY to "u1")),
         )
 
@@ -196,36 +199,30 @@ class PublicProfileViewModelTest {
             assertNotNull(loaded.content.neighbor?.mutuals)
         }
 
-    @Test fun follow_marks_succeeded_and_emits_toast() =
+    /**
+     * `GET /api/users/id/:id` carries no Beacon handle, and `User.username` is
+     * a different namespace from `PublicPersona.handle` — so the handshake
+     * must not open against a handle we can't attribute.
+     */
+    @Test fun follow_does_not_use_username_as_beacon_handle() =
         runTest {
             coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
-            coEvery { relationships.sendRequest("u1", null) } returns
-                NetworkResult.Success(ConnectionRequestResponse(message = "ok"))
             val vm = makeVm()
             vm.load()
             vm.follow()
-            assertEquals(PublicProfileActionState.Succeeded, vm.followState.value)
-            assertEquals("Following", vm.toastMessage.value)
+            assertFalse(vm.showFollowHandshake.value)
+            assertEquals("", vm.loadedPersonaHandle())
+            assertEquals("Following isn't available from this profile yet.", vm.toastMessage.value)
         }
 
-    @Test fun follow_failure_surfaces_toast() =
-        runTest {
-            coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
-            coEvery { relationships.sendRequest("u1", null) } returns
-                NetworkResult.Failure(NetworkError.Forbidden)
-            val vm = makeVm()
-            vm.load()
-            vm.follow()
-            assertTrue(vm.followState.value is PublicProfileActionState.Failed)
-            assertTrue(!vm.toastMessage.value.isNullOrEmpty())
-        }
-
-    @Test fun show_subscribe_toast_emits_placeholder_message() =
+    @Test fun unlock_broadcast_without_beacon_handle_stays_closed() =
         runTest {
             coEvery { repo.publicProfile("u1") } returns NetworkResult.Success(profile())
             val vm = makeVm()
             vm.load()
-            vm.showSubscribeToast()
-            assertEquals("Subscribe flow coming soon", vm.toastMessage.value)
+            vm.unlockBroadcast(2)
+            assertFalse(vm.showFollowHandshake.value)
+            assertEquals(null, vm.handshakePreselectedTierRank.value)
+            assertEquals("Following isn't available from this profile yet.", vm.toastMessage.value)
         }
 }

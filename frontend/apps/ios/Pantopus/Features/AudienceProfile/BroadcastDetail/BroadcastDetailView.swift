@@ -21,16 +21,16 @@ public struct BroadcastDetailView: View {
     private let onBack: @MainActor () -> Void
     private let onOverflow: @MainActor () -> Void
     private let onReply: @MainActor () -> Void
-    private let onBoost: @MainActor () -> Void
-    private let onPin: @MainActor () -> Void
+    private let onBoost: (@MainActor () -> Void)?
+    private let onPin: (@MainActor () -> Void)?
 
     public init(
         viewModel: BroadcastDetailViewModel,
         onBack: @escaping @MainActor () -> Void = {},
         onOverflow: @escaping @MainActor () -> Void = {},
         onReply: @escaping @MainActor () -> Void = {},
-        onBoost: @escaping @MainActor () -> Void = {},
-        onPin: @escaping @MainActor () -> Void = {}
+        onBoost: (@MainActor () -> Void)? = nil,
+        onPin: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
@@ -450,10 +450,14 @@ public struct BroadcastDetailView: View {
 
     private var stickyFooter: some View {
         HStack(spacing: Spacing.s2) {
-            secondaryFooterButton(icon: .rocket, label: "Boost", action: onBoost)
-                .accessibilityIdentifier("broadcastDetailBoost")
-            secondaryFooterButton(icon: .pin, label: "Pin", action: onPin)
-                .accessibilityIdentifier("broadcastDetailPin")
+            if let onBoost {
+                secondaryFooterButton(icon: .rocket, label: "Boost", action: onBoost)
+                    .accessibilityIdentifier("broadcastDetailBoost")
+            }
+            if let onPin {
+                secondaryFooterButton(icon: .pin, label: "Pin", action: onPin)
+                    .accessibilityIdentifier("broadcastDetailPin")
+            }
             Button(action: onReply) {
                 HStack(spacing: Spacing.s1) {
                     Icon(.reply, size: 14, strokeWidth: 2.4, color: Theme.Color.appTextInverse)

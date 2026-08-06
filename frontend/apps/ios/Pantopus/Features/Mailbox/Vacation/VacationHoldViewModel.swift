@@ -56,17 +56,18 @@ public final class VacationHoldViewModel {
 
     // MARK: - Trailing-action labels
 
-    /// Top-bar trailing label. `Save` in scheduling, `End hold` in active.
+    /// Top-bar trailing label. `Save` in scheduling, `Edit` in active
+    /// (ending the hold moved to the destructive bottom row).
     public var trailingActionLabel: String {
         switch mode {
         case .scheduling: "Save"
-        case .active: "End hold"
+        case .active: "Edit"
         }
     }
 
     /// Scheduling mode disables Save when the draft is invalid. Active
-    /// mode always renders the End-hold button enabled (in neutral tone)
-    /// so the user can end the hold at any time.
+    /// mode always renders the Edit button enabled so the user can
+    /// adjust the hold at any time.
     public var trailingActionEnabled: Bool {
         switch mode {
         case let .scheduling(draft): draft.isValid
@@ -74,12 +75,12 @@ public final class VacationHoldViewModel {
         }
     }
 
-    /// `primary600` in scheduling for the Save CTA; neutral `appText`
-    /// in the active variant for End hold.
+    /// `primary600` in scheduling for the Save CTA; muted fg3 tone in
+    /// the active variant for Edit, per the JSX active frame.
     public var trailingActionTint: Color {
         switch mode {
         case .scheduling: trailingActionEnabled ? Theme.Color.primary600 : Theme.Color.appTextMuted
-        case .active: Theme.Color.appText
+        case .active: Theme.Color.appTextSecondary
         }
     }
 
@@ -97,8 +98,18 @@ public final class VacationHoldViewModel {
             // "Save flips to active" handoff.
             mode = .active(VacationHoldSampleData.activeHold)
         case .active:
+            // Edit returns to the scheduling form (the only edit state
+            // the screen has today).
             mode = .scheduling(VacationHoldSampleData.schedulingDraft)
         }
+    }
+
+    /// A14.8 — destructive "End hold early" row at the bottom of the
+    /// active body. Carries the end-hold behaviour the top bar used to
+    /// hold: the hold ends and the screen returns to scheduling.
+    public func endHoldEarly() {
+        guard case .active = mode else { return }
+        mode = .scheduling(VacationHoldSampleData.schedulingDraft)
     }
 
     public func tapFromDate() {

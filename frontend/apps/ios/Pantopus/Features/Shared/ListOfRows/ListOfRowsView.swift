@@ -134,6 +134,7 @@ public struct ListOfRowsView<DataSource: ListOfRowsDataSource, Header: View>: Vi
                 hasMore: hasMore,
                 banner: dataSource.banner,
                 listingContext: dataSource.listingContext,
+                monoFooter: dataSource.monoFooter,
                 onEndReached: { Task { await dataSource.loadMoreIfNeeded() } },
                 onRefresh: { await dataSource.refresh() }
             )
@@ -356,6 +357,7 @@ private struct LoadedList: View {
     let hasMore: Bool
     let banner: BannerConfig?
     let listingContext: ListingContextConfig?
+    let monoFooter: String?
     let onEndReached: () -> Void
     let onRefresh: () async -> Void
 
@@ -390,6 +392,22 @@ private struct LoadedList: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                     .onAppear(perform: onEndReached)
+            }
+            if let monoFooter {
+                // Same mono-footer treatment as `GroupedListView` /
+                // `PaymentsView` so A14 settings screens read identically.
+                Text(monoFooter)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, 18)
+                    .padding(.bottom, Spacing.s1)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .accessibilityIdentifier("listOfRowsMonoFooter")
             }
         }
         .listStyle(.plain)

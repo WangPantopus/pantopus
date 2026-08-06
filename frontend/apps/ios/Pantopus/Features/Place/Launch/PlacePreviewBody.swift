@@ -190,7 +190,7 @@ struct PlaceComingRegionBody: View {
                     .foregroundStyle(Theme.Color.appText)
                 Text(message +
                     " Today, home intelligence reads off U.S. sources — county records, FEMA, the Census. Following, fanning, and messaging work in your region right now.")
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
                     .foregroundStyle(Theme.Color.appTextSecondary)

@@ -34,10 +34,10 @@ final class VacationHoldViewModelTests: XCTestCase {
             return XCTFail("Expected active, got \(vm.mode)")
         }
         XCTAssertEqual(hold.daysLeft, 5)
-        XCTAssertEqual(hold.untilLabel, "Dec 12")
+        XCTAssertEqual(hold.untilLabel, "Jun 9")
         XCTAssertEqual(hold.stats.count, 3)
         XCTAssertEqual(hold.heldItems.count, 4)
-        XCTAssertEqual(vm.trailingActionLabel, "End hold")
+        XCTAssertEqual(vm.trailingActionLabel, "Edit")
         XCTAssertTrue(vm.trailingActionEnabled)
     }
 
@@ -68,7 +68,7 @@ final class VacationHoldViewModelTests: XCTestCase {
         let vm = VacationHoldViewModel(seed: .scheduling)
         vm.toggleScope(.mail, isOn: false)
         vm.toggleScope(.packages, isOn: false)
-        vm.toggleScope(.magicTask, isOn: false)
+        vm.toggleScope(.marketplacePickups, isOn: false)
         XCTAssertFalse(vm.trailingActionEnabled, "All scopes off → form invalid → Save disabled")
     }
 
@@ -111,14 +111,23 @@ final class VacationHoldViewModelTests: XCTestCase {
         guard case .active = vm.mode else {
             return XCTFail("Expected active after save, got \(vm.mode)")
         }
-        XCTAssertEqual(vm.trailingActionLabel, "End hold")
+        XCTAssertEqual(vm.trailingActionLabel, "Edit")
     }
 
-    func test_endHold_flipsActiveToScheduling() {
+    func test_edit_flipsActiveToScheduling() {
         let vm = VacationHoldViewModel(seed: .active)
         vm.tapTrailingAction()
         guard case .scheduling = vm.mode else {
-            return XCTFail("Expected scheduling after end hold")
+            return XCTFail("Expected scheduling after tapping Edit")
+        }
+        XCTAssertEqual(vm.trailingActionLabel, "Save")
+    }
+
+    func test_endHoldEarly_flipsActiveToScheduling() {
+        let vm = VacationHoldViewModel(seed: .active)
+        vm.endHoldEarly()
+        guard case .scheduling = vm.mode else {
+            return XCTFail("Expected scheduling after ending the hold early")
         }
         XCTAssertEqual(vm.trailingActionLabel, "Save")
     }

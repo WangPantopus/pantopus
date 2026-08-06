@@ -31,8 +31,9 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CommunityBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GenericMailBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GenericMailBodyContent
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
-import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MemoryBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedConfirmGate
@@ -246,8 +247,14 @@ private fun CategoryBody(
     onAcceptGig: () -> Unit,
     onReceiveAtDoor: () -> Unit,
 ) {
+    // Category first, payload second — mirrors iOS `categoryBody(for:)`. Every
+    // branch that can't render its bespoke body (package enrichment missing, a
+    // payload that failed to decode) falls through to the generic readable
+    // body, so no known category ever renders an empty surface.
+    val category = content.category
+    val payload = content.payload
     when {
-        content.category == MailItemCategory.Package && content.packageInfo != null ->
+        category == MailItemCategory.Package && content.packageInfo != null ->
             PackageBody(
                 content = content.packageInfo,
                 isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
@@ -255,34 +262,37 @@ private fun CategoryBody(
                 isReceived = ctaFlags.primaryCompleted,
                 onReceiveAtDoor = onReceiveAtDoor,
             )
-        content.payload is MailboxCategoryPayload.Coupon ->
-            CouponBody(coupon = content.payload.detail)
-        content.payload is MailboxCategoryPayload.Booklet ->
-            BookletBody(booklet = content.payload.detail)
-        content.payload is MailboxCategoryPayload.Certified ->
+        category == MailItemCategory.Coupon && payload is MailboxCategoryPayload.Coupon ->
+            CouponBody(coupon = payload.detail)
+        category == MailItemCategory.Booklet && payload is MailboxCategoryPayload.Booklet ->
+            BookletBody(booklet = payload.detail)
+        category == MailItemCategory.Certified && payload is MailboxCategoryPayload.Certified ->
             CertifiedBody(
-                certified = content.payload.detail,
+                certified = payload.detail,
                 onViewTerms = onViewTerms,
             )
-        content.payload is MailboxCategoryPayload.Community ->
+        category == MailItemCategory.Community && payload is MailboxCategoryPayload.Community ->
             CommunityBody(
-                community = content.payload.detail,
+                community = payload.detail,
                 authorName = content.sender.displayName,
                 authorInitials = content.sender.initials,
             )
-        content.payload is MailboxCategoryPayload.Gig ->
+        category == MailItemCategory.Gig && payload is MailboxCategoryPayload.Gig ->
             GigBody(
-                gig = content.payload.detail,
+                gig = payload.detail,
                 onAccept = onAcceptGig,
             )
-        content.payload is MailboxCategoryPayload.Memory ->
+        category == MailItemCategory.Memory && payload is MailboxCategoryPayload.Memory ->
             MemoryBody(
-                memory = content.payload.detail,
-                isSaved = content.payload.detail.isSaved,
+                memory = payload.detail,
+                isSaved = payload.detail.isSaved,
             )
-        content.category != MailItemCategory.Package ->
-            MailItemPlaceholderBody(category = content.category)
-        else -> Unit
+        else ->
+            GenericMailBody(
+                content =
+                    content.genericBody
+                        ?: GenericMailBodyContent(category = category),
+            )
     }
 }
 

@@ -2,14 +2,18 @@
 
 package app.pantopus.android.ui.screens.settings
 
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.BuildConfig
+import app.pantopus.android.core.security.AppLockManager
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.components.ChannelGlyph
 import app.pantopus.android.ui.components.FuzzStop
+import app.pantopus.android.ui.components.ToastKind
+import app.pantopus.android.ui.components.ToastMessage
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListBanner
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListFuzz
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
@@ -160,7 +164,12 @@ class SettingsIndexViewModel
                                             },
                                         control = RowControl.Chevron,
                                     ),
-                                    GroupedListRow(id = "visibility", label = "Profiles & Privacy", control = RowControl.Chevron),
+                                    GroupedListRow(
+                                        id = "visibility",
+                                        label = "Visibility preferences",
+                                        subtext = "Verified connections only",
+                                        control = RowControl.Chevron,
+                                    ),
                                     GroupedListRow(id = "export", label = "Data export", control = RowControl.Chevron),
                                 ),
                         ),
@@ -200,7 +209,7 @@ class SettingsIndexViewModel
                                     GroupedListRow(id = "legal", label = "Legal", control = RowControl.Chevron),
                                     GroupedListRow(
                                         id = "about",
-                                        label = "About",
+                                        label = "About Pantopus",
                                         subtext = versionString,
                                         control = RowControl.Chevron,
                                     ),
@@ -524,7 +533,10 @@ internal object NotificationCatalog {
 @HiltViewModel
 class PrivacySettingsViewModel
     @Inject
-    constructor() : ViewModel() {
+    constructor(
+        private val appLock: AppLockManager,
+        private val authRepository: AuthRepository,
+    ) : ViewModel() {
         enum class Variant { Populated, Stealth }
 
         val title: String = "Privacy"
@@ -535,7 +547,7 @@ class PrivacySettingsViewModel
         private var isStealth: Boolean = false
         private var visibility: String = "verified"
         private var address: String = "street"
-        private var fuzz: FuzzStop = FuzzStop.BlockDefault
+        private var fuzz: FuzzStop = FuzzStop.HalfMile
         private val activity: MutableMap<String, Boolean> = PrivacyCatalog.seedActivity(stealth = false).toMutableMap()
 
         private val _state = MutableStateFlow<GroupedListUiState>(GroupedListUiState.Loading)
@@ -544,7 +556,12 @@ class PrivacySettingsViewModel
         private val _banner = MutableStateFlow<GroupedListBanner?>(null)
         val banner: StateFlow<GroupedListBanner?> = _banner.asStateFlow()
 
+        private val _toast = MutableStateFlow<ToastMessage?>(null)
+        val toast: StateFlow<ToastMessage?> = _toast.asStateFlow()
+
         fun load() {
+            configureAppLockForSignedInUser()
+            appLock.refreshCapability()
             rebuild()
         }
 
@@ -553,7 +570,7 @@ class PrivacySettingsViewModel
             isStealth = variant == Variant.Stealth
             visibility = if (isStealth) "hidden" else "verified"
             address = if (isStealth) "hidden" else "street"
-            fuzz = if (isStealth) FuzzStop.Neighborhood else FuzzStop.BlockDefault
+            fuzz = if (isStealth) FuzzStop.Neighborhood else FuzzStop.HalfMile
             activity.clear()
             activity.putAll(PrivacyCatalog.seedActivity(isStealth))
             rebuild()
@@ -571,10 +588,54 @@ class PrivacySettingsViewModel
         fun onToggle(
             rowId: String,
             isOn: Boolean,
+            hostActivity: FragmentActivity? = null,
         ) {
+            if (rowId == "appLockToggle") {
+                viewModelScope.launch {
+                    val activity = hostActivity
+                    if (activity == null) {
+                        rebuild()
+                        return@launch
+                    }
+                    configureAppLockForSignedInUser()
+                    val changed = appLock.setEnabled(isOn, activity)
+                    if (changed) {
+                        _toast.value =
+                            ToastMessage(
+                                text =
+                                    if (isOn) {
+                                        "${appLock.biometricLabel.value} protection is on."
+                                    } else {
+                                        "Biometric protection turned off."
+                                    },
+                                kind = ToastKind.Success,
+                            )
+                    } else if (isOn) {
+                        _toast.value =
+                            ToastMessage(
+                                text = "App lock setup was cancelled.",
+                                kind = ToastKind.Neutral,
+                            )
+                    }
+                    rebuild()
+                }
+                return
+            }
             if (!activity.containsKey(rowId)) return
             activity[rowId] = isOn
             rebuild()
+        }
+
+        fun onTapRow(rowId: String) {
+            // Open Device Settings — mirrored from iOS UIApplication.openSettingsURLString.
+            // Download / What we collect / Delete are out-of-scope placeholders.
+            if (rowId == "appLockOpenSettings") {
+                // Handled in the screen (needs Context).
+            }
+        }
+
+        fun consumeToast() {
+            _toast.value = null
         }
 
         fun onSetFuzz(
@@ -584,6 +645,12 @@ class PrivacySettingsViewModel
             if (rowId != PrivacyCatalog.FUZZ) return
             fuzz = stop
             rebuild()
+        }
+
+        private fun configureAppLockForSignedInUser() {
+            val userId =
+                (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+            appLock.configure(userId)
         }
 
         private fun rebuild() {
@@ -603,6 +670,7 @@ class PrivacySettingsViewModel
 
         private fun groups(): List<GroupedListGroup> =
             listOf(
+                biometricSecurityGroup(),
                 visibilityGroup(),
                 addressGroup(),
                 fuzzGroup(),
@@ -610,6 +678,47 @@ class PrivacySettingsViewModel
                 dataGroup(),
                 deleteGroup(),
             )
+
+        private fun biometricSecurityGroup(): GroupedListGroup {
+            val label = appLock.biometricLabel.value
+            val capability = appLock.capability.value
+            return GroupedListGroup(
+                id = PrivacyCatalog.BIOMETRIC_SECURITY,
+                overline = "BIOMETRIC SECURITY",
+                rows =
+                    listOf(
+                        GroupedListRow(
+                            id = "appLockToggle",
+                            label = "Require $label for sensitive actions",
+                            subtext = "Protect payments, mailbox, and account changes with biometric verification.",
+                            control = RowControl.Toggle(appLock.preferenceEnabled.value),
+                            testTag = "appLockToggle",
+                        ),
+                        GroupedListRow(
+                            id = "appLockCapabilityStatus",
+                            label = "Current Capability",
+                            control =
+                                RowControl.ChipStatus(
+                                    label = capability.statusText,
+                                    tone =
+                                        if (capability == AppLockManager.Capability.Available) {
+                                            RowControl.ChipTone.Success
+                                        } else {
+                                            RowControl.ChipTone.Warning
+                                        },
+                                    includesChevron = false,
+                                ),
+                            testTag = "appLockCapabilityStatus",
+                        ),
+                        GroupedListRow(
+                            id = "appLockOpenSettings",
+                            label = "Open Device Settings",
+                            control = RowControl.Chevron,
+                            testTag = "appLockOpenSettings",
+                        ),
+                    ),
+            )
+        }
 
         private fun visibilityGroup(): GroupedListGroup =
             GroupedListGroup(
@@ -732,6 +841,7 @@ class PrivacySettingsViewModel
  */
 internal object PrivacyCatalog {
     const val FUZZ = "fuzz"
+    const val BIOMETRIC_SECURITY = "biometricSecurity"
 
     data class Option(
         val key: String,

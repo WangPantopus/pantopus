@@ -1247,6 +1247,9 @@ extension GigDetailViewModel {
                 title: "By", icon: .calendar, label: formatScheduledStart(deadline)
             )))
         }
+        if let photos = photoStripModule(gig) {
+            modules.append(photos)
+        }
         modules.append(.capsuleRow(ContentDetailCapsuleRow(capsules: [
             ContentDetailPill(label: "Verified address", icon: .shieldCheck, tone: .info),
             ContentDetailPill(label: "Local Pantopus job", icon: .check, tone: .success)
@@ -1256,7 +1259,11 @@ extension GigDetailViewModel {
         if suppressBidsModule {
             // no-op — `gigDetail.bids` renders below the modules.
         } else if bidCount > 0, !bids.isEmpty {
-            modules.append(.bids(ContentDetailBidsModule(title: "\(bidCount) bids", bids: bids.map { projectBid($0) })))
+            modules.append(.bids(ContentDetailBidsModule(
+                title: "\(bidCount) bids",
+                sub: bidRangeSub(bids),
+                bids: bids.map { projectBid($0) }
+            )))
         } else {
             modules.append(.callout(ContentDetailCallout(
                 identifier: "be-first",
@@ -1291,6 +1298,38 @@ extension GigDetailViewModel {
             trustCapsules: [],
             dock: dock
         )
+    }
+
+    /// A09.1 "Photos · N" strip when the gig carries uploaded attachments.
+    /// Each tile renders the poster's real attachment; the deterministic
+    /// gradient keyed off the URL is the loading / failure fallback.
+    private static func photoStripModule(_ gig: GigDTO) -> ContentDetailModule? {
+        guard let attachments = gig.attachments, !attachments.isEmpty else { return nil }
+        return .photoStrip(ContentDetailPhotoStrip(
+            title: "Photos",
+            icon: .image,
+            countLabel: "\(attachments.count)",
+            tiles: attachments.map { url in
+                ContentDetailPhotoTile(
+                    id: url,
+                    gradient: ListingGradient.from(id: url),
+                    icon: .image,
+                    imageURL: URL(string: url)
+                )
+            }
+        ))
+    }
+
+    /// A09.1 bids subheader — "low $X · high $Y" once two or more live
+    /// bids carry amounts; nil otherwise.
+    private static func bidRangeSub(_ bids: [GigBidDTO]) -> String? {
+        let amounts = bids.compactMap { $0.bidAmount ?? $0.amount }
+        guard amounts.count >= 2, let low = amounts.min(), let high = amounts.max() else { return nil }
+        return "low \(bidAmountLabel(low)) · high \(bidAmountLabel(high))"
+    }
+
+    private static func bidAmountLabel(_ amount: Double) -> String {
+        amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
     }
 
     /// Pickup → drop-off two-stop card when both ends are known, else the
@@ -1455,7 +1494,7 @@ extension GigDetailViewModel {
         let name = bid.bidder?.resolvedDisplayName ?? "Bidder"
         let initials = name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
         let amount = bid.bidAmount ?? bid.amount ?? 0
-        let amountLabel = amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
+        let amountLabel = bidAmountLabel(amount)
         let won = acceptedBy != nil && bid.userId == acceptedBy
         let dimmed = acceptedBy != nil && !won
         return ContentDetailBidRow(

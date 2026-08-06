@@ -374,6 +374,13 @@ public extension ListOfRowsDataSource {
     var topBarSubtitle: String? {
         nil
     }
+
+    /// A14.4 — optional monospaced caption rendered after the last
+    /// section (the design's `MonoFooter`, e.g. "Maria Lewin · ID 8174").
+    /// When `nil`, nothing renders — preserving every existing call site.
+    var monoFooter: String? {
+        nil
+    }
 }
 
 /// Top-bar trailing action payload.

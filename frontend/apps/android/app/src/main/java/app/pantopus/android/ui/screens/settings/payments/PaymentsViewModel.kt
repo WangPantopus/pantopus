@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.settings.payments
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.payments.PaymentsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,7 +78,7 @@ class PaymentsViewModel
                                 PaymentsMapper.liveFrame(result.data.paymentMethods.map(PaymentsMapper::toUiMethod)),
                             )
                     is NetworkResult.Failure ->
-                        _state.value = PaymentsUiState.Error(result.error.message)
+                        _state.value = PaymentsUiState.Error(result.error.displayMessage("Couldn't load Payments."))
                 }
             }
         }

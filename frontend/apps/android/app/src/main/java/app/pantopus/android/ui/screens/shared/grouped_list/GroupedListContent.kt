@@ -78,6 +78,12 @@ data class GroupedListRow(
     val leadingIcon: PantopusIcon? = null,
     /** Red destructive text + this row lands in its own card. */
     val destructive: Boolean = false,
+    /**
+     * Optional Compose testTag / a11y id. When null, the shell uses
+     * `groupedListRow_$id` (iOS parity for rows that set an explicit
+     * accessibilityIdentifier).
+     */
+    val testTag: String? = null,
 )
 
 /** One group — a card of rows with optional overline + helper. */

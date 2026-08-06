@@ -455,7 +455,7 @@ private struct CommunityEventCard: View {
 
     private var whereRow: some View {
         HStack(alignment: .center, spacing: Spacing.s3) {
-            MapChip(accent: accent)
+            MiniMap(accent: accent)
             VStack(alignment: .leading, spacing: 2) {
                 Text("WHERE")
                     .font(.system(size: 11, weight: .bold))
@@ -586,17 +586,35 @@ private struct DateChip: View {
     }
 }
 
-private struct MapChip: View {
+// Abstract mini-map preview (community.jsx MiniMap): park block +
+// crossing paths + tree dots under a centered drop pin. Purely
+// decorative — geometry mirrors the design's 52×56 SVG.
+private struct MiniMap: View {
     let accent: Color
 
     var body: some View {
         ZStack {
             Theme.Color.successBg
-            VStack(spacing: Spacing.s0) {
-                Rectangle().fill(Theme.Color.appSurface).frame(height: 3).padding(.top, 17)
-                Spacer()
+            Rectangle()
+                .fill(Theme.Color.successLight)
+                .frame(width: 40, height: 28)
+                .position(x: 26, y: 28)
+            Rectangle()
+                .fill(Theme.Color.appSurface)
+                .frame(width: 52, height: 3)
+                .position(x: 26, y: 21.5)
+            Rectangle()
+                .fill(Theme.Color.appSurface)
+                .frame(width: 3, height: 56)
+                .position(x: 21.5, y: 28)
+            Group {
+                Circle().fill(Theme.Color.success).frame(width: 4, height: 4).position(x: 10, y: 18)
+                Circle().fill(Theme.Color.success).frame(width: 4, height: 4).position(x: 38, y: 36)
+                Circle().fill(Theme.Color.success).frame(width: 3, height: 3).position(x: 40, y: 18)
             }
-            Icon(.mapPin, size: 18, color: accent)
+            .opacity(0.7)
+            MapPinDrop(accent: accent, size: 18)
+                .position(x: 26, y: 20)
         }
         .frame(width: 52, height: 56)
         .overlay(
@@ -604,6 +622,32 @@ private struct MapChip: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityIdentifier("mailDetail_community_miniMap")
+    }
+}
+
+// Teardrop map pin — rounded square with one sharp corner, rotated so
+// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+private struct MapPinDrop: View {
+    let accent: Color
+    let size: CGFloat
+
+    var body: some View {
+        teardrop
+            .fill(accent)
+            .overlay(teardrop.stroke(Theme.Color.appSurface, lineWidth: 2))
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(-45))
+            .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0, y: 1)
+    }
+
+    private var teardrop: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: size / 2,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: size / 2,
+            topTrailingRadius: size / 2
+        )
     }
 }
 

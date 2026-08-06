@@ -35,10 +35,10 @@ class VacationHoldViewModelTest {
         assertTrue(mode is VacationHoldMode.Active)
         mode as VacationHoldMode.Active
         assertEquals(5, mode.hold.daysLeft)
-        assertEquals("Dec 12", mode.hold.untilLabel)
+        assertEquals("Jun 9", mode.hold.untilLabel)
         assertEquals(3, mode.hold.stats.size)
         assertEquals(4, mode.hold.heldItems.size)
-        assertEquals("End hold", vm.trailingActionLabel)
+        assertEquals("Edit", vm.trailingActionLabel)
         assertTrue(vm.trailingActionEnabled)
     }
 
@@ -65,7 +65,7 @@ class VacationHoldViewModelTest {
         val vm = VacationHoldViewModel(VacationHoldSeed.Scheduling)
         vm.toggleScope(VacationHoldScope.Kind.Mail, isOn = false)
         vm.toggleScope(VacationHoldScope.Kind.Packages, isOn = false)
-        vm.toggleScope(VacationHoldScope.Kind.MagicTask, isOn = false)
+        vm.toggleScope(VacationHoldScope.Kind.MarketplacePickups, isOn = false)
         assertFalse(vm.trailingActionEnabled)
     }
 
@@ -91,13 +91,21 @@ class VacationHoldViewModelTest {
         val vm = VacationHoldViewModel(VacationHoldSeed.Scheduling)
         vm.tapTrailingAction()
         assertTrue(vm.mode.value is VacationHoldMode.Active)
-        assertEquals("End hold", vm.trailingActionLabel)
+        assertEquals("Edit", vm.trailingActionLabel)
     }
 
     @Test
-    fun endHold_flipsActiveToScheduling() {
+    fun edit_flipsActiveToScheduling() {
         val vm = VacationHoldViewModel(VacationHoldSeed.Active)
         vm.tapTrailingAction()
+        assertTrue(vm.mode.value is VacationHoldMode.Scheduling)
+        assertEquals("Save", vm.trailingActionLabel)
+    }
+
+    @Test
+    fun endHoldEarly_flipsActiveToScheduling() {
+        val vm = VacationHoldViewModel(VacationHoldSeed.Active)
+        vm.endHoldEarly()
         assertTrue(vm.mode.value is VacationHoldMode.Scheduling)
         assertEquals("Save", vm.trailingActionLabel)
     }

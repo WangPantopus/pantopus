@@ -6,7 +6,12 @@
 //  destination so SwiftUI views (or coordinators) can react.
 //
 
-// swiftlint:disable cyclomatic_complexity
+// The routing table is one flat switch on purpose — it has to stay
+// diff-able against the Android `when` in `core/routing/DeepLinkRouter.kt`,
+// which carries the same `@Suppress("CyclomaticComplexMethod", "LongMethod")`
+// for the same reason. Most of the length here is the per-destination docs.
+// swiftlint:disable cyclomatic_complexity type_body_length
+// swiftlint:disable file_length function_body_length
 
 import Foundation
 import Logging
@@ -46,6 +51,10 @@ final class DeepLinkRouter {
         case postcardVerification(id: String)
         case conversation(id: String)
         case user(id: String)
+        /// `pantopus://persona/:handle` or `/@handle` — public Beacon profile.
+        case beaconProfile(handle: String)
+        /// `pantopus://join/:code` — signup invite code (RN `/join/[code]` alias).
+        case joinInvite(code: String)
         case connections
         /// `pantopus://beacons` — A03.2 Beacon Updates feed (`surface=personas`).
         case beacons
@@ -110,38 +119,51 @@ final class DeepLinkRouter {
         case unknown(URL)
     }
 
+    /// How a resolved destination should be handled relative to auth.
+    private enum RoutingKind {
+        /// OAuth callback / `.unknown` — never stash, never park as content.
+        case discard
+        /// `reset-password` / `verify-email` — auth stack owns these; never persist.
+        case authOwned
+        /// Content destinations. When signed out, persist for post-login replay.
+        case content
+    }
+
     static let shared = DeepLinkRouter()
 
     /// The most recent pending destination. Consumers read this and then call `consume()`.
     private(set) var pending: Destination?
+
+    /// Set when a signed-out deep link should auto-present Sign-in
+    /// (auth-owned or deferred content). `PlaceLaunchHost` observes this
+    /// and opens the existing Login cover without disrupting the Place funnel.
+    private(set) var prefersLoginPresentation = false
 
     private let logger = Logger(label: "app.pantopus.ios.DeepLinkRouter")
 
     private init() {}
 
     func handle(url: URL) {
+        // Browser OAuth callbacks are owned by ASWebAuthenticationSession /
+        // AuthManager — never park them as content destinations.
+        if AuthManager.isOAuthCallback(url) { return }
+
         let destination = resolve(url: url)
         logger.info("deeplink", metadata: [
             "url": .string(url.absoluteString),
             "destination": .string("\(destination)")
         ])
-        pending = destination
         Observability.shared.track("deeplink.received", properties: [
             "url": url.absoluteString
         ])
+        apply(destination: destination, persistencePath: Self.normalizedPath(for: url))
     }
 
     /// Receive a raw path-style link from a notification payload (e.g.
     /// `link` on `NotificationDTO`). Routed through the same
     /// resolver as full URL deep links.
     func handle(path: String) {
-        let normalized: String = if path.hasPrefix("pantopus://") || path.hasPrefix("http") {
-            path
-        } else if path.hasPrefix("/") {
-            "pantopus://" + String(path.dropFirst())
-        } else {
-            "pantopus://" + path
-        }
+        let normalized = Self.normalizeIncoming(path)
         guard let url = URL(string: normalized) else { return }
         handle(url: url)
     }
@@ -151,12 +173,120 @@ final class DeepLinkRouter {
         return pending
     }
 
+    /// Drop in-memory pending + login prompt (sign-out / invalid).
+    func clearPending() {
+        pending = nil
+        prefersLoginPresentation = false
+    }
+
+    func acknowledgeLoginPresentation() {
+        prefersLoginPresentation = false
+    }
+
+    // MARK: - Classification + persistence (Workstream 1.4)
+
+    private func apply(destination: Destination, persistencePath: String) {
+        switch Self.routingKind(of: destination) {
+        case .discard:
+            // Never stash / never treat `.unknown` (or OAuth, already filtered)
+            // as a content destination.
+            return
+        case .authOwned:
+            // Auth stack (`LoginView`) owns reset / verify — park in-memory
+            // only so the cover can consume; do NOT persist across process death.
+            pending = destination
+            if !Self.isSignedIn {
+                prefersLoginPresentation = true
+            }
+        case .content:
+            // Product choice (documented): RN allows gig/post/listing/invite/
+            // business/user public routes signed-out. Native today only shows
+            // PlaceLaunchHost while signed out — there is no signed-out content
+            // browser — so we still persist these for post-login replay rather
+            // than dropping them. Do NOT treat them as "browse now without login".
+            if Self.isSignedIn {
+                prefersLoginPresentation = false
+                pending = destination
+            } else {
+                PendingDeepLinkStore.stash(persistencePath)
+                pending = nil
+                prefersLoginPresentation = true
+            }
+        }
+    }
+
+    /// Production reading of the session state. Kept separate from
+    /// `signedInProvider` so `bindSignedInProvider(nil)` can restore it.
+    private static let defaultSignedInProvider: @MainActor () -> Bool = {
+        if case .signedIn = AuthManager.shared.state { return true }
+        return false
+    }
+
+    /// Seam for the signed-in check. Mirrors Android
+    /// `DeepLinkRouter.bindSignedInProvider` so both platforms' routing can be
+    /// exercised without standing up a real session.
+    private static var signedInProvider: @MainActor () -> Bool = defaultSignedInProvider
+
+    /// Override the session check. Pass `nil` to restore the `AuthManager` read.
+    static func bindSignedInProvider(_ provider: (@MainActor () -> Bool)?) {
+        signedInProvider = provider ?? defaultSignedInProvider
+    }
+
+    private static var isSignedIn: Bool {
+        signedInProvider()
+    }
+
+    private static func routingKind(of destination: Destination) -> RoutingKind {
+        switch destination {
+        case .unknown:
+            return .discard
+        case .resetPassword, .verifyEmail:
+            return .authOwned
+        default:
+            return .content
+        }
+    }
+
+    static func normalizeIncoming(_ path: String) -> String {
+        if path.hasPrefix("pantopus://") || path.hasPrefix("http") {
+            return path
+        }
+        if path.hasPrefix("/") {
+            return "pantopus://" + String(path.dropFirst())
+        }
+        return "pantopus://" + path
+    }
+
+    private static func normalizedPath(for url: URL) -> String {
+        // Prefer a stable pantopus:// form for custom-scheme and https links
+        // so replay goes through the same resolver. Mirrors Android
+        // `DeepLinkRouter.Paths.normalized`: pure string surgery on the raw
+        // URL. Rebuilding the path from `url.pathComponents` would
+        // percent-DECODE every segment, so an encoded `%2F` inside an
+        // identifier would come back as a real separator and an encoded space
+        // would make the replayed string unparseable.
+        let raw = url.absoluteString
+        guard let schemeRange = raw.range(of: "://") else { return normalizeIncoming(raw) }
+        let scheme = raw[raw.startIndex..<schemeRange.lowerBound].lowercased()
+        guard scheme == "http" || scheme == "https" else { return raw }
+        let rest = raw[schemeRange.upperBound...]
+        guard let slash = rest.firstIndex(of: "/") else { return "pantopus://" }
+        return "pantopus://" + String(rest[rest.index(after: slash)...])
+    }
+
     // MARK: - URL parsing
 
-    /// Accepts both `pantopus://…` and `https://pantopus.app/…`.
+    /// Accepts `pantopus://…` and `https://pantopus.app/…`.
+    /// RN historically advertised `pantopus.com` associated domains; native
+    /// ships on `pantopus.app`. Custom-scheme links are host-agnostic. Adding
+    /// `pantopus.com` HTTPS hosts here is safe for resolve; AASA/entitlements
+    /// for that domain remain a product/infra decision outside this router.
     func resolve(url: URL) -> Destination {
         let segments = routeSegments(for: url)
         let firstSegment = segments.first ?? ""
+        if firstSegment.hasPrefix("@"), firstSegment.count > 1 {
+            return .beaconProfile(handle: String(firstSegment.dropFirst()))
+        }
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let tabQuery = queryValue("tab", in: comps)
         // B1.6 — `?id=` seeds the translation / unboxing mailbox sub-screens.
@@ -182,7 +312,8 @@ final class DeepLinkRouter {
                 return .supportTrainManage(id: id)
             }
             return .supportTrain(id: id)
-        case "post", "posts":
+        case "post", "posts", "broadcast", "broadcasts":
+            // `/broadcast/:id` aliases Pulse/persona post detail (RN parity).
             if let id = segments.dropFirst().first { return .post(id: id) }
             return .unknown(url)
         case "gig", "gigs":
@@ -206,8 +337,23 @@ final class DeepLinkRouter {
         case "chat", "message", "messages", "conversation":
             if let id = segments.dropFirst().first { return .conversation(id: id) }
             return .unknown(url)
-        case "user", "users":
+        case "user", "users", "u":
+            // Short profile URL `pantopus://u/:username` shares the user surface.
             if let id = segments.dropFirst().first { return .user(id: id) }
+            return .unknown(url)
+        case "b":
+            // Public business short link `pantopus://b/:username`.
+            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            return .businessProfile(businessId: id)
+        case "persona":
+            // `pantopus://persona/:handle` is the public Beacon profile — the
+            // same destination Android resolves and the `/@handle` alias above.
+            if let handle = segments.dropFirst().first { return .beaconProfile(handle: handle) }
+            return .unknown(url)
+        case "join":
+            // RN `/join/:code` → register-with-invite. Root presents the same
+            // token-accept surface it uses for `.invite`.
+            if let code = segments.dropFirst().first, !code.isEmpty { return .joinInvite(code: code) }
             return .unknown(url)
         case "connections":
             return .connections
@@ -248,10 +394,24 @@ final class DeepLinkRouter {
     private func routeSegments(for url: URL) -> [String] {
         var segments = url.pathComponents.filter { $0 != "/" }
         if url.scheme != "http", url.scheme != "https",
-           let host = url.host, !host.isEmpty {
+           let host = Self.customSchemeAuthority(for: url), !host.isEmpty {
             segments.insert(host, at: 0)
         }
         return segments
+    }
+
+    /// The authority of a custom-scheme link, read off the raw string.
+    /// `URL(string: "pantopus://@mariak")` treats `@` as the userinfo
+    /// delimiter and reports `host == "mariak"`, which silently drops the
+    /// marker the `/@handle` Beacon alias depends on. Android parses the raw
+    /// string, so mirror that here and keep both platforms on one answer.
+    private static func customSchemeAuthority(for url: URL) -> String? {
+        let raw = url.absoluteString
+        guard let schemeRange = raw.range(of: "://") else { return url.host }
+        let authority = raw[schemeRange.upperBound...].prefix {
+            $0 != "/" && $0 != "?" && $0 != "#"
+        }
+        return authority.isEmpty ? url.host : String(authority)
     }
 
     private func queryValue(_ name: String, in components: URLComponents?) -> String? {
@@ -331,6 +491,9 @@ final class DeepLinkRouter {
         email: String?
     ) -> Destination {
         switch segments.dropFirst().first ?? "" {
+        case "callback":
+            // OAuth return — swallowed by `handle(url:)` / PantopusApp.
+            .unknown(url)
         case "reset-password", "reset_password":
             resetPasswordDestination(url: url, token: token)
         case "verify-email", "verify_email":

@@ -34,6 +34,8 @@ public enum YouRoute: Hashable {
     /// from the Mailbox root top-bar settings menu.
     case vacationHold
     case settings
+    /// A14.6 — Settings → Payments (payments-out · Stripe setup).
+    case paymentsSettings
     case placeholder(label: String)
     case helpCenter
     case privacySettings
@@ -111,11 +113,10 @@ public enum YouRoute: Hashable {
     /// `BusinessProfileView` overflow when the viewer owns the business
     /// and from the `pantopus://businesses/:id/page-editor` deep link.
     case editBusinessPage(businessId: String)
-    /// P6.6 — "Register a business · coming soon" waitlist surface. The
-    /// full registration wizard is a future Phase 9 item.
+    /// Legacy waitlist route — forwards to the Create Business wizard.
     case businessWaitlist
     /// A12.10 — Create Business wizard. Reached from the My Businesses
-    /// FAB / empty-state CTA in the You tab.
+    /// FAB / empty-state CTA in the You tab (and deep link / waitlist).
     case createBusiness
     /// T6.3f / P14 — Home dashboard for a specific home, reached from
     /// the My homes row tap inside the You stack.
@@ -305,6 +306,8 @@ public enum YouRoute: Hashable {
     /// A18.4 — Persistent "waiting for approval" room.
     /// `pantopus://homes/:id/waiting-room`.
     case waitingRoom(homeId: String)
+    /// Cancel ownership claim from waiting room / home settings.
+    case cancelClaim(homeId: String)
     #if DEBUG
     case statusWaiting
     case ceremonialMail
@@ -767,6 +770,26 @@ public struct YouTabRoot: View {
         if !path.isEmpty { path.removeLast() }
     }
 
+    @MainActor
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+        switch nav {
+        case .notifications:
+            path.append(.settings)
+        case let .backToHome(id):
+            path.removeAll { route in
+                if case .waitingRoom = route { return true }
+                return false
+            }
+            path.append(.homeDashboard(homeId: id))
+        case .viewClaim:
+            path.append(.myClaims)
+        case let .updateEvidence(id, _):
+            path.append(.claimOwnership(homeId: id))
+        case let .cancelClaim(id):
+            path.append(.cancelClaim(homeId: id))
+        }
+    }
+
     /// Called by `ListingComposeWizardView` on success. Pops the wizard and
     /// pushes the new listing's detail so Back returns to My Listings, not
     /// the success step. Defined as a method (not a closure literal at the
@@ -896,6 +919,13 @@ public struct YouTabRoot: View {
             )
         case .settings:
             SettingsView(
+                onClose: { Task { @MainActor in pop() } },
+                onEditProfile: { showsEditProfile = true },
+                onSignedOut: { Task { @MainActor in pop() } }
+            )
+        case .paymentsSettings:
+            SettingsView(
+                initialRoute: .payments,
                 onClose: { Task { @MainActor in pop() } },
                 onEditProfile: { showsEditProfile = true },
                 onSignedOut: { Task { @MainActor in pop() } }
@@ -1517,18 +1547,12 @@ public struct YouTabRoot: View {
                     tierSegments: tierSegments
                 ),
                 onBack: { Task { @MainActor in pop() } },
-                onOverflow: {
-                    Task { @MainActor in path.append(.placeholder(label: "Broadcast actions")) }
-                },
+                onOverflow: {},
                 onReply: {
-                    Task { @MainActor in path.append(.placeholder(label: "Reply to broadcast")) }
+                    Task { @MainActor in path.append(.creatorInbox) }
                 },
-                onBoost: {
-                    Task { @MainActor in path.append(.placeholder(label: "Boost broadcast")) }
-                },
-                onPin: {
-                    Task { @MainActor in path.append(.placeholder(label: "Pin broadcast")) }
-                }
+                onBoost: nil,
+                onPin: nil
             )
         case .creatorInbox:
             CreatorInboxView(
@@ -1930,19 +1954,20 @@ public struct YouTabRoot: View {
                     }
                 )
             )
-        case .businessWaitlist:
-            BusinessWaitlistView { Task { @MainActor in pop() } }
-        case .createBusiness:
+        case .businessWaitlist, .createBusiness:
+            // Waitlist is retired — both routes open the create wizard.
             CreateBusinessWizardView(
                 onClose: { Task { @MainActor in pop() } },
                 onOpenBusiness: { businessId in
-                    // Replace the wizard with the business profile so Back
+                    // Replace the wizard with the owner dashboard so Back
                     // returns to My Businesses, not the success step.
                     path.removeAll { route in
-                        if case .createBusiness = route { return true }
-                        return false
+                        switch route {
+                        case .createBusiness, .businessWaitlist: return true
+                        default: return false
+                        }
                     }
-                    path.append(.businessProfile(businessId: businessId))
+                    path.append(.businessOwner(businessId: businessId))
                 }
             )
         case let .homeDashboard(homeId):
@@ -2103,8 +2128,8 @@ public struct YouTabRoot: View {
             BusinessProfileView(
                 businessId: businessId,
                 onBack: { Task { @MainActor in pop() } },
-                onOpenMessages: {
-                    Task { @MainActor in path.append(.placeholder(label: "Messages")) }
+                onOpenMessages: { destination in
+                    Task { @MainActor in path.append(.chatConversation(destination)) }
                 },
                 onShare: {
                     systemSheet = .share(
@@ -2178,12 +2203,12 @@ public struct YouTabRoot: View {
             EarnView(
                 onBack: { Task { @MainActor in pop() } },
                 onHelp: { path.append(.placeholder(label: "Earn help")) },
-                onCashOut: { path.append(.placeholder(label: "Payments")) },
+                onCashOut: { path.append(.paymentsSettings) },
                 onBrowseTasks: { path.append(.gigsFeed) },
                 onReferNeighbor: { path.append(.placeholder(label: "Refer a neighbor")) },
                 onOfferService: { path.append(.placeholder(label: "Offer a service")) },
-                onManagePayout: { path.append(.placeholder(label: "Payments")) },
-                onAddBank: { path.append(.placeholder(label: "Payments")) },
+                onManagePayout: { path.append(.paymentsSettings) },
+                onAddBank: { path.append(.paymentsSettings) },
                 onSeeAllEarnings: { path.append(.placeholder(label: "All earnings")) },
                 onOpenTaxDocs: { path.append(.placeholder(label: "Tax documents")) }
             )
@@ -2206,10 +2231,16 @@ public struct YouTabRoot: View {
             )
         case let .waitingRoom(homeId):
             WaitingRoomView(
-                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active)
-            ) {
-                pop()
-            }
+                viewModel: WaitingRoomViewModel(homeId: homeId, state: .active),
+                onBack: { pop() },
+                onNav: { nav in handleWaitingRoomNav(nav, homeId: homeId) }
+            )
+        case let .cancelClaim(homeId):
+            CancelClaimView(
+                viewModel: CancelClaimViewModel(homeId: homeId),
+                onBack: { pop() },
+                onCancelled: { pop() }
+            )
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(

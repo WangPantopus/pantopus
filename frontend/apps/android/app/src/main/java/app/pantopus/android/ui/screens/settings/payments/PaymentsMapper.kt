@@ -79,7 +79,7 @@ object PaymentsMapper {
                 PaymentsPayoutRow(
                     id = "payouts.method",
                     label = "Payout method",
-                    subtext = "Available after Stripe connect",
+                    subtext = "Add after connecting Stripe",
                     trailing = PaymentsRowTrailing.GatedDash,
                 ),
             payoutSchedule = null,
@@ -87,7 +87,7 @@ object PaymentsMapper {
                 PaymentsPayoutRow(
                     id = "payouts.tax",
                     label = "Tax info",
-                    subtext = "Available after Stripe connect",
+                    subtext = "W-9 collected during setup",
                     trailing = PaymentsRowTrailing.GatedDash,
                 ),
             helper = "Required before you can post paid tasks or sell on Marketplace.",

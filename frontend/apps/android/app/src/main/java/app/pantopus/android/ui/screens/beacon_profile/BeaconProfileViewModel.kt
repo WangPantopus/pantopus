@@ -141,13 +141,24 @@ class BeaconProfileViewModel
             _toastMessage.value = null
         }
 
-        fun showSubscribeToast() {
-            _toastMessage.value = "Subscribe flow coming soon"
+        private val _handshakePreselectedTierRank = MutableStateFlow<Int?>(null)
+        val handshakePreselectedTierRank: StateFlow<Int?> = _handshakePreselectedTierRank.asStateFlow()
+
+        /** Visitor unlock on a tier-gated broadcast. */
+        fun unlockBroadcast(tierRank: Int?) {
+            if (isOwner) return
+            _handshakePreselectedTierRank.value = tierRank
+            _showFollowHandshake.value = true
+        }
+
+        fun clearHandshakeTier() {
+            _handshakePreselectedTierRank.value = null
         }
 
         /** Visitor Follow → route through the privacy handshake wizard. */
         fun follow() {
             if (isOwner || _followBusy.value || _followStatus.value != BeaconFollowStatus.None) return
+            _handshakePreselectedTierRank.value = null
             _showFollowHandshake.value = true
         }
 
@@ -294,6 +305,7 @@ class BeaconProfileViewModel
                 visibility = visibility(post.visibility, post.targetTierRank),
                 isLocked = locked,
                 intent = null,
+                targetTierRank = post.targetTierRank,
             )
         }
 

@@ -24,24 +24,23 @@ object PaymentsSampleData {
             methods =
                 listOf(
                     PaymentMethod(
-                        id = "card_visa_4523",
+                        id = "card_visa_4421",
                         brand = PaymentMethodBrand.Visa,
-                        label = "Visa •• 4523",
-                        subtext = "Expires 03/24",
+                        label = "Visa •• 4421",
+                        subtext = "Expires 09/27",
                         chip = PaymentMethodChip("Default", PaymentsChipTone.Primary),
                     ),
                     PaymentMethod(
-                        id = "card_mc_7892",
+                        id = "card_mc_8830",
                         brand = PaymentMethodBrand.Mastercard,
-                        label = "Mastercard •• 7892",
-                        subtext = "Expires 04/25",
+                        label = "Mastercard •• 8830",
+                        subtext = "Expires 03/26",
                     ),
                     PaymentMethod(
                         id = "wallet_apple",
                         brand = PaymentMethodBrand.ApplePay,
                         label = "Apple Pay",
                         subtext = "iPhone 15 Pro",
-                        chip = PaymentMethodChip("Active default", PaymentsChipTone.Neutral),
                     ),
                 ),
             payouts =
@@ -82,19 +81,19 @@ object PaymentsSampleData {
                 PaymentsActivity.Stats(
                     listOf(
                         PaymentsActivityStat(
-                            id = "activity.lifetime",
-                            label = "Lifetime",
-                            subtext = "$9,847 earned · all-time",
+                            id = "activity.transactions",
+                            label = "Transactions",
+                            subtext = "$2,340 earned · 47 in 2024",
                         ),
                         PaymentsActivityStat(
-                            id = "activity.ytd",
-                            label = "Year to date",
-                            subtext = "$3,184 · 42 transactions",
+                            id = "activity.statements",
+                            label = "Statements",
+                            subtext = "Monthly PDFs",
                         ),
                         PaymentsActivityStat(
-                            id = "activity.lastPayout",
-                            label = "Last payout",
-                            subtext = "Nov 28 · $186.00",
+                            id = "activity.disputes",
+                            label = "Disputes",
+                            subtext = "None",
                         ),
                     ),
                 ),
@@ -124,7 +123,7 @@ object PaymentsSampleData {
                         PaymentsPayoutRow(
                             id = "payouts.method",
                             label = "Payout method",
-                            subtext = "Available after Stripe connect",
+                            subtext = "Add after connecting Stripe",
                             trailing = PaymentsRowTrailing.GatedDash,
                         ),
                     payoutSchedule = null,
@@ -132,7 +131,7 @@ object PaymentsSampleData {
                         PaymentsPayoutRow(
                             id = "payouts.tax",
                             label = "Tax info",
-                            subtext = "Available after Stripe connect",
+                            subtext = "W-9 collected during setup",
                             trailing = PaymentsRowTrailing.GatedDash,
                         ),
                     helper = "Required before you can post paid tasks or sell on Marketplace.",

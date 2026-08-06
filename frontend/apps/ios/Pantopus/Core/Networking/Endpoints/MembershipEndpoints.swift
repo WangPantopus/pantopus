@@ -27,4 +27,9 @@ public enum MembershipEndpoints {
     public static func cancelMembership(personaId: String) -> Endpoint {
         Endpoint(method: .post, path: "/api/personas/\(personaId)/membership/cancel")
     }
+
+    // Upgrade / downgrade / refund-request are paid actions deferred to
+    // Phase 3 (see `MembershipDetailViewModel` — they stay host callbacks).
+    // Their clients are added back alongside the UI that calls them rather
+    // than sitting here unreachable.
 }

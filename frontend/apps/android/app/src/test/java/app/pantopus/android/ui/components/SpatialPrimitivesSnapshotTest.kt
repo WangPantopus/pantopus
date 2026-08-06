@@ -77,18 +77,18 @@ class SpatialPrimitivesSnapshotTest {
     }
 
     @Test
-    fun fuzz_map_building() {
-        paparazzi.snapshot { FuzzFrame(stop = FuzzStop.Building) }
-    }
-
-    @Test
     fun fuzz_map_block() {
         paparazzi.snapshot { FuzzFrame(stop = FuzzStop.Block) }
     }
 
     @Test
-    fun fuzz_map_block_default() {
-        paparazzi.snapshot { FuzzFrame(stop = FuzzStop.BlockDefault) }
+    fun fuzz_map_quarter_mile() {
+        paparazzi.snapshot { FuzzFrame(stop = FuzzStop.QuarterMile) }
+    }
+
+    @Test
+    fun fuzz_map_half_mile() {
+        paparazzi.snapshot { FuzzFrame(stop = FuzzStop.HalfMile) }
     }
 
     @Test

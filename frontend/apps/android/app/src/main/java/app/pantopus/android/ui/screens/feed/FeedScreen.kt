@@ -143,6 +143,7 @@ fun FeedScreen(
                 chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
                 activeId = activeIntent.key,
                 onSelect = { id -> viewModel.selectIntent(PulseIntent.fromKey(id)) },
+                skeleton = state is PulseFeedUiState.Loading,
             )
             when (val s = state) {
                 is PulseFeedUiState.Loading -> LoadingFrame()

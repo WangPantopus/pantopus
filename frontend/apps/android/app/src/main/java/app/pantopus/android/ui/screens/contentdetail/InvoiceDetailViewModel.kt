@@ -24,7 +24,9 @@ import javax.inject.Inject
  * T2.6 ships the invoice frame from fixture display data. Block 3B wires the
  * "Pay" CTA to Stripe PaymentSheet only when a real backend order reference is
  * provided through navigation args; fixture invoices leave checkout disabled
- * rather than sending placeholder payee/amount data.
+ * rather than sending placeholder payee/amount data. On a successful pay we
+ * re-project into the paid frame (A09.4) — once a real invoice backend lands,
+ * [load] reads the paid state from the server instead.
  */
 @HiltViewModel
 class InvoiceDetailViewModel
@@ -78,12 +80,31 @@ class InvoiceDetailViewModel
          */
         private val checkoutRequest: CheckoutRequest? = checkoutRequestFrom(savedStateHandle)
 
+        /**
+         * Flips to true after a successful pay so [load] re-projects the
+         * paid frame (A09.4).
+         */
+        private var paid: Boolean = false
+
         fun load() {
-            _state.value = ContentDetailUiState.Loaded(Projection.fixture(invoiceId))
+            _state.value =
+                ContentDetailUiState.Loaded(
+                    if (paid) Projection.paidFixture(invoiceId) else Projection.fixture(invoiceId),
+                )
         }
+
+        /**
+         * Short summary handed to the paid dock's Share action (system
+         * share sheet). Mirrors the iOS string exactly.
+         */
+        fun shareSummary(): String = "Invoice ${invoiceId.uppercase()} · Paid $642.85 via Pantopus Pay"
 
         /** Tapped "Pay" — create the PaymentIntent, then ask the screen to present the sheet. */
         fun pay() {
+            // The paid dock reuses the primary slot for "Download receipt" —
+            // never re-run checkout once this invoice is settled. Mirrors the
+            // iOS `guard !paid` in `InvoiceDetailViewModel.payNow()`.
+            if (paid) return
             val checkoutRequest = checkoutRequest
             if (checkoutRequest == null) {
                 _paymentStatus.value = InvoicePaymentStatus.Declined("This invoice can't be paid yet.")
@@ -111,7 +132,9 @@ class InvoiceDetailViewModel
             when (outcome) {
                 CheckoutOutcome.Paid -> {
                     _paymentStatus.value = InvoicePaymentStatus.Paid
-                    // Re-read the source of truth rather than flipping locally.
+                    // Re-project into the paid frame (Paid pill, green
+                    // total, receipt row, Share + Download dock).
+                    paid = true
                     load()
                 }
                 CheckoutOutcome.Canceled -> _paymentStatus.value = InvoicePaymentStatus.Canceled

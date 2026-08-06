@@ -52,12 +52,12 @@ final class PaymentsViewModelTests: XCTestCase {
             XCTFail("Tax row should show on-file chip + chevron")
         }
 
-        // Activity: 3 stat rows.
+        // Activity: 3 chevron rows.
         if case let .stats(stats) = loaded.activity {
             XCTAssertEqual(stats.count, 3)
-            XCTAssertEqual(stats[0].label, "Lifetime")
-            XCTAssertEqual(stats[1].label, "Year to date")
-            XCTAssertEqual(stats[2].label, "Last payout")
+            XCTAssertEqual(stats[0].label, "Transactions")
+            XCTAssertEqual(stats[1].label, "Statements")
+            XCTAssertEqual(stats[2].label, "Disputes")
         } else {
             XCTFail("Activity should be stats[]")
         }

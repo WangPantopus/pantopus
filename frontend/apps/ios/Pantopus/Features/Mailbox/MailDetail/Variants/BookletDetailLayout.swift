@@ -38,7 +38,13 @@ struct BookletDetailLayout: View {
             attachments: makeAttachments(),
             hero: { HeroCard(content: content) },
             keyFacts: { keyFacts() },
-            body: { BookletPager(pages: booklet.pages, pageCount: booklet.pageCount) },
+            body: {
+                BookletPager(
+                    pages: booklet.pages,
+                    pageCount: booklet.pageCount,
+                    ocrTexts: booklet.ocrTexts
+                )
+            },
             sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
             actions: { ActionsRow() }
         )

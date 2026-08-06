@@ -201,14 +201,14 @@ public final class PaymentsViewModel {
         payoutMethod: PaymentsPayoutRow(
             id: "payouts.method",
             label: "Payout method",
-            subtext: "Available after Stripe connect",
+            subtext: "Add after connecting Stripe",
             trailing: .gatedDash
         ),
         payoutSchedule: nil,
         taxInfo: PaymentsPayoutRow(
             id: "payouts.tax",
             label: "Tax info",
-            subtext: "Available after Stripe connect",
+            subtext: "W-9 collected during setup",
             trailing: .gatedDash
         ),
         helper: "Required before you can post paid tasks or sell on Marketplace."

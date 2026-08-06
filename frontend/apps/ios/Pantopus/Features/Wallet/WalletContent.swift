@@ -157,8 +157,13 @@ public struct WalletContent: Equatable, Sendable {
     public let monthValue: String
     public let monthMeta: String
     public let activity: [WalletActivityItem]
-    public let payoutMethod: WalletPayoutMethod
-    public let taxDocs: WalletTaxDocs
+    /// `nil` until a real payout method is known — the live read path has
+    /// no Stripe payout-method feed yet, and the section is hidden rather
+    /// than filled with fabricated bank details.
+    public let payoutMethod: WalletPayoutMethod?
+    /// `nil` until real tax-document data is known — same rule as
+    /// `payoutMethod`; never show invented YTD earnings.
+    public let taxDocs: WalletTaxDocs?
     /// Populated only in the `.hold` variant.
     public let holdState: WalletHoldState?
     /// Block 3C — whether the seller's Stripe Connect account has payouts
@@ -178,8 +183,8 @@ public struct WalletContent: Equatable, Sendable {
         monthValue: String,
         monthMeta: String,
         activity: [WalletActivityItem],
-        payoutMethod: WalletPayoutMethod,
-        taxDocs: WalletTaxDocs,
+        payoutMethod: WalletPayoutMethod? = nil,
+        taxDocs: WalletTaxDocs? = nil,
         holdState: WalletHoldState? = nil,
         payoutsEnabled: Bool = true
     ) {

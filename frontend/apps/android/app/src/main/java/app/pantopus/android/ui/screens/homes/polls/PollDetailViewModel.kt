@@ -11,6 +11,7 @@ import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.homes.CastVoteRequest
 import app.pantopus.android.data.api.models.homes.PollDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +71,7 @@ class PollDetailViewModel
                 // and pick the matching row. Lists are small.
                 when (val result = repo.getHomePolls(homeId)) {
                     is NetworkResult.Failure ->
-                        _state.value = PollDetailUiState.Error(result.error.message)
+                        _state.value = PollDetailUiState.Error(result.error.displayMessage("Couldn't load this poll."))
                     is NetworkResult.Success -> {
                         val poll = result.data.polls.firstOrNull { it.id == pollId }
                         _state.value =

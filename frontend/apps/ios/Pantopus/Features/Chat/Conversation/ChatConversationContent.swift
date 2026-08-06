@@ -34,7 +34,21 @@ public struct ChatCreatorThreadContext: Sendable, Hashable {
     /// theme today.
     public let fanTierRank: Int
     public let fanSubtitle: String
-    public let quota: ChatCreatorQuota
+    /// `nil` when the backend hasn't reported a reply allowance for this
+    /// thread. There is no creator-side weekly reply quota on the wire yet
+    /// (`backend/routes/personaDms.js` only meters the fan), so the meter
+    /// and its lock stay hidden instead of showing invented counts.
+    public let quota: ChatCreatorQuota?
+
+    /// Tier the creator would invite this fan up to — derived from the
+    /// fan's current rank rather than hardcoded.
+    public var upgradeTierName: String {
+        switch fanTierRank {
+        case ..<2: "Bronze"
+        case 2: "Silver"
+        default: "Gold"
+        }
+    }
 
     public init(
         personaName: String,
@@ -42,7 +56,7 @@ public struct ChatCreatorThreadContext: Sendable, Hashable {
         fanTierName: String,
         fanTierRank: Int,
         fanSubtitle: String,
-        quota: ChatCreatorQuota
+        quota: ChatCreatorQuota? = nil
     ) {
         self.personaName = personaName
         self.audienceSummary = audienceSummary
@@ -59,7 +73,7 @@ public struct ChatCreatorThreadContext: Sendable, Hashable {
             fanTierName: fanTierName,
             fanTierRank: fanTierRank,
             fanSubtitle: fanTierRank <= 1 ? "Free member" : "Member since Aug · 0.4 mi",
-            quota: ChatCreatorQuota(used: 12, total: 30, resetCopy: "Resets Monday")
+            quota: nil
         )
     }
 }
@@ -73,6 +87,13 @@ public struct ChatCreatorQuota: Sendable, Hashable {
         self.used = used
         self.total = total
         self.resetCopy = resetCopy
+    }
+
+    /// True when the creator has used all weekly replies for this fan tier.
+    /// A `total` of zero means "no replies allowed", which is maxed — the
+    /// unknown case is modelled by a nil quota, not by a zero total.
+    public var isMaxed: Bool {
+        used >= total
     }
 }
 

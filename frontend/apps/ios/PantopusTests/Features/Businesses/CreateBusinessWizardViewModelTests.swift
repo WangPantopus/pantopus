@@ -79,21 +79,12 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.chrome.primaryCTALabel, "Next")
     }
 
-    func testPrimaryFromLegalInfoAdvancesToProfile() {
+    func testPrimaryFromLegalInfoRequiresBasicFields() {
         let vm = makeVM()
         vm.primaryTapped() // → legalInfo
-        vm.primaryTapped() // → profile
-        XCTAssertEqual(vm.currentStep, .profile)
-        XCTAssertEqual(vm.chrome.progressLabel, .stepOf(current: 3, total: 4))
-    }
-
-    func testPrimaryFromProfileAdvancesToConfirm() {
-        let vm = makeVM()
-        vm.primaryTapped() // legal
-        vm.primaryTapped() // profile
-        vm.primaryTapped() // confirm
-        XCTAssertEqual(vm.currentStep, .confirm)
-        XCTAssertEqual(vm.chrome.primaryCTALabel, "Confirm")
+        vm.primaryTapped() // blocked without fields
+        XCTAssertEqual(vm.currentStep, .legalInfo)
+        XCTAssertNotNil(vm.submitError)
     }
 
     func testBackFromLegalInfoReturnsToPickCategory() {
@@ -101,6 +92,30 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
         vm.primaryTapped()
         vm.leadingTapped()
         XCTAssertEqual(vm.currentStep, .pickCategory)
+    }
+
+    func testBackClearsSubmitErrorSoItDoesNotLeakOntoThePreviousStep() {
+        let vm = makeVM()
+        vm.primaryTapped() // → legalInfo
+        vm.primaryTapped() // blocked, sets submitError
+        XCTAssertNotNil(vm.submitError)
+
+        vm.leadingTapped() // → pickCategory
+
+        XCTAssertEqual(vm.currentStep, .pickCategory)
+        XCTAssertNil(vm.submitError)
+    }
+
+    /// `createBusinessFullSchema` rejects `name > 100` / `description > 2000`,
+    /// so the setters clamp instead of letting the wizard reach a 400.
+    /// (`username` is covered by inspection — its setter also schedules the
+    /// availability check, which would fire a request from a unit test.)
+    func testFieldSettersClampToCreateFullSchemaLimits() {
+        let vm = makeVM()
+        vm.setBusinessName(String(repeating: "a", count: 150))
+        vm.setDescription(String(repeating: "c", count: 2_500))
+        XCTAssertEqual(vm.businessName.count, CreateBusinessFieldLimits.maxName)
+        XCTAssertEqual(vm.descriptionText.count, CreateBusinessFieldLimits.maxDescription)
     }
 
     func testCloseOnPickCategoryDispatchesDismiss() {
@@ -116,7 +131,10 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.selectedCategoryId, .home)
         XCTAssertEqual(vm.currentStep, .pickCategory)
         XCTAssertEqual(vm.searchText, "alpaca grooming")
-        XCTAssertEqual(vm.submitError, "Custom categories are not accepted by the backend yet.")
+        XCTAssertEqual(
+            vm.submitError,
+            "Custom categories aren't available yet. Pick a listed category instead."
+        )
         XCTAssertFalse(vm.isSubmittingCustom)
     }
 

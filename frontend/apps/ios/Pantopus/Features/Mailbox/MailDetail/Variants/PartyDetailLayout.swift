@@ -210,11 +210,7 @@ private struct EventDetailsCard: View {
 
             VStack(spacing: Spacing.s2 + 2) {
                 HStack(spacing: Spacing.s3) {
-                    DateTile(
-                        monthLabel: party.event.date.monthLabel,
-                        dayNumber: party.event.date.dayNumber,
-                        dayLabel: party.event.date.dayLabel
-                    )
+                    PartyMap()
                     VStack(alignment: .leading, spacing: 3) {
                         Text(party.event.location)
                             .font(.system(size: 13.5, weight: .bold))
@@ -257,6 +253,77 @@ private struct EventDetailsCard: View {
                 .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// Abstract mini-map preview (party.jsx PartyMap): four street-grid
+// blocks (one park-green) split by white roads, tiny house dots, and
+// a drop pin near the venue corner. Purely decorative — geometry
+// mirrors the design's 64×64 SVG.
+private struct PartyMap: View {
+    var body: some View {
+        ZStack {
+            Theme.Color.appSurfaceSunken
+            Group {
+                Rectangle().fill(Theme.Color.appBorderSubtle)
+                    .frame(width: 28, height: 28).position(x: 14, y: 14)
+                Rectangle().fill(Theme.Color.appBorderSubtle)
+                    .frame(width: 30, height: 28).position(x: 49, y: 14)
+                Rectangle().fill(Theme.Color.appBorderSubtle)
+                    .frame(width: 28, height: 28).position(x: 14, y: 50)
+                Rectangle().fill(Theme.Color.successBg)
+                    .frame(width: 30, height: 28).position(x: 49, y: 50)
+            }
+            Rectangle().fill(Theme.Color.appSurface)
+                .frame(width: 6, height: 64).position(x: 31, y: 32)
+            Rectangle().fill(Theme.Color.appSurface)
+                .frame(width: 64, height: 8).position(x: 32, y: 32)
+            Rectangle().fill(Theme.Color.appBorder)
+                .frame(width: 1, height: 64).position(x: 31, y: 32)
+            Rectangle().fill(Theme.Color.appBorder)
+                .frame(width: 64, height: 1).position(x: 32, y: 32)
+            Group {
+                Rectangle().fill(Theme.Color.appBorderStrong)
+                    .frame(width: 6, height: 6).position(x: 9, y: 9)
+                Rectangle().fill(Theme.Color.appBorderStrong)
+                    .frame(width: 6, height: 6).position(x: 21, y: 17)
+                Rectangle().fill(Theme.Color.appBorderStrong)
+                    .frame(width: 6, height: 6).position(x: 47, y: 9)
+                Rectangle().fill(Theme.Color.appBorderStrong)
+                    .frame(width: 6, height: 6).position(x: 9, y: 47)
+            }
+            PartyMapPinDrop()
+                .position(x: 47, y: 40)
+        }
+        .frame(width: 64, height: 64)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityIdentifier("partyEventDetails_miniMap")
+    }
+}
+
+// Teardrop map pin — rounded square with one sharp corner, rotated so
+// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+private struct PartyMapPinDrop: View {
+    var body: some View {
+        teardrop
+            .fill(Theme.Color.categoryParty)
+            .overlay(teardrop.stroke(Theme.Color.appSurface, lineWidth: 2))
+            .frame(width: 20, height: 20)
+            .rotationEffect(.degrees(-45))
+            .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0, y: 1)
+    }
+
+    private var teardrop: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 10,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 10,
+            topTrailingRadius: 10
+        )
     }
 }
 

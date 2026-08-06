@@ -2,12 +2,17 @@
 
 package app.pantopus.android.data.auth
 
+import app.pantopus.android.core.routing.DeepLinkRouter
+import app.pantopus.android.core.routing.PendingDeepLinkStore
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.auth.AuthErrorBody
 import app.pantopus.android.data.api.models.auth.AuthenticatedUser
 import app.pantopus.android.data.api.models.auth.ForgotPasswordRequest
 import app.pantopus.android.data.api.models.auth.LoginRequest
+import app.pantopus.android.data.api.models.auth.LoginResponse
+import app.pantopus.android.data.api.models.auth.OAuthCodeExchangeRequest
+import app.pantopus.android.data.api.models.auth.OAuthTokenExchangeRequest
 import app.pantopus.android.data.api.models.auth.RefreshRequest
 import app.pantopus.android.data.api.models.auth.RegisterRequest
 import app.pantopus.android.data.api.models.auth.ResendVerificationRequest
@@ -140,8 +145,13 @@ class AuthRepository
         private val _state = MutableStateFlow<State>(State.Unknown)
         val state: StateFlow<State> = _state.asStateFlow()
 
-        private val errorBodyAdapter = Moshi.Builder().build().adapter(AuthErrorBody::class.java)
         private val userAdapter = Moshi.Builder().build().adapter(UserDto::class.java)
+
+        init {
+            // Workstream 1.4 — DeepLinkRouter is a process singleton; bind
+            // signed-in state so signed-out content links can be deferred.
+            DeepLinkRouter.bindSignedInProvider { _state.value is State.SignedIn }
+        }
 
         /** Called once at app start to hydrate session from persisted tokens. */
         suspend fun restore() {
@@ -215,22 +225,85 @@ class AuthRepository
         ): Result<UserDto> =
             runCatching {
                 val response = api.login(LoginRequest(email = email, password = password))
-                val user = response.user.toSessionUser()
-                tokenStorage.save(
-                    accessToken = response.accessToken.orEmpty(),
-                    refreshToken = response.refreshToken,
-                    userId = response.user.id,
-                )
-                persistCachedUser(user)
-                observability.identify(userId = user.id, email = user.email)
-                Analytics.identify(userId = user.id)
-                observability.track("auth.signed_in")
-                response.accessToken?.takeIf { it.isNotBlank() }?.let(socketManager::connect)
-                _state.value = State.SignedIn(user)
-                user
+                persistLoginResponse(response)
             }.onFailure { t ->
                 if (t !is kotlin.coroutines.cancellation.CancellationException) observability.capture(t)
             }
+
+        /**
+         * Fetch the provider authorization URL from `GET /api/users/oauth/:provider`.
+         * Route: `backend/routes/users.js:3715`.
+         *
+         * [nonce] is the per-attempt CSRF value from `OAuthSessionStore.begin`;
+         * it rides on `redirectTo` and must come back on the callback.
+         */
+        suspend fun oauthAuthorizationUrl(
+            provider: OAuthProvider,
+            nonce: String,
+        ): String =
+            mappingAuthFailures {
+                authApi.oauthUrl(provider.apiValue, OAuthSessionStore.redirectUri(nonce)).url
+            }
+
+        /**
+         * Exchange the browser callback code through
+         * `POST /api/users/oauth/callback` (route
+         * `backend/routes/users.js:3862`) and apply the same encrypted token
+         * persistence + signed-in transition as email login.
+         */
+        suspend fun exchangeOAuthCode(code: String): UserDto =
+            mappingAuthFailures {
+                persistLoginResponse(authApi.exchangeOAuthCode(OAuthCodeExchangeRequest(code)))
+            }
+
+        /**
+         * Legacy fragment-token path via `POST /api/users/oauth/token`
+         * (route `backend/routes/users.js:3792`).
+         */
+        suspend fun exchangeOAuthTokens(
+            accessToken: String,
+            refreshToken: String,
+        ): UserDto =
+            mappingAuthFailures {
+                persistLoginResponse(
+                    authApi.exchangeOAuthToken(
+                        OAuthTokenExchangeRequest(
+                            accessToken = accessToken,
+                            refreshToken = refreshToken,
+                        ),
+                    ),
+                )
+            }
+
+        /**
+         * Runs [block], letting coroutine cancellation propagate untouched and
+         * projecting every other failure through [AuthErrorMapper.generic] (an
+         * [AuthError] thrown from inside passes through unchanged). Keeps the
+         * three OAuth entry points to a single error contract.
+         */
+        private suspend fun <T> mappingAuthFailures(block: suspend () -> T): T {
+            try {
+                return block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                throw AuthErrorMapper.generic(t)
+            }
+        }
+
+        private suspend fun persistLoginResponse(response: LoginResponse): UserDto {
+            val access = response.accessToken?.takeIf { it.isNotBlank() } ?: throw AuthError.Unknown
+            val user = response.user.toSessionUser()
+            tokenStorage.save(
+                accessToken = access,
+                refreshToken = response.refreshToken,
+                userId = response.user.id,
+            )
+            persistCachedUser(user)
+            finishSignedIn(user, access)
+            observability.track("auth.signed_in")
+            return user
+        }
 
         /**
          * `POST /api/users/register` (route `backend/routes/users.js:1177`).
@@ -281,7 +354,7 @@ class AuthRepository
                     requiresEmailVerification = response.requiresEmailVerification ?: true,
                 )
             } catch (t: Throwable) {
-                throw mapRegisterError(t)
+                throw AuthErrorMapper.register(t)
             }
         }
 
@@ -295,7 +368,7 @@ class AuthRepository
                 authApi.forgotPassword(ForgotPasswordRequest(email = email))
                 observability.track("auth.forgot_password_requested")
             } catch (t: Throwable) {
-                throw mapGenericError(t)
+                throw AuthErrorMapper.generic(t)
             }
         }
 
@@ -311,7 +384,7 @@ class AuthRepository
                 authApi.resetPassword(ResetPasswordRequest(token = token, newPassword = newPassword))
                 observability.track("auth.password_reset")
             } catch (t: Throwable) {
-                throw mapResetPasswordError(t)
+                throw AuthErrorMapper.resetPassword(t)
             }
         }
 
@@ -325,7 +398,7 @@ class AuthRepository
                 authApi.verifyEmail(VerifyEmailRequest(tokenHash = token))
                 observability.track("auth.email_verified")
             } catch (t: Throwable) {
-                throw mapVerifyEmailError(t)
+                throw AuthErrorMapper.verifyEmail(t)
             }
         }
 
@@ -338,7 +411,7 @@ class AuthRepository
                 authApi.resendVerification(ResendVerificationRequest(email = email))
                 observability.track("auth.verification_resent")
             } catch (t: Throwable) {
-                throw mapGenericError(t)
+                throw AuthErrorMapper.generic(t)
             }
         }
 
@@ -409,91 +482,104 @@ class AuthRepository
             observability.identify(userId = null)
             Analytics.identify(userId = null)
             observability.track("auth.signed_out")
+            // Workstream 1.4 — never resume a prior user's deferred destination.
+            PendingDeepLinkStore.clear()
+            DeepLinkRouter.clearPending()
             _state.value = State.SignedOut
         }
+    }
 
-        // MARK: - Error mapping
+/**
+ * `Throwable` -> [AuthError] projection for every auth request. Lives beside
+ * the repository (rather than inside it) so the class body stays focused on
+ * the request flows. Mirrors the iOS `AuthManager.map*Error` helpers.
+ */
+private object AuthErrorMapper {
+    private val errorBodyAdapter = Moshi.Builder().build().adapter(AuthErrorBody::class.java)
 
-        private fun mapRegisterError(t: Throwable): AuthError {
-            return when (t) {
-                is IOException -> AuthError.NetworkError
-                is HttpException -> {
-                    val status = t.code()
-                    if (status == 429) return AuthError.RateLimited
-                    val raw = t.response()?.errorBody()?.string().orEmpty()
-                    val message = extractMessage(raw) ?: raw
-                    when {
-                        message.contains("already registered", ignoreCase = true) ||
-                            message.contains("Email already", ignoreCase = true) -> AuthError.EmailAlreadyExists
-                        message.contains("password", ignoreCase = true) -> AuthError.WeakPassword
-                        status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
-                        else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
-                    }
+    fun register(t: Throwable): AuthError {
+        return when (t) {
+            is IOException -> AuthError.NetworkError
+            is HttpException -> {
+                val status = t.code()
+                if (status == 429) return AuthError.RateLimited
+                val raw = t.response()?.errorBody()?.string().orEmpty()
+                val message = extractMessage(raw) ?: raw
+                when {
+                    message.contains("already registered", ignoreCase = true) ||
+                        message.contains("Email already", ignoreCase = true) -> AuthError.EmailAlreadyExists
+                    message.contains("password", ignoreCase = true) -> AuthError.WeakPassword
+                    status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
+                    else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
                 }
-                else -> AuthError.Unknown
             }
-        }
-
-        private fun mapResetPasswordError(t: Throwable): AuthError {
-            return when (t) {
-                is IOException -> AuthError.NetworkError
-                is HttpException -> {
-                    val status = t.code()
-                    if (status == 429) return AuthError.RateLimited
-                    val raw = t.response()?.errorBody()?.string().orEmpty()
-                    val message = extractMessage(raw) ?: raw
-                    when {
-                        message.contains("password", ignoreCase = true) &&
-                            !message.contains("Invalid or expired", ignoreCase = true) -> AuthError.WeakPassword
-                        status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
-                        else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
-                    }
-                }
-                else -> AuthError.Unknown
-            }
-        }
-
-        private fun mapVerifyEmailError(t: Throwable): AuthError {
-            return when (t) {
-                is IOException -> AuthError.NetworkError
-                is HttpException -> {
-                    val status = t.code()
-                    if (status == 429) return AuthError.RateLimited
-                    val raw = t.response()?.errorBody()?.string().orEmpty()
-                    val message = extractMessage(raw) ?: raw
-                    if (status >= 500) {
-                        AuthError.ServerError(message.ifBlank { "Server error $status." })
-                    } else {
-                        AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
-                    }
-                }
-                else -> AuthError.Unknown
-            }
-        }
-
-        private fun mapGenericError(t: Throwable): AuthError {
-            return when (t) {
-                is IOException -> AuthError.NetworkError
-                is HttpException -> {
-                    val status = t.code()
-                    val raw = t.response()?.errorBody()?.string().orEmpty()
-                    val message = extractMessage(raw) ?: raw
-                    when {
-                        status == 401 -> AuthError.InvalidCredentials
-                        status == 429 -> AuthError.RateLimited
-                        status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
-                        else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
-                    }
-                }
-                else -> AuthError.Unknown
-            }
-        }
-
-        private fun extractMessage(body: String): String? {
-            if (body.isBlank()) return null
-            return runCatching { errorBodyAdapter.fromJson(body)?.error }.getOrNull()
+            else -> AuthError.Unknown
         }
     }
+
+    fun resetPassword(t: Throwable): AuthError {
+        return when (t) {
+            is IOException -> AuthError.NetworkError
+            is HttpException -> {
+                val status = t.code()
+                if (status == 429) return AuthError.RateLimited
+                val raw = t.response()?.errorBody()?.string().orEmpty()
+                val message = extractMessage(raw) ?: raw
+                when {
+                    message.contains("password", ignoreCase = true) &&
+                        !message.contains("Invalid or expired", ignoreCase = true) -> AuthError.WeakPassword
+                    status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
+                    else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
+                }
+            }
+            else -> AuthError.Unknown
+        }
+    }
+
+    fun verifyEmail(t: Throwable): AuthError {
+        return when (t) {
+            is IOException -> AuthError.NetworkError
+            is HttpException -> {
+                val status = t.code()
+                if (status == 429) return AuthError.RateLimited
+                val raw = t.response()?.errorBody()?.string().orEmpty()
+                val message = extractMessage(raw) ?: raw
+                if (status >= 500) {
+                    AuthError.ServerError(message.ifBlank { "Server error $status." })
+                } else {
+                    AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
+                }
+            }
+            else -> AuthError.Unknown
+        }
+    }
+
+    fun generic(t: Throwable): AuthError {
+        return when (t) {
+            // Already typed by a lower layer (e.g. a login response with no
+            // access token) — keep the specific error rather than flattening.
+            is AuthError -> t
+            is IOException -> AuthError.NetworkError
+            is HttpException -> {
+                val status = t.code()
+                val raw = t.response()?.errorBody()?.string().orEmpty()
+                val message = extractMessage(raw) ?: raw
+                when {
+                    status == 401 -> AuthError.InvalidCredentials
+                    status == 429 -> AuthError.RateLimited
+                    status >= 500 -> AuthError.ServerError(message.ifBlank { "Server error $status." })
+                    else -> AuthError.ServerError(message.ifBlank { "Request failed ($status)." })
+                }
+            }
+            else -> AuthError.Unknown
+        }
+    }
+
+    private fun extractMessage(body: String): String? {
+        if (body.isBlank()) return null
+        return runCatching { errorBodyAdapter.fromJson(body)?.error }.getOrNull()
+    }
+}
 
 /** Projection of [AuthenticatedUser] → the compact [UserDto] used in session state. */
 private fun AuthenticatedUser.toSessionUser(): UserDto =

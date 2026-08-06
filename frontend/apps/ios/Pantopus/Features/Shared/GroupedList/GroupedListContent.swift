@@ -48,6 +48,9 @@ public struct GroupedListRow: Identifiable, Sendable, Hashable {
     /// label. Used by the Privacy "Your data" action rows. `nil` for
     /// plain settings rows.
     public let leadingIcon: PantopusIcon?
+    /// Optional parity identifier for controls whose product contract uses
+    /// a stable unprefixed name.
+    public let accessibilityIdentifier: String?
     /// Red destructive text + force this row into its own card. The
     /// shell pulls it out of the group and renders a dedicated card.
     public let destructive: Bool
@@ -58,6 +61,7 @@ public struct GroupedListRow: Identifiable, Sendable, Hashable {
         subtext: String? = nil,
         control: RowControl,
         leadingIcon: PantopusIcon? = nil,
+        accessibilityIdentifier: String? = nil,
         destructive: Bool = false
     ) {
         self.id = id
@@ -65,6 +69,7 @@ public struct GroupedListRow: Identifiable, Sendable, Hashable {
         self.subtext = subtext
         self.control = control
         self.leadingIcon = leadingIcon
+        self.accessibilityIdentifier = accessibilityIdentifier
         self.destructive = destructive
     }
 }

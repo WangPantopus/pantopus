@@ -57,11 +57,11 @@ public struct CreateBusinessWizardView: View {
                 PickCategoryStep(viewModel: viewModel)
             }
         case .legalInfo:
-            LegalInfoStep()
+            LegalInfoStep(viewModel: viewModel)
         case .profile:
-            ProfileStep()
+            ProfileStep(viewModel: viewModel)
         case .confirm:
-            ConfirmStep()
+            ConfirmStep(viewModel: viewModel)
         }
     }
 

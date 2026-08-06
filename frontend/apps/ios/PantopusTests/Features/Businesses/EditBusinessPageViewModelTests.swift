@@ -2,13 +2,8 @@
 //  EditBusinessPageViewModelTests.swift
 //  PantopusTests
 //
-//  P4.2 — A13.10 Edit Business Page. View-model behaviour:
-//    - preview-seeded init lands in `.loaded` (so previews + snapshot
-//      tests don't go through the load stub)
-//    - `save()` clears the dirty bits on every field and zeroes
-//      `unsavedCount` in the `published` mode
-//    - `discardConfirmed()` reverts every field to its original value
-//    - the toast message updates per action
+//  P4.2 — A13.10 Edit Business Page. View-model behaviour for the
+//  preview-seeded local-persistence path (snapshots + previews).
 //
 
 import XCTest
@@ -29,7 +24,6 @@ final class EditBusinessPageViewModelTests: XCTestCase {
 
     func test_save_clearsDirtyFieldsAndZeroesUnsavedCount() async {
         var seed = EditBusinessPageSampleData.publishedRoostCafe
-        // Trip the name field — original != current.
         seed = withModifiedName(seed, current: "Roost Café & Bakery")
         let viewModel = EditBusinessPageViewModel(businessId: "biz-1", preview: seed)
         XCTAssertTrue(currentName(viewModel) == "Roost Café & Bakery")
@@ -47,16 +41,14 @@ final class EditBusinessPageViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.toastMessage, "Saved")
     }
 
-    func test_liveLoadedSaveDoesNotPretendToPersist() async {
-        let viewModel = EditBusinessPageViewModel(businessId: "biz-1")
-        await viewModel.load()
-
-        await viewModel.save()
-
-        XCTAssertEqual(
-            viewModel.toastMessage,
-            "Business page editing is not connected to the backend yet."
+    func test_updateMarksFieldDirty() {
+        let viewModel = EditBusinessPageViewModel(
+            businessId: "biz-1",
+            preview: EditBusinessPageSampleData.publishedRoostCafe
         )
+        viewModel.update(.name, to: "Roost Café & Bakery")
+        XCTAssertTrue(currentNameIsDirty(viewModel))
+        XCTAssertEqual(currentName(viewModel), "Roost Café & Bakery")
     }
 
     func test_discardConfirmed_revertsCurrentToOriginal() async {

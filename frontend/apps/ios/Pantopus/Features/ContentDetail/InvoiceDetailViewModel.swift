@@ -5,8 +5,9 @@
 //  T2.6 ships the invoice frame from fixture display data. Block 3B wires
 //  the "Pay" CTA to Stripe PaymentSheet only when a real backend order
 //  reference is injected; fixture invoices leave checkout disabled rather
-//  than sending placeholder payee/amount data. On success we re-read server
-//  state and never mark the invoice paid client-side.
+//  than sending placeholder payee/amount data. On a successful pay we
+//  re-project into the paid frame (A09.4) — once a real invoice backend
+//  lands, `load()` reads the paid state from the server instead.
 //
 
 import Foundation
@@ -30,7 +31,9 @@ public final class InvoiceDetailViewModel {
     public private(set) var paymentStatus: InvoicePaymentStatus = .idle
 
     private let invoiceId: String
-    private let paid: Bool
+    /// Flips to true after a successful pay so `load()` re-projects the
+    /// paid frame (A09.4).
+    private var paid: Bool
     private let checkout: CheckoutCoordinator
     /// The order this invoice bills for. Real invoices must carry a backend
     /// order reference; fixture invoices leave this nil so pay is disabled
@@ -53,10 +56,10 @@ public final class InvoiceDetailViewModel {
         state = .loaded(paid ? Self.paidFixture(invoiceId: invoiceId) : Self.fixture(invoiceId: invoiceId))
     }
 
-    /// Run the PaymentSheet checkout for this invoice. On success we re-read
-    /// from the backend (the source of truth) rather than flipping the state
-    /// locally — for the fixture that re-projects the same frame; once a real
-    /// invoice backend lands, `load()` reflects the paid state.
+    /// Run the PaymentSheet checkout for this invoice. On success we
+    /// re-project into the paid frame (Paid pill, green total, receipt
+    /// row, Share + Download dock); once a real invoice backend lands,
+    /// `load()` reads the paid state from the server instead.
     public func payNow() async {
         guard !paid else { return }
         guard let request = checkoutRequest else {
@@ -68,6 +71,7 @@ public final class InvoiceDetailViewModel {
         switch outcome {
         case .paid:
             paymentStatus = .paid
+            paid = true
             await load()
         case .canceled:
             paymentStatus = .canceled
@@ -79,6 +83,12 @@ public final class InvoiceDetailViewModel {
     /// Clear a result toast once the view has shown it.
     public func clearPaymentStatus() {
         paymentStatus = .idle
+    }
+
+    /// Short summary handed to the paid dock's Share action (system share
+    /// sheet). Mirrors the Android string exactly.
+    public var shareSummary: String {
+        "Invoice \(invoiceId.uppercased()) · Paid $642.85 via Pantopus Pay"
     }
 
     // MARK: - Fixtures

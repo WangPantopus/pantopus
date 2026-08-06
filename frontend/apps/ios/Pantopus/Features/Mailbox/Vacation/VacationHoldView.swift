@@ -12,8 +12,9 @@
 //
 //  · active — sky-gradient `HoldStatusHero` with pulsing pill + days-
 //    left + 3-cell stats grid, a "Currently held" ledger via `HeldList`,
-//    read-only forwarding + emergency cards, and the trailing slot in
-//    the top bar swaps `Save` for a neutral `End hold` text button.
+//    read-only forwarding + emergency cards, a destructive "End hold
+//    early" row at the bottom, and the trailing slot in the top bar
+//    swaps `Save` for a muted `Edit` text button.
 //
 
 // swiftlint:disable file_length
@@ -47,7 +48,8 @@ public struct VacationHoldView: View {
                         VacationActiveBody(
                             hold: hold,
                             onTapForwarding: { viewModel.tapForwarding() },
-                            onTapEmergency: { viewModel.tapEmergency() }
+                            onTapEmergency: { viewModel.tapEmergency() },
+                            onEndHold: { viewModel.endHoldEarly() }
                         )
                     }
                 }
@@ -245,6 +247,7 @@ private struct VacationActiveBody: View {
     let hold: VacationActiveHold
     let onTapForwarding: () -> Void
     let onTapEmergency: () -> Void
+    let onEndHold: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -293,6 +296,16 @@ private struct VacationActiveBody: View {
                     )
                 }
             }
+
+            VacationCard {
+                VacationDestructiveRow(
+                    label: "End hold early",
+                    sub: "Mail resumes tomorrow morning",
+                    onTap: onEndHold,
+                    identifier: "vacationHoldEndEarly"
+                )
+            }
+            .padding(.top, 18)
 
             VacationMonoFooter(hold.activeSinceLabel)
         }
@@ -547,6 +560,36 @@ private struct VacationChevronRow: View {
         case let .view(view):
             view
         }
+    }
+}
+
+/// A14.8 — destructive card row ("End hold early") at the bottom of the
+/// active body. Error-tinted label + secondary sub, no chevron, per the
+/// JSX active frame's `destructive` Row.
+private struct VacationDestructiveRow: View {
+    let label: String
+    let sub: String
+    let onTap: () -> Void
+    let identifier: String
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+                Text(sub)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel("\(label), \(sub)")
     }
 }
 

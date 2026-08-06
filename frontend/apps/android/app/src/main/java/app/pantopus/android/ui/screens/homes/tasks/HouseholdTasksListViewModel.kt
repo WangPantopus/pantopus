@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomeTasksRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.components.StatusChipVariant
@@ -193,7 +194,7 @@ class HouseholdTasksListViewModel
                     is NetworkResult.Failure -> {
                         tasks = null
                         _banner.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                     }
                 }
             }

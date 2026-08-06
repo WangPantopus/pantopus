@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.GigSavedSearchDto
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.gigs.GigDraftQueue
 import app.pantopus.android.data.gigs.GigSavedSearchesRepository
@@ -358,7 +359,7 @@ class GigsFeedViewModel
                         rebuildSavedSearches()
                     }
                     is NetworkResult.Failure -> {
-                        _savedSearches.value = GigSavedSearchesUiState.Error(result.error.message)
+                        _savedSearches.value = GigSavedSearchesUiState.Error(result.error.displayMessage("Couldn't load saved searches."))
                     }
                 }
             }
@@ -563,7 +564,7 @@ class GigsFeedViewModel
                     )
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = GigsFeedUiState.Error(result.error.message)
+                    _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
                 }
             }
         }
@@ -603,7 +604,7 @@ class GigsFeedViewModel
                     writeWidgetSnapshot(result.data.gigs)
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = GigsFeedUiState.Error(result.error.message)
+                    _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
                 }
             }
         }

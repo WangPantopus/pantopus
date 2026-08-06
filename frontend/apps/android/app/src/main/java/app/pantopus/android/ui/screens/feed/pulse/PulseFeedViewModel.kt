@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
@@ -272,7 +273,7 @@ class PulseFeedViewModel
                             if (response.posts.isNotEmpty()) rebuildLoadedState()
                         }
                         is NetworkResult.Failure -> {
-                            _state.value = PulseFeedUiState.Error(result.error.message)
+                            _state.value = PulseFeedUiState.Error(result.error.displayMessage("Couldn't load Pulse."))
                         }
                     }
                 } finally {

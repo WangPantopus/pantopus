@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.support_trains.SupportTrainsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,7 +72,7 @@ class SupportTrainDetailViewModel
                         is NetworkResult.Success ->
                             SupportTrainDetailUiState.Loaded(SupportTrainDetailProjection.project(result.data))
                         is NetworkResult.Failure ->
-                            SupportTrainDetailUiState.Error(result.error.message)
+                            SupportTrainDetailUiState.Error(result.error.displayMessage("Couldn't load this train."))
                     }
             }
         }

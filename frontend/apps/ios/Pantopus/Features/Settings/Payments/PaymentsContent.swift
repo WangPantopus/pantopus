@@ -29,8 +29,9 @@ public struct PaymentsLoaded: Sendable, Hashable {
     public let methods: [PaymentMethod]
     /// Payouts card — Stripe Connect row + payout method row + tax row.
     public let payouts: PaymentsPayouts
-    /// Activity card — populated has 3 stat rows (lifetime · YTD ·
-    /// last payout); empty collapses to one muted "No transactions" row.
+    /// Activity card — populated has 3 chevron rows (Transactions ·
+    /// Statements · Disputes); empty collapses to one muted
+    /// "No transactions" row.
     public let activity: PaymentsActivity
     /// Surfaces the "Close payment account" destructive card.
     /// `false` on the empty frame (no account to close yet).
@@ -150,8 +151,8 @@ public struct PaymentsPayouts: Sendable, Hashable {
     /// "Connected" chip; empty frame shows a primary "Connect" CTA chip.
     public let stripe: PaymentsPayoutRow
     /// Payout method row (e.g. "Payout to Chase •• 1023"). On the
-    /// empty frame this renders gated with a lock glyph + "Available
-    /// after Stripe connect" sub.
+    /// empty frame this renders gated with an em-dash + "Add after
+    /// connecting Stripe" sub.
     public let payoutMethod: PaymentsPayoutRow
     /// Payout schedule row (only rendered on the populated frame —
     /// nil hides the row).
@@ -210,14 +211,14 @@ public enum PaymentsRowTrailing: Sendable, Hashable {
     /// Primary CTA chip without a chevron (e.g. blue "Connect" chip
     /// on Stripe Connect in the empty frame).
     case ctaChip(label: String, tone: PaymentsChipTone)
-    /// Em-dash glyph used to mark a gated row (empty frame's payout
-    /// method / tax info — locked behind Stripe Connect).
+    /// Em-dash "—" value used to mark a gated row (empty frame's
+    /// payout method / tax info — gated behind Stripe Connect).
     case gatedDash
 }
 
 /// Activity card content.
 public enum PaymentsActivity: Sendable, Hashable {
-    /// Three stat rows: lifetime · YTD · last payout.
+    /// Three chevron rows: Transactions · Statements · Disputes.
     case stats([PaymentsActivityStat])
     /// Single muted "No transactions yet" row. Used on the empty
     /// frame when there's no Stripe history.

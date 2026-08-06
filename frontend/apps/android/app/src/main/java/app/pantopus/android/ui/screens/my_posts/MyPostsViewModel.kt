@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.posts.MyPostDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
@@ -242,7 +243,7 @@ class MyPostsViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = ListOfRowsUiState.Error(result.error.message)
+                            _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                         }
                     }
                 }

@@ -47,6 +47,7 @@ public final class BusinessProfileViewModel {
     private let businessId: String
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.BusinessProfile")
+    private var isStartingInquiry = false
 
     init(businessId: String, client: APIClient = .shared) {
         self.businessId = businessId
@@ -80,6 +81,43 @@ public final class BusinessProfileViewModel {
         } catch {
             saveState = .failed(message: "Something went wrong. Try again.")
             toastMessage = "Something went wrong. Try again."
+        }
+    }
+
+    /// Opens (or resumes) an inquiry chat via
+    /// `POST /api/businesses/:id/inbox/start` and returns a conversation
+    /// destination for the host to push. Mirrors RN/web
+    /// `startBusinessInquiry`.
+    public func resolveChatDestination() async -> InboxConversationDestination? {
+        guard case let .loaded(content) = state else { return nil }
+        guard !isStartingInquiry else { return nil }
+        isStartingInquiry = true
+        defer { isStartingInquiry = false }
+        let name = content.header.displayName
+        let handle = content.header.handle
+        let subject: String = {
+            if let handle, !handle.isEmpty {
+                return "Inquiry for @\(handle.trimmingCharacters(in: CharacterSet(charactersIn: "@")))"
+            }
+            return "Inquiry for \(name)"
+        }()
+        do {
+            let response: StartBusinessInquiryResponse = try await client.request(
+                BusinessesEndpoints.startInquiry(businessId: businessId, subject: subject)
+            )
+            return InboxConversationDestination(
+                mode: .room(id: response.roomId),
+                displayName: name,
+                initials: Self.initials(from: name),
+                identityKind: "business",
+                verified: content.header.isVerified
+            )
+        } catch let error as APIError {
+            toastMessage = friendlyMessage(for: error)
+            return nil
+        } catch {
+            toastMessage = "Couldn't open chat. Try again."
+            return nil
         }
     }
 
@@ -144,6 +182,14 @@ public final class BusinessProfileViewModel {
         case .transport: "Check your connection and try again."
         default: "Something went wrong. Try again."
         }
+    }
+
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content.
+    private static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
     }
 }
 

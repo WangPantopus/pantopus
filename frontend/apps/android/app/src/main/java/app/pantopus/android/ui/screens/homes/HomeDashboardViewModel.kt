@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.HomePublicProfile
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsTab
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroStat
@@ -201,7 +202,10 @@ class HomeDashboardViewModel
                     if (result.error is NetworkError.Forbidden || result.error is NetworkError.NotFound) {
                         fetchPublic()
                     } else {
-                        _state.value = HomeDashboardUiState.Error(result.error.message)
+                        _state.value =
+                            HomeDashboardUiState.Error(
+                                result.error.displayMessage("Couldn't load this home."),
+                            )
                     }
             }
         }
@@ -209,7 +213,11 @@ class HomeDashboardViewModel
         private suspend fun fetchPublic() {
             when (val result = repo.publicProfile(homeId)) {
                 is NetworkResult.Success -> applyPublic(result.data.home)
-                is NetworkResult.Failure -> _state.value = HomeDashboardUiState.Error(result.error.message)
+                is NetworkResult.Failure ->
+                    _state.value =
+                        HomeDashboardUiState.Error(
+                            result.error.displayMessage("Couldn't load this home."),
+                        )
             }
         }
 

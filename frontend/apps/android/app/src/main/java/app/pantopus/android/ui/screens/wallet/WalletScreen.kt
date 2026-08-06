@@ -55,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroSplitCell
 import app.pantopus.android.ui.components.BalanceHeroTone
@@ -146,6 +147,8 @@ fun WalletScreen(
             else -> Unit
         }
     }
+
+    SecureScreenEffect()
 
     Box(modifier = Modifier.fillMaxSize()) {
         WalletScreenContent(
@@ -448,14 +451,18 @@ private fun WalletBody(
                 actionTag = "walletSeeAllActivity",
             )
             ActivityList(items = content.activity)
-            SectionOverline(title = "Payout method")
-            PayoutMethodCard(
-                method = content.payoutMethod,
-                onManage = onManagePayout,
-                onReverify = onReverifyPayout,
-            )
-            SectionOverline(title = "Taxes")
-            TaxDocsRow(docs = content.taxDocs, onClick = onOpenTaxDocs)
+            content.payoutMethod?.let { method ->
+                SectionOverline(title = "Payout method")
+                PayoutMethodCard(
+                    method = method,
+                    onManage = onManagePayout,
+                    onReverify = onReverifyPayout,
+                )
+            }
+            content.taxDocs?.let { docs ->
+                SectionOverline(title = "Taxes")
+                TaxDocsRow(docs = docs, onClick = onOpenTaxDocs)
+            }
         }
         WalletBottomBar(
             content = content,

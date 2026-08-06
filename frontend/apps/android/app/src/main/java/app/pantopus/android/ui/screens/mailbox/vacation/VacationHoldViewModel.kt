@@ -37,7 +37,8 @@ import javax.inject.Inject
  *   fields have no backend source).
  * - Save (`tapTrailingAction` in scheduling) resolves the user's primary home,
  *   maps the draft to `startVacationSchema`, and POSTs `/vacation/start`.
- * - End hold (`tapTrailingAction` in active) POSTs `/vacation/cancel`.
+ * - Edit (`tapTrailingAction` in active) returns to the scheduling form.
+ * - End hold early (`endHoldEarly`) POSTs `/vacation/cancel`.
  *
  * The production seam is the [Inject] constructor (Hilt supplies real
  * repositories). The `internal constructor(seed)` is the test / preview seam:
@@ -63,6 +64,17 @@ class VacationHoldViewModel
 
         /** Id of the active hold (from `/vacation/status` or `/vacation/start`) — needed to cancel. */
         private var activeHoldId: String? = null
+
+        /** Wire row backing the active hold, so Edit can seed the composer from it. */
+        private var activeHoldDto: VacationHoldDto? = null
+
+        /**
+         * Id of the hold the composer is currently editing. The backend has no
+         * update route (`/vacation/start` always inserts), so saving an edit
+         * cancels this hold first — otherwise Save would leave two overlapping
+         * holds on the same home.
+         */
+        private var editingHoldId: String? = null
 
         private var onBack: () -> Unit = {}
         private var onEditForwarding: () -> Unit = {}
@@ -107,9 +119,13 @@ class VacationHoldViewModel
                         val active = result.data.active
                         if (active != null) {
                             activeHoldId = active.id
+                            activeHoldDto = active
+                            editingHoldId = null
                             _mode.value = VacationHoldMode.Active(active.toActiveHold())
                         } else {
                             activeHoldId = null
+                            activeHoldDto = null
+                            editingHoldId = null
                             _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
                         }
                     }
@@ -123,15 +139,15 @@ class VacationHoldViewModel
 
         // MARK: - Trailing-action chrome
 
-        /** "Save" in scheduling, "End hold" in active. */
+        /** "Save" in scheduling, "Edit" in active (ending moved to the bottom row). */
         val trailingActionLabel: String
             get() =
                 when (_mode.value) {
                     is VacationHoldMode.Scheduling -> "Save"
-                    is VacationHoldMode.Active -> "End hold"
+                    is VacationHoldMode.Active -> "Edit"
                 }
 
-        /** Save disables when the draft is invalid; End hold is always enabled. */
+        /** Save disables when the draft is invalid; Edit is always enabled. */
         val trailingActionEnabled: Boolean
             get() =
                 when (val current = _mode.value) {
@@ -148,7 +164,7 @@ class VacationHoldViewModel
             val homesRepo = homesRepository
             if (repo == null || homesRepo == null) {
                 // Preview / test seam — flip locally so the QA + snapshot path
-                // validates the "Save flips chrome" handoff.
+                // validates the "Save flips chrome" / "Edit returns to form" handoff.
                 _mode.value =
                     when (_mode.value) {
                         is VacationHoldMode.Scheduling ->
@@ -160,8 +176,46 @@ class VacationHoldViewModel
             }
             when (val current = _mode.value) {
                 is VacationHoldMode.Scheduling -> startHold(current.draft, repo, homesRepo)
-                is VacationHoldMode.Active -> cancelHold(repo)
+                is VacationHoldMode.Active -> {
+                    // Edit returns to the scheduling form (the only edit state
+                    // the screen has today), seeded from the *live* hold —
+                    // dropping back to the sample draft would silently rewrite
+                    // the user's real dates. Ending the hold is `endHoldEarly`.
+                    editingHoldId = activeHoldId
+                    _mode.value = VacationHoldMode.Scheduling(draftForEdit(activeHoldDto))
+                }
             }
+        }
+
+        /**
+         * Seed the composer from the live hold. The rich scope / forwarding /
+         * emergency fields have no backend source, so they keep the sample
+         * defaults; the dates and the forwarding switch come from the wire row.
+         */
+        private fun draftForEdit(hold: VacationHoldDto?): VacationScheduleDraft {
+            val base = VacationHoldSampleData.schedulingDraft
+            if (hold == null) return base
+            val from = parseDate(hold.startDate) ?: base.fromDate
+            val to = parseDate(hold.endDate) ?: base.toDate
+            return base.copy(
+                fromDate = from,
+                toDate = if (to.isBefore(from)) from else to,
+                forwardingEnabled = hold.holdAction == FORWARD_TO_HOUSEHOLD,
+            )
+        }
+
+        /**
+         * A14.8 — destructive "End hold early" row at the bottom of the
+         * active body. Cancels the live hold (or flips locally in preview).
+         */
+        fun endHoldEarly() {
+            if (_mode.value !is VacationHoldMode.Active) return
+            val repo = repository
+            if (repo == null) {
+                _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
+                return
+            }
+            cancelHold(repo)
         }
 
         fun tapFromDate() = onPickFromDate()
@@ -226,9 +280,19 @@ class VacationHoldViewModel
         ) {
             viewModelScope.launch {
                 val homeId = resolveHomeId(homesRepo) ?: return@launch
+                // Editing an existing hold: there is no update route, so retire
+                // the old row first. Bail out if that fails rather than leaving
+                // two overlapping holds on the same home.
+                val editingId = editingHoldId
+                if (editingId != null) {
+                    if (repo.cancelVacation(editingId) is NetworkResult.Failure) return@launch
+                    editingHoldId = null
+                    activeHoldId = null
+                    activeHoldDto = null
+                }
                 // The composer collects scopes/forwarding, not the backend's
                 // hold/package enums — derive the closest action from forwarding.
-                val holdAction = if (draft.forwardingEnabled) "forward_to_household" else "hold_in_vault"
+                val holdAction = if (draft.forwardingEnabled) FORWARD_TO_HOUSEHOLD else "hold_in_vault"
                 val request =
                     StartVacationRequest(
                         homeId = homeId,
@@ -241,6 +305,7 @@ class VacationHoldViewModel
                 when (val result = repo.startVacation(request)) {
                     is NetworkResult.Success -> {
                         activeHoldId = result.data.hold.id
+                        activeHoldDto = result.data.hold
                         _mode.value = VacationHoldMode.Active(result.data.hold.toActiveHold())
                     }
                     is NetworkResult.Failure -> Unit // keep the composer; the CTA can be retried
@@ -254,6 +319,8 @@ class VacationHoldViewModel
                 when (repo.cancelVacation(holdId)) {
                     is NetworkResult.Success -> {
                         activeHoldId = null
+                        activeHoldDto = null
+                        editingHoldId = null
                         _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
                     }
                     is NetworkResult.Failure -> Unit // keep the active hold visible
@@ -267,6 +334,9 @@ class VacationHoldViewModel
                 is NetworkResult.Failure -> null
             }
     }
+
+/** Backend `hold_action` value for "forward urgent mail to the household". */
+private const val FORWARD_TO_HOUSEHOLD = "forward_to_household"
 
 private fun makeMode(seed: VacationHoldSeed): VacationHoldMode =
     when (seed) {
@@ -304,7 +374,7 @@ private fun VacationHoldDto.toActiveHold(today: LocalDate = LocalDate.now()): Va
             emptyList()
         }
     val forwarding =
-        if (holdAction == "forward_to_household") {
+        if (holdAction == FORWARD_TO_HOUSEHOLD) {
             VacationForwardingTarget(title = "Forwarding urgent mail", sub = "To your household address")
         } else {
             null

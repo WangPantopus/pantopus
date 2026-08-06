@@ -24,7 +24,8 @@ public struct BusinessProfileView: View {
     @State private var viewModel: BusinessProfileViewModel
     @State private var savedStore = SavedPlacesStore()
     private let onBack: @MainActor () -> Void
-    private let onOpenMessages: @MainActor () -> Void
+    /// Host pushes the chat conversation after Contact resolves a room.
+    private let onOpenMessages: @MainActor (InboxConversationDestination) -> Void
     private let onShare: @MainActor () -> Void
     private let onOpenReport: @MainActor () -> Void
     private let onOpenWebsite: @MainActor (URL) -> Void
@@ -36,7 +37,7 @@ public struct BusinessProfileView: View {
     public init(
         businessId: String,
         onBack: @escaping @MainActor () -> Void,
-        onOpenMessages: @escaping @MainActor () -> Void = {},
+        onOpenMessages: @escaping @MainActor (InboxConversationDestination) -> Void = { _ in },
         onShare: @escaping @MainActor () -> Void = {},
         onOpenReport: @escaping @MainActor () -> Void = {},
         onOpenWebsite: @escaping @MainActor (URL) -> Void = { _ in },
@@ -180,7 +181,7 @@ public struct BusinessProfileView: View {
                         savedStore.toggle(pending)
                     }
                 },
-                onContact: onOpenMessages,
+                onContact: { Task { await openContact() } },
                 onBook: onBook,
                 onCall: callBusiness
             )
@@ -193,6 +194,12 @@ public struct BusinessProfileView: View {
 
     private func presentOverflow() {
         viewModel.showOverflow = true
+    }
+
+    /// Contact dock → `POST …/inbox/start` → host chat push.
+    private func openContact() async {
+        guard let destination = await viewModel.resolveChatDestination() else { return }
+        onOpenMessages(destination)
     }
 
     private func callBusiness() {

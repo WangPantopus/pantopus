@@ -92,7 +92,7 @@ struct PlaceSourceNote: View {
                 Text(asOf)
             }
         }
-        .font(.system(size: 12))
+        .font(Theme.Font.caption)
         .foregroundStyle(Theme.Color.appTextMuted)
         .padding(.top, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,7 +125,7 @@ struct PlaceFactCell: View {
             PlaceIconTile(icon: icon, tone: .home, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)
                 Text(value)
                     .font(.system(size: 15, weight: .semibold))

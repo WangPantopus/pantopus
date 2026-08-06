@@ -40,6 +40,7 @@ public struct PaymentsView: View {
         .background(Theme.Color.appBg)
         .task { await viewModel.load() }
         .accessibilityIdentifier("payments.screen")
+        .sensitiveScreen()
         .confirmationDialog(
             actionMethod?.label ?? "Payment method",
             isPresented: Binding(
@@ -281,7 +282,7 @@ private extension PaymentsView {
                     .foregroundStyle(Theme.Color.appText)
                 if let subtext = stat.subtext {
                     Text(subtext)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
             }
@@ -305,7 +306,7 @@ private extension PaymentsView {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.Color.appTextSecondary)
                 Text(body)
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
             Spacer(minLength: Spacing.s0)

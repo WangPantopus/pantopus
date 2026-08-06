@@ -23,7 +23,7 @@ data class VacationHoldScope(
     enum class Kind(val id: String) {
         Mail("mail"),
         Packages("packages"),
-        MagicTask("magicTask"),
+        MarketplacePickups("marketplacePickups"),
         Civic("civic"),
     }
 }

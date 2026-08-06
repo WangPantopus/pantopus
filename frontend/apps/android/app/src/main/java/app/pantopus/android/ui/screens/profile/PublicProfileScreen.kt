@@ -64,6 +64,10 @@ import kotlinx.coroutines.delay
 fun PublicProfileScreen(
     onBack: () -> Unit,
     onOpenMessages: (app.pantopus.android.data.api.models.profile.PublicProfileDto) -> Unit = {},
+    onOpenHandshake: (String, Int?) -> Unit = { _, _ -> },
+    onOpenInsights: () -> Unit = {},
+    onEditPersona: () -> Unit = {},
+    onComposeBroadcast: () -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -72,11 +76,22 @@ fun PublicProfileScreen(
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val connectState by viewModel.connectState.collectAsStateWithLifecycle()
-    val followState by viewModel.followState.collectAsStateWithLifecycle()
+    val showHandshake by viewModel.showFollowHandshake.collectAsStateWithLifecycle()
+    val handshakeTier by viewModel.handshakePreselectedTierRank.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
     val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showReportSheet by remember { mutableStateOf(false) }
 
+    LaunchedEffect(showHandshake) {
+        if (showHandshake) {
+            val handle = viewModel.loadedPersonaHandle()
+            if (handle.isNotBlank()) {
+                onOpenHandshake(handle, handshakeTier)
+                viewModel.setShowFollowHandshake(false)
+                viewModel.clearHandshakeTier()
+            }
+        }
+    }
     LaunchedEffect(Unit) { viewModel.load() }
 
     LaunchedEffect(toast) {
@@ -116,7 +131,6 @@ fun PublicProfileScreen(
                     PublicProfileLoadedFrame(
                         content = content,
                         selectedTab = selectedTab,
-                        followState = followState,
                         connectState = connectState,
                         onBack = onBack,
                         onSelectTab = { viewModel.selectTab(it) },
@@ -124,7 +138,10 @@ fun PublicProfileScreen(
                         onMessage = { onOpenMessages(content.profile) },
                         onConnect = { viewModel.connect() },
                         onOverflow = { viewModel.setShowOverflow(true) },
-                        onUnlock = { viewModel.showSubscribeToast() },
+                        onUnlock = { post -> viewModel.unlockBroadcast(post.targetTierRank) },
+                        onOpenInsights = onOpenInsights,
+                        onEditPersona = onEditPersona,
+                        onComposeBroadcast = onComposeBroadcast,
                         receivedReviews = {
                             ReceivedTransactionReviewsSection(userId = content.profile.id)
                         },
@@ -186,12 +203,17 @@ fun PublicProfileScreen(
  * P6.5 — Kind-aware loaded frame, exposed as `internal` so Paparazzi
  * snapshot tests can render the populated view without spinning up a
  * Hilt VM.
+ *
+ * There is no `followState`: the persona Follow button hands off to the
+ * privacy-handshake wizard, which owns the request and its in-flight /
+ * succeeded poses. Only [connectState] resolves on this screen (it drives
+ * the local profile's Connect → Requested flip), and iOS
+ * `PublicProfileView.identityActions` renders exactly the same pair.
  */
 @Composable
 internal fun PublicProfileLoadedFrame(
     content: PublicProfileContent,
     selectedTab: ProfileTab,
-    followState: PublicProfileActionState,
     connectState: PublicProfileActionState,
     onBack: () -> Unit,
     onSelectTab: (ProfileTab) -> Unit,
@@ -199,7 +221,10 @@ internal fun PublicProfileLoadedFrame(
     onMessage: () -> Unit,
     onConnect: () -> Unit,
     onOverflow: () -> Unit,
-    onUnlock: () -> Unit,
+    onUnlock: (PublicProfilePost) -> Unit,
+    onOpenInsights: () -> Unit = {},
+    onEditPersona: () -> Unit = {},
+    onComposeBroadcast: () -> Unit = {},
     receivedReviews: @Composable () -> Unit = {},
 ) {
     val persona = content.kind == PublicProfileKind.Persona
@@ -236,18 +261,30 @@ internal fun PublicProfileLoadedFrame(
                         stats = content.stats.stats,
                     ) {
                         if (persona) {
-                            val following = followState is PublicProfileActionState.Succeeded
-                            BeaconHeaderGhostButton(
-                                icon = PantopusIcon.Share,
-                                actionLabel = "Share profile",
-                                onClick = onOverflow,
-                            )
-                            BeaconHeaderPrimaryButton(
-                                title = if (following) "Following" else "Follow",
-                                icon = PantopusIcon.Plus,
-                                onClick = onFollow,
-                                isProminent = !following,
-                            )
+                            if (content.isOwner) {
+                                BeaconHeaderGhostButton(
+                                    icon = PantopusIcon.BarChart3,
+                                    actionLabel = "Insights",
+                                    onClick = onOpenInsights,
+                                )
+                                BeaconHeaderGhostButton(
+                                    title = "Edit",
+                                    icon = PantopusIcon.Pencil,
+                                    actionLabel = "Edit Persona",
+                                    onClick = onEditPersona,
+                                )
+                            } else {
+                                BeaconHeaderGhostButton(
+                                    icon = PantopusIcon.Share,
+                                    actionLabel = "Share profile",
+                                    onClick = onOverflow,
+                                )
+                                BeaconHeaderPrimaryButton(
+                                    title = "Follow",
+                                    icon = PantopusIcon.Plus,
+                                    onClick = onFollow,
+                                )
+                            }
                         } else {
                             val requested = connectState is PublicProfileActionState.Succeeded
                             BeaconHeaderGhostButton(
@@ -282,8 +319,13 @@ internal fun PublicProfileLoadedFrame(
                 PublicProfilePostsFeed(
                     kind = content.kind,
                     posts = content.posts,
-                    onUnlock = { onUnlock() },
-                    onEmptyCta = if (persona) onFollow else onMessage,
+                    onUnlock = onUnlock,
+                    onEmptyCta =
+                        when {
+                            !persona -> onMessage
+                            content.isOwner -> onComposeBroadcast
+                            else -> onFollow
+                        },
                 )
             }
         },

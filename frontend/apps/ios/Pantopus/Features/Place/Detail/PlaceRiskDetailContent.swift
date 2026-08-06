@@ -64,7 +64,7 @@ struct PlaceRiskDetailContent: View {
                     }
                     if let disclaimer = riskDisclaimer(env) {
                         Text(disclaimer)
-                            .font(.system(size: 12))
+                            .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
                 }
@@ -118,13 +118,13 @@ struct PlaceRiskDetailContent: View {
                                         .foregroundStyle(Theme.Color.appTextStrong)
                                     Spacer()
                                     Text(String(format: "%.1f mi", f.distanceMi))
-                                        .font(.system(size: 12)).foregroundStyle(Theme.Color.appTextMuted)
+                                        .pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextMuted)
                                 }
                             }
                         }
                     }
                     if let disclaimer = healthDisclaimer(env) {
-                        Text(disclaimer).font(.system(size: 12)).foregroundStyle(Theme.Color.appTextMuted)
+                        Text(disclaimer).pantopusTextStyle(.caption).foregroundStyle(Theme.Color.appTextMuted)
                     }
                 }
             }
@@ -235,7 +235,7 @@ private struct EmergencyChecklist: View {
                     }
                 }
                 Text(item)
-                    .font(.system(size: 14))
+                    .pantopusTextStyle(.small)
                     .foregroundStyle(Theme.Color.appText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
