@@ -66,6 +66,11 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
     public let pendingClaimId: String?
     /// Parsed PostGIS point from `GET /api/homes/my-homes`.
     public let location: HomeLocation?
+    /// Server-computed predicate — true when the viewer owns the Home row
+    /// outright or is a verified *primary* owner. Gates the destructive
+    /// "Delete home" affordance; everyone else must leave instead.
+    /// Computed at `backend/routes/home.js:1653`.
+    public let canDeleteHome: Bool?
 
     public var id: String {
         home.id
@@ -91,6 +96,7 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
         isPrimaryOwner = try container.decodeIfPresent(Bool.self, forKey: .isPrimaryOwner)
         pendingClaimId = try container.decodeIfPresent(String.self, forKey: .pendingClaimId)
         location = try container.decodeIfPresent(HomeLocation.self, forKey: .location)
+        canDeleteHome = try container.decodeIfPresent(Bool.self, forKey: .canDeleteHome)
     }
 
     private enum FlatKeys: String, CodingKey {
@@ -100,6 +106,7 @@ public struct MyHome: Decodable, Sendable, Hashable, Identifiable {
         case isPrimaryOwner = "is_primary_owner"
         case pendingClaimId = "pending_claim_id"
         case location
+        case canDeleteHome = "can_delete_home"
     }
 }
 
@@ -412,20 +419,61 @@ public struct CheckAddressRequest: Encodable, Sendable {
 }
 
 /// `POST /api/homes/check-address` response.
+///
+/// The handler (`backend/routes/home.js:635` / `:661`) returns
+/// `{ status, home_id?, is_multi_unit, formatted_address? }` where
+/// `status` is one of `HOME_NOT_FOUND | HOME_FOUND_UNCLAIMED |
+/// HOME_FOUND_CLAIMED`. The older `exists / homeCount /
+/// hasVerifiedMembers` triple is kept as a derived (and still
+/// decodable) convenience so existing call sites keep compiling.
 public struct CheckAddressResponse: Decodable, Sendable, Hashable {
+    /// Backend status string. `nil` only when the server omits it.
+    public let status: String?
+    /// Id of the matched home — present for both FOUND statuses.
+    public let homeId: String?
+    /// True when the matched address is a multi-unit building.
+    public let isMultiUnit: Bool
+    /// Server-formatted "address, unit, city, state, zip" label.
+    public let formattedAddress: String?
+
     public let exists: Bool
     public let homeCount: Int
     public let hasVerifiedMembers: Bool
     public let verdictStatus: String?
     public let normalizedAddress: NormalizedAddressDTO?
 
+    /// `status === 'HOME_FOUND_CLAIMED'` — an existing home at this
+    /// address already has active occupants, so creating another Home
+    /// row would duplicate it. RN shows `AddressClaimedModal` here.
+    public var isAlreadyClaimed: Bool {
+        status == Self.statusFoundClaimed
+    }
+
+    /// `status === 'HOME_FOUND_UNCLAIMED'` — a home row exists but has
+    /// no active occupants.
+    public var isFoundUnclaimed: Bool {
+        status == Self.statusFoundUnclaimed
+    }
+
+    public static let statusNotFound = "HOME_NOT_FOUND"
+    public static let statusFoundUnclaimed = "HOME_FOUND_UNCLAIMED"
+    public static let statusFoundClaimed = "HOME_FOUND_CLAIMED"
+
     public init(
-        exists: Bool,
-        homeCount: Int,
-        hasVerifiedMembers: Bool,
+        status: String? = nil,
+        homeId: String? = nil,
+        isMultiUnit: Bool = false,
+        formattedAddress: String? = nil,
+        exists: Bool = false,
+        homeCount: Int = 0,
+        hasVerifiedMembers: Bool = false,
         verdictStatus: String? = nil,
         normalizedAddress: NormalizedAddressDTO? = nil
     ) {
+        self.status = status
+        self.homeId = homeId
+        self.isMultiUnit = isMultiUnit
+        self.formattedAddress = formattedAddress
         self.exists = exists
         self.homeCount = homeCount
         self.hasVerifiedMembers = hasVerifiedMembers
@@ -434,9 +482,33 @@ public struct CheckAddressResponse: Decodable, Sendable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case status
+        case homeId = "home_id"
+        case isMultiUnit = "is_multi_unit"
+        case formattedAddress = "formatted_address"
         case exists, homeCount, hasVerifiedMembers
         case verdictStatus = "verdict_status"
         case normalizedAddress = "normalized_address"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        homeId = try container.decodeIfPresent(String.self, forKey: .homeId)
+        isMultiUnit = try container.decodeIfPresent(Bool.self, forKey: .isMultiUnit) ?? false
+        formattedAddress = try container.decodeIfPresent(String.self, forKey: .formattedAddress)
+        verdictStatus = try container.decodeIfPresent(String.self, forKey: .verdictStatus)
+        normalizedAddress = try container.decodeIfPresent(
+            NormalizedAddressDTO.self,
+            forKey: .normalizedAddress
+        )
+        let foundStatuses = [Self.statusFoundClaimed, Self.statusFoundUnclaimed]
+        exists = try container.decodeIfPresent(Bool.self, forKey: .exists)
+            ?? (status.map(foundStatuses.contains) ?? false)
+        homeCount = try container.decodeIfPresent(Int.self, forKey: .homeCount)
+            ?? (homeId == nil ? 0 : 1)
+        hasVerifiedMembers = try container.decodeIfPresent(Bool.self, forKey: .hasVerifiedMembers)
+            ?? (status == Self.statusFoundClaimed)
     }
 }
 

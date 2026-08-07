@@ -68,6 +68,7 @@ public struct PostcardVerificationView: View {
             postcardPreview
             PostcardHero(
                 stage: viewModel.stage,
+                codeEntryMode: viewModel.showsCodeEntryFrame,
                 deliveredOn: viewModel.content.deliveredOn
             )
             PostcardStatusTimeline(
@@ -91,18 +92,28 @@ public struct PostcardVerificationView: View {
 
     @ViewBuilder
     private var secondaryActionBlock: some View {
-        if viewModel.stage == .delivered {
-            DeliveredSecondaryRow { viewModel.resendPostcard() }
+        if viewModel.showsCodeEntryFrame {
+            DeliveredSecondaryRow { viewModel.requestNewCode() }
         } else {
-            InTransitHelpBlock(
-                resendOn: viewModel.content.resendAvailableOn
-            ) { viewModel.resendPostcard() }
+            VStack(spacing: Spacing.s3) {
+                InTransitHelpBlock { viewModel.requestNewCode() }
+                Button {
+                    viewModel.markHasCode()
+                } label: {
+                    Text("I already have a code")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.Color.primary600)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .accessibilityIdentifier("postcardHaveCodeCTA")
+            }
         }
     }
 
     private var stickyDock: some View {
         VStack(spacing: Spacing.s2) {
-            if viewModel.stage != .delivered {
+            if !viewModel.showsCodeEntryFrame {
                 HStack(spacing: Spacing.s1) {
                     Icon(.bell, size: 12, color: Theme.Color.appTextSecondary)
                     Text("You'll be notified the moment it's delivered")
@@ -118,6 +129,20 @@ public struct PostcardVerificationView: View {
                 await MainActor.run { viewModel.verifyTapped() }
             }
             .accessibilityIdentifier("postcardVerifyCTA")
+
+            if viewModel.needsNewCode {
+                Button {
+                    viewModel.requestNewCode()
+                } label: {
+                    Text("Request a new code")
+                        .pantopusTextStyle(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Theme.Color.primary600)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .disabled(viewModel.isRequestingCode)
+                .accessibilityIdentifier("postcardRequestNewCodeCTA")
+            }
         }
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s3)
@@ -176,6 +201,10 @@ private struct PostcardTopBar: View {
 
 private struct PostcardHero: View {
     let stage: PostcardDeliveryStage
+    /// True once the user is holding the card — swaps the headline to
+    /// the enter-your-code copy even while the timeline still reads
+    /// "in transit".
+    let codeEntryMode: Bool
     let deliveredOn: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -236,18 +265,13 @@ private struct PostcardHero: View {
     }
 
     private var headline: String {
-        switch stage {
-        case .delivered: "Enter the code from the card"
-        case .inTransit, .mailed: "Your card is on the way"
-        }
+        codeEntryMode ? "Enter the code from the card" : "Your card is on the way"
     }
 
     private var subcopy: String {
-        switch stage {
-        case .delivered: "6 characters, printed on the left side. Case doesn't matter."
-        case .inTransit, .mailed:
-            "Estimated arrival Mon, Oct 12. We'll push you a notification when it lands."
-        }
+        codeEntryMode
+            ? "6 characters, printed on the left side. Case doesn't matter."
+            : "We'll push you a notification when it lands — or enter the code now if you already have it."
     }
 }
 
@@ -503,6 +527,25 @@ private struct PostcardCodeArea: View {
                     .foregroundStyle(Theme.Color.error)
                     .accessibilityIdentifier("postcardSubmitError")
             }
+            if let attempts = viewModel.attemptsRemainingLabel {
+                Text(attempts)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
+                    .accessibilityIdentifier("postcardAttemptsRemaining")
+            }
+            if let expiry = viewModel.codeExpiryLabel {
+                Text(expiry)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .accessibilityIdentifier("postcardCodeExpiry")
+            }
+            if let notice = viewModel.notice {
+                Text(notice.text)
+                    .pantopusTextStyle(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(notice.isError ? Theme.Color.error : Theme.Color.appTextSecondary)
+                    .accessibilityIdentifier("postcardNotice")
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -516,28 +559,28 @@ private struct DeliveredSecondaryRow: View {
     var body: some View {
         HStack(spacing: Spacing.s4) {
             Button(action: onResend) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.refreshCw, size: 12, color: Theme.Color.appTextSecondary)
                     Text("Resend")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 .padding(.horizontal, Spacing.s1)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
             }
             .accessibilityIdentifier("postcardResendCTA")
             Rectangle()
                 .fill(Theme.Color.appBorder)
                 .frame(width: 1, height: 12)
             Button(action: {}, label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Icon(.camera, size: 12, color: Theme.Color.appTextSecondary)
                     Text("Scan code")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
                 .padding(.horizontal, Spacing.s1)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.s1)
             })
             .accessibilityIdentifier("postcardScanCTA")
         }
@@ -546,19 +589,17 @@ private struct DeliveredSecondaryRow: View {
 }
 
 private struct InTransitHelpBlock: View {
-    let resendOn: String
     let onResend: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.s0) {
             HelpRow(
                 icon: .refreshCw,
                 title: "Resend postcard",
-                subcopy: "If it doesn't arrive by \(resendOn).",
-                trailingMeta: "available \(resendOn)",
-                disabled: true,
+                subcopy: "Mails a fresh code to this address.",
+                disabled: false,
                 onTap: onResend,
-                identifier: "postcardResendDisabled"
+                identifier: "postcardResendCTA"
             )
             Divider().background(Theme.Color.appBorder)
             HelpRow(

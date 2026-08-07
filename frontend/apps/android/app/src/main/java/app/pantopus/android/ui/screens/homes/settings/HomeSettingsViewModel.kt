@@ -37,6 +37,13 @@ enum class HomeSettingsRoute {
     AccessCodes,
     TrustedNeighbors,
     Security,
+
+    /**
+     * A14.2 (policy variant) — per-home ownership security policy
+     * (`/api/homes/:id/security`). Distinct from [Security], which is the
+     * 9-toggle privacy screen on `/api/homes/:id/privacy`.
+     */
+    OwnershipSecurity,
     People,
     InviteLink,
     HomeNotifications,
@@ -109,6 +116,7 @@ class HomeSettingsViewModel
                     "accessCodes" -> HomeSettingsRoute.AccessCodes
                     "trustedNeighbors" -> HomeSettingsRoute.TrustedNeighbors
                     "privacy" -> HomeSettingsRoute.Security
+                    "ownershipSecurity" -> HomeSettingsRoute.OwnershipSecurity
                     "people" -> HomeSettingsRoute.People
                     "inviteLink" -> HomeSettingsRoute.InviteLink
                     "homeNotifications" -> HomeSettingsRoute.HomeNotifications
@@ -241,6 +249,12 @@ class HomeSettingsViewModel
                             control = RowControl.Chevron,
                         ),
                         GroupedListRow("privacy", "Privacy", subtext = subtexts.privacy, control = RowControl.Chevron),
+                        GroupedListRow(
+                            "ownershipSecurity",
+                            "Ownership & Security",
+                            subtext = "Discoverability, owner claims, member policy",
+                            control = RowControl.Chevron,
+                        ),
                     ),
             )
 

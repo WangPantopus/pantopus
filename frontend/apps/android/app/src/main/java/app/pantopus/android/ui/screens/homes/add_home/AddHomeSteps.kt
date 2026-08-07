@@ -61,10 +61,16 @@ data class AddHomeAddressFields(
 /** User's role on the home being added — picked in step 3. */
 enum class AddHomeRole(
     val label: String,
+    /**
+     * `claimed_role` sent with `POST /api/homes/:id/claim`
+     * (`backend/routes/home.js:6482`). Values mirror RN's role picker
+     * (`src/components/homes/types.ts:17-20`).
+     */
+    val claimedRole: String,
 ) {
-    Owner("Owner"),
-    Tenant("Tenant"),
-    HouseholdMember("Household member"),
+    Owner("Owner", "owner"),
+    Tenant("Tenant", "renter"),
+    HouseholdMember("Household member", "household"),
 }
 
 /**
@@ -93,6 +99,24 @@ sealed interface AddHomeOutboundEvent {
 
     /** Pop the wizard and navigate to the new home dashboard. */
     data class OpenHomeDashboard(
+        val homeId: String,
+    ) : AddHomeOutboundEvent
+
+    /**
+     * `check-address` matched an already-claimed home and the user
+     * picked the owner role — hand off to the ownership-claim wizard
+     * for that existing home rather than creating a duplicate row.
+     * Mirrors RN `useHomeForm.ts:461`.
+     */
+    data class OpenClaimOwnership(
+        val homeId: String,
+    ) : AddHomeOutboundEvent
+
+    /**
+     * Residency claim filed against an existing home — RN routes to the
+     * waiting room (`useHomeForm.ts:466`).
+     */
+    data class OpenWaitingRoom(
         val homeId: String,
     ) : AddHomeOutboundEvent
 }

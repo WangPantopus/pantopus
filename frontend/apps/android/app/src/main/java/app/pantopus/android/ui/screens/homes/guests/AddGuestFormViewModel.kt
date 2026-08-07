@@ -52,6 +52,12 @@ data class AddGuestUiState(
     val isSaving: Boolean = false,
     val toast: GuestToast? = null,
     val shouldDismiss: Boolean = false,
+    /**
+     * A13.6 — set once the pass is created. Carries the raw one-time
+     * `token` (composed into a public viewer URL) so the screen can fire
+     * the OS share sheet. Cleared by `acknowledgeShare()`.
+     */
+    val createdShare: GuestPassShare? = null,
 ) {
     val durationOptions: List<ChipPickerOption> get() = AddGuestSampleData.durationOptions
     val areaOptions: List<ChipPickerOption> get() = AddGuestSampleData.areaOptions
@@ -107,10 +113,13 @@ data class AddGuestUiState(
 /**
  * A13.1 — Add Guest form view-model. [submit] issues the pass via
  * `POST /api/homes/:id/guest-passes` (route `backend/routes/homeIam.js:667`),
- * then raises a success toast ("Pass sent to <name>") and signals
- * [AddGuestUiState.shouldDismiss] so the host pops the modal. The contact,
- * welcome note, and allowed-area chips are UI affordances the create
- * endpoint doesn't model, so they stay local.
+ * raises a success toast ("Pass sent to <name>") and publishes
+ * [AddGuestUiState.createdShare] — the one-time share token composed into a
+ * viewer link. The screen offers the OS share sheet (RN parity:
+ * `src/app/homes/[id]/share.tsx:60-82`) and then calls [acknowledgeShare],
+ * which flips [AddGuestUiState.shouldDismiss] so the host pops the form.
+ * The contact, welcome note, and allowed-area chips are UI affordances the
+ * create endpoint doesn't model, so they stay local.
  */
 @HiltViewModel
 class AddGuestFormViewModel
@@ -206,12 +215,22 @@ class AddGuestFormViewModel
                     )
                 when (val result = guestPassesRepo.create(homeId, request)) {
                     is NetworkResult.Success -> {
-                        val name = _state.value.firstName ?: "your guest"
+                        val firstName = _state.value.firstName
+                        val name = firstName ?: "your guest"
+                        // The raw token is returned exactly once
+                        // (homeIam.js:762-767) — this is the only moment a
+                        // shareable link can be built.
+                        val share =
+                            GuestPassShare(
+                                id = result.data.pass.id,
+                                guestName = firstName.orEmpty(),
+                                url = GuestPassShare.urlForToken(result.data.token),
+                            )
                         _state.update {
                             it.copy(
                                 isSaving = false,
                                 toast = GuestToast("Pass sent to $name", isError = false),
-                                shouldDismiss = true,
+                                createdShare = share,
                             )
                         }
                     }
@@ -237,6 +256,15 @@ class AddGuestFormViewModel
 
         fun acknowledgeDismiss() {
             _state.update { it.copy(shouldDismiss = false) }
+        }
+
+        /**
+         * A13.6 — called by the screen once the user has either shared the
+         * new pass or declined. Clears the offer and asks the host to pop
+         * the form.
+         */
+        fun acknowledgeShare() {
+            _state.update { it.copy(createdShare = null, shouldDismiss = true) }
         }
 
         // ─── Guest-pass window ──────────────────────────────────────

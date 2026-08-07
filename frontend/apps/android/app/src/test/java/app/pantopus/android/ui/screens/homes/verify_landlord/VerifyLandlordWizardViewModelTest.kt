@@ -5,12 +5,19 @@ package app.pantopus.android.ui.screens.homes.verify_landlord
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.PostcardInfoDto
 import app.pantopus.android.data.api.models.homes.RequestPostcardResponse
+import app.pantopus.android.data.api.models.tenant.TenantLeaseDto
+import app.pantopus.android.data.api.models.tenant.TenantLeaseMetadataDto
+import app.pantopus.android.data.api.models.tenant.TenantRequestApprovalRequest
+import app.pantopus.android.data.api.models.tenant.TenantRequestApprovalResponse
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.tenant.TenantRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,11 +42,25 @@ class VerifyLandlordWizardViewModelTest {
         }
 
     private val verificationRepository: HomeVerificationRepository = mockk(relaxed = true)
+    private val tenantRepository: TenantRepository = mockk(relaxed = true)
+
+    private val stubLease =
+        TenantLeaseDto(
+            id = "lease-1",
+            homeId = "home-1",
+            state = "pending",
+            source = "tenant_request",
+            startAt = "2026-04-01T00:00:00.000Z",
+            createdAt = "2026-03-04T18:12:00.000Z",
+            metadata = TenantLeaseMetadataDto(message = "Hi, I'm the new tenant."),
+        )
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         coEvery { verificationRepository.requestPostcard(any()) } returns
             NetworkResult.Success(RequestPostcardResponse("ok", PostcardInfoDto("p1")))
+        coEvery { tenantRepository.requestApproval(any()) } returns
+            NetworkResult.Success(TenantRequestApprovalResponse(stubLease))
     }
 
     @After fun tearDown() {
@@ -50,7 +71,8 @@ class VerifyLandlordWizardViewModelTest {
         networkMonitor: NetworkMonitor,
         handle: SavedStateHandle,
         verificationRepository: HomeVerificationRepository,
-    ) : VerifyLandlordWizardViewModel(networkMonitor, handle, verificationRepository) {
+        tenantRepository: TenantRepository,
+    ) : VerifyLandlordWizardViewModel(networkMonitor, handle, verificationRepository, tenantRepository) {
         override val submitDelayMillis: Long = 0L
     }
 
@@ -59,7 +81,23 @@ class VerifyLandlordWizardViewModelTest {
             networkMonitor = networkMonitor,
             handle = SavedStateHandle(mapOf(VERIFY_LANDLORD_HOME_ID_KEY to homeId)),
             verificationRepository = verificationRepository,
+            tenantRepository = tenantRepository,
         )
+
+    /** Feeds a valid form through the public mutators. */
+    private fun TestVm.seedPopulatedForm() {
+        VerifyLandlordSampleData.populatedForm.let { f ->
+            setOwnerName(f.ownerName)
+            setContactName(f.contactName)
+            setEmail(f.email)
+            setPhone(f.phone)
+            setLease(f.lease)
+            setPMEnabled(true)
+            setPMName(f.pmName)
+            setPMEmail(f.pmEmail)
+            setPMPhone(f.pmPhone)
+        }
+    }
 
     // MARK: - Step machine
 
@@ -180,21 +218,45 @@ class VerifyLandlordWizardViewModelTest {
             assertFalse(vm.chrome.primaryCtaEnabled)
         }
 
-    @Test fun submit_happy_path_fires_open_postcard_event() =
+    @Test fun submit_posts_approval_request_and_lands_on_sent_step() =
         runTest {
+            val captured = slot<TenantRequestApprovalRequest>()
+            coEvery { tenantRepository.requestApproval(capture(captured)) } returns
+                NetworkResult.Success(TenantRequestApprovalResponse(stubLease))
             val vm = makeVm("home-42")
             vm.onPrimary()
-            VerifyLandlordSampleData.populatedForm.let { f ->
-                vm.setOwnerName(f.ownerName)
-                vm.setContactName(f.contactName)
-                vm.setEmail(f.email)
-                vm.setPhone(f.phone)
-                vm.setLease(f.lease)
-                vm.setPMEnabled(true)
-                vm.setPMName(f.pmName)
-                vm.setPMEmail(f.pmEmail)
-                vm.setPMPhone(f.pmPhone)
-            }
+            vm.seedPopulatedForm()
+            vm.setMoveInDate("2026-04-01")
+            vm.setMessageToLandlord("Hi, I'm the new tenant.")
+            vm.onPrimary() // submit
+            assertEquals(VerifyLandlordStep.Sent, vm.state.value.currentStep)
+            assertEquals(VerifyLandlordSubmitState.Submitted, vm.state.value.submitState)
+            assertEquals(
+                VerifyLandlordApprovalResult.Kind.Submitted,
+                vm.state.value.approvalResult?.kind,
+            )
+            assertEquals("home-42", captured.captured.homeId)
+            assertEquals("2026-04-01T00:00:00.000Z", captured.captured.startAt)
+            assertTrue(captured.captured.message.orEmpty().contains("Hi, I'm the new tenant."))
+            assertTrue(
+                "Landlord details must travel with the request instead of being discarded",
+                captured.captured.message.orEmpty().contains("Elm Street Holdings LLC"),
+            )
+            assertNull(vm.pendingEvent.value)
+        }
+
+    @Test fun submit_without_verified_landlord_falls_back_to_postcard() =
+        runTest {
+            coEvery { tenantRepository.requestApproval(any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(
+                        400,
+                        """{"error":"This property has no verified landlord. Cannot submit a lease request."}""",
+                    ),
+                )
+            val vm = makeVm("home-42")
+            vm.onPrimary()
+            vm.seedPopulatedForm()
             vm.onPrimary() // submit
             assertEquals(
                 VerifyLandlordOutboundEvent.OpenPostcardVerification("home-42"),
@@ -202,6 +264,77 @@ class VerifyLandlordWizardViewModelTest {
             )
             assertEquals(VerifyLandlordSubmitState.Submitted, vm.state.value.submitState)
         }
+
+    @Test fun submit_surfaces_existing_pending_request() =
+        runTest {
+            coEvery { tenantRepository.requestApproval(any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(
+                        409,
+                        """{"error":"You already have a pending request for this home"}""",
+                    ),
+                )
+            val vm = makeVm()
+            vm.onPrimary()
+            vm.seedPopulatedForm()
+            vm.onPrimary()
+            assertEquals(VerifyLandlordStep.Sent, vm.state.value.currentStep)
+            assertEquals(
+                VerifyLandlordApprovalResult.Kind.AlreadyPending,
+                vm.state.value.approvalResult?.kind,
+            )
+            assertEquals(
+                "You already have a pending request for this home",
+                vm.state.value.approvalResult?.serverMessage,
+            )
+        }
+
+    @Test fun submit_surfaces_existing_active_lease() =
+        runTest {
+            coEvery { tenantRepository.requestApproval(any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(
+                        409,
+                        """{"error":"You already have an active lease at this home"}""",
+                    ),
+                )
+            val vm = makeVm()
+            vm.onPrimary()
+            vm.seedPopulatedForm()
+            vm.onPrimary()
+            assertEquals(
+                VerifyLandlordApprovalResult.Kind.AlreadyActive,
+                vm.state.value.approvalResult?.kind,
+            )
+        }
+
+    @Test fun sent_step_secondary_starts_postcard_fallback() =
+        runTest {
+            val vm = makeVm("home-9")
+            vm.onPrimary()
+            vm.seedPopulatedForm()
+            vm.onPrimary() // submit -> Sent
+            assertEquals(VerifyLandlordStep.Sent, vm.state.value.currentStep)
+            assertEquals("Mail me a code", vm.chrome.secondaryCta?.label)
+            vm.onSecondary()
+            assertEquals(
+                VerifyLandlordOutboundEvent.OpenPostcardVerification("home-9"),
+                vm.pendingEvent.value,
+            )
+        }
+
+    @Test fun move_in_date_must_be_iso_shaped() {
+        assertEquals(
+            "Use YYYY-MM-DD",
+            VerifyLandlordSampleData.populatedForm.copy(moveInDate = "04/01/2026").validate().moveInDate,
+        )
+        assertNull(
+            VerifyLandlordSampleData.populatedForm.copy(moveInDate = "2026-04-01").validate().moveInDate,
+        )
+        assertNull(
+            VerifyLandlordSampleData.populatedForm.copy(moveInDate = "").validate().moveInDate,
+        )
+    }
 
     // MARK: - Field mutations
 

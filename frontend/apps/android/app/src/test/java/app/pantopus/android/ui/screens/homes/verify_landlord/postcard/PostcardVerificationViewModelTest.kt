@@ -21,6 +21,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * A12.7 — mirrors iOS `PostcardVerificationViewModelTests`. The delivery
+ * stage is chrome only; the code field is live at all times so
+ * `POST /api/homes/:id/verify-postcard` is reachable for real homes.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PostcardVerificationViewModelTest {
     @Before fun setUp() {
@@ -47,52 +52,55 @@ class PostcardVerificationViewModelTest {
             expectedCode = expectedCode,
         )
 
-    // MARK: - Stage gating
+    // MARK: - Code entry is never gated on delivery
 
-    @Test fun in_transit_stage_locks_code_input() {
+    @Test fun in_transit_stage_still_allows_code_entry() {
         val vm = makeVm()
-        assertFalse(vm.state.value.isCodeInputUnlocked)
+        assertTrue(vm.state.value.isCodeInputUnlocked)
         assertFalse(vm.state.value.primaryCtaEnabled)
     }
 
-    @Test fun delivered_homeid_resolves_to_delivered_stage() {
-        val vm = makeVm("home-delivered")
-        assertEquals(PostcardDeliveryStage.Delivered, vm.state.value.stage)
+    @Test fun real_home_id_does_not_lock_the_field() {
+        // Regression: the old sample helper only unlocked home ids
+        // containing "delivered", so every production home was locked.
+        val vm = makeVm("0f0d7f0e-1c3a-4a1e-9a2b-6f0f7d6f1a2c")
+        vm.updateCode("4Q2K7B")
         assertTrue(vm.state.value.isCodeInputUnlocked)
+        assertTrue(vm.state.value.primaryCtaEnabled)
     }
 
-    @Test fun setStage_transitions_and_resets_code_when_locking() {
-        val vm = makeVm("home-delivered")
-        vm.updateCode("4Q2K7B")
-        vm.setStage(PostcardDeliveryStage.InTransit)
-        assertEquals(PostcardDeliveryStage.InTransit, vm.state.value.stage)
-        assertEquals("", vm.state.value.codeInput)
-        assertNull(vm.state.value.content.deliveredOn)
+    @Test fun have_code_escape_hatch_flips_frame() {
+        val vm = makeVm()
+        assertFalse(vm.state.value.showsCodeEntryFrame)
+        vm.markHasCode()
+        assertTrue(vm.state.value.showsCodeEntryFrame)
+    }
+
+    @Test fun setStage_delivered_enters_code_frame() {
+        val vm = makeVm()
+        vm.setStage(PostcardDeliveryStage.Delivered)
+        assertEquals(PostcardDeliveryStage.Delivered, vm.state.value.stage)
+        assertNotNull(vm.state.value.content.deliveredOn)
+        assertTrue(vm.state.value.showsCodeEntryFrame)
     }
 
     // MARK: - Code typing
 
     @Test fun updateCode_uppercases_and_clamps() {
-        val vm = makeVm("home-delivered")
+        val vm = makeVm()
         vm.updateCode("abc123extra")
         assertEquals("ABC123", vm.state.value.codeInput)
-    }
-
-    @Test fun filled_code_enables_cta_on_delivered() {
-        val vm = makeVm("home-delivered")
-        vm.updateCode("4Q2K7B")
-        assertTrue(vm.state.value.primaryCtaEnabled)
     }
 
     // MARK: - Verify
 
     @Test fun verify_correct_code_fires_verified_event() =
         runTest {
-            val vm = makeVm("home-42-delivered", expectedCode = "4Q2K7B")
+            val vm = makeVm("home-42", expectedCode = "4Q2K7B")
             vm.updateCode("4Q2K7B")
             vm.verifyTapped()
             assertEquals(
-                PostcardVerificationOutboundEvent.Verified("home-42-delivered"),
+                PostcardVerificationOutboundEvent.Verified("home-42"),
                 vm.pendingEvent.value,
             )
             assertEquals(VerifyLandlordSubmitState.Submitted, vm.state.value.submitState)
@@ -100,7 +108,7 @@ class PostcardVerificationViewModelTest {
 
     @Test fun verify_wrong_code_surfaces_error_and_clears_input() =
         runTest {
-            val vm = makeVm("home-delivered", expectedCode = "ABCDEF")
+            val vm = makeVm("home-1", expectedCode = "ABCDEF")
             vm.updateCode("4Q2K7B")
             vm.verifyTapped()
             assertTrue(vm.state.value.submitState is VerifyLandlordSubmitState.Error)
@@ -108,12 +116,22 @@ class PostcardVerificationViewModelTest {
             assertNull(vm.pendingEvent.value)
         }
 
-    @Test fun in_transit_verify_is_noop() =
+    @Test fun verify_from_in_transit_frame_still_submits() =
         runTest {
-            val vm = makeVm() // in-transit
-            // Even if a faulty caller pushes a code, in-transit blocks
-            // submit.
+            val vm = makeVm("home-7", expectedCode = "4Q2K7B")
+            assertFalse(vm.state.value.showsCodeEntryFrame)
             vm.updateCode("4Q2K7B")
+            vm.verifyTapped()
+            assertEquals(
+                PostcardVerificationOutboundEvent.Verified("home-7"),
+                vm.pendingEvent.value,
+            )
+        }
+
+    @Test fun short_code_does_not_submit() =
+        runTest {
+            val vm = makeVm()
+            vm.updateCode("4Q2")
             vm.verifyTapped()
             assertEquals(VerifyLandlordSubmitState.Idle, vm.state.value.submitState)
             assertNull(vm.pendingEvent.value)
@@ -121,10 +139,10 @@ class PostcardVerificationViewModelTest {
 
     // MARK: - Resend
 
-    @Test fun resend_clears_code_input() {
-        val vm = makeVm("home-delivered")
+    @Test fun request_new_code_clears_code_input() {
+        val vm = makeVm()
         vm.updateCode("4Q2K7B")
-        vm.resendPostcard()
+        vm.requestNewCode()
         assertEquals("", vm.state.value.codeInput)
     }
 

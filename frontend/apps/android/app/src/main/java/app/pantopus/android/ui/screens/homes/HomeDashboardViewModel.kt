@@ -1,15 +1,24 @@
-@file:Suppress("MagicNumber")
+@file:Suppress("MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homedashboard.HomeBillTrendsDto
+import app.pantopus.android.data.api.models.homedashboard.HomeDashboardResponse
+import app.pantopus.android.data.api.models.homedashboard.HomeHealthScoreDto
+import app.pantopus.android.data.api.models.homedashboard.HomePropertyValueDto
+import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistCarryoverDto
+import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistDto
+import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistItemDto
+import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistProgressDto
 import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.HomePublicProfile
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.homes.HomeDashboardRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsTab
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroStat
@@ -17,6 +26,8 @@ import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTile
 import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTone
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,6 +117,35 @@ data class HomeDashboardOnboardingStep(
     val actionId: String,
 )
 
+/**
+ * Per-card state for the Home Intelligence stack. Each card renders its
+ * own loading / loaded / absent / error surface so a failure in one read
+ * never blanks the dashboard.
+ *
+ * Mirrors iOS `HomeIntelligenceCardState`.
+ */
+sealed interface HomeIntelligenceCardState<out T> {
+    data object Loading : HomeIntelligenceCardState<Nothing>
+
+    data class Loaded<T>(
+        val value: T,
+    ) : HomeIntelligenceCardState<T>
+
+    /** The signed-in member isn't permitted to see this card (HTTP 403). */
+    data object Forbidden : HomeIntelligenceCardState<Nothing>
+
+    data class Failed(
+        val message: String,
+    ) : HomeIntelligenceCardState<Nothing>
+}
+
+/** Convenience accessor mirroring iOS's `HomeIntelligenceCardState.value`. */
+fun <T> HomeIntelligenceCardState<T>.valueOrNull(): T? =
+    when (this) {
+        is HomeIntelligenceCardState.Loaded -> value
+        else -> null
+    }
+
 /** Observed state for the Home Dashboard. */
 sealed interface HomeDashboardUiState {
     data object Loading : HomeDashboardUiState
@@ -132,10 +172,12 @@ sealed interface HomeDashboardUiState {
  * nav-backstack [SavedStateHandle].
  */
 @HiltViewModel
+@Suppress("TooManyFunctions")
 class HomeDashboardViewModel
     @Inject
     constructor(
         private val repo: HomesRepository,
+        private val intelligenceRepo: HomeDashboardRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val homeId: String =
@@ -147,6 +189,45 @@ class HomeDashboardViewModel
 
         /** Observed state. */
         val state: StateFlow<HomeDashboardUiState> = _state.asStateFlow()
+
+        // ── Home Intelligence (independent per-card state) ──────────
+
+        private val _healthScore =
+            MutableStateFlow<HomeIntelligenceCardState<HomeHealthScoreDto>>(HomeIntelligenceCardState.Loading)
+
+        /** `GET /api/homes/:id/health-score`. */
+        val healthScore: StateFlow<HomeIntelligenceCardState<HomeHealthScoreDto>> = _healthScore.asStateFlow()
+
+        private val _checklist =
+            MutableStateFlow<HomeIntelligenceCardState<SeasonalChecklistDto>>(HomeIntelligenceCardState.Loading)
+
+        /** `GET /api/homes/:id/seasonal-checklist`. */
+        val checklist: StateFlow<HomeIntelligenceCardState<SeasonalChecklistDto>> = _checklist.asStateFlow()
+
+        private val _propertyValue =
+            MutableStateFlow<HomeIntelligenceCardState<HomePropertyValueDto>>(HomeIntelligenceCardState.Loading)
+
+        /** `GET /api/homes/:id/property-value`. */
+        val propertyValue: StateFlow<HomeIntelligenceCardState<HomePropertyValueDto>> = _propertyValue.asStateFlow()
+
+        private val _billTrends =
+            MutableStateFlow<HomeIntelligenceCardState<HomeBillTrendsDto>>(HomeIntelligenceCardState.Loading)
+
+        /** `GET /api/homes/:id/bill-trends`. */
+        val billTrends: StateFlow<HomeIntelligenceCardState<HomeBillTrendsDto>> = _billTrends.asStateFlow()
+
+        private val _pendingChecklistItemIds = MutableStateFlow<Set<String>>(emptySet())
+
+        /**
+         * Checklist item ids with an in-flight PATCH — the row disables
+         * while its mutation awaits the server's returned item state.
+         */
+        val pendingChecklistItemIds: StateFlow<Set<String>> = _pendingChecklistItemIds.asStateFlow()
+
+        // Raw responses; [rebuild] composes the rendered content from them.
+        private var detailData: HomeDetail? = null
+        private var publicData: HomePublicProfile? = null
+        private var dashboardData: HomeDashboardResponse? = null
 
         private val _selectedTab = MutableStateFlow("overview")
 
@@ -192,89 +273,256 @@ class HomeDashboardViewModel
                 return
             }
             _state.value = HomeDashboardUiState.Loading
-            viewModelScope.launch { fetch() }
+            viewModelScope.launch { fetchAll() }
         }
 
-        private suspend fun fetch() {
-            when (val result = repo.detail(homeId)) {
-                is NetworkResult.Success -> applyDetail(result.data.home)
-                is NetworkResult.Failure ->
-                    if (result.error is NetworkError.Forbidden || result.error is NetworkError.NotFound) {
-                        fetchPublic()
-                    } else {
-                        _state.value =
-                            HomeDashboardUiState.Error(
-                                result.error.displayMessage("Couldn't load this home."),
-                            )
-                    }
+        private suspend fun fetchAll() =
+            coroutineScope {
+                val core = async { fetchCore() }
+                val health = async { loadHealthScore() }
+                val seasonal = async { loadChecklist() }
+                val property = async { loadPropertyValue() }
+                val trends = async { loadBillTrends() }
+                core.await()
+                health.await()
+                seasonal.await()
+                property.await()
+                trends.await()
             }
-        }
+
+        /** Home detail (identity / ownership) + the dashboard aggregate. */
+        private suspend fun fetchCore() =
+            coroutineScope {
+                val detailDeferred = async { repo.detail(homeId) }
+                val dashboardDeferred = async { intelligenceRepo.dashboard(homeId) }
+                val detailResult = detailDeferred.await()
+                val dashboardResult = dashboardDeferred.await()
+                dashboardData = if (dashboardResult is NetworkResult.Success) dashboardResult.data else null
+
+                when (detailResult) {
+                    is NetworkResult.Success -> {
+                        detailData = detailResult.data.home
+                        publicData = null
+                        rebuild()
+                    }
+                    is NetworkResult.Failure ->
+                        if (detailResult.error is NetworkError.Forbidden ||
+                            detailResult.error is NetworkError.NotFound
+                        ) {
+                            fetchPublic()
+                        } else {
+                            detailData = null
+                            publicData = null
+                            _state.value =
+                                HomeDashboardUiState.Error(
+                                    detailResult.error.displayMessage("Couldn't load this home."),
+                                )
+                        }
+                }
+            }
 
         private suspend fun fetchPublic() {
             when (val result = repo.publicProfile(homeId)) {
-                is NetworkResult.Success -> applyPublic(result.data.home)
-                is NetworkResult.Failure ->
+                is NetworkResult.Success -> {
+                    publicData = result.data.home
+                    detailData = null
+                    rebuild()
+                }
+                is NetworkResult.Failure -> {
+                    detailData = null
+                    publicData = null
                     _state.value =
                         HomeDashboardUiState.Error(
                             result.error.displayMessage("Couldn't load this home."),
                         )
+                }
             }
         }
 
-        private fun applyDetail(detail: HomeDetail) {
-            val address = detail.address ?: detail.name ?: "Home"
-            val stats =
-                listOf(
-                    HomeHeroStat("packages", "4", "Packages"),
-                    HomeHeroStat("access_codes", "2", "Access codes"),
-                    HomeHeroStat("tasks", "7", "Tasks"),
-                )
-            // Header / summary: home has any verified owner. Banner gate:
-            // I'm the verified owner only when isOwner is true and there
-            // is no pending claim still in flight.
-            val homeVerified = detail.isOwner || detail.owners.any { it.ownerStatus == "verified" }
-            val iAmVerified = detail.isOwner && !detail.isPendingOwner
-            _state.value =
-                HomeDashboardUiState.Loaded(
-                    content(address, verified = homeVerified, isVerifiedOwner = iAmVerified, stats = stats),
+        // ── Home Intelligence reads ─────────────────────────────────
+
+        /**
+         * Mirrors RN's `useHomeIntelligence`, which always forces a server
+         * recompute so a stale zero-score can't mask a populated home.
+         */
+        private suspend fun loadHealthScore() {
+            _healthScore.value = intelligenceRepo.healthScore(homeId, force = true).toCardState()
+            // The Overview's emergency row reads the health breakdown.
+            rebuild()
+        }
+
+        private suspend fun loadChecklist() {
+            _checklist.value = intelligenceRepo.seasonalChecklist(homeId).toCardState()
+        }
+
+        private suspend fun loadPropertyValue() {
+            _propertyValue.value = intelligenceRepo.propertyValue(homeId).toCardState()
+        }
+
+        private suspend fun loadBillTrends() {
+            _billTrends.value = intelligenceRepo.billTrends(homeId).toCardState()
+        }
+
+        private fun <T> NetworkResult<T>.toCardState(): HomeIntelligenceCardState<T> =
+            when (this) {
+                is NetworkResult.Success -> HomeIntelligenceCardState.Loaded(data)
+                is NetworkResult.Failure ->
+                    if (error is NetworkError.Forbidden) {
+                        HomeIntelligenceCardState.Forbidden
+                    } else {
+                        HomeIntelligenceCardState.Failed(
+                            error.displayMessage("Couldn't load this card."),
+                        )
+                    }
+            }
+
+        // ── Seasonal checklist actions ──────────────────────────────
+
+        /** `PATCH …/seasonal-checklist/:itemId { status: "completed" }`. */
+        fun completeChecklistItem(itemId: String) {
+            viewModelScope.launch { updateChecklistItem(itemId, "completed") }
+        }
+
+        /** `PATCH …/seasonal-checklist/:itemId { status: "skipped" }`. */
+        fun skipChecklistItem(itemId: String) {
+            viewModelScope.launch { updateChecklistItem(itemId, "skipped") }
+        }
+
+        /**
+         * The GET is idempotent-generate: it creates the current season's
+         * items when the home has none, so "Generate checklist" is a re-read.
+         */
+        fun generateChecklist() {
+            _checklist.value = HomeIntelligenceCardState.Loading
+            viewModelScope.launch { loadChecklist() }
+        }
+
+        /** Card-level retry for the health-score ring. */
+        fun refreshHealthScore() {
+            _healthScore.value = HomeIntelligenceCardState.Loading
+            viewModelScope.launch { loadHealthScore() }
+        }
+
+        /** Card-level retry for the property-value card. */
+        fun retryPropertyValue() {
+            _propertyValue.value = HomeIntelligenceCardState.Loading
+            viewModelScope.launch { loadPropertyValue() }
+        }
+
+        /** Card-level retry for the bill-trends card. */
+        fun retryBillTrends() {
+            _billTrends.value = HomeIntelligenceCardState.Loading
+            viewModelScope.launch { loadBillTrends() }
+        }
+
+        private suspend fun updateChecklistItem(
+            itemId: String,
+            status: String,
+        ) {
+            if (_pendingChecklistItemIds.value.contains(itemId)) return
+            _pendingChecklistItemIds.value = _pendingChecklistItemIds.value + itemId
+            try {
+                when (val result = intelligenceRepo.updateSeasonalChecklistItem(homeId, itemId, status)) {
+                    is NetworkResult.Success -> {
+                        // Reflect exactly what the server returned, then
+                        // re-read the score (seasonal progress is one of
+                        // its six dimensions).
+                        applyChecklistItem(result.data)
+                        loadHealthScore()
+                    }
+                    is NetworkResult.Failure ->
+                        _checklist.value =
+                            HomeIntelligenceCardState.Failed(
+                                result.error.displayMessage("Couldn't update that task. Try again."),
+                            )
+                }
+            } finally {
+                _pendingChecklistItemIds.value = _pendingChecklistItemIds.value - itemId
+            }
+        }
+
+        /**
+         * Splice the server's returned row back into the loaded checklist
+         * and recompute progress the same way the backend does
+         * (`home.js:7526`).
+         */
+        private fun applyChecklistItem(updated: SeasonalChecklistItemDto) {
+            val current = _checklist.value.valueOrNull() ?: return
+            val items = current.items.map { if (it.id == updated.id) updated else it }
+            val carryover =
+                current.carryover?.let { block ->
+                    SeasonalChecklistCarryoverDto(
+                        season = block.season,
+                        items = block.items.map { if (it.id == updated.id) updated else it },
+                    )
+                }
+            val completed = items.count { it.isResolved }
+            _checklist.value =
+                HomeIntelligenceCardState.Loaded(
+                    current.copy(
+                        items = items,
+                        progress =
+                            SeasonalChecklistProgressDto(
+                                total = items.size,
+                                completed = completed,
+                                percentage = HomeDashboardProjection.percentage(completed, items.size),
+                            ),
+                        carryover = carryover,
+                    ),
                 )
         }
 
-        private fun applyPublic(publicProfile: HomePublicProfile) {
-            val stats =
-                listOf(
-                    HomeHeroStat("packages", "0", "Packages"),
-                    HomeHeroStat("access_codes", "0", "Access codes"),
-                    HomeHeroStat("tasks", "0", "Tasks"),
-                )
-            // Public-profile path is hit when the user is NOT a verified
-            // owner; the private detail call returned 403/404 first.
-            _state.value =
-                HomeDashboardUiState.Loaded(
-                    content(
-                        address = publicProfile.address,
-                        verified = publicProfile.hasVerifiedOwner,
-                        isVerifiedOwner = false,
-                        stats = stats,
-                    ),
-                )
+        // ── Projection ──────────────────────────────────────────────
+
+        private fun rebuild() {
+            val detail = detailData
+            val publicProfile = publicData
+            when {
+                detail != null ->
+                    _state.value =
+                        HomeDashboardUiState.Loaded(
+                            content(
+                                address = detail.address ?: detail.name ?: "Home",
+                                // Header / summary: home has any verified owner.
+                                verified = detail.isOwner || detail.owners.any { it.ownerStatus == "verified" },
+                                // Banner gate: I'm the verified owner only when
+                                // isOwner is true and no claim is still in flight.
+                                isVerifiedOwner = detail.isOwner && !detail.isPendingOwner,
+                            ),
+                        )
+                publicProfile != null ->
+                    _state.value =
+                        HomeDashboardUiState.Loaded(
+                            content(
+                                address = publicProfile.address,
+                                verified = publicProfile.hasVerifiedOwner,
+                                // Public-profile path is hit when the user is NOT
+                                // a verified owner; detail returned 403/404 first.
+                                isVerifiedOwner = false,
+                            ),
+                        )
+            }
         }
 
         private fun content(
             address: String,
             verified: Boolean,
             isVerifiedOwner: Boolean,
-            stats: List<HomeHeroStat>,
-        ): HomeDashboardContent =
-            HomeDashboardContent(
+        ): HomeDashboardContent {
+            val counts = dashboardData?.counts
+            return HomeDashboardContent(
                 address = address,
                 verified = verified,
                 isVerifiedOwner = isVerifiedOwner,
-                stats = stats,
-                quickActions =
-                    HomeDashboardSampleData.populatedQuickActions,
-                tabs = HomeDashboardSampleData.tabs,
-                overview = HomeDashboardSampleData.populatedOverview,
+                stats = HomeDashboardProjection.stats(counts),
+                quickActions = HomeDashboardProjection.quickActions(counts),
+                tabs = HomeDashboardProjection.tabs,
+                overview =
+                    HomeDashboardProjection.overview(
+                        dashboard = dashboardData,
+                        health = _healthScore.value.valueOrNull(),
+                    ),
                 attentionSummary = null,
             )
+        }
     }

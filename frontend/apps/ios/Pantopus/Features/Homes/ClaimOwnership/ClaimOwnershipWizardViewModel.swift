@@ -26,6 +26,21 @@ import Observation
 public enum ClaimOwnershipOutboundEvent: Sendable, Equatable {
     case dismiss
     case openClaimsList
+    /// Someone else's verification already blocks this home — send the
+    /// user to the "Find or Add Home" discovery surface so they can
+    /// request to join instead. Mirrors RN
+    /// `claim-owner/evidence.tsx:210` (`router.replace('/homes/find')`).
+    case openFindHome
+}
+
+/// How the viewer wants to get onto this home. Mirrors RN
+/// `src/app/homes/[id]/claim-owner/index.tsx:14-15` — the document /
+/// escrow / IDV methods all funnel into the same evidence upload
+/// natively, so they collapse into `.verifyOwnership`; the
+/// `ask_verified_owner` branch posts instead of uploading.
+public enum ClaimStartMethod: String, Sendable, CaseIterable {
+    case verifyOwnership
+    case askVerifiedOwner
 }
 
 /// ViewModel backing `ClaimOwnershipWizardView`.
@@ -35,6 +50,12 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     // MARK: - Published state
 
     private(set) var currentStep: ClaimOwnershipStep = .start
+    /// Which verification this run is performing. Drives the slot set,
+    /// the wizard copy, and the `claim_type` sent on submit.
+    let verificationType: ClaimVerificationType
+    /// Selected `evidence_type` for slots that accept several document
+    /// kinds (residency). `nil` until the user picks one.
+    var selectedDocumentType: String?
     var slots: [ClaimEvidenceSlot: ClaimSlotUiState] = [:]
     /// Per-slot address-match verdict from the on-upload OCR check. Computed
     /// when a file is picked (sample-data heuristic until the evidence
@@ -45,6 +66,46 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     private(set) var isSubmitting: Bool = false
     private(set) var submitError: String?
     var pendingEvent: ClaimOwnershipOutboundEvent?
+
+    // MARK: - Start-step method picker (A12.3)
+
+    /// `has_verified_owner && !is_member` from
+    /// `GET /api/homes/:id/public-profile` — the exact condition RN uses
+    /// at `src/app/homes/[id]/claim-owner/index.tsx:52`.
+    private(set) var hasVerifiedOwner: Bool = false
+    private(set) var isMember: Bool = false
+    /// Only render the "ask a verified owner" option when the home has a
+    /// verified owner AND the viewer is not already a member.
+    var showsAskVerifiedOwner: Bool {
+        hasVerifiedOwner && !isMember
+    }
+
+    var selectedStartMethod: ClaimStartMethod = .verifyOwnership
+    /// True while `POST /:id/request-household-from-owner` is in flight.
+    private(set) var isSendingAskRequest: Bool = false
+    /// Success copy shown in a confirm alert; dismissing it closes the wizard.
+    private(set) var askRequestConfirmation: String?
+    /// Failure copy shown in an alert; dismissing it keeps the wizard open.
+    private(set) var askRequestError: String?
+
+    /// Non-nil when the claim POST came back 409 (or with a nil claim
+    /// id) because another person's verification already owns this
+    /// home. The view shows an alert whose "Search homes" action opens
+    /// the Find-or-Add-Home discovery route.
+    private(set) var blockedByOtherClaimPrompt: String?
+
+    /// RN sends different copy per variant
+    /// (`claim-owner/evidence.tsx:206-212`).
+    private var blockedByOtherClaimCopy: String {
+        if verificationType == .residency {
+            return "Someone else's verification is already in progress for this home, so you can't "
+                + "upload documents on this path. Search for the home and request to join, or ask "
+                + "your household for an invite."
+        }
+        return "Someone else's verification is already in progress for this home, so you can't upload "
+            + "documents here. Search for this home and request to join the household, or use "
+            + "Support if you believe this is wrong."
+    }
 
     /// Server-side claim id once `POST /ownership-claims` succeeds. Held
     /// across retry attempts so a partial-success → retry doesn't create
@@ -69,6 +130,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         api: APIClient = .shared,
         uploader: MultipartUploader = .shared,
         startContent: ClaimOwnershipStartContent? = nil,
+        verificationType: ClaimVerificationType = .owner,
         // Defaults to the live monitor in production. Tests inject a fixed
         // value so CI simulator reachability does not gate stubbed requests.
         isOnlineProvider: @escaping @MainActor () -> Bool = { NetworkMonitor.shared.isOnline }
@@ -76,27 +138,72 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         self.homeId = homeId
         self.api = api
         self.uploader = uploader
+        self.verificationType = verificationType
         self.isOnlineProvider = isOnlineProvider
         self.startContent = startContent ?? ClaimOwnershipSampleData.startContent(for: homeId)
         for slot in ClaimEvidenceSlot.allCases {
             slots[slot] = .empty
         }
+        currentStep = verificationType.steps.first ?? .start
+        // Residency's single slot accepts three document kinds; RN forces
+        // an explicit pick (`evidence.tsx:162`), so we start unselected.
+        selectedDocumentType = nil
+    }
+
+    /// Slots this run requires — `verificationType.slots`.
+    var activeSlots: [ClaimEvidenceSlot] {
+        verificationType.slots
+    }
+
+    /// Document kinds the user must choose between before uploading.
+    /// Empty when every active slot has a fixed `evidence_type`.
+    var documentOptions: [ClaimDocumentOption] {
+        activeSlots.flatMap(\.documentOptions)
+    }
+
+    /// True when the active slot set needs an explicit document-kind pick
+    /// and the user hasn't made one yet.
+    var needsDocumentTypeSelection: Bool {
+        !documentOptions.isEmpty && selectedDocumentType == nil
+    }
+
+    func selectDocumentType(_ id: String) {
+        guard documentOptions.contains(where: { $0.id == id }) else { return }
+        selectedDocumentType = id
+        submitError = nil
+    }
+
+    /// Resolves the `evidence_type` sent for a slot: fixed for owner
+    /// slots, user-picked for the residency slot.
+    func evidenceType(for slot: ClaimEvidenceSlot) -> String {
+        slot.fixedBackendType ?? selectedDocumentType ?? slot.backendType
     }
 
     // MARK: - WizardModel
+
+    /// 1-indexed position of `currentStep` inside the variant's step list.
+    private var stepIndex: Int {
+        (verificationType.steps.firstIndex(of: currentStep) ?? 0) + 1
+    }
+
+    private var stepTotal: Int {
+        verificationType.steps.count
+    }
 
     var chrome: WizardChrome {
         switch currentStep {
         case .start:
             WizardChrome(
-                title: "Claim ownership",
-                progressLabel: .stepOf(current: 1, total: 3),
-                progressFraction: 1.0 / 3.0,
+                title: verificationType.wizardTitle,
+                progressLabel: .stepOf(current: stepIndex, total: stepTotal),
+                progressFraction: Double(stepIndex) / Double(stepTotal),
                 leading: .close,
-                primaryCTALabel: "Start claim",
-                primaryCTAEnabled: true,
+                primaryCTALabel: selectedStartMethod == .askVerifiedOwner
+                    ? "Send request"
+                    : "Start claim",
+                primaryCTAEnabled: !isSendingAskRequest,
                 secondaryCTA: nil,
-                isSubmitting: false,
+                isSubmitting: isSendingAskRequest,
                 // Once the user has filled any slot or typed a note on the
                 // upload step, going back to Start must still surface the
                 // discard-confirm so an X tap doesn't dump the in-memory
@@ -106,12 +213,14 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
             )
         case .upload:
             WizardChrome(
-                title: "Claim ownership",
-                progressLabel: .stepOf(current: 2, total: 3),
-                progressFraction: 2.0 / 3.0,
-                leading: .back,
-                primaryCTALabel: "Submit claim",
-                primaryCTAEnabled: bothSlotsHaveFiles && !isSubmitting,
+                title: verificationType.wizardTitle,
+                progressLabel: .stepOf(current: stepIndex, total: stepTotal),
+                progressFraction: Double(stepIndex) / Double(stepTotal),
+                // Residency starts on Upload, so there is nothing to go
+                // back to — the leading control closes the wizard.
+                leading: verificationType.steps.first == .upload ? .close : .back,
+                primaryCTALabel: verificationType == .residency ? "Submit" : "Submit claim",
+                primaryCTAEnabled: canSubmit && !isSubmitting,
                 secondaryCTA: nil,
                 isSubmitting: isSubmitting,
                 footerHint: isSubmitting ? "Waiting for upload to finish" : nil,
@@ -120,7 +229,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
             )
         case .success:
             WizardChrome(
-                title: "Claim ownership",
+                title: verificationType.wizardTitle,
                 progressLabel: .hidden,
                 progressFraction: nil,
                 leading: .close,
@@ -139,7 +248,13 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         case .start:
             pendingEvent = .dismiss
         case .upload:
-            currentStep = .start
+            // Residency has no preceding step — close instead of popping
+            // into a step this variant never renders.
+            if verificationType.steps.first == .upload {
+                pendingEvent = .dismiss
+            } else {
+                currentStep = .start
+            }
         case .success:
             pendingEvent = .dismiss
         }
@@ -152,12 +267,96 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     func primaryTapped() {
         switch currentStep {
         case .start:
-            currentStep = .upload
+            if selectedStartMethod == .askVerifiedOwner {
+                Task { await sendHouseholdRequest() }
+            } else {
+                currentStep = .upload
+            }
         case .upload:
             Task { await submit() }
         case .success:
             pendingEvent = .openClaimsList
         }
+    }
+
+    // MARK: - Start step
+
+    func selectStartMethod(_ method: ClaimStartMethod) {
+        guard method != .askVerifiedOwner || showsAskVerifiedOwner else { return }
+        selectedStartMethod = method
+    }
+
+    /// Resolve `has_verified_owner` / `is_member` so the start step can
+    /// decide whether to render the "ask a verified owner" option, and
+    /// replace the sample home label with the real address.
+    func load() async {
+        do {
+            let response: HomePublicPreviewResponse = try await api.request(
+                HomeDiscoveryEndpoints.publicProfile(homeId: homeId)
+            )
+            hasVerifiedOwner = response.hasVerifiedOwner
+            isMember = response.isMember
+            let label = response.home.displayAddress
+            if !label.isEmpty {
+                startContent = ClaimOwnershipStartContent(
+                    homeLabel: label,
+                    contestedClaim: startContent.contestedClaim
+                )
+            }
+            if !showsAskVerifiedOwner, selectedStartMethod == .askVerifiedOwner {
+                selectedStartMethod = .verifyOwnership
+            }
+        } catch {
+            // The picker degrades to the ownership-verification path
+            // when the preview can't be read — never invent the flag.
+            logger.warning("Claim start public-profile load failed: \(error)")
+        }
+    }
+
+    /// `POST /api/homes/:id/request-household-from-owner` — notifies the
+    /// home's verified owner(s) that a non-member wants to be added.
+    func sendHouseholdRequest() async {
+        guard !isSendingAskRequest else { return }
+        if !isOnlineProvider() {
+            askRequestError = "You're offline. Try again when you're back online."
+            return
+        }
+        isSendingAskRequest = true
+        defer { isSendingAskRequest = false }
+        do {
+            _ = try await api.request(
+                HomeDiscoveryEndpoints.requestHouseholdFromOwner(
+                    homeId: homeId,
+                    request: RequestHouseholdFromOwnerRequest(requestedIdentity: "owner")
+                )
+            ) as RequestHouseholdFromOwnerResponse
+            askRequestConfirmation =
+                "Verified owners were notified. They can add you from the home Members screen."
+        } catch {
+            askRequestError = (error as? APIError)?.errorDescription ?? "Try again later."
+        }
+    }
+
+    /// Dismiss the "Request sent" alert → close the wizard (RN pops back
+    /// to the homes list on OK).
+    func acknowledgeAskConfirmation() {
+        askRequestConfirmation = nil
+        pendingEvent = .dismiss
+    }
+
+    func acknowledgeAskError() {
+        askRequestError = nil
+    }
+
+    /// "OK" on the blocked-claim alert — stay put.
+    func dismissBlockedByOtherClaim() {
+        blockedByOtherClaimPrompt = nil
+    }
+
+    /// "Search homes" on the blocked-claim alert.
+    func openFindHomeFromBlockedClaim() {
+        blockedByOtherClaimPrompt = nil
+        pendingEvent = .openFindHome
     }
 
     func secondaryTapped() {
@@ -194,18 +393,25 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         submitError = "That file is over 10 MB. Try a smaller photo."
     }
 
+    /// Every slot the active variant requires carries a file.
     var bothSlotsHaveFiles: Bool {
-        slots.values.allSatisfy(\.hasFile)
+        activeSlots.allSatisfy { slots[$0]?.hasFile == true }
     }
 
     var anySlotHasFile: Bool {
-        slots.values.contains { $0.hasFile }
+        activeSlots.contains { slots[$0]?.hasFile == true }
+    }
+
+    /// Submit gate — files in every required slot, plus an explicit
+    /// document-kind pick when the variant offers a choice.
+    var canSubmit: Bool {
+        bothSlotsHaveFiles && !needsDocumentTypeSelection
     }
 
     // MARK: - Submit
 
     func submit() async {
-        guard bothSlotsHaveFiles, !isSubmitting else { return }
+        guard canSubmit, !isSubmitting else { return }
         if !isOnlineProvider() {
             submitError = "You're offline. Try again when you're back online."
             return
@@ -226,20 +432,33 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                 claimResponse = try await api.request(
                     HomesEndpoints.submitClaim(
                         homeId: homeId,
-                        request: SubmitClaimRequest(method: "doc_upload")
+                        request: SubmitClaimRequest(
+                            claimType: verificationType.claimType,
+                            method: "doc_upload"
+                        )
                     )
                 )
             } catch {
-                submitError = "Couldn't submit. Retry."
+                // 409 = someone else's verification is already in
+                // flight for this home (EXISTING_IN_FLIGHT_CLAIM /
+                // DUPLICATE_CLAIM). RN offers "Search homes" here
+                // (`claim-owner/evidence.tsx:194-212`); mirror that so
+                // the user has somewhere to go.
+                if case let .clientError(status, _) = error as? APIError ?? .invalidResponse,
+                   status == 409 {
+                    blockedByOtherClaimPrompt = blockedByOtherClaimCopy
+                } else {
+                    submitError = "Couldn't submit. Retry."
+                }
                 logger.warning("Claim submit failed: \(error)")
                 Analytics.track(.ctaClaimOwnershipSubmit(result: .error))
                 return
             }
             guard let id = claimResponse.claim.id else {
                 // Opaque-handshake path can return nil claim id when a
-                // duplicate exists. Surface a friendly message rather
-                // than failing silently.
-                submitError = "We're already working on a claim for this home."
+                // duplicate exists — same user-visible outcome as the
+                // 409 above.
+                blockedByOtherClaimPrompt = blockedByOtherClaimCopy
                 Analytics.track(.ctaClaimOwnershipSubmit(result: .error))
                 return
             }
@@ -251,7 +470,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         // any slot we already finished on a prior attempt, and skip the
         // upload step for slots whose bytes are already in storage —
         // both retry-paths exist so partial failures don't repeat work.
-        for (index, slot) in ClaimEvidenceSlot.allCases.enumerated() {
+        for (index, slot) in activeSlots.enumerated() {
             if case .uploaded = slots[slot] { continue }
             guard let file = slots[slot]?.pickedFile else { continue }
             let metadata: [String: String]? =
@@ -281,7 +500,7 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
                         homeId: homeId,
                         claimId: claimId,
                         request: UploadEvidenceRequest(
-                            evidenceType: slot.backendType,
+                            evidenceType: evidenceType(for: slot),
                             storageRef: fileURL,
                             metadata: metadata
                         )

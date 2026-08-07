@@ -55,7 +55,18 @@ public struct VerifyLandlordWizardView: View {
             VerifyStartStep(content: viewModel.startContent)
         case .details:
             VerifyDetailsStep(viewModel: viewModel)
+        case .sent:
+            if let result = viewModel.approvalResult {
+                VerifySentStep(result: result, errorMessage: submitErrorMessage)
+            }
         }
+    }
+
+    /// Surfaces a failed mailed-code fallback under the sent panel
+    /// rather than dropping it.
+    private var submitErrorMessage: String? {
+        if case let .error(message) = viewModel.submitState { return message }
+        return nil
     }
 
     private func handle(_ event: VerifyLandlordOutboundEvent?) {

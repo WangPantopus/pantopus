@@ -30,6 +30,10 @@ public enum HomeSettingsRoute: Sendable, Hashable {
     case accessCodes
     case trustedNeighbors
     case security
+    /// A14.2 (policy variant) — per-home ownership security policy
+    /// (`/api/homes/:id/security`). Distinct from `.security`, which is
+    /// the 9-toggle privacy screen on `/api/homes/:id/privacy`.
+    case ownershipSecurity
     case people
     case inviteLink
     case homeNotifications
@@ -88,6 +92,7 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         "accessCodes": .accessCodes,
         "trustedNeighbors": .trustedNeighbors,
         "privacy": .security,
+        "ownershipSecurity": .ownershipSecurity,
         "people": .people,
         "inviteLink": .inviteLink,
         "homeNotifications": .homeNotifications,
@@ -269,7 +274,13 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         let rows: [GroupedListRow] = [
             GroupedListRow(id: "accessCodes", label: "Access codes", subtext: subtexts.accessCodes, control: .chevron),
             GroupedListRow(id: "trustedNeighbors", label: "Trusted neighbors", subtext: subtexts.trustedNeighbors, control: .chevron),
-            GroupedListRow(id: "privacy", label: "Privacy", subtext: subtexts.privacy, control: .chevron)
+            GroupedListRow(id: "privacy", label: "Privacy", subtext: subtexts.privacy, control: .chevron),
+            GroupedListRow(
+                id: "ownershipSecurity",
+                label: "Ownership & Security",
+                subtext: "Discoverability, owner claims, member policy",
+                control: .chevron
+            )
         ]
         return GroupedListGroup(id: "access", overline: "Access", rows: rows)
     }

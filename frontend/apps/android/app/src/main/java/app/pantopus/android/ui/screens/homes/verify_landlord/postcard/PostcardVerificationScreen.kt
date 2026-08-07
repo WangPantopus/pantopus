@@ -106,11 +106,14 @@ fun PostcardVerificationScreen(
         topBar = { PostcardTopBar(onBack = viewModel::dismissTapped) },
         bottomBar = {
             PostcardStickyDock(
-                showHint = state.stage != PostcardDeliveryStage.Delivered,
+                showHint = !state.showsCodeEntryFrame,
                 label = state.primaryCtaLabel,
                 enabled = state.primaryCtaEnabled,
                 loading = state.isSubmitting,
+                showRequestNewCode = state.needsNewCode,
+                requestNewCodeEnabled = !state.isRequestingCode,
                 onPrimary = viewModel::verifyTapped,
+                onRequestNewCode = viewModel::requestNewCode,
             )
         },
     ) { padding: PaddingValues ->
@@ -130,7 +133,11 @@ fun PostcardVerificationScreen(
                 delivered = state.stage == PostcardDeliveryStage.Delivered,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
-            PostcardHero(stage = state.stage, deliveredOn = state.content.deliveredOn)
+            PostcardHero(
+                codeEntryMode = state.showsCodeEntryFrame,
+                deliveredOn = state.content.deliveredOn,
+                stage = state.stage,
+            )
             PostcardStatusTimeline(stage = state.stage, content = state.content)
             PostcardCodeArea(
                 value = state.codeInput,
@@ -138,13 +145,18 @@ fun PostcardVerificationScreen(
                 disabled = !state.isCodeInputUnlocked,
                 error =
                     (state.submitState as? VerifyLandlordSubmitState.Error)?.message,
+                attemptsLabel = state.attemptsRemainingLabel,
+                expiryLabel = state.codeExpiryLabel,
+                notice = state.notice,
             )
-            if (state.stage == PostcardDeliveryStage.Delivered) {
-                DeliveredSecondaryRow(onResend = viewModel::resendPostcard)
+            if (state.showsCodeEntryFrame) {
+                DeliveredSecondaryRow(onResend = viewModel::requestNewCode)
             } else {
-                InTransitHelpBlock(
-                    resendOn = state.content.resendAvailableOn,
-                    onResend = viewModel::resendPostcard,
+                InTransitHelpBlock(onResend = viewModel::requestNewCode)
+                TextAction(
+                    label = "I already have a code",
+                    tag = "postcardHaveCodeCTA",
+                    onClick = viewModel::markHasCode,
                 )
             }
         }
@@ -196,7 +208,10 @@ private fun PostcardStickyDock(
     label: String,
     enabled: Boolean,
     loading: Boolean,
+    showRequestNewCode: Boolean,
+    requestNewCodeEnabled: Boolean,
     onPrimary: () -> Unit,
+    onRequestNewCode: () -> Unit,
 ) {
     Column(
         modifier =
@@ -235,13 +250,49 @@ private fun PostcardStickyDock(
                     .fillMaxWidth()
                     .testTag("postcardVerifyCTA"),
         )
+        if (showRequestNewCode) {
+            TextAction(
+                label = "Request a new code",
+                tag = "postcardRequestNewCodeCTA",
+                enabled = requestNewCodeEnabled,
+                onClick = onRequestNewCode,
+            )
+        }
+    }
+}
+
+/** Centred text-only secondary action used by the postcard frames. */
+@Composable
+private fun TextAction(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .clip(RoundedCornerShape(Radii.md))
+                .clickable(enabled = enabled, onClick = onClick)
+                .alpha(if (enabled) 1f else 0.5f)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = PantopusTextStyle.body.copy(fontWeight = FontWeight.Medium),
+            color = PantopusColors.primary600,
+        )
     }
 }
 
 @Composable
 private fun PostcardHero(
-    stage: PostcardDeliveryStage,
+    codeEntryMode: Boolean,
     deliveredOn: String?,
+    stage: PostcardDeliveryStage,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -255,7 +306,7 @@ private fun PostcardHero(
         }
         Text(
             text =
-                if (stage == PostcardDeliveryStage.Delivered) {
+                if (codeEntryMode) {
                     "Enter the code from the card"
                 } else {
                     "Your card is on the way"
@@ -267,10 +318,10 @@ private fun PostcardHero(
         )
         Text(
             text =
-                if (stage == PostcardDeliveryStage.Delivered) {
+                if (codeEntryMode) {
                     "6 characters, printed on the left side. Case doesn't matter."
                 } else {
-                    "Estimated arrival Mon, Oct 12. We'll push you a notification when it lands."
+                    "We'll push you a notification when it lands — or enter the code now if you already have it."
                 },
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
@@ -536,6 +587,9 @@ private fun PostcardCodeArea(
     onChange: (String) -> Unit,
     disabled: Boolean,
     error: String?,
+    attemptsLabel: String?,
+    expiryLabel: String?,
+    notice: PostcardNotice?,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -554,6 +608,31 @@ private fun PostcardCodeArea(
                 style = PantopusTextStyle.caption,
                 color = PantopusColors.error,
                 modifier = Modifier.testTag("postcardSubmitError"),
+            )
+        }
+        if (attemptsLabel != null) {
+            Text(
+                text = attemptsLabel,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+                modifier = Modifier.testTag("postcardAttemptsRemaining"),
+            )
+        }
+        if (expiryLabel != null) {
+            Text(
+                text = expiryLabel,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.testTag("postcardCodeExpiry"),
+            )
+        }
+        if (notice != null) {
+            Text(
+                text = notice.text,
+                style = PantopusTextStyle.caption,
+                textAlign = TextAlign.Center,
+                color = if (notice.isError) PantopusColors.error else PantopusColors.appTextSecondary,
+                modifier = Modifier.testTag("postcardNotice"),
             )
         }
     }
@@ -622,10 +701,7 @@ private fun IconAction(
 }
 
 @Composable
-private fun InTransitHelpBlock(
-    resendOn: String,
-    onResend: () -> Unit,
-) {
+private fun InTransitHelpBlock(onResend: () -> Unit) {
     Column(
         modifier =
             Modifier
@@ -639,11 +715,10 @@ private fun InTransitHelpBlock(
         HelpRow(
             icon = PantopusIcon.RefreshCw,
             title = "Resend postcard",
-            subcopy = "If it doesn't arrive by $resendOn.",
-            trailingMeta = "available $resendOn",
-            disabled = true,
+            subcopy = "Mails a fresh code to this address.",
+            disabled = false,
             onTap = onResend,
-            tag = "postcardResendDisabled",
+            tag = "postcardResendCTA",
         )
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
         HelpRow(

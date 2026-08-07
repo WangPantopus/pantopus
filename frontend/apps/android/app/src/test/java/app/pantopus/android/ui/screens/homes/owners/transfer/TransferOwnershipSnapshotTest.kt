@@ -20,11 +20,10 @@ import org.junit.Test
  * A13.4 Paparazzi baselines for the Transfer Ownership form.
  *
  * Locks the two design frames:
- *  - ready: Maya selected, backend-backed preview recipient, 25% slider,
- *    before/after diff, TRANSFER typed, CTA armed.
- *  - confirm_sheet: Face ID / biometric bottom sheet over the form's
- *    diff card (rendered standalone so the scrim doesn't dominate the
- *    baseline diff).
+ *  - ready: buyer email typed + resolved recipient card, TRANSFER typed,
+ *    CTA armed.
+ *  - confirm_sheet: biometric bottom sheet (rendered standalone so the
+ *    scrim doesn't dominate the baseline diff).
  */
 class TransferOwnershipSnapshotTest {
     @get:Rule
@@ -44,10 +43,11 @@ class TransferOwnershipSnapshotTest {
                 TransferOwnershipLoaded(
                     state = readyState(),
                     onBack = {},
-                    onAmountChange = {},
-                    onPresetSelected = {},
+                    onRecipientChange = {},
+                    onRecipientClear = {},
                     onConfirmationChange = {},
                     onArmCta = {},
+                    onRetry = {},
                 )
             }
         }
@@ -60,10 +60,9 @@ class TransferOwnershipSnapshotTest {
                 val state = readyState()
                 BiometricConfirmSheet(
                     parties = state.confirmSheetParties,
-                    amount = state.amount,
-                    recipientName = state.recipient.name,
-                    homeAddress = state.homeContext.address,
-                    coOwnerNames = state.homeContext.coOwnerNames,
+                    recipientName = state.recipientEmail,
+                    homeAddress = state.homeAddress,
+                    coOwnerNames = state.coOwnerNames,
                     timestamp = state.confirmationTimestamp,
                     biometryLabel = state.biometryLabel,
                     isAuthenticating = false,
@@ -88,18 +87,25 @@ class TransferOwnershipSnapshotTest {
 
     private fun readyState(): TransferOwnershipUiState =
         TransferOwnershipUiState(
-            homeContext = TransferOwnershipSampleData.homeContext("preview"),
-            recipient = TransferOwnershipSampleData.mayaFortune,
-            currentUser = TransferOwnershipSampleData.currentUser,
-            coOwners = TransferOwnershipSampleData.coOwners,
-            recipientIsBackendBacked = true,
-            amount = TransferOwnershipSampleData.DEFAULT_AMOUNT,
+            contextState = TransferContextState.Loaded,
+            homeTitle = "412 Elm Street",
+            homeAddress = "412 Elm Street",
+            coOwnerNames = "Mateo and Jin",
+            otherOwnerCount = 2,
+            senderDisplayName = "Daniel Kovács",
+            recipientField =
+                FormFieldState(
+                    id = "recipientEmail",
+                    value = "buyer@example.com",
+                    touched = true,
+                ),
             confirmationField =
                 FormFieldState(
                     id = "confirmation",
-                    value = TransferOwnershipSampleData.CONFIRMATION_PHRASE,
+                    value = TRANSFER_CONFIRMATION_PHRASE,
                     touched = true,
                 ),
             biometryLabel = "Face ID",
+            confirmationTimestamp = "14:23 May 26",
         )
 }

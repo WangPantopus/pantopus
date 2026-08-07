@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.NormalizedAddressDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -42,7 +43,36 @@ data class AddHomeUiState(
     val isSubmitting: Boolean = false,
     val createdHomeId: String? = null,
     val errorMessage: String? = null,
+    /**
+     * `check-address` returned `HOME_FOUND_CLAIMED` — show the two-page
+     * confirm modal instead of advancing (RN `useHomeForm.ts:611`).
+     */
+    val showsClaimedModal: Boolean = false,
+    /** Second page of that modal ("Confirm this is your address"). */
+    val showsConfirmAddressSheet: Boolean = false,
+    /** Submit resolves against the existing home, not `POST /api/homes`. */
+    val isClaimingExistingHome: Boolean = false,
+    /** `home_id` returned by `check-address` for the matched home. */
+    val existingHomeId: String? = null,
 ) {
+    /**
+     * Address label rendered in the confirm sheet — the server's
+     * `formatted_address` when present, else the typed fields.
+     */
+    val claimedAddressLabel: String
+        get() =
+            addressCheck
+                ?.formattedAddress
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf(
+                    form.address.street,
+                    form.address.unit,
+                    form.address.city,
+                    form.address.state,
+                    form.address.zipCode,
+                ).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
+
     val zipMismatch: AddHomeZipMismatch?
         get() {
             val geocoded = geocodedAddress ?: return null
@@ -96,6 +126,7 @@ open class AddHomeWizardViewModel
     @Inject
     constructor(
         private val repository: HomesRepository,
+        private val discoveryRepository: HomeDiscoveryRepository,
         private val savedStateHandle: SavedStateHandle,
         private val networkMonitor: NetworkMonitor,
     ) : ViewModel(),
@@ -291,7 +322,10 @@ open class AddHomeWizardViewModel
                     runCheckAddress()
                 }
                 AddHomeStep.Confirm -> {
-                    if (!_state.value.isCheckingAddress && _state.value.zipMismatch == null) {
+                    if (!_state.value.isCheckingAddress &&
+                        _state.value.zipMismatch == null &&
+                        !_state.value.showsClaimedModal
+                    ) {
                         transitionTo(AddHomeStep.Role)
                     }
                 }
@@ -334,6 +368,10 @@ open class AddHomeWizardViewModel
                     addressCheck = null,
                     geocodedAddress = null,
                     errorMessage = null,
+                    showsClaimedModal = false,
+                    showsConfirmAddressSheet = false,
+                    isClaimingExistingHome = false,
+                    existingHomeId = null,
                 )
             }
             val request =
@@ -351,6 +389,15 @@ open class AddHomeWizardViewModel
                             addressCheck = result.data,
                             geocodedAddress = geocodedAddress(result.data, fields),
                             isCheckingAddress = false,
+                            existingHomeId = result.data.homeId,
+                            // RN `useHomeForm.ts:611` — never advance;
+                            // the modal owns the next action.
+                            showsClaimedModal = result.data.isAlreadyClaimed,
+                            // A home row exists with no active occupants —
+                            // RN claims it instead of creating a duplicate
+                            // (`useHomeForm.ts:616`).
+                            isClaimingExistingHome =
+                                result.data.isFoundUnclaimed && result.data.homeId != null,
                         )
                     }
                 is NetworkResult.Failure ->
@@ -360,6 +407,79 @@ open class AddHomeWizardViewModel
                             errorMessage =
                                 result.error.message
                                     ?: "Couldn't verify that address. Try again.",
+                        )
+                    }
+            }
+        }
+
+        // MARK: - Address-already-claimed modal
+
+        /**
+         * "Change address" / "Edit" — close the modal and return to the
+         * address step so the user can correct their input.
+         */
+        fun dismissClaimedModal() {
+            _state.update {
+                it.copy(
+                    showsClaimedModal = false,
+                    showsConfirmAddressSheet = false,
+                    isClaimingExistingHome = false,
+                    existingHomeId = null,
+                )
+            }
+            transitionTo(AddHomeStep.Address)
+        }
+
+        /** "This address is correct" → show the confirm page. */
+        fun showConfirmAddressStep() {
+            _state.update { it.copy(showsConfirmAddressSheet = true) }
+        }
+
+        /**
+         * "Confirm address" — commit to joining the existing home. RN
+         * skips the details step and lands on role selection
+         * (`useHomeForm.ts:700-705`).
+         */
+        fun confirmClaimedAddress() {
+            _state.update {
+                it.copy(
+                    showsClaimedModal = false,
+                    showsConfirmAddressSheet = false,
+                    isClaimingExistingHome = true,
+                )
+            }
+            transitionTo(AddHomeStep.Role)
+        }
+
+        private suspend fun submitExistingHomeClaim(role: AddHomeRole) {
+            val homeId = _state.value.existingHomeId
+            if (homeId == null) {
+                _state.update {
+                    it.copy(
+                        errorMessage =
+                            "We could not find the existing home record. " +
+                                "Please try that address again.",
+                    )
+                }
+                transitionTo(AddHomeStep.Address)
+                return
+            }
+            if (role == AddHomeRole.Owner) {
+                // Owner path: verification, not a residency claim.
+                pendingEvent.value = AddHomeOutboundEvent.OpenClaimOwnership(homeId)
+                return
+            }
+            _state.update { it.copy(isSubmitting = true, errorMessage = null) }
+            when (val result = discoveryRepository.submitResidencyClaim(homeId, role.claimedRole)) {
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(isSubmitting = false) }
+                    pendingEvent.value = AddHomeOutboundEvent.OpenWaitingRoom(homeId)
+                }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            isSubmitting = false,
+                            errorMessage = result.error.message ?: "Failed to submit claim",
                         )
                     }
             }
@@ -376,6 +496,12 @@ open class AddHomeWizardViewModel
                         errorMessage = "You're offline. Try again when you're back online.",
                     )
                 }
+                return
+            }
+            // Existing-home flow: claim it rather than creating a
+            // duplicate Home row (RN `useHomeForm.ts:456-473`).
+            if (_state.value.isClaimingExistingHome) {
+                submitExistingHomeClaim(role)
                 return
             }
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
@@ -486,7 +612,7 @@ open class AddHomeWizardViewModel
         private fun primaryCtaLabel(step: AddHomeStep): String =
             when (step) {
                 AddHomeStep.Address, AddHomeStep.Confirm, AddHomeStep.Role -> "Continue"
-                AddHomeStep.Review -> "Submit"
+                AddHomeStep.Review -> if (_state.value.isClaimingExistingHome) "Submit claim" else "Submit"
                 AddHomeStep.Success -> "View home"
             }
 
@@ -510,7 +636,11 @@ open class AddHomeWizardViewModel
         private fun primaryEnabled(state: AddHomeUiState): Boolean =
             when (state.form.currentStep) {
                 AddHomeStep.Address -> state.selectedHomeId != null
-                AddHomeStep.Confirm -> !state.isCheckingAddress && state.errorMessage == null && state.zipMismatch == null
+                AddHomeStep.Confirm ->
+                    !state.isCheckingAddress &&
+                        state.errorMessage == null &&
+                        state.zipMismatch == null &&
+                        !state.showsClaimedModal
                 AddHomeStep.Role -> state.form.role != null
                 AddHomeStep.Review -> state.form.role != null
                 AddHomeStep.Success -> state.createdHomeId != null

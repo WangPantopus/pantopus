@@ -87,6 +87,17 @@ public enum AddHomeRole: String, CaseIterable, Codable, Sendable {
         case .householdMember: "Household member"
         }
     }
+
+    /// `claimed_role` sent with `POST /api/homes/:id/claim`
+    /// (`backend/routes/home.js:6482`). Values mirror RN's role picker
+    /// (`src/components/homes/types.ts:17-20`).
+    public var claimedRole: String {
+        switch self {
+        case .owner: "owner"
+        case .tenant: "renter"
+        case .householdMember: "household"
+        }
+    }
 }
 
 /// Snapshot of all wizard form state. Encoded into `@SceneStorage` so the

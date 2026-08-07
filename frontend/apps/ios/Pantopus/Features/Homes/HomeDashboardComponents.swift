@@ -218,26 +218,34 @@ struct HomeOverviewSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             DashboardCard(title: "Upcoming", action: "See all", accent: Theme.Color.warning) {
-                VStack(spacing: Spacing.s0) {
-                    ForEach(content.overview.upcoming) { item in
-                        TimelineRow(item: item)
-                        if item.id != content.overview.upcoming.last?.id {
-                            Rectangle()
-                                .fill(Theme.Color.appBorderSubtle)
-                                .frame(height: 1)
+                if content.overview.upcoming.isEmpty {
+                    OverviewEmptyRow(text: "Nothing due today. You're all clear.")
+                } else {
+                    VStack(spacing: Spacing.s0) {
+                        ForEach(content.overview.upcoming) { item in
+                            TimelineRow(item: item)
+                            if item.id != content.overview.upcoming.last?.id {
+                                Rectangle()
+                                    .fill(Theme.Color.appBorderSubtle)
+                                    .frame(height: 1)
+                            }
                         }
                     }
                 }
             }
 
             DashboardCard(title: "Recent activity", action: "See all") {
-                VStack(spacing: Spacing.s0) {
-                    ForEach(content.overview.activity) { item in
-                        ActivityRow(item: item)
-                        if item.id != content.overview.activity.last?.id {
-                            Rectangle()
-                                .fill(Theme.Color.appBorderSubtle)
-                                .frame(height: 1)
+                if content.overview.activity.isEmpty {
+                    OverviewEmptyRow(text: "No household activity yet.")
+                } else {
+                    VStack(spacing: Spacing.s0) {
+                        ForEach(content.overview.activity) { item in
+                            ActivityRow(item: item)
+                            if item.id != content.overview.activity.last?.id {
+                                Rectangle()
+                                    .fill(Theme.Color.appBorderSubtle)
+                                    .frame(height: 1)
+                            }
                         }
                     }
                 }
@@ -262,7 +270,8 @@ struct HomeOverviewSection: View {
     }
 }
 
-private struct DashboardCard<Content: View>: View {
+/// Shared card chrome for the Overview + Home Intelligence sections.
+struct DashboardCard<Content: View>: View {
     let title: String
     var action: String?
     var accent: Color?
@@ -314,6 +323,18 @@ private struct DashboardCard<Content: View>: View {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
+    }
+}
+
+private struct OverviewEmptyRow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .pantopusTextStyle(.caption)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Spacing.s3)
     }
 }
 

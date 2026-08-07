@@ -63,7 +63,12 @@ class VerifyLandlordDetailsSnapshotTest {
     private class SnapshotVm(
         networkMonitor: NetworkMonitor,
         handle: SavedStateHandle,
-    ) : VerifyLandlordWizardViewModel(networkMonitor, handle, mockk(relaxed = true)) {
+    ) : VerifyLandlordWizardViewModel(
+            networkMonitor,
+            handle,
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+        ) {
         override val submitDelayMillis: Long = 0L
     }
 
@@ -86,6 +91,8 @@ class VerifyLandlordDetailsSnapshotTest {
                 vm.setPMEmail(pmEmail)
                 vm.setPMPhone(pmPhone)
             }
+            vm.setMoveInDate(moveInDate)
+            vm.setMessageToLandlord(messageToLandlord)
         }
         return vm
     }

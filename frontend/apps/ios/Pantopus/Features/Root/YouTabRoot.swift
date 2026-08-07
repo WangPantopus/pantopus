@@ -42,9 +42,17 @@ public enum YouRoute: Hashable {
     case legal
     case legalContent(LegalDocument)
     case addHome
+    /// A12.1 — "Find or Add Home" discovery. Mirrors RN
+    /// `src/app/homes/find.tsx`.
+    case findHome
     case myClaims
     case claimStatus(claimId: String)
     case claimOwnership(homeId: String)
+    /// Residency-verification variant of the evidence flow. Sends
+    /// `claim_type: 'resident'` and offers the lease / utility-bill /
+    /// tax-bill document set (RN
+    /// `homes/[id]/claim-owner/evidence.tsx?verificationType=residency`).
+    case verifyResidency(homeId: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
     case offers
     /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
@@ -236,6 +244,10 @@ public enum YouRoute: Hashable {
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
+    /// Per-home **issue tracker** (`HomeIssue`). A different backend
+    /// collection from `.homeMaintenance` (maintenance tasks) — this is
+    /// the surface RN calls "Maintenance" (`homes/[id]/maintenance.tsx`).
+    case homeIssues(homeId: String)
     /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
     /// FAB; on success the host pops back and refreshes the list.
     case logMaintenance(homeId: String)
@@ -249,6 +261,14 @@ public enum YouRoute: Hashable {
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
     case homeOwners(homeId: String)
+    /// H5 — Transfer Ownership form. Pushed from the sticky
+    /// "Transfer Ownership" action on the Owners list (RN parity:
+    /// `src/app/homes/[id]/owners/index.tsx:116-123`).
+    case transferOwnership(homeId: String)
+    /// H6 — per-home **owner** claim review (ownership + residency
+    /// claims on this home). Pushed from the Owners list top-bar gavel.
+    /// Distinct from the admin `reviewClaims` queue in `HubRoute`.
+    case homeClaimReview(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -771,7 +791,7 @@ public struct YouTabRoot: View {
     }
 
     @MainActor
-    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId _: String) {
         switch nav {
         case .notifications:
             path.append(.settings)
@@ -948,10 +968,28 @@ public struct YouTabRoot: View {
                 if !path.isEmpty { path.removeLast() }
             }
         case .addHome:
-            AddHomeWizardView { homeId in
-                path.removeAll { $0 == .addHome }
-                path.append(.homeDashboard(homeId: homeId))
-            }
+            AddHomeWizardView(
+                onOpenHomeDashboard: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.homeDashboard(homeId: homeId))
+                },
+                onOpenClaimOwnership: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.claimOwnership(homeId: homeId))
+                },
+                onOpenWaitingRoom: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.waitingRoom(homeId: homeId))
+                }
+            )
+        case .findHome:
+            FindHomeView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenClaimOwnership: { homeId in
+                    Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
+                },
+                onOpenAddHome: { Task { @MainActor in path.append(.addHome) } }
+            )
         case .myClaims:
             MyClaimsListView(
                 viewModel: MyClaimsListViewModel(
@@ -990,6 +1028,35 @@ public struct YouTabRoot: View {
                         return false
                     }
                     path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
+                }
+            )
+        case let .verifyResidency(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                verificationType: .residency,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
                 }
             )
         // Wave A — pre-staged placeholder destinations. When an A.x screen
@@ -1919,6 +1986,15 @@ public struct YouTabRoot: View {
                     },
                     onAddHome: {
                         Task { @MainActor in path.append(.addHome) }
+                    },
+                    onFindHome: {
+                        Task { @MainActor in path.append(.findHome) }
+                    },
+                    onUploadOwnershipEvidence: { homeId in
+                        Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
+                    },
+                    onVerifyResidency: { homeId in
+                        Task { @MainActor in path.append(.verifyResidency(homeId: homeId)) }
                     }
                 )
             )
@@ -1960,8 +2036,8 @@ public struct YouTabRoot: View {
                     // returns to My Businesses, not the success step.
                     path.removeAll { route in
                         switch route {
-                        case .createBusiness, .businessWaitlist: return true
-                        default: return false
+                        case .createBusiness, .businessWaitlist: true
+                        default: false
                         }
                     }
                     path.append(.businessOwner(businessId: businessId))
@@ -2009,6 +2085,12 @@ public struct YouTabRoot: View {
                 },
                 onOpenMembers: { membersHomeId in
                     Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
+                },
+                onHireHelp: { _ in
+                    // H1 — "Hire" on a seasonal-checklist item opens the
+                    // gig composer. The You-tab route carries no category
+                    // preselection, so the wizard starts on category pick.
+                    Task { @MainActor in path.append(.composeTask) }
                 }
             )
         case let .homeTasks(homeId):
@@ -2056,9 +2138,14 @@ public struct YouTabRoot: View {
                     },
                     onAddTask: {
                         Task { @MainActor in path.append(.logMaintenance(homeId: homeId)) }
+                    },
+                    onOpenIssues: {
+                        Task { @MainActor in path.append(.homeIssues(homeId: homeId)) }
                     }
                 )
             )
+        case let .homeIssues(homeId):
+            HomeIssuesListView(homeId: homeId)
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
@@ -2101,7 +2188,30 @@ public struct YouTabRoot: View {
             }()
             OwnersListView(
                 homeId: homeId,
-                currentUserId: currentUserId
+                currentUserId: currentUserId,
+                onOpenClaimReview: {
+                    Task { @MainActor in path.append(.homeClaimReview(homeId: homeId)) }
+                },
+                onOpenTransfer: {
+                    Task { @MainActor in path.append(.transferOwnership(homeId: homeId)) }
+                }
+            )
+        case let .transferOwnership(homeId):
+            let signedInUser: UserDTO? = {
+                if case let .signedIn(user) = auth.state { return user }
+                return nil
+            }()
+            TransferOwnershipView(
+                viewModel: TransferOwnershipViewModel(
+                    homeId: homeId,
+                    currentUserId: signedInUser?.id,
+                    currentUserName: signedInUser?.displayName ?? signedInUser?.username
+                )
+            )
+        case let .homeClaimReview(homeId):
+            HomeClaimReviewView(
+                homeId: homeId,
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)

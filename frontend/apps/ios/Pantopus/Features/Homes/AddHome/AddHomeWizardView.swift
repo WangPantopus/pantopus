@@ -19,20 +19,35 @@ public struct AddHomeWizardView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let onOpenHomeDashboard: (String) -> Void
+    /// `check-address` matched an already-claimed home and the user
+    /// picked "owner" — route to the ownership-claim wizard for that
+    /// existing home instead of creating a duplicate.
+    private let onOpenClaimOwnership: (String) -> Void
+    /// Residency claim filed against an existing home — route to the
+    /// waiting room.
+    private let onOpenWaitingRoom: (String) -> Void
 
     public init(
-        onOpenHomeDashboard: @escaping (String) -> Void
+        onOpenHomeDashboard: @escaping (String) -> Void,
+        onOpenClaimOwnership: @escaping (String) -> Void = { _ in },
+        onOpenWaitingRoom: @escaping (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: AddHomeWizardViewModel())
         self.onOpenHomeDashboard = onOpenHomeDashboard
+        self.onOpenClaimOwnership = onOpenClaimOwnership
+        self.onOpenWaitingRoom = onOpenWaitingRoom
     }
 
     init(
         viewModel: AddHomeWizardViewModel,
-        onOpenHomeDashboard: @escaping (String) -> Void
+        onOpenHomeDashboard: @escaping (String) -> Void,
+        onOpenClaimOwnership: @escaping (String) -> Void = { _ in },
+        onOpenWaitingRoom: @escaping (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenHomeDashboard = onOpenHomeDashboard
+        self.onOpenClaimOwnership = onOpenClaimOwnership
+        self.onOpenWaitingRoom = onOpenWaitingRoom
     }
 
     public var body: some View {
@@ -58,6 +73,11 @@ public struct AddHomeWizardView: View {
         .onChange(of: viewModel.form) { _, _ in persist() }
         .onChange(of: viewModel.pendingEvent) { _, event in
             handle(event)
+        }
+        .overlay {
+            if viewModel.showsClaimedModal {
+                AddressClaimedModal(viewModel: viewModel)
+            }
         }
         .accessibilityIdentifier("addHomeWizard")
     }
@@ -98,8 +118,133 @@ public struct AddHomeWizardView: View {
         case let .openHomeDashboard(homeId):
             storedForm = ""
             onOpenHomeDashboard(homeId)
+        case let .openClaimOwnership(homeId):
+            storedForm = ""
+            onOpenClaimOwnership(homeId)
+        case let .openWaitingRoom(homeId):
+            storedForm = ""
+            onOpenWaitingRoom(homeId)
         }
         viewModel.pendingEvent = nil
+    }
+}
+
+// MARK: - Address-already-claimed modal (RN AddressClaimedModal)
+
+/// Two-page confirm modal shown when `POST /api/homes/check-address`
+/// returns `HOME_FOUND_CLAIMED`. Copy mirrors RN's `ADDRESS_CHECK`
+/// constants (`src/constants/ownershipCopy.ts:176-183`).
+private struct AddressClaimedModal: View {
+    @Bindable var viewModel: AddHomeWizardViewModel
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Theme.Color.appText.opacity(0.45))
+                .ignoresSafeArea()
+                .onTapGesture { viewModel.dismissClaimedModal() }
+            card
+                .padding(.horizontal, Spacing.s5)
+        }
+        .accessibilityIdentifier("addHomeAddressClaimedModal")
+    }
+
+    @ViewBuilder
+    private var card: some View {
+        if viewModel.showsConfirmAddressSheet {
+            modalCard {
+                Text("Confirm this is your address")
+                    .pantopusTextStyle(.h3)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                Text("You entered:")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                Text(viewModel.claimedAddressLabel)
+                    .pantopusTextStyle(.body)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(Spacing.s3)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .accessibilityIdentifier("addHomeClaimedAddressLabel")
+                primaryButton("Confirm address", identifier: "addHomeClaimedConfirmAddress") {
+                    viewModel.confirmClaimedAddress()
+                }
+                secondaryButton("Edit", identifier: "addHomeClaimedEditAddress") {
+                    viewModel.dismissClaimedModal()
+                }
+            }
+        } else {
+            modalCard {
+                Circle()
+                    .fill(Theme.Color.personalBg)
+                    .frame(width: 56, height: 56)
+                    .overlay {
+                        Icon(.shieldCheck, size: 28, color: Theme.Color.primary600)
+                    }
+                Text("This home already has verified members")
+                    .pantopusTextStyle(.h3)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                Text("To protect privacy, you’ll need verification to join this home.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                primaryButton("This address is correct", identifier: "addHomeClaimedCorrect") {
+                    viewModel.showConfirmAddressStep()
+                }
+                secondaryButton("Change address", identifier: "addHomeClaimedChangeAddress") {
+                    viewModel.dismissClaimedModal()
+                }
+            }
+        }
+    }
+
+    private func modalCard(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: Spacing.s3) {
+            content()
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private func primaryButton(
+        _ title: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func secondaryButton(
+        _ title: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 

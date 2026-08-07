@@ -24,6 +24,8 @@ fun MaintenanceListScreen(
     onOpenTask: (String) -> Unit,
     onAddTask: () -> Unit,
     onBack: (() -> Unit)? = null,
+    /** Routes to the per-home issue tracker (a different collection). */
+    onOpenIssues: (() -> Unit)? = null,
     viewModel: MaintenanceListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -32,7 +34,11 @@ fun MaintenanceListScreen(
     val banner by viewModel.banner.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configureNavigation(onOpenTask = onOpenTask, onAddTask = onAddTask)
+        viewModel.configureNavigation(
+            onOpenTask = onOpenTask,
+            onAddTask = onAddTask,
+            onOpenIssues = onOpenIssues,
+        )
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenHomeMaintenanceViewed)
     }

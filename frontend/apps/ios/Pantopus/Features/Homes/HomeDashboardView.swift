@@ -82,6 +82,11 @@ struct HomeDashboardView: View {
     /// captured inside the `ContentDetailTopBarAction`'s Sendable
     /// handler.
     private let onOpenSettings: (@MainActor @Sendable (String) -> Void)?
+    /// H1 — "Hire help" on a seasonal-checklist item. Receives the
+    /// `GigsCategory` raw value derived from the item's `gig_category`
+    /// so the host can open the gig composer pre-filtered (RN routes to
+    /// `/gig-v2/new?initialText=…`).
+    private let onHireHelp: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -101,7 +106,8 @@ struct HomeDashboardView: View {
         onOpenMaintenance: ((String) -> Void)? = nil,
         onOpenMembers: ((String) -> Void)? = nil,
         onOpenPropertyDetails: ((String) -> Void)? = nil,
-        onOpenSettings: (@MainActor @Sendable (String) -> Void)? = nil
+        onOpenSettings: (@MainActor @Sendable (String) -> Void)? = nil,
+        onHireHelp: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -122,6 +128,7 @@ struct HomeDashboardView: View {
         self.onOpenMembers = onOpenMembers
         self.onOpenPropertyDetails = onOpenPropertyDetails
         self.onOpenSettings = onOpenSettings
+        self.onHireHelp = onHireHelp
     }
 
     /// Current signed-in user's email; used by the Invite Owner form
@@ -200,11 +207,14 @@ struct HomeDashboardView: View {
                             if let brandNew {
                                 BrandNewHomeSection(brandNew: brandNew) { handleQuickAction($0) }
                             } else {
-                                HomeOverviewSection(
-                                    content: content,
-                                    onOpenEmergency: { onOpenEmergency?(homeId) },
-                                    onOpenPropertyDetails: { onOpenPropertyDetails?(homeId) }
-                                )
+                                VStack(alignment: .leading, spacing: Spacing.s4) {
+                                    homeIntelligenceStack
+                                    HomeOverviewSection(
+                                        content: content,
+                                        onOpenEmergency: { onOpenEmergency?(homeId) },
+                                        onOpenPropertyDetails: { onOpenPropertyDetails?(homeId) }
+                                    )
+                                }
                             }
                         }
                     )
@@ -226,6 +236,37 @@ struct HomeDashboardView: View {
                 currentUserEmail: currentUserEmail
             ) { showsInviteOwner = false }
         }
+    }
+
+    /// H1 — health-score ring + seasonal checklist + property value +
+    /// bill trends. Each card owns its loading / loaded / empty / error
+    /// surface so one failing read can't blank the Overview.
+    @ViewBuilder
+    private var homeIntelligenceStack: some View {
+        HealthScoreRingCard(
+            state: viewModel.healthScore,
+            onAction: { handleQuickAction($0) },
+            onRetry: { Task { await viewModel.refreshHealthScore() } }
+        )
+        SeasonalChecklistCard(
+            state: viewModel.checklist,
+            pendingItemIds: viewModel.pendingChecklistItemIds,
+            onComplete: { itemId in Task { await viewModel.completeChecklistItem(itemId) } },
+            onSkip: { itemId in Task { await viewModel.skipChecklistItem(itemId) } },
+            onHireHelp: { item in
+                onHireHelp?(GigsCategory.from(backendKey: item.gigCategory).rawValue)
+            },
+            onGenerate: { Task { await viewModel.generateChecklist() } },
+            onRetry: { Task { await viewModel.generateChecklist() } }
+        )
+        PropertyValueCard(
+            state: viewModel.propertyValue,
+            onRetry: { Task { await viewModel.retryPropertyValue() } }
+        )
+        BillTrendsCard(
+            state: viewModel.billTrends,
+            onRetry: { Task { await viewModel.retryBillTrends() } }
+        )
     }
 
     private func handleFabAction(_ action: String) {

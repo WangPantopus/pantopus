@@ -27,6 +27,14 @@ public enum AddHomeOutboundEvent: Sendable, Equatable {
     case dismiss
     /// Pop the wizard and navigate to the newly-created home dashboard.
     case openHomeDashboard(homeId: String)
+    /// `check-address` matched an already-claimed home and the user
+    /// picked the owner role — hand off to the ownership-claim wizard
+    /// for that existing home instead of creating a duplicate row.
+    /// Mirrors RN `useHomeForm.ts:461`.
+    case openClaimOwnership(homeId: String)
+    /// Residency claim submitted against an existing home — RN routes
+    /// to the waiting room (`useHomeForm.ts:466`).
+    case openWaitingRoom(homeId: String)
 }
 
 struct AddHomeGeocodedAddress: Equatable {
@@ -81,6 +89,40 @@ final class AddHomeWizardViewModel: WizardModel {
     /// Set once the user reaches the success step, holds the new home's
     /// id so the "View home" CTA can route to the dashboard.
     private(set) var createdHomeId: String?
+
+    // MARK: - Existing-home (address already claimed) branch
+
+    /// `check-address` returned `HOME_FOUND_CLAIMED` — show the
+    /// two-step confirm modal instead of advancing. Mirrors RN
+    /// `useHomeForm.ts:611`.
+    private(set) var showsClaimedModal: Bool = false
+    /// Second page of that modal ("Confirm this is your address").
+    var showsConfirmAddressSheet: Bool = false
+    /// Once the user confirms, submit resolves against the existing
+    /// home instead of `POST /api/homes`.
+    private(set) var isClaimingExistingHome: Bool = false
+    /// `home_id` returned by `check-address` for the matched home.
+    private(set) var existingHomeId: String?
+
+    /// Address label rendered in the confirm sheet — the server's
+    /// `formatted_address` when present, else the typed fields.
+    var claimedAddressLabel: String {
+        if let formatted = addressCheck?.formattedAddress?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !formatted.isEmpty {
+            return formatted
+        }
+        return [
+            form.address.street,
+            form.address.unit,
+            form.address.city,
+            form.address.state,
+            form.address.zipCode
+        ]
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+        .joined(separator: ", ")
+    }
 
     /// One-shot navigation events the host view consumes.
     var pendingEvent: AddHomeOutboundEvent?
@@ -289,7 +331,7 @@ final class AddHomeWizardViewModel: WizardModel {
             transition(to: .confirm)
             await runCheckAddress()
         case .confirm:
-            guard !isCheckingAddress, zipMismatch == nil else { return }
+            guard !isCheckingAddress, zipMismatch == nil, !showsClaimedModal else { return }
             transition(to: .role)
         case .role:
             transition(to: .review)
@@ -328,6 +370,10 @@ final class AddHomeWizardViewModel: WizardModel {
         defer { isCheckingAddress = false }
         addressCheck = nil
         geocodedAddress = nil
+        showsClaimedModal = false
+        showsConfirmAddressSheet = false
+        isClaimingExistingHome = false
+        existingHomeId = nil
         let request = CheckAddressRequest(
             address: form.address.street,
             unitNumber: form.address.unit.isEmpty ? nil : form.address.unit,
@@ -341,9 +387,74 @@ final class AddHomeWizardViewModel: WizardModel {
             )
             addressCheck = response
             geocodedAddress = makeAddHomeGeocodedAddress(from: response, fallback: form.address)
+            existingHomeId = response.homeId
+            if response.isAlreadyClaimed {
+                // RN `useHomeForm.ts:611` — never advance; the modal
+                // owns the next action.
+                showsClaimedModal = true
+            } else if response.isFoundUnclaimed {
+                // A home row exists with no active occupants — RN
+                // (`useHomeForm.ts:616`) claims it instead of creating
+                // a duplicate.
+                isClaimingExistingHome = response.homeId != nil
+            }
         } catch {
             errorMessage = (error as? APIError)?.errorDescription
                 ?? "Couldn't verify that address. Try again."
+        }
+    }
+
+    // MARK: - Address-already-claimed modal
+
+    /// "Change address" / "Edit" — close the modal and return to the
+    /// address step so the user can correct their input.
+    func dismissClaimedModal() {
+        showsClaimedModal = false
+        showsConfirmAddressSheet = false
+        isClaimingExistingHome = false
+        existingHomeId = nil
+        transition(to: .address)
+    }
+
+    /// "This address is correct" → show the confirm page of the modal.
+    func showConfirmAddressStep() {
+        showsConfirmAddressSheet = true
+    }
+
+    /// "Confirm address" — commit to joining the existing home. RN skips
+    /// the details step and lands on role selection
+    /// (`useHomeForm.ts:700-705`).
+    func confirmClaimedAddress() {
+        showsClaimedModal = false
+        showsConfirmAddressSheet = false
+        isClaimingExistingHome = true
+        transition(to: .role)
+    }
+
+    private func submitExistingHomeClaim(role: AddHomeRole) async {
+        guard let homeId = existingHomeId else {
+            errorMessage = "We could not find the existing home record. Please try that address again."
+            transition(to: .address)
+            return
+        }
+        if role == .owner {
+            // Owner path: verification, not a residency claim.
+            pendingEvent = .openClaimOwnership(homeId: homeId)
+            return
+        }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await api.request(
+                HomeDiscoveryEndpoints.submitResidencyClaim(
+                    homeId: homeId,
+                    request: SubmitResidencyClaimRequest(claimedRole: role.claimedRole)
+                )
+            ) as SubmitResidencyClaimResponse
+            pendingEvent = .openWaitingRoom(homeId: homeId)
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription
+                ?? "Failed to submit claim"
         }
     }
 
@@ -353,6 +464,12 @@ final class AddHomeWizardViewModel: WizardModel {
         if !isOnlineProvider() {
             // P15: surface offline state inline; never silent-queue.
             errorMessage = "You're offline. Try again when you're back online."
+            return
+        }
+        // Existing-home flow: claim it rather than creating a duplicate
+        // Home row (RN `useHomeForm.ts:456-473`).
+        if isClaimingExistingHome {
+            await submitExistingHomeClaim(role: role)
             return
         }
         isSubmitting = true
@@ -408,7 +525,7 @@ final class AddHomeWizardViewModel: WizardModel {
     private func primaryCTALabel(for step: AddHomeStep) -> String {
         switch step {
         case .address, .confirm, .role: "Continue"
-        case .review: "Submit"
+        case .review: isClaimingExistingHome ? "Submit claim" : "Submit"
         case .success: "View home"
         }
     }
@@ -421,7 +538,8 @@ final class AddHomeWizardViewModel: WizardModel {
     private func primaryEnabled(for step: AddHomeStep) -> Bool {
         switch step {
         case .address: selectedHomeID != nil
-        case .confirm: !isCheckingAddress && errorMessage == nil && zipMismatch == nil
+        case .confirm:
+            !isCheckingAddress && errorMessage == nil && zipMismatch == nil && !showsClaimedModal
         case .role: form.role != nil
         case .review: form.role != nil
         case .success: createdHomeId != nil

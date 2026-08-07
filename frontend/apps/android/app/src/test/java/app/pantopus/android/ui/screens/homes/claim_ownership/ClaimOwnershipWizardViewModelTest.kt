@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
@@ -39,6 +40,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ClaimOwnershipWizardViewModelTest {
     private val repo: HomesRepository = mockk(relaxed = true)
+    private val discoveryRepo: HomeDiscoveryRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
             every { it.isOnline } returns MutableStateFlow(true)
@@ -55,6 +57,7 @@ class ClaimOwnershipWizardViewModelTest {
     private fun makeVm(): ClaimOwnershipWizardViewModel =
         ClaimOwnershipWizardViewModel(
             repository = repo,
+            discoveryRepository = discoveryRepo,
             networkMonitor = networkMonitor,
             savedStateHandle = SavedStateHandle(mapOf(CLAIM_OWNERSHIP_HOME_ID_KEY to "home-1")),
         )
@@ -337,6 +340,7 @@ class ClaimOwnershipWizardViewModelTest {
             val vm =
                 ClaimOwnershipWizardViewModel(
                     repository = repo,
+                    discoveryRepository = discoveryRepo,
                     networkMonitor = offlineMonitor,
                     savedStateHandle = SavedStateHandle(mapOf(CLAIM_OWNERSHIP_HOME_ID_KEY to "home-1")),
                 )

@@ -22,6 +22,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
+import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,6 +48,12 @@ sealed interface OwnersListEvent {
         val ownerId: String,
         val displayName: String,
     ) : OwnersListEvent
+
+    /**
+     * H6 — open the per-home owner claim-review surface
+     * (`HomeClaimReviewScreen`). Fired by the top-bar gavel.
+     */
+    data object OpenClaimReview : OwnersListEvent
 }
 
 /**
@@ -104,6 +111,25 @@ class OwnersListViewModel
         fun requestInvite() {
             _pendingEvent.value = OwnersListEvent.OpenInvite
         }
+
+        /** Fired by the top-bar gavel. */
+        fun requestClaimReview() {
+            _pendingEvent.value = OwnersListEvent.OpenClaimReview
+        }
+
+        /**
+         * H6 — entry point to the per-home claim-review surface
+         * (`HomeClaimReviewScreen`). Deliberately un-badged: counting
+         * pending claims would mean two extra owner-scoped reads on every
+         * roster load, and the review screen already shows per-tab counts.
+         * Mirrors iOS `OwnersListViewModel.topBarAction`.
+         */
+        val topBarAction: TopBarAction =
+            TopBarAction(
+                icon = PantopusIcon.Gavel,
+                contentDescription = "Review claims on this home",
+                onClick = ::requestClaimReview,
+            )
 
         /** FAB payload — 52dp secondary-create + user-plus glyph +
          *  home-green tint to match the home-pillar identity. */

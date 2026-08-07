@@ -41,9 +41,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -80,6 +82,8 @@ fun AddHomeWizardScreen(
     onDismiss: () -> Unit,
     onOpenHomeDashboard: (String) -> Unit,
     viewModel: AddHomeWizardViewModel = hiltViewModel(),
+    onOpenClaimOwnership: (String) -> Unit = {},
+    onOpenWaitingRoom: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
@@ -93,6 +97,14 @@ fun AddHomeWizardScreen(
             is AddHomeOutboundEvent.OpenHomeDashboard -> {
                 viewModel.acknowledgeEvent()
                 onOpenHomeDashboard(event.homeId)
+            }
+            is AddHomeOutboundEvent.OpenClaimOwnership -> {
+                viewModel.acknowledgeEvent()
+                onOpenClaimOwnership(event.homeId)
+            }
+            is AddHomeOutboundEvent.OpenWaitingRoom -> {
+                viewModel.acknowledgeEvent()
+                onOpenWaitingRoom(event.homeId)
             }
             null -> Unit
         }
@@ -129,6 +141,146 @@ fun AddHomeWizardScreen(
             AddHomeStep.Success -> SuccessStep()
         }
         state.errorMessage?.let { ErrorBanner(it) }
+    }
+
+    if (state.showsClaimedModal) {
+        AddressClaimedModal(
+            showsConfirmAddressSheet = state.showsConfirmAddressSheet,
+            addressLabel = state.claimedAddressLabel,
+            onDismiss = viewModel::dismissClaimedModal,
+            onThisIsCorrect = viewModel::showConfirmAddressStep,
+            onConfirmAddress = viewModel::confirmClaimedAddress,
+        )
+    }
+}
+
+// MARK: - Address-already-claimed modal (RN AddressClaimedModal)
+
+/**
+ * Two-page confirm dialog shown when `POST /api/homes/check-address`
+ * returns `HOME_FOUND_CLAIMED`. Copy mirrors RN's `ADDRESS_CHECK`
+ * constants (`src/constants/ownershipCopy.ts:176-183`).
+ */
+@Composable
+internal fun AddressClaimedModal(
+    showsConfirmAddressSheet: Boolean,
+    addressLabel: String,
+    onDismiss: () -> Unit,
+    onThisIsCorrect: () -> Unit,
+    onConfirmAddress: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .padding(Spacing.s5)
+                    .testTag("addHomeAddressClaimedModal"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (showsConfirmAddressSheet) {
+                Text(
+                    text = "Confirm this is your address",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "You entered:",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = addressLabel,
+                    style = PantopusTextStyle.body,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.appSurfaceSunken)
+                            .padding(Spacing.s3)
+                            .testTag("addHomeClaimedAddressLabel"),
+                )
+                ModalPrimaryButton("Confirm address", "addHomeClaimedConfirmAddress", onConfirmAddress)
+                ModalSecondaryButton("Edit", "addHomeClaimedEditAddress", onDismiss)
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(Spacing.s12)
+                            .clip(CircleShape)
+                            .background(PantopusColors.personalBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.ShieldCheck,
+                        contentDescription = null,
+                        size = Spacing.s6,
+                        tint = PantopusColors.primary600,
+                    )
+                }
+                Text(
+                    text = "This home already has verified members",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "To protect privacy, you’ll need verification to join this home.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                ModalPrimaryButton("This address is correct", "addHomeClaimedCorrect", onThisIsCorrect)
+                ModalSecondaryButton("Change address", "addHomeClaimedChangeAddress", onDismiss)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModalPrimaryButton(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Spacing.s12)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary600)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, style = PantopusTextStyle.body, color = PantopusColors.appTextInverse)
+    }
+}
+
+@Composable
+private fun ModalSecondaryButton(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Spacing.s12)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, style = PantopusTextStyle.body, color = PantopusColors.appTextSecondary)
     }
 }
 

@@ -4,8 +4,9 @@
 //
 //  Covers the verify-landlord wizard state machine: step transitions,
 //  form validation (email format · lease unit mismatch · PM-required-
-//  when-toggled-on), the error-summary count, and the submit ->
-//  openPostcardVerification outbound event.
+//  when-toggled-on · move-in date format), the error-summary count, and
+//  the three submit outcomes:
+//    201 -> .sent, 409 -> .sent (existing lease), 400 -> postcard fallback.
 //
 
 import Foundation
@@ -20,16 +21,37 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
         homeId: String = "home-1",
         form: VerifyLandlordForm? = nil,
         startContent: VerifyLandlordStartContent? = nil,
-        postcardRequester: VerifyLandlordWizardViewModel.PostcardRequester? = nil
+        postcardRequester: VerifyLandlordWizardViewModel.PostcardRequester? = nil,
+        approvalRequester: VerifyLandlordWizardViewModel.ApprovalRequester? = nil
     ) -> VerifyLandlordWizardViewModel {
         VerifyLandlordWizardViewModel(
             homeId: homeId,
             startContent: startContent,
             form: form,
             submitDelayNanos: 0,
-            postcardRequester: postcardRequester
+            postcardRequester: postcardRequester,
+            approvalRequester: approvalRequester ?? { _ in .success(Self.stubLease) }
         )
     }
+
+    /// Minimal `HomeLease` row shaped like the 201 body from
+    /// `backend/routes/landlordTenant.js:587`.
+    private static let stubLease: TenantLeaseDTO = {
+        let json = """
+        {
+          "id": "lease-1",
+          "home_id": "home-1",
+          "state": "pending",
+          "source": "tenant_request",
+          "start_at": "2026-04-01T00:00:00.000Z",
+          "end_at": null,
+          "created_at": "2026-03-04T18:12:00.000Z",
+          "metadata": { "message": "Hi, I'm the new tenant." }
+        }
+        """
+        // swiftlint:disable:next force_try
+        return try! JSONDecoder().decode(TenantLeaseDTO.self, from: Data(json.utf8))
+    }()
 
     private func waitFor(
         _ description: String = "predicate",
@@ -161,19 +183,115 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.chrome.primaryCTAEnabled, "CTA should disable while errors remain")
     }
 
-    func testSubmitHappyPathFiresOpenPostcardEvent() async {
+    func testSubmitPostsApprovalRequestAndLandsOnSentStep() async {
+        var captured: TenantRequestApprovalRequest?
+        var form = VerifyLandlordSampleData.populatedForm
+        form.moveInDate = "2026-04-01"
+        form.messageToLandlord = "Hi, I'm the new tenant."
         let vm = makeVM(
             homeId: "home-1",
-            form: VerifyLandlordSampleData.populatedForm
-        ) { .success(()) }
+            form: form,
+            approvalRequester: { request in
+                captured = request
+                return .success(Self.stubLease)
+            }
+        )
         vm.primaryTapped() // start -> details
+        await vm.submit()
+        XCTAssertEqual(vm.currentStep, .sent)
+        XCTAssertEqual(vm.submitState, .submitted)
+        XCTAssertEqual(vm.approvalResult?.kind, .submitted)
+        XCTAssertEqual(captured?.homeId, "home-1")
+        XCTAssertEqual(captured?.startAt, "2026-04-01T00:00:00.000Z")
+        XCTAssertTrue(captured?.message?.contains("Hi, I'm the new tenant.") == true)
+        XCTAssertTrue(
+            captured?.message?.contains("Elm Street Holdings LLC") == true,
+            "Landlord details must travel with the request instead of being discarded"
+        )
+        XCTAssertNil(vm.pendingEvent, "A landlord request should not jump to the postcard tracker")
+    }
+
+    func testSubmitWithoutVerifiedLandlordFallsBackToPostcard() async {
+        let vm = makeVM(
+            homeId: "home-1",
+            form: VerifyLandlordSampleData.populatedForm,
+            postcardRequester: { .success(()) },
+            approvalRequester: { _ in
+                .failure(
+                    APIError.clientError(
+                        status: 400,
+                        message: "{\"error\":\"This property has no verified landlord. Cannot submit a lease request.\"}"
+                    )
+                )
+            }
+        )
+        vm.primaryTapped()
         await vm.submit()
         await waitFor("pendingEvent == .openPostcardVerification") {
             vm.pendingEvent == .openPostcardVerification(homeId: "home-1")
         }
         XCTAssertEqual(vm.submitState, .submitted)
-        XCTAssertNotNil(vm.errors)
-        XCTAssertTrue(vm.errors?.isEmpty == true)
+    }
+
+    func testSubmitSurfacesExistingPendingRequest() async {
+        let vm = makeVM(
+            form: VerifyLandlordSampleData.populatedForm,
+            approvalRequester: { _ in
+                .failure(
+                    APIError.clientError(
+                        status: 409,
+                        message: "{\"error\":\"You already have a pending request for this home\"}"
+                    )
+                )
+            }
+        )
+        vm.primaryTapped()
+        await vm.submit()
+        XCTAssertEqual(vm.currentStep, .sent)
+        XCTAssertEqual(vm.approvalResult?.kind, .alreadyPending)
+        XCTAssertEqual(vm.approvalResult?.serverMessage, "You already have a pending request for this home")
+    }
+
+    func testSubmitSurfacesExistingActiveLease() async {
+        let vm = makeVM(
+            form: VerifyLandlordSampleData.populatedForm,
+            approvalRequester: { _ in
+                .failure(
+                    APIError.clientError(
+                        status: 409,
+                        message: "{\"error\":\"You already have an active lease at this home\"}"
+                    )
+                )
+            }
+        )
+        vm.primaryTapped()
+        await vm.submit()
+        XCTAssertEqual(vm.currentStep, .sent)
+        XCTAssertEqual(vm.approvalResult?.kind, .alreadyActive)
+    }
+
+    func testSentStepSecondaryStartsPostcardFallback() async {
+        let vm = makeVM(
+            homeId: "home-9",
+            form: VerifyLandlordSampleData.populatedForm,
+            postcardRequester: { .success(()) }
+        )
+        vm.primaryTapped()
+        await vm.submit()
+        XCTAssertEqual(vm.currentStep, .sent)
+        XCTAssertEqual(vm.chrome.secondaryCTA?.label, "Mail me a code")
+        await vm.startPostcardFallback()
+        XCTAssertEqual(vm.pendingEvent, .openPostcardVerification(homeId: "home-9"))
+    }
+
+    func testMoveInDateMustBeISOShaped() {
+        var form = VerifyLandlordSampleData.populatedForm
+        form.moveInDate = "04/01/2026"
+        XCTAssertEqual(form.validate().moveInDate, "Use YYYY-MM-DD")
+        form.moveInDate = "2026-04-01"
+        XCTAssertNil(form.validate().moveInDate)
+        form.moveInDate = ""
+        XCTAssertNil(form.validate().moveInDate, "Blank move-in date is allowed")
     }
 
     func testCTADisabledWhenErrorsPresent() async {

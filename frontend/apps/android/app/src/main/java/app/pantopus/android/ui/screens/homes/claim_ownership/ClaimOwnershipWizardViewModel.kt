@@ -18,6 +18,7 @@ import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -37,11 +38,28 @@ import javax.inject.Inject
 const val CLAIM_OWNERSHIP_HOME_ID_KEY: String = "homeId"
 
 /**
+ * Nav-arg key selecting the evidence variant — `owner` (default) or
+ * `residency`. Mirrors RN's `?verificationType=residency` query param
+ * (`src/app/homes/[id]/claim-owner/evidence.tsx:86`).
+ */
+const val CLAIM_VERIFICATION_TYPE_KEY: String = "verificationType"
+
+/**
  * Aggregate UI state for the Claim Ownership wizard. Combined so the
  * screen derives the [WizardChrome] from a single state read.
  */
 data class ClaimOwnershipUiState(
     val currentStep: ClaimOwnershipStep = ClaimOwnershipStep.Start,
+    /**
+     * Which verification this run performs. Drives the slot set, the
+     * wizard copy, and the `claim_type` sent on submit.
+     */
+    val verificationType: ClaimVerificationType = ClaimVerificationType.Owner,
+    /**
+     * Selected `evidence_type` for slots that accept several document
+     * kinds (residency). `null` until the user picks one.
+     */
+    val selectedDocumentType: String? = null,
     val startContent: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
     val slots: Map<ClaimEvidenceSlot, ClaimSlotState> =
         ClaimEvidenceSlot.entries.associateWith { ClaimSlotState.Empty },
@@ -54,12 +72,62 @@ data class ClaimOwnershipUiState(
     val note: String = "",
     val isSubmitting: Boolean = false,
     val submitError: String? = null,
+    // MARK: - Start-step method picker (A12.3)
+    /**
+     * `has_verified_owner` from `GET /api/homes/:id/public-profile`.
+     */
+    val hasVerifiedOwner: Boolean = false,
+    /** `is_member` from the same call. */
+    val isMember: Boolean = false,
+    val selectedStartMethod: ClaimStartMethod = ClaimStartMethod.VerifyOwnership,
+    /** True while `POST /:id/request-household-from-owner` is in flight. */
+    val isSendingAskRequest: Boolean = false,
+    /** Success copy for the confirm dialog; dismissing it closes the wizard. */
+    val askRequestConfirmation: String? = null,
+    /** Failure copy for the alert; dismissing keeps the wizard open. */
+    val askRequestError: String? = null,
+    /**
+     * Non-null when the claim POST came back 409 (or with a null claim
+     * id) because another person's verification already owns this home.
+     * The screen shows an alert whose "Search homes" action opens the
+     * Find-or-Add-Home discovery route.
+     */
+    val blockedByOtherClaimPrompt: String? = null,
 ) {
+    /**
+     * Only render the "ask a verified owner" option when the home has a
+     * verified owner AND the viewer is not already a member — the exact
+     * condition RN uses at
+     * `src/app/homes/[id]/claim-owner/index.tsx:52`.
+     */
+    val showsAskVerifiedOwner: Boolean
+        get() = hasVerifiedOwner && !isMember
+
+    /** Slots this run requires. */
+    val activeSlots: List<ClaimEvidenceSlot>
+        get() = verificationType.slots
+
+    /** Document kinds the user must choose between before uploading. */
+    val documentOptions: List<ClaimDocumentOption>
+        get() = activeSlots.flatMap { it.documentOptions }
+
+    /** True when a document-kind pick is required and still missing. */
+    val needsDocumentTypeSelection: Boolean
+        get() = documentOptions.isNotEmpty() && selectedDocumentType == null
+
     val bothSlotsHaveFiles: Boolean
-        get() = slots.values.all { it.hasFile }
+        get() = activeSlots.all { slots[it]?.hasFile == true }
 
     val anySlotHasFile: Boolean
-        get() = slots.values.any { it.hasFile }
+        get() = activeSlots.any { slots[it]?.hasFile == true }
+
+    /** Submit gate — every required file plus an explicit doc-kind pick. */
+    val canSubmit: Boolean
+        get() = bothSlotsHaveFiles && !needsDocumentTypeSelection
+
+    /** `evidence_type` sent for [slot]: fixed, or the user's pick. */
+    fun evidenceTypeFor(slot: ClaimEvidenceSlot): String =
+        slot.fixedBackendType ?: selectedDocumentType ?: slot.backendType
 }
 
 /**
@@ -82,6 +150,7 @@ open class ClaimOwnershipWizardViewModel
     @Inject
     constructor(
         private val repository: HomesRepository,
+        private val discoveryRepository: HomeDiscoveryRepository,
         private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel(),
@@ -91,9 +160,26 @@ open class ClaimOwnershipWizardViewModel
                 "ClaimOwnershipWizardViewModel requires a '$CLAIM_OWNERSHIP_HOME_ID_KEY' nav arg."
             }
 
+        /**
+         * Evidence variant selected by the caller. `owner` unless the
+         * route carried `verificationType=residency`.
+         */
+        private val verificationType: ClaimVerificationType =
+            ClaimVerificationType.fromArg(savedStateHandle.get<String>(CLAIM_VERIFICATION_TYPE_KEY))
+
+        private val blockedByOtherClaimCopy: String
+            get() =
+                if (verificationType == ClaimVerificationType.Residency) {
+                    BLOCKED_BY_OTHER_CLAIM_RESIDENCY_COPY
+                } else {
+                    BLOCKED_BY_OTHER_CLAIM_COPY
+                }
+
         private val _state =
             MutableStateFlow(
                 ClaimOwnershipUiState(
+                    currentStep = verificationType.steps.first(),
+                    verificationType = verificationType,
                     startContent = ClaimOwnershipSampleData.startContent(homeId),
                 ),
             )
@@ -125,7 +211,14 @@ open class ClaimOwnershipWizardViewModel
         override fun onLeading() {
             when (_state.value.currentStep) {
                 ClaimOwnershipStep.Start -> pendingEvent.value = ClaimOwnershipOutboundEvent.Dismiss
-                ClaimOwnershipStep.Upload -> transitionTo(ClaimOwnershipStep.Start)
+                // Residency starts on Upload — there is no preceding step
+                // to pop back into, so the leading control closes.
+                ClaimOwnershipStep.Upload ->
+                    if (verificationType.steps.first() == ClaimOwnershipStep.Upload) {
+                        pendingEvent.value = ClaimOwnershipOutboundEvent.Dismiss
+                    } else {
+                        transitionTo(ClaimOwnershipStep.Start)
+                    }
                 ClaimOwnershipStep.Success -> pendingEvent.value = ClaimOwnershipOutboundEvent.Dismiss
             }
         }
@@ -136,11 +229,117 @@ open class ClaimOwnershipWizardViewModel
 
         override fun onPrimary() {
             when (_state.value.currentStep) {
-                ClaimOwnershipStep.Start -> transitionTo(ClaimOwnershipStep.Upload)
+                ClaimOwnershipStep.Start ->
+                    if (_state.value.selectedStartMethod == ClaimStartMethod.AskVerifiedOwner) {
+                        viewModelScope.launch { sendHouseholdRequest() }
+                    } else {
+                        transitionTo(ClaimOwnershipStep.Upload)
+                    }
                 ClaimOwnershipStep.Upload -> viewModelScope.launch { submit() }
                 ClaimOwnershipStep.Success ->
                     pendingEvent.value = ClaimOwnershipOutboundEvent.OpenClaimsList
             }
+        }
+
+        // MARK: - Start step (A12.3 method picker)
+
+        init {
+            viewModelScope.launch { loadPublicPreview() }
+        }
+
+        fun selectStartMethod(method: ClaimStartMethod) {
+            if (method == ClaimStartMethod.AskVerifiedOwner && !_state.value.showsAskVerifiedOwner) return
+            _state.update { it.copy(selectedStartMethod = method) }
+        }
+
+        /**
+         * Resolve `has_verified_owner` / `is_member` so the start step
+         * can decide whether to render the "ask a verified owner"
+         * option, and replace the sample home label with the real one.
+         */
+        private suspend fun loadPublicPreview() {
+            // The picker degrades to the ownership-verification path when
+            // the preview can't be read — never invent the flag.
+            val preview =
+                runCatching { discoveryRepository.publicPreview(homeId) }
+                    .getOrNull()
+                    .let { it as? NetworkResult.Success }
+                    ?.data ?: return
+            val label = preview.home.displayAddress
+            _state.update { current ->
+                val next =
+                    current.copy(
+                        hasVerifiedOwner = preview.hasVerifiedOwner,
+                        isMember = preview.isMember,
+                        startContent =
+                            if (label.isNotEmpty()) {
+                                current.startContent.copy(homeLabel = label)
+                            } else {
+                                current.startContent
+                            },
+                    )
+                if (!next.showsAskVerifiedOwner &&
+                    next.selectedStartMethod == ClaimStartMethod.AskVerifiedOwner
+                ) {
+                    next.copy(selectedStartMethod = ClaimStartMethod.VerifyOwnership)
+                } else {
+                    next
+                }
+            }
+        }
+
+        /**
+         * `POST /api/homes/:id/request-household-from-owner` — notifies
+         * the home's verified owner(s) that a non-member wants in.
+         */
+        suspend fun sendHouseholdRequest() {
+            if (_state.value.isSendingAskRequest) return
+            if (!networkMonitor.isOnline.value) {
+                _state.update {
+                    it.copy(askRequestError = "You're offline. Try again when you're back online.")
+                }
+                return
+            }
+            _state.update { it.copy(isSendingAskRequest = true, askRequestError = null) }
+            when (val result = discoveryRepository.requestHouseholdFromOwner(homeId, "owner")) {
+                is NetworkResult.Success ->
+                    _state.update {
+                        it.copy(
+                            isSendingAskRequest = false,
+                            askRequestConfirmation =
+                                "Verified owners were notified. They can add you from the " +
+                                    "home Members screen.",
+                        )
+                    }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            isSendingAskRequest = false,
+                            askRequestError = result.error.message.ifBlank { "Try again later." },
+                        )
+                    }
+            }
+        }
+
+        /** Dismiss the "Request sent" dialog → close the wizard. */
+        fun acknowledgeAskConfirmation() {
+            _state.update { it.copy(askRequestConfirmation = null) }
+            pendingEvent.value = ClaimOwnershipOutboundEvent.Dismiss
+        }
+
+        fun acknowledgeAskError() {
+            _state.update { it.copy(askRequestError = null) }
+        }
+
+        /** "OK" on the blocked-claim dialog — stay put. */
+        fun dismissBlockedByOtherClaim() {
+            _state.update { it.copy(blockedByOtherClaimPrompt = null) }
+        }
+
+        /** "Search homes" on the blocked-claim dialog. */
+        fun openFindHomeFromBlockedClaim() {
+            _state.update { it.copy(blockedByOtherClaimPrompt = null) }
+            pendingEvent.value = ClaimOwnershipOutboundEvent.OpenFindHome
         }
 
         override fun onSecondary() {
@@ -188,6 +387,12 @@ open class ClaimOwnershipWizardViewModel
             _state.update { it.copy(note = value) }
         }
 
+        /** Picks the `evidence_type` for the residency slot. */
+        fun selectDocumentType(id: String) {
+            if (_state.value.documentOptions.none { it.id == id }) return
+            _state.update { it.copy(selectedDocumentType = id, submitError = null) }
+        }
+
         fun acknowledgeEvent() {
             pendingEvent.value = null
         }
@@ -197,7 +402,7 @@ open class ClaimOwnershipWizardViewModel
         @Suppress("ReturnCount")
         private suspend fun submit() {
             val current = _state.value
-            if (!current.bothSlotsHaveFiles || current.isSubmitting) return
+            if (!current.canSubmit || current.isSubmitting) return
             if (!networkMonitor.isOnline.value) {
                 _state.update {
                     it.copy(
@@ -214,14 +419,32 @@ open class ClaimOwnershipWizardViewModel
             val claimId =
                 pendingClaimId ?: run {
                     val claimResult =
-                        repository.submitClaim(homeId, SubmitClaimRequest(method = "doc_upload"))
+                        repository.submitClaim(
+                            homeId,
+                            SubmitClaimRequest(
+                                claimType = verificationType.claimType,
+                                method = "doc_upload",
+                            ),
+                        )
                     val envelope =
                         when (claimResult) {
                             is NetworkResult.Success -> claimResult.data.claim
                             is NetworkResult.Failure -> {
                                 Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
+                                // 409 = someone else's verification is
+                                // already in flight for this home
+                                // (EXISTING_IN_FLIGHT_CLAIM /
+                                // DUPLICATE_CLAIM). RN offers "Search
+                                // homes" here
+                                // (`claim-owner/evidence.tsx:194-212`).
+                                val blocked = claimResult.error.code == HTTP_CONFLICT
                                 _state.update {
-                                    it.copy(isSubmitting = false, submitError = "Couldn't submit. Retry.")
+                                    it.copy(
+                                        isSubmitting = false,
+                                        submitError = if (blocked) null else "Couldn't submit. Retry.",
+                                        blockedByOtherClaimPrompt =
+                                            if (blocked) blockedByOtherClaimCopy else null,
+                                    )
                                 }
                                 return
                             }
@@ -229,10 +452,13 @@ open class ClaimOwnershipWizardViewModel
                     val resolvedId =
                         envelope.id ?: run {
                             Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.ERROR))
+                            // Opaque-handshake path can return a null
+                            // claim id when a duplicate exists — same
+                            // user-visible outcome as the 409 above.
                             _state.update {
                                 it.copy(
                                     isSubmitting = false,
-                                    submitError = "We're already working on a claim for this home.",
+                                    blockedByOtherClaimPrompt = blockedByOtherClaimCopy,
                                 )
                             }
                             return
@@ -246,7 +472,7 @@ open class ClaimOwnershipWizardViewModel
             // cached `storage_ref` from a prior partial-success run so a
             // retry doesn't re-upload bytes (which would orphan the
             // earlier file server-side).
-            for ((index, slot) in ClaimEvidenceSlot.entries.withIndex()) {
+            for ((index, slot) in current.activeSlots.withIndex()) {
                 if (current.slots[slot] is ClaimSlotState.Uploaded) continue
                 val file = current.slots[slot]?.pickedFile ?: continue
                 val cachedUrl = pendingUploadUrls[slot]
@@ -283,7 +509,7 @@ open class ClaimOwnershipWizardViewModel
                         claimId = claimId,
                         request =
                             UploadEvidenceRequest(
-                                evidenceType = slot.backendType,
+                                evidenceType = current.evidenceTypeFor(slot),
                                 storageRef = fileUrl,
                                 metadata = metadata,
                             ),
@@ -333,18 +559,27 @@ open class ClaimOwnershipWizardViewModel
 
         // MARK: - Chrome derivation
 
-        private fun computeChrome(state: ClaimOwnershipUiState): WizardChrome =
-            when (state.currentStep) {
+        private fun computeChrome(state: ClaimOwnershipUiState): WizardChrome {
+            val steps = state.verificationType.steps
+            val total = steps.size
+            val index = steps.indexOf(state.currentStep).coerceAtLeast(0) + 1
+            val title = state.verificationType.wizardTitle
+            return when (state.currentStep) {
                 ClaimOwnershipStep.Start ->
                     WizardChrome(
-                        title = "Claim ownership",
-                        progressLabel = WizardProgressLabel.StepOf(1, 3),
-                        progressFraction = 1f / 3f,
+                        title = title,
+                        progressLabel = WizardProgressLabel.StepOf(index, total),
+                        progressFraction = index.toFloat() / total.toFloat(),
                         leading = WizardLeadingControl.Close,
-                        primaryCtaLabel = "Start claim",
-                        primaryCtaEnabled = true,
+                        primaryCtaLabel =
+                            if (state.selectedStartMethod == ClaimStartMethod.AskVerifiedOwner) {
+                                "Send request"
+                            } else {
+                                "Start claim"
+                            },
+                        primaryCtaEnabled = !state.isSendingAskRequest,
                         secondaryCta = null,
-                        isSubmitting = false,
+                        isSubmitting = state.isSendingAskRequest,
                         // Once the user has touched Upload (picked a file or
                         // typed a note), Back→Start must still surface the
                         // discard-confirm so an X tap doesn't dump the
@@ -354,12 +589,24 @@ open class ClaimOwnershipWizardViewModel
                     )
                 ClaimOwnershipStep.Upload ->
                     WizardChrome(
-                        title = "Claim ownership",
-                        progressLabel = WizardProgressLabel.StepOf(2, 3),
-                        progressFraction = 2f / 3f,
-                        leading = WizardLeadingControl.Back,
-                        primaryCtaLabel = "Submit claim",
-                        primaryCtaEnabled = state.bothSlotsHaveFiles && !state.isSubmitting,
+                        title = title,
+                        progressLabel = WizardProgressLabel.StepOf(index, total),
+                        progressFraction = index.toFloat() / total.toFloat(),
+                        // Residency starts here, so there is nothing behind
+                        // this step — the leading control closes instead.
+                        leading =
+                            if (steps.first() == ClaimOwnershipStep.Upload) {
+                                WizardLeadingControl.Close
+                            } else {
+                                WizardLeadingControl.Back
+                            },
+                        primaryCtaLabel =
+                            if (state.verificationType == ClaimVerificationType.Residency) {
+                                "Submit"
+                            } else {
+                                "Submit claim"
+                            },
+                        primaryCtaEnabled = state.canSubmit && !state.isSubmitting,
                         secondaryCta = null,
                         isSubmitting = state.isSubmitting,
                         footerHint = if (state.isSubmitting) "Waiting for upload to finish" else null,
@@ -368,7 +615,7 @@ open class ClaimOwnershipWizardViewModel
                     )
                 ClaimOwnershipStep.Success ->
                     WizardChrome(
-                        title = "Claim ownership",
+                        title = title,
                         progressLabel = WizardProgressLabel.Hidden,
                         progressFraction = null,
                         leading = WizardLeadingControl.Close,
@@ -380,4 +627,20 @@ open class ClaimOwnershipWizardViewModel
                         showsProgressBar = false,
                     )
             }
+        }
+
+        companion object {
+            private const val HTTP_CONFLICT = 409
+
+            private const val BLOCKED_BY_OTHER_CLAIM_COPY =
+                "Someone else's verification is already in progress for this home, so you can't " +
+                    "upload documents here. Search for this home and request to join the " +
+                    "household, or use Support if you believe this is wrong."
+
+            /** RN uses different copy for the residency path (`evidence.tsx:206-212`). */
+            private const val BLOCKED_BY_OTHER_CLAIM_RESIDENCY_COPY =
+                "Someone else's verification is already in progress for this home, so you can't " +
+                    "upload documents on this path. Search for the home and request to join, or " +
+                    "ask your household for an invite."
+        }
     }

@@ -18,7 +18,16 @@ public enum HubRoute: Hashable {
     /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
     case mailboxVault
     case addHome
+    /// A12.1 — "Find or Add Home" discovery. Search public-preview
+    /// homes, start a claim on one, add a missing address, or paste an
+    /// invite code. Mirrors RN `src/app/homes/find.tsx`.
+    case findHome
     case claimOwnership(homeId: String)
+    /// Residency-verification variant of the evidence flow. Sends
+    /// `claim_type: 'resident'` and offers the lease / utility-bill /
+    /// tax-bill document set (RN
+    /// `homes/[id]/claim-owner/evidence.tsx?verificationType=residency`).
+    case verifyResidency(homeId: String)
     /// A12.5 / A12.6 — Verify landlord wizard. Pushed when the
     /// dashboard's ownership claim resolves to the "verify via
     /// landlord" branch (rental detected, owner-claim path not
@@ -68,6 +77,10 @@ public enum HubRoute: Hashable {
     case editHouseholdTask(homeId: String, taskId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
+    /// Per-home **issue tracker** (`HomeIssue`). A different backend
+    /// collection from `.homeMaintenance` (maintenance tasks) — this is
+    /// the surface RN calls "Maintenance" (`homes/[id]/maintenance.tsx`).
+    case homeIssues(homeId: String)
     /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
     /// FAB; on success the host pops back and refreshes the list.
     case logMaintenance(homeId: String)
@@ -85,6 +98,10 @@ public enum HubRoute: Hashable {
     /// A14.2 (P5.1) — Per-home Security toggles. Reached from the
     /// per-home Settings `Privacy` row.
     case homeSecurity(homeId: String)
+    /// A14.2 (policy variant) — per-home ownership security policy
+    /// (`GET/PATCH /api/homes/:id/security`). Reached from the per-home
+    /// Settings `Ownership & Security` row.
+    case homeOwnershipSecurity(homeId: String)
     /// Leave this home (`POST /api/homes/:id/move-out`).
     case leaveHome(homeId: String)
     /// Cancel ownership claim (`DELETE …/ownership-claims/:claimId`).
@@ -297,6 +314,9 @@ public enum HubRoute: Hashable {
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
+    /// A13.6 — Guest-pass management for a home (Active / Past passes,
+    /// revoke). Pushed from Home settings → "Invite link".
+    case guestPasses(homeId: String)
     /// A13.4 — Transfer ownership form. Pushed from the Owners list
     /// "Transfer" action and from `pantopus://homes/:id/owners/transfer`
     /// deep links. The form owns its own Face ID bottom-sheet confirm so
@@ -470,10 +490,14 @@ public struct HubTabRoot: View {
             path.append(.trustedNeighbors(homeId: homeId))
         case .security:
             path.append(.homeSecurity(homeId: homeId))
+        case .ownershipSecurity:
+            path.append(.homeOwnershipSecurity(homeId: homeId))
         case .people:
             path.append(.homeMembers(homeId: homeId))
         case .inviteLink:
-            modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
+            // A13.6 — the guest-pass manager (Active / Past + revoke).
+            // The Add Guest form is reachable from its FAB.
+            path.append(.guestPasses(homeId: homeId))
         case .homeNotifications:
             path.append(.homeNotifications(homeId: homeId))
         case .leaveHome:
@@ -484,7 +508,7 @@ public struct HubTabRoot: View {
     }
 
     @MainActor
-    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId _: String) {
         switch nav {
         case .notifications:
             path.append(.notifications)
@@ -612,7 +636,7 @@ public struct HubTabRoot: View {
         case .homeProperty: return .propertyDetails(homeId: homeId)
         case .homeOverview: return .homeDashboard(homeId: homeId)
         case .homeTasks: return .homeTasks(homeId: homeId)
-        case .homeIssues: return .homeMaintenance(homeId: homeId)
+        case .homeIssues: return .homeIssues(homeId: homeId)
         case .homeBills: return .homeBills(homeId: homeId)
         case .homeMembers: return .homeMembers(homeId: homeId)
         case .homeMailbox: return .mailboxRoot
@@ -940,7 +964,14 @@ public struct HubTabRoot: View {
             MyHomesListView(
                 viewModel: MyHomesListViewModel(
                     onOpenHome: { homeId in Task { @MainActor in push(.homeDashboard(homeId: homeId)) } },
-                    onAddHome: { Task { @MainActor in push(.addHome) } }
+                    onAddHome: { Task { @MainActor in push(.addHome) } },
+                    onFindHome: { Task { @MainActor in push(.findHome) } },
+                    onUploadOwnershipEvidence: { homeId in
+                        Task { @MainActor in push(.claimOwnership(homeId: homeId)) }
+                    },
+                    onVerifyResidency: { homeId in
+                        Task { @MainActor in push(.verifyResidency(homeId: homeId)) }
+                    }
                 )
             )
         case .myBusinesses:
@@ -1035,6 +1066,11 @@ public struct HubTabRoot: View {
                 },
                 onOpenSettings: { id in
                     Task { @MainActor in push(.homeSettings(homeId: id)) }
+                },
+                onHireHelp: { categoryKey in
+                    // H1 — "Hire" on a seasonal-checklist item opens the
+                    // gig composer pre-filtered to the item's category.
+                    Task { @MainActor in push(.composeGig(category: categoryKey)) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1048,9 +1084,14 @@ public struct HubTabRoot: View {
                     },
                     onAddTask: {
                         Task { @MainActor in push(.logMaintenance(homeId: homeId)) }
+                    },
+                    onOpenIssues: {
+                        Task { @MainActor in push(.homeIssues(homeId: homeId)) }
                     }
                 )
             )
+        case let .homeIssues(homeId):
+            HomeIssuesListView(homeId: homeId)
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
@@ -1438,6 +1479,12 @@ public struct HubTabRoot: View {
             HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
                 pop()
             }
+        case let .homeOwnershipSecurity(homeId):
+            HomeOwnershipSecurityView(
+                viewModel: HomeOwnershipSecurityViewModel(homeId: homeId)
+            ) {
+                pop()
+            }
         case let .leaveHome(homeId):
             LeaveHomeView(
                 viewModel: LeaveHomeViewModel(homeId: homeId),
@@ -1447,10 +1494,11 @@ public struct HubTabRoot: View {
                     // home now 403s — drop it along with the settings stack.
                     path.removeAll { route in
                         switch route {
-                        case .leaveHome(let id) where id == homeId: true
-                        case .homeSettings(let id) where id == homeId: true
-                        case .homeSecurity(let id) where id == homeId: true
-                        case .homeDashboard(let id) where id == homeId: true
+                        case let .leaveHome(id) where id == homeId: true
+                        case let .homeSettings(id) where id == homeId: true
+                        case let .homeSecurity(id) where id == homeId: true
+                        case let .homeOwnershipSecurity(id) where id == homeId: true
+                        case let .homeDashboard(id) where id == homeId: true
                         default: false
                         }
                     }
@@ -1485,6 +1533,35 @@ public struct HubTabRoot: View {
                         return false
                     }
                     path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
+                }
+            )
+        case let .verifyResidency(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                verificationType: .residency,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
                 }
             )
         case let .verifyLandlord(homeId):
@@ -2275,9 +2352,23 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
+        case let .guestPasses(homeId):
+            // A13.6 — Guest-pass manager. The FAB pushes the Add Guest
+            // form; popping back re-fetches so the new pass appears.
+            GuestPassesListView(homeId: homeId) {
+                Task { @MainActor in push(.addGuest(homeId: homeId)) }
+            }
         case let .transferOwnership(homeId):
+            let transferUser: UserDTO? = {
+                if case let .signedIn(user) = auth.state { return user }
+                return nil
+            }()
             TransferOwnershipView(
-                viewModel: TransferOwnershipViewModel(homeId: homeId)
+                viewModel: TransferOwnershipViewModel(
+                    homeId: homeId,
+                    currentUserId: transferUser?.id,
+                    currentUserName: transferUser?.displayName ?? transferUser?.username
+                )
             )
         case let .tasksMap(categoryKey):
             TasksMapView(
@@ -2444,12 +2535,30 @@ public struct HubTabRoot: View {
                 onNav: { nav in handleWaitingRoomNav(nav, homeId: homeId) }
             )
         case .addHome:
-            AddHomeWizardView { homeId in
-                // Replace the wizard with the dashboard so Back goes to
-                // MyHomes, not the success screen.
-                path.removeAll { $0 == .addHome }
-                path.append(.homeDashboard(homeId: homeId))
-            }
+            AddHomeWizardView(
+                onOpenHomeDashboard: { homeId in
+                    // Replace the wizard with the dashboard so Back goes to
+                    // MyHomes, not the success screen.
+                    path.removeAll { $0 == .addHome }
+                    path.append(.homeDashboard(homeId: homeId))
+                },
+                onOpenClaimOwnership: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.claimOwnership(homeId: homeId))
+                },
+                onOpenWaitingRoom: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.waitingRoom(homeId: homeId))
+                }
+            )
+        case .findHome:
+            FindHomeView(
+                onBack: { pop() },
+                onOpenClaimOwnership: { homeId in
+                    Task { @MainActor in push(.claimOwnership(homeId: homeId)) }
+                },
+                onOpenAddHome: { Task { @MainActor in push(.addHome) } }
+            )
         case let .placeDashboard(homeId):
             PlaceDashboardView(
                 viewModel: PlaceDashboardViewModel(

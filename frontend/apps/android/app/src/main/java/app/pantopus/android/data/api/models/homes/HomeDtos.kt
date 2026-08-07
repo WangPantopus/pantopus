@@ -64,6 +64,13 @@ data class MyHome(
     @Json(name = "is_primary_owner") val isPrimaryOwner: Boolean?,
     @Json(name = "pending_claim_id") val pendingClaimId: String?,
     val location: HomeLocation? = null,
+    /**
+     * Server-computed predicate — true when the viewer owns the Home row
+     * outright or is a verified *primary* owner. Gates the destructive
+     * "Delete home" affordance; everyone else must leave instead.
+     * Computed at `backend/routes/home.js:1653`.
+     */
+    @Json(name = "can_delete_home") val canDeleteHome: Boolean? = null,
 )
 
 /** Human-readable area label for the compose target picker. */
@@ -243,15 +250,50 @@ data class CheckAddressRequest(
     val country: String? = null,
 )
 
-/** `POST /api/homes/check-address` response. */
+/**
+ * `POST /api/homes/check-address` response.
+ *
+ * The handler (`backend/routes/home.js:635` / `:661`) returns
+ * `{ status, home_id?, is_multi_unit, formatted_address? }` where
+ * `status` is `HOME_NOT_FOUND | HOME_FOUND_UNCLAIMED | HOME_FOUND_CLAIMED`.
+ * The older `exists / homeCount / hasVerifiedMembers` triple is kept as a
+ * derived convenience so existing call sites keep compiling.
+ */
 @JsonClass(generateAdapter = true)
 data class CheckAddressResponse(
-    val exists: Boolean,
-    val homeCount: Int,
-    val hasVerifiedMembers: Boolean,
-    @Json(name = "verdict_status") val verdictStatus: String?,
+    val status: String? = null,
+    @Json(name = "home_id") val homeId: String? = null,
+    @Json(name = "is_multi_unit") val isMultiUnit: Boolean = false,
+    @Json(name = "formatted_address") val formattedAddress: String? = null,
+    @Json(name = "exists") val existsRaw: Boolean? = null,
+    @Json(name = "homeCount") val homeCountRaw: Int? = null,
+    @Json(name = "hasVerifiedMembers") val hasVerifiedMembersRaw: Boolean? = null,
+    @Json(name = "verdict_status") val verdictStatus: String? = null,
     @Json(name = "normalized_address") val normalizedAddress: NormalizedAddressDto? = null,
-)
+) {
+    /**
+     * `status === 'HOME_FOUND_CLAIMED'` — an existing home at this
+     * address already has active occupants, so `POST /api/homes` would
+     * duplicate it. RN shows `AddressClaimedModal` here.
+     */
+    val isAlreadyClaimed: Boolean get() = status == STATUS_FOUND_CLAIMED
+
+    /** `status === 'HOME_FOUND_UNCLAIMED'` — home row with no occupants. */
+    val isFoundUnclaimed: Boolean get() = status == STATUS_FOUND_UNCLAIMED
+
+    val exists: Boolean
+        get() = existsRaw ?: (status == STATUS_FOUND_CLAIMED || status == STATUS_FOUND_UNCLAIMED)
+
+    val homeCount: Int get() = homeCountRaw ?: if (homeId == null) 0 else 1
+
+    val hasVerifiedMembers: Boolean get() = hasVerifiedMembersRaw ?: (status == STATUS_FOUND_CLAIMED)
+
+    companion object {
+        const val STATUS_NOT_FOUND = "HOME_NOT_FOUND"
+        const val STATUS_FOUND_UNCLAIMED = "HOME_FOUND_UNCLAIMED"
+        const val STATUS_FOUND_CLAIMED = "HOME_FOUND_CLAIMED"
+    }
+}
 
 /** Canonical address returned when validation/geocoding normalizes input. */
 @JsonClass(generateAdapter = true)

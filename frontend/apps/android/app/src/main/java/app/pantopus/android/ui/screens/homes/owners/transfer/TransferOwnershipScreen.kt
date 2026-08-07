@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -49,12 +47,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PantopusFieldState
+import app.pantopus.android.ui.components.PantopusTextField
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.components.Toast
 import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.components.ToastMessage
 import app.pantopus.android.ui.screens.homes.owners.transfer.components.BiometricConfirmSheet
-import app.pantopus.android.ui.screens.homes.owners.transfer.components.SharesSlider
-import app.pantopus.android.ui.screens.homes.owners.transfer.components.SplitDiff
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.screens.shared.form.FormShellLeading
@@ -75,6 +73,8 @@ fun TransferOwnershipScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) { viewModel.load() }
 
     val biometryLabel =
         remember(context) {
@@ -129,10 +129,11 @@ fun TransferOwnershipScreen(
         TransferOwnershipLoaded(
             state = state,
             onBack = onBack,
-            onAmountChange = viewModel::updateAmount,
-            onPresetSelected = viewModel::selectPreset,
+            onRecipientChange = viewModel::updateRecipientEmail,
+            onRecipientClear = viewModel::clearRecipientEmail,
             onConfirmationChange = viewModel::updateConfirmation,
             onArmCta = viewModel::presentConfirmSheet,
+            onRetry = viewModel::refresh,
         )
 
         state.toast?.let { toast ->
@@ -165,10 +166,11 @@ fun TransferOwnershipScreen(
 internal fun TransferOwnershipLoaded(
     state: TransferOwnershipUiState,
     onBack: () -> Unit,
-    onAmountChange: (Int) -> Unit,
-    onPresetSelected: (Int) -> Unit,
+    onRecipientChange: (String) -> Unit,
+    onRecipientClear: () -> Unit,
     onConfirmationChange: (String) -> Unit,
     onArmCta: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     FormShell(
         title = "Transfer ownership",
@@ -180,26 +182,34 @@ internal fun TransferOwnershipLoaded(
         onCommit = onArmCta,
         stickyBottom = { StickyCta(state = state, onTap = onArmCta) },
     ) {
-        HomeStrip(context = state.homeContext)
-        FormFieldGroup(title = "Recipient") {
-            RecipientSearchField(value = state.recipient.name)
-            RecipientCard(recipient = state.recipient)
+        when (val context = state.contextState) {
+            is TransferContextState.Loading -> HomeStripSkeleton()
+            is TransferContextState.Error -> TransferLoadError(message = context.message, onRetry = onRetry)
+            is TransferContextState.Loaded ->
+                HomeStrip(
+                    title = state.homeTitle,
+                    address = state.homeAddress,
+                    ownerSummary = state.ownerSummary,
+                )
         }
-        FormFieldGroup(title = "Share to transfer · ${state.amount}%") {
-            SliderCard(
-                state = state,
-                onAmountChange = onAmountChange,
-                onPresetSelected = onPresetSelected,
+        FormFieldGroup(title = "Recipient") {
+            PantopusTextField(
+                label = "Buyer's email",
+                value = state.recipientField.value,
+                onValueChange = onRecipientChange,
+                placeholder = "buyer@example.com",
+                state = state.recipientFieldState,
+                isRequired = true,
+                keyboardType = KeyboardType.Email,
+                fieldTestTag = "field_recipientEmail",
             )
-            SplitDiff(
-                before = state.beforeSegments,
-                after = state.afterSegments,
-                amount = state.amount,
-                recipientName =
-                    state.recipient.name
-                        .split(" ")
-                        .firstOrNull() ?: state.recipient.name,
-            )
+            if (state.recipientIsValid) {
+                RecipientCard(
+                    email = state.recipientEmail,
+                    initials = state.recipientInitials,
+                    onClear = onRecipientClear,
+                )
+            }
         }
         FormFieldGroup(title = "Confirmation") {
             ConfirmationField(
@@ -212,7 +222,11 @@ internal fun TransferOwnershipLoaded(
 }
 
 @Composable
-private fun HomeStrip(context: TransferOwnershipSampleData.HomeContext) {
+private fun HomeStrip(
+    title: String,
+    address: String,
+    ownerSummary: String,
+) {
     Row(
         modifier =
             Modifier
@@ -223,10 +237,8 @@ private fun HomeStrip(context: TransferOwnershipSampleData.HomeContext) {
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md + 2.dp))
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2 + 2.dp)
                 .semantics {
-                    contentDescription =
-                        "${context.address}, you hold ${context.yourStake}%, transfer is irreversible"
-                }
-                .testTag("transferHomeStrip"),
+                    contentDescription = "$address, $ownerSummary, transfer is irreversible"
+                }.testTag("transferHomeStrip"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp),
     ) {
@@ -250,21 +262,15 @@ private fun HomeStrip(context: TransferOwnershipSampleData.HomeContext) {
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                Text(
-                    text = context.title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.appText,
-                )
-                Text(
-                    text = "· ${context.since}",
-                    fontSize = 11.sp,
-                    color = PantopusColors.appTextMuted,
-                )
-            }
             Text(
-                text = "You hold ${context.yourStake}% · ${context.coOwnerNames}",
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+            )
+            Text(
+                text = ownerSummary,
                 fontSize = 11.sp,
                 color = PantopusColors.appTextSecondary,
             )
@@ -297,57 +303,78 @@ private fun HomeStrip(context: TransferOwnershipSampleData.HomeContext) {
 }
 
 @Composable
-private fun RecipientSearchField(value: String) {
+private fun HomeStripSkeleton() {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 44.dp)
+                .padding(horizontal = Spacing.s4)
                 .clip(RoundedCornerShape(Radii.md + 2.dp))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md + 2.dp))
-                .padding(horizontal = Spacing.s3)
-                .testTag("recipientSearchField"),
+                .background(PantopusColors.appSurfaceRaised)
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2 + 2.dp)
+                .testTag("transferHomeStripSkeleton"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Search,
-            contentDescription = null,
-            size = 16.dp,
-            tint = PantopusColors.appTextSecondary,
-        )
-        Text(
-            text = if (value.isEmpty()) "Search neighbors by name, email, or @handle" else value.lowercase(),
-            fontSize = 14.sp,
-            fontWeight = if (value.isEmpty()) FontWeight.Normal else FontWeight.Medium,
-            color = if (value.isEmpty()) PantopusColors.appTextMuted else PantopusColors.appText,
-            maxLines = 1,
+        Shimmer(width = 32.dp, height = 32.dp, cornerRadius = 9.dp)
+        Column(
             modifier = Modifier.weight(1f),
-        )
-        if (value.isNotEmpty()) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(PantopusColors.appSurfaceSunken),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.X,
-                    contentDescription = null,
-                    size = 12.dp,
-                    tint = PantopusColors.appTextSecondary,
-                )
-            }
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Shimmer(width = 140.dp, height = 11.dp, cornerRadius = Radii.xs)
+            Shimmer(width = 96.dp, height = 9.dp, cornerRadius = Radii.xs)
         }
     }
 }
 
 @Composable
-private fun RecipientCard(recipient: TransferOwnershipSampleData.RecipientSeed) {
+private fun TransferLoadError(
+    message: String,
+    onRetry: () -> Unit,
+) {
     Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.md + 2.dp))
+                .background(PantopusColors.appSurfaceRaised)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md + 2.dp))
+                .padding(Spacing.s3)
+                .testTag("transferOwnershipLoadError"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "Couldn't load this home",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = message,
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = "Retry",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.primary600,
+            modifier =
+                Modifier
+                    .clickable(onClick = onRetry)
+                    .testTag("transferOwnershipRetry"),
+        )
+    }
+}
+
+@Composable
+private fun RecipientCard(
+    email: String,
+    initials: String,
+    onClear: () -> Unit,
+) {
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -355,242 +382,55 @@ private fun RecipientCard(recipient: TransferOwnershipSampleData.RecipientSeed) 
                 .background(PantopusColors.appSurface)
                 .border(1.5.dp, PantopusColors.primary600, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3 + 2.dp)
-                .semantics { contentDescription = "Selected recipient ${recipient.name}, verified" }
+                .semantics { contentDescription = "Transfer recipient $email" }
                 .testTag("recipientCard"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(PantopusColors.business, PantopusColors.businessDark),
-                            ),
+        Box(
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(PantopusColors.business, PantopusColors.businessDark),
                         ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = recipient.initials,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextInverse,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 2.dp),
-                ) {
-                    Text(
-                        text = recipient.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PantopusColors.appText,
-                    )
-                    Text(
-                        text = "VERIFIED",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.7.sp,
-                        color = PantopusColors.success,
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(Radii.xs))
-                                .background(PantopusColors.successBg)
-                                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(Radii.xs))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.AtSign,
-                        contentDescription = null,
-                        size = 11.dp,
-                        tint = PantopusColors.appTextSecondary,
-                    )
-                    Text(
-                        text = "${recipient.handle} · ${recipient.email}",
-                        fontSize = 12.sp,
-                        color = PantopusColors.appTextSecondary,
-                        maxLines = 1,
-                    )
-                }
-            }
-            Text(
-                text = "Change",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.primary600,
-            )
-        }
-        MetaStrip(recipient = recipient)
-    }
-}
-
-@Composable
-private fun MetaStrip(recipient: TransferOwnershipSampleData.RecipientSeed) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appBorderSubtle)
-                .border(1.dp, PantopusColors.appBorderSubtle, RoundedCornerShape(Radii.md)),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-    ) {
-        MetaCell(icon = PantopusIcon.Home, label = "OWNS", value = recipient.owns)
-        MetaCell(icon = PantopusIcon.ShieldCheck, label = "ON PANTOPUS", value = recipient.onPantopus)
-        MetaCell(icon = PantopusIcon.Users, label = "MUTUAL", value = recipient.mutual)
-    }
-}
-
-@Composable
-private fun RowScope.MetaCell(
-    icon: PantopusIcon,
-    label: String,
-    value: String,
-) {
-    Column(
-        modifier =
-            Modifier
-                .weight(1f)
-                .background(PantopusColors.appSurface)
-                .padding(vertical = Spacing.s2),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            PantopusIconImage(
-                icon = icon,
-                contentDescription = null,
-                size = 10.dp,
-                tint = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.4.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        Text(
-            text = value,
-            fontSize = 12.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appText,
-        )
-    }
-}
-
-@Composable
-private fun SliderCard(
-    state: TransferOwnershipUiState,
-    onAmountChange: (Int) -> Unit,
-    onPresetSelected: (Int) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .padding(Spacing.s3 + 2.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s3 + 2.dp),
+                    ),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                SharesSlider(
-                    value = state.amount,
-                    onValueChange = onAmountChange,
-                    range = state.sliderRange,
-                    ticks = state.presets,
-                )
-            }
-            PercentPill(amount = state.amount)
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                text = "1%",
-                fontSize = 10.5.sp,
-                fontFamily = FontFamily.Monospace,
-                color = PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = "Max ${state.maxAmount}% (your stake)",
-                fontSize = 10.5.sp,
-                fontFamily = FontFamily.Monospace,
-                color = PantopusColors.appTextSecondary,
+                text = initials,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1 + 2.dp)) {
-            state.presets.forEach { preset ->
-                PresetChip(
-                    preset = preset,
-                    isActive = preset == state.amount,
-                    onTap = { onPresetSelected(preset) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = email,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+            )
+            Text(
+                text =
+                    "We'll notify this address. If they don't have a Pantopus account yet, " +
+                        "the claim waits for them to sign up.",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
         }
-    }
-}
-
-@Composable
-private fun PercentPill(amount: Int) {
-    Text(
-        text = "$amount%",
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
-        color = PantopusColors.primary700,
-        modifier =
-            Modifier
-                .widthIn(min = 44.dp)
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.primary50)
-                .padding(horizontal = Spacing.s2 + 2.dp, vertical = Spacing.s1),
-    )
-}
-
-@Composable
-private fun RowScope.PresetChip(
-    preset: Int,
-    isActive: Boolean,
-    onTap: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .heightIn(min = 30.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .background(if (isActive) PantopusColors.primary50 else PantopusColors.appSurface)
-                .border(
-                    1.dp,
-                    if (isActive) PantopusColors.primary100 else PantopusColors.appBorder,
-                    RoundedCornerShape(Radii.md),
-                )
-                .clickable(onClick = onTap)
-                .testTag("sharePreset_$preset"),
-        contentAlignment = Alignment.Center,
-    ) {
         Text(
-            text = "$preset%",
+            text = "Change",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            color = if (isActive) PantopusColors.primary700 else PantopusColors.appTextStrong,
+            color = PantopusColors.primary600,
+            modifier =
+                Modifier
+                    .clickable(onClick = onClear)
+                    .testTag("recipientClearButton"),
         )
     }
 }
@@ -648,8 +488,7 @@ private fun ConfirmationField(
                         if (state.confirmationMatches) 2.dp else 1.dp,
                         borderColor,
                         RoundedCornerShape(Radii.md),
-                    )
-                    .padding(horizontal = Spacing.s3),
+                    ).padding(horizontal = Spacing.s3),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
@@ -738,8 +577,7 @@ private fun StickyCta(
                     .clip(RoundedCornerShape(Radii.lg))
                     .background(
                         if (state.isReadyToCommit) PantopusColors.primary600 else PantopusColors.appBorderStrong,
-                    )
-                    .clickable(enabled = state.isReadyToCommit, onClick = onTap)
+                    ).clickable(enabled = state.isReadyToCommit, onClick = onTap)
                     .semantics { contentDescription = state.ctaLabel }
                     .testTag("transferOwnershipCTA"),
             contentAlignment = Alignment.Center,
@@ -759,6 +597,7 @@ private fun StickyCta(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = PantopusColors.appTextInverse,
+                    maxLines = 1,
                 )
             }
         }
@@ -800,8 +639,7 @@ private fun ConfirmOverlay(
                 .background(PantopusColors.appText.copy(alpha = 0.5f))
                 .pointerInput(Unit) {
                     // Block taps from passing through to the form behind the scrim.
-                }
-                .clickable(onClick = onCancel)
+                }.clickable(onClick = onCancel)
                 .semantics { contentDescription = "Confirmation sheet scrim" },
         verticalArrangement = Arrangement.Bottom,
     ) {
@@ -840,10 +678,9 @@ private fun ConfirmOverlay(
             }
             BiometricConfirmSheet(
                 parties = state.confirmSheetParties,
-                amount = state.amount,
-                recipientName = state.recipient.name,
-                homeAddress = state.homeContext.address,
-                coOwnerNames = state.homeContext.coOwnerNames,
+                recipientName = state.recipientEmail,
+                homeAddress = state.homeAddress,
+                coOwnerNames = state.coOwnerNames,
                 timestamp = state.confirmationTimestamp,
                 biometryLabel = state.biometryLabel,
                 isAuthenticating = state.sheetPhase == ConfirmSheetPhase.Authenticating,
@@ -889,11 +726,10 @@ private fun launchBiometric(
     val info =
         BiometricPrompt.PromptInfo.Builder()
             .setTitle("Final confirmation")
-            .setSubtitle("Confirm transfer of ${state.amount}% to ${state.recipient.name}")
+            .setSubtitle("Confirm ownership transfer to ${state.recipientEmail}")
             .setAllowedAuthenticators(
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-            )
-            .build()
+            ).build()
     prompt.authenticate(info)
 }
 

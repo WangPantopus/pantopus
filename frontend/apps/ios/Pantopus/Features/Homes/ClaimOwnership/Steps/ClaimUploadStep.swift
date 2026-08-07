@@ -38,38 +38,61 @@ struct ClaimUploadStepContent: View {
     let homeLabel: String
     let slots: [ClaimUploadSlotModel]
     @Binding var statement: String
+    var verificationType: ClaimVerificationType = .owner
+    /// Document kinds the user must choose between. Empty for the owner
+    /// variant, whose slots carry fixed `evidence_type`s.
+    var documentOptions: [ClaimDocumentOption] = []
+    var selectedDocumentType: String?
     var submitError: String?
     var onPick: (String) -> Void = { _ in }
     var onRemove: (String) -> Void = { _ in }
+    var onSelectDocumentType: (String) -> Void = { _ in }
 
     private var attachedCount: Int {
         slots.filter(\.state.isAttached).count
+    }
+
+    private var isResidency: Bool {
+        verificationType == .residency
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             ClaimHomeChip(label: homeLabel)
 
-            HeadlineBlock(
-                "Upload your evidence",
-                subtitle: "Two documents help us verify you own \(homeLabel). " +
-                    "We auto-check the address against your account."
-            )
+            HeadlineBlock(headline, subtitle: subtitle)
 
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                Text("Documents · \(attachedCount) of \(slots.count) attached")
-                    .pantopusTextStyle(.overline)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                ForEach(slots) { slot in
-                    UploadSlot(
-                        id: slot.id,
-                        label: slot.label,
-                        required: slot.required,
-                        hint: slot.hint,
-                        state: slot.state,
-                        onPick: { onPick(slot.id) },
-                        onRemove: { onRemove(slot.id) }
+            InfoBanner(text: infoText)
+
+            if !documentOptions.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    Text("1. Select document type")
+                        .pantopusTextStyle(.overline)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    ClaimDocumentTypePicker(
+                        options: documentOptions,
+                        selected: selectedDocumentType,
+                        onSelect: onSelectDocumentType
                     )
+                }
+            }
+
+            if documentOptions.isEmpty || selectedDocumentType != nil {
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    Text(uploadSectionLabel)
+                        .pantopusTextStyle(.overline)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    ForEach(slots) { slot in
+                        UploadSlot(
+                            id: slot.id,
+                            label: slot.label,
+                            required: slot.required,
+                            hint: slot.hint,
+                            state: slot.state,
+                            onPick: { onPick(slot.id) },
+                            onRemove: { onRemove(slot.id) }
+                        )
+                    }
                 }
             }
 
@@ -83,6 +106,57 @@ struct ClaimUploadStepContent: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    private var headline: String {
+        isResidency ? "Verify you live here" : "Upload your evidence"
+    }
+
+    private var subtitle: String {
+        if isResidency {
+            return "Upload a document that proves you live at \(homeLabel). " +
+                "Your access will be limited until verified."
+        }
+        return "Two documents help us verify you own \(homeLabel). " +
+            "We auto-check the address against your account."
+    }
+
+    /// Copy lifted from RN's info banner (`evidence.tsx:283-289`).
+    private var infoText: String {
+        if isResidency {
+            return "For residency verification, please upload a lease agreement, utility bill " +
+                "(electric, gas, water, internet), or similar document showing your name at this address."
+        }
+        return "For ownership verification, please upload a deed, closing disclosure, or property " +
+            "tax statement. Utility bills and leases can only be used for residency verification."
+    }
+
+    private var uploadSectionLabel: String {
+        documentOptions.isEmpty
+            ? "Documents · \(attachedCount) of \(slots.count) attached"
+            : "2. Upload your document"
+    }
+}
+
+// MARK: - Info banner
+
+private struct InfoBanner: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.info, size: 18, color: Theme.Color.primary600)
+            Text(text)
+                .font(.system(size: 12.5))
+                .foregroundStyle(Theme.Color.primary700)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.primary50)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("claimOwnership_infoBanner")
+    }
 }
 
 // MARK: - View-model-bound step
@@ -95,15 +169,19 @@ struct ClaimUploadStep: View {
     var body: some View {
         ClaimUploadStepContent(
             homeLabel: viewModel.startContent.homeLabel,
-            slots: ClaimEvidenceSlot.allCases.map(slotModel(for:)),
+            slots: viewModel.activeSlots.map(slotModel(for:)),
             statement: $viewModel.note,
+            verificationType: viewModel.verificationType,
+            documentOptions: viewModel.documentOptions,
+            selectedDocumentType: viewModel.selectedDocumentType,
             submitError: viewModel.submitError,
             onPick: { id in
                 if let slot = ClaimEvidenceSlot(rawValue: id) { photosPickerSlot = slot }
             },
             onRemove: { id in
                 if let slot = ClaimEvidenceSlot(rawValue: id) { viewModel.remove(slot) }
-            }
+            },
+            onSelectDocumentType: { viewModel.selectDocumentType($0) }
         )
         // Driving the sheet directly off `photosPickerSlot` (rather than an
         // intermediate onAppear hop) keeps the picker reachable after a
@@ -122,9 +200,15 @@ struct ClaimUploadStep: View {
     }
 
     private func slotModel(for slot: ClaimEvidenceSlot) -> ClaimUploadSlotModel {
-        ClaimUploadSlotModel(
+        // A chooser slot takes the label of the document kind the user
+        // picked, so the tile reads "Utility Bill" rather than a generic
+        // "Proof of residency".
+        let pickedLabel = slot.documentOptions
+            .first { $0.id == viewModel.selectedDocumentType }?
+            .label
+        return ClaimUploadSlotModel(
             id: slot.rawValue,
-            label: slot.title,
+            label: pickedLabel ?? slot.title,
             required: true,
             hint: slot.acceptHint,
             state: viewState(for: slot)

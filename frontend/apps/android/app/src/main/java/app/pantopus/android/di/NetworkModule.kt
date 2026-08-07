@@ -21,8 +21,14 @@ import app.pantopus.android.data.api.services.FollowingApi
 import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.api.services.GigSavedSearchesApi
 import app.pantopus.android.data.api.services.GigsApi
+import app.pantopus.android.data.api.services.HomeAdminApi
+import app.pantopus.android.data.api.services.HomeClaimReviewApi
+import app.pantopus.android.data.api.services.HomeDashboardApi
+import app.pantopus.android.data.api.services.HomeDiscoveryApi
 import app.pantopus.android.data.api.services.HomeGuestPassesApi
+import app.pantopus.android.data.api.services.HomeIssuesApi
 import app.pantopus.android.data.api.services.HomeMembersApi
+import app.pantopus.android.data.api.services.HomeOwnershipSecurityApi
 import app.pantopus.android.data.api.services.HomePetsApi
 import app.pantopus.android.data.api.services.HomePrivacyApi
 import app.pantopus.android.data.api.services.HomeTasksApi
@@ -53,6 +59,7 @@ import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
+import app.pantopus.android.data.api.services.TenantApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.TransactionReviewsApi
 import app.pantopus.android.data.api.services.UploadApi
@@ -242,6 +249,16 @@ object NetworkModule {
     @Provides @Singleton
     fun provideHomesApi(retrofit: Retrofit): HomesApi = retrofit.create(HomesApi::class.java)
 
+    /** H6 — per-home owner claim review (ownership + residency claims). */
+    @Provides @Singleton
+    fun provideHomeClaimReviewApi(retrofit: Retrofit): HomeClaimReviewApi =
+        retrofit.create(HomeClaimReviewApi::class.java)
+
+    /** H1 — dashboard aggregate + Home Intelligence reads. */
+    @Provides @Singleton
+    fun provideHomeDashboardApi(retrofit: Retrofit): HomeDashboardApi =
+        retrofit.create(HomeDashboardApi::class.java)
+
     @Provides @Singleton
     fun provideHomePetsApi(retrofit: Retrofit): HomePetsApi = retrofit.create(HomePetsApi::class.java)
 
@@ -249,7 +266,13 @@ object NetworkModule {
     fun provideHomeTasksApi(retrofit: Retrofit): HomeTasksApi = retrofit.create(HomeTasksApi::class.java)
 
     @Provides @Singleton
+    fun provideHomeIssuesApi(retrofit: Retrofit): HomeIssuesApi = retrofit.create(HomeIssuesApi::class.java)
+
+    @Provides @Singleton
     fun provideHomeMembersApi(retrofit: Retrofit): HomeMembersApi = retrofit.create(HomeMembersApi::class.java)
+
+    @Provides @Singleton
+    fun provideHomeAdminApi(retrofit: Retrofit): HomeAdminApi = retrofit.create(HomeAdminApi::class.java)
 
     @Provides @Singleton
     fun provideHomeGuestPassesApi(retrofit: Retrofit): HomeGuestPassesApi = retrofit.create(HomeGuestPassesApi::class.java)
@@ -259,6 +282,17 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideHomePrivacyApi(retrofit: Retrofit): HomePrivacyApi = retrofit.create(HomePrivacyApi::class.java)
+
+    /** A12.1 Find-or-Add-Home discovery + join-an-existing-home routes. */
+    @Provides @Singleton
+    fun provideHomeDiscoveryApi(retrofit: Retrofit): HomeDiscoveryApi = retrofit.create(HomeDiscoveryApi::class.java)
+
+    @Provides @Singleton
+    fun provideHomeOwnershipSecurityApi(retrofit: Retrofit): HomeOwnershipSecurityApi =
+        retrofit.create(HomeOwnershipSecurityApi::class.java)
+
+    @Provides @Singleton
+    fun provideTenantApi(retrofit: Retrofit): TenantApi = retrofit.create(TenantApi::class.java)
 
     @Provides @Singleton
     fun provideFilesApi(retrofit: Retrofit): FilesApi = retrofit.create(FilesApi::class.java)

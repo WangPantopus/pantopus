@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+@file:Suppress("MagicNumber", "LongMethod", "LongParameterList", "CyclomaticComplexMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes
 
@@ -40,6 +40,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
 import app.pantopus.android.ui.screens.shared.content_detail.FabCreateCTA
@@ -87,10 +88,20 @@ fun HomeDashboardScreen(
     /** A14.1 (P5.1) — push to the per-home Settings index. Wired from
      *  the dashboard's top-bar settings affordance. */
     onOpenSettings: ((String) -> Unit)? = null,
+    /** H1 — "Hire" on a seasonal-checklist item. Receives the
+     *  [app.pantopus.android.ui.screens.gigs.GigsCategory] key derived from
+     *  the item's `gig_category` so the host can open the gig composer
+     *  pre-filtered (RN routes to `/gig-v2/new?initialText=…`). */
+    onHireHelp: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val healthScore by viewModel.healthScore.collectAsStateWithLifecycle()
+    val checklist by viewModel.checklist.collectAsStateWithLifecycle()
+    val propertyValue by viewModel.propertyValue.collectAsStateWithLifecycle()
+    val billTrends by viewModel.billTrends.collectAsStateWithLifecycle()
+    val pendingChecklistItemIds by viewModel.pendingChecklistItemIds.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.load()
@@ -197,12 +208,38 @@ fun HomeDashboardScreen(
         }
     }
 
+    // H1 — health ring + seasonal checklist + property value + bill
+    // trends. Each card owns its loading / loaded / empty / error surface
+    // so one failing read can't blank the Overview.
+    val intelligenceStack: @Composable () -> Unit = {
+        HealthScoreRingCard(
+            state = healthScore,
+            onAction = ::handleQuickAction,
+            onRetry = viewModel::refreshHealthScore,
+        )
+        SeasonalChecklistCard(
+            state = checklist,
+            pendingItemIds = pendingChecklistItemIds,
+            onComplete = viewModel::completeChecklistItem,
+            onSkip = viewModel::skipChecklistItem,
+            onHireHelp = { item ->
+                onHireHelp?.invoke(GigsCategory.fromBackendKey(item.gigCategory).key)
+                    ?: openPlaceholder("hire_help")
+            },
+            onGenerate = viewModel::generateChecklist,
+            onRetry = viewModel::generateChecklist,
+        )
+        PropertyValueCard(state = propertyValue, onRetry = viewModel::retryPropertyValue)
+        BillTrendsCard(state = billTrends, onRetry = viewModel::retryBillTrends)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         when (val current = state) {
             HomeDashboardUiState.Loading -> LoadingLayout(onBack = onBack)
             is HomeDashboardUiState.Loaded ->
                 DashboardLayout(
                     content = current.content,
+                    intelligence = intelligenceStack,
                     brandNew = null,
                     selectedTab = selectedTab,
                     onSelectTab = viewModel::selectTab,
@@ -257,6 +294,7 @@ fun HomeDashboardScreen(
             is HomeDashboardUiState.NeedsAttention ->
                 DashboardLayout(
                     content = current.content,
+                    intelligence = intelligenceStack,
                     brandNew = null,
                     selectedTab = selectedTab,
                     onSelectTab = viewModel::selectTab,
@@ -358,6 +396,9 @@ private fun DashboardLayout(
     onViewClaims: () -> Unit,
     onOpenPropertyDetails: () -> Unit,
     onOpenSettings: (() -> Unit)? = null,
+    /** H1 — Home Intelligence stack slot (health ring, seasonal checklist,
+     *  property value, bill trends). Empty in preview/snapshot hosts. */
+    intelligence: @Composable () -> Unit = {},
 ) {
     ContentDetailShell(
         title = "Home",
@@ -402,11 +443,14 @@ private fun DashboardLayout(
                     if (brandNew != null) {
                         BrandNewHomeSection(brandNew = brandNew, onStep = onQuickAction)
                     } else {
-                        OverviewSection(
-                            content = content,
-                            onOpenEmergency = { onQuickAction("view_emergency") },
-                            onOpenPropertyDetails = onOpenPropertyDetails,
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                            intelligence()
+                            OverviewSection(
+                                content = content,
+                                onOpenEmergency = { onQuickAction("view_emergency") },
+                                onOpenPropertyDetails = onOpenPropertyDetails,
+                            )
+                        }
                     }
                 }
             }
@@ -693,6 +737,9 @@ private fun OverviewSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
         DashboardCard(title = "Upcoming", action = "See all", accent = PantopusColors.warning) {
+            if (content.overview.upcoming.isEmpty()) {
+                OverviewEmptyRow("Nothing due today. You're all clear.")
+            }
             content.overview.upcoming.forEachIndexed { index, item ->
                 TimelineRow(item)
                 if (index != content.overview.upcoming.lastIndex) {
@@ -701,6 +748,9 @@ private fun OverviewSection(
             }
         }
         DashboardCard(title = "Recent activity", action = "See all") {
+            if (content.overview.activity.isEmpty()) {
+                OverviewEmptyRow("No household activity yet.")
+            }
             content.overview.activity.forEachIndexed { index, item ->
                 ActivityRow(item)
                 if (index != content.overview.activity.lastIndex) {
@@ -713,16 +763,18 @@ private fun OverviewSection(
     }
 }
 
+/** Shared card chrome for the Overview + Home Intelligence sections. */
 @Composable
-private fun DashboardCard(
+internal fun DashboardCard(
     title: String,
     action: String? = null,
     accent: Color? = null,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
@@ -755,6 +807,16 @@ private fun DashboardCard(
         Column(modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s1), content = content)
         Spacer(Modifier.height(Spacing.s2))
     }
+}
+
+@Composable
+private fun OverviewEmptyRow(text: String) {
+    Text(
+        text = text,
+        style = PantopusTextStyle.caption,
+        color = PantopusColors.appTextSecondary,
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
+    )
 }
 
 @Composable

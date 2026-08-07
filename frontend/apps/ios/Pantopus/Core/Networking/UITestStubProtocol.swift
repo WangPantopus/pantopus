@@ -285,10 +285,10 @@ final class UITestStubProtocol: URLProtocol {
     {"results":[{"address":"412 Elm St","city":"Portland","state":"OR","zipCode":"97214"}]}
     """
 
-    /// `CheckAddressResponse` — exists=false so the wizard's verdict row
-    /// renders the "looks good" path.
+    /// `CheckAddressResponse` — `HOME_NOT_FOUND` so the wizard's verdict
+    /// row renders the "looks good" path.
     static let defaultCheckAddressJSON = """
-    {"exists":false,"homeCount":0,"hasVerifiedMembers":false,"verdictStatus":null}
+    {"status":"HOME_NOT_FOUND","is_multi_unit":false}
     """
 
     /// `CreateHomeResponse` envelope. The wizard's "View home" CTA uses

@@ -150,7 +150,12 @@ import app.pantopus.android.ui.screens.homes.calendar.EventDetailScreen
 import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_VERIFICATION_TYPE_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
+import app.pantopus.android.ui.screens.homes.claim_review.HOME_CLAIM_REVIEW_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_review.HomeClaimReviewScreen
+import app.pantopus.android.ui.screens.homes.issues.HOME_ISSUES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.issues.HomeIssuesListScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
@@ -168,8 +173,11 @@ import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_ITEM_ID_
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
+import app.pantopus.android.ui.screens.homes.find_home.FindHomeScreen
 import app.pantopus.android.ui.screens.homes.guests.ADD_GUEST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.guests.AddGuestFormScreen
+import app.pantopus.android.ui.screens.homes.guests.GUEST_PASSES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.guests.GuestPassesListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
@@ -212,6 +220,8 @@ import app.pantopus.android.ui.screens.homes.settings.cancel_claim.CancelClaimSc
 import app.pantopus.android.ui.screens.homes.settings.leave_home.LEAVE_HOME_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.leave_home.LeaveHomeScreen
 import app.pantopus.android.ui.screens.homes.settings.notifications.HomeNotificationsScreen
+import app.pantopus.android.ui.screens.homes.settings.ownership_security.HOME_OWNERSHIP_SECURITY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.ownership_security.HomeOwnershipSecurityScreen
 import app.pantopus.android.ui.screens.homes.settings.photos.HomePhotosScreen
 import app.pantopus.android.ui.screens.homes.settings.trusted_neighbors.TrustedNeighborsScreen
 import app.pantopus.android.ui.screens.homes.property_correction.PROPERTY_CORRECTION_HOME_ID_KEY
@@ -330,12 +340,25 @@ private object ChildRoutes {
     const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
 
+    /**
+     * A12.1 — "Find or Add Home" discovery. Search public-preview homes,
+     * start a claim on one, add a missing address, or paste an invite
+     * code. Mirrors RN `src/app/homes/find.tsx`.
+     */
+    const val FIND_HOME = "homes/find"
+
     /** Legacy waitlist route — redirects to [CREATE_BUSINESS]. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
 
     /** A12.10 — Create Business wizard route. */
     const val CREATE_BUSINESS = "businesses/new"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
+
+    /** Residency-verification variant of the evidence wizard. */
+    const val VERIFY_RESIDENCY = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/verify-residency"
+
+    /** Per-home issue tracker (`HomeIssue`) — distinct from maintenance. */
+    const val HOME_ISSUES = "homes/{$HOME_ISSUES_HOME_ID_KEY}/issues"
 
     /** A12.5 / A12.6 — Verify landlord wizard. Pushed from the home
      *  dashboard's ownership-claim CTA when the home record marks
@@ -688,6 +711,14 @@ private object ChildRoutes {
     /** Build the concrete path for a home owners list. */
     fun homeOwners(homeId: String): String = "homes/$homeId/owners"
 
+    /** H6 — per-home **owner** claim review (ownership + residency
+     *  claims on this home). Distinct from the admin `review-claims`
+     *  queue mounted elsewhere in this file. */
+    const val HOME_CLAIM_REVIEW = "homes/{$HOME_CLAIM_REVIEW_HOME_ID_KEY}/owners/review-claims"
+
+    /** Build the concrete path for the per-home claim-review screen. */
+    fun homeClaimReview(homeId: String): String = "homes/$homeId/owners/review-claims"
+
     /** Members list per home (T6.3a / P9). */
     const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
 
@@ -705,6 +736,13 @@ private object ChildRoutes {
 
     /** Build the concrete path for the per-home Security screen. */
     fun homeSecurity(homeId: String): String = "homes/$homeId/settings/security"
+
+    /** A14.2 (policy variant) — per-home ownership security policy. */
+    const val HOME_OWNERSHIP_SECURITY =
+        "homes/{$HOME_OWNERSHIP_SECURITY_HOME_ID_KEY}/settings/ownership-security"
+
+    /** Build the concrete path for the per-home Ownership & Security screen. */
+    fun homeOwnershipSecurity(homeId: String): String = "homes/$homeId/settings/ownership-security"
 
     const val LEAVE_HOME = "homes/{$LEAVE_HOME_HOME_ID_KEY}/settings/leave"
 
@@ -1170,6 +1208,16 @@ private object ChildRoutes {
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 
+    /**
+     * Build the residency-verification path — the same wizard driven by
+     * `verificationType=residency`, which sends `claim_type: 'resident'`
+     * and offers the lease / utility-bill / tax-bill document set.
+     */
+    fun verifyResidency(homeId: String): String = "homes/$homeId/verify-residency"
+
+    /** Build the per-home issue-tracker path. */
+    fun homeIssues(homeId: String): String = "homes/$homeId/issues"
+
     /** Build the verify-landlord wizard path. */
     fun verifyLandlord(homeId: String): String = "homes/$homeId/verify-landlord"
 
@@ -1375,6 +1423,14 @@ private object ChildRoutes {
     const val ADD_GUEST = "homes/{$ADD_GUEST_HOME_ID_KEY}/guests/new"
 
     fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
+
+    /** A13.6 — Guest-pass manager for a home (Active / Past + revoke).
+     *  Pushed from Home settings → "Invite link"; its FAB opens
+     *  [ADD_GUEST]. */
+    const val GUEST_PASSES_HOME_ID_KEY = "homeId"
+    const val GUEST_PASSES = "homes/{$GUEST_PASSES_HOME_ID_KEY}/guests"
+
+    fun guestPasses(homeId: String): String = "homes/$homeId/guests"
 
     /** A13.4 — Transfer Ownership form. Pushed from the Owners list
      *  "Transfer" action and from `pantopus://homes/:id/owners/transfer`
@@ -2018,7 +2074,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     MyHomesListScreen(
                         onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
                         onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onFindHome = { navController.navigate(ChildRoutes.FIND_HOME) },
                         onBack = { navController.popBackStack() },
+                        onUploadOwnershipEvidence = { homeId ->
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onVerifyResidency = { homeId ->
+                            navController.navigate(ChildRoutes.verifyResidency(homeId))
+                        },
                     )
                 }
                 composable(ChildRoutes.MY_LISTINGS) {
@@ -2200,6 +2263,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         },
                         onOpenSettings = { homeId ->
                             navController.navigate(ChildRoutes.homeSettings(homeId))
+                        },
+                        onHireHelp = { categoryKey ->
+                            // H1 — "Hire" on a seasonal-checklist item opens
+                            // the gig composer pre-filtered to the item's
+                            // category.
+                            navController.navigate(ChildRoutes.composeGig(categoryKey))
                         },
                     )
                 }
@@ -2660,6 +2729,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.logMaintenance(homeId))
                         },
                         onBack = { navController.popBackStack() },
+                        onOpenIssues = {
+                            navController.navigate(ChildRoutes.homeIssues(homeId))
+                        },
                     )
                 }
                 composable(
@@ -2717,8 +2789,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenInvite = { homeId ->
                             navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                         },
+                        onOpenTransfer = { homeId ->
+                            navController.navigate(ChildRoutes.transferOwnership(homeId))
+                        },
+                        onOpenClaimReview = { homeId ->
+                            navController.navigate(ChildRoutes.homeClaimReview(homeId))
+                        },
                         onBack = { navController.popBackStack() },
                     )
+                }
+                composable(
+                    route = ChildRoutes.HOME_CLAIM_REVIEW,
+                    arguments =
+                        listOf(
+                            navArgument(HOME_CLAIM_REVIEW_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    HomeClaimReviewScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.PACKAGE_DETAIL,
@@ -2777,10 +2864,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     navController.navigate(ChildRoutes.trustedNeighbors(homeId))
                                 HomeSettingsRoute.Security ->
                                     navController.navigate(ChildRoutes.homeSecurity(homeId))
+                                HomeSettingsRoute.OwnershipSecurity ->
+                                    navController.navigate(ChildRoutes.homeOwnershipSecurity(homeId))
                                 HomeSettingsRoute.People ->
                                     navController.navigate(ChildRoutes.homeMembers(homeId))
                                 HomeSettingsRoute.InviteLink ->
-                                    navController.navigate(ChildRoutes.addGuest(homeId))
+                                    // A13.6 — the guest-pass manager
+                                    // (Active / Past + revoke). The Add
+                                    // Guest form is reachable from its FAB.
+                                    navController.navigate(ChildRoutes.guestPasses(homeId))
                                 HomeSettingsRoute.HomeNotifications ->
                                     navController.navigate(ChildRoutes.homeNotifications(homeId))
                                 HomeSettingsRoute.LeaveHome ->
@@ -2796,6 +2888,15 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(HOME_SECURITY_HOME_ID_KEY) { type = NavType.StringType }),
                 ) {
                     HomeSecurityScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.HOME_OWNERSHIP_SECURITY,
+                    arguments =
+                        listOf(
+                            navArgument(HOME_OWNERSHIP_SECURITY_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    HomeOwnershipSecurityScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.LEAVE_HOME,
@@ -4067,6 +4168,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     )
                 }
                 composable(
+                    route = ChildRoutes.GUEST_PASSES,
+                    arguments = listOf(navArgument(GUEST_PASSES_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    // A13.6 — Guest-pass manager. The FAB pushes the Add
+                    // Guest form; popping back re-fetches so the new pass
+                    // appears.
+                    val homeId = entry.arguments?.getString(GUEST_PASSES_HOME_ID_KEY).orEmpty()
+                    GuestPassesListScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
+                    )
+                }
+                composable(
                     route = ChildRoutes.TRANSFER_OWNERSHIP,
                     arguments = listOf(navArgument(TRANSFER_HOME_ID_KEY) { type = NavType.StringType }),
                 ) {
@@ -4378,6 +4492,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.popBackStack()
                             navController.navigate(ChildRoutes.homeDashboard(homeId))
                         },
+                        onOpenClaimOwnership = { homeId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onOpenWaitingRoom = { homeId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.waitingRoom(homeId))
+                        },
+                    )
+                }
+                composable(ChildRoutes.FIND_HOME) {
+                    FindHomeScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenClaimOwnership = { homeId ->
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onOpenAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onOpenInviteToken = { token ->
+                            navController.navigate(ChildRoutes.tokenAccept(token))
+                        },
                     )
                 }
                 composable(ChildRoutes.BUSINESS_WAITLIST) {
@@ -4398,6 +4532,43 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.popBackStack()
                             navController.navigate(ChildRoutes.MY_CLAIMS)
                         },
+                        onOpenFindHome = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.FIND_HOME)
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.VERIFY_RESIDENCY,
+                    arguments =
+                        listOf(
+                            navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType },
+                            // Not part of the path — the default flips the
+                            // wizard into its residency variant.
+                            navArgument(CLAIM_VERIFICATION_TYPE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = "residency"
+                            },
+                        ),
+                ) {
+                    ClaimOwnershipWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenClaimsList = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.MY_CLAIMS)
+                        },
+                        onOpenFindHome = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.FIND_HOME)
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_ISSUES,
+                    arguments = listOf(navArgument(HOME_ISSUES_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    HomeIssuesListScreen(
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable(
@@ -4572,7 +4743,7 @@ private fun routeForDrawer(
         NavigationDrawerDestination.HomeTasks ->
             if (homeId.isNotEmpty()) ChildRoutes.homeTasks(homeId) else ChildRoutes.placeholder("Coming soon")
         NavigationDrawerDestination.HomeIssues ->
-            if (homeId.isNotEmpty()) ChildRoutes.homeMaintenance(homeId) else ChildRoutes.placeholder("Coming soon")
+            if (homeId.isNotEmpty()) ChildRoutes.homeIssues(homeId) else ChildRoutes.placeholder("Coming soon")
         NavigationDrawerDestination.HomeBills ->
             if (homeId.isNotEmpty()) ChildRoutes.homeBills(homeId) else ChildRoutes.placeholder("Coming soon")
         NavigationDrawerDestination.HomeMembers ->
