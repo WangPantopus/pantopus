@@ -6,6 +6,9 @@ import app.pantopus.android.data.api.models.mailbox.v2.Drawer
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerItemsResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.models.mailbox.v2.DrawerMail
+import app.pantopus.android.data.api.models.mailbox.v2.PendingItemDto
+import app.pantopus.android.data.api.models.mailbox.v2.PendingMailDto
+import app.pantopus.android.data.api.models.mailbox.v2.PendingResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
@@ -38,6 +41,10 @@ class MailboxRootLiveWiringTest {
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // `load()`/`refresh()` also poll the disambiguation queue for the
+        // "N items need routing" banner; default it to empty so the
+        // list-focused cases below stay unaffected.
+        coEvery { repo.pending() } returns NetworkResult.Success(PendingResponse(emptyList()))
     }
 
     @After fun tearDown() {
@@ -174,5 +181,52 @@ class MailboxRootLiveWiringTest {
             vm.selectDrawer(MailboxDrawer.Home)
             assertEquals(MailboxDrawer.Home, vm.selectedDrawer.value)
             assertEquals(2, (vm.state.value as ListOfRowsUiState.Loaded).sections.flatMap { it.rows }.size)
+        }
+
+    // ── Pending-routing banner (GET /api/mailbox/v2/pending) ───────────
+
+    @Test
+    fun live_pendingRoutingCountDrivesBanner() =
+        runTest {
+            coEvery { repo.drawers() } returns NetworkResult.Success(drawerList())
+            coEvery { repo.drawer(any(), any(), any(), any()) } returns
+                NetworkResult.Success(DrawerItemsResponse(mail = emptyList(), total = 0, drawer = "personal"))
+            coEvery { repo.pending() } returns
+                NetworkResult.Success(
+                    PendingResponse(
+                        listOf(
+                            PendingItemDto(
+                                mailId = "m-1",
+                                recipientNameRaw = "M. Kovacs",
+                                mail = PendingMailDto(subject = "Water bill"),
+                            ),
+                            PendingItemDto(
+                                mailId = "m-2",
+                                recipientNameRaw = "Marcus K",
+                                mail = PendingMailDto(subject = "Notice"),
+                            ),
+                        ),
+                    ),
+                )
+
+            val vm = MailboxRootViewModel(repo)
+            vm.load()
+
+            assertEquals(2, vm.pendingRoutingCount.value)
+        }
+
+    @Test
+    fun live_pendingRoutingFailureLeavesBannerHidden() =
+        runTest {
+            coEvery { repo.drawers() } returns NetworkResult.Success(drawerList())
+            coEvery { repo.drawer(any(), any(), any(), any()) } returns
+                NetworkResult.Success(DrawerItemsResponse(mail = emptyList(), total = 0, drawer = "personal"))
+            coEvery { repo.pending() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
+
+            val vm = MailboxRootViewModel(repo)
+            vm.load()
+
+            // The banner is non-blocking chrome.
+            assertEquals(0, vm.pendingRoutingCount.value)
         }
 }

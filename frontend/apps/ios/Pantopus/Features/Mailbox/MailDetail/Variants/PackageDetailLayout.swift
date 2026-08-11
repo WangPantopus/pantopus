@@ -22,6 +22,10 @@ struct PackageDetailLayout: View {
     let onAcknowledgeDelivery: @MainActor () -> Void
     let onOpenSenderProfile: (@MainActor (String) -> Void)?
     var onSaveToVault: @MainActor () -> Void = {}
+    /// A17.14 — when set, the overflow surfaces "Virtual unboxing", which
+    /// opens the Unboxing capture flow for this package. Mirrors RN's
+    /// delivered-only CTA in `src/app/mailbox/package.tsx:180-187`.
+    var onOpenUnboxing: (@MainActor @Sendable () -> Void)?
 
     var body: some View {
         MailItemDetailShell(
@@ -63,16 +67,30 @@ struct PackageDetailLayout: View {
                 icon: .bookmark,
                 accessibilityLabel: "Save to vault"
             ) { @Sendable in Task { @MainActor in onSaveToVault() } },
-            overflowItems: [
-                MailOverflowItem(id: "openMap", icon: .map, label: "Track map") {},
-                MailOverflowItem(id: "handoff", icon: .userPlus, label: "Hand-off") {},
-                MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
-                    Task { @MainActor in onSaveToVault() }
-                },
-                MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
-                MailOverflowItem(id: "report", icon: .alertTriangle, label: "Report issue") {}
-            ]
+            overflowItems: overflowItems
         )
+    }
+
+    private var overflowItems: [MailOverflowItem] {
+        var items: [MailOverflowItem] = []
+        // RN only offers the unboxing flow once the package is delivered.
+        if let onOpenUnboxing, package.status == .delivered {
+            items.append(
+                MailOverflowItem(id: "unboxing", icon: .scanLine, label: "Virtual unboxing") { @Sendable in
+                    Task { @MainActor in onOpenUnboxing() }
+                }
+            )
+        }
+        items.append(contentsOf: [
+            MailOverflowItem(id: "openMap", icon: .map, label: "Track map") {},
+            MailOverflowItem(id: "handoff", icon: .userPlus, label: "Hand-off") {},
+            MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
+                Task { @MainActor in onSaveToVault() }
+            },
+            MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
+            MailOverflowItem(id: "report", icon: .alertTriangle, label: "Report issue") {}
+        ])
+        return items
     }
 
     private func makeAIElf() -> AIElfStripContent? {

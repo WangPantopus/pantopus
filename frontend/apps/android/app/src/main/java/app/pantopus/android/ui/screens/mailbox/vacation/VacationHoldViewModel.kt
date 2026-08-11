@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.StartVacationRequest
 import app.pantopus.android.data.api.models.mailbox.v2.VacationHoldDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,14 +28,14 @@ import javax.inject.Inject
  *
  * BLOCK 3E wires this to the live backend
  * (`GET /api/mailbox/v2/p3/vacation/status`, `POST …/vacation/start`,
- * `POST …/vacation/cancel`). The iOS counterpart is still sample-only — its
- * "persistence lands later" comment predates these routes shipping — so this
- * is the parity-leading platform until iOS follows.
+ * `POST …/vacation/cancel`). iOS `VacationHoldViewModel` now mirrors the same
+ * calls, mode machine and error handling.
  *
  * - `load()` fetches the current hold: an `active` hold renders the Active
- *   variant; otherwise the scheduling composer (seeded from
- *   [VacationHoldSampleData], since the rich scope / forwarding / emergency
- *   fields have no backend source).
+ *   variant; otherwise the scheduling composer, seeded from
+ *   [VacationScheduleDraft.liveDefault] — today → +7 days with empty
+ *   forwarding / emergency rows, since those fields have no backend source
+ *   and a fixture would read as the user's own saved data.
  * - Save (`tapTrailingAction` in scheduling) resolves the user's primary home,
  *   maps the draft to `startVacationSchema`, and POSTs `/vacation/start`.
  * - Edit (`tapTrailingAction` in active) returns to the scheduling form.
@@ -61,6 +62,20 @@ class VacationHoldViewModel
 
         /** Observed mode. */
         val mode: StateFlow<VacationHoldMode> = _mode.asStateFlow()
+
+        private val _toast = MutableStateFlow<String?>(null)
+
+        /** Transient banner; the screen clears it after display. Mirrors iOS `toast`. */
+        val toast: StateFlow<String?> = _toast.asStateFlow()
+
+        private val _mutationInFlight = MutableStateFlow(false)
+
+        /** Save / End-hold mutation in-flight; the chrome disables while it runs. */
+        val mutationInFlight: StateFlow<Boolean> = _mutationInFlight.asStateFlow()
+
+        fun consumeToast() {
+            _toast.value = null
+        }
 
         /** Id of the active hold (from `/vacation/status` or `/vacation/start`) — needed to cancel. */
         private var activeHoldId: String? = null
@@ -126,13 +141,15 @@ class VacationHoldViewModel
                             activeHoldId = null
                             activeHoldDto = null
                             editingHoldId = null
-                            _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
+                            _mode.value = VacationHoldMode.Scheduling(VacationScheduleDraft.liveDefault())
                         }
                     }
-                    is NetworkResult.Failure ->
+                    is NetworkResult.Failure -> {
                         // A14.8 has no dedicated error frame — fall back to the
                         // scheduling composer so a hold can still be set.
-                        _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
+                        _mode.value = VacationHoldMode.Scheduling(VacationScheduleDraft.liveDefault())
+                        _toast.value = result.error.displayMessage("Couldn't load your hold.")
+                    }
                 }
             }
         }
@@ -147,13 +164,14 @@ class VacationHoldViewModel
                     is VacationHoldMode.Active -> "Edit"
                 }
 
-        /** Save disables when the draft is invalid; Edit is always enabled. */
+        /** Save disables when the draft is invalid or a write is in flight; Edit is always enabled. */
         val trailingActionEnabled: Boolean
             get() =
-                when (val current = _mode.value) {
-                    is VacationHoldMode.Scheduling -> current.draft.isValid
-                    is VacationHoldMode.Active -> true
-                }
+                !_mutationInFlight.value &&
+                    when (val current = _mode.value) {
+                        is VacationHoldMode.Scheduling -> current.draft.isValid
+                        is VacationHoldMode.Active -> true
+                    }
 
         // MARK: - View intents
 
@@ -189,11 +207,11 @@ class VacationHoldViewModel
 
         /**
          * Seed the composer from the live hold. The rich scope / forwarding /
-         * emergency fields have no backend source, so they keep the sample
+         * emergency fields have no backend source, so they keep the live
          * defaults; the dates and the forwarding switch come from the wire row.
          */
         private fun draftForEdit(hold: VacationHoldDto?): VacationScheduleDraft {
-            val base = VacationHoldSampleData.schedulingDraft
+            val base = VacationScheduleDraft.liveDefault()
             if (hold == null) return base
             val from = parseDate(hold.startDate) ?: base.fromDate
             val to = parseDate(hold.endDate) ?: base.toDate
@@ -278,53 +296,76 @@ class VacationHoldViewModel
             repo: MailboxRepository,
             homesRepo: HomesRepository,
         ) {
+            if (_mutationInFlight.value) return
+            _mutationInFlight.value = true
             viewModelScope.launch {
-                val homeId = resolveHomeId(homesRepo) ?: return@launch
-                // Editing an existing hold: there is no update route, so retire
-                // the old row first. Bail out if that fails rather than leaving
-                // two overlapping holds on the same home.
-                val editingId = editingHoldId
-                if (editingId != null) {
-                    if (repo.cancelVacation(editingId) is NetworkResult.Failure) return@launch
-                    editingHoldId = null
-                    activeHoldId = null
-                    activeHoldDto = null
-                }
-                // The composer collects scopes/forwarding, not the backend's
-                // hold/package enums — derive the closest action from forwarding.
-                val holdAction = if (draft.forwardingEnabled) FORWARD_TO_HOUSEHOLD else "hold_in_vault"
-                val request =
-                    StartVacationRequest(
-                        homeId = homeId,
-                        startDate = draft.fromDate.toString(),
-                        endDate = draft.toDate.toString(),
-                        holdAction = holdAction,
-                        packageAction = "hold_at_carrier",
-                        autoNeighborRequest = false,
-                    )
-                when (val result = repo.startVacation(request)) {
-                    is NetworkResult.Success -> {
-                        activeHoldId = result.data.hold.id
-                        activeHoldDto = result.data.hold
-                        _mode.value = VacationHoldMode.Active(result.data.hold.toActiveHold())
+                try {
+                    val homeId = resolveHomeId(homesRepo)
+                    if (homeId == null) {
+                        _toast.value = "Add a home before scheduling a hold."
+                        return@launch
                     }
-                    is NetworkResult.Failure -> Unit // keep the composer; the CTA can be retried
+                    // Editing an existing hold: there is no update route, so retire
+                    // the old row first. Bail out if that fails rather than leaving
+                    // two overlapping holds on the same home.
+                    val editingId = editingHoldId
+                    if (editingId != null) {
+                        val cancelled = repo.cancelVacation(editingId)
+                        if (cancelled is NetworkResult.Failure) {
+                            _toast.value = cancelled.error.displayMessage("Couldn't update your hold.")
+                            return@launch
+                        }
+                        editingHoldId = null
+                        activeHoldId = null
+                        activeHoldDto = null
+                    }
+                    // The composer collects scopes/forwarding, not the backend's
+                    // hold/package enums — derive the closest action from forwarding.
+                    val holdAction = if (draft.forwardingEnabled) FORWARD_TO_HOUSEHOLD else "hold_in_vault"
+                    val request =
+                        StartVacationRequest(
+                            homeId = homeId,
+                            startDate = draft.fromDate.toString(),
+                            endDate = draft.toDate.toString(),
+                            holdAction = holdAction,
+                            packageAction = "hold_at_carrier",
+                            autoNeighborRequest = false,
+                        )
+                    when (val result = repo.startVacation(request)) {
+                        is NetworkResult.Success -> {
+                            activeHoldId = result.data.hold.id
+                            activeHoldDto = result.data.hold
+                            _mode.value = VacationHoldMode.Active(result.data.hold.toActiveHold())
+                            _toast.value = "Hold scheduled"
+                        }
+                        // Keep the composer; the CTA can be retried.
+                        is NetworkResult.Failure ->
+                            _toast.value = result.error.displayMessage("Couldn't schedule your hold.")
+                    }
+                } finally {
+                    _mutationInFlight.value = false
                 }
             }
         }
 
         private fun cancelHold(repo: MailboxRepository) {
             val holdId = activeHoldId ?: return
+            if (_mutationInFlight.value) return
+            _mutationInFlight.value = true
             viewModelScope.launch {
-                when (repo.cancelVacation(holdId)) {
+                when (val result = repo.cancelVacation(holdId)) {
                     is NetworkResult.Success -> {
                         activeHoldId = null
                         activeHoldDto = null
                         editingHoldId = null
-                        _mode.value = VacationHoldMode.Scheduling(VacationHoldSampleData.schedulingDraft)
+                        _mode.value = VacationHoldMode.Scheduling(VacationScheduleDraft.liveDefault())
+                        _toast.value = "Hold ended"
                     }
-                    is NetworkResult.Failure -> Unit // keep the active hold visible
+                    // Keep the active hold visible.
+                    is NetworkResult.Failure ->
+                        _toast.value = result.error.displayMessage("Couldn't end your hold.")
                 }
+                _mutationInFlight.value = false
             }
         }
 

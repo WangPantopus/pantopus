@@ -53,6 +53,15 @@ import java.util.Locale
 /**
  * Hub → MailboxList → MailboxItemDetail screen. The ViewModel reads the
  * mail id via the nav-backstack [androidx.lifecycle.SavedStateHandle].
+ *
+ * NOT ROUTED (M5 parity sweep): `RootTabScreen.kt` renders
+ * `MailDetailScreen` for `MAILBOX_ITEM_DETAIL`, so nothing reaches this
+ * composable at runtime. It is kept because its shell + category bodies are
+ * still the reference for the A17 variant work and it carries its own unit /
+ * snapshot coverage; the A17.1 per-category ACTIONS row was added to the
+ * screen that actually renders (`mail_detail/variants/GenericMailDetailLayout.kt`)
+ * rather than by routing this one. Delete both this file and
+ * `MailboxItemDetailViewModel` together if the shell is ever retired.
  */
 @Suppress("CyclomaticComplexMethod")
 @Composable

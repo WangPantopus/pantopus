@@ -30,12 +30,18 @@ public enum UnboxingPhase: String, Sendable, Hashable {
     case filed
 }
 
-/// State machine for the Unboxing screen. Both cases carry the same
-/// `UnboxingContent`; only the rendering differs (live capture chrome vs
-/// filed summary chrome).
+/// State machine for the Unboxing screen. `.capture` and `.filed` carry
+/// the same `UnboxingContent`; only the rendering differs (live capture
+/// chrome vs filed summary chrome). `.loading` / `.error` cover the
+/// package fetch, and `.unavailable` is the honest frame for the case
+/// where the screen was opened without an originating package — nothing
+/// can be persisted, so nothing is faked.
 public enum UnboxingScreenState: Sendable {
+    case loading
     case capture(UnboxingContent)
     case filed(UnboxingContent)
+    case error(message: String)
+    case unavailable
 }
 
 // MARK: - Drawer suggestion
@@ -184,9 +190,201 @@ public struct UnboxingContent: Sendable {
             facts: facts,
             filedTo: filedTo,
             filedSubtitle: filedSubtitle,
+            photosSavedLabel: Self.photosLabel(count: shots.count),
+            classifyElf: classifyElf,
+            filedElf: filedElf
+        )
+    }
+
+    /// Copy stamped as just-filed — used after `POST
+    /// /p2/package/:mailId/save-warranty` succeeds.
+    public func withFiled() -> UnboxingContent {
+        UnboxingContent(
+            category: category,
+            timeLabel: timeLabel,
+            productTitle: productTitle,
+            productSubtitle: productSubtitle,
+            shots: shots,
+            suggestion: suggestion,
+            alternates: alternates,
+            facts: facts,
+            filedTo: filedTo,
+            filedSubtitle: "Confirmed by you \u{00B7} Just now",
             photosSavedLabel: photosSavedLabel,
             classifyElf: classifyElf,
             filedElf: filedElf
         )
+    }
+
+    static func photosLabel(count: Int) -> String {
+        count == 1 ? "1 photo saved" : "\(count) photos saved"
+    }
+}
+
+// MARK: - Live projection
+
+public extension UnboxingContent {
+    /// Neutral shell shown while `GET /api/mailbox/v2/package/:mailId` is
+    /// in flight. Never rendered as loaded content — the screen shows its
+    /// skeleton for `.loading`.
+    static let placeholder = UnboxingContent(
+        category: "Unboxing",
+        timeLabel: "",
+        productTitle: "",
+        productSubtitle: "",
+        shots: [],
+        suggestion: UnboxingDrawer(
+            id: "ub-drawer-home",
+            drawer: "Home",
+            folder: "Warranties & Receipts",
+            tint: .home
+        ),
+        alternates: [],
+        facts: [],
+        filedTo: "Home \u{203A} Warranties",
+        filedSubtitle: "",
+        photosSavedLabel: "",
+        classifyElf: AIElfStripContent(headline: "", summary: "", bullets: []),
+        filedElf: AIElfStripContent(headline: "", summary: "", bullets: [])
+    )
+
+    /// Project the real `MailPackage` row into the screen's content.
+    ///
+    /// There is no OCR / classification route on the backend, so every
+    /// value here comes off the package row itself — item name, carrier,
+    /// masked tracking, delivery note, and the `warranty_saved` /
+    /// `manual_saved` flags. The drawer suggestion is not a classifier
+    /// output: `POST /p2/package/:mailId/save-warranty`
+    /// (`backend/routes/mailboxV2Phase2.js:1260`) files to the caller's
+    /// Home › Warranties folder unconditionally, so that is stated as a
+    /// destination, with no confidence score and no re-route alternatives
+    /// (no route exists to honour them).
+    static func live(package: UnboxingPackageDTO, sender: String?) -> UnboxingContent {
+        var shots: [UnboxingShot] = []
+        if let delivery = package.deliveryPhotoUrl, !delivery.isEmpty {
+            shots.append(UnboxingShot(id: "delivery", tag: "DELIVERY", label: "Delivery photo", isMain: true))
+        }
+        if let condition = package.conditionPhotoUrl, !condition.isEmpty {
+            shots.append(
+                UnboxingShot(id: "condition", tag: "CONDITION", label: "Condition photo", isMain: shots.isEmpty)
+            )
+        }
+
+        var facts: [OcrFact] = []
+        if let item = package.inferredItemName, !item.isEmpty {
+            facts.append(OcrFact(id: "ub-fact-item", icon: .package, label: "Item", value: item))
+        }
+        if let carrier = package.carrier, !carrier.isEmpty {
+            facts.append(OcrFact(id: "ub-fact-carrier", icon: .truck, label: "Carrier", value: carrier))
+        }
+        if let tracking = package.trackingIdMasked, !tracking.isEmpty {
+            facts.append(
+                OcrFact(id: "ub-fact-tracking", icon: .hash, label: "Tracking", value: tracking, isCode: true)
+            )
+        }
+        if let note = package.deliveryLocationNote, !note.isEmpty {
+            facts.append(OcrFact(id: "ub-fact-note", icon: .mapPin, label: "Left at", value: note))
+        }
+        if package.warrantySaved == true {
+            facts.append(
+                OcrFact(
+                    id: "ub-fact-warranty",
+                    icon: .shieldCheck,
+                    label: "Warranty",
+                    value: "Saved to Home \u{203A} Warranties",
+                    tag: OcrFactTag(text: "Saved", tone: .success)
+                )
+            )
+        }
+        if package.manualSaved == true {
+            facts.append(
+                OcrFact(
+                    id: "ub-fact-manual",
+                    icon: .fileText,
+                    label: "Manual",
+                    value: "Saved to Home \u{203A} Warranties",
+                    tag: OcrFactTag(text: "Saved", tone: .success)
+                )
+            )
+        }
+
+        let subtitleParts = [package.carrier, package.trackingIdMasked]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        let title = [package.inferredItemName, sender]
+            .compactMap { $0 }
+            .first(where: { !$0.isEmpty }) ?? "Your package"
+
+        return UnboxingContent(
+            category: "Unboxing",
+            timeLabel: statusLabel(package.status),
+            productTitle: title,
+            productSubtitle: subtitleParts.isEmpty
+                ? "Delivered package"
+                : subtitleParts.joined(separator: " \u{00B7} "),
+            shots: shots,
+            suggestion: UnboxingDrawer(
+                id: "ub-drawer-home",
+                drawer: "Home",
+                folder: "Warranties & Receipts",
+                tint: .home
+            ),
+            alternates: [],
+            facts: facts,
+            filedTo: "Home \u{203A} Warranties",
+            filedSubtitle: package.warrantySaved == true ? "Confirmed by you" : "",
+            photosSavedLabel: photosLabel(count: shots.count),
+            classifyElf: AIElfStripContent(
+                headline: "Ready to file this delivery",
+                summary: "Confirm and Pantopus saves the warranty paperwork to your Home \u{203A} Warranties "
+                    + "folder and marks this unboxing complete. Condition photos you take here attach to the "
+                    + "package record.",
+                bullets: [
+                    AIElfBullet(id: "ub-elf-c1", icon: .folderLock, label: "Files to Home", text: "Warranties"),
+                    AIElfBullet(
+                        id: "ub-elf-c2",
+                        icon: .camera,
+                        label: "Condition photos",
+                        text: photosLabel(count: shots.count)
+                    ),
+                    AIElfBullet(
+                        id: "ub-elf-c3",
+                        icon: .usersRound,
+                        label: "Need a hand?",
+                        text: "post an assembly task"
+                    )
+                ]
+            ),
+            filedElf: AIElfStripContent(
+                headline: "Filed to your Home drawer",
+                summary: "The paperwork for this delivery is in Home \u{203A} Warranties and the unboxing is "
+                    + "marked complete on the package record.",
+                bullets: [
+                    AIElfBullet(
+                        id: "ub-elf-f1",
+                        icon: .folderLock,
+                        label: "Home \u{203A} Warranties",
+                        text: "document saved"
+                    ),
+                    AIElfBullet(
+                        id: "ub-elf-f2",
+                        icon: .archive,
+                        label: photosLabel(count: shots.count),
+                        text: "kept on the package"
+                    )
+                ]
+            )
+        )
+    }
+
+    private static func statusLabel(_ status: String?) -> String {
+        switch status {
+        case "delivered": "Delivered"
+        case "out_for_delivery": "Out for delivery"
+        case "in_transit": "In transit"
+        case "exception": "Delivery exception"
+        case "pre_receipt": "Expected"
+        default: "Package"
+        }
     }
 }

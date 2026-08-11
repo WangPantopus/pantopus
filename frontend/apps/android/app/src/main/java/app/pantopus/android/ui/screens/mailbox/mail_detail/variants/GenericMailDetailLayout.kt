@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @file:Suppress(
     "PackageNaming",
     "MagicNumber",
@@ -14,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
+import app.pantopus.android.ui.screens.mailbox.mail_detail.MailCategoryAction
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailKeyFact
 import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfStripContent
@@ -85,6 +89,15 @@ fun GenericMailDetailLayout(
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
     onTranslate: (() -> Unit)? = null,
+    // A17.12 — when set, the overflow surfaces "Create task", which opens
+    // the Mail-tasks screen in its create frame for this mail.
+    onCreateTask: (() -> Unit)? = null,
+    // A17.1 — per-category ACTIONS row (RN `CATEGORY_ACTIONS`). Empty hides
+    // the section.
+    categoryActions: List<MailCategoryAction> = emptyList(),
+    // Tile currently POSTing to `/item/:id/action`.
+    categoryActionInFlight: MailCategoryAction? = null,
+    onCategoryAction: ((MailCategoryAction) -> Unit)? = null,
 ) {
     Box(modifier = Modifier.testTag("mailDetail_generic")) {
         MailItemDetailShell(
@@ -103,6 +116,15 @@ fun GenericMailDetailLayout(
                         buildList {
                             if (onTranslate != null) {
                                 add(MailOverflowItem("translate", PantopusIcon.Globe, "Translate") { onTranslate() })
+                            }
+                            if (onCreateTask != null) {
+                                add(
+                                    MailOverflowItem(
+                                        "createTask",
+                                        PantopusIcon.ListChecks,
+                                        "Create task",
+                                    ) { onCreateTask() },
+                                )
                             }
                             add(MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {})
                             add(MailOverflowItem("move", PantopusIcon.FolderPlus, "Move") { onSaveToVault() })
@@ -151,6 +173,9 @@ fun GenericMailDetailLayout(
                 ActionsRow(
                     content = content,
                     ackInFlight = ackInFlight,
+                    categoryActions = categoryActions,
+                    categoryActionInFlight = categoryActionInFlight,
+                    onCategoryAction = onCategoryAction,
                     onAck = onAcknowledge,
                     onMove = onSaveToVault,
                 )
@@ -662,12 +687,23 @@ private fun BodyCard(paragraphs: List<String>) {
 private fun ActionsRow(
     content: MailDetailContent,
     ackInFlight: Boolean,
+    categoryActions: List<MailCategoryAction>,
+    categoryActionInFlight: MailCategoryAction?,
+    onCategoryAction: ((MailCategoryAction) -> Unit)?,
     onAck: () -> Unit,
     onMove: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         if (content.ackRequired || content.isAcknowledged) {
             AcknowledgeButton(content = content, ackInFlight = ackInFlight, onAck = onAck)
+        }
+        if (categoryActions.isNotEmpty() && onCategoryAction != null) {
+            CategoryActionsSection(
+                accent = content.category.accent,
+                actions = categoryActions,
+                inFlight = categoryActionInFlight,
+                onAction = onCategoryAction,
+            )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             SecondaryTile(
@@ -794,6 +830,91 @@ private fun SecondaryTile(
             fontSize = 10.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.appTextStrong,
+        )
+    }
+}
+
+/**
+ * A17.1 — the per-category row RN renders under an "ACTIONS" overline:
+ * first tile filled with the category accent, the rest outlined, wrapping
+ * (`detail.tsx:188-208`). Mirrors iOS `ActionsRow.categoryActionsSection`.
+ */
+@Composable
+private fun CategoryActionsSection(
+    accent: Color,
+    actions: List<MailCategoryAction>,
+    inFlight: MailCategoryAction?,
+    onAction: (MailCategoryAction) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.s1)
+                .testTag("mailDetail_categoryActions"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "ACTIONS",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.semantics { heading() },
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            actions.forEachIndexed { index, action ->
+                CategoryActionTile(
+                    action = action,
+                    isPrimary = index == 0,
+                    accent = accent,
+                    isBusy = inFlight == action,
+                    enabled = inFlight == null,
+                    onClick = { onAction(action) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryActionTile(
+    action: MailCategoryAction,
+    isPrimary: Boolean,
+    accent: Color,
+    isBusy: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val foreground = if (isPrimary) PantopusColors.appTextInverse else PantopusColors.appText
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (isPrimary) accent else PantopusColors.appSurfaceSunken)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                .alpha(if (isBusy) 0.5f else 1f)
+                .semantics { contentDescription = action.label }
+                .testTag("mailDetail_categoryAction_${action.id}"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = action.icon,
+            contentDescription = null,
+            size = 14.dp,
+            tint = foreground,
+        )
+        Text(
+            text = action.label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = foreground,
+            maxLines = 1,
         )
     }
 }

@@ -311,10 +311,19 @@ public enum YouRoute: Hashable {
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
     case mailTask(taskId: String)
+    /// A17.12 (list) — every mail-linked task. When `mailId` is non-nil the
+    /// screen opens in its create frame for that mail.
+    case mailTaskList(mailId: String?, mailSubject: String?, mailSender: String?)
     /// A17.13 — Auto-translated mail view. `pantopus://mailbox/translation?id=`.
     case mailTranslation(mailId: String)
     /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
     case unboxing(mailId: String?)
+    /// A17.4 — Community mail feed (neighborhood / civic). Reached from
+    /// the Mailbox root overflow menu.
+    case communityMail
+    /// Home Records — the linked-asset hub. Reached from the Mailbox
+    /// root overflow menu.
+    case homeRecords
     /// A10.11 — Earn dashboard (Wallet sibling). `pantopus://mailbox/earn`.
     case earn
     /// A10.7 — Business owner view. `pantopus://businesses/:id`.
@@ -328,10 +337,17 @@ public enum YouRoute: Hashable {
     case waitingRoom(homeId: String)
     /// Cancel ownership claim from waiting room / home settings.
     case cancelClaim(homeId: String)
+    /// Four-moment Ceremonial Mail compose wizard. Production entry point
+    /// is the Mailbox root's compose FAB.
+    case ceremonialMail
+    /// Ceremonial open experience for a letter carrying a stationery
+    /// theme. Reached by redirect from the generic mail detail.
+    case ceremonialMailOpen(mailId: String)
+    /// Disambiguation queue behind the Mailbox root's
+    /// "N items need routing" banner.
+    case mailRoutingQueue
     #if DEBUG
     case statusWaiting
-    case ceremonialMail
-    case ceremonialMailOpen(mailId: String)
     #endif
 }
 
@@ -890,7 +906,27 @@ public struct YouTabRoot: View {
                     onOpenEarn: { path.append(.earn) },
                     onOpenVacationHold: { path.append(.vacationHold) },
                     onOpenStamps: { path.append(.stamps) },
-                    onOpenUnboxing: { path.append(.unboxing(mailId: nil)) }
+                    onOpenUnboxing: { path.append(.unboxing(mailId: nil)) },
+                    onOpenCompose: { path.append(.ceremonialMail) },
+                    onOpenRoutingQueue: { path.append(.mailRoutingQueue) },
+                    onOpenCommunity: { path.append(.communityMail) },
+                    onOpenRecords: { path.append(.homeRecords) },
+                    onOpenMailTasks: {
+                        path.append(.mailTaskList(mailId: nil, mailSubject: nil, mailSender: nil))
+                    }
+                )
+            )
+        case .communityMail:
+            CommunityMailView(
+                viewModel: CommunityMailViewModel(onBack: { Task { @MainActor in pop() } })
+            )
+        case .homeRecords:
+            HomeRecordsView(
+                viewModel: HomeRecordsViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    }
                 )
             )
         case .mailboxMap:
@@ -935,6 +971,24 @@ public struct YouTabRoot: View {
                     // A17.12 — the certified-notice "view task" affordance
                     // opens the mail-derived task keyed by its source mail.
                     Task { @MainActor in path.append(.mailTask(taskId: sourceMailId)) }
+                },
+                onOpenCeremonialMail: { ceremonialId in
+                    // Replace (not push) so Back returns to the Mailbox,
+                    // matching RN's `router.replace`.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.ceremonialMailOpen(mailId: ceremonialId))
+                    }
+                },
+                onCreateTask: {
+                    // A17.12 — RN's "Create Task" in the detail MORE row
+                    // (`src/app/mailbox/detail.tsx:221-227`).
+                    Task { @MainActor in
+                        path.append(.mailTaskList(mailId: mailId, mailSubject: nil, mailSender: nil))
+                    }
+                },
+                onOpenUnboxing: {
+                    Task { @MainActor in path.append(.unboxing(mailId: mailId)) }
                 }
             )
         case .settings:
@@ -2289,22 +2343,36 @@ public struct YouTabRoot: View {
                     onBack: { Task { @MainActor in pop() } }
                 )
             )
+        case let .mailTaskList(mailId, mailSubject, mailSender):
+            // A17.12 (list) — every mail-linked task, plus the
+            // create-from-mail form when the route carries a mail id.
+            MailTaskListView(
+                viewModel: MailTaskListViewModel(
+                    mailId: mailId,
+                    mailSubject: mailSubject,
+                    mailSender: mailSender,
+                    onOpenTask: { taskId in
+                        Task { @MainActor in path.append(.mailTask(taskId: taskId)) }
+                    },
+                    onBack: { Task { @MainActor in pop() } }
+                )
+            )
         case let .mailTranslation(mailId):
             MailTranslationView(
                 mailId: mailId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onReply: { _ in Task { @MainActor in path.append(.placeholder(label: "Reply in English")) } }
             )
-        case .unboxing:
-            // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-            // (OCR / classification / vault upload are out of scope), so the
-            // `mailId` payload is unused today; it rides the route for when a
-            // real originating-mail fetch lands.
+        case let .unboxing(mailId):
+            // A17.14 — the capture flow loads the real `MailPackage` row for
+            // `mailId` and every action writes to `/api/mailbox/v2/p2`.
+            // Without a mail id there is nothing to persist, and the screen
+            // says so rather than projecting a fixture.
             let openDrawer: @MainActor () -> Void = {
                 Task { @MainActor in path.append(.placeholder(label: "Home drawer")) }
             }
             UnboxingView(
-                viewModel: UnboxingViewModel(onOpenDrawer: openDrawer)
+                viewModel: UnboxingViewModel(mailId: mailId, onOpenDrawer: openDrawer)
             ) { Task { @MainActor in pop() } }
         case .earn:
             EarnView(
@@ -2348,13 +2416,6 @@ public struct YouTabRoot: View {
                 onBack: { pop() },
                 onCancelled: { pop() }
             )
-        #if DEBUG
-        case .statusWaiting:
-            StatusWaitingView(
-                content: .claimSubmitted(homeName: "412 Elm St"),
-                onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
-                onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
-            )
         case .ceremonialMail:
             CeremonialMailWizardView(
                 onDismiss: { Task { @MainActor in pop() } },
@@ -2365,6 +2426,15 @@ public struct YouTabRoot: View {
                 viewModel: CeremonialMailOpenViewModel(mailId: mailId),
                 onBack: { Task { @MainActor in pop() } },
                 onWriteBack: { _ in path.append(.ceremonialMail) }
+            )
+        case .mailRoutingQueue:
+            MailRoutingQueueView { Task { @MainActor in pop() } }
+        #if DEBUG
+        case .statusWaiting:
+            StatusWaitingView(
+                content: .claimSubmitted(homeName: "412 Elm St"),
+                onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
+                onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
             )
         #endif
         }

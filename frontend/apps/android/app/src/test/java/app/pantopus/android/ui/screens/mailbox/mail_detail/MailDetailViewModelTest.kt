@@ -137,6 +137,47 @@ class MailDetailViewModelTest {
             assertTrue(vm.state.value is MailDetailUiState.Error)
         }
 
+    /**
+     * Ceremonial mail (carrying `mail_extracted.stationeryTheme`) redirects
+     * out of the generic detail into the ceremonial open experience, and the
+     * plain layout never renders — mirrors RN `src/app/mailbox/detail.tsx:43-49`.
+     */
+    @Test
+    fun load_stationeryMail_redirectsToCeremonialOpen() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail =
+                            makeDetail(
+                                displayTitle = "A letter from Ada",
+                                content = "Dear you,",
+                            ).copy(mailExtracted = mapOf("stationeryTheme" to "linen")),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+
+            assertEquals("m1", vm.ceremonialRedirectMailId.value)
+            assertTrue(vm.state.value is MailDetailUiState.Loading)
+            vm.acknowledgeCeremonialRedirect()
+            assertNull(vm.ceremonialRedirectMailId.value)
+        }
+
+    @Test
+    fun load_withoutStationery_doesNotRedirect() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(mail = makeDetail(displayTitle = "Notice", content = "Body")),
+                )
+            val vm = makeVm()
+            vm.load()
+
+            assertNull(vm.ceremonialRedirectMailId.value)
+            assertTrue(vm.state.value is MailDetailUiState.Loaded)
+        }
+
     // ─── Pure projection ──────────────────────────────────
 
     @Test

@@ -18,11 +18,23 @@
 //  Reduce Motion — so snapshots are deterministic. Mirrors `UnboxingScreen`
 //  on Android.
 //
+//  The shutter opens a real image source (system camera when the device
+//  has one, otherwise the photo library); the picked JPEG is uploaded and
+//  attached to the package by the view-model. Confirm files the warranty
+//  paperwork to Home › Warranties and the assembly card posts the help
+//  gig — all three are real writes.
+//
 
+import PhotosUI
 import SwiftUI
+import UIKit
 
 public struct UnboxingView: View {
     @State private var viewModel: UnboxingViewModel
+    @State private var showsPhotoSourcePicker = false
+    @State private var showsCamera = false
+    @State private var showsLibrary = false
+    @State private var pickerItem: PhotosPickerItem?
     private let reduceMotionOverride: Bool?
     private let onBack: @MainActor () -> Void
 
@@ -77,6 +89,49 @@ public struct UnboxingView: View {
         .accessibilityIdentifier("unboxing")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .overlay(alignment: .bottom) { toastOverlay }
+        .pantopusAnimation(.componentState, value: viewModel.toast)
+        .confirmationDialog(
+            "Add a condition photo",
+            isPresented: $showsPhotoSourcePicker,
+            titleVisibility: .visible
+        ) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Take photo") { showsCamera = true }
+                    .accessibilityIdentifier("unboxing_photo_camera")
+            }
+            Button("Choose from library") { showsLibrary = true }
+                .accessibilityIdentifier("unboxing_photo_library")
+            Button("Cancel", role: .cancel) {}
+        }
+        .fullScreenCover(isPresented: $showsCamera) {
+            SystemCameraPicker(isPresented: $showsCamera) { image in
+                guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+                Task { await viewModel.capture(photo: data) }
+            }
+            .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showsLibrary, selection: $pickerItem, matching: .images)
+        .onChange(of: pickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self), !data.isEmpty {
+                    await viewModel.capture(photo: data)
+                }
+                pickerItem = nil
+            }
+        }
+    }
+
+    /// The shutter and the filmstrip "+" tile both request a photo. In the
+    /// preview / snapshot seam the view-model has no mail id and appends a
+    /// fixture shot instead of opening the picker.
+    private func requestPhoto() {
+        if viewModel.mailId == nil {
+            viewModel.capture()
+        } else {
+            showsPhotoSourcePicker = true
+        }
     }
 
     // MARK: - Body per phase
@@ -84,11 +139,41 @@ public struct UnboxingView: View {
     @ViewBuilder
     private var scrollBody: some View {
         switch viewModel.state {
+        case .loading:
+            loadingBody
         case let .capture(content):
             captureBody(content)
         case let .filed(content):
             filedBody(content)
+        case let .error(message):
+            ErrorState(headline: "Couldn't load this package", message: message) {
+                await viewModel.retry()
+            }
+            .accessibilityIdentifier("unboxing_error")
+        case .unavailable:
+            EmptyState(
+                icon: .package,
+                headline: "Nothing to unbox yet",
+                subcopy: "Open a delivered package from your mailbox and tap Virtual unboxing to start.",
+                cta: EmptyState.CTA(title: "Back to Mailbox") { await MainActor.run { onBack() } }
+            )
+            .accessibilityIdentifier("unboxing_unavailable")
         }
+    }
+
+    private var loadingBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            HStack(spacing: Spacing.s2) {
+                Shimmer(width: 96, height: 20, cornerRadius: Radii.pill)
+                Shimmer(width: 78, height: 20, cornerRadius: Radii.pill)
+                Spacer()
+                Shimmer(width: 64, height: 14)
+            }
+            Shimmer(height: 220, cornerRadius: Radii.xl)
+            Shimmer(height: 132, cornerRadius: Radii.xl)
+            Shimmer(height: 150, cornerRadius: Radii.xl)
+        }
+        .accessibilityIdentifier("unboxing_loading")
     }
 
     private func captureBody(_ content: UnboxingContent) -> some View {
@@ -98,8 +183,8 @@ public struct UnboxingView: View {
                 accent: accent,
                 shots: viewModel.shots,
                 reduceMotionOverride: reduceMotionOverride,
-                onCapture: { viewModel.capture() },
-                onAddShot: { viewModel.capture() }
+                onCapture: { requestPhoto() },
+                onAddShot: { requestPhoto() }
             )
             AIElfStripView(content: content.classifyElf)
                 .accessibilityIdentifier("unboxing_elf")
@@ -112,13 +197,51 @@ public struct UnboxingView: View {
                 onSelectAlternate: { _ in },
                 onChooseAnother: {}
             )
-            OcrFactsList(
-                title: "Read from your scans",
-                status: OcrFactsStatus(icon: .scanLine, text: "Tap to edit", tone: .neutral),
-                facts: content.facts
-            )
-            .accessibilityIdentifier("unboxing_facts")
+            if !content.facts.isEmpty {
+                OcrFactsList(
+                    title: "On this package",
+                    status: OcrFactsStatus(icon: .package, text: "From the carrier", tone: .neutral),
+                    facts: content.facts
+                )
+                .accessibilityIdentifier("unboxing_facts")
+            }
+            assemblyGigCard
         }
+    }
+
+    /// "Need help assembling?" — RN's package gig card
+    /// (`src/app/mailbox/unboxing.tsx:141-158`), posting
+    /// `POST /api/mailbox/v2/p2/package/:mailId/gig` with
+    /// `gigType: "assembly"`.
+    private var assemblyGigCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Need help assembling?")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextStrong)
+            Text("Post a task and a Verified Neighbor will help. Package details are pre-filled.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Button(action: { Task { await viewModel.postAssemblyGig() } }, label: {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.usersRound, size: 16, strokeWidth: 2, color: Theme.Color.appTextInverse)
+                    Text("Create Task Request")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Theme.Color.business)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            })
+            .buttonStyle(.plain)
+            .disabled(viewModel.isBusy)
+            .accessibilityIdentifier("unboxing_assemblyGig")
+        }
+        .padding(Spacing.s3 + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.businessBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .accessibilityIdentifier("unboxing_assemblyCard")
     }
 
     private func filedBody(_ content: UnboxingContent) -> some View {
@@ -134,12 +257,15 @@ public struct UnboxingView: View {
             )
             AIElfStripView(content: content.filedElf)
                 .accessibilityIdentifier("unboxing_elf")
-            OcrFactsList(
-                title: "Read from your scans",
-                status: OcrFactsStatus(icon: .lock, text: "Saved", tone: .success),
-                facts: content.facts
-            )
-            .accessibilityIdentifier("unboxing_facts")
+            if !content.facts.isEmpty {
+                OcrFactsList(
+                    title: "On this package",
+                    status: OcrFactsStatus(icon: .lock, text: "Saved", tone: .success),
+                    facts: content.facts
+                )
+                .accessibilityIdentifier("unboxing_facts")
+            }
+            assemblyGigCard
             ScanNextCard(
                 accent: accent,
                 accentDark: accentDark,
@@ -181,26 +307,63 @@ public struct UnboxingView: View {
 
     // MARK: - Action shelf
 
+    @ViewBuilder
     private var actionShelf: some View {
-        Group {
-            switch viewModel.state {
-            case .capture:
-                UnboxActions(accent: accent) { viewModel.confirm() }
-            case .filed:
+        switch viewModel.state {
+        case .capture:
+            shelfChrome {
+                UnboxActions(
+                    accent: accent,
+                    isBusy: viewModel.isBusy,
+                    onConfirm: { Task { await viewModel.confirm() } },
+                    onRetake: { requestPhoto() },
+                    onSaveManual: { Task { await viewModel.saveManual() } }
+                )
+            }
+        case .filed:
+            shelfChrome {
                 FiledActions { viewModel.openDrawer() }
             }
+        case .loading, .error, .unavailable:
+            EmptyView()
         }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.top, Spacing.s3)
-        .padding(.bottom, Spacing.s4)
-        .frame(maxWidth: .infinity)
-        .background(
-            Theme.Color.appSurface
-                .overlay(alignment: .top) {
-                    Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+    }
+
+    private func shelfChrome<Content: View>(@ViewBuilder _ body: () -> Content) -> some View {
+        body()
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+            .padding(.bottom, Spacing.s4)
+            .frame(maxWidth: .infinity)
+            .background(
+                Theme.Color.appSurface
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+            )
+    }
+
+    // MARK: - Toast
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            Text(toast)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appText.opacity(0.9))
+                .clipShape(Capsule())
+                .padding(.bottom, 160)
+                .transition(.opacity)
+                .task {
+                    try? await Task.sleep(nanoseconds: 1_800_000_000)
+                    viewModel.toast = nil
                 }
-                .ignoresSafeArea(edges: .bottom)
-        )
+                .accessibilityLabel(toast)
+        }
     }
 }
 
@@ -305,7 +468,10 @@ private struct StateChip: View {
 
 private struct UnboxActions: View {
     let accent: Color
+    let isBusy: Bool
     let onConfirm: () -> Void
+    let onRetake: () -> Void
+    let onSaveManual: () -> Void
 
     var body: some View {
         VStack(spacing: Spacing.s2) {
@@ -315,13 +481,15 @@ private struct UnboxActions: View {
                 background: accent,
                 action: onConfirm
             )
+            .disabled(isBusy)
             .accessibilityIdentifier("unboxing_confirm")
             HStack(spacing: Spacing.s2) {
-                UbChip(icon: .arrowsRepeat, label: "Retake") {}
-                UbChip(icon: .pencil, label: "Edit facts") {}
-                UbChip(icon: .messageSquare, label: "Add note") {}
-                UbChip(icon: .trash2, label: "Discard") {}
+                UbChip(icon: .camera, label: "Add photo", action: onRetake)
+                    .accessibilityIdentifier("unboxing_addPhoto")
+                UbChip(icon: .fileText, label: "Save manual", action: onSaveManual)
+                    .accessibilityIdentifier("unboxing_saveManual")
             }
+            .disabled(isBusy)
         }
     }
 }

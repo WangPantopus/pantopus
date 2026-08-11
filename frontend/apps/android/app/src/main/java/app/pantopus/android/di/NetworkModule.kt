@@ -16,6 +16,7 @@ import app.pantopus.android.data.api.services.BusinessTeamApi
 import app.pantopus.android.data.api.services.BusinessesApi
 import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.ConnectApi
+import app.pantopus.android.data.api.services.EarnOffersApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.FollowingApi
 import app.pantopus.android.data.api.services.GeoApi
@@ -42,6 +43,10 @@ import app.pantopus.android.data.api.services.ListingsReadApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailDayApi
 import app.pantopus.android.data.api.services.MailboxApi
+import app.pantopus.android.data.api.services.MailboxCommunityApi
+import app.pantopus.android.data.api.services.MailboxPackageApi
+import app.pantopus.android.data.api.services.MailboxRecordsApi
+import app.pantopus.android.data.api.services.MailboxTasksApi
 import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.MailboxVaultApi
 import app.pantopus.android.data.api.services.MembershipApi
@@ -304,10 +309,28 @@ object NetworkModule {
     fun provideMailboxV2Api(retrofit: Retrofit): MailboxV2Api = retrofit.create(MailboxV2Api::class.java)
 
     @Provides @Singleton
+    fun provideMailboxTasksApi(retrofit: Retrofit): MailboxTasksApi = retrofit.create(MailboxTasksApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxPackageApi(retrofit: Retrofit): MailboxPackageApi =
+        retrofit.create(MailboxPackageApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxCommunityApi(retrofit: Retrofit): MailboxCommunityApi =
+        retrofit.create(MailboxCommunityApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxRecordsApi(retrofit: Retrofit): MailboxRecordsApi =
+        retrofit.create(MailboxRecordsApi::class.java)
+
+    @Provides @Singleton
     fun provideMailboxVaultApi(retrofit: Retrofit): MailboxVaultApi = retrofit.create(MailboxVaultApi::class.java)
 
     @Provides @Singleton
     fun provideMailDayApi(retrofit: Retrofit): MailDayApi = retrofit.create(MailDayApi::class.java)
+
+    @Provides @Singleton
+    fun provideEarnOffersApi(retrofit: Retrofit): EarnOffersApi = retrofit.create(EarnOffersApi::class.java)
 
     @Provides @Singleton
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)

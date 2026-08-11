@@ -153,16 +153,33 @@ final class MailboxRootViewModelTests: XCTestCase {
         XCTAssertEqual(vm.unreadCount(drawer: .business, tab: .counter), 4)
     }
 
-    // MARK: - FAB visibility
+    // MARK: - FAB (compose)
 
-    func test_fabHiddenOnEmptyShownOnPopulated() async {
+    /// The FAB is the Mailbox's compose affordance and is present in every
+    /// state, including empty — an empty mailbox is exactly when a user
+    /// wants to write. (The old scan-line/map FAB moved to the overflow
+    /// menu; it was the one hidden on empty.)
+    func test_fabIsComposeAndShownInEveryState() async {
         let populated = sampleVM(drawer: .me, tab: .incoming)
         await populated.load()
-        XCTAssertNotNil(populated.fab)
+        XCTAssertEqual(populated.fab?.accessibilityLabel, "Write a letter")
 
         let empty = sampleVM(drawer: .earn, tab: .incoming)
         await empty.load()
-        XCTAssertNil(empty.fab)
+        XCTAssertEqual(empty.fab?.accessibilityLabel, "Write a letter")
+    }
+
+    func test_fabInvokesComposeHandler() async {
+        let didOpenCompose = expectation(description: "compose opened")
+        let vm = MailboxRootViewModel(
+            initialDrawer: .me,
+            initialTab: .incoming,
+            onOpenCompose: { didOpenCompose.fulfill() },
+            dataProvider: MailboxRootSampleData.sections
+        )
+        await vm.load()
+        vm.fab?.handler()
+        await fulfillment(of: [didOpenCompose], timeout: 1)
     }
 
     // MARK: - Trust override flows into the row chips
@@ -204,6 +221,10 @@ final class MailboxRootViewModelTests: XCTestCase {
     ]}
     """
 
+    /// `GET /api/mailbox/v2/pending` with an empty queue — `load()` polls it
+    /// between `/drawers` and `/drawer/:drawer`.
+    private static let emptyPendingBody = "{\"pending\":[]}"
+
     private static func drawerItem(id: String, title: String, trust: String) -> String {
         """
         {"id":"\(id)","type":"bill","mail_type":"bill","display_title":"\(title)",
@@ -218,6 +239,7 @@ final class MailboxRootViewModelTests: XCTestCase {
         let items = "\(Self.drawerItem(id: "m-1", title: "Water bill", trust: "verified_utility"))"
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.drawersBody),
+            .status(200, body: Self.emptyPendingBody),
             .status(200, body: "{\"mail\":[\(items)],\"total\":1,\"drawer\":\"personal\"}")
         ]
         let vm = MailboxRootViewModel(api: makeAPI())
@@ -237,6 +259,7 @@ final class MailboxRootViewModelTests: XCTestCase {
     func test_live_drawerBadgeReadsUnreadFromDrawersEndpoint() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.drawersBody),
+            .status(200, body: Self.emptyPendingBody),
             .status(200, body: "{\"mail\":[],\"total\":0,\"drawer\":\"personal\"}")
         ]
         let vm = MailboxRootViewModel(api: makeAPI())
@@ -253,6 +276,7 @@ final class MailboxRootViewModelTests: XCTestCase {
     func test_live_emptyDrawerTransitionsToEmpty() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.drawersBody),
+            .status(200, body: Self.emptyPendingBody),
             .status(200, body: "{\"mail\":[],\"total\":0,\"drawer\":\"personal\"}")
         ]
         let vm = MailboxRootViewModel(api: makeAPI())
@@ -267,6 +291,7 @@ final class MailboxRootViewModelTests: XCTestCase {
     func test_live_listFailureTransitionsToError() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.drawersBody),
+            .status(200, body: Self.emptyPendingBody),
             .status(500, body: "{\"error\":\"boom\"}")
         ]
         let vm = MailboxRootViewModel(api: makeAPI())
@@ -284,6 +309,7 @@ final class MailboxRootViewModelTests: XCTestCase {
             .joined(separator: ",")
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.drawersBody),
+            .status(200, body: Self.emptyPendingBody),
             .status(200, body: "{\"mail\":[\(page)],\"total\":40,\"drawer\":\"personal\"}")
         ]
         let vm = MailboxRootViewModel(api: makeAPI())
@@ -293,5 +319,38 @@ final class MailboxRootViewModelTests: XCTestCase {
             return XCTFail("Expected loaded, got \(vm.state)")
         }
         XCTAssertTrue(hasMore, "A full page should signal more to load")
+    }
+
+    // MARK: - Pending-routing banner (GET /api/mailbox/v2/pending)
+
+    func test_live_pendingRoutingCountDrivesBanner() async {
+        let pending = """
+        {"pending":[
+          {"mail_id":"m-1","home_id":"h-1","recipient_name_raw":"M. Kovacs","Mail":{"subject":"Water bill"}},
+          {"mail_id":"m-2","home_id":"h-1","recipient_name_raw":"Marcus K","Mail":{"subject":"Notice"}}
+        ]}
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.drawersBody),
+            .status(200, body: pending),
+            .status(200, body: "{\"mail\":[],\"total\":0,\"drawer\":\"personal\"}")
+        ]
+        let vm = MailboxRootViewModel(api: makeAPI())
+        await vm.load()
+
+        XCTAssertEqual(vm.pendingRoutingCount, 2)
+        XCTAssertEqual(vm.pendingRoutingLabel, "2 items need routing")
+    }
+
+    func test_live_pendingRoutingFailureLeavesBannerHidden() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.drawersBody),
+            .status(500, body: "{\"error\":\"boom\"}"),
+            .status(200, body: "{\"mail\":[],\"total\":0,\"drawer\":\"personal\"}")
+        ]
+        let vm = MailboxRootViewModel(api: makeAPI())
+        await vm.load()
+
+        XCTAssertEqual(vm.pendingRoutingCount, 0, "The banner is non-blocking chrome")
     }
 }

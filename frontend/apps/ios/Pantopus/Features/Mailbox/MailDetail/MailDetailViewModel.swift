@@ -25,6 +25,8 @@
 //  "everything else" rendering.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 
@@ -55,6 +57,20 @@ public final class MailDetailViewModel {
     public private(set) var saveToVaultFolders: [VaultFolderDTO] = []
     /// Save mutation in-flight.
     public private(set) var saveToVaultInFlight: Bool = false
+    /// A17.1 — per-category action currently POSTing to
+    /// `/item/:id/action`; disables the ACTIONS row while it runs.
+    public private(set) var categoryActionInFlight: MailCategoryAction?
+    /// A17.1 — destructive category action awaiting confirmation
+    /// (today only `Dismiss`, which shreds the item).
+    public var pendingDestructiveAction: MailCategoryAction?
+    /// Set to this mail's id when the loaded item carries a stationery
+    /// theme — i.e. it came out of the Ceremonial Mail compose flow and
+    /// belongs in the ceremonial open experience (envelope tap-to-open,
+    /// voice postscript, ceremonial CTAs) rather than the plain detail.
+    /// The host observes this and *replaces* the current route, mirroring
+    /// RN's `router.replace('/mailbox/open?id=…')`
+    /// (`src/app/mailbox/detail.tsx:43-49`).
+    public private(set) var ceremonialRedirectMailId: String?
 
     private let mailId: String
     private let api: APIClient
@@ -84,11 +100,25 @@ public final class MailDetailViewModel {
         await fetch()
     }
 
+    /// Clear the ceremonial redirect once the host has navigated, so a
+    /// later `refresh()` can raise it again if needed.
+    public func acknowledgeCeremonialRedirect() {
+        ceremonialRedirectMailId = nil
+    }
+
     private func fetch() async {
         do {
             let response: MailDetailResponse = try await api.request(
                 MailboxEndpoints.detail(mailId: mailId)
             )
+            // Ceremonial mail never lands on the generic detail — hand it
+            // straight to the open experience and hold the loading frame
+            // so the plain layout never flashes (RN does the same by
+            // short-circuiting before `setLoading(false)`).
+            if response.mail.stationeryTheme != nil {
+                ceremonialRedirectMailId = mailId
+                return
+            }
             state = .loaded(Self.project(detail: response.mail, now: now()))
         } catch {
             state = .error(
@@ -411,6 +441,52 @@ public final class MailDetailViewModel {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "h:mm a"
         return "Today \(formatter.string(from: Date())) · retention 7y"
+    }
+
+    // MARK: - Per-category actions (A17.1)
+
+    /// The ACTIONS row for the loaded item — RN's
+    /// `CATEGORY_ACTIONS[item.category] || CATEGORY_ACTIONS.other`, minus
+    /// `Pay` / `Sign` for unknown senders (`detail.tsx:56-72`).
+    public var categoryActions: [MailCategoryAction] {
+        guard case let .loaded(content) = state else { return [] }
+        return MailCategoryActions.actions(
+            forCategory: content.mailCategoryKey,
+            isSenderUnknown: content.isSenderUnknown
+        )
+    }
+
+    /// Route a tile tap. Destructive tiles park in
+    /// `pendingDestructiveAction` for the view's confirm dialog; the rest
+    /// fire straight away.
+    public func tapCategoryAction(_ action: MailCategoryAction) async {
+        guard action.isDestructive else {
+            await performCategoryAction(action)
+            return
+        }
+        pendingDestructiveAction = action
+    }
+
+    /// `POST /api/mailbox/v2/item/:id/action` — route
+    /// `backend/routes/mailboxV2.js:459`. The handler records a
+    /// `mail_action_clicked` event itself, so (unlike RN, which posts a
+    /// second `/event` write) one call is enough.
+    public func performCategoryAction(_ action: MailCategoryAction) async {
+        guard case .loaded = state, categoryActionInFlight == nil else { return }
+        pendingDestructiveAction = nil
+        categoryActionInFlight = action
+        defer { categoryActionInFlight = nil }
+        do {
+            let _: MailboxItemActionResponse = try await api.request(
+                MailboxV2Endpoints.itemAction(mailId: mailId, action: action.actionKey)
+            )
+            // RN only toasts (`detail.tsx:56-66`) — the generic detail
+            // renders nothing derived from `lifecycle`, so a refetch would
+            // buy a loading flash and nothing else.
+            toast = action.successToast
+        } catch {
+            toast = (error as? APIError)?.errorDescription ?? "Action failed"
+        }
     }
 
     // MARK: - Save to vault (T6.5e / P19.5)

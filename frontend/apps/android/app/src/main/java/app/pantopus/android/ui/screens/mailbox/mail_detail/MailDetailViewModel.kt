@@ -79,6 +79,17 @@ private data class PendingGigBidAcceptance(
 data class MailDetailContent(
     val mailId: String,
     val category: MailItemCategory,
+    /**
+     * Raw backend `Mail.category` (`bill` / `legal` / `notice` / `receipt` /
+     * `community` / `promo` / `other`). Distinct from [category], which
+     * projects `mail_type`. Drives the A17.1 per-category ACTIONS row.
+     */
+    val mailCategoryKey: String? = null,
+    /**
+     * True when the sender resolves to RN's `unknown` trust bucket —
+     * suppresses the Pay / Sign tiles (`detail.tsx:69-72`).
+     */
+    val isSenderUnknown: Boolean = false,
     val trust: MailTrust,
     val detailTrust: MailDetailTrust,
     val senderDisplayName: String,
@@ -201,7 +212,38 @@ class MailDetailViewModel
         private val _saveToVaultInFlight = MutableStateFlow(false)
         val saveToVaultInFlight: StateFlow<Boolean> = _saveToVaultInFlight.asStateFlow()
 
+        /**
+         * A17.1 — per-category action currently POSTing to
+         * `/item/:id/action`; disables the ACTIONS row while it runs.
+         */
+        private val _categoryActionInFlight = MutableStateFlow<MailCategoryAction?>(null)
+        val categoryActionInFlight: StateFlow<MailCategoryAction?> = _categoryActionInFlight.asStateFlow()
+
+        /**
+         * A17.1 — destructive category action awaiting confirmation (today
+         * only `Dismiss`, which shreds the item).
+         */
+        private val _pendingDestructiveAction = MutableStateFlow<MailCategoryAction?>(null)
+        val pendingDestructiveAction: StateFlow<MailCategoryAction?> = _pendingDestructiveAction.asStateFlow()
+
         private var pendingGigBidAcceptance: PendingGigBidAcceptance? = null
+
+        /**
+         * Set to this mail's id when the loaded item carries a stationery
+         * theme — i.e. it came out of the Ceremonial Mail compose flow and
+         * belongs in the ceremonial open experience (envelope tap-to-open,
+         * voice postscript, ceremonial CTAs) rather than the plain detail.
+         * The host observes this and *replaces* the current route, mirroring
+         * RN's `router.replace('/mailbox/open?id=…')`
+         * (`src/app/mailbox/detail.tsx:43-49`).
+         */
+        private val _ceremonialRedirectMailId = MutableStateFlow<String?>(null)
+        val ceremonialRedirectMailId: StateFlow<String?> = _ceremonialRedirectMailId.asStateFlow()
+
+        /** Clear the redirect once the host has navigated. */
+        fun acknowledgeCeremonialRedirect() {
+            _ceremonialRedirectMailId.value = null
+        }
 
         fun load() {
             if (_state.value is MailDetailUiState.Loaded) return
@@ -213,7 +255,15 @@ class MailDetailViewModel
             viewModelScope.launch {
                 when (val result = repo.detail(mailId)) {
                     is NetworkResult.Success ->
-                        _state.value = MailDetailUiState.Loaded(project(result.data.mail))
+                        // Ceremonial mail never lands on the generic detail —
+                        // hand it straight to the open experience and hold the
+                        // loading frame so the plain layout never flashes (RN
+                        // short-circuits before `setLoading(false)`).
+                        if (result.data.mail.stationeryTheme != null) {
+                            _ceremonialRedirectMailId.value = mailId
+                        } else {
+                            _state.value = MailDetailUiState.Loaded(project(result.data.mail))
+                        }
                     is NetworkResult.Failure ->
                         _state.value = MailDetailUiState.Error(result.error.displayMessage("Couldn't load this item."))
                 }
@@ -301,6 +351,66 @@ class MailDetailViewModel
                 CommunityRsvpStatus.NotGoing -> "Marked as can't make it"
                 CommunityRsvpStatus.Undecided -> "RSVP cleared"
             }
+
+        // MARK: - Per-category actions (A17.1)
+
+        /**
+         * The ACTIONS row for the loaded item — RN's
+         * `CATEGORY_ACTIONS[item.category] || CATEGORY_ACTIONS.other`, minus
+         * Pay / Sign for unknown senders (`detail.tsx:56-72`).
+         */
+        fun categoryActions(): List<MailCategoryAction> {
+            val content = (_state.value as? MailDetailUiState.Loaded)?.content ?: return emptyList()
+            return MailCategoryActions.actions(
+                rawCategory = content.mailCategoryKey,
+                isSenderUnknown = content.isSenderUnknown,
+            )
+        }
+
+        /**
+         * Route a tile tap. Destructive tiles park in
+         * [pendingDestructiveAction] for the screen's confirm dialog; the
+         * rest fire straight away.
+         */
+        fun tapCategoryAction(action: MailCategoryAction) {
+            if (action.isDestructive) {
+                _pendingDestructiveAction.value = action
+                return
+            }
+            performCategoryAction(action)
+        }
+
+        fun dismissDestructiveAction() {
+            _pendingDestructiveAction.value = null
+        }
+
+        /**
+         * `POST /api/mailbox/v2/item/:id/action` — route
+         * `backend/routes/mailboxV2.js:459`. The handler records a
+         * `mail_action_clicked` event itself, so (unlike RN, which posts a
+         * second `/event` write) one call is enough.
+         */
+        fun performCategoryAction(action: MailCategoryAction) {
+            if (_state.value !is MailDetailUiState.Loaded) return
+            if (_categoryActionInFlight.value != null) return
+            _pendingDestructiveAction.value = null
+            _categoryActionInFlight.value = action
+            viewModelScope.launch {
+                when (val result = repo.itemAction(mailId, action.actionKey)) {
+                    is NetworkResult.Success -> {
+                        // RN only toasts (`detail.tsx:56-66`) — the generic
+                        // detail renders nothing derived from `lifecycle`, so
+                        // a refetch would buy a skeleton flash and nothing else.
+                        _toast.value = action.successToast
+                        _categoryActionInFlight.value = null
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value = result.error.displayMessage("Action failed")
+                        _categoryActionInFlight.value = null
+                    }
+                }
+            }
+        }
 
         // MARK: - Save to vault (T6.5e / P19.5)
 
@@ -689,6 +799,8 @@ class MailDetailViewModel
                 return MailDetailContent(
                     mailId = detail.id,
                     category = category,
+                    mailCategoryKey = detail.category,
+                    isSenderUnknown = resolveSenderTrust(detail) == "unknown",
                     trust = trust,
                     detailTrust = trust.detailTrust,
                     senderDisplayName = senderDisplayName,
@@ -719,6 +831,30 @@ class MailDetailViewModel
                     partyDetail = variants.party,
                     recordsDetail = variants.records,
                 )
+            }
+
+            /**
+             * RN `getSenderTrust` (`src/components/mailbox/sender.ts:39-58`)
+             * — the same fallback ladder the backend's `resolveSenderTrust`
+             * (`backend/routes/mailboxV2.js:198`) uses. Only the `unknown`
+             * bucket matters to the ACTIONS row (it suppresses Pay / Sign).
+             */
+            @JvmStatic
+            fun resolveSenderTrust(detail: MailDetail): String {
+                val known =
+                    setOf(
+                        "verified_gov",
+                        "verified_utility",
+                        "verified_business",
+                        "pantopus_user",
+                        "unknown",
+                    )
+                val raw = detail.senderTrust?.trim().orEmpty()
+                if (raw in known) return raw
+                val business = detail.senderBusinessName?.trim().orEmpty()
+                if (business.isNotEmpty()) return "verified_business"
+                if (detail.senderUserId != null || detail.sender != null) return "pantopus_user"
+                return "unknown"
             }
 
             private data class VariantDetails(

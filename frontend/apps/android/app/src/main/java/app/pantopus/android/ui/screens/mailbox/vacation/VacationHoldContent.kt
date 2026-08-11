@@ -110,6 +110,57 @@ data class VacationScheduleDraft(
      */
     val isValid: Boolean
         get() = spanDays >= 1 && scopes.any { it.isOn && !it.isLocked }
+
+    companion object {
+        /**
+         * Blank composer the live screen opens with when
+         * `GET /vacation/status` reports no hold. Only the scope copy is
+         * canned (UI labelling, not user data) — the dates default to today
+         * → +7 days the way RN's `vacation.tsx:37-41` does, and the
+         * forwarding address / emergency contact stay empty rather than
+         * showing a fixture as if it were the user's own. Mirrors iOS
+         * `VacationScheduleDraft.liveDefault`.
+         */
+        fun liveDefault(today: LocalDate = LocalDate.now()): VacationScheduleDraft =
+            VacationScheduleDraft(
+                fromDate = today,
+                toDate = today.plusDays(DEFAULT_HOLD_DAYS),
+                scopes =
+                    listOf(
+                        VacationHoldScope(
+                            kind = VacationHoldScope.Kind.Mail,
+                            label = "Mail & flyers",
+                            sub = "Postal hold via USPS API",
+                            isOn = true,
+                        ),
+                        VacationHoldScope(
+                            kind = VacationHoldScope.Kind.Packages,
+                            label = "Packages",
+                            sub = "Carriers hold at neighborhood hub",
+                            isOn = true,
+                        ),
+                        VacationHoldScope(
+                            kind = VacationHoldScope.Kind.MarketplacePickups,
+                            label = "Marketplace pickups",
+                            sub = "Buyers see away status",
+                            isOn = true,
+                        ),
+                        VacationHoldScope(
+                            kind = VacationHoldScope.Kind.Civic,
+                            label = "Civic notices",
+                            sub = "Permits, voting, service alerts",
+                            isOn = false,
+                            isLocked = true,
+                        ),
+                    ),
+                forwardingEnabled = false,
+                forwarding = null,
+                emergency = null,
+                footerBlurb = "Applies to your primary home address.",
+            )
+
+        private const val DEFAULT_HOLD_DAYS = 7L
+    }
 }
 
 /** What the screen is doing right now. */

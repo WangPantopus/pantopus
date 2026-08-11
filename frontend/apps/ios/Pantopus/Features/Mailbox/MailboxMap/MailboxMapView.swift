@@ -1074,12 +1074,18 @@ private struct MailboxPaginationDots: View {
 
 #if DEBUG
 #Preview("Populated") {
-    MailboxMapView(viewModel: MailboxMapViewModel(todayWeekday: 4)) {}
+    MailboxMapView(
+        viewModel: MailboxMapViewModel(
+            spots: MailboxMapSampleData.spots,
+            todayWeekday: 4
+        )
+    ) {}
 }
 
 #Preview("Selected") {
     MailboxMapView(
         viewModel: MailboxMapViewModel(
+            spots: MailboxMapSampleData.spots,
             seededState: .selected(
                 spot: MailboxMapSampleData.spots[0],
                 spots: MailboxMapSampleData.spots
@@ -1092,6 +1098,7 @@ private struct MailboxPaginationDots: View {
 #Preview("Error") {
     MailboxMapView(
         viewModel: MailboxMapViewModel(
+            spots: MailboxMapSampleData.spots,
             seededState: .error(message: "Couldn't load mailbox spots."),
             todayWeekday: 4
         )

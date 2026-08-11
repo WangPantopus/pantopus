@@ -19,6 +19,10 @@ import SwiftUI
 
 public struct EarnView: View {
     @State private var viewModel: EarnViewModel
+    /// Backs the `Offers` tab — the paid-offer wall. Held here (not in
+    /// `EarnOffersTab`) so a running dwell timer survives a tab switch.
+    @State private var offersViewModel: EarnOffersViewModel
+    @State private var selectedTab: EarnTab = .offers
     private let onBack: () -> Void
     private let onHelp: () -> Void
     private let onCashOut: () -> Void
@@ -32,6 +36,7 @@ public struct EarnView: View {
 
     public init(
         viewModel: EarnViewModel = EarnViewModel(),
+        offersViewModel: EarnOffersViewModel? = nil,
         onBack: @escaping () -> Void = {},
         onHelp: @escaping () -> Void = {},
         onCashOut: @escaping () -> Void = {},
@@ -44,6 +49,7 @@ public struct EarnView: View {
         onOpenTaxDocs: @escaping () -> Void = {}
     ) {
         _viewModel = State(initialValue: viewModel)
+        _offersViewModel = State(initialValue: offersViewModel ?? EarnOffersViewModel())
         self.onBack = onBack
         self.onHelp = onHelp
         self.onCashOut = onCashOut
@@ -59,12 +65,24 @@ public struct EarnView: View {
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             EarnTopBar(onBack: onBack, onHelp: onHelp)
-            content
+            EarnTabStrip(selected: $selectedTab)
+            switch selectedTab {
+            case .offers:
+                EarnOffersTab(viewModel: offersViewModel)
+            case .earnings:
+                content
+            }
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("earn")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
-        .task { await viewModel.load() }
+        // The earnings dashboard only pays for its fetch once the user
+        // asks for it — the Offers tab is what opens by default.
+        .task(id: selectedTab) {
+            guard selectedTab == .earnings, case .loading = viewModel.state else { return }
+            await viewModel.load()
+        }
+        .onDisappear { offersViewModel.cancelDwellTimers() }
     }
 
     @ViewBuilder private var content: some View {
@@ -387,17 +405,29 @@ private struct BrowseCTA: View {
 }
 
 #Preview("Earn · populated") {
-    EarnView(viewModel: EarnViewModel(content: EarnSampleData.populated))
+    EarnView(
+        viewModel: EarnViewModel(content: EarnSampleData.populated),
+        offersViewModel: EarnOffersViewModel(state: .empty(balance: .zero))
+    )
 }
 
 #Preview("Earn · empty") {
-    EarnView(viewModel: EarnViewModel(content: nil))
+    EarnView(
+        viewModel: EarnViewModel(content: nil),
+        offersViewModel: EarnOffersViewModel(state: .empty(balance: .zero))
+    )
 }
 
 #Preview("Earn · loading") {
-    EarnView(viewModel: EarnViewModel(state: .loading))
+    EarnView(
+        viewModel: EarnViewModel(state: .loading),
+        offersViewModel: EarnOffersViewModel(state: .loading)
+    )
 }
 
 #Preview("Earn · error") {
-    EarnView(viewModel: EarnViewModel(state: .error(message: "Network unavailable.")))
+    EarnView(
+        viewModel: EarnViewModel(state: .error(message: "Network unavailable.")),
+        offersViewModel: EarnOffersViewModel(state: .error(message: "Network unavailable."))
+    )
 }

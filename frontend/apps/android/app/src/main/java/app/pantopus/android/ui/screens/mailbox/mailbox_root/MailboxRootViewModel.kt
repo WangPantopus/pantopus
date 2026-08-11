@@ -120,6 +120,17 @@ class MailboxRootViewModel
         /** Active tab. Preserved across drawer switches. */
         val selectedTab: StateFlow<MailboxTab> = _selectedTab.asStateFlow()
 
+        private val _pendingRoutingCount = MutableStateFlow(0)
+
+        /**
+         * Count of mail sitting unresolved in `MailRoutingQueue` — drives the
+         * "N items need routing" banner. `0` hides it. Source:
+         * `GET /api/mailbox/v2/pending` (`backend/routes/mailboxV2.js:612`),
+         * polled on load + refresh exactly like RN
+         * (`src/app/mailbox/index.tsx:65-70`).
+         */
+        val pendingRoutingCount: StateFlow<Int> = _pendingRoutingCount.asStateFlow()
+
         val drawers: List<MailboxDrawer> = MailboxDrawer.entries
         val mailTabs: List<MailboxTab> = MailboxTab.entries
 
@@ -174,6 +185,7 @@ class MailboxRootViewModel
             _state.value = ListOfRowsUiState.Loading
             viewModelScope.launch {
                 fetchDrawerBadges()
+                fetchPendingRouting()
                 reloadActiveCombo()
             }
         }
@@ -186,6 +198,7 @@ class MailboxRootViewModel
             }
             viewModelScope.launch {
                 fetchDrawerBadges()
+                fetchPendingRouting()
                 reloadActiveCombo()
             }
         }
@@ -291,6 +304,20 @@ class MailboxRootViewModel
                 // failure so the list still renders.
                 is NetworkResult.Failure -> drawerUnread = emptyMap()
             }
+        }
+
+        /**
+         * Poll the disambiguation queue. The banner is non-blocking chrome —
+         * a transport failure just leaves the count at zero so the list
+         * still renders (mirrors RN's swallowed catch).
+         */
+        private suspend fun fetchPendingRouting() {
+            val repo = repo ?: return
+            _pendingRoutingCount.value =
+                when (val result = repo.pending()) {
+                    is NetworkResult.Success -> result.data.pending.size
+                    is NetworkResult.Failure -> 0
+                }
         }
 
         private fun applyLiveState(

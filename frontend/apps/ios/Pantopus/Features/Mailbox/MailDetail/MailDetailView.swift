@@ -23,13 +23,28 @@ public struct MailDetailView: View {
     /// non-nil the certified variant surfaces a "view task" card. The
     /// closure receives the mail id so the host can resolve the task.
     private let onOpenExtractedTask: (@MainActor (String) -> Void)?
+    /// Mail that carries a stationery theme belongs in the ceremonial
+    /// open experience, not here. When set, the host *replaces* this
+    /// screen with `CeremonialMailOpenView` — mirroring RN's
+    /// `router.replace` in `src/app/mailbox/detail.tsx:43-49`.
+    private let onOpenCeremonialMail: (@MainActor (String) -> Void)?
+    /// A17.12 — opens the Mail-tasks screen in its create frame for this
+    /// mail (`POST /api/mailbox/v2/p3/tasks/from-mail`). Mirrors RN's
+    /// "Create Task" affordance in `src/app/mailbox/detail.tsx:221-227`.
+    private let onCreateTask: (@MainActor @Sendable () -> Void)?
+    /// A17.14 — opens the Unboxing flow for this package. Mirrors RN's
+    /// "Virtual Unboxing" CTA in `src/app/mailbox/package.tsx:183`.
+    private let onOpenUnboxing: (@MainActor @Sendable () -> Void)?
 
     public init(
         mailId: String,
         onBack: @escaping () -> Void,
         onOpenSenderProfile: (@MainActor (String) -> Void)? = nil,
         onTranslate: (@MainActor @Sendable () -> Void)? = nil,
-        onOpenExtractedTask: (@MainActor (String) -> Void)? = nil
+        onOpenExtractedTask: (@MainActor (String) -> Void)? = nil,
+        onOpenCeremonialMail: (@MainActor (String) -> Void)? = nil,
+        onCreateTask: (@MainActor @Sendable () -> Void)? = nil,
+        onOpenUnboxing: (@MainActor @Sendable () -> Void)? = nil
     ) {
         self.mailId = mailId
         _viewModel = State(initialValue: MailDetailViewModel(mailId: mailId))
@@ -37,6 +52,9 @@ public struct MailDetailView: View {
         self.onOpenSenderProfile = onOpenSenderProfile
         self.onTranslate = onTranslate
         self.onOpenExtractedTask = onOpenExtractedTask
+        self.onOpenCeremonialMail = onOpenCeremonialMail
+        self.onCreateTask = onCreateTask
+        self.onOpenUnboxing = onOpenUnboxing
     }
 
     public var body: some View {
@@ -55,6 +73,11 @@ public struct MailDetailView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("mailDetail")
         .task { await viewModel.load() }
+        .onChange(of: viewModel.ceremonialRedirectMailId) { _, redirect in
+            guard let redirect, let onOpenCeremonialMail else { return }
+            viewModel.acknowledgeCeremonialRedirect()
+            onOpenCeremonialMail(redirect)
+        }
         .overlay(alignment: .bottom) {
             if let toast = viewModel.toast {
                 ToastBanner(message: toast)
@@ -87,6 +110,33 @@ public struct MailDetailView: View {
         } message: {
             Text("Pick a folder to keep this mail in.")
         }
+        .confirmationDialog(
+            destructiveActionTitle,
+            isPresented: Binding(
+                get: { viewModel.pendingDestructiveAction != nil },
+                set: { if !$0 { viewModel.pendingDestructiveAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pending = viewModel.pendingDestructiveAction {
+                Button(pending.label, role: .destructive) {
+                    Task { await viewModel.performCategoryAction(pending) }
+                }
+                .accessibilityIdentifier("mailDetail_categoryActionConfirm")
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.pendingDestructiveAction = nil
+            }
+        } message: {
+            Text("It moves out of your mailbox and stops showing up in this drawer.")
+        }
+    }
+
+    /// Confirm-sheet title for the destructive category action (today only
+    /// `Dismiss`, which shreds the item server-side).
+    private var destructiveActionTitle: String {
+        guard case let .loaded(content) = viewModel.state else { return "Dismiss this mail?" }
+        return "Dismiss \"\(content.title)\"?"
     }
 
     @ViewBuilder
@@ -230,7 +280,8 @@ public struct MailDetailView: View {
                 onBack: { onBack() },
                 onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
                 onOpenSenderProfile: onOpenSenderProfile,
-                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
+                onOpenUnboxing: onOpenUnboxing
             )
         } else {
             generic(content)
@@ -282,7 +333,13 @@ public struct MailDetailView: View {
             onAcknowledge: { Task { await viewModel.acknowledge() } },
             onOpenSenderProfile: onOpenSenderProfile,
             onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
-            onTranslate: onTranslate
+            onTranslate: onTranslate,
+            onCreateTask: onCreateTask,
+            categoryActions: viewModel.categoryActions,
+            categoryActionInFlight: viewModel.categoryActionInFlight,
+            onCategoryAction: { action in
+                Task { await viewModel.tapCategoryAction(action) }
+            }
         )
     }
 }

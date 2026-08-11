@@ -267,19 +267,29 @@ import app.pantopus.android.ui.screens.inbox.search.ChatSearchResultKind
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
+import app.pantopus.android.ui.screens.mailbox.community.CommunityMailScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.earn.EarnScreen
+import app.pantopus.android.ui.screens.mailbox.home_records.HomeRecordsScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_NONE
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_SENDER_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_SUBJECT_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskListScreen
 import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
+import app.pantopus.android.ui.screens.mailbox.routing_queue.MailRoutingQueueScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
 import app.pantopus.android.ui.screens.mailbox.translation.MailTranslationScreen
+import app.pantopus.android.ui.screens.mailbox.unboxing.UNBOXING_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.unboxing.UNBOXING_MAIL_ID_NONE
 import app.pantopus.android.ui.screens.mailbox.unboxing.UnboxingScreen
 import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
@@ -791,6 +801,11 @@ private object ChildRoutes {
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
+
+    /** Mail routing queue — the disambiguation lane behind the Mailbox
+     *  root's "N items need routing" banner. Walks
+     *  `GET /api/mailbox/v2/pending` and resolves each row. */
+    const val MAIL_ROUTING_QUEUE = "mailbox/routing-queue"
 
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
@@ -1469,6 +1484,12 @@ private object ChildRoutes {
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
 
+    /** A17.4 — Community mail feed (neighborhood / civic). */
+    const val MAILBOX_COMMUNITY = "mailbox/community"
+
+    /** Home Records — the linked-asset hub behind the Mailbox. */
+    const val MAILBOX_HOME_RECORDS = "mailbox/records"
+
     /** A14.8 — Vacation hold (scheduling + active variants). */
     const val MAILBOX_VACATION = "mailbox/vacation"
 
@@ -1518,14 +1539,39 @@ private object ChildRoutes {
 
     fun mailTask(taskId: String): String = "mailbox/tasks/$taskId"
 
+    /**
+     * A17.12 (list) — every mail-linked task. All three legs are optional;
+     * absent ones travel as the `-` sentinel. When `mailId` is present the
+     * screen opens in its create frame for that mail.
+     */
+    const val MAIL_TASK_LIST =
+        "mailbox/tasks?mailId={mailId}&mailSubject={mailSubject}&mailSender={mailSender}"
+
+    fun mailTaskList(
+        mailId: String? = null,
+        mailSubject: String? = null,
+        mailSender: String? = null,
+    ): String {
+        fun leg(value: String?) = Uri.encode(value?.takeIf { it.isNotBlank() } ?: MAIL_TASK_LIST_NONE)
+        return "mailbox/tasks?mailId=${leg(mailId)}" +
+            "&mailSubject=${leg(mailSubject)}&mailSender=${leg(mailSender)}"
+    }
+
     /** A17.13 — Auto-translated mail view. `:mailId` is the source Mail UUID. */
     const val TRANSLATION_MAIL_ID_KEY = "mailId"
     const val TRANSLATION = "mailbox/translation/{$TRANSLATION_MAIL_ID_KEY}"
 
     fun translation(mailId: String): String = "mailbox/translation/$mailId"
 
-    /** A17.14 — Scan-first capture (unboxing) flow. */
-    const val UNBOXING = "mailbox/unboxing"
+    /**
+     * A17.14 — Unboxing capture flow for a delivered package. The route
+     * carries the originating mail id; without one the screen has nothing
+     * to persist and says so. Absent ids travel as the `-` sentinel.
+     */
+    const val UNBOXING = "mailbox/unboxing?mailId={mailId}"
+
+    fun unboxing(mailId: String? = null): String =
+        "mailbox/unboxing?mailId=" + Uri.encode(mailId?.takeIf { it.isNotBlank() } ?: UNBOXING_MAIL_ID_NONE)
 
     /** A10.11 — Earn dashboard (Wallet sibling). */
     const val EARN = "mailbox/earn"
@@ -1821,7 +1867,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.Unboxing -> {
                 navController.navigate(ChildRoutes.MAILBOX_ROOT)
-                navController.navigate(ChildRoutes.UNBOXING)
+                navController.navigate(ChildRoutes.unboxing(pending.mailId))
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Earn -> {
@@ -2972,6 +3018,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             // opens the mail-derived task keyed by its source mail.
                             navController.navigate(ChildRoutes.mailTask(sourceMailId))
                         },
+                        onOpenCeremonialMail = { ceremonialId ->
+                            // Replace (not push) so Back returns to the Mailbox,
+                            // matching RN's `router.replace`.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.ceremonialMailOpen(ceremonialId))
+                        },
+                        onCreateTask = { sourceMailId ->
+                            // A17.12 — RN's "Create Task" in the detail MORE row
+                            // (`src/app/mailbox/detail.tsx:221-227`).
+                            navController.navigate(ChildRoutes.mailTaskList(mailId = sourceMailId))
+                        },
+                        onOpenUnboxing = { sourceMailId ->
+                            navController.navigate(ChildRoutes.unboxing(sourceMailId))
+                        },
                     )
                 }
                 composable(
@@ -3067,6 +3127,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
                 ) {
                     DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAIL_ROUTING_QUEUE) {
+                    MailRoutingQueueScreen(onClose = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.MAILBOX_VAULT) {
                     // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
@@ -4279,8 +4342,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
                         onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
                         onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
-                        onOpenUnboxing = { navController.navigate(ChildRoutes.UNBOXING) },
+                        onOpenUnboxing = { navController.navigate(ChildRoutes.unboxing()) },
+                        onOpenCompose = { navController.navigate(ChildRoutes.CEREMONIAL_MAIL) },
+                        onOpenRoutingQueue = { navController.navigate(ChildRoutes.MAIL_ROUTING_QUEUE) },
+                        onOpenCommunity = { navController.navigate(ChildRoutes.MAILBOX_COMMUNITY) },
+                        onOpenRecords = { navController.navigate(ChildRoutes.MAILBOX_HOME_RECORDS) },
+                        onOpenMailTasks = { navController.navigate(ChildRoutes.mailTaskList()) },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_COMMUNITY) {
+                    CommunityMailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAILBOX_HOME_RECORDS) {
+                    HomeRecordsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
                     )
                 }
                 composable(ChildRoutes.MAILBOX_MAP) {
@@ -4319,6 +4398,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     )
                 }
                 composable(
+                    route = ChildRoutes.MAIL_TASK_LIST,
+                    arguments =
+                        listOf(
+                            navArgument(MAIL_TASK_LIST_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                            navArgument(MAIL_TASK_LIST_SUBJECT_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                            navArgument(MAIL_TASK_LIST_SENDER_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                        ),
+                ) {
+                    // A17.12 (list) — every mail-linked task, plus the
+                    // create-from-mail form when the route carries a mail id.
+                    MailTaskListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTask = { taskId -> navController.navigate(ChildRoutes.mailTask(taskId)) },
+                    )
+                }
+                composable(
                     route = ChildRoutes.TRANSLATION,
                     arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
                 ) {
@@ -4327,14 +4431,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onReply = { navController.navigate(ChildRoutes.placeholder("Reply in English")) },
                     )
                 }
-                composable(ChildRoutes.UNBOXING) {
-                    // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-                    // (OCR / classification / vault upload are out of scope), so the
-                    // route carries no mail id today.
+                composable(
+                    route = ChildRoutes.UNBOXING,
+                    arguments =
+                        listOf(
+                            navArgument(UNBOXING_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = UNBOXING_MAIL_ID_NONE
+                            },
+                        ),
+                ) {
+                    // A17.14 — the capture flow loads the real `MailPackage` row for
+                    // the routed mail id and every action writes to the p2 package
+                    // routes. Without a mail id there is nothing to persist, and the
+                    // screen says so rather than projecting a fixture.
                     UnboxingScreen(
                         onBack = { navController.popBackStack() },
                         onScanNext = { /* re-arms capture in-place — stays on this screen */ },
-                        onOpenDrawer = { navController.navigate(ChildRoutes.placeholder("Home drawer")) },
+                        onOpenDrawer = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
                     )
                 }
                 composable(ChildRoutes.EARN) {

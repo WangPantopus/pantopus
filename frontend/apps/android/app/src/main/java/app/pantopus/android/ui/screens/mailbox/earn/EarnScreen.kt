@@ -21,6 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +50,7 @@ import app.pantopus.android.ui.screens.mailbox.earn.components.EarnPayoutSetting
 import app.pantopus.android.ui.screens.mailbox.earn.components.EarnTaxDocsRow
 import app.pantopus.android.ui.screens.mailbox.earn.components.EarnWaysToEarnCard
 import app.pantopus.android.ui.screens.mailbox.earn.components.WeeklyGoalCard
+import app.pantopus.android.ui.screens.mailbox.earn.offers.EarnOffersTab
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -83,10 +87,20 @@ fun EarnScreen(
     viewModel: EarnViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { viewModel.load() }
+    var selectedTab by rememberSaveable { mutableStateOf(EarnTab.Offers) }
+    // The earnings dashboard only pays for its fetch once the user asks
+    // for it — the Offers wall is what opens by default.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == EarnTab.Earnings && viewModel.state.value is EarnUiState.Loading) {
+            viewModel.load()
+        }
+    }
 
     EarnScreenContent(
         state = state,
+        selectedTab = selectedTab,
+        onSelectTab = { selectedTab = it },
+        offersContent = { EarnOffersTab() },
         onBack = onBack,
         onHelp = onHelp,
         onCashOut = onCashOut,
@@ -104,6 +118,14 @@ fun EarnScreen(
 @Composable
 internal fun EarnScreenContent(
     state: EarnUiState,
+    /**
+     * Non-null renders the Offers / Earnings strip under the top bar and
+     * routes the body. Left null by the Paparazzi baselines, which lock
+     * the earnings dashboard frames on their own.
+     */
+    selectedTab: EarnTab? = null,
+    onSelectTab: (EarnTab) -> Unit = {},
+    offersContent: @Composable () -> Unit = {},
     onBack: () -> Unit = {},
     onHelp: () -> Unit = {},
     onCashOut: () -> Unit = {},
@@ -132,32 +154,39 @@ internal fun EarnScreenContent(
                 .testTag("earn"),
     ) {
         EarnTopBar(onBack = onBack, onHelp = onHelp)
-        when (val current = state) {
-            EarnUiState.Loading -> LoadingBody()
-            is EarnUiState.Populated ->
-                PopulatedBody(
-                    content = current.content,
-                    onSelectWay = onSelectWay,
-                    onCashOut = onCashOut,
-                    onBrowseTasks = onBrowseTasks,
-                    onSeeAllEarnings = onSeeAllEarnings,
-                    onManagePayout = onManagePayout,
-                    onOpenTaxDocs = onOpenTaxDocs,
-                )
-            is EarnUiState.Empty ->
-                EmptyBody(
-                    waysToEarn = current.waysToEarn,
-                    onSelectWay = onSelectWay,
-                    onBrowseTasks = onBrowseTasks,
-                    onAddBank = onAddBank,
-                )
-            is EarnUiState.Error ->
-                ErrorState(
-                    headline = "Couldn't load Earn",
-                    message = current.message,
-                    modifier = Modifier.testTag("earnError"),
-                    onRetry = onRetry,
-                )
+        if (selectedTab != null) {
+            EarnTabStrip(selected = selectedTab, onSelect = onSelectTab)
+        }
+        if (selectedTab == EarnTab.Offers) {
+            offersContent()
+        } else {
+            when (val current = state) {
+                EarnUiState.Loading -> LoadingBody()
+                is EarnUiState.Populated ->
+                    PopulatedBody(
+                        content = current.content,
+                        onSelectWay = onSelectWay,
+                        onCashOut = onCashOut,
+                        onBrowseTasks = onBrowseTasks,
+                        onSeeAllEarnings = onSeeAllEarnings,
+                        onManagePayout = onManagePayout,
+                        onOpenTaxDocs = onOpenTaxDocs,
+                    )
+                is EarnUiState.Empty ->
+                    EmptyBody(
+                        waysToEarn = current.waysToEarn,
+                        onSelectWay = onSelectWay,
+                        onBrowseTasks = onBrowseTasks,
+                        onAddBank = onAddBank,
+                    )
+                is EarnUiState.Error ->
+                    ErrorState(
+                        headline = "Couldn't load Earn",
+                        message = current.message,
+                        modifier = Modifier.testTag("earnError"),
+                        onRetry = onRetry,
+                    )
+            }
         }
     }
 }

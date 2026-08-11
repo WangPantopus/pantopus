@@ -59,6 +59,8 @@ fun MailboxRootHeader(
     onSelectDrawer: (MailboxDrawer) -> Unit,
     onSelectTab: (MailboxTab) -> Unit,
     onOpenMailDay: () -> Unit = {},
+    pendingRoutingCount: Int = 0,
+    onOpenRoutingQueue: () -> Unit = {},
 ) {
     Column(modifier = Modifier.background(PantopusColors.appSurface)) {
         MailDayCTA(onClick = onOpenMailDay)
@@ -83,6 +85,12 @@ fun MailboxRootHeader(
             }
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle)
+        if (pendingRoutingCount > 0) {
+            PendingRoutingBanner(
+                count = pendingRoutingCount,
+                onClick = onOpenRoutingQueue,
+            )
+        }
         Row(
             modifier =
                 Modifier
@@ -102,6 +110,57 @@ fun MailboxRootHeader(
             }
         }
         HorizontalDivider(color = PantopusColors.appBorder)
+    }
+}
+
+/**
+ * "N items need routing" — opens the disambiguation queue. Rendered only
+ * when `GET /api/mailbox/v2/pending` returned rows. Mirrors RN
+ * (`src/app/mailbox/index.tsx:176-188`) and iOS `pendingRoutingBanner`.
+ */
+@Composable
+private fun PendingRoutingBanner(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val label = "$count item${if (count == 1) "" else "s"} need routing"
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.warningBg)
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = Spacing.s4, vertical = 10.dp)
+                    .heightIn(min = 44.dp)
+                    .testTag("mailboxRootPendingBanner")
+                    .semantics { contentDescription = "$label. Opens the routing queue." },
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.HelpCircle,
+                contentDescription = null,
+                size = Radii.xl,
+                strokeWidth = 2.2f,
+                tint = PantopusColors.warning,
+            )
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.warning,
+                modifier = Modifier.weight(1f),
+            )
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronRight,
+                contentDescription = null,
+                size = 14.dp,
+                strokeWidth = 2.2f,
+                tint = PantopusColors.warning,
+            )
+        }
+        HorizontalDivider(color = PantopusColors.warningLight)
     }
 }
 

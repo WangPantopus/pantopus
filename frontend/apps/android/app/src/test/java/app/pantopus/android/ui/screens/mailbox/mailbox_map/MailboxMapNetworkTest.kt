@@ -23,8 +23,9 @@ import org.junit.Test
 
 /**
  * A11.4 — coverage for the live `/map/pins` wiring (BLOCK 3E). `HomeMapPin`
- * rows project into `MailboxSpot` lossily; an empty list or a failure falls
- * back to the sample venue directory.
+ * rows project into `MailboxSpot` lossily; an empty list stays empty and a
+ * failure surfaces the Error frame. The sample directory is never shown as
+ * if it were live data (mirrors iOS `MailboxMapViewModel`).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailboxMapNetworkTest {
@@ -65,7 +66,7 @@ class MailboxMapNetworkTest {
         }
 
     @Test
-    fun load_withNoPins_fallsBackToSampleDirectory() =
+    fun load_withNoPins_staysEmpty() =
         runTest {
             coEvery { repository.mapPins(any(), any()) } returns NetworkResult.Success(MapPinsResponse(pins = emptyList()))
             val vm = MailboxMapViewModel(repository)
@@ -74,21 +75,17 @@ class MailboxMapNetworkTest {
 
             val state = vm.state.value
             assertTrue(state is MailboxMapUiState.Populated)
-            assertEquals(MailboxMapSampleData.spots.size, (state as MailboxMapUiState.Populated).spots.size)
+            assertEquals(0, (state as MailboxMapUiState.Populated).spots.size)
         }
 
     @Test
-    fun load_failure_fallsBackToSampleDirectory() =
+    fun load_failure_surfacesErrorFrame() =
         runTest {
             coEvery { repository.mapPins(any(), any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
             val vm = MailboxMapViewModel(repository)
 
             vm.load()
 
-            assertTrue(vm.state.value is MailboxMapUiState.Populated)
-            assertEquals(
-                MailboxMapSampleData.spots.size,
-                (vm.state.value as MailboxMapUiState.Populated).spots.size,
-            )
+            assertTrue(vm.state.value is MailboxMapUiState.Error)
         }
 }

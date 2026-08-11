@@ -83,12 +83,23 @@ fun PackageDetailLayout(
     onAcknowledgeDelivery: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
     onSaveToVault: () -> Unit = {},
+    // A17.14 — when set (and the package is delivered), the overflow
+    // surfaces "Virtual unboxing", which opens the Unboxing capture flow.
+    // Mirrors RN's delivered-only CTA in `src/app/mailbox/package.tsx:180`.
+    onOpenUnboxing: (() -> Unit)? = null,
 ) {
     val isReceived =
         content.isAcknowledged || (packageDetail.deliveryPhoto?.isReceived == true)
     Box(modifier = Modifier.testTag("mailDetail_package")) {
         MailItemDetailShell(
-            topBar = makeTopBar(packageDetail = packageDetail, content = content, onBack = onBack, onSaveToVault = onSaveToVault),
+            topBar =
+                makeTopBar(
+                    packageDetail = packageDetail,
+                    content = content,
+                    onBack = onBack,
+                    onSaveToVault = onSaveToVault,
+                    onOpenUnboxing = onOpenUnboxing,
+                ),
             aiElf = makeAIElf(packageDetail = packageDetail),
             attachments = makeAttachments(content = content),
             hero = { PackageHeroCard(content = content, packageDetail = packageDetail) },
@@ -122,6 +133,7 @@ private fun makeTopBar(
     content: MailDetailContent,
     onBack: () -> Unit,
     onSaveToVault: () -> Unit,
+    onOpenUnboxing: (() -> Unit)? = null,
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = packageDetail.carrier,
@@ -134,13 +146,23 @@ private fun makeTopBar(
                 onClick = onSaveToVault,
             ),
         overflowItems =
-            listOf(
-                MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {},
-                MailOverflowItem("handoff", PantopusIcon.UserPlus, "Hand-off") {},
-                MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
-                MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
-                MailOverflowItem("report", PantopusIcon.AlertTriangle, "Report issue") {},
-            ),
+            buildList {
+                // RN only offers the unboxing flow once the package is delivered.
+                if (onOpenUnboxing != null && packageDetail.status == PackageDeliveryStatus.Delivered) {
+                    add(
+                        MailOverflowItem(
+                            "unboxing",
+                            PantopusIcon.ScanLine,
+                            "Virtual unboxing",
+                        ) { onOpenUnboxing() },
+                    )
+                }
+                add(MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {})
+                add(MailOverflowItem("handoff", PantopusIcon.UserPlus, "Hand-off") {})
+                add(MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() })
+                add(MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {})
+                add(MailOverflowItem("report", PantopusIcon.AlertTriangle, "Report issue") {})
+            },
     )
 
 private fun makeAIElf(packageDetail: PackageBodyContent): AIElfStripContent {

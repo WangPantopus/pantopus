@@ -105,27 +105,27 @@ final class VacationHoldViewModelTests: XCTestCase {
 
     // MARK: - Save flips to active
 
-    func test_save_flipsSchedulingToActive() {
+    func test_save_flipsSchedulingToActive() async {
         let vm = VacationHoldViewModel(seed: .scheduling)
-        vm.tapTrailingAction()
+        await vm.tapTrailingAction()
         guard case .active = vm.mode else {
             return XCTFail("Expected active after save, got \(vm.mode)")
         }
         XCTAssertEqual(vm.trailingActionLabel, "Edit")
     }
 
-    func test_edit_flipsActiveToScheduling() {
+    func test_edit_flipsActiveToScheduling() async {
         let vm = VacationHoldViewModel(seed: .active)
-        vm.tapTrailingAction()
+        await vm.tapTrailingAction()
         guard case .scheduling = vm.mode else {
             return XCTFail("Expected scheduling after tapping Edit")
         }
         XCTAssertEqual(vm.trailingActionLabel, "Save")
     }
 
-    func test_endHoldEarly_flipsActiveToScheduling() {
+    func test_endHoldEarly_flipsActiveToScheduling() async {
         let vm = VacationHoldViewModel(seed: .active)
-        vm.endHoldEarly()
+        await vm.endHoldEarly()
         guard case .scheduling = vm.mode else {
             return XCTFail("Expected scheduling after ending the hold early")
         }

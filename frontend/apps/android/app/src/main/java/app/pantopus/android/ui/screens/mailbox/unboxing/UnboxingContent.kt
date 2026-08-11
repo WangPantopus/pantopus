@@ -16,10 +16,13 @@ import app.pantopus.android.ui.theme.PantopusIcon
  * its papers), Pantopus reads + classifies it, suggests a drawer, and you
  * Confirm or re-route.
  *
- * Real OCR / classification / vault upload are out of scope (B2.4) — the
- * view-model projects the deterministic [UnboxingSampleData] fixture. The
- * `CameraScanner` + `OcrFactsList` primitives (B1.2) render the viewfinder,
- * filmstrip, and facts grid; this screen owns the data.
+ * The view-model loads the real `MailPackage` row for the routed mail id
+ * and projects it via `UnboxingProjection` — there is no OCR /
+ * classification route, so the facts list carries only what the package row
+ * knows and nothing is invented. [UnboxingSampleData] survives purely as the
+ * Paparazzi / preview seam. The `CameraScanner` + `OcrFactsList` primitives
+ * (B1.2) render the viewfinder, filmstrip, and facts grid; this screen owns
+ * the data.
  */
 
 // MARK: - Phase / state
@@ -28,17 +31,33 @@ import app.pantopus.android.ui.theme.PantopusIcon
 enum class UnboxingPhase { Capture, Filed }
 
 /**
- * State machine for the Unboxing screen. Both cases carry the same
- * [UnboxingContent]; only the rendering differs (live capture chrome vs
- * filed summary chrome).
+ * State machine for the Unboxing screen. `Capture` and `Filed` carry the
+ * same [UnboxingContent]; only the rendering differs (live capture chrome
+ * vs filed summary chrome). `Loading` / `Error` cover the package fetch,
+ * and `Unavailable` is the honest frame for the case where the screen was
+ * opened without an originating package — nothing can be persisted, so
+ * nothing is faked.
  */
 sealed interface UnboxingUiState {
-    val content: UnboxingContent
+    data object Loading : UnboxingUiState
 
-    data class Capture(override val content: UnboxingContent) : UnboxingUiState
+    data class Capture(val content: UnboxingContent) : UnboxingUiState
 
-    data class Filed(override val content: UnboxingContent) : UnboxingUiState
+    data class Filed(val content: UnboxingContent) : UnboxingUiState
+
+    data class Error(val message: String) : UnboxingUiState
+
+    data object Unavailable : UnboxingUiState
 }
+
+/** The projected content when the state carries one, else null. */
+val UnboxingUiState.contentOrNull: UnboxingContent?
+    get() =
+        when (this) {
+            is UnboxingUiState.Capture -> content
+            is UnboxingUiState.Filed -> content
+            else -> null
+        }
 
 // MARK: - Drawer suggestion
 

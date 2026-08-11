@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.v2.MapPinDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.shared.map_list_hybrid.MapListHybridDetent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,10 +29,14 @@ import javax.inject.Inject
  * notices, civic alerts). Those are a *different feature*; there is no
  * venue-directory backend. Per the explicit instruction to wire the named
  * endpoint, [load] fetches pins and projects them into [MailboxSpot] lossily
- * (no hours/services; synthetic pin positions), and falls back to the
- * deterministic [MailboxMapSampleData] directory whenever there are no pins or
- * the call fails — which is the common case, so the screen normally looks
- * unchanged. iOS stays sample-only.
+ * (no hours/services; synthetic pin positions).
+ *
+ * No pins → `Populated(emptyList())` (the sheet renders its inline empty
+ * note); a transport failure → [MailboxMapUiState.Error] with Retry. The
+ * [MailboxMapSampleData] directory is a preview / snapshot seam only — it used
+ * to be the empty/failure fallback, which surfaced fixtures as if they were
+ * live venues and left the Empty + Error frames unreachable. iOS
+ * `MailboxMapViewModel` mirrors this exactly.
  *
  * The production seam is the [Inject] constructor (Hilt supplies the
  * repository); the `internal constructor(spots, seededState, todayWeekday)` is
@@ -86,9 +91,9 @@ class MailboxMapViewModel
 
         /**
          * Surface the spots. A seeded state wins (previews / error frames);
-         * without a repository the sample directory is projected synchronously;
-         * with one, `/map/pins` is fetched and projected, falling back to the
-         * sample directory when empty or on failure.
+         * without a repository the seeded spots are projected synchronously;
+         * with one, `/map/pins` is fetched and projected — an empty list stays
+         * empty and a failure surfaces the Error frame.
          */
         fun load() {
             val seeded = seededState
@@ -105,13 +110,20 @@ class MailboxMapViewModel
             }
             _state.value = MailboxMapUiState.Loading
             viewModelScope.launch {
-                val resolved =
-                    when (val result = repo.mapPins()) {
-                        is NetworkResult.Success -> result.data.pins.map { it.toSpot() }.ifEmpty { allSpots }
-                        is NetworkResult.Failure -> allSpots
+                when (val result = repo.mapPins()) {
+                    is NetworkResult.Success -> {
+                        val spots = result.data.pins.map { it.toSpot() }
+                        workingSpots = spots
+                        _state.value = MailboxMapUiState.Populated(filtered(spots))
                     }
-                workingSpots = resolved
-                _state.value = MailboxMapUiState.Populated(filtered(resolved))
+                    is NetworkResult.Failure -> {
+                        workingSpots = emptyList()
+                        _state.value =
+                            MailboxMapUiState.Error(
+                                result.error.displayMessage("Couldn't load mailbox spots."),
+                            )
+                    }
+                }
             }
         }
 

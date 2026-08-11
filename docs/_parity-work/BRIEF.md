@@ -105,6 +105,19 @@ file you did not create. If an `Edit` fails because the file changed under you, 
 it and retry — that failure means a sibling agent just edited it, and retrying is correct.
 Keep each edit as small as possible.
 
+## Compile traps that already cost a wave (do not repeat these)
+
+1. **Kotlin block comments NEST.** A KDoc containing a path like
+   `` `/api/v1/tenant/*` `` or `` `ui/screens/review_claims/*` `` opens a nested comment
+   that is never closed, and the file fails with `Unclosed comment` at EOF — which then
+   masks itself as a flood of Hilt/KSP `error.NonExistentClass` failures across every
+   unrelated module. Write `` `/api/v1/tenant/…` `` instead. Never put `/*` inside a
+   comment.
+2. **iOS: a `public init` cannot take an internal type.** `APIClient` is internal, so
+   view-model initialisers that accept `api: APIClient = .shared` must be declared
+   `init(` — not `public init(`. Match `MembersListViewModel.swift:204`.
+3. **Kotlin `when` over a `Long`** needs `0L ->` / `1L ->`, not `0 ->`.
+
 ## Do NOT
 
 - Do **not** run `make build`, `./gradlew`, or `xcodebuild`. A compile gate runs after
