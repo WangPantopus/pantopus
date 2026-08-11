@@ -7,22 +7,52 @@ import app.pantopus.android.ui.theme.PantopusIcon
 /**
  * Design sample frames for A09.4 Invoice — previews and Paparazzi baselines
  * only. The shipped screen never renders these: [InvoiceDetailViewModel]
- * projects the real invoice from
- * `GET api/businesses/invoices/{id}`. Kept alongside
- * `GigDetailSampleData` / `ListingDetailSampleData` so the designed states
- * stay pixel-locked without fixture data leaking into production.
+ * projects the real invoice from `GET api/businesses/invoices/{id}`. Kept
+ * alongside `GigDetailSampleData` / `ListingDetailSampleData` so the designed
+ * states stay pixel-locked without fixture data leaking into production.
  */
 object InvoiceDetailSampleData {
     /** Single source of truth for the sample total. */
     const val TOTAL_VALUE = "$642.85"
 
+    // Declared before the frames below — object properties initialise in
+    // declaration order, so the frames must come last.
+    private val payerPayee =
+        ContentDetailModule.FromTo(
+            id = "fromto",
+            from =
+                ContentDetailParty(
+                    label = "From",
+                    name = "Brightside Outdoor",
+                    sub = "Business · Verified",
+                    accent = ContentDetailParty.Accent.Business,
+                ),
+            to =
+                ContentDetailParty(
+                    label = "To",
+                    name = "Marcus Chen",
+                    sub = "Personal",
+                    accent = ContentDetailParty.Accent.Personal,
+                ),
+        )
+
+    private val noteFromSender =
+        ContentDetailModule.Description(
+            id = "note",
+            title = "Note from sender",
+            icon = null,
+            body =
+                "“Takedown is on the schedule for the first Tuesday in January — no need " +
+                    "to be home. Thanks again Marcus, happy holidays.”",
+        )
+
     /** A09.4 · due state. */
-    val due: ContentDetailContent = due("INV-00318")
+    val due: ContentDetailContent = dueFrame("INV-00318")
 
     /** A09.4 · paid state (paid 4 days early via Pantopus Pay). */
-    val paid: ContentDetailContent = paid("INV-00318")
+    val paid: ContentDetailContent = paidFrame("INV-00318")
 
-    fun due(invoiceId: String): ContentDetailContent =
+    fun dueFrame(invoiceId: String): ContentDetailContent =
         ContentDetailContent(
             kind = ContentDetailKind.Invoice,
             statusPill =
@@ -67,7 +97,7 @@ object InvoiceDetailSampleData {
                 ),
         )
 
-    fun paid(invoiceId: String): ContentDetailContent =
+    fun paidFrame(invoiceId: String): ContentDetailContent =
         ContentDetailContent(
             kind = ContentDetailKind.Invoice,
             statusPill =
@@ -112,25 +142,6 @@ object InvoiceDetailSampleData {
                 ),
         )
 
-    private val payerPayee =
-        ContentDetailModule.FromTo(
-            id = "fromto",
-            from =
-                ContentDetailParty(
-                    label = "From",
-                    name = "Brightside Outdoor",
-                    sub = "Business · Verified",
-                    accent = ContentDetailParty.Accent.Business,
-                ),
-            to =
-                ContentDetailParty(
-                    label = "To",
-                    name = "Marcus Chen",
-                    sub = "Personal",
-                    accent = ContentDetailParty.Accent.Personal,
-                ),
-        )
-
     private fun lineItems(
         totalLabel: String,
         totalTone: ContentDetailModule.LineItems.TotalTone,
@@ -155,15 +166,5 @@ object InvoiceDetailSampleData {
             totalLabel = totalLabel,
             totalValue = TOTAL_VALUE,
             totalTone = totalTone,
-        )
-
-    private val noteFromSender =
-        ContentDetailModule.Description(
-            id = "note",
-            title = "Note from sender",
-            icon = null,
-            body =
-                "“Takedown is on the schedule for the first Tuesday in January — no need " +
-                    "to be home. Thanks again Marcus, happy holidays.”",
         )
 }

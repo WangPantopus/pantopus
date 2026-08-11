@@ -99,18 +99,15 @@ public struct WalletView: View {
                     // account, so the connected *account* is what we render —
                     // and it carries the only reachable "Open Stripe Dashboard".
                     section(overline: "Payout account") {
-                        PayoutAccountCard(
-                            account: payoutAccount,
-                            onAction: {
-                                Task {
-                                    if payoutAccount.warn {
-                                        await viewModel.setupPayouts()
-                                    } else {
-                                        await viewModel.openDashboard()
-                                    }
+                        PayoutAccountCard(account: payoutAccount) {
+                            Task {
+                                if payoutAccount.warn {
+                                    await viewModel.setupPayouts()
+                                } else {
+                                    await viewModel.openDashboard()
                                 }
                             }
-                        )
+                        }
                     }
                 }
                 if let taxDocs = content.taxDocs {

@@ -77,16 +77,17 @@ object PaymentsMapper {
     private fun transactionTitle(
         entry: PaymentHistoryEntryDto,
         isPayout: Boolean,
-    ): String {
+    ): String =
         if (isPayout) {
-            entry.destinationLast4?.takeIf { it.isNotEmpty() }?.let { return "Payout to bank ••••$it" }
-            return entry.description ?: "Payout"
+            entry.destinationLast4?.takeIf { it.isNotEmpty() }?.let { "Payout to bank ••••$it" }
+                ?: entry.description?.takeIf { it.isNotEmpty() }
+                ?: "Payout"
+        } else {
+            entry.gig?.title?.takeIf { it.isNotEmpty() }
+                ?: entry.description?.takeIf { it.isNotEmpty() }
+                ?: entry.paymentType?.takeIf { it.isNotEmpty() }?.let(::humanised)
+                ?: "Payment"
         }
-        entry.gig?.title?.takeIf { it.isNotEmpty() }?.let { return it }
-        entry.description?.takeIf { it.isNotEmpty() }?.let { return it }
-        entry.paymentType?.takeIf { it.isNotEmpty() }?.let { return humanised(it) }
-        return "Payment"
-    }
 
     private fun transactionMeta(
         entry: PaymentHistoryEntryDto,

@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "FunctionNaming")
+@file:Suppress(
+    "MagicNumber",
+    "LongMethod",
+    "PackageNaming",
+    "CyclomaticComplexMethod",
+    "FunctionNaming",
+    "TooManyFunctions",
+)
 
 package app.pantopus.android.ui.screens.settings.payments
 

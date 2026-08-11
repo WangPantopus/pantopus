@@ -36,8 +36,8 @@ interface BusinessInvoicesApi {
      */
     @GET("api/businesses/invoices/received")
     suspend fun receivedInvoices(
-        @Query("page") page: Int = 1,
-        @Query("page_size") pageSize: Int = 20,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
     ): BusinessInvoicesResponse
 
     /**
@@ -49,7 +49,7 @@ interface BusinessInvoicesApi {
     @POST("api/businesses/invoices/{invoiceId}/pay")
     suspend fun payInvoice(
         @Path("invoiceId") invoiceId: String,
-        @Body request: PayInvoiceRequest = PayInvoiceRequest(),
+        @Body request: PayInvoiceRequest,
     ): PayInvoiceResponse
 
     /**
