@@ -155,7 +155,7 @@ public struct RootTabView: View {
              .vacationHold, .wallet, .mailDay, .paymentsSettings,
              // B1.6 — batch-2 routing seam destinations all resolve inside the
              // Hub tab's stack (deep links open them on the placeholder).
-             .stamps, .mailTask, .mailTranslation, .unboxing, .earn,
+             .stamps, .mailTask, .mailTranslation, .unboxing, .packageGig, .earn,
              .businessOwner, .viewAs, .waitingRoom:
             model.selected = .home
         case .conversation:
