@@ -85,6 +85,8 @@ fun GigsFeedScreen(
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val savedSearches by viewModel.savedSearches.collectAsStateWithLifecycle()
     val draftBanner by viewModel.draftBanner.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
+    val loadingMore by viewModel.loadingMore.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
     var showSavedSearches by remember { mutableStateOf(false) }
 
@@ -152,6 +154,9 @@ fun GigsFeedScreen(
                             onOpenGig = onOpenGig,
                             onDismissGig = viewModel::dismissGig,
                             onHideCategory = viewModel::hideCategory,
+                            hasMore = hasMore,
+                            loadingMore = loadingMore,
+                            onLoadMore = viewModel::loadMore,
                         )
                     is GigsFeedUiState.BrowseLoaded ->
                         BrowseFrame(
@@ -641,6 +646,9 @@ internal fun PopulatedFrame(
     onOpenGig: (String) -> Unit,
     onDismissGig: (String) -> Unit = {},
     onHideCategory: (GigsCategory) -> Unit = {},
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
 ) {
     LazyColumn(
         modifier =
@@ -657,6 +665,22 @@ internal fun PopulatedFrame(
                 onDismiss = { onDismissGig(row.id) },
                 onHideCategory = { onHideCategory(row.category) },
             )
+        }
+        // Infinite scroll — composing the footer means the user reached
+        // the bottom, which kicks the next `GET /api/gigs` page. While it
+        // is in flight the footer renders a skeleton row so the state
+        // mirrors the loaded geometry instead of a bare spinner.
+        if (hasMore) {
+            item(key = "gigsFeedLoadMore") {
+                LaunchedEffect(rows.size) { onLoadMore() }
+                Box(modifier = Modifier.fillMaxWidth().testTag("gigsFeedLoadMore")) {
+                    if (loadingMore) {
+                        Box(modifier = Modifier.testTag("gigsFeedLoadingMore")) { FeedSkeletonCard() }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp))
+                    }
+                }
+            }
         }
     }
 }

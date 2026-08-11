@@ -18,13 +18,19 @@ import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionDto
 import app.pantopus.android.data.api.models.gigs.GigReportReason
 import app.pantopus.android.data.api.models.gigs.PlaceBidBody
+import app.pantopus.android.data.api.models.gigs.ViewerBidStatus
+import app.pantopus.android.data.api.models.offers.BidDto
+import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigReassignmentRepository
+import app.pantopus.android.data.gigs.GigViewerBidRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.reviews.ReviewsRepository
@@ -75,6 +81,11 @@ data class GigActiveTaskUi(
     val runningLate: Boolean = false,
     /** Phase 5b — ETA minutes accompanying `running_late`, when given. */
     val lateEtaMinutes: Int? = null,
+    /**
+     * Assigned worker, before work starts — "Can't make it" self-release
+     * (`POST /worker-release`, `backend/routes/gigs.js:5954`).
+     */
+    val showCantMakeIt: Boolean = false,
 )
 
 @HiltViewModel
@@ -83,6 +94,11 @@ class GigDetailViewModel
     @Inject
     constructor(
         private val repo: GigsRepository,
+        private val reassignmentRepo: GigReassignmentRepository,
+        // Bidder side — `GET /api/gigs/:id/my-bid`; the update / withdraw
+        // half reuses OffersRepository rather than duplicating the routes.
+        private val viewerBidRepo: GigViewerBidRepository,
+        private val offersRepo: OffersRepository,
         private val authRepo: AuthRepository,
         private val filesRepo: FilesRepository,
         private val paymentsRepo: PaymentsRepository,
@@ -93,6 +109,13 @@ class GigDetailViewModel
     ) : ViewModel() {
         companion object {
             const val GIG_ID_KEY = "gigId"
+
+            /**
+             * Page size for the `GET /api/gigs/my-bids` fallback that
+             * enriches a countered bid with its counter columns. Mirrors
+             * RN's `getMyBids({ limit: 200 })` (`BidPanel.tsx:111`).
+             */
+            private const val MY_BIDS_LOOKUP_LIMIT = 200
 
             /**
              * Worker self-completion gate: the signed-in viewer is the
@@ -163,6 +186,38 @@ class GigDetailViewModel
                 if (currentUserId.isNullOrEmpty() || gig.userId != currentUserId) return false
                 if (gig.status?.lowercase() != "completed") return false
                 return gig.ownerConfirmedAt.isNullOrEmpty()
+            }
+
+            /**
+             * "Can't make it" gate — the assigned worker releases themselves
+             * before work starts. Mirrors `POST /worker-release`'s
+             * preconditions exactly (`backend/routes/gigs.js:5972-5984`):
+             * caller is `accepted_by`, `status == "assigned"`, `started_at`
+             * still null.
+             */
+            fun workerCanRelease(
+                gig: GigDto,
+                currentUserId: String?,
+            ): Boolean {
+                if (currentUserId.isNullOrEmpty() || gig.acceptedBy != currentUserId) return false
+                if (gig.status?.lowercase() != "assigned") return false
+                return gig.startedAt.isNullOrEmpty()
+            }
+
+            /**
+             * "Replace worker" gate — the poster swaps the assigned worker
+             * out before work starts. Mirrors `POST /reopen-bidding`'s
+             * preconditions (`backend/routes/gigs.js:4900-4914`): owner-only,
+             * `status == "assigned"`, `started_at` still null. Unlike Cancel
+             * task this costs no cancellation fee.
+             */
+            fun ownerCanReplaceWorker(
+                gig: GigDto,
+                currentUserId: String?,
+            ): Boolean {
+                if (currentUserId.isNullOrEmpty() || gig.userId != currentUserId) return false
+                if (gig.status?.lowercase() != "assigned") return false
+                return gig.startedAt.isNullOrEmpty()
             }
 
             /** Either participant on a completed gig may leave one review. */
@@ -255,6 +310,22 @@ class GigDetailViewModel
         /** Bid id whose accept/counter/reject call is in flight. */
         private val _bidActionInFlight = MutableStateFlow<String?>(null)
         val bidActionInFlight: StateFlow<String?> = _bidActionInFlight.asStateFlow()
+
+        // MARK: - Viewer's own bid (bidder side)
+
+        /**
+         * The signed-in viewer's own bid on this gig, from
+         * `GET /api/gigs/:id/my-bid`. Null for the poster, for signed-out
+         * viewers, and for anyone who has not bid.
+         */
+        private val _viewerBid = MutableStateFlow<BidDto?>(null)
+        val viewerBid: StateFlow<BidDto?> = _viewerBid.asStateFlow()
+
+        /** True while an update / withdraw / counter response is in flight. */
+        private val _viewerBidActionInFlight = MutableStateFlow(false)
+        val viewerBidActionInFlight: StateFlow<Boolean> = _viewerBidActionInFlight.asStateFlow()
+
+        private var viewerIsWorker = false
 
         /** True while `POST /instant-accept` is in flight. */
         private val _instantAcceptInFlight = MutableStateFlow(false)
@@ -436,6 +507,9 @@ class GigDetailViewModel
                             is NetworkResult.Success -> bids = bidsResult.data.bids
                             else -> Unit
                         }
+                        // Bidder side — resolve before projecting so the
+                        // dock renders "Update bid" on the first frame.
+                        loadViewerBid(result.data.gig)
                         applyLoaded(result.data.gig, bids)
                         loadQuestions()
                     }
@@ -458,6 +532,7 @@ class GigDetailViewModel
             rawGig = gig
             _saved.value = gig.savedByUser == true
             viewerIsOwner = uid != null && uid == gig.userId
+            viewerIsWorker = uid != null && uid == gig.acceptedBy
             canMarkDelivered = viewerCanMarkDelivered(gig, uid)
             canTip = viewerCanTip(gig, uid)
             canInstantAccept = viewerCanInstantAccept(gig, uid)
@@ -478,8 +553,189 @@ class GigDetailViewModel
                         uid,
                         canInstantAccept,
                         Projection.ownerPanelHandlesBids(gig, viewerIsOwner),
+                        viewerCanEditBid(),
                     ),
                 )
+        }
+
+        // MARK: - Viewer's own bid
+
+        /**
+         * Load the signed-in viewer's own bid on this gig.
+         *
+         * `GET /api/gigs/:id/my-bid` (`backend/routes/gigs.js:7882`) is the
+         * source of truth for *existence*, but its column list omits the
+         * counter fields, so a `countered` bid is enriched from
+         * `GET /api/gigs/my-bids` (`backend/routes/gigs.js:1452`) — which
+         * carries `counter_amount` and `counter_status`. A *failed* my-bid
+         * call also falls back to my-bids (mirrors RN
+         * `BidPanel.fetchMyBid`, `BidPanel.tsx:110`).
+         */
+        private suspend fun loadViewerBid(gig: GigDto) {
+            val uid = currentUserId()
+            if (uid == null || uid == gig.userId) {
+                _viewerBid.value = null
+                return
+            }
+            val myBid = viewerBidRepo.myBid(gigId)
+            // A successful `bid: null` is authoritative, so the common
+            // "hasn't bid" case stays a single request; only a *failed*
+            // call or a countered bid needs the my-bids enrichment.
+            val resolved = myBid is NetworkResult.Success
+            var bid: BidDto? = if (myBid is NetworkResult.Success) myBid.data.bid else null
+            val needsCounterFields = bid?.status?.lowercase() == "countered"
+            if (!resolved || needsCounterFields) {
+                val mine = offersRepo.myBids(limit = MY_BIDS_LOOKUP_LIMIT)
+                if (mine is NetworkResult.Success) {
+                    mine.data.bids.firstOrNull { it.gigId == gigId }?.let { bid = it }
+                }
+            }
+            _viewerBid.value = bid
+        }
+
+        /**
+         * True when the viewer has a bid still live on this gig (`pending`,
+         * `countered`, `accepted`). Withdrawn / rejected / expired bids
+         * leave the screen on its normal "Place bid" path.
+         */
+        fun viewerHasActiveBid(): Boolean {
+            val status = _viewerBid.value?.status?.lowercase() ?: return false
+            return status in ViewerBidStatus.ACTIVE
+        }
+
+        /**
+         * True when the viewer's bid can still be edited or withdrawn: gig
+         * still `open` and the bid `pending` / `countered` — the backend's
+         * own preconditions (`backend/routes/gigs.js:4166` and
+         * `backend/routes/gigs.js:5440`).
+         */
+        fun viewerCanEditBid(): Boolean {
+            if (rawGig?.status?.lowercase() != "open") return false
+            val status = _viewerBid.value?.status?.lowercase() ?: return false
+            return status in ViewerBidStatus.MUTABLE
+        }
+
+        /**
+         * True when the poster sent a counter-offer the viewer has not
+         * answered yet — surfaces Accept / Decline instead of Update /
+         * Withdraw.
+         */
+        fun viewerHasPendingCounter(): Boolean {
+            val bid = _viewerBid.value ?: return false
+            return bid.status?.lowercase() == "countered" &&
+                bid.counterStatus == "pending" &&
+                bid.counterAmount != null
+        }
+
+        /**
+         * The "Your bid" panel renders whenever a non-owner viewer has a
+         * live bid. Suppressed once they became the assigned worker — the
+         * active-task panel owns that surface (mirrors RN's `!isWorker`
+         * guard, `BidPanel.tsx:540`).
+         */
+        fun showViewerBidPanel(): Boolean = !viewerIsOwner && !viewerIsWorker && viewerHasActiveBid()
+
+        /**
+         * Update the viewer's existing bid —
+         * `PUT /api/gigs/:gigId/bids/:bidId` (`backend/routes/gigs.js:4143`).
+         */
+        fun updateViewerBid(
+            amount: Double,
+            message: String?,
+            proposedTime: String? = null,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            val bidId = _viewerBid.value?.id
+            if (bidId == null || _viewerBidActionInFlight.value) {
+                onResult(false)
+                return
+            }
+            _viewerBidActionInFlight.value = true
+            viewModelScope.launch {
+                val result =
+                    offersRepo.updateBid(
+                        gigId = gigId,
+                        bidId = bidId,
+                        body = UpdateBidBody(bidAmount = amount, message = message, proposedTime = proposedTime),
+                    )
+                _viewerBidActionInFlight.value = false
+                when (result) {
+                    is NetworkResult.Success -> {
+                        load()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                        onResult(false)
+                    }
+                }
+            }
+        }
+
+        /**
+         * Withdraw the viewer's bid —
+         * `DELETE /api/gigs/:gigId/bids/:bidId` (`backend/routes/gigs.js:5417`).
+         * The backend soft-deletes to `withdrawn`, which drops the panel and
+         * restores the "Place bid" dock on refresh.
+         */
+        fun withdrawViewerBid(reason: String? = null) {
+            val bidId = _viewerBid.value?.id ?: return
+            if (_viewerBidActionInFlight.value) return
+            _viewerBidActionInFlight.value = true
+            viewModelScope.launch {
+                val result = offersRepo.withdrawBid(gigId = gigId, bidId = bidId, reason = reason)
+                _viewerBidActionInFlight.value = false
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _viewerBid.value = null
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast("Bid withdrawn."))
+                        load()
+                    }
+                    is NetworkResult.Failure ->
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                }
+            }
+        }
+
+        /**
+         * Accept the poster's counter-offer —
+         * `POST .../bids/:bidId/counter/accept` (`backend/routes/gigs.js:5191`).
+         * The bid amount becomes the counter amount and reverts to `pending`.
+         */
+        fun acceptViewerCounter() =
+            respondToViewerCounter(success = "Counter-offer accepted.") { bidId ->
+                repo.acceptCounterOffer(gigId, bidId)
+            }
+
+        /**
+         * Decline the poster's counter-offer —
+         * `POST .../bids/:bidId/counter/decline` (`backend/routes/gigs.js:5267`).
+         * The original bid stands.
+         */
+        fun declineViewerCounter() =
+            respondToViewerCounter(success = "Counter-offer declined.") { bidId ->
+                repo.declineCounterOffer(gigId, bidId)
+            }
+
+        private fun respondToViewerCounter(
+            success: String,
+            call: suspend (String) -> NetworkResult<Any>,
+        ) {
+            val bidId = _viewerBid.value?.id ?: return
+            if (!viewerHasPendingCounter() || _viewerBidActionInFlight.value) return
+            _viewerBidActionInFlight.value = true
+            viewModelScope.launch {
+                val result = call(bidId)
+                _viewerBidActionInFlight.value = false
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(success))
+                        load()
+                    }
+                    is NetworkResult.Failure ->
+                        _lifecycleEvents.emit(GigLifecycleEvent.Toast(result.error.message, isError = true))
+                }
+            }
         }
 
         private fun deriveActiveTask(
@@ -507,6 +763,7 @@ class GigDetailViewModel
                 showRunningLate = isWorker && status == "assigned" && gig.workerAckStatus != "running_late",
                 runningLate = runningLate,
                 lateEtaMinutes = if (runningLate) gig.workerAckEtaMinutes else null,
+                showCantMakeIt = workerCanRelease(gig, uid),
             )
         }
 
@@ -1147,6 +1404,79 @@ class GigDetailViewModel
             return gig.status?.lowercase() in listOf("open", "assigned", "in_progress")
         }
 
+        // MARK: - Pre-start release (reopen bidding / worker self-release)
+
+        /** Overflow gate for "Replace worker" — poster, assigned, pre-start. */
+        fun canReplaceWorker(): Boolean {
+            val gig = rawGig ?: return false
+            return ownerCanReplaceWorker(gig, currentUserId())
+        }
+
+        /**
+         * Poster's "Replace worker" — `POST /reopen-bidding`. Unassigns the
+         * current worker, cancels the pre-capture payment hold, rejects
+         * their accepted bid, and moves the gig back to `open`
+         * (`backend/routes/gigs.js:4874`). Refetches on success so the
+         * lifecycle sections re-render in the reopened state.
+         */
+        fun replaceWorker(onResult: (Boolean) -> Unit = {}) {
+            viewModelScope.launch {
+                when (val result = reassignmentRepo.reopenBidding(gigId)) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(
+                            GigLifecycleEvent.Toast(
+                                result.data.message ?: "Worker removed and bidding reopened",
+                            ),
+                        )
+                        silentRefetch()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(
+                            GigLifecycleEvent.Toast(
+                                result.error.displayMessage("Failed to replace worker"),
+                                isError = true,
+                            ),
+                        )
+                        onResult(false)
+                    }
+                }
+            }
+        }
+
+        /**
+         * Assigned worker's "Can't make it" — `POST /worker-release`.
+         * Unassigns the viewer, releases the payment hold, reopens the task
+         * for bids, and notifies the poster (`backend/routes/gigs.js:5954`).
+         */
+        fun releaseAssignment(
+            note: String? = null,
+            onResult: (Boolean) -> Unit = {},
+        ) {
+            viewModelScope.launch {
+                when (val result = reassignmentRepo.workerRelease(gigId, note)) {
+                    is NetworkResult.Success -> {
+                        _lifecycleEvents.emit(
+                            GigLifecycleEvent.Toast(
+                                result.data.message ?: "You have been released from this task",
+                            ),
+                        )
+                        silentRefetch()
+                        onResult(true)
+                    }
+                    is NetworkResult.Failure -> {
+                        _lifecycleEvents.emit(
+                            GigLifecycleEvent.Toast(
+                                result.error.displayMessage("Failed to release from task"),
+                                isError = true,
+                            ),
+                        )
+                        onResult(false)
+                    }
+                }
+            }
+        }
+
         /** Fetch the zone + fee preview when the cancel sheet opens. */
         fun requestCancelPreview() {
             _cancelPreview.value = null
@@ -1322,11 +1652,21 @@ class GigDetailViewModel
                 viewerUserId: String? = null,
                 canInstantAccept: Boolean = false,
                 suppressBidsModule: Boolean = false,
+                viewerCanUpdateBid: Boolean = false,
             ): ContentDetailContent {
                 return if (shouldProjectTaskV2(gig)) {
-                    projectTaskV2(gig, bids, canMarkDelivered, canTip, viewerUserId, canInstantAccept, suppressBidsModule)
+                    projectTaskV2(
+                        gig,
+                        bids,
+                        canMarkDelivered,
+                        canTip,
+                        viewerUserId,
+                        canInstantAccept,
+                        suppressBidsModule,
+                        viewerCanUpdateBid,
+                    )
                 } else {
-                    projectGigV1(gig, bids, canTip, viewerUserId, suppressBidsModule)
+                    projectGigV1(gig, bids, canTip, viewerUserId, suppressBidsModule, viewerCanUpdateBid)
                 }
             }
 
@@ -1379,7 +1719,19 @@ class GigDetailViewModel
                     primary = ContentDetailDockButton(label = "Send a tip", icon = PantopusIcon.HandCoins),
                 )
 
-            @Suppress("CyclomaticComplexMethod")
+            /**
+             * The bidder's dock once they already have a live bid — "Place
+             * bid" would re-POST and 409, so the primary becomes "Update
+             * bid" and the "Your bid" panel below carries Withdraw and the
+             * counter responses.
+             */
+            val updateBidDock =
+                ContentDetailDock(
+                    secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
+                    primary = ContentDetailDockButton(label = "Update bid", icon = PantopusIcon.Pencil),
+                )
+
+            @Suppress("CyclomaticComplexMethod", "LongParameterList")
             private fun projectTaskV2(
                 gig: GigDto,
                 bids: List<GigBidDto>,
@@ -1388,6 +1740,7 @@ class GigDetailViewModel
                 viewerUserId: String? = null,
                 canInstantAccept: Boolean = false,
                 suppressBidsModule: Boolean = false,
+                viewerCanUpdateBid: Boolean = false,
             ): ContentDetailContent {
                 val category = GigsCategory.fromBackendKey(gig.category)
                 val bidCount = gig.bidCount ?: bids.size
@@ -1521,6 +1874,8 @@ class GigDetailViewModel
                             secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
                             primary = ContentDetailDockButton(label = "Accept this task", icon = PantopusIcon.Zap),
                         )
+                    } else if (viewerCanUpdateBid) {
+                        updateBidDock
                     } else {
                         ContentDetailDock(
                             secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
@@ -1649,6 +2004,7 @@ class GigDetailViewModel
                 canTip: Boolean = false,
                 viewerUserId: String? = null,
                 suppressBidsModule: Boolean = false,
+                viewerCanUpdateBid: Boolean = false,
             ): ContentDetailContent {
                 val awarded = isAwarded(gig)
                 val bidCount = gig.bidCount ?: bids.size
@@ -1706,7 +2062,7 @@ class GigDetailViewModel
                     counterparty = posterCounterparty(gig, viewerUserId),
                     modules = modules,
                     trustCapsules = emptyList(),
-                    dock = gigV1Dock(canTip = canTip, awarded = awarded),
+                    dock = gigV1Dock(canTip = canTip, awarded = awarded, viewerCanUpdateBid = viewerCanUpdateBid),
                 )
             }
 
@@ -1730,6 +2086,7 @@ class GigDetailViewModel
             private fun gigV1Dock(
                 canTip: Boolean,
                 awarded: Boolean,
+                viewerCanUpdateBid: Boolean = false,
             ): ContentDetailDock =
                 when {
                     canTip -> tipDock
@@ -1738,6 +2095,7 @@ class GigDetailViewModel
                             secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),
                             primary = ContentDetailDockButton(label = "Bidding closed", icon = PantopusIcon.Lock, enabled = false),
                         )
+                    viewerCanUpdateBid -> updateBidDock
                     else ->
                         ContentDetailDock(
                             secondary = ContentDetailDockButton(label = "Message", icon = PantopusIcon.Send),

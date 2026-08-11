@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
 import app.pantopus.android.data.api.models.gigs.GigChangeOrdersResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigMyBidResponse
 import app.pantopus.android.data.api.models.gigs.GigPaymentDto
 import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
@@ -22,12 +23,16 @@ import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.RescheduleGigResponse
 import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
+import app.pantopus.android.data.api.models.offers.MyBidsResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigReassignmentRepository
+import app.pantopus.android.data.gigs.GigViewerBidRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.reviews.ReviewsRepository
@@ -78,6 +83,9 @@ private class RecordingActiveNotifier : GigActiveNotifier {
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigDetailSaveViewModelTest {
     private val repo: GigsRepository = mockk()
+    private val reassignmentRepo: GigReassignmentRepository = mockk()
+    private val viewerBidRepo: GigViewerBidRepository = mockk()
+    private val offersRepo: OffersRepository = mockk()
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
@@ -93,6 +101,10 @@ class GigDetailSaveViewModelTest {
                 user = UserDto(id = "viewer-1", email = "v@example.com", displayName = "Viewer", avatarUrl = null),
             )
         every { authRepo.state } returns MutableStateFlow<AuthRepository.State>(signed)
+        // Bidder-side lookup: unless a test says otherwise, this viewer has
+        // no bid of their own on the gig.
+        coEvery { viewerBidRepo.myBid(any()) } returns NetworkResult.Success(GigMyBidResponse(bid = null))
+        coEvery { offersRepo.myBids(any()) } returns NetworkResult.Success(MyBidsResponse(bids = emptyList()))
     }
 
     @After
@@ -116,6 +128,9 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                reassignmentRepo,
+                viewerBidRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,
@@ -233,6 +248,9 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                reassignmentRepo,
+                viewerBidRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,
@@ -308,6 +326,9 @@ class GigDetailSaveViewModelTest {
             val vm =
                 GigDetailViewModel(
                     repo,
+                    reassignmentRepo,
+                    viewerBidRepo,
+                    offersRepo,
                     authRepo,
                     filesRepo,
                     paymentsRepo,
@@ -358,6 +379,9 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                reassignmentRepo,
+                viewerBidRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,

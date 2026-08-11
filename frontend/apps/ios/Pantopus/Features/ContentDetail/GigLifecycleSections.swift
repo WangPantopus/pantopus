@@ -292,11 +292,15 @@ struct GigActiveTaskPanel: View {
     var runningLateLabel: String?
     /// Worker-only "Running late" secondary action (Phase 5b).
     var canReportRunningLate: Bool = false
+    /// Worker-only "Can't make it" self-release — assigned, pre-start
+    /// (`POST /worker-release`).
+    var canReleaseAssignment: Bool = false
     let onWorkerAck: @MainActor () -> Void
     let onStartTask: @MainActor () -> Void
     let onConfirmCompletion: @MainActor () -> Void
     let onReportNoShow: @MainActor () -> Void
     var onRunningLate: @MainActor () -> Void = {}
+    var onCantMakeIt: @MainActor () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -427,6 +431,25 @@ struct GigActiveTaskPanel: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("gigDetail.noShow")
+        }
+        if canReleaseAssignment {
+            Button(action: onCantMakeIt) {
+                HStack(spacing: 6) {
+                    Icon(.xCircle, size: 14, strokeWidth: 2.2, color: Theme.Color.error)
+                    Text("Can't make it")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.error)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(Theme.Color.errorBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigDetail.cantMakeIt")
+            Text("Releases you and reopens the task for new bids.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
         }
     }
 

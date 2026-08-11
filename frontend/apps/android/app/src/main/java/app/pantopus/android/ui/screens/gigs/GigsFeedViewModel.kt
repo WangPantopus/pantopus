@@ -91,6 +91,19 @@ class GigsFeedViewModel
         private val _draftBanner = MutableStateFlow<GigsDraftBanner?>(null)
         val draftBanner: StateFlow<GigsDraftBanner?> = _draftBanner.asStateFlow()
 
+        /**
+         * Flat-list pagination — true when `GET /api/gigs` says another
+         * page exists after the loaded window. Derived from the server
+         * response (`pagination.hasMore` / `total`), never guessed when
+         * the backend told us. Always false in browse mode.
+         */
+        private val _hasMore = MutableStateFlow(false)
+        val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
+        /** Flat-list pagination — true while the next page is in flight. */
+        private val _loadingMore = MutableStateFlow(false)
+        val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
+
         /** P6c — serialises banner "Post now" taps. */
         private var draftPosting = false
 
@@ -112,6 +125,9 @@ class GigsFeedViewModel
         private var longitude: Double? = null
         private var radiusMiles: Double = RADIUS_LADDER_MILES.first()
         private var loading = false
+
+        /** Offset the next [loadMore] page starts at (rows already loaded). */
+        private var nextOffset = 0
 
         /** P1.B — banner dismissed for this session (VM lifetime). */
         private var radiusSuggestionDismissed = false
@@ -549,6 +565,10 @@ class GigsFeedViewModel
             val lng = longitude ?: return fetchFlat()
             // The radius ladder is a flat-list concept — drop any stale banner.
             _radiusSuggestion.value = null
+            // Browse is a fixed sectioned surface — the backend caps each
+            // section server-side, so there is nothing to page through.
+            _hasMore.value = false
+            nextOffset = 0
             when (val result = repo.browse(lat, lng)) {
                 is NetworkResult.Success -> {
                     val content = projectBrowse(result.data)
@@ -569,7 +589,15 @@ class GigsFeedViewModel
             }
         }
 
-        private suspend fun fetchFlat() {
+        /**
+         * One page of `GET /api/gigs`. [append] `false` replaces the loaded
+         * window (first page / refresh); `true` is the infinite-scroll
+         * continuation and never downgrades the screen to `Error`.
+         */
+        private suspend fun fetchFlat(
+            offset: Int = 0,
+            append: Boolean = false,
+        ) {
             val category = _activeCategory.value
             val sort = _activeSort.value
             val criteria = _filters.value
@@ -581,6 +609,8 @@ class GigsFeedViewModel
                         latitude = latitude,
                         longitude = longitude,
                         radiusMiles = radiusMiles,
+                        limit = PAGE_SIZE,
+                        offset = offset,
                         minPrice =
                             criteria.budgetLower
                                 .toDouble()
@@ -595,16 +625,58 @@ class GigsFeedViewModel
                     )
             ) {
                 is NetworkResult.Success -> {
-                    loadedGigs = result.data.gigs
-                    pendingDismissals.clear()
-                    pendingCategoryHides.clear()
+                    loadedGigs =
+                        if (append) {
+                            val seen = loadedGigs.mapTo(mutableSetOf()) { it.id }
+                            loadedGigs + result.data.gigs.filterNot { it.id in seen }
+                        } else {
+                            result.data.gigs
+                        }
+                    if (!append) {
+                        pendingDismissals.clear()
+                        pendingCategoryHides.clear()
+                    }
+                    _hasMore.value = result.data.hasMorePages(offset = offset, limit = PAGE_SIZE)
+                    nextOffset = offset + result.data.gigs.size
                     rebuild()
-                    updateRadiusSuggestion()
+                    // The radius ladder reacts to the first page only — a
+                    // thin page 3 says nothing about the search width.
+                    if (!append) updateRadiusSuggestion()
                     // P6c — refresh the home-screen widget snapshot.
-                    writeWidgetSnapshot(result.data.gigs)
+                    writeWidgetSnapshot(loadedGigs)
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
+                    if (append) {
+                        // Keep the rows already on screen; stop the footer
+                        // retrying in a loop and surface what happened.
+                        _hasMore.value = false
+                        _toast.value =
+                            GigsFeedToast(
+                                text = result.error.displayMessage("Couldn't load more tasks."),
+                                isError = true,
+                            )
+                    } else {
+                        _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
+                    }
+                }
+            }
+        }
+
+        /**
+         * Infinite scroll — appends the next [PAGE_SIZE] window once the
+         * list footer scrolls into view. No-op in browse mode, while
+         * another fetch is running, or once the server says there is
+         * nothing left.
+         */
+        fun loadMore() {
+            if (loading || _loadingMore.value || !_hasMore.value) return
+            if (_state.value !is GigsFeedUiState.Loaded) return
+            _loadingMore.value = true
+            viewModelScope.launch {
+                try {
+                    fetchFlat(offset = nextOffset, append = true)
+                } finally {
+                    _loadingMore.value = false
                 }
             }
         }
@@ -721,6 +793,12 @@ class GigsFeedViewModel
 
             /** P1.F — vertical sections cap at three rows. */
             internal const val VERTICAL_SECTION_LIMIT = 3
+
+            /**
+             * Rows requested per `GET /api/gigs` page. Mirrors iOS
+             * `GigsFeedViewModel.pageSize`.
+             */
+            internal const val PAGE_SIZE = 20
 
             private const val METERS_PER_MILE = 1_609.344
 

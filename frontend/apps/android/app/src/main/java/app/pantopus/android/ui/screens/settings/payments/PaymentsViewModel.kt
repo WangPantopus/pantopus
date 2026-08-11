@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.payments.PaymentHistoryRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,18 +30,26 @@ enum class PaymentsSeed {
 }
 
 /**
- * Projects the A14.6 Payments screen into render state. Phase 3 (3A) wires
- * the Payment-methods card to the real backend: list saved methods, add a
- * card via Stripe PaymentSheet, set-default and remove (optimistic). The
- * balance hero / Payouts (Stripe Connect) / Activity sections render an
- * honest "not set up yet" scaffold in the live frame — wired in 3C.
+ * Projects the A14.6 Payments screen into render state. The Payment-methods
+ * card is wired to the real backend (list saved methods, add a card via
+ * Stripe PaymentSheet, set-default and remove — optimistic), and the Activity
+ * card renders the real combined payment + payout history from
+ * `GET api/payments/history`. The balance hero stays empty because Wallet
+ * owns the earnings-in surface; Payouts route into Wallet where Stripe
+ * Connect is live.
  */
 @HiltViewModel
 class PaymentsViewModel
     @Inject
     constructor(
         private val repository: PaymentsRepository,
+        private val historyRepository: PaymentHistoryRepository,
     ) : ViewModel() {
+        private companion object {
+            /** Matches the server's default page size for `GET api/payments/history`. */
+            const val HISTORY_PAGE_SIZE = 50
+        }
+
         val title: String = "Payments"
 
         private val _state = MutableStateFlow<PaymentsUiState>(PaymentsUiState.Loading)
@@ -75,13 +84,31 @@ class PaymentsViewModel
                     is NetworkResult.Success ->
                         _state.value =
                             PaymentsUiState.Loaded(
-                                PaymentsMapper.liveFrame(result.data.paymentMethods.map(PaymentsMapper::toUiMethod)),
+                                PaymentsMapper.liveFrame(
+                                    methods = result.data.paymentMethods.map(PaymentsMapper::toUiMethod),
+                                    activity = fetchActivity(),
+                                ),
                             )
                     is NetworkResult.Failure ->
                         _state.value = PaymentsUiState.Error(result.error.displayMessage("Couldn't load Payments."))
                 }
             }
         }
+
+        /**
+         * `GET api/payments/history` → the Activity card. History is
+         * supplementary: a transport failure keeps the screen usable and says
+         * so rather than claiming the user has no transactions.
+         */
+        private suspend fun fetchActivity(): PaymentsActivity =
+            when (val result = historyRepository.history(limit = HISTORY_PAGE_SIZE, offset = 0)) {
+                is NetworkResult.Success -> PaymentsMapper.activity(result.data.entries)
+                is NetworkResult.Failure ->
+                    PaymentsActivity.Empty(
+                        title = "Couldn't load transactions",
+                        body = "Pull down to refresh and try again.",
+                    )
+            }
 
         fun refresh() {
             load()

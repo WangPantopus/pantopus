@@ -87,6 +87,10 @@ fun PackageDetailLayout(
     // surfaces "Virtual unboxing", which opens the Unboxing capture flow.
     // Mirrors RN's delivered-only CTA in `src/app/mailbox/package.tsx:180`.
     onOpenUnboxing: (() -> Unit)? = null,
+    // A17.8 → "Ask a Neighbor". Opens the package-gig form pre-filled from
+    // this package; the flag mirrors RN's `?mode=pre|post`
+    // (`src/app/mailbox/package.tsx:196-204`).
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
 ) {
     val isReceived =
         content.isAcknowledged || (packageDetail.deliveryPhoto?.isReceived == true)
@@ -99,6 +103,7 @@ fun PackageDetailLayout(
                     onBack = onBack,
                     onSaveToVault = onSaveToVault,
                     onOpenUnboxing = onOpenUnboxing,
+                    onAskNeighbor = onAskNeighbor,
                 ),
             aiElf = makeAIElf(packageDetail = packageDetail),
             attachments = makeAttachments(content = content),
@@ -134,6 +139,7 @@ private fun makeTopBar(
     onBack: () -> Unit,
     onSaveToVault: () -> Unit,
     onOpenUnboxing: (() -> Unit)? = null,
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = packageDetail.carrier,
@@ -155,6 +161,18 @@ private fun makeTopBar(
                             PantopusIcon.ScanLine,
                             "Virtual unboxing",
                         ) { onOpenUnboxing() },
+                    )
+                }
+                // RN offers the neighbor gig at every stage — pre-delivery
+                // before the drop, post-delivery after (`package.tsx:196-204`).
+                if (onAskNeighbor != null) {
+                    val isPreDelivery = packageDetail.status != PackageDeliveryStatus.Delivered
+                    add(
+                        MailOverflowItem(
+                            "askNeighbor",
+                            PantopusIcon.UsersRound,
+                            "Ask a Verified Neighbor",
+                        ) { onAskNeighbor(isPreDelivery) },
                     )
                 }
                 add(MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {})

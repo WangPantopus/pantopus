@@ -94,6 +94,24 @@ public struct WalletView: View {
                             onReverify: { Task { await viewModel.setupPayouts() } }
                         )
                     }
+                } else if let payoutAccount = content.payoutAccount {
+                    // Live path: Stripe gives us no bank detail for an Express
+                    // account, so the connected *account* is what we render —
+                    // and it carries the only reachable "Open Stripe Dashboard".
+                    section(overline: "Payout account") {
+                        PayoutAccountCard(
+                            account: payoutAccount,
+                            onAction: {
+                                Task {
+                                    if payoutAccount.warn {
+                                        await viewModel.setupPayouts()
+                                    } else {
+                                        await viewModel.openDashboard()
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
                 if let taxDocs = content.taxDocs {
                     section(overline: "Taxes") {

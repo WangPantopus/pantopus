@@ -21,8 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -87,6 +89,8 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
     var noShowSheetVisible by remember { mutableStateOf(false) }
     var runningLateSheetVisible by remember { mutableStateOf(false) }
     var proposeChangeSheetVisible by remember { mutableStateOf(false) }
+    // Assigned worker's pre-start "Can't make it" confirm (`POST /worker-release`).
+    var cantMakeItConfirmVisible by remember { mutableStateOf(false) }
 
     val gig = viewModel.gigSnapshot()
     // Single source of truth with the projection: whenever this panel
@@ -112,6 +116,37 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
             onStartTask = { viewModel.startTask() },
             onConfirmCompletion = { viewModel.confirmCompletion() },
             onReportNoShow = { noShowSheetVisible = true },
+            onCantMakeIt = { cantMakeItConfirmVisible = true },
+        )
+    }
+
+    // Worker's "Can't make it" confirm — releases them, drops the payment
+    // hold, and reopens the task for bids. Copy mirrors the poster's
+    // "Replace worker" dialog on the other side of the same transition.
+    if (cantMakeItConfirmVisible) {
+        AlertDialog(
+            onDismissRequest = { cantMakeItConfirmVisible = false },
+            title = { Text("Can't Make It") },
+            text = {
+                Text(
+                    "This will unassign you from the task and reopen it for new bids. " +
+                        "Any payment hold will be released.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        cantMakeItConfirmVisible = false
+                        viewModel.releaseAssignment()
+                    },
+                    modifier = Modifier.testTag("gigDetail.cantMakeItConfirm"),
+                ) {
+                    Text("I Can't Make It", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { cantMakeItConfirmVisible = false }) { Text("Stay on the task") }
+            },
         )
     }
 
@@ -592,6 +627,7 @@ private fun GigActiveTaskPanel(
     onStartTask: () -> Unit,
     onConfirmCompletion: () -> Unit,
     onReportNoShow: () -> Unit,
+    onCantMakeIt: () -> Unit,
 ) {
     Column(
         modifier =
@@ -691,6 +727,21 @@ private fun GigActiveTaskPanel(
                     destructive = true,
                     modifier = Modifier.testTag("gigDetail.noShow"),
                     onClick = onReportNoShow,
+                )
+            }
+            if (panel.showCantMakeIt) {
+                ActivePanelButton(
+                    label = "Can't make it",
+                    icon = PantopusIcon.XCircle,
+                    prominent = false,
+                    destructive = true,
+                    modifier = Modifier.testTag("gigDetail.cantMakeIt"),
+                    onClick = onCantMakeIt,
+                )
+                Text(
+                    text = "Releases you and reopens the task for new bids.",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
                 )
             }
         }

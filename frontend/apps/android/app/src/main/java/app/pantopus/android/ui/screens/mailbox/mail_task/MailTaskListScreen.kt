@@ -74,6 +74,9 @@ import app.pantopus.android.ui.theme.Spacing
 fun MailTaskListScreen(
     onBack: () -> Unit,
     onOpenTask: (String) -> Unit,
+    // A17.8 → "Ask a Neighbor". RN's "Post as Neighbor Task Instead"
+    // escalation out of the create frame (`src/app/mailbox/tasks.tsx:236`).
+    onPostAsNeighborTask: (String) -> Unit = {},
     viewModel: MailTaskListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -88,7 +91,11 @@ fun MailTaskListScreen(
     val convertingTaskId by viewModel.convertingTaskId.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.configureNavigation(onOpenTask = onOpenTask, onBack = onBack)
+        viewModel.configureNavigation(
+            onOpenTask = onOpenTask,
+            onBack = onBack,
+            onPostAsNeighborTask = onPostAsNeighborTask,
+        )
         viewModel.load()
     }
 
@@ -109,6 +116,7 @@ fun MailTaskListScreen(
                 onPriorityChange = viewModel::updateDraftPriority,
                 onCreate = viewModel::create,
                 onSeeAll = viewModel::cancelCreate,
+                onPostAsNeighborTask = viewModel::postAsNeighborTask,
             )
         } else {
             when (val current = state) {
@@ -489,6 +497,7 @@ private fun CreateFrame(
     onPriorityChange: (MailTaskPriority) -> Unit,
     onCreate: () -> Unit,
     onSeeAll: () -> Unit,
+    onPostAsNeighborTask: () -> Unit,
 ) {
     Column(
         modifier =
@@ -576,6 +585,35 @@ private fun CreateFrame(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = PantopusColors.appTextInverse,
+            )
+        }
+
+        // A17.8 → "Ask a Neighbor". RN's escalation out of the task pipeline
+        // (`src/app/mailbox/tasks.tsx:231-240`).
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.businessBg)
+                    .clickable(onClick = onPostAsNeighborTask)
+                    .testTag("mailTaskList_postAsNeighborTask"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.UsersRound,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.business,
+            )
+            Spacer(Modifier.size(Spacing.s2))
+            Text(
+                text = "Post as Neighbor Task Instead",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.business,
             )
         }
 

@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BeaconProfileApi
 import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.BusinessDiscoveryApi
+import app.pantopus.android.data.api.services.BusinessInvoicesApi
 import app.pantopus.android.data.api.services.BusinessTeamApi
 import app.pantopus.android.data.api.services.BusinessesApi
 import app.pantopus.android.data.api.services.ChatApi
@@ -20,7 +21,9 @@ import app.pantopus.android.data.api.services.EarnOffersApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.FollowingApi
 import app.pantopus.android.data.api.services.GeoApi
+import app.pantopus.android.data.api.services.GigReassignmentApi
 import app.pantopus.android.data.api.services.GigSavedSearchesApi
+import app.pantopus.android.data.api.services.GigViewerBidApi
 import app.pantopus.android.data.api.services.GigsApi
 import app.pantopus.android.data.api.services.HomeAdminApi
 import app.pantopus.android.data.api.services.HomeClaimReviewApi
@@ -53,6 +56,7 @@ import app.pantopus.android.data.api.services.MembershipApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
+import app.pantopus.android.data.api.services.PaymentHistoryApi
 import app.pantopus.android.data.api.services.PaymentsApi
 import app.pantopus.android.data.api.services.PlaceApi
 import app.pantopus.android.data.api.services.PostsApi
@@ -240,6 +244,9 @@ object NetworkModule {
     fun providePaymentsApi(retrofit: Retrofit): PaymentsApi = retrofit.create(PaymentsApi::class.java)
 
     @Provides @Singleton
+    fun providePaymentHistoryApi(retrofit: Retrofit): PaymentHistoryApi = retrofit.create(PaymentHistoryApi::class.java)
+
+    @Provides @Singleton
     fun provideConnectApi(retrofit: Retrofit): ConnectApi = retrofit.create(ConnectApi::class.java)
 
     @Provides @Singleton
@@ -247,6 +254,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideBusinessesApi(retrofit: Retrofit): BusinessesApi = retrofit.create(BusinessesApi::class.java)
+
+    @Provides @Singleton
+    fun provideBusinessInvoicesApi(retrofit: Retrofit): BusinessInvoicesApi = retrofit.create(BusinessInvoicesApi::class.java)
 
     @Provides @Singleton
     fun provideBusinessTeamApi(retrofit: Retrofit): BusinessTeamApi = retrofit.create(BusinessTeamApi::class.java)
@@ -382,6 +392,14 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideGigSavedSearchesApi(retrofit: Retrofit): GigSavedSearchesApi = retrofit.create(GigSavedSearchesApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGigViewerBidApi(retrofit: Retrofit): GigViewerBidApi = retrofit.create(GigViewerBidApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGigReassignmentApi(retrofit: Retrofit): GigReassignmentApi = retrofit.create(GigReassignmentApi::class.java)
 
     @Provides
     @Singleton

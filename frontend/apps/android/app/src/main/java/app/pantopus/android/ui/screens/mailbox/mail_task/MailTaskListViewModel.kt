@@ -101,14 +101,17 @@ class MailTaskListViewModel
 
         private var onOpenTask: (String) -> Unit = {}
         private var onBack: () -> Unit = {}
+        private var onPostAsNeighborTask: (String) -> Unit = {}
 
         /** Wire nav callbacks before first paint. */
         fun configureNavigation(
             onOpenTask: (String) -> Unit = {},
             onBack: () -> Unit = {},
+            onPostAsNeighborTask: (String) -> Unit = {},
         ) {
             this.onOpenTask = onOpenTask
             this.onBack = onBack
+            this.onPostAsNeighborTask = onPostAsNeighborTask
         }
 
         // ── Lifecycle ────────────────────────────────────────────
@@ -184,6 +187,25 @@ class MailTaskListViewModel
 
         fun cancelCreate() {
             _mode.value = MailTaskListMode.List
+        }
+
+        /**
+         * A17.8 → "Ask a Neighbor". RN's create frame offers "Post as Neighbor
+         * Task Instead", which leaves the task pipeline entirely and opens the
+         * package-gig form for the source mail in post-delivery mode
+         * (`src/app/mailbox/tasks.tsx:231-240`).
+         */
+        fun postAsNeighborTask() {
+            val mail = mailId
+            if (mail == null) {
+                _alert.value =
+                    MailTaskListAlert(
+                        title = "No Mail",
+                        message = "This task must be linked to a mail item.",
+                    )
+                return
+            }
+            onPostAsNeighborTask(mail)
         }
 
         // ── Create ───────────────────────────────────────────────

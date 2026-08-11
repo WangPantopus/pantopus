@@ -64,6 +64,9 @@ data class GigDto(
     @Json(name = "user_id") val userId: String? = null,
     @Json(name = "accepted_by") val acceptedBy: String? = null,
     @Json(name = "accepted_at") val acceptedAt: String? = null,
+    // Set the moment the worker starts. Both pre-start release routes
+    // (`/reopen-bidding`, `/worker-release`) reject once this is non-null.
+    @Json(name = "started_at") val startedAt: String? = null,
     // Set when the poster confirms completion — gates the Block 3D tip affordance.
     @Json(name = "owner_confirmed_at") val ownerConfirmedAt: String? = null,
     @Json(name = "scheduled_start") val scheduledStart: String? = null,
@@ -115,13 +118,43 @@ data class GigCoordinate(
     val longitude: Double? = null,
 )
 
+/**
+ * Paging envelope emitted by the **spatial** branch of `GET /api/gigs`
+ * (`backend/routes/gigs.js:2388`). Keys are already camelCase on the wire.
+ * The non-spatial branch omits it and returns an exact `total` instead
+ * (`backend/routes/gigs.js:2588`).
+ */
+@JsonClass(generateAdapter = true)
+data class GigsListPagination(
+    val limit: Int? = null,
+    val offset: Int? = null,
+    val hasMore: Boolean? = null,
+)
+
 /** Envelope from `/api/gigs`. */
 @JsonClass(generateAdapter = true)
 data class GigsListResponse(
     val gigs: List<GigDto>,
     val total: Int? = null,
     val radiusMeters: Int? = null,
-)
+    /** Present only on the spatial branch — see [GigsListPagination]. */
+    val pagination: GigsListPagination? = null,
+) {
+    /**
+     * Whether another page exists after the one just decoded. Preference
+     * order matches what the backend actually sends: the spatial branch's
+     * explicit `pagination.hasMore`, then the non-spatial branch's exact
+     * `total`, and only then the "did we get a full page" heuristic.
+     */
+    fun hasMorePages(
+        offset: Int,
+        limit: Int,
+    ): Boolean {
+        pagination?.hasMore?.let { return it }
+        total?.let { return offset + gigs.size < it }
+        return gigs.size >= limit
+    }
+}
 
 /** Save / unsave envelope from `POST /api/gigs/:id/save`. */
 @JsonClass(generateAdapter = true)

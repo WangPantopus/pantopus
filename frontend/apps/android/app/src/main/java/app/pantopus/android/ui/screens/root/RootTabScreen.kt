@@ -284,6 +284,12 @@ import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskListScreen
 import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MAIL_ID_NONE
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_KEY
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_POST
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_PRE
+import app.pantopus.android.ui.screens.mailbox.package_gig.PackageGigScreen
 import app.pantopus.android.ui.screens.mailbox.routing_queue.MailRoutingQueueScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
@@ -1572,6 +1578,22 @@ private object ChildRoutes {
 
     fun unboxing(mailId: String? = null): String =
         "mailbox/unboxing?mailId=" + Uri.encode(mailId?.takeIf { it.isNotBlank() } ?: UNBOXING_MAIL_ID_NONE)
+
+    /**
+     * A17.8 → "Ask a Neighbor" — the package-help gig created from a mailbox
+     * package. Carries the source mail id plus RN's `mode=pre|post` leg
+     * (`src/app/mailbox/gig.tsx`).
+     */
+    const val PACKAGE_GIG = "mailbox/gig?mailId={mailId}&mode={mode}"
+
+    fun packageGig(
+        mailId: String,
+        isPreDelivery: Boolean,
+    ): String {
+        val mode = if (isPreDelivery) PACKAGE_GIG_MODE_PRE else PACKAGE_GIG_MODE_POST
+        val leg = Uri.encode(mailId.takeIf { it.isNotBlank() } ?: PACKAGE_GIG_MAIL_ID_NONE)
+        return "mailbox/gig?mailId=$leg&mode=$mode"
+    }
 
     /** A10.11 — Earn dashboard (Wallet sibling). */
     const val EARN = "mailbox/earn"
@@ -3032,6 +3054,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenUnboxing = { sourceMailId ->
                             navController.navigate(ChildRoutes.unboxing(sourceMailId))
                         },
+                        onAskNeighbor = { sourceMailId, isPreDelivery ->
+                            // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                            navController.navigate(
+                                ChildRoutes.packageGig(mailId = sourceMailId, isPreDelivery = isPreDelivery),
+                            )
+                        },
                     )
                 }
                 composable(
@@ -4420,6 +4448,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     MailTaskListScreen(
                         onBack = { navController.popBackStack() },
                         onOpenTask = { taskId -> navController.navigate(ChildRoutes.mailTask(taskId)) },
+                        onPostAsNeighborTask = { sourceMailId ->
+                            // A17.8 — RN's "Post as Neighbor Task Instead"
+                            // (`mailbox/tasks.tsx:236`) always escalates in
+                            // post-delivery mode.
+                            navController.navigate(
+                                ChildRoutes.packageGig(mailId = sourceMailId, isPreDelivery = false),
+                            )
+                        },
                     )
                 }
                 composable(
@@ -4449,6 +4485,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                         onScanNext = { /* re-arms capture in-place — stays on this screen */ },
                         onOpenDrawer = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PACKAGE_GIG,
+                    arguments =
+                        listOf(
+                            navArgument(PACKAGE_GIG_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = PACKAGE_GIG_MAIL_ID_NONE
+                            },
+                            navArgument(PACKAGE_GIG_MODE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = PACKAGE_GIG_MODE_POST
+                            },
+                        ),
+                ) {
+                    // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+                    // `POST api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+                    // into the created gig, matching RN `mailbox/gig.tsx`.
+                    PackageGigScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     )
                 }
                 composable(ChildRoutes.EARN) {

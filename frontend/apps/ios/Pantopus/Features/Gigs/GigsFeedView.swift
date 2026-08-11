@@ -496,6 +496,9 @@ public struct GigsFeedView: View {
                     .contextMenu { rowMenu(row) }
                     .accessibilityIdentifier("gigsRow_\(row.id)")
                 }
+                if viewModel.hasMore {
+                    loadMoreFooter
+                }
                 Spacer(minLength: 110)
             }
             .padding(.horizontal, Spacing.s3)
@@ -503,6 +506,23 @@ public struct GigsFeedView: View {
         }
         .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("gigsFeedList")
+    }
+
+    /// Infinite-scroll footer. Appearing at the bottom of the list kicks
+    /// the next `GET /api/gigs` page; while it is in flight the footer
+    /// renders a skeleton row so the loading state mirrors the loaded
+    /// geometry instead of a bare spinner.
+    private var loadMoreFooter: some View {
+        VStack(spacing: Spacing.s2) {
+            if viewModel.isLoadingMore {
+                FeedSkeletonCard()
+                    .accessibilityIdentifier("gigsFeedLoadingMore")
+            }
+            Color.clear
+                .frame(height: 1)
+                .onAppear { Task { await viewModel.loadMore() } }
+                .accessibilityIdentifier("gigsFeedLoadMore")
+        }
     }
 
     /// Long-press menu on a feed row — "Not interested" + "Hide all

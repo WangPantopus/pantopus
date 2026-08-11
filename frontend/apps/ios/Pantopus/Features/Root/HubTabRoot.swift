@@ -391,6 +391,9 @@ public enum HubRoute: Hashable {
     case mailTranslation(mailId: String)
     /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
     case unboxing(mailId: String?)
+    /// A17.8 → "Ask a Neighbor" — package-help gig created from a mailbox
+    /// package. `pantopus://mailbox/gig?id=&mode=pre|post`.
+    case packageGig(mailId: String, isPreDelivery: Bool)
     /// A17.4 — Community mail feed (neighborhood / civic). Reached from
     /// the Mailbox root overflow menu.
     case communityMail
@@ -810,6 +813,10 @@ public struct HubTabRoot: View {
         case let .unboxing(mailId):
             path.append(.mailboxRoot)
             path.append(.unboxing(mailId: mailId))
+            _ = router.consume()
+        case let .packageGig(mailId, isPreDelivery):
+            path.append(.mailboxRoot)
+            path.append(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
             _ = router.consume()
         case .earn:
             path.append(.mailboxRoot)
@@ -1645,6 +1652,12 @@ public struct HubTabRoot: View {
                 },
                 onOpenUnboxing: {
                     Task { @MainActor in push(.unboxing(mailId: mailId)) }
+                },
+                onAskNeighbor: { isPreDelivery in
+                    // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                    Task { @MainActor in
+                        push(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
+                    }
                 }
             )
         case let .publicProfile(userId):
@@ -2554,7 +2567,15 @@ public struct HubTabRoot: View {
                     onOpenTask: { taskId in
                         Task { @MainActor in push(.mailTask(taskId: taskId)) }
                     },
-                    onBack: { if !path.isEmpty { path.removeLast() } }
+                    onBack: { if !path.isEmpty { path.removeLast() } },
+                    onPostAsNeighborTask: { sourceMailId in
+                        // A17.8 — RN's "Post as Neighbor Task Instead"
+                        // (`mailbox/tasks.tsx:236`) always escalates in
+                        // post-delivery mode.
+                        Task { @MainActor in
+                            push(.packageGig(mailId: sourceMailId, isPreDelivery: false))
+                        }
+                    }
                 )
             )
         case let .mailTranslation(mailId):
@@ -2574,6 +2595,20 @@ public struct HubTabRoot: View {
             UnboxingView(
                 viewModel: UnboxingViewModel(mailId: mailId, onOpenDrawer: openDrawer)
             ) { if !path.isEmpty { path.removeLast() } }
+        case let .packageGig(mailId, isPreDelivery):
+            // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+            // `POST /api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+            // into the created gig, matching RN `mailbox/gig.tsx`.
+            PackageGigView(
+                viewModel: PackageGigViewModel(
+                    mailId: mailId,
+                    isPreDelivery: isPreDelivery,
+                    onBack: { if !path.isEmpty { path.removeLast() } },
+                    onOpenGig: { gigId in
+                        Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                    }
+                )
+            )
         case .earn:
             EarnView(
                 onBack: pop,

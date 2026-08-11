@@ -102,6 +102,21 @@ public struct MagicDraftDTO: Codable, Sendable, Hashable {
     public let urgentDetails: GigUrgentDetails?
     public let eventDetails: GigEventDetails?
     public let items: [GigTaskItemDraft]?
+    // delivery_errand / pro_service_quote suggestions ride flat on the
+    // draft (`magicTaskService.js:460-480` normalises the AI's
+    // `pickup_location_text` into `pickup_address`), so the Fill-gaps
+    // step can prefill the Delivery / Professional modules.
+    public let pickupAddress: String?
+    public let pickupNotes: String?
+    public let dropoffAddress: String?
+    public let dropoffNotes: String?
+    public let deliveryProofRequired: Bool?
+    public let requiresLicense: Bool?
+    public let licenseType: String?
+    public let requiresInsurance: Bool?
+    public let scopeDescription: String?
+    public let depositRequired: Bool?
+    public let depositAmount: Double?
 
     enum CodingKeys: String, CodingKey {
         case title, description, category, tags, items
@@ -121,6 +136,17 @@ public struct MagicDraftDTO: Codable, Sendable, Hashable {
         case remoteDetails = "remote_details"
         case urgentDetails = "urgent_details"
         case eventDetails = "event_details"
+        case pickupAddress = "pickup_address"
+        case pickupNotes = "pickup_notes"
+        case dropoffAddress = "dropoff_address"
+        case dropoffNotes = "dropoff_notes"
+        case deliveryProofRequired = "delivery_proof_required"
+        case requiresLicense = "requires_license"
+        case licenseType = "license_type"
+        case requiresInsurance = "requires_insurance"
+        case scopeDescription = "scope_description"
+        case depositRequired = "deposit_required"
+        case depositAmount = "deposit_amount"
     }
 }
 
@@ -402,6 +428,20 @@ public struct MagicPostDraft: Encodable, Sendable {
     public let remoteDetails: GigRemoteDetails?
     public let urgentDetails: GigUrgentDetails?
     public let eventDetails: GigEventDetails?
+    // Delivery module — flat gig columns, not JSONB
+    // (`backend/routes/gigs.js:481-486`).
+    public let pickupAddress: String?
+    public let pickupNotes: String?
+    public let dropoffAddress: String?
+    public let dropoffNotes: String?
+    public let deliveryProofRequired: Bool?
+    // Pro-service module (`backend/routes/gigs.js:499-505`).
+    public let requiresLicense: Bool?
+    public let licenseType: String?
+    public let requiresInsurance: Bool?
+    public let scopeDescription: String?
+    public let depositRequired: Bool?
+    public let depositAmount: Double?
 
     public init(
         title: String,
@@ -428,7 +468,18 @@ public struct MagicPostDraft: Encodable, Sendable {
         logisticsDetails: GigLogisticsDetails? = nil,
         remoteDetails: GigRemoteDetails? = nil,
         urgentDetails: GigUrgentDetails? = nil,
-        eventDetails: GigEventDetails? = nil
+        eventDetails: GigEventDetails? = nil,
+        pickupAddress: String? = nil,
+        pickupNotes: String? = nil,
+        dropoffAddress: String? = nil,
+        dropoffNotes: String? = nil,
+        deliveryProofRequired: Bool? = nil,
+        requiresLicense: Bool? = nil,
+        licenseType: String? = nil,
+        requiresInsurance: Bool? = nil,
+        scopeDescription: String? = nil,
+        depositRequired: Bool? = nil,
+        depositAmount: Double? = nil
     ) {
         self.title = title
         self.description = description
@@ -455,6 +506,17 @@ public struct MagicPostDraft: Encodable, Sendable {
         self.remoteDetails = remoteDetails
         self.urgentDetails = urgentDetails
         self.eventDetails = eventDetails
+        self.pickupAddress = pickupAddress
+        self.pickupNotes = pickupNotes
+        self.dropoffAddress = dropoffAddress
+        self.dropoffNotes = dropoffNotes
+        self.deliveryProofRequired = deliveryProofRequired
+        self.requiresLicense = requiresLicense
+        self.licenseType = licenseType
+        self.requiresInsurance = requiresInsurance
+        self.scopeDescription = scopeDescription
+        self.depositRequired = depositRequired
+        self.depositAmount = depositAmount
     }
 
     enum CodingKeys: String, CodingKey {
@@ -478,6 +540,17 @@ public struct MagicPostDraft: Encodable, Sendable {
         case remoteDetails = "remote_details"
         case urgentDetails = "urgent_details"
         case eventDetails = "event_details"
+        case pickupAddress = "pickup_address"
+        case pickupNotes = "pickup_notes"
+        case dropoffAddress = "dropoff_address"
+        case dropoffNotes = "dropoff_notes"
+        case deliveryProofRequired = "delivery_proof_required"
+        case requiresLicense = "requires_license"
+        case licenseType = "license_type"
+        case requiresInsurance = "requires_insurance"
+        case scopeDescription = "scope_description"
+        case depositRequired = "deposit_required"
+        case depositAmount = "deposit_amount"
     }
 }
 

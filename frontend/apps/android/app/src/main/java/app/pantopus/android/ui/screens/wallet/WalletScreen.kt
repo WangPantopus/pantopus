@@ -64,6 +64,7 @@ import app.pantopus.android.ui.components.ToastController
 import app.pantopus.android.ui.components.ToastHost
 import app.pantopus.android.ui.screens.wallet.components.ActivityRow
 import app.pantopus.android.ui.screens.wallet.components.HoldBanner
+import app.pantopus.android.ui.screens.wallet.components.PayoutAccountCard
 import app.pantopus.android.ui.screens.wallet.components.PayoutMethodCard
 import app.pantopus.android.ui.screens.wallet.components.TaxDocsRow
 import app.pantopus.android.ui.theme.PantopusColors
@@ -451,12 +452,22 @@ private fun WalletBody(
                 actionTag = "walletSeeAllActivity",
             )
             ActivityList(items = content.activity)
-            content.payoutMethod?.let { method ->
+            if (content.payoutMethod != null) {
                 SectionOverline(title = "Payout method")
                 PayoutMethodCard(
-                    method = method,
+                    method = content.payoutMethod,
                     onManage = onManagePayout,
                     onReverify = onReverifyPayout,
+                )
+            } else if (content.payoutAccount != null) {
+                // Live path: Stripe gives us no bank detail for an Express
+                // account, so the connected *account* is what we render — and
+                // it carries the only reachable "Open Stripe Dashboard".
+                val account = content.payoutAccount
+                SectionOverline(title = "Payout account")
+                PayoutAccountCard(
+                    account = account,
+                    onAction = { if (account.warn) onReverifyPayout() else onManagePayout() },
                 )
             }
             content.taxDocs?.let { docs ->

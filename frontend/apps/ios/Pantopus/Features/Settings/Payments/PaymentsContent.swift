@@ -220,8 +220,10 @@ public enum PaymentsRowTrailing: Sendable, Hashable {
 public enum PaymentsActivity: Sendable, Hashable {
     /// Three chevron rows: Transactions · Statements · Disputes.
     case stats([PaymentsActivityStat])
-    /// Single muted "No transactions yet" row. Used on the empty
-    /// frame when there's no Stripe history.
+    /// The real transaction-history feed from `GET /api/payments/history`.
+    case transactions([PaymentsTransaction])
+    /// Single muted "No transactions yet" row. Used when the history feed
+    /// came back empty (or couldn't be read — with the honest copy).
     case empty(title: String, body: String)
 }
 
@@ -235,5 +237,46 @@ public struct PaymentsActivityStat: Identifiable, Sendable, Hashable {
         self.id = id
         self.label = label
         self.subtext = subtext
+    }
+}
+
+/// One row of the Transaction-history feed (`GET /api/payments/history`).
+/// Amounts are pre-formatted from the server's `amount_cents`; `isOutgoing`
+/// drives the sign and the red/green treatment.
+public struct PaymentsTransaction: Identifiable, Sendable, Hashable {
+    /// Drives the leading icon disc, mirroring RN's `HistoryTab`
+    /// iconography: tip → star, payout → arrow-up disc, money out → arrow-up,
+    /// money in → arrow-down.
+    public enum Kind: String, Sendable, Hashable {
+        case tip
+        case payout
+        case sent
+        case received
+    }
+
+    public let id: String
+    public let kind: Kind
+    /// Gig title / description / humanised payment type.
+    public let title: String
+    /// "Mar 4 · succeeded · to Ana Ruiz" — date, status and counterparty.
+    public let meta: String
+    /// Signed, formatted amount — e.g. `"-$40.00"` / `"+$120.00"`.
+    public let amount: String
+    public let isOutgoing: Bool
+
+    public init(
+        id: String,
+        kind: Kind,
+        title: String,
+        meta: String,
+        amount: String,
+        isOutgoing: Bool
+    ) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.meta = meta
+        self.amount = amount
+        self.isOutgoing = isOutgoing
     }
 }

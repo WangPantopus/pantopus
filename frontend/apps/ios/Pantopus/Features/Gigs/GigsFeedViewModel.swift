@@ -65,6 +65,16 @@ public final class GigsFeedViewModel {
     /// the banner's "Post now" (disables the button against double-taps).
     public private(set) var isPostingDraft = false
 
+    /// Flat-list pagination — true while the next page is in flight.
+    /// Drives the list's loading-more footer.
+    public private(set) var isLoadingMore = false
+
+    /// Flat-list pagination — true when `GET /api/gigs` says another page
+    /// exists after the one currently loaded. Derived from the server
+    /// response (`pagination.hasMore` or `total`), never guessed when the
+    /// backend told us. Always false in browse mode.
+    public private(set) var hasMore = false
+
     private let api: APIClient
     private let latitude: Double?
     private let longitude: Double?
@@ -83,6 +93,8 @@ public final class GigsFeedViewModel {
     /// Set by browse "See all" so the flat list renders even with
     /// category == All and no filters. Cleared by re-selecting "All".
     private var flatListOverride = false
+    /// Offset the next `loadMore()` page starts at (rows already loaded).
+    private var nextOffset = 0
     private var realtimeTask: Task<Void, Never>?
 
     init(
@@ -317,6 +329,10 @@ public final class GigsFeedViewModel {
     }
 
     private func fetchBrowse(coordinate: UserCoordinate) async {
+        // Browse is a fixed sectioned surface — the backend caps each
+        // section server-side, so there is nothing to page through.
+        hasMore = false
+        nextOffset = 0
         do {
             let response: GigsBrowseResponse = try await api.request(
                 GigsEndpoints.browse(
@@ -340,7 +356,10 @@ public final class GigsFeedViewModel {
         }
     }
 
-    private func fetchFlat() async {
+    /// One page of `GET /api/gigs`. `append == false` replaces the loaded
+    /// window (first page / refresh); `append == true` is the infinite-
+    /// scroll continuation and never downgrades the screen to `.error`.
+    private func fetchFlat(offset: Int = 0, append: Bool = false) async {
         do {
             let response: GigsListResponse = try await api.request(
                 GigsEndpoints.list(
@@ -353,20 +372,48 @@ public final class GigsFeedViewModel {
                     maxPrice: filters.serverMaxPrice,
                     payType: filters.serverPayType,
                     scheduleType: filters.serverScheduleType,
-                    limit: 20
+                    limit: Self.pageSize,
+                    offset: offset
                 )
             )
-            loadedItems = response.gigs
+            if append {
+                let seen = Set(loadedItems.map(\.id))
+                loadedItems.append(contentsOf: response.gigs.filter { !seen.contains($0.id) })
+            } else {
+                loadedItems = response.gigs
+            }
+            hasMore = response.hasMorePages(offset: offset, limit: Self.pageSize)
+            nextOffset = offset + response.gigs.count
             let visibleCount = rebuildState()
-            updateRadiusSuggestion(resultCount: visibleCount)
+            // The radius ladder reacts to the first page only — a thin
+            // page 3 says nothing about how wide the search should be.
+            if !append { updateRadiusSuggestion(resultCount: visibleCount) }
             writeWidgetSnapshot(
-                tasks: response.gigs.map { Self.widgetTask(from: Self.project($0)) },
-                totalNearby: response.total ?? response.gigs.count
+                tasks: loadedItems.map { Self.widgetTask(from: Self.project($0)) },
+                totalNearby: response.total ?? loadedItems.count
             )
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gigs."
-            state = .error(message: message)
+            if append {
+                // Keep the rows already on screen; stop the footer from
+                // retrying in a loop and tell the user what happened.
+                hasMore = false
+                toast = ToastMessage(text: message, kind: .error)
+            } else {
+                state = .error(message: message)
+            }
         }
+    }
+
+    /// Infinite scroll — appends the next `pageSize` window once the
+    /// footer scrolls into view. No-op in browse mode, while another
+    /// fetch is running, or once the server says there is nothing left.
+    public func loadMore() async {
+        guard hasMore, !isLoadingMore, !isLoading, !isBrowseMode else { return }
+        guard case .loaded = state else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        await fetchFlat(offset: nextOffset, append: true)
     }
 
     /// Project `loadedItems` through the residual client-side filters
@@ -516,6 +563,10 @@ public final class GigsFeedViewModel {
 
 extension GigsFeedViewModel {
     static let metersPerMile = 1609.34
+
+    /// Rows requested per `GET /api/gigs` page. Mirrors Android's
+    /// `GigsFeedViewModel.PAGE_SIZE`.
+    static let pageSize = 20
 
     /// `GigDTO` → render-only `GigCardContent`. Exposed (internal) so the
     /// Gig Search surface projects identical rows without duplicating the

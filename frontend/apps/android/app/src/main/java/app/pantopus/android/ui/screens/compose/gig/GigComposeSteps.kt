@@ -309,6 +309,61 @@ object GigComposeLimits {
 }
 
 /**
+ * delivery_errand route fields. Unlike the archetype JSONB modules these
+ * ride as flat snake_case gig columns — `pickup_address`,
+ * `pickup_notes`, `dropoff_address`, `dropoff_notes`,
+ * `delivery_proof_required` (`backend/routes/gigs.js:481-486`; the read
+ * side is `GigDto.pickupAddress`).
+ */
+data class GigDeliveryDetails(
+    val pickupAddress: String = "",
+    val pickupNotes: String = "",
+    val dropoffAddress: String = "",
+    val dropoffNotes: String = "",
+    val proofRequired: Boolean = false,
+) {
+    val hasAnyData: Boolean
+        get() =
+            pickupAddress.isNotBlank() ||
+                pickupNotes.isNotBlank() ||
+                dropoffAddress.isNotBlank() ||
+                dropoffNotes.isNotBlank() ||
+                proofRequired
+}
+
+/**
+ * pro_service_quote requirements — flat columns again
+ * (`requires_license`, `license_type`, `requires_insurance`,
+ * `scope_description`, `deposit_required`, `deposit_amount`;
+ * `backend/routes/gigs.js:499-505`). [depositAmount] is held as text
+ * like the budget fields and parsed at send time.
+ */
+data class GigProServiceDetails(
+    val requiresLicense: Boolean = false,
+    val licenseType: String = "",
+    val requiresInsurance: Boolean = false,
+    val scopeDescription: String = "",
+    val depositRequired: Boolean = false,
+    val depositAmount: String = "",
+) {
+    /**
+     * A deposit toggle with no (positive) amount blocks the step —
+     * mirrors RN's "amount required when the deposit toggle is on".
+     */
+    val isDepositAmountMissing: Boolean
+        get() = depositRequired && (depositAmount.toDoubleOrNull() ?: 0.0) <= 0.0
+
+    val hasAnyData: Boolean
+        get() =
+            requiresLicense ||
+                licenseType.isNotBlank() ||
+                requiresInsurance ||
+                scopeDescription.isNotBlank() ||
+                depositRequired ||
+                depositAmount.isNotBlank()
+}
+
+/**
  * Snapshot of all wizard form state. Scalar fields mirror into
  * [androidx.lifecycle.SavedStateHandle] so the wizard survives config
  * changes and process death (module objects + items are kept in-memory
@@ -359,6 +414,10 @@ data class GigComposeFormState(
     val eventDetails: EventDetailsDto? = null,
     /** delivery_errand shopping list (≤[GigComposeLimits.MAX_ITEMS]). */
     val items: List<MagicTaskItemDto> = emptyList(),
+    /** delivery_errand route (flat `pickup_*` / `dropoff_*` columns). */
+    val deliveryDetails: GigDeliveryDetails? = null,
+    /** pro_service_quote requirements (flat `requires_*` columns). */
+    val proServiceDetails: GigProServiceDetails? = null,
 ) {
     val currentStep: GigComposeStep
         get() = GigComposeStep.fromOrdinal(step)
@@ -393,7 +452,9 @@ data class GigComposeFormState(
                 cancellationPolicy != null ||
                 isUrgent ||
                 tags.isNotEmpty() ||
-                items.isNotEmpty()
+                items.isNotEmpty() ||
+                deliveryDetails?.hasAnyData == true ||
+                proServiceDetails?.hasAnyData == true
 
     companion object {
         val EMPTY = GigComposeFormState()

@@ -2,6 +2,9 @@
 
 package app.pantopus.android.ui.screens.contentdetail
 
+import app.pantopus.android.data.api.models.businesses.BusinessInvoiceDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoiceLineItemDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoicePartyDto
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigCoordinate
 import app.pantopus.android.data.api.models.gigs.GigCreator
@@ -309,36 +312,89 @@ class ContentDetailProjectionTest {
         assertTrue(content.hero.inlinePills.any { it.label == "Free" })
     }
 
+    /**
+     * A real `BusinessInvoice` row. Timestamps sit at 17:00Z so the short-date
+     * label is stable in both UTC and US time zones.
+     */
+    private fun invoiceDto(
+        status: String = "sent",
+        paidAt: String? = null,
+        subtotalCents: Int = 35_400,
+        totalCents: Int = 35_400,
+    ) = BusinessInvoiceDto(
+        id = "7f3c1a24-1111-4000-8000-000000000001",
+        lineItems =
+            listOf(
+                BusinessInvoiceLineItemDto(description = "Install labor", amountCents = 6500, quantity = 2),
+                BusinessInvoiceLineItemDto(description = "LED string lights", amountCents = 2800, quantity = 8),
+            ),
+        subtotalCents = subtotalCents,
+        feeCents = 1062,
+        totalCents = totalCents,
+        currency = "usd",
+        status = status,
+        dueDate = "2025-12-18T17:00:00.000Z",
+        memo = "Takedown is on the schedule for the first Tuesday in January.",
+        createdAt = "2025-12-04T17:00:00.000Z",
+        paidAt = paidAt,
+        business = BusinessInvoicePartyDto(id = "b1", name = "Brightside Outdoor"),
+    )
+
     @Test fun invoice_due_carries_total_hero_line_items_and_pay_dock() {
-        val content = InvoiceDetailViewModel.Projection.fixture("INV-00318")
+        val content = InvoiceDetailViewModel.Projection.from(invoiceDto())
         assertEquals(ContentDetailKind.Invoice, content.kind)
-        assertEquals("Due in 7 days", content.statusPill?.label)
-        assertEquals("$642.85", content.hero.priceLine)
+        assertEquals("Due Dec 18", content.statusPill?.label)
+        assertEquals("$354.00", content.hero.priceLine)
         assertEquals("total · USD", content.hero.priceCaption)
         assertFalse(content.hero.priceCheckDisc)
-        assertTrue(content.hero.monoId?.contains("INV-00318") == true)
+        assertTrue(content.hero.monoId?.contains("7F3C1A24") == true)
         val items = content.modules.filterIsInstance<ContentDetailModule.LineItems>().firstOrNull()
-        assertEquals(3, items?.fees?.size)
-        assertEquals("$642.85", items?.totalValue)
+        assertEquals(2, items?.rows?.size)
+        assertEquals("$130.00", items?.rows?.first()?.total)
+        // Fee is deducted from the business payout, never billed to the payer.
+        assertTrue(items?.fees?.isEmpty() == true)
+        assertEquals("$354.00", items?.totalValue)
         assertEquals(ContentDetailModule.LineItems.TotalTone.Primary, items?.totalTone)
         assertTrue(content.modules.any { it is ContentDetailModule.FromTo })
         assertNull(content.dock.secondary)
-        assertTrue(content.dock.primary.label.contains("Pay"))
+        assertEquals("Pay $354.00", content.dock.primary.label)
+        assertTrue(content.dock.primary.enabled)
+    }
+
+    @Test fun invoice_subtotal_row_appears_only_when_it_differs_from_total() {
+        val content =
+            InvoiceDetailViewModel.Projection.from(invoiceDto(subtotalCents = 35_400, totalCents = 30_000))
+        val items = content.modules.filterIsInstance<ContentDetailModule.LineItems>().first()
+        assertEquals("Subtotal", items.fees.first().label)
+        assertEquals("$354.00", items.fees.first().value)
+        assertEquals("$300.00", items.totalValue)
     }
 
     @Test fun invoice_paid_recolors_total_adds_receipt_and_pivots_dock() {
-        val content = InvoiceDetailViewModel.Projection.paidFixture("INV-00318")
+        val content =
+            InvoiceDetailViewModel.Projection.from(
+                invoiceDto(status = "paid", paidAt = "2025-12-14T17:00:00.000Z"),
+            )
         assertEquals("Paid · Dec 14", content.statusPill?.label)
         assertEquals(ContentDetailPill.Tone.Success, content.statusPill?.tone)
         assertEquals(ContentDetailHero.PriceTone.Success, content.hero.priceTone)
         assertTrue(content.hero.priceCheckDisc)
         assertEquals("paid in full", content.hero.priceTrailingLabel)
-        assertTrue(content.modules.any { it is ContentDetailModule.Callout && it.id == "pantopus-pay-receipt" })
+        assertTrue(content.modules.any { it is ContentDetailModule.Callout && it.id == "invoice-paid" })
         val items = content.modules.filterIsInstance<ContentDetailModule.LineItems>().firstOrNull()
         assertEquals("Paid", items?.totalLabel)
         assertEquals(ContentDetailModule.LineItems.TotalTone.Success, items?.totalTone)
         assertEquals("Share", content.dock.secondary?.label)
-        assertEquals("Download receipt", content.dock.primary.label)
+        assertEquals("Paid in full", content.dock.primary.label)
+        assertFalse(content.dock.primary.enabled)
+    }
+
+    @Test fun invoice_void_locks_the_dock() {
+        val content = InvoiceDetailViewModel.Projection.from(invoiceDto(status = "void"))
+        assertEquals("Voided", content.statusPill?.label)
+        assertEquals(ContentDetailPill.Tone.Error, content.statusPill?.tone)
+        assertFalse(content.dock.primary.enabled)
+        assertEquals("Invoice voided", content.dock.primary.label)
     }
 
     @Test fun sample_frames_carry_signature_elements() {

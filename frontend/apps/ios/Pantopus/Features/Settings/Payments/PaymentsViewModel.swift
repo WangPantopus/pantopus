@@ -65,7 +65,10 @@ public final class PaymentsViewModel {
         state = .loading
         do {
             let methods = try await fetchMethods()
-            state = .loaded(Self.liveFrame(methods: methods))
+            // History is supplementary — a failure there shouldn't sink the
+            // whole screen, so it degrades to the "couldn't load" activity row
+            // while the methods card still renders.
+            state = .loaded(Self.liveFrame(methods: methods, activity: await fetchActivity()))
         } catch {
             state = .error(message: Self.message(for: error))
         }
@@ -147,6 +150,21 @@ public final class PaymentsViewModel {
         return response.paymentMethods.map(Self.uiMethod(from:))
     }
 
+    /// `GET /api/payments/history` → the Activity card. A transport failure
+    /// keeps the screen usable and says so rather than claiming the user has
+    /// no transactions.
+    private func fetchActivity() async -> PaymentsActivity {
+        do {
+            let response: PaymentHistoryResponse = try await api.request(PaymentHistoryEndpoints.history())
+            return Self.activity(from: response.transactions)
+        } catch {
+            return .empty(
+                title: "Couldn't load transactions",
+                body: "Pull down to refresh and try again."
+            )
+        }
+    }
+
     private func reloadMethods() async {
         do {
             let methods = try await fetchMethods()
@@ -174,20 +192,141 @@ public final class PaymentsViewModel {
         }
     }
 
-    /// Live frame: real saved methods + a payout entry point. Balance and
-    /// activity stay nil here because Wallet owns the earnings-in surface.
-    static func liveFrame(methods: [PaymentMethod]) -> PaymentsLoaded {
+    /// Live frame: real saved methods + a payout entry point + the real
+    /// transaction history. The balance hero stays nil because Wallet owns
+    /// the earnings-in surface.
+    static func liveFrame(
+        methods: [PaymentMethod],
+        activity: PaymentsActivity = .empty(
+            title: "No transactions yet",
+            body: "Hires and sales will appear here."
+        )
+    ) -> PaymentsLoaded {
         PaymentsLoaded(
             balance: nil,
             methods: methods,
             payouts: notConnectedPayouts,
-            activity: .empty(
-                title: "No transactions yet",
-                body: "Hires and sales will appear here."
-            ),
+            activity: activity,
             canCloseAccount: false,
             footerCaption: "Payments are processed securely by Stripe."
         )
+    }
+
+    // MARK: - Transaction history projection
+
+    /// Project `GET /api/payments/history` rows onto the Activity card. An
+    /// empty feed keeps the genuine empty state.
+    static func activity(from entries: [PaymentHistoryEntryDTO]) -> PaymentsActivity {
+        guard !entries.isEmpty else {
+            return .empty(title: "No transactions yet", body: "Hires and sales will appear here.")
+        }
+        return .transactions(entries.map(transaction(from:)))
+    }
+
+    /// One history row → one Activity row. Mirrors RN `HistoryTab`: payouts
+    /// and debits read as money out, credits as money in, tips get the star.
+    static func transaction(from entry: PaymentHistoryEntryDTO) -> PaymentsTransaction {
+        let isPayout = entry.entryType == "payout"
+        let isTip = entry.paymentType == "tip"
+        let isOutgoing = isPayout
+            || entry.direction?.lowercased() == "debit"
+            || (entry.direction == nil && entry.isSender == true)
+        let kind: PaymentsTransaction.Kind = if isTip {
+            .tip
+        } else if isPayout {
+            .payout
+        } else if isOutgoing {
+            .sent
+        } else {
+            .received
+        }
+        return PaymentsTransaction(
+            id: entry.id,
+            kind: kind,
+            title: title(for: entry, isPayout: isPayout),
+            meta: meta(for: entry, isPayout: isPayout, isOutgoing: isOutgoing),
+            amount: "\(isOutgoing ? "-" : "+")\(centsToCurrency(entry.amountCents))",
+            isOutgoing: isOutgoing
+        )
+    }
+
+    private static func title(for entry: PaymentHistoryEntryDTO, isPayout: Bool) -> String {
+        if isPayout {
+            if let last4 = entry.destinationLast4, !last4.isEmpty {
+                return "Payout to bank ••••\(last4)"
+            }
+            return entry.description ?? "Payout"
+        }
+        if let gigTitle = entry.gig?.title, !gigTitle.isEmpty { return gigTitle }
+        if let description = entry.description, !description.isEmpty { return description }
+        if let type = entry.paymentType, !type.isEmpty { return humanised(type) }
+        return "Payment"
+    }
+
+    private static func meta(
+        for entry: PaymentHistoryEntryDTO,
+        isPayout: Bool,
+        isOutgoing: Bool
+    ) -> String {
+        var parts: [String] = []
+        if let date = shortDate(entry.createdAt) { parts.append(date) }
+        if let status = entry.status, !status.isEmpty { parts.append(humanised(status)) }
+        if !isPayout {
+            let counterparty = isOutgoing ? entry.payee?.displayName : entry.payer?.displayName
+            if let counterparty {
+                parts.append(isOutgoing ? "to \(counterparty)" : "from \(counterparty)")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// `gig_payment` → `Gig payment`, `authorize_pending` → `Authorize pending`.
+    private static func humanised(_ raw: String) -> String {
+        let spaced = raw.replacingOccurrences(of: "_", with: " ")
+        return spaced.prefix(1).uppercased() + spaced.dropFirst()
+    }
+
+    private static let centsFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter
+    }()
+
+    /// Integer cents → `"$1,284.50"`. Formatting only — the server's amount
+    /// is never re-derived or rounded.
+    static func centsToCurrency(_ cents: Int) -> String {
+        let dollars = Double(abs(cents)) / 100.0
+        let plain = centsFormatter.string(from: NSNumber(value: dollars)) ?? String(format: "%.2f", dollars)
+        return "$\(plain)"
+    }
+
+    private static let iso8601Fraction: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    static func shortDate(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let date = iso8601Fraction.date(from: raw) ?? iso8601Plain.date(from: raw) else { return nil }
+        return shortDateFormatter.string(from: date)
     }
 
     private static let notConnectedPayouts = PaymentsPayouts(

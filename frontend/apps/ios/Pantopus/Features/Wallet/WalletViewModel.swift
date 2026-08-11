@@ -156,6 +156,7 @@ public final class WalletViewModel {
                 transactions: history.transactions,
                 pending: pending,
                 payoutsEnabled: enabled,
+                connectAccount: connect?.account,
                 calendar: calendar,
                 now: now()
             )
@@ -240,16 +241,19 @@ public final class WalletViewModel {
 
     // MARK: - Mapping (pure — unit-test surface)
 
-    /// Project the read-path DTOs into a `WalletContent`. The withdraw/payout
-    /// slots (payout method, tax docs) stay nil — they are wired in Phase 3
-    /// with Stripe Connect, and the screen hides those sections rather than
-    /// showing fixture bank details / YTD earnings. `holdState` stays nil
+    /// Project the read-path DTOs into a `WalletContent`. `payoutMethod` and
+    /// `taxDocs` stay nil — Stripe never hands the platform bank details for
+    /// an Express account, and the screen hides those sections rather than
+    /// showing fixture bank details / YTD earnings. `payoutAccount` *is*
+    /// populated from the real Connect status, which is what makes the
+    /// "Open Stripe Dashboard" action reachable. `holdState` stays nil
     /// because the hold banner copy is Stripe-specific.
     public static func makeContent(
         balance: WalletBalanceResponse,
         transactions: [WalletTransactionDTO],
         pending: WalletPendingReleaseResponse?,
         payoutsEnabled: Bool = true,
+        connectAccount: ConnectAccountDTO? = nil,
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> WalletContent {
@@ -264,9 +268,35 @@ public final class WalletViewModel {
             monthMeta: monthMeta(count: monthIncomeCount(transactions, calendar: calendar, now: now)),
             activity: activity,
             payoutMethod: nil,
+            payoutAccount: payoutAccount(from: connectAccount),
             taxDocs: nil,
             holdState: nil,
             payoutsEnabled: payoutsEnabled
+        )
+    }
+
+    /// Map the live Connect status onto the "Payout account" card. Mirrors
+    /// RN `PayoutsTab`: onboarded = `charges_enabled && payouts_enabled`;
+    /// an account id without both flags is still verifying. No account at
+    /// all → nil, and the bottom bar's "Set up payouts" remains the entry
+    /// point.
+    public static func payoutAccount(from account: ConnectAccountDTO?) -> WalletPayoutAccount? {
+        guard let account else { return nil }
+        let onboarded = account.chargesEnabled && account.payoutsEnabled
+        if onboarded {
+            return WalletPayoutAccount(
+                headline: "Stripe account connected",
+                bodyText: "Payouts enabled · Card payments enabled",
+                actionLabel: "Open Stripe Dashboard",
+                warn: false
+            )
+        }
+        guard let id = account.stripeAccountId, !id.isEmpty else { return nil }
+        return WalletPayoutAccount(
+            headline: "Account verification in progress",
+            bodyText: "Stripe is verifying your identity. This usually takes 1–2 business days.",
+            actionLabel: "Continue setup",
+            warn: true
         )
     }
 

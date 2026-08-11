@@ -22,13 +22,13 @@ import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
 import com.stripe.android.paymentsheet.rememberPaymentSheet
 
 /**
- * T2.6 invoice detail. Block 3B wires the "Pay" CTA to the real Stripe
- * PaymentSheet: the VM creates a PaymentIntent and emits
- * [InvoiceDetailEvent.PresentCheckout]; PaymentSheet (created in composition —
- * it registers an ActivityResult launcher) collects the card + handles SCA,
+ * A09.4 invoice detail. The invoice is read from
+ * `GET api/businesses/invoices/{id}`; the "Pay" CTA runs the real
+ * pay → PaymentSheet → confirm sequence. PaymentSheet (created in composition
+ * — it registers an ActivityResult launcher) collects the card + handles SCA,
  * and the outcome drives a success / declined / canceled toast. On success
- * the VM re-projects into the paid frame (A09.4), whose dock swaps to
- * Share + Download receipt.
+ * the VM confirms with the backend and re-reads the invoice, so the paid
+ * frame is whatever the server says it is.
  */
 @Composable
 fun InvoiceDetailScreen(
@@ -84,7 +84,7 @@ fun InvoiceDetailScreen(
             // Only the paid dock carries a secondary button ("Share") —
             // the due dock's secondary slot is null.
             onSecondaryAction = { context.shareText(viewModel.shareSummary(), "Share invoice") },
-            onRetry = { viewModel.load() },
+            onRetry = { viewModel.refresh() },
             onMessageCounterparty = null,
         )
         PaymentResultMarker(paymentStatus)

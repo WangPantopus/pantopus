@@ -26,6 +26,10 @@ struct PackageDetailLayout: View {
     /// opens the Unboxing capture flow for this package. Mirrors RN's
     /// delivered-only CTA in `src/app/mailbox/package.tsx:180-187`.
     var onOpenUnboxing: (@MainActor @Sendable () -> Void)?
+    /// A17.8 → "Ask a Neighbor". Opens the package-gig form pre-filled from
+    /// this package. `isPreDelivery` mirrors RN's `?mode=pre|post`
+    /// (`src/app/mailbox/package.tsx:196-204`).
+    var onAskNeighbor: (@MainActor @Sendable (_ isPreDelivery: Bool) -> Void)?
 
     var body: some View {
         MailItemDetailShell(
@@ -78,6 +82,16 @@ struct PackageDetailLayout: View {
             items.append(
                 MailOverflowItem(id: "unboxing", icon: .scanLine, label: "Virtual unboxing") { @Sendable in
                     Task { @MainActor in onOpenUnboxing() }
+                }
+            )
+        }
+        // RN offers the neighbor gig at every stage — pre-delivery before the
+        // drop, post-delivery after (`package.tsx:196-204`).
+        if let onAskNeighbor {
+            let isPreDelivery = package.status != .delivered
+            items.append(
+                MailOverflowItem(id: "askNeighbor", icon: .usersRound, label: "Ask a Verified Neighbor") { @Sendable in
+                    Task { @MainActor in onAskNeighbor(isPreDelivery) }
                 }
             )
         }

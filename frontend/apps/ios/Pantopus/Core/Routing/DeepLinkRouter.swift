@@ -107,6 +107,10 @@ final class DeepLinkRouter {
         /// `pantopus://mailbox/unboxing` — A17.14 scan-first capture flow. The
         /// optional `?id=` seeds the originating mail item when present.
         case unboxing(mailId: String?)
+        /// `pantopus://mailbox/gig?id=&mode=pre|post` — A17.8 → "Ask a
+        /// Neighbor" package-help gig. `id` is the source mail item; `mode`
+        /// defaults to post-delivery, matching RN's `gig.tsx` param default.
+        case packageGig(mailId: String, isPreDelivery: Bool)
         /// `pantopus://mailbox/earn` — A10.11 Earn dashboard (Wallet sibling).
         case earn
         /// `pantopus://businesses/:id` — A10.7 Business owner view. The public
@@ -471,10 +475,21 @@ final class DeepLinkRouter {
         case "stamps": .stamps
         case "earn": .earn
         case "unboxing": .unboxing(mailId: idQuery)
+        case "gig": packageGigDestination(url: url, idQuery: idQuery)
         case "translation": .mailTranslation(mailId: idQuery ?? "")
         case "tasks": mailTaskDestination(url: url, segments: segments)
         default: .unknown(url)
         }
+    }
+
+    /// `pantopus://mailbox/gig?id=&mode=pre|post` — A17.8 "Ask a Neighbor".
+    /// Without a source mail id the package-gig form has nothing to pre-fill,
+    /// so the link falls through to `.unknown`.
+    private func packageGigDestination(url: URL, idQuery: String?) -> Destination {
+        guard let mailId = idQuery, !mailId.isEmpty else { return .unknown(url) }
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let mode = queryValue("mode", in: comps)?.lowercased()
+        return .packageGig(mailId: mailId, isPreDelivery: mode == "pre")
     }
 
     /// `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail. The

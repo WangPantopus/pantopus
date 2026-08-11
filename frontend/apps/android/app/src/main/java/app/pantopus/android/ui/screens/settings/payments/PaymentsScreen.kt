@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -501,8 +502,91 @@ private fun ActivityCard(
                         Divider()
                     }
                 }
+            is PaymentsActivity.Transactions ->
+                activity.rows.forEachIndexed { index, transaction ->
+                    TransactionRow(transaction = transaction)
+                    if (index < activity.rows.size - 1) {
+                        Divider()
+                    }
+                }
             is PaymentsActivity.Empty -> ActivityEmptyRow(title = activity.title, body = activity.body)
         }
+    }
+}
+
+/**
+ * One row of the real transaction-history feed
+ * (`GET api/payments/history`). Icon + tint mirror RN's `HistoryTab`: tips
+ * get the star, payouts the primary arrow disc, money-out red, money-in green.
+ */
+@Composable
+private fun TransactionRow(transaction: PaymentsTransaction) {
+    val tint =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusColors.warning
+            PaymentsTransaction.Kind.Payout -> PantopusColors.primary600
+            PaymentsTransaction.Kind.Sent -> PantopusColors.error
+            PaymentsTransaction.Kind.Received -> PantopusColors.success
+        }
+    val icon =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusIcon.Star
+            PaymentsTransaction.Kind.Payout -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Sent -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Received -> PantopusIcon.ArrowDown
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag("paymentsTransaction_${transaction.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2.2f,
+                tint = tint,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = transaction.title,
+                color = PantopusColors.appText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (transaction.meta.isNotEmpty()) {
+                Text(
+                    text = transaction.meta,
+                    color = PantopusColors.appTextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        Text(
+            text = transaction.amount,
+            color = if (transaction.isOutgoing) PantopusColors.error else PantopusColors.success,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

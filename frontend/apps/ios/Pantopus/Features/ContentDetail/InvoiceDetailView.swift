@@ -2,13 +2,14 @@
 //  InvoiceDetailView.swift
 //  Pantopus
 //
-//  T2.6 invoice detail. Wraps `TransactionalDetailShell` with the same
-//  vocabulary as gig + listing. Block 3B wires the "Pay" CTA to the real
-//  Stripe PaymentSheet via the view-model's `CheckoutCoordinator`:
-//  PaymentSheet (presented by the SDK over the current screen) collects the
-//  card + handles SCA/3-D Secure, and the result drives a success / declined /
-//  canceled toast. On success the VM re-projects into the paid frame
-//  (A09.4), whose dock swaps to Share + Download receipt.
+//  A09.4 invoice detail. Wraps `TransactionalDetailShell` with the same
+//  vocabulary as gig + listing. The invoice itself is read from
+//  `GET /api/businesses/invoices/{id}`; the "Pay" CTA runs the real
+//  pay → PaymentSheet → confirm sequence via the view-model. PaymentSheet
+//  (presented by the SDK over the current screen) collects the card + handles
+//  SCA/3-D Secure, and the result drives a success / declined / canceled
+//  toast. On success the VM re-reads the invoice, so the paid frame is
+//  whatever the backend says it is.
 //
 
 import SwiftUI
@@ -36,7 +37,7 @@ public struct InvoiceDetailView: View {
             // Only the paid dock carries a secondary button ("Share") —
             // the due dock's secondary slot is nil.
             onSecondaryAction: { shareItem = ShareTextItem(text: viewModel.shareSummary) },
-            onRetry: { Task { await viewModel.load() } },
+            onRetry: { Task { await viewModel.refresh() } },
             onMessageCounterparty: nil
         )
         .task { await viewModel.load() }

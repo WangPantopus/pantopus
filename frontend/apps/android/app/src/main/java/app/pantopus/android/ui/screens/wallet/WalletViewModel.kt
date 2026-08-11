@@ -79,13 +79,21 @@ class WalletViewModel
                         val transactions =
                             (repository.transactions() as? NetworkResult.Success)?.data?.transactions ?: emptyList()
                         val pending = (repository.pendingRelease() as? NetworkResult.Success)?.data
-                        val enabled =
-                            (connectRepository.accountStatus() as? NetworkResult.Success)?.data?.account?.payoutsEnabled
-                                ?: false
+                        val connectAccount =
+                            (connectRepository.accountStatus() as? NetworkResult.Success)?.data?.account
+                        val enabled = connectAccount?.payoutsEnabled ?: false
                         availableCents = balance.data.wallet.balance
                         payoutsEnabled = enabled
                         _state.value =
-                            WalletUiState.Populated(WalletMapper.build(balance.data, transactions, pending, enabled))
+                            WalletUiState.Populated(
+                                WalletMapper.build(
+                                    balance = balance.data,
+                                    transactions = transactions,
+                                    pending = pending,
+                                    payoutsEnabled = enabled,
+                                    connectAccount = connectAccount,
+                                ),
+                            )
                     }
                     is NetworkResult.Failure -> {
                         _state.value = WalletUiState.Error(balance.error.message)

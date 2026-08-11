@@ -79,6 +79,10 @@ fun MailDetailScreen(
     // A17.14 — opens the Unboxing flow for this package. Mirrors RN's
     // "Virtual Unboxing" CTA in `src/app/mailbox/package.tsx:183`.
     onOpenUnboxing: ((String) -> Unit)? = null,
+    // A17.8 → "Ask a Neighbor". Opens the package-gig form for this package;
+    // the flag mirrors RN's `?mode=pre|post`
+    // (`src/app/mailbox/package.tsx:196-204`).
+    onAskNeighbor: ((String, Boolean) -> Unit)? = null,
     viewModel: MailDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -173,6 +177,10 @@ fun MailDetailScreen(
                     onOpenUnboxing =
                         onOpenUnboxing?.let { open ->
                             { open(current.content.mailId) }
+                        },
+                    onAskNeighbor =
+                        onAskNeighbor?.let { open ->
+                            { isPreDelivery: Boolean -> open(current.content.mailId, isPreDelivery) }
                         },
                 )
             is MailDetailUiState.Error ->
@@ -298,6 +306,7 @@ private fun LoadedLayout(
     onOpenExtractedTask: (() -> Unit)? = null,
     onCreateTask: (() -> Unit)? = null,
     onOpenUnboxing: (() -> Unit)? = null,
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
 ) {
     // Dispatch to ceremonial variant layouts when the projected content
     // carries decoded payloads. Every variant composes the shared
@@ -382,6 +391,7 @@ private fun LoadedLayout(
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
                 onOpenUnboxing = onOpenUnboxing,
+                onAskNeighbor = onAskNeighbor,
             )
         content.category == MailItemCategory.Party && party != null ->
             PartyDetailLayout(

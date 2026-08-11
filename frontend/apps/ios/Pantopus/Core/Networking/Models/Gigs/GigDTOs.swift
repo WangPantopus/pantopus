@@ -329,16 +329,47 @@ public struct TopBidderDTO: Decodable, Sendable, Hashable, Identifiable {
     public let color: String
 }
 
+/// Paging envelope emitted by the **spatial** branch of `GET /api/gigs`
+/// (`backend/routes/gigs.js:2388`). The keys are already camelCase on the
+/// wire. The non-spatial branch omits this object entirely and returns an
+/// exact `total` row count instead (`backend/routes/gigs.js:2588`).
+public struct GigsListPagination: Decodable, Sendable, Hashable {
+    public let limit: Int?
+    public let offset: Int?
+    public let hasMore: Bool?
+
+    public init(limit: Int? = nil, offset: Int? = nil, hasMore: Bool? = nil) {
+        self.limit = limit
+        self.offset = offset
+        self.hasMore = hasMore
+    }
+}
+
 /// Top-level envelope from `/api/gigs`.
 public struct GigsListResponse: Decodable, Sendable {
     public let gigs: [GigDTO]
     public let total: Int?
     public let radiusMeters: Int?
+    /// Present only on the spatial branch — see `GigsListPagination`.
+    public let pagination: GigsListPagination?
 
     enum CodingKeys: String, CodingKey {
         case gigs
         case total
         case radiusMeters
+        case pagination
+    }
+
+    /// Whether another page exists after the one just decoded.
+    ///
+    /// Preference order matches what the backend actually sends:
+    /// 1. the spatial branch's explicit `pagination.hasMore`,
+    /// 2. the non-spatial branch's exact `total` (`{ count: 'exact' }`),
+    /// 3. the "did we get a full page" heuristic as a last resort.
+    public func hasMorePages(offset: Int, limit: Int) -> Bool {
+        if let flag = pagination?.hasMore { return flag }
+        if let total { return offset + gigs.count < total }
+        return gigs.count >= limit
     }
 }
 

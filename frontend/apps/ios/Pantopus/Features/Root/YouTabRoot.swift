@@ -318,6 +318,9 @@ public enum YouRoute: Hashable {
     case mailTranslation(mailId: String)
     /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
     case unboxing(mailId: String?)
+    /// A17.8 → "Ask a Neighbor" — package-help gig created from a mailbox
+    /// package. `pantopus://mailbox/gig?id=&mode=pre|post`.
+    case packageGig(mailId: String, isPreDelivery: Bool)
     /// A17.4 — Community mail feed (neighborhood / civic). Reached from
     /// the Mailbox root overflow menu.
     case communityMail
@@ -989,6 +992,12 @@ public struct YouTabRoot: View {
                 },
                 onOpenUnboxing: {
                     Task { @MainActor in path.append(.unboxing(mailId: mailId)) }
+                },
+                onAskNeighbor: { isPreDelivery in
+                    // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                    Task { @MainActor in
+                        path.append(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
+                    }
                 }
             )
         case .settings:
@@ -2354,7 +2363,15 @@ public struct YouTabRoot: View {
                     onOpenTask: { taskId in
                         Task { @MainActor in path.append(.mailTask(taskId: taskId)) }
                     },
-                    onBack: { Task { @MainActor in pop() } }
+                    onBack: { Task { @MainActor in pop() } },
+                    onPostAsNeighborTask: { sourceMailId in
+                        // A17.8 — RN's "Post as Neighbor Task Instead"
+                        // (`mailbox/tasks.tsx:236`) always escalates in
+                        // post-delivery mode.
+                        Task { @MainActor in
+                            path.append(.packageGig(mailId: sourceMailId, isPreDelivery: false))
+                        }
+                    }
                 )
             )
         case let .mailTranslation(mailId):
@@ -2374,6 +2391,20 @@ public struct YouTabRoot: View {
             UnboxingView(
                 viewModel: UnboxingViewModel(mailId: mailId, onOpenDrawer: openDrawer)
             ) { Task { @MainActor in pop() } }
+        case let .packageGig(mailId, isPreDelivery):
+            // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+            // `POST /api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+            // into the created gig, matching RN `mailbox/gig.tsx`.
+            PackageGigView(
+                viewModel: PackageGigViewModel(
+                    mailId: mailId,
+                    isPreDelivery: isPreDelivery,
+                    onBack: { Task { @MainActor in pop() } },
+                    onOpenGig: { gigId in
+                        Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                    }
+                )
+            )
         case .earn:
             EarnView(
                 onBack: { Task { @MainActor in pop() } },

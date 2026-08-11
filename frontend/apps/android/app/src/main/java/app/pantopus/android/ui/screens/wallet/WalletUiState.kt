@@ -85,6 +85,30 @@ data class WalletPayoutMethod(
 )
 
 /**
+ * Connected-payout-account card payload, derived from the real Stripe Connect
+ * status (`GET api/payments/connect/account`). Stripe does not hand the
+ * platform a bank name or last-4 for an Express account, so this card
+ * describes the *account* — what it can do, and how to manage it in Stripe's
+ * own dashboard — rather than inventing bank details.
+ */
+data class WalletPayoutAccount(
+    /** `Stripe account connected` / `Account verification in progress`. */
+    val headline: String,
+    /** Supporting line — capability summary or the verification note. */
+    val bodyText: String,
+    /**
+     * Label for the trailing control — "Open Stripe Dashboard" once
+     * onboarded, "Continue setup" while Stripe is still verifying.
+     */
+    val actionLabel: String,
+    /**
+     * `true` → the account exists but isn't onboarded yet: amber treatment,
+     * and the action resumes hosted onboarding instead of the dashboard.
+     */
+    val warn: Boolean,
+)
+
+/**
  * Tax-docs row payload. [ready] lights up the home-green icon tile +
  * `New` chip + "1099-NEC ready" body. Otherwise the row renders the
  * neutral grey YTD line.
@@ -125,6 +149,13 @@ data class WalletContent(
      * filled with fabricated bank details.
      */
     val payoutMethod: WalletPayoutMethod? = null,
+    /**
+     * The seller's Stripe Connect account, when they have one. Drives the
+     * "Payout account" card — and with it the "Open Stripe Dashboard" action,
+     * which is otherwise unreachable. `null` when no connected account exists
+     * (the bottom bar's "Set up payouts" covers that case).
+     */
+    val payoutAccount: WalletPayoutAccount? = null,
     /**
      * `null` until real tax-document data is known — same rule as
      * [payoutMethod]; never show invented YTD earnings.

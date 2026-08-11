@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.wallet
 
+import app.pantopus.android.data.api.models.connect.ConnectAccountDto
 import app.pantopus.android.data.api.models.wallet.WalletBalanceResponse
 import app.pantopus.android.data.api.models.wallet.WalletPendingReleaseResponse
 import app.pantopus.android.data.api.models.wallet.WalletTransactionDto
@@ -28,6 +29,7 @@ object WalletMapper {
         transactions: List<WalletTransactionDto>,
         pending: WalletPendingReleaseResponse?,
         payoutsEnabled: Boolean = true,
+        connectAccount: ConnectAccountDto? = null,
         zone: ZoneId = ZoneId.systemDefault(),
         now: Instant = Instant.now(),
     ): WalletContent {
@@ -41,9 +43,36 @@ object WalletMapper {
             monthMeta = monthMeta(monthIncomeRows(transactions, zone, now).size),
             activity = transactions.map { activityItem(it, zone, now) },
             payoutMethod = null,
+            payoutAccount = payoutAccount(connectAccount),
             taxDocs = null,
             holdState = null,
             payoutsEnabled = payoutsEnabled,
+        )
+    }
+
+    /**
+     * Map the live Connect status onto the "Payout account" card. Mirrors RN
+     * `PayoutsTab`: onboarded = `charges_enabled && payouts_enabled`; an
+     * account id without both flags is still verifying. No account at all →
+     * null, and the bottom bar's "Set up payouts" remains the entry point.
+     * Mirrors iOS `WalletViewModel.payoutAccount(from:)`.
+     */
+    fun payoutAccount(account: ConnectAccountDto?): WalletPayoutAccount? {
+        if (account == null) return null
+        if (account.chargesEnabled && account.payoutsEnabled) {
+            return WalletPayoutAccount(
+                headline = "Stripe account connected",
+                bodyText = "Payouts enabled · Card payments enabled",
+                actionLabel = "Open Stripe Dashboard",
+                warn = false,
+            )
+        }
+        if (account.stripeAccountId.isNullOrEmpty()) return null
+        return WalletPayoutAccount(
+            headline = "Account verification in progress",
+            bodyText = "Stripe is verifying your identity. This usually takes 1–2 business days.",
+            actionLabel = "Continue setup",
+            warn = true,
         )
     }
 

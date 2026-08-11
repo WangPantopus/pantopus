@@ -55,6 +55,7 @@ public final class MailTaskListViewModel {
     private let client: APIClient
     private let onOpenTask: @MainActor (String) -> Void
     private let onBack: @MainActor () -> Void
+    private let onPostAsNeighborTask: @MainActor (String) -> Void
 
     init(
         mailId: String? = nil,
@@ -62,8 +63,10 @@ public final class MailTaskListViewModel {
         mailSender: String? = nil,
         client: APIClient = .shared,
         onOpenTask: @escaping @MainActor (String) -> Void = { _ in },
-        onBack: @escaping @MainActor () -> Void = {}
+        onBack: @escaping @MainActor () -> Void = {},
+        onPostAsNeighborTask: @escaping @MainActor (String) -> Void = { _ in }
     ) {
+        self.onPostAsNeighborTask = onPostAsNeighborTask
         self.mailId = mailId
         self.mailSubject = mailSubject
         self.mailSender = mailSender
@@ -130,6 +133,21 @@ public final class MailTaskListViewModel {
 
     public func cancelCreate() {
         mode = .list
+    }
+
+    /// A17.8 → "Ask a Neighbor". RN's create frame offers "Post as Neighbor
+    /// Task Instead", which leaves the task pipeline entirely and opens the
+    /// package-gig form for the source mail in post-delivery mode
+    /// (`src/app/mailbox/tasks.tsx:231-240`).
+    public func postAsNeighborTask() {
+        guard let mailId else {
+            alert = MailTaskListAlert(
+                title: "No Mail",
+                message: "This task must be linked to a mail item."
+            )
+            return
+        }
+        onPostAsNeighborTask(mailId)
     }
 
     // MARK: - Create

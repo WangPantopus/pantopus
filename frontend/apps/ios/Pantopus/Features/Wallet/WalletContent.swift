@@ -107,6 +107,31 @@ public struct WalletPayoutMethod: Equatable, Sendable {
     }
 }
 
+/// Connected-payout-account card payload, derived from the real Stripe
+/// Connect status (`GET /api/payments/connect/account`). Stripe does not
+/// hand the platform a bank name or last-4 for an Express account, so this
+/// card describes the *account* (what it can do, and how to manage it in
+/// Stripe's own dashboard) rather than inventing bank details.
+public struct WalletPayoutAccount: Equatable, Sendable {
+    /// `Stripe account connected` / `Account verification in progress`.
+    public let headline: String
+    /// Supporting line — capability summary or the verification note.
+    public let bodyText: String
+    /// Dock label for the trailing control — "Open Stripe Dashboard" once
+    /// onboarded, "Continue setup" while Stripe is still verifying.
+    public let actionLabel: String
+    /// `true` → the account exists but isn't onboarded yet: amber treatment,
+    /// and the action resumes hosted onboarding instead of the dashboard.
+    public let warn: Bool
+
+    public init(headline: String, bodyText: String, actionLabel: String, warn: Bool) {
+        self.headline = headline
+        self.bodyText = bodyText
+        self.actionLabel = actionLabel
+        self.warn = warn
+    }
+}
+
 /// Tax-docs row payload. `ready` lights up the home-green icon tile +
 /// `New` chip + "1099-NEC ready" body. Otherwise the row renders the
 /// neutral grey YTD line.
@@ -161,6 +186,11 @@ public struct WalletContent: Equatable, Sendable {
     /// no Stripe payout-method feed yet, and the section is hidden rather
     /// than filled with fabricated bank details.
     public let payoutMethod: WalletPayoutMethod?
+    /// The seller's Stripe Connect account, when they have one. Drives the
+    /// "Payout account" card — and with it the "Open Stripe Dashboard"
+    /// action, which is otherwise unreachable. `nil` when no connected
+    /// account exists (the bottom bar's "Set up payouts" covers that case).
+    public let payoutAccount: WalletPayoutAccount?
     /// `nil` until real tax-document data is known — same rule as
     /// `payoutMethod`; never show invented YTD earnings.
     public let taxDocs: WalletTaxDocs?
@@ -184,6 +214,7 @@ public struct WalletContent: Equatable, Sendable {
         monthMeta: String,
         activity: [WalletActivityItem],
         payoutMethod: WalletPayoutMethod? = nil,
+        payoutAccount: WalletPayoutAccount? = nil,
         taxDocs: WalletTaxDocs? = nil,
         holdState: WalletHoldState? = nil,
         payoutsEnabled: Bool = true
@@ -195,6 +226,7 @@ public struct WalletContent: Equatable, Sendable {
         self.monthMeta = monthMeta
         self.activity = activity
         self.payoutMethod = payoutMethod
+        self.payoutAccount = payoutAccount
         self.taxDocs = taxDocs
         self.holdState = holdState
         self.payoutsEnabled = payoutsEnabled

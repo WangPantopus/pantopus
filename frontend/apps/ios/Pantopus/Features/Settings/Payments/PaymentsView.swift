@@ -118,6 +118,7 @@ private extension PaymentsView {
             }
             .padding(.bottom, Spacing.s5)
         }
+        .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("paymentsContent")
     }
 
@@ -215,6 +216,13 @@ private extension PaymentsView {
                             divider
                         }
                     }
+                case let .transactions(transactions):
+                    ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
+                        transactionRow(transaction)
+                        if index < transactions.count - 1 {
+                            divider
+                        }
+                    }
                 case let .empty(title, body):
                     activityEmptyRow(title: title, body: body)
                 }
@@ -293,6 +301,65 @@ private extension PaymentsView {
         .padding(.vertical, 14)
         .frame(minHeight: 48)
         .accessibilityIdentifier("paymentsActivityStat_\(stat.id)")
+    }
+
+    /// One row of the real transaction-history feed
+    /// (`GET /api/payments/history`). Icon + tint mirror RN's `HistoryTab`:
+    /// tips get the star, payouts the indigo arrow disc, money-out red,
+    /// money-in green.
+    private func transactionRow(_ transaction: PaymentsTransaction) -> some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                Circle()
+                    .fill(transactionTint(transaction.kind).opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Icon(
+                    transactionIcon(transaction.kind),
+                    size: 16,
+                    strokeWidth: 2.2,
+                    color: transactionTint(transaction.kind)
+                )
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                if !transaction.meta.isEmpty {
+                    Text(transaction.meta)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: Spacing.s2)
+            Text(transaction.amount)
+                .font(.system(size: 15, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(transaction.isOutgoing ? Theme.Color.error : Theme.Color.success)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, 14)
+        .frame(minHeight: 48)
+        .accessibilityIdentifier("paymentsTransaction_\(transaction.id)")
+    }
+
+    private func transactionIcon(_ kind: PaymentsTransaction.Kind) -> PantopusIcon {
+        switch kind {
+        case .tip: .star
+        case .payout: .arrowUp
+        case .sent: .arrowUp
+        case .received: .arrowDown
+        }
+    }
+
+    private func transactionTint(_ kind: PaymentsTransaction.Kind) -> Color {
+        switch kind {
+        case .tip: Theme.Color.warning
+        case .payout: Theme.Color.primary600
+        case .sent: Theme.Color.error
+        case .received: Theme.Color.success
+        }
     }
 
     private func activityEmptyRow(title: String, body: String) -> some View {

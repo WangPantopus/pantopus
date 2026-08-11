@@ -35,6 +35,10 @@ public struct MailDetailView: View {
     /// A17.14 — opens the Unboxing flow for this package. Mirrors RN's
     /// "Virtual Unboxing" CTA in `src/app/mailbox/package.tsx:183`.
     private let onOpenUnboxing: (@MainActor @Sendable () -> Void)?
+    /// A17.8 → "Ask a Neighbor". Opens the package-gig form for this
+    /// package; the flag mirrors RN's `?mode=pre|post`
+    /// (`src/app/mailbox/package.tsx:196-204`).
+    private let onAskNeighbor: (@MainActor @Sendable (_ isPreDelivery: Bool) -> Void)?
 
     public init(
         mailId: String,
@@ -44,7 +48,8 @@ public struct MailDetailView: View {
         onOpenExtractedTask: (@MainActor (String) -> Void)? = nil,
         onOpenCeremonialMail: (@MainActor (String) -> Void)? = nil,
         onCreateTask: (@MainActor @Sendable () -> Void)? = nil,
-        onOpenUnboxing: (@MainActor @Sendable () -> Void)? = nil
+        onOpenUnboxing: (@MainActor @Sendable () -> Void)? = nil,
+        onAskNeighbor: (@MainActor @Sendable (_ isPreDelivery: Bool) -> Void)? = nil
     ) {
         self.mailId = mailId
         _viewModel = State(initialValue: MailDetailViewModel(mailId: mailId))
@@ -55,6 +60,7 @@ public struct MailDetailView: View {
         self.onOpenCeremonialMail = onOpenCeremonialMail
         self.onCreateTask = onCreateTask
         self.onOpenUnboxing = onOpenUnboxing
+        self.onAskNeighbor = onAskNeighbor
     }
 
     public var body: some View {
@@ -281,7 +287,8 @@ public struct MailDetailView: View {
                 onAcknowledgeDelivery: { Task { await viewModel.acknowledge() } },
                 onOpenSenderProfile: onOpenSenderProfile,
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
-                onOpenUnboxing: onOpenUnboxing
+                onOpenUnboxing: onOpenUnboxing,
+                onAskNeighbor: onAskNeighbor
             )
         } else {
             generic(content)
