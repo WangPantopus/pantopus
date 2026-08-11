@@ -49,6 +49,9 @@ struct HubView: View {
                     content: content.topBar,
                     onAvatarTap: { onNavigate(.openProfile) },
                     onBellTap: { onNavigate(.openNotifications) },
+                    onAudienceTap: content.topBar.audienceUnreadCount > 0
+                        ? { onNavigate(.openAudienceNotifications) }
+                        : nil,
                     onMenuTap: { onNavigate(.openMenu) }
                 )
                 HubActionStrip(chips: content.actionChips) { onNavigate(.action($0)) }
@@ -63,13 +66,21 @@ struct HubView: View {
                     HubTodayCard(summary: today) { onNavigate(.openToday) }
                 }
                 HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
-                if !content.discovery.isEmpty {
-                    HubDiscoveryRail(
-                        items: content.discovery,
-                        onTap: { onNavigate(.openDiscovery($0)) },
-                        onSeeAll: { onNavigate(.openDiscoverHub) }
-                    )
-                }
+                // Rendered unconditionally: the filter tabs must stay
+                // reachable when a filter comes back with zero rows (the
+                // rail renders its own empty row instead).
+                HubDiscoveryRail(
+                    items: content.discovery,
+                    onTap: { onNavigate(.openDiscovery($0)) },
+                    activeFilter: viewModel.discoveryFilter,
+                    onFilterChange: { filter in
+                        Task { await viewModel.selectDiscoveryFilter(filter) }
+                    },
+                    isLoading: viewModel.discoveryLoading,
+                    onSeeAll: { onNavigate(.openDiscoverHub) },
+                    onExploreMap: { onNavigate(.openExploreMap) },
+                    onFindBusinesses: { onNavigate(.openFindBusinesses) }
+                )
                 if !content.jumpBackIn.isEmpty {
                     HubJumpBackIn(items: content.jumpBackIn) { onNavigate(.jumpBackIn($0)) }
                 }
@@ -102,13 +113,18 @@ struct HubView: View {
                     )
                     HubFirstRunHero(content: content) { onNavigate(.startVerification) }
                     HubPillarGrid(tiles: content.pillars) { onNavigate(.pillar($0)) }
-                    if !content.discovery.isEmpty {
-                        HubDiscoveryRail(
-                            items: content.discovery,
-                            onTap: { onNavigate(.openDiscovery($0)) },
-                            onSeeAll: { onNavigate(.openDiscoverHub) }
-                        )
-                    }
+                    HubDiscoveryRail(
+                        items: content.discovery,
+                        onTap: { onNavigate(.openDiscovery($0)) },
+                        activeFilter: viewModel.discoveryFilter,
+                        onFilterChange: { filter in
+                            Task { await viewModel.selectDiscoveryFilter(filter) }
+                        },
+                        isLoading: viewModel.discoveryLoading,
+                        onSeeAll: { onNavigate(.openDiscoverHub) },
+                        onExploreMap: { onNavigate(.openExploreMap) },
+                        onFindBusinesses: { onNavigate(.openFindBusinesses) }
+                    )
                     // Bottom padding leaves room for the floating progress
                     // card pinned below by the ZStack alignment.
                     Spacer(minLength: 96)
@@ -127,6 +143,10 @@ struct HubView: View {
 /// Outbound navigation intents raised by the hub.
 enum HubNavigationIntent {
     case openNotifications
+    /// S5 — megaphone shortcut straight into the Beacon (audience)
+    /// notification zone. Host pushes
+    /// `HubRoute.notificationsZone(context: "audience")`.
+    case openAudienceNotifications
     case openMenu
     case openProfile
     case action(ActionChipContent.Kind)
@@ -134,6 +154,12 @@ enum HubNavigationIntent {
     case pillar(PillarTile.Pillar)
     case openDiscovery(DiscoveryCardContent)
     case openDiscoverHub
+    /// "Explore Map" header link on the Discover section — RN
+    /// `src/app/(tabs)/index.tsx:505`.
+    case openExploreMap
+    /// "Find Businesses" header link on the Discover section — RN
+    /// `src/app/(tabs)/index.tsx:506`.
+    case openFindBusinesses
     case jumpBackIn(JumpBackItem)
     /// Today-card tap — currently a no-op host-side (the design's tap
     /// destination is "home calendar" but P11 hasn't shipped the native

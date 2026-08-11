@@ -128,6 +128,15 @@ public struct ManageTrainContent: Sendable, Hashable {
     /// Close-train sheet
     public let close: CloseTrainSheetContent
 
+    /// Lifecycle status straight off the payload — `draft` / `published`
+    /// / `active` / `paused` / `completed` / `archived`. Drives which
+    /// lifecycle rows are legal (the backend 409s on the rest).
+    public let status: String
+    /// Organizer tier. `primary` unlocks unpublish / archive / delete /
+    /// co-organizer edits / fund disable
+    /// (`backend/middleware/supportTrainPermissions.js:51`).
+    public let viewerRole: SupportTrainViewerRole
+
     public init(
         trainId: String,
         title: String,
@@ -148,7 +157,9 @@ public struct ManageTrainContent: Sendable, Hashable {
         pushToPhones: Bool,
         organizeRows: [OrganizeRowContent],
         closeRow: OrganizeRowContent,
-        close: CloseTrainSheetContent
+        close: CloseTrainSheetContent,
+        status: String = "active",
+        viewerRole: SupportTrainViewerRole = .primaryOrganizer
     ) {
         self.trainId = trainId
         self.title = title
@@ -170,6 +181,8 @@ public struct ManageTrainContent: Sendable, Hashable {
         self.organizeRows = organizeRows
         self.closeRow = closeRow
         self.close = close
+        self.status = status
+        self.viewerRole = viewerRole
     }
 }
 
@@ -211,8 +224,34 @@ public final class ManageTrainViewModel {
     /// Transient toast (e.g. "Update sent · 12 helpers").
     public var toast: String?
 
+    // MARK: - S1 organizer surfaces
+
+    /// Helper roster from `GET /:id/reservations` — drives share-address /
+    /// confirm-delivery / remove-from-slot.
+    public private(set) var helperRows: [ManageHelperRow] = []
+    /// Slot roster from the detail payload — drives add / edit / remove date.
+    public private(set) var slotRows: [ManageSlotRow] = []
+    /// Co-organizer roster from `GET /:id/organizers`.
+    public private(set) var organizerRows: [ManageOrganizerRow] = []
+    /// Gift-fund summary from `GET /:id/fund`.
+    public private(set) var fund: SupportTrainFundDTO?
+    /// True while any organizer mutation is in flight.
+    public private(set) var isSubmitting = false
+    /// AI-drafted open-slots nudge, editable before sending.
+    public var nudgeDraft: String?
+    /// Text field backing the "add co-organizer" row (a user id).
+    public var newOrganizerUserId: String = ""
+    /// Inline failure copy for the last organizer action.
+    public var actionError: String?
+    /// Presented slot editor (add or edit), or nil.
+    public var slotEditor: ManageSlotEditorState?
+    /// Pending destructive confirm, or nil.
+    public var pendingConfirm: ManageDestructiveConfirm?
+    /// Set once the train has been deleted so the host can pop the screen.
+    public private(set) var didDeleteTrain = false
+
     private let trainId: String
-    private let api: APIClient
+    let api: APIClient
     /// Explicit offline content (previews / tests). When set `load()`
     /// renders it directly instead of hitting the network.
     private let seed: ManageTrainContent?
@@ -242,10 +281,39 @@ public final class ManageTrainViewModel {
                 SupportTrainsEndpoints.detail(supportTrainId: trainId)
             )
             apply(Self.project(dto))
+            slotRows = Self.slotRows(dto.slots ?? [])
+            await loadOrganizerSurfaces()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load this support train."
             state = .error(message: message)
         }
+    }
+
+    /// Test / preview seam for the S1 organizer surfaces.
+    func replaceOrganizerSurfaces(
+        helpers: [ManageHelperRow]? = nil,
+        slots: [ManageSlotRow]? = nil,
+        organizers: [ManageOrganizerRow]? = nil,
+        fund: SupportTrainFundDTO? = nil
+    ) {
+        if let helpers { helperRows = helpers }
+        if let slots { slotRows = slots }
+        if let organizers { organizerRows = organizers }
+        if let fund { self.fund = fund }
+    }
+
+    func setSubmitting(_ value: Bool) {
+        isSubmitting = value
+    }
+
+    func markDeleted() {
+        didDeleteTrain = true
+    }
+
+    /// `id` accessor for the action extension (which lives in a separate
+    /// file and can't see the private stored property).
+    var supportTrainId: String {
+        trainId
     }
 
     public func refresh() async {

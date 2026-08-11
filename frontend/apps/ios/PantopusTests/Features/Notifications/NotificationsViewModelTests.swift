@@ -123,17 +123,20 @@ final class NotificationsViewModelTests: XCTestCase {
 
     // MARK: - Tabs
 
-    func testTabsExposeAllAndUnreadWithCounts() async {
+    func testTabsExposeAllUnreadAndReadWithCounts() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.twoUnreadJSON)]
         let vm = makeVM()
         await vm.load()
-        XCTAssertEqual(vm.tabs.count, 2)
+        XCTAssertEqual(vm.tabs.count, 3)
         XCTAssertEqual(vm.tabs[0].id, NotificationsTab.all)
         XCTAssertEqual(vm.tabs[1].id, NotificationsTab.unread)
+        XCTAssertEqual(vm.tabs[2].id, NotificationsTab.read)
         XCTAssertEqual(vm.tabs[0].label, "All")
         XCTAssertEqual(vm.tabs[1].label, "Unread")
+        XCTAssertEqual(vm.tabs[2].label, "Read")
         XCTAssertEqual(vm.tabs[0].count, 2)
         XCTAssertEqual(vm.tabs[1].count, 2)
+        XCTAssertEqual(vm.tabs[2].count, 0, "Both fixture rows are unread")
         XCTAssertEqual(vm.selectedTab, NotificationsTab.all)
     }
 

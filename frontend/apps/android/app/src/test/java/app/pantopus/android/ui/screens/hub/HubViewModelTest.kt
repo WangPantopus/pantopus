@@ -13,9 +13,11 @@ import app.pantopus.android.data.api.models.hub.HubResponse
 import app.pantopus.android.data.api.models.hub.HubSetup
 import app.pantopus.android.data.api.models.hub.HubTodayResponse
 import app.pantopus.android.data.api.models.hub.HubUser
+import app.pantopus.android.data.api.models.notifications.NotificationUnreadCountResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.hub.HubRepository
+import app.pantopus.android.data.notifications.NotificationsRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -41,8 +43,13 @@ class HubViewModelTest {
             every { getBoolean(any(), any()) } returns false
         }
 
+    // S5 — the Hub reads `byContext.audience` for the Beacon megaphone.
+    private val notificationsRepo: NotificationsRepository = mockk()
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        coEvery { notificationsRepo.unreadCount() } returns
+            NetworkResult.Success(NotificationUnreadCountResponse(count = 0, byContext = null))
     }
 
     @After fun tearDown() {
@@ -122,7 +129,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs)
+            val vm = HubViewModel(repo, prefs, notificationsRepo)
             assertTrue(vm.state.value is HubUiState.Skeleton)
             vm.load()
             val populated = vm.state.value as HubUiState.Populated
@@ -139,7 +146,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs)
+            val vm = HubViewModel(repo, prefs, notificationsRepo)
             vm.load()
             val first = vm.state.value as HubUiState.FirstRun
             assertEquals(0.2f, first.content.profileCompleteness, 0.001f)
@@ -157,7 +164,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs)
+            val vm = HubViewModel(repo, prefs, notificationsRepo)
             vm.load()
             assertTrue(vm.state.value is HubUiState.Error)
             vm.refresh()
@@ -172,7 +179,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs)
+            val vm = HubViewModel(repo, prefs, notificationsRepo)
             vm.load()
             val firstContent = (vm.state.value as HubUiState.Populated).content
             assertNotNull(firstContent.setupBanner)
@@ -204,7 +211,7 @@ class HubViewModelTest {
                             ),
                     ),
                 )
-            val vm = HubViewModel(repo, prefs)
+            val vm = HubViewModel(repo, prefs, notificationsRepo)
             vm.load()
             val populated = vm.state.value as HubUiState.Populated
             assertEquals(1, populated.content.discovery.size)

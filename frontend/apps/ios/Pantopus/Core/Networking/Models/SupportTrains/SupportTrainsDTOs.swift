@@ -167,8 +167,16 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
     public let createdAt: String?
     public let updatedAt: String?
     public let canceledAt: String?
-    /// Backend nests the helper as `User` (capitalised). Mapped to
-    /// `helper` at the decoder boundary.
+    /// Email-only (guest) signup address — organizers email the exact
+    /// address to this address instead of granting in-app access.
+    public let guestEmail: String?
+    /// True once the organizer has shared the exact address with this
+    /// helper (`SupportTrainAddressGrant`) or emailed the guest
+    /// (`backend/routes/supportTrains.js:3415`).
+    public let exactAddressShared: Bool?
+    /// The handler responds with a lowercase `user` object
+    /// (`backend/routes/supportTrains.js:3418`); the capitalised `User`
+    /// Supabase alias is still accepted so older fixtures decode.
     public let helper: SupportTrainHelperDTO?
 
     /// Memberwise init for optimistic patches. Declared in the struct
@@ -189,7 +197,9 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
         createdAt: String?,
         updatedAt: String?,
         canceledAt: String?,
-        helper: SupportTrainHelperDTO?
+        helper: SupportTrainHelperDTO?,
+        guestEmail: String? = nil,
+        exactAddressShared: Bool? = nil
     ) {
         self.id = id
         self.slotId = slotId
@@ -206,6 +216,34 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
         self.updatedAt = updatedAt
         self.canceledAt = canceledAt
         self.helper = helper
+        self.guestEmail = guestEmail
+        self.exactAddressShared = exactAddressShared
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        slotId = try container.decodeIfPresent(String.self, forKey: .slotId)
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+        guestName = try container.decodeIfPresent(String.self, forKey: .guestName)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        contributionMode = try container.decodeIfPresent(String.self, forKey: .contributionMode)
+        dishTitle = try container.decodeIfPresent(String.self, forKey: .dishTitle)
+        restaurantName = try container.decodeIfPresent(String.self, forKey: .restaurantName)
+        estimatedArrivalAt = try container.decodeIfPresent(String.self, forKey: .estimatedArrivalAt)
+        noteToRecipient = try container.decodeIfPresent(String.self, forKey: .noteToRecipient)
+        privateNoteToOrganizer = try container.decodeIfPresent(
+            String.self,
+            forKey: .privateNoteToOrganizer
+        )
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        canceledAt = try container.decodeIfPresent(String.self, forKey: .canceledAt)
+        guestEmail = try container.decodeIfPresent(String.self, forKey: .guestEmail)
+        exactAddressShared = try container.decodeIfPresent(Bool.self, forKey: .exactAddressShared)
+        let lowercase = try container.decodeIfPresent(SupportTrainHelperDTO.self, forKey: .helper)
+        helper = try lowercase
+            ?? container.decodeIfPresent(SupportTrainHelperDTO.self, forKey: .legacyHelper)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -213,6 +251,7 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
         case slotId = "slot_id"
         case userId = "user_id"
         case guestName = "guest_name"
+        case guestEmail = "guest_email"
         case contributionMode = "contribution_mode"
         case dishTitle = "dish_title"
         case restaurantName = "restaurant_name"
@@ -222,7 +261,15 @@ public struct SupportTrainReservationDTO: Decodable, Sendable, Identifiable, Has
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case canceledAt = "canceled_at"
-        case helper = "User"
+        case exactAddressShared = "exact_address_shared"
+        case helper = "user"
+        case legacyHelper = "User"
+    }
+
+    /// Guest (email-only) signups have no linked account — organizers
+    /// email them the address instead of granting in-app access.
+    public var isGuestSignup: Bool {
+        userId == nil && (guestName != nil || guestEmail != nil)
     }
 
     /// Returns `true` when `updatedAt > createdAt` — used by the VM to

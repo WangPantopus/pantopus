@@ -78,11 +78,17 @@ final class ConnectionsViewModelTests: XCTestCase {
     private func stubConnections(
         accepted: StubResponse,
         pending: StubResponse,
+        sent: StubResponse = .status(200, body: "{\"requests\":[]}"),
+        blocked: StubResponse = .status(200, body: "{\"blocked\":[]}"),
         actions: [StubResponse] = []
     ) {
         SequencedURLProtocol.routeResponses = [
             "/api/relationships": [accepted],
-            "/api/relationships/requests/pending": [pending]
+            "/api/relationships/requests/pending": [pending],
+            // S5 — the Sent + Blocked tabs fetch in the same fan-out, so
+            // they need stubs or they'd eat the `actions` sequence.
+            "/api/relationships/requests/sent": [sent],
+            "/api/relationships/blocked": [blocked]
         ]
         SequencedURLProtocol.sequence = actions
     }
@@ -199,7 +205,7 @@ final class ConnectionsViewModelTests: XCTestCase {
         )
         let vm = makeVM()
         await vm.load()
-        XCTAssertEqual(vm.tabs.count, 3)
+        XCTAssertEqual(vm.tabs.count, 5)
         XCTAssertEqual(vm.tabs[0].id, ConnectionsTab.all)
         XCTAssertEqual(vm.tabs[0].count, 2)
         XCTAssertEqual(vm.tabs[1].id, ConnectionsTab.neighbors)
@@ -207,6 +213,8 @@ final class ConnectionsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.tabs[1].count, 1)
         XCTAssertEqual(vm.tabs[2].id, ConnectionsTab.pending)
         XCTAssertEqual(vm.tabs[2].count, 1)
+        XCTAssertEqual(vm.tabs[3].id, ConnectionsTab.sent)
+        XCTAssertEqual(vm.tabs[4].id, ConnectionsTab.blocked)
     }
 
     func testNeighborsTabFiltersOutConnectionsWithoutCity() async {

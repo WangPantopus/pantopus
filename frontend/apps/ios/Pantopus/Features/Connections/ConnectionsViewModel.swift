@@ -21,11 +21,19 @@
 //          stacked Accept / Ignore on Pending.
 //    - Empty states per tab (matching the design's empty frame copy).
 //
-//  Backend (existing — verified against `backend/routes/relationships.js`):
-//    - `GET /api/relationships`                        → Accepted list
-//    - `GET /api/relationships/requests/pending`       → Pending tab
-//    - `POST /api/relationships/:id/accept`            → Accept
-//    - `POST /api/relationships/:id/reject`            → Ignore
+//  S5 (RN parity, `src/app/connections.tsx:16-21,70-82,126-148`) adds
+//  the Sent + Blocked tabs, the per-row Remove (disconnect, confirmed)
+//  and Unblock actions.
+//
+//  Backend (verified against `backend/routes/relationships.js`):
+//    - `GET /api/relationships`                    :622 → Accepted list
+//    - `GET /api/relationships/requests/pending`   :669 → Pending tab
+//    - `GET /api/relationships/requests/sent`      :698 → Sent tab
+//    - `GET /api/relationships/blocked`            :727 → Blocked tab
+//    - `POST /api/relationships/:id/accept`        :217 → Accept
+//    - `POST /api/relationships/:id/reject`        :295 → Ignore
+//    - `DELETE /api/relationships/:id`             :578 → Remove
+//    - `POST /api/relationships/:id/unblock`       :522 → Unblock
 //
 //  Two GETs fire in parallel on initial load; subsequent tab switches
 //  segment over the cached payload (no extra fetch). Accept / Reject are
@@ -44,6 +52,24 @@ public enum ConnectionsTab {
     public static let all = "all"
     public static let neighbors = "neighbors"
     public static let pending = "pending"
+    /// S5 — outbound requests still awaiting a decision. RN
+    /// `src/app/connections.tsx:19`.
+    public static let sent = "sent"
+    /// S5 — people the viewer has blocked. RN
+    /// `src/app/connections.tsx:20`.
+    public static let blocked = "blocked"
+}
+
+/// Pending "remove this connection?" confirmation. Names the person so
+/// the dialog copy can't be mistaken for a generic destructive prompt.
+public struct ConnectionRemovalRequest: Sendable, Identifiable, Hashable {
+    public let id: String
+    public let displayName: String
+
+    public init(id: String, displayName: String) {
+        self.id = id
+        self.displayName = displayName
+    }
 }
 
 /// Routing payload emitted by the Connections row's message-CTA. The
@@ -117,9 +143,14 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
                 label: "Neighbors",
                 count: filteredNeighbors.count
             ),
-            ListOfRowsTab(id: ConnectionsTab.pending, label: "Pending", count: filteredPending.count)
+            ListOfRowsTab(id: ConnectionsTab.pending, label: "Pending", count: filteredPending.count),
+            ListOfRowsTab(id: ConnectionsTab.sent, label: "Sent", count: filteredSent.count),
+            ListOfRowsTab(id: ConnectionsTab.blocked, label: "Blocked", count: filteredBlocked.count)
         ]
     }
+
+    /// Row awaiting disconnect confirmation. `nil` = no dialog.
+    public var pendingRemoval: ConnectionRemovalRequest?
 
     public var selectedTab: String = ConnectionsTab.all {
         didSet {
@@ -166,6 +197,8 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
 
     private var accepted: [RelationshipDTO] = []
     private var pending: [PendingRequestDTO] = []
+    private var sent: [SentRequestDTO] = []
+    private var blocked: [BlockedRelationshipDTO] = []
     private var loadedOnce: Bool = false
 
     init(
@@ -189,11 +222,11 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
     public func load() async {
         if loadedOnce { return }
         state = .loading
-        await fetchBoth()
+        await fetchAll()
     }
 
     public func refresh() async {
-        await fetchBoth()
+        await fetchAll()
     }
 
     public func loadMoreIfNeeded() async {
@@ -261,19 +294,104 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
         }
     }
 
+    // MARK: - Remove (disconnect) / Unblock
+
+    /// Ask for confirmation before disconnecting. The screen renders a
+    /// `confirmationDialog` off `pendingRemoval`; RN shows the same
+    /// Cancel / Remove alert (`src/app/connections.tsx:70-77`).
+    public func requestRemoval(relationshipId: String) {
+        guard let rel = accepted.first(where: { $0.id == relationshipId }) else { return }
+        pendingRemoval = ConnectionRemovalRequest(
+            id: relationshipId,
+            displayName: Self.displayName(for: rel.otherUser) ?? "this connection"
+        )
+    }
+
+    /// Dismiss the confirmation without disconnecting.
+    public func cancelRemoval() {
+        pendingRemoval = nil
+    }
+
+    /// Run the confirmed disconnect.
+    public func confirmRemoval() async {
+        guard let request = pendingRemoval else { return }
+        pendingRemoval = nil
+        await disconnect(relationshipId: request.id)
+    }
+
+    /// `DELETE /api/relationships/:id`. Optimistic — the row disappears
+    /// immediately and is restored if the call fails.
+    public func disconnect(relationshipId: String) async {
+        let previous = accepted
+        accepted.removeAll { $0.id == relationshipId }
+        rebuild()
+        do {
+            let _: RelationshipActionEcho = try await api.request(
+                ConnectionsEndpoints.disconnect(id: relationshipId)
+            )
+        } catch {
+            accepted = previous
+            rebuild()
+        }
+    }
+
+    /// `POST /api/relationships/:id/unblock`. Optimistic — the row leaves
+    /// the Blocked tab and is restored if the call fails. The backend
+    /// deletes the row outright, so nothing moves into Connections.
+    public func unblock(relationshipId: String) async {
+        let previous = blocked
+        blocked.removeAll { $0.id == relationshipId }
+        rebuild()
+        do {
+            let _: RelationshipActionEcho = try await api.request(
+                ConnectionsEndpoints.unblock(id: relationshipId)
+            )
+        } catch {
+            blocked = previous
+            rebuild()
+        }
+    }
+
     // MARK: - Fetching
 
-    private func fetchBoth() async {
+    private func fetchAll() async {
         async let acceptedTask = fetchAccepted()
         async let pendingTask = fetchPending()
+        async let sentTask = fetchSent()
+        async let blockedTask = fetchBlocked()
         let (acceptedResult, pendingResult) = await (acceptedTask, pendingTask)
-        if !acceptedResult && !pendingResult {
-            // Both failed → surface the error banner.
+        let (sentResult, blockedResult) = await (sentTask, blockedTask)
+        if !acceptedResult, !pendingResult, !sentResult, !blockedResult {
+            // Everything failed → surface the error banner.
             state = .error(message: "Couldn't load your connections. Try again.")
             return
         }
         loadedOnce = true
         rebuild()
+    }
+
+    private func fetchSent() async -> Bool {
+        do {
+            let response: SentRequestsResponse = try await api.request(
+                ConnectionsEndpoints.sentRequests
+            )
+            sent = response.requests
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func fetchBlocked() async -> Bool {
+        do {
+            let response: BlockedRelationshipsResponse = try await api.request(
+                ConnectionsEndpoints.blocked
+            )
+            blocked = response.blocked
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func fetchAccepted() async -> Bool {
@@ -328,6 +446,18 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
         }
     }
 
+    private var filteredSent: [SentRequestDTO] {
+        applySearch(sent) { req in
+            Self.searchableText(for: req.addressee)
+        }
+    }
+
+    private var filteredBlocked: [BlockedRelationshipDTO] {
+        applySearch(blocked) { rel in
+            Self.searchableText(for: rel.blockedUser)
+        }
+    }
+
     private func applySearch<T>(_ items: [T], by text: (T) -> String) -> [T] {
         let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !needle.isEmpty else { return items }
@@ -338,6 +468,10 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
         let rows: [RowModel] = switch selectedTab {
         case ConnectionsTab.pending:
             filteredPending.map { rowForPending($0) }
+        case ConnectionsTab.sent:
+            filteredSent.map { rowForSent($0) }
+        case ConnectionsTab.blocked:
+            filteredBlocked.map { rowForBlocked($0) }
         case ConnectionsTab.neighbors:
             filteredNeighbors.map { rowForAccepted($0) }
         default:
@@ -358,6 +492,20 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
                 icon: .mailbox,
                 headline: "No pending requests",
                 subcopy: "When someone sends you a connection request, it'll show up here."
+            )
+        case ConnectionsTab.sent:
+            ListOfRowsState.EmptyContent(
+                icon: .send,
+                headline: "No sent requests",
+                subcopy: "Requests you send will appear here until accepted or declined."
+            )
+        case ConnectionsTab.blocked:
+            ListOfRowsState.EmptyContent(
+                icon: .ban,
+                headline: "No blocked users",
+                subcopy: "People you block stop seeing your posts and can't message you.",
+                tint: Theme.Color.appSurfaceSunken,
+                accent: Theme.Color.appTextSecondary
             )
         case ConnectionsTab.neighbors:
             ListOfRowsState.EmptyContent(
@@ -424,7 +572,81 @@ public final class ConnectionsViewModel: ListOfRowsDataSource {
             },
             body: body,
             subtitleIcon: Self.localityText(user) == nil ? nil : .mapPin,
-            bodyIcon: .userPlus
+            bodyIcon: .userPlus,
+            destructiveAction: RowDestructiveAction(
+                label: "Remove",
+                identifier: "connections.row.\(rel.id).remove"
+            ) { [weak self] in
+                Task { @MainActor in self?.requestRemoval(relationshipId: rel.id) }
+            }
+        )
+    }
+
+    /// Outbound request row — no actions, just the "Pending" status the
+    /// RN screen shows (`src/app/connections.tsx:141-143`).
+    public func rowForSent(_ request: SentRequestDTO) -> RowModel {
+        let user = request.addressee
+        let displayName = Self.displayName(for: user) ?? "Member"
+        let body = "Sent " + (
+            Self.formatRelativeTime(
+                request.createdAt,
+                now: now(),
+                calendar: calendar,
+                timeZone: timeZone
+            ) ?? "just now"
+        )
+        return RowModel(
+            id: request.id,
+            title: displayName,
+            subtitle: Self.localityText(user),
+            template: .statusChip,
+            leading: .avatarWithBadge(
+                name: displayName,
+                imageURL: Self.avatarURL(user),
+                background: .gradient(ConnectionAvatarTone.tone(for: user?.id ?? request.id).gradient),
+                size: .large,
+                verified: false
+            ),
+            trailing: .statusChip(text: "Pending", variant: .warning),
+            body: body,
+            subtitleIcon: Self.localityText(user) == nil ? nil : .mapPin,
+            bodyIcon: .clock
+        )
+    }
+
+    /// Blocked row — trailing neutral "Unblock" pill, matching the
+    /// A14.4 blocked-users treatment the shell already ships.
+    public func rowForBlocked(_ rel: BlockedRelationshipDTO) -> RowModel {
+        let user = rel.blockedUser
+        let displayName = Self.displayName(for: user) ?? "Member"
+        let body = "Blocked " + (
+            Self.formatRelativeTime(
+                rel.respondedAt ?? rel.createdAt,
+                now: now(),
+                calendar: calendar,
+                timeZone: timeZone
+            ) ?? "recently"
+        )
+        let relationshipId = rel.id
+        return RowModel(
+            id: rel.id,
+            title: displayName,
+            subtitle: Self.localityText(user),
+            template: .statusChip,
+            leading: .avatarWithBadge(
+                name: displayName,
+                imageURL: Self.avatarURL(user),
+                background: .gradient(ConnectionAvatarTone.tone(for: user?.id ?? rel.id).gradient),
+                size: .large,
+                verified: false
+            ),
+            trailing: .pillButton(label: "Unblock", tone: .neutral) { [weak self] in
+                Task { @MainActor in await self?.unblock(relationshipId: relationshipId) }
+            },
+            body: body,
+            subtitleIcon: Self.localityText(user) == nil ? nil : .mapPin,
+            bodyIcon: .ban,
+            note: rel.blockReason?.isEmpty == false ? rel.blockReason : nil
         )
     }
 

@@ -1,7 +1,8 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "LongParameterList")
+@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "LongParameterList", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.feed
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,9 +27,12 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -53,10 +58,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.screens.feed.map.FeedMapQuery
+import app.pantopus.android.ui.screens.feed.map.FeedMapSection
+import app.pantopus.android.ui.screens.feed.map.FeedViewMode
 import app.pantopus.android.ui.screens.feed.pulse.PulseFeedUiState
 import app.pantopus.android.ui.screens.feed.pulse.PulseFeedViewModel
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.feed.pulse.PulsePostCard
+import app.pantopus.android.ui.screens.feed.pulse.PulsePostCardContent
 import app.pantopus.android.ui.screens.shared.feed.FeedChipItem
 import app.pantopus.android.ui.screens.shared.feed.FeedChipRow
 import app.pantopus.android.ui.screens.shared.feed.FeedComposeFAB
@@ -66,12 +75,15 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.delay
 
 /**
  * Pulse tab — the public neighborhood feed reached from
  * Hub → pillar(.pulse). Replaces the legacy List-of-strings stub.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("CyclomaticComplexMethod")
 fun FeedScreen(
     surface: FeedSurface = FeedSurface.Pulse,
     onOpenPost: (String) -> Unit = {},
@@ -80,18 +92,49 @@ fun FeedScreen(
     onBack: (() -> Unit)? = null,
     viewModel: PulseFeedViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     val searchText by viewModel.searchText.collectAsStateWithLifecycle()
+    // The VM is configured in a LaunchedEffect, so the host's `surface`
+    // argument stays authoritative for the chrome that must not flash
+    // (title, toggle visibility); `activeSurface` drives what the toggle
+    // itself selects.
+    val activeSurface by viewModel.surface.collectAsStateWithLifecycle()
+    val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
+    val overflowPostId by viewModel.overflowPostId.collectAsStateWithLifecycle()
+    val reportingPostId by viewModel.reportingPostId.collectAsStateWithLifecycle()
+    val deletingPostId by viewModel.deletingPostId.collectAsStateWithLifecycle()
+    val mutingPostId by viewModel.mutingPostId.collectAsStateWithLifecycle()
+    val showsPreferences by viewModel.showsPreferences.collectAsStateWithLifecycle()
     var showsSearch by remember { mutableStateOf(false) }
     var showsIntentPicker by remember { mutableStateOf(false) }
+    // List / Map segment — mirrors RN `FeedHeader.tsx:35-52`.
+    var viewMode by remember { mutableStateOf(FeedViewMode.List) }
 
     LaunchedEffect(Unit) {
         viewModel.configureSurface(surface)
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenPulseFeedViewed(intent = activeIntent.key))
+    }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            delay(2_500)
+            viewModel.dismissToast()
+        }
+    }
+
+    fun launchShareSheet(postId: String) {
+        val send =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, viewModel.shareUrl(postId))
+            }
+        context.startActivity(Intent.createChooser(send, "Share post"))
+        viewModel.recordShare(postId)
     }
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("pulseFeed")) {
@@ -104,7 +147,16 @@ fun FeedScreen(
                     if (!showsSearch) viewModel.setSearchText("")
                 },
                 onFilterTap = { showsIntentPicker = true },
+                onPreferencesTap = { viewModel.openPreferences() },
+                viewMode = viewMode.takeIf { surface.supportsMapMode },
+                onViewModeChange = { viewMode = it },
             )
+            if (surface in FeedSurface.toggleSurfaces) {
+                FeedSurfaceTabs(active = activeSurface) { next ->
+                    viewMode = FeedViewMode.List
+                    viewModel.selectSurface(next)
+                }
+            }
             if (showsSearch) {
                 OutlinedTextField(
                     value = searchText,
@@ -145,23 +197,51 @@ fun FeedScreen(
                 onSelect = { id -> viewModel.selectIntent(PulseIntent.fromKey(id)) },
                 skeleton = state is PulseFeedUiState.Loading,
             )
-            when (val s = state) {
-                is PulseFeedUiState.Loading -> LoadingFrame()
-                is PulseFeedUiState.Empty ->
-                    FeedEmptyState(content = s.content) { onEmptyCta?.invoke() ?: onCompose(activeIntent) }
-                is PulseFeedUiState.Loaded ->
-                    PopulatedFrame(
-                        state = s,
-                        onTapPost = onOpenPost,
-                        onTapReaction = viewModel::tapReaction,
-                        isRefreshing = isRefreshing,
-                        onRefresh = viewModel::refresh,
-                        isLoadingMore = isLoadingMore,
-                        onRowAppeared = viewModel::loadMoreIfNeeded,
-                        searchActive = searchText.isNotBlank(),
-                    )
-                is PulseFeedUiState.Error ->
-                    ErrorFrame(message = s.message, onRetry = { viewModel.refresh() })
+            if (viewMode == FeedViewMode.Map && surface.supportsMapMode) {
+                FeedMapSection(
+                    query = FeedMapQuery(surface = activeSurface, postType = activeIntent.postType),
+                    onOpenPost = onOpenPost,
+                )
+            } else {
+                when (val s = state) {
+                    is PulseFeedUiState.Loading -> LoadingFrame()
+                    is PulseFeedUiState.Empty ->
+                        FeedEmptyState(content = s.content) { onEmptyCta?.invoke() ?: onCompose(activeIntent) }
+                    is PulseFeedUiState.Loaded ->
+                        PopulatedFrame(
+                            state = s,
+                            onTapPost = onOpenPost,
+                            onTapReaction = viewModel::tapReaction,
+                            isRefreshing = isRefreshing,
+                            onRefresh = viewModel::refresh,
+                            isLoadingMore = isLoadingMore,
+                            onRowAppeared = viewModel::loadMoreIfNeeded,
+                            searchActive = searchText.isNotBlank(),
+                            rowActions =
+                                PulseFeedRowActions(
+                                    onOverflow = viewModel::openOverflow,
+                                    onDismissSeeded = viewModel::dismissSeededFact,
+                                    onToggleSave = viewModel::toggleSave,
+                                    onToggleRepost = viewModel::toggleRepost,
+                                ),
+                        )
+                    is PulseFeedUiState.Error ->
+                        ErrorFrame(message = s.message, onRetry = { viewModel.refresh() })
+                }
+            }
+        }
+        toast?.let { message ->
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.s16)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.appText)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("pulseFeedToast"),
+            ) {
+                Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextInverse)
             }
         }
         if (showsIntentPicker) {
@@ -200,6 +280,384 @@ fun FeedScreen(
                     .padding(end = Spacing.s4, bottom = Spacing.s10),
         )
     }
+
+    val loadedRows = (state as? PulseFeedUiState.Loaded)?.rows.orEmpty()
+    overflowPostId?.let { id ->
+        loadedRows.firstOrNull { it.id == id }?.let { row ->
+            PostOverflowSheet(
+                row = row,
+                onDismiss = { viewModel.dismissOverflow() },
+                onToggleSave = {
+                    viewModel.dismissOverflow()
+                    viewModel.toggleSave(row.id)
+                },
+                onToggleRepost = {
+                    viewModel.dismissOverflow()
+                    viewModel.toggleRepost(row.id)
+                },
+                onShare = {
+                    viewModel.dismissOverflow()
+                    launchShareSheet(row.id)
+                },
+                onHide = {
+                    viewModel.dismissOverflow()
+                    viewModel.hidePost(row.id)
+                },
+                onNotHelpful = {
+                    viewModel.dismissOverflow()
+                    viewModel.markNotHelpful(row.id)
+                },
+                onMuteAuthor = { viewModel.beginMuteAuthor(row.id) },
+                onMuteTopic = {
+                    viewModel.dismissOverflow()
+                    viewModel.muteTopic(row.id)
+                },
+                onMarkSolved = {
+                    viewModel.dismissOverflow()
+                    viewModel.markSolved(row.id)
+                },
+                onReport = { viewModel.beginReport(row.id) },
+                onDelete = { viewModel.beginDelete(row.id) },
+            )
+        }
+    }
+
+    reportingPostId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelReport() },
+            title = { Text("Report this post?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+                    Text(
+                        text =
+                            "Reports are reviewed by the Pantopus team. " +
+                                "The author isn't told who reported.",
+                        fontSize = 13.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                    pulseReportReasons.forEach { (key, label) ->
+                        TextButton(
+                            onClick = { viewModel.reportPost(id, key) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .testTag("pulseFeedReportReason_$key"),
+                        ) {
+                            Text(label, color = PantopusColors.appText)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelReport() }) { Text("Cancel") }
+            },
+        )
+    }
+
+    deletingPostId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDelete() },
+            title = { Text("Delete post?") },
+            text = { Text("This will permanently remove your post.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deletePost(id) },
+                    modifier = Modifier.testTag("pulseFeedDeleteConfirm"),
+                ) {
+                    Text("Delete", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") }
+            },
+        )
+    }
+
+    mutingPostId?.let { id ->
+        val name = loadedRows.firstOrNull { it.id == id }?.actions?.muteEntityName ?: "this author"
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelMuteAuthor() },
+            title = { Text("Mute $name?") },
+            text = { Text("You won't see their posts in any feed. You can undo this from their profile.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.muteAuthor(id) },
+                    modifier = Modifier.testTag("pulseFeedMuteConfirm"),
+                ) {
+                    Text("Mute", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelMuteAuthor() }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showsPreferences) {
+        FeedPreferencesSheet(
+            onClose = { viewModel.dismissPreferences() },
+            onPrefsChanged = { viewModel.refresh() },
+        )
+    }
+}
+
+/** Report reasons accepted by `reportPostSchema` (`backend/routes/posts.js:3168`). */
+private val pulseReportReasons =
+    listOf(
+        "spam" to "Spam",
+        "harassment" to "Harassment",
+        "inappropriate" to "Inappropriate content",
+        "misinformation" to "Misinformation",
+        "safety" to "Safety concern",
+        "other" to "Other",
+    )
+
+/**
+ * Per-row callbacks handed down to [PulsePostCard]. Bundled so
+ * [PopulatedFrame] keeps a readable signature.
+ */
+internal data class PulseFeedRowActions(
+    val onOverflow: (String) -> Unit = {},
+    val onDismissSeeded: (String) -> Unit = {},
+    val onToggleSave: (String) -> Unit = {},
+    val onToggleRepost: (String) -> Unit = {},
+)
+
+/**
+ * Nearby / Connections surface toggle — RN
+ * `src/components/feed/FeedSurfaceTabs.tsx:19-33`. Switching hits
+ * `GET /api/posts/feed?surface=place|connections`.
+ */
+@Composable
+private fun FeedSurfaceTabs(
+    active: FeedSurface,
+    onSelect: (FeedSurface) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s3)) {
+            FeedSurface.toggleSurfaces.forEach { tab ->
+                val isActive = tab == active
+                val tint = if (isActive) PantopusColors.primary600 else PantopusColors.appTextSecondary
+                Box(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(tab) }
+                                .padding(vertical = 10.dp)
+                                .semantics { contentDescription = tab.toggleLabel }
+                                .testTag("pulseSurfaceTab_${tab.name.lowercase()}"),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PantopusIconImage(
+                            icon = tab.toggleIcon,
+                            contentDescription = null,
+                            size = 15.dp,
+                            tint = tint,
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(
+                            text = tab.toggleLabel,
+                            fontSize = 14.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = tint,
+                        )
+                    }
+                    if (isActive) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(2.dp)
+                                    .background(PantopusColors.primary600),
+                        )
+                    }
+                }
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(PantopusColors.appBorder),
+        )
+    }
+}
+
+/**
+ * Card overflow menu — save / repost / share / hide / not-helpful / mute /
+ * mark-solved / report / delete, gated exactly as RN gates them
+ * (`PostCard.tsx:382-397, 445-470, 507-527`).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PostOverflowSheet(
+    row: PulsePostCardContent,
+    onDismiss: () -> Unit,
+    onToggleSave: () -> Unit,
+    onToggleRepost: () -> Unit,
+    onShare: () -> Unit,
+    onHide: () -> Unit,
+    onNotHelpful: () -> Unit,
+    onMuteAuthor: () -> Unit,
+    onMuteTopic: () -> Unit,
+    onMarkSolved: () -> Unit,
+    onReport: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val actions = row.actions
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = PantopusColors.appBg,
+        modifier = Modifier.testTag("pulseFeedOverflowSheet"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.s4),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Text(
+                text = "Post options",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            OverflowAction(
+                label = if (actions.isSaved) "Remove bookmark" else "Save post",
+                testTag = "pulseFeedOverflowSave",
+                onClick = onToggleSave,
+            )
+            OverflowAction(
+                label = if (actions.isReposted) "Undo repost" else "Repost",
+                testTag = "pulseFeedOverflowRepost",
+                onClick = onToggleRepost,
+            )
+            OverflowAction(label = "Share…", testTag = "pulseFeedOverflowShare", onClick = onShare)
+            OverflowAction(label = "Hide this post", testTag = "pulseFeedOverflowHide", onClick = onHide)
+            if (actions.canFlagNotHelpful) {
+                OverflowAction(
+                    label = "Not helpful here",
+                    testTag = "pulseFeedOverflowNotHelpful",
+                    onClick = onNotHelpful,
+                )
+            }
+            if (actions.canMuteAuthor) {
+                OverflowAction(
+                    label = "Mute ${actions.muteEntityName}",
+                    testTag = "pulseFeedOverflowMuteAuthor",
+                    onClick = onMuteAuthor,
+                )
+            }
+            val topic = actions.topicLabel
+            if (actions.canMuteTopic && !topic.isNullOrEmpty()) {
+                OverflowAction(
+                    label = "Mute $topic posts",
+                    testTag = "pulseFeedOverflowMuteTopic",
+                    onClick = onMuteTopic,
+                )
+            }
+            if (actions.canMarkSolved) {
+                OverflowAction(
+                    label = "Mark solved",
+                    testTag = "pulseFeedOverflowMarkSolved",
+                    onClick = onMarkSolved,
+                )
+            }
+            if (actions.canReport) {
+                OverflowAction(
+                    label = "Report post",
+                    testTag = "pulseFeedOverflowReport",
+                    isDestructive = true,
+                    onClick = onReport,
+                )
+            }
+            if (actions.canDelete) {
+                OverflowAction(
+                    label = "Delete post",
+                    testTag = "pulseFeedOverflowDelete",
+                    isDestructive = true,
+                    onClick = onDelete,
+                )
+            }
+            OverflowAction(label = "Cancel", testTag = "pulseFeedOverflowCancel", onClick = onDismiss)
+            Spacer(modifier = Modifier.height(Spacing.s6))
+        }
+    }
+}
+
+@Composable
+private fun OverflowAction(
+    label: String,
+    testTag: String,
+    isDestructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().testTag(testTag),
+    ) {
+        Text(
+            text = label,
+            color = if (isDestructive) PantopusColors.error else PantopusColors.appText,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * List / Map segmented pill. RN hides it on the `personas` (Beacons)
+ * surface — `src/components/feed/FeedHeader.tsx:36`.
+ */
+@Composable
+private fun ViewModeToggle(
+    active: FeedViewMode,
+    onSelect: (FeedViewMode) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.pill))
+                .padding(3.dp)
+                .testTag("pulseViewModeToggle"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        FeedViewMode.entries.forEach { mode ->
+            val selected = mode == active
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(if (selected) PantopusColors.primary600 else PantopusColors.appSurfaceSunken)
+                        .clickable { onSelect(mode) }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .testTag("pulseViewModeSegment_${mode.key}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                PantopusIconImage(
+                    icon = if (mode == FeedViewMode.List) PantopusIcon.List else PantopusIcon.Map,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = mode.label,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -208,6 +666,10 @@ private fun TopBar(
     onBack: (() -> Unit)?,
     onSearchTap: (() -> Unit)? = null,
     onFilterTap: (() -> Unit)? = null,
+    onPreferencesTap: (() -> Unit)? = null,
+    /** Non-null renders the List / Map segment (hidden on Beacons). */
+    viewMode: FeedViewMode? = null,
+    onViewModeChange: (FeedViewMode) -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxWidth().background(PantopusColors.appBg)) {
         Row(
@@ -243,6 +705,10 @@ private fun TopBar(
                 modifier = Modifier.semantics { heading() },
             )
             Spacer(modifier = Modifier.weight(1f))
+            if (viewMode != null) {
+                ViewModeToggle(active = viewMode, onSelect = onViewModeChange)
+                Spacer(modifier = Modifier.size(Spacing.s2))
+            }
             if (onSearchTap != null) {
                 Box(
                     modifier =
@@ -269,6 +735,24 @@ private fun TopBar(
                             .clickable(onClick = onFilterTap)
                             .testTag("pulseFilterButton")
                             .semantics { contentDescription = "Filter by intent" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Filter,
+                        contentDescription = null,
+                        size = 20.dp,
+                        tint = PantopusColors.appText,
+                    )
+                }
+            }
+            if (onPreferencesTap != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clickable(onClick = onPreferencesTap)
+                            .testTag("pulsePreferencesButton")
+                            .semantics { contentDescription = "Pulse preferences" },
                     contentAlignment = Alignment.Center,
                 ) {
                     PantopusIconImage(
@@ -433,6 +917,7 @@ private fun PopulatedFrame(
     isLoadingMore: Boolean = false,
     onRowAppeared: (String) -> Unit = {},
     searchActive: Boolean = false,
+    rowActions: PulseFeedRowActions = PulseFeedRowActions(),
 ) {
     val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
     Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
@@ -455,11 +940,16 @@ private fun PopulatedFrame(
         ) {
             items(items = state.rows, key = { it.id }) { row ->
                 LaunchedEffect(row.id) { onRowAppeared(row.id) }
+                val seeded = row.actions.isSeeded
                 PulsePostCard(
                     content = row,
                     onTap = { onTapPost(row.id) },
                     onPrimaryReaction = { onTapReaction(row.id) },
                     onRSVP = if (row.attendees == null) null else ({ onTapReaction(row.id) }),
+                    onOverflow = if (seeded) null else ({ rowActions.onOverflow(row.id) }),
+                    onDismissSeeded = if (seeded) ({ rowActions.onDismissSeeded(row.id) }) else null,
+                    onToggleSave = if (seeded) null else ({ rowActions.onToggleSave(row.id) }),
+                    onToggleRepost = if (seeded) null else ({ rowActions.onToggleRepost(row.id) }),
                 )
             }
             if (isLoadingMore) {

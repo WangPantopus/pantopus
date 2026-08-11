@@ -190,6 +190,11 @@ public enum HubRoute: Hashable {
     case gigsFeed
     /// Gig Search (P4.4). Pushed from the Gigs feed search bar.
     case gigSearch
+    /// S2 — Universal search (All / Tasks / People / Beacons /
+    /// Businesses / Homes). Pushed from the navigation drawer's
+    /// "Search" row; gig-only search stays reachable from its Tasks tab
+    /// and from the Gigs feed search bar.
+    case universalSearch
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
     case gigDetail(gigId: String)
     /// Map+List Hybrid opened from the Gigs feed map-toggle. Carries the
@@ -216,6 +221,12 @@ public enum HubRoute: Hashable {
     case invoiceDetail(invoiceId: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
+    /// S5 — Notifications scoped to one identity-firewall zone. Pushed by
+    /// the Hub megaphone with `context: "audience"` so the Beacon stream
+    /// opens directly (RN `?context=audience`,
+    /// `pantopus/frontend/apps/mobile/src/app/(tabs)/index.tsx:534`).
+    /// Values must be a `NotificationsZone` raw value.
+    case notificationsZone(context: String)
     /// Connections center (T5.2.3). Reached from the You / Me action grid
     /// or via the `pantopus://connections` deep link.
     case connections
@@ -640,7 +651,7 @@ public struct HubTabRoot: View {
         case .mailbox: return .mailboxRoot
         case .profileAndPrivacy: return .privacySettings
         case .beaconUpdates: return .beaconsFeed
-        case .search: return .gigSearch
+        case .search: return .universalSearch
         case .discoverNeighbors: return .discoverHub
         case .myBeacon: return .myBeacon
         case .myListings: return .marketplace
@@ -677,6 +688,24 @@ public struct HubTabRoot: View {
         case .businessReviews: return .placeholder(label: "Reviews")
         case .businessPayments: return .paymentsSettings
         case .businessSettings: return .placeholder(label: "Business Settings")
+        }
+    }
+
+    /// S2 — maps a universal-search result onto the route that opens it.
+    /// Mirrors Android `routeForUniversalSearch(...)` in
+    /// `RootTabScreen.kt`.
+    static func route(forUniversalSearch destination: UniversalSearchDestination) -> HubRoute {
+        switch destination {
+        case let .task(gigId): .gigDetail(gigId: gigId)
+        case let .person(userId): .publicProfile(userId: userId)
+        case let .beacon(handle): .beaconProfile(handle: handle)
+        case let .business(businessId): .businessProfile(businessId: businessId)
+        // Home rows come from `/api/homes/discover`, which only returns
+        // `public_preview` homes the viewer may not belong to. The home
+        // dashboard falls back to the public profile for non-members
+        // (`HomeDashboardViewModel.fetchPublicProfile`), so it is the
+        // correct landing surface for both cases.
+        case let .home(homeId): .homeDashboard(homeId: homeId)
         }
     }
 
@@ -843,6 +872,8 @@ public struct HubTabRoot: View {
         HubView { intent in
             switch intent {
             case .openNotifications: path.append(.notifications)
+            case .openAudienceNotifications:
+                path.append(.notificationsZone(context: NotificationsZone.audience.rawValue))
             case .openMenu: showNavDrawer = true
             case .startVerification: path.append(.addHome)
             case .action(.addHome): path.append(.addHome)
@@ -856,6 +887,8 @@ public struct HubTabRoot: View {
             case .openProfile: onOpenProfile()
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
+            case .openExploreMap: path.append(.explore)
+            case .openFindBusinesses: path.append(.discoverBusinesses)
             case let .jumpBackIn(item):
                 if item.route.hasPrefix("/app/chat") {
                     rootTabs.selected = .messages
@@ -1866,6 +1899,14 @@ public struct HubTabRoot: View {
                 },
                 onBack: pop
             )
+        case .universalSearch:
+            UniversalSearchView(
+                onOpen: { destination in
+                    Task { @MainActor in push(Self.route(forUniversalSearch: destination)) }
+                },
+                onBrowseNearbyBusinesses: { Task { @MainActor in push(.discoverBusinesses) } },
+                onBack: pop
+            )
         case let .gigDetail(gigId):
             GigDetailView(
                 viewModel: GigDetailViewModel(gigId: gigId),
@@ -2006,6 +2047,10 @@ public struct HubTabRoot: View {
             NotificationsView(
                 viewModel: NotificationsViewModel()
             ) { Task { @MainActor in pop() } }
+        case let .notificationsZone(context):
+            NotificationsView(
+                viewModel: NotificationsViewModel(initialContext: context)
+            ) { Task { @MainActor in pop() } }
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
@@ -2082,12 +2127,9 @@ public struct HubTabRoot: View {
                     )
                 },
                 onSignUp: {
-                    // Slot claim sheet wiring lands with the
-                    // editor surface in P3.7 follow-up — keep the
-                    // affordance visible per the design contract.
-                    Task { @MainActor in
-                        push(.placeholder(label: "Claim a slot"))
-                    }
+                    // S1 — the reserve sheet is owned by the detail
+                    // screen itself (`ReserveSlotSheet`), which posts
+                    // `POST …/slots/:slotId/reserve`. Nothing to push.
                 },
                 onEditSlot: { _ in
                     Task { @MainActor in
@@ -2119,10 +2161,19 @@ public struct HubTabRoot: View {
                             items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onConfirm: { _ in
-                        // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
-                        // wiring lands with the editor surface; the VM's
-                        // optimistic patch is the user-facing feedback today.
+                    onConfirm: { reservationId in
+                        // S1 — the optimistic row flip is paired with the
+                        // real `POST …/reservations/:reservationId/confirm`
+                        // (`backend/routes/supportTrains.js:3214`).
+                        Task { @MainActor in
+                            _ = try? await APIClient.shared.request(
+                                SupportTrainActionsEndpoints.confirmDelivery(
+                                    supportTrainId: supportTrainId,
+                                    reservationId: reservationId
+                                ),
+                                as: EmptyResponse.self
+                            )
+                        }
                     },
                     onMessage: { _ in
                         Task { @MainActor in push(.placeholder(label: "Message helper")) }
@@ -2441,6 +2492,12 @@ public struct HubTabRoot: View {
                         case .item: push(.listingDetail(listingId: entity.id))
                         case .post: push(.pulsePost(postId: entity.id))
                         case .spot: push(.businessProfile(businessId: entity.id))
+                        // `homes` markers are neighborhood addresses, not
+                        // homes the viewer owns — the backend has no
+                        // viewer-facing detail route for someone else's
+                        // home, so the tap selects the pin and the rail
+                        // card carries the address + locality.
+                        case .home: break
                         }
                     }
                 },

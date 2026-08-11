@@ -17,7 +17,9 @@ import app.pantopus.android.data.api.services.BusinessTeamApi
 import app.pantopus.android.data.api.services.BusinessesApi
 import app.pantopus.android.data.api.services.ChatApi
 import app.pantopus.android.data.api.services.ConnectApi
+import app.pantopus.android.data.api.services.ConnectionsApi
 import app.pantopus.android.data.api.services.EarnOffersApi
+import app.pantopus.android.data.api.services.FeedActionsApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.FollowingApi
 import app.pantopus.android.data.api.services.GeoApi
@@ -60,6 +62,7 @@ import app.pantopus.android.data.api.services.PaymentHistoryApi
 import app.pantopus.android.data.api.services.PaymentsApi
 import app.pantopus.android.data.api.services.PlaceApi
 import app.pantopus.android.data.api.services.PostsApi
+import app.pantopus.android.data.api.services.PostsMapApi
 import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
@@ -67,10 +70,12 @@ import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
+import app.pantopus.android.data.api.services.SupportTrainActionsApi
 import app.pantopus.android.data.api.services.SupportTrainsApi
 import app.pantopus.android.data.api.services.TenantApi
 import app.pantopus.android.data.api.services.TokenAcceptApi
 import app.pantopus.android.data.api.services.TransactionReviewsApi
+import app.pantopus.android.data.api.services.UniversalSearchApi
 import app.pantopus.android.data.api.services.UploadApi
 import app.pantopus.android.data.api.services.UserReportsApi
 import app.pantopus.android.data.api.services.UsersApi
@@ -346,10 +351,21 @@ object NetworkModule {
     fun providePostsApi(retrofit: Retrofit): PostsApi = retrofit.create(PostsApi::class.java)
 
     @Provides @Singleton
+    fun provideFeedActionsApi(retrofit: Retrofit): FeedActionsApi = retrofit.create(FeedActionsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePostsMapApi(retrofit: Retrofit): PostsMapApi = retrofit.create(PostsMapApi::class.java)
+
+    @Provides @Singleton
     fun provideUploadApi(retrofit: Retrofit): UploadApi = retrofit.create(UploadApi::class.java)
 
     @Provides @Singleton
     fun provideRelationshipsApi(retrofit: Retrofit): RelationshipsApi = retrofit.create(RelationshipsApi::class.java)
+
+    /** S5 — Connections Sent / Blocked / disconnect / unblock routes. */
+    @Provides @Singleton
+    fun provideConnectionsApi(retrofit: Retrofit): ConnectionsApi = retrofit.create(ConnectionsApi::class.java)
 
     @Provides @Singleton
     fun provideFollowingApi(retrofit: Retrofit): FollowingApi = retrofit.create(FollowingApi::class.java)
@@ -467,6 +483,17 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSupportTrainsApi(retrofit: Retrofit): SupportTrainsApi = retrofit.create(SupportTrainsApi::class.java)
+
+    /** S1 — Support Train write routes (reserve / cancel / organizer management). */
+    @Provides
+    @Singleton
+    fun provideSupportTrainActionsApi(retrofit: Retrofit): SupportTrainActionsApi =
+        retrofit.create(SupportTrainActionsApi::class.java)
+
+    /** S2 — universal search fan-out across the five search surfaces. */
+    @Provides
+    @Singleton
+    fun provideUniversalSearchApi(retrofit: Retrofit): UniversalSearchApi = retrofit.create(UniversalSearchApi::class.java)
 
     @Provides
     @Singleton

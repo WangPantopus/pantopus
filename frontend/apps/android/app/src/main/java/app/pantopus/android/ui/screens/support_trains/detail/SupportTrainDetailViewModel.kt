@@ -5,6 +5,8 @@ package app.pantopus.android.ui.screens.support_trains.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.support_trains.CancelReservationBody
+import app.pantopus.android.data.api.models.support_trains.ReserveSlotBody
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.support_trains.SupportTrainsRepository
@@ -12,8 +14,30 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/**
+ * Reserve-sheet presentation payload. `slotId` is pre-filled when the
+ * user tapped a specific open slot; null starts on the date-picker step.
+ */
+data class ReserveSheetSelection(
+    val slotId: String? = null,
+)
+
+/**
+ * S1 — the action layer that sits beside the render state: sign-up
+ * sheet presentation, in-flight flag, toast + error. Mirrors the iOS
+ * `SupportTrainDetailViewModel` published fields.
+ */
+data class SupportTrainDetailActionState(
+    val isSubmitting: Boolean = false,
+    val toast: String? = null,
+    val error: String? = null,
+    val reserveSheet: ReserveSheetSelection? = null,
+    val pendingLeave: SlotRowContent? = null,
+)
 
 /**
  * A10.9 — VM for the participant-facing Support Train detail screen.
@@ -89,6 +113,151 @@ class SupportTrainDetailViewModel
         fun seed(state: SupportTrainDetailUiState) {
             _state.value = state
         }
+
+        // ─── S1 · helper actions ───────────────────────────────────────
+
+        private val _action = MutableStateFlow(SupportTrainDetailActionState())
+        val action: StateFlow<SupportTrainDetailActionState> = _action.asStateFlow()
+
+        /** A signup landed while the sheet was up — refresh on dismissal. */
+        private var pendingReserveRefresh = false
+
+        private val loadedContent: SupportTrainDetailContent?
+            get() = (_state.value as? SupportTrainDetailUiState.Loaded)?.content
+
+        /** Open the reserve sheet; pass a slot id to skip the picker step. */
+        fun startReserve(slotId: String? = null) {
+            val content = loadedContent
+            if (content == null || content.reserveOptions.isEmpty()) {
+                _action.update { it.copy(error = "There are no open dates left on this train.") }
+                return
+            }
+            val resolved = content.reserveOptions.firstOrNull { it.id == slotId }?.id
+            _action.update { it.copy(reserveSheet = ReserveSheetSelection(resolved)) }
+        }
+
+        /**
+         * Closes the sheet and — when a signup landed — refreshes the
+         * screen. The refresh is deferred to dismissal on purpose:
+         * calling `load()` while the sheet is up flips the state back to
+         * `Loading`, which unmounts the sheet and loses its success step.
+         */
+        fun dismissReserve() {
+            _action.update { it.copy(reserveSheet = null) }
+            if (pendingReserveRefresh) {
+                pendingReserveRefresh = false
+                load()
+            }
+        }
+
+        fun requestLeave(row: SlotRowContent) {
+            _action.update { it.copy(pendingLeave = row) }
+        }
+
+        fun dismissLeave() {
+            _action.update { it.copy(pendingLeave = null) }
+        }
+
+        fun acknowledgeToast() {
+            _action.update { it.copy(toast = null) }
+        }
+
+        fun acknowledgeError() {
+            _action.update { it.copy(error = null) }
+        }
+
+        /**
+         * `POST /:id/slots/:slotId/reserve`. Reports failures through
+         * [onResult] so the sheet can render them inline (matching RN's
+         * ReserveSheet error box); null means success.
+         */
+        fun reserve(
+            slotId: String,
+            body: ReserveSlotBody,
+            onResult: (String?) -> Unit,
+        ) {
+            if (_action.value.isSubmitting) return
+            _action.update { it.copy(isSubmitting = true) }
+            viewModelScope.launch {
+                when (val result = repo.reserve(trainId, slotId, body)) {
+                    is NetworkResult.Success -> {
+                        pendingReserveRefresh = true
+                        _action.update { it.copy(isSubmitting = false, toast = "You're signed up") }
+                        onResult(null)
+                    }
+                    is NetworkResult.Failure -> {
+                        _action.update { it.copy(isSubmitting = false) }
+                        onResult(reserveFailureMessage(result.error.displayMessage("Failed to reserve. Please try again.")))
+                    }
+                }
+            }
+        }
+
+        /**
+         * `POST /:id/reservations/:rid/cancel` with `helper_reason` — the
+         * helper leaving their own slot (RN `handleLeaveSlot`).
+         */
+        fun leaveSlot(
+            reservationId: String,
+            reason: String? = null,
+        ) = runAction(
+            success = "Slot reopened",
+            failure = "Failed to leave this slot.",
+        ) {
+            repo.cancelReservation(
+                trainId,
+                reservationId,
+                CancelReservationBody(helperReason = reason?.takeIf { it.isNotBlank() }),
+            )
+        }
+
+        /** `POST /:id/reservations/:rid/deliver`. */
+        fun markDelivered(reservationId: String) =
+            runAction(
+                success = "Marked delivered",
+                failure = "Failed to mark this as delivered.",
+            ) { repo.markDelivered(trainId, reservationId) }
+
+        /** `POST /:id/reservations/:rid/confirm` (recipient / organizer). */
+        fun confirmDelivery(reservationId: String) =
+            runAction(
+                success = "Delivery confirmed",
+                failure = "Failed to confirm this delivery.",
+            ) { repo.confirmDelivery(trainId, reservationId) }
+
+        private fun runAction(
+            success: String,
+            failure: String,
+            block: suspend () -> NetworkResult<Unit>,
+        ) {
+            if (_action.value.isSubmitting) return
+            _action.update { it.copy(isSubmitting = true, pendingLeave = null) }
+            viewModelScope.launch {
+                when (val result = block()) {
+                    is NetworkResult.Success -> {
+                        _action.update { it.copy(isSubmitting = false, toast = success) }
+                        load()
+                    }
+                    is NetworkResult.Failure ->
+                        _action.update {
+                            it.copy(isSubmitting = false, error = result.error.displayMessage(failure))
+                        }
+                }
+            }
+        }
+
+        /**
+         * RN maps the reserve-specific 409 codes onto friendlier copy
+         * (`components/support-trains/ReserveSheet.tsx:138`); mirror it.
+         */
+        private fun reserveFailureMessage(raw: String): String =
+            when {
+                raw.contains("SLOT_FULL") || raw.contains("SLOT_NOT_OPEN") || raw.contains("no longer open") ->
+                    "This slot was just filled. Please refresh and try another."
+                raw.contains("ALREADY_RESERVED") || raw.contains("already have a reservation") ->
+                    "You already have a reservation on this slot."
+                else -> raw
+            }
     }
 
 /**

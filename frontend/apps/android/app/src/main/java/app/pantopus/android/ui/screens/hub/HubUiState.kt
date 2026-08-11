@@ -77,6 +77,14 @@ data class TopBarContent(
     val identity: IdentityPillar = IdentityPillar.Personal,
     val ringProgress: Float,
     val unreadCount: Int,
+    /**
+     * S5 — unread count in the Beacon (audience) firewall zone, read from
+     * `GET /api/notifications/unread-count`'s `byContext.audience`
+     * (`backend/routes/notifications.js:187-193`). Drives the megaphone
+     * shortcut next to the bell, mirroring RN's `hub-bell-audience`
+     * button. `0` hides the shortcut.
+     */
+    val audienceUnreadCount: Int = 0,
 )
 
 /** Chip in the action strip. */
@@ -120,6 +128,23 @@ data class PillarTile(
     val caption: String? = null,
 ) {
     enum class Pillar { Pulse, Marketplace, Gigs, Mail }
+}
+
+/**
+ * The Discover section's filter tabs. Each entry is a `filter` query value
+ * accepted by `GET /api/hub/discovery`
+ * (`backend/routes/hub.js:783-1009`) — the handler 400s on anything
+ * outside `gigs | people | businesses | posts | listings`.
+ * Mirrors RN `src/components/hub/HubDiscovery.tsx:9-14`.
+ */
+enum class HubDiscoveryFilter(
+    val queryValue: String,
+    val label: String,
+) {
+    Gigs("gigs", "Tasks"),
+    People("people", "People"),
+    Businesses("businesses", "Businesses"),
+    Posts("posts", "Posts"),
 }
 
 /**
@@ -194,6 +219,13 @@ data class ActivityEntry(
 sealed interface HubNavigationIntent {
     data object OpenNotifications : HubNavigationIntent
 
+    /**
+     * S5 — megaphone shortcut straight into the Beacon (audience)
+     * notification zone. The host navigates to
+     * `ChildRoutes.notificationsZone("audience")`.
+     */
+    data object OpenAudienceNotifications : HubNavigationIntent
+
     data object OpenMenu : HubNavigationIntent
 
     data object OpenProfile : HubNavigationIntent
@@ -215,6 +247,12 @@ sealed interface HubNavigationIntent {
     /** Hub Discovery rail "See all" CTA — pushes the typed Discover hub
      *  screen (T5.4.1 / P11). */
     data object OpenDiscoverHub : HubNavigationIntent
+
+    /** Discover header "Explore Map" link — RN `(tabs)/index.tsx:505`. */
+    data object OpenExploreMap : HubNavigationIntent
+
+    /** Discover header "Find Businesses" link — RN `(tabs)/index.tsx:506`. */
+    data object OpenFindBusinesses : HubNavigationIntent
 
     data class JumpBackTapped(
         val item: JumpBackItem,

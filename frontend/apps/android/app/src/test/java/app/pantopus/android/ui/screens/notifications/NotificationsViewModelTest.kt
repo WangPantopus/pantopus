@@ -131,13 +131,17 @@ class NotificationsViewModelTest {
             val vm = NotificationsViewModel(repo)
             vm.load()
             val tabs = vm.tabs.value
-            assertEquals(2, tabs.size)
+            assertEquals(3, tabs.size)
             assertEquals(NotificationsTab.ALL, tabs[0].id)
             assertEquals("All", tabs[0].label)
             assertEquals(2, tabs[0].count)
             assertEquals(NotificationsTab.UNREAD, tabs[1].id)
             assertEquals("Unread", tabs[1].label)
             assertEquals(2, tabs[1].count)
+            // S5 — the "Read" filter RN has and native was missing.
+            assertEquals(NotificationsTab.READ, tabs[2].id)
+            assertEquals("Read", tabs[2].label)
+            assertEquals(0, tabs[2].count)
             assertEquals(NotificationsTab.ALL, vm.selectedTab.value)
         }
 

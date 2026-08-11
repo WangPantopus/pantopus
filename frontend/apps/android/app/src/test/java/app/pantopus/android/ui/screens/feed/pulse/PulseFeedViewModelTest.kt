@@ -9,14 +9,18 @@ import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.feed.FeedActionsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -31,6 +35,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PulseFeedViewModelTest {
     private val repo: PostsRepository = mockk()
+    private val feedActions: FeedActionsRepository = mockk(relaxed = true)
+    private val authRepo: AuthRepository =
+        mockk<AuthRepository>().also {
+            every { it.state } returns
+                MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
+        }
     private val locationProvider =
         object : LocationProvider {
             override fun cachedCoordinate(): UserCoordinate? = null
@@ -99,7 +109,8 @@ class PulseFeedViewModelTest {
                 ),
         )
 
-    private fun makeVm(): PulseFeedViewModel = PulseFeedViewModel(repo, locationProvider, postsRefresh)
+    private fun makeVm(): PulseFeedViewModel =
+        PulseFeedViewModel(repo, feedActions, authRepo, locationProvider, postsRefresh)
 
     @Test fun load_with_posts_transitions_loaded() =
         runTest {

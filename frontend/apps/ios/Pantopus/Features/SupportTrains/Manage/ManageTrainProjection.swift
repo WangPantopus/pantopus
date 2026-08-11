@@ -57,7 +57,9 @@ extension ManageTrainViewModel {
                 neighborsHelped: helpers,
                 coverageDays: "\(days)d",
                 recipientQuote: dto.story ?? ""
-            )
+            ),
+            status: dto.status ?? "",
+            viewerRole: SupportTrainDetailViewModel.viewerRole(dto)
         )
     }
 

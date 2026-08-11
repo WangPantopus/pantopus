@@ -19,6 +19,27 @@ public struct ConnectionsView: View {
     public var body: some View {
         ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier("connections")
+            .confirmationDialog(
+                "Remove connection?",
+                isPresented: Binding(
+                    get: { viewModel.pendingRemoval != nil },
+                    set: { presented in if !presented { viewModel.cancelRemoval() } }
+                ),
+                titleVisibility: .visible,
+                presenting: viewModel.pendingRemoval
+            ) { _ in
+                Button("Remove", role: .destructive) {
+                    Task { @MainActor in await viewModel.confirmRemoval() }
+                }
+                .accessibilityIdentifier("connections.removeConfirm")
+                Button("Cancel", role: .cancel) { viewModel.cancelRemoval() }
+                    .accessibilityIdentifier("connections.removeCancel")
+            } message: { request in
+                Text(
+                    "\(request.displayName) will be removed from your connections. " +
+                        "You can send a new request later."
+                )
+            }
     }
 }
 

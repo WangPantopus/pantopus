@@ -21,7 +21,18 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
     public let createdAt: String
     public let likeCount: Int
     public let commentCount: Int
+    public let shareCount: Int
     public let userHasLiked: Bool
+    public let userHasSaved: Bool
+    public let userHasReposted: Bool
+    /// Lifecycle state — `open` / `solved` (`feedService.js:234`).
+    public let state: String?
+    /// True for cold-start neighborhood facts injected by the feed handler
+    /// (`backend/routes/posts.js:84`). Those rows are dismissable, not
+    /// reportable.
+    public let isSeeded: Bool
+    /// Set when the post was authored as a business (`feedService.js:115`).
+    public let businessAuthorId: String?
     public let locationName: String?
     public let eventDate: String?
     public let eventVenue: String?
@@ -42,7 +53,13 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         case createdAt = "created_at"
         case likeCount = "like_count"
         case commentCount = "comment_count"
+        case shareCount = "share_count"
         case userHasLiked
+        case userHasSaved
+        case userHasReposted
+        case state
+        case isSeeded = "is_seeded"
+        case businessAuthorId = "business_author_id"
         case locationName = "location_name"
         case eventDate = "event_date"
         case eventVenue = "event_venue"
@@ -64,7 +81,13 @@ public struct FeedPostDTO: Decodable, Sendable, Hashable, Identifiable {
         createdAt = try c.decode(String.self, forKey: .createdAt)
         likeCount = try c.decodeIfPresent(Int.self, forKey: .likeCount) ?? 0
         commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0
+        shareCount = try c.decodeIfPresent(Int.self, forKey: .shareCount) ?? 0
         userHasLiked = try c.decodeIfPresent(Bool.self, forKey: .userHasLiked) ?? false
+        userHasSaved = try c.decodeIfPresent(Bool.self, forKey: .userHasSaved) ?? false
+        userHasReposted = try c.decodeIfPresent(Bool.self, forKey: .userHasReposted) ?? false
+        state = try c.decodeIfPresent(String.self, forKey: .state)
+        isSeeded = try c.decodeIfPresent(Bool.self, forKey: .isSeeded) ?? false
+        businessAuthorId = try c.decodeIfPresent(String.self, forKey: .businessAuthorId)
         locationName = try c.decodeIfPresent(String.self, forKey: .locationName)
         eventDate = try c.decodeIfPresent(String.self, forKey: .eventDate)
         eventVenue = try c.decodeIfPresent(String.self, forKey: .eventVenue)

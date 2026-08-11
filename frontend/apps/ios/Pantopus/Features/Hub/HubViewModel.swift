@@ -16,6 +16,14 @@ final class HubViewModel {
     /// Current state observed by `HubView`.
     private(set) var state: HubState = .skeleton
 
+    /// Active Discover filter tab. Drives the `filter` query param on
+    /// `GET /api/hub/discovery` — RN `(tabs)/index.tsx:138`.
+    private(set) var discoveryFilter: HubDiscoveryFilter = .gigs
+
+    /// True while a filter-tab refetch is in flight (rail shows its
+    /// skeleton instead of stale rows).
+    private(set) var discoveryLoading = false
+
     private let api: APIClient
     private let bannerDismissedKey = "hub.setupBanner.dismissed"
     private var bannerDismissed: Bool {
@@ -57,6 +65,60 @@ final class HubViewModel {
         }
     }
 
+    /// Discover filter-tab tap. Refetches only
+    /// `GET /api/hub/discovery?filter=…` and swaps the rail's rows in
+    /// place — the rest of the hub stays put (RN keeps the hub query and
+    /// the discovery query separate, `(tabs)/index.tsx:332`).
+    func selectDiscoveryFilter(_ filter: HubDiscoveryFilter) async {
+        guard filter != discoveryFilter else { return }
+        discoveryFilter = filter
+        await refreshDiscovery()
+    }
+
+    /// Re-request the Discover rail for the active filter.
+    func refreshDiscovery() async {
+        discoveryLoading = true
+        defer { discoveryLoading = false }
+        let filter = discoveryFilter.queryValue
+        let response: HubDiscoveryResponse? = await optional {
+            try await self.api.request(HubEndpoints.discovery(filter: filter, limit: 10))
+        }
+        applyDiscovery(response?.items.prefix(10).map(Self.projectDiscovery(_:)) ?? [])
+    }
+
+    /// Swap the discovery rows into whichever content state is showing.
+    private func applyDiscovery(_ cards: [DiscoveryCardContent]) {
+        switch state {
+        case let .populated(content):
+            state = .populated(HubState.PopulatedContent(
+                topBar: content.topBar,
+                actionChips: content.actionChips,
+                setupBanner: content.setupBanner,
+                today: content.today,
+                pillars: content.pillars,
+                discovery: cards,
+                jumpBackIn: content.jumpBackIn,
+                activity: content.activity
+            ))
+        case let .firstRun(content):
+            state = .firstRun(HubState.FirstRunContent(
+                greeting: content.greeting,
+                name: content.name,
+                avatarInitials: content.avatarInitials,
+                identity: content.identity,
+                ringProgress: content.ringProgress,
+                profileCompleteness: content.profileCompleteness,
+                stepsDone: content.stepsDone,
+                stepsTotal: content.stepsTotal,
+                steps: content.steps,
+                pillars: content.pillars,
+                discovery: cards
+            ))
+        case .skeleton, .error:
+            break
+        }
+    }
+
     // MARK: - Fetch
 
     private func fetch() async {
@@ -73,12 +135,25 @@ final class HubViewModel {
         async let todayTask: HubTodayResponse? = optional {
             try await self.api.request(HubEndpoints.today())
         }
+        let filter = discoveryFilter.queryValue
         async let discoveryTask: HubDiscoveryResponse? = optional {
-            try await self.api.request(HubEndpoints.discovery(filter: "gigs", limit: 10))
+            try await self.api.request(HubEndpoints.discovery(filter: filter, limit: 10))
         }
         let today = await todayTask
         let discovery = await discoveryTask
-        applyResults(hub: hub, today: today, discovery: discovery)
+        // S5 — per-firewall unread split powers the megaphone shortcut
+        // into the Beacon notification zone. Sequenced (not raced) after
+        // the companions so a stubbed test sequence stays predictable;
+        // optional so its failure never blanks the hub.
+        let unread: NotificationUnreadCountResponse? = await optional {
+            try await self.api.request(NotificationsEndpoints.unreadCount)
+        }
+        applyResults(
+            hub: hub,
+            today: today,
+            discovery: discovery,
+            audienceUnread: unread?.byContext?.audience ?? 0
+        )
     }
 
     /// Run a throwing async request and swallow its failure, returning nil.
@@ -90,7 +165,8 @@ final class HubViewModel {
     private func applyResults(
         hub: HubResponse,
         today: HubTodayResponse?,
-        discovery: HubDiscoveryResponse?
+        discovery: HubDiscoveryResponse?,
+        audienceUnread: Int = 0
     ) {
         let todaySummary = Self.projectToday(today)
         let identity = Self.primaryIdentity(for: hub)
@@ -134,7 +210,8 @@ final class HubViewModel {
                     avatarInitials: Self.initials(from: hub.user.name),
                     identity: identity,
                     ringProgress: hub.setup.profileCompleteness.score,
-                    unreadCount: hub.statusItems.count
+                    unreadCount: hub.statusItems.count,
+                    audienceUnreadCount: audienceUnread
                 ),
                 actionChips: Self.defaultActionChips(),
                 setupBanner: banner,

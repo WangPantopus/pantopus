@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.hub.HubResponse
 import app.pantopus.android.data.api.models.hub.HubTodayResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.hub.HubRepository
+import app.pantopus.android.data.notifications.NotificationsRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,11 +34,59 @@ class HubViewModel
     constructor(
         private val repo: HubRepository,
         private val prefs: SharedPreferences,
+        /**
+         * S5 — read-only use of `GET /api/notifications/unread-count` for
+         * the Beacon megaphone's `byContext.audience` split.
+         */
+        private val notificationsRepo: NotificationsRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<HubUiState>(HubUiState.Skeleton)
 
         /** Observed hub state. */
         val state: StateFlow<HubUiState> = _state.asStateFlow()
+
+        private val _discoveryFilter = MutableStateFlow(HubDiscoveryFilter.Gigs)
+
+        /**
+         * Active Discover filter tab. Drives the `filter` query param on
+         * `GET /api/hub/discovery` — RN `(tabs)/index.tsx:138`.
+         */
+        val discoveryFilter: StateFlow<HubDiscoveryFilter> = _discoveryFilter.asStateFlow()
+
+        private val _discoveryLoading = MutableStateFlow(false)
+
+        /** True while a filter-tab refetch is in flight. */
+        val discoveryLoading: StateFlow<Boolean> = _discoveryLoading.asStateFlow()
+
+        /**
+         * Discover filter-tab tap. Refetches only
+         * `GET /api/hub/discovery?filter=…` and swaps the rail's rows in
+         * place — the rest of the hub stays put.
+         */
+        fun selectDiscoveryFilter(filter: HubDiscoveryFilter) {
+            if (_discoveryFilter.value == filter) return
+            _discoveryFilter.value = filter
+            viewModelScope.launch { refreshDiscovery() }
+        }
+
+        private suspend fun refreshDiscovery() {
+            _discoveryLoading.value = true
+            val result = repo.discovery(filter = _discoveryFilter.value.queryValue)
+            val items = (result as? NetworkResult.Success)?.data?.items.orEmpty()
+            applyDiscovery(projectDiscovery(items))
+            _discoveryLoading.value = false
+        }
+
+        /** Swap the discovery rows into whichever content state is showing. */
+        private fun applyDiscovery(cards: List<DiscoveryCardContent>) {
+            when (val current = _state.value) {
+                is HubUiState.Populated ->
+                    _state.value = HubUiState.Populated(current.content.copy(discovery = cards))
+                is HubUiState.FirstRun ->
+                    _state.value = HubUiState.FirstRun(current.content.copy(discovery = cards))
+                else -> Unit
+            }
+        }
 
         /** Initial load; no-op when already populated. */
         fun load() {
@@ -75,33 +124,38 @@ class HubViewModel
             val (today, discovery) =
                 coroutineScope {
                     val todayJob = async { (repo.today() as? NetworkResult.Success)?.data }
-                    val discoveryJob = async { (repo.discovery() as? NetworkResult.Success)?.data }
+                    val discoveryJob =
+                        async {
+                            (
+                                repo.discovery(filter = _discoveryFilter.value.queryValue)
+                                    as? NetworkResult.Success
+                            )?.data
+                        }
                     todayJob.await() to discoveryJob.await()
                 }
 
-            applyResults(hub, today, discovery?.items.orEmpty())
+            // S5 — per-firewall unread split powers the megaphone shortcut
+            // into the Beacon notification zone. Sequenced (not raced)
+            // after the companions so a stubbed test sequence stays
+            // predictable; a failure just hides the shortcut.
+            val audienceUnread =
+                (notificationsRepo.unreadCount() as? NetworkResult.Success)
+                    ?.data
+                    ?.byContext
+                    ?.audience ?: 0
+
+            applyResults(hub, today, discovery?.items.orEmpty(), audienceUnread)
         }
 
         private fun applyResults(
             hub: HubResponse,
             today: HubTodayResponse?,
             discoveryItems: List<app.pantopus.android.data.api.models.hub.DiscoveryItem>,
+            audienceUnread: Int = 0,
         ) {
             val todaySummary = projectToday(today)
             val identity = primaryIdentity(hub)
-            val discoveryCards =
-                discoveryItems.take(10).map {
-                    val kind = DiscoveryKind.fromRawType(it.type)
-                    DiscoveryCardContent(
-                        id = it.id,
-                        title = it.title,
-                        meta = it.meta,
-                        category = it.category.orEmpty(),
-                        avatarInitials = initials(it.title),
-                        kind = kind,
-                        tint = tintForDiscoveryKind(kind),
-                    )
-                }
+            val discoveryCards = projectDiscovery(discoveryItems)
             if (isFirstRun(hub)) {
                 _state.value = firstRunState(hub, identity, discoveryCards)
                 return
@@ -123,6 +177,7 @@ class HubViewModel
                                     hub.setup.profileCompleteness.score
                                         .toFloat(),
                                 unreadCount = hub.statusItems.size,
+                                audienceUnreadCount = audienceUnread,
                             ),
                         actionChips =
                             listOf(
@@ -159,6 +214,23 @@ class HubViewModel
                     ),
                 )
         }
+
+        /** Project `/api/hub/discovery` rows onto the rail's card model. */
+        private fun projectDiscovery(
+            items: List<app.pantopus.android.data.api.models.hub.DiscoveryItem>,
+        ): List<DiscoveryCardContent> =
+            items.take(10).map {
+                val kind = DiscoveryKind.fromRawType(it.type)
+                DiscoveryCardContent(
+                    id = it.id,
+                    title = it.title,
+                    meta = it.meta,
+                    category = it.category.orEmpty(),
+                    avatarInitials = initials(it.title),
+                    kind = kind,
+                    tint = tintForDiscoveryKind(kind),
+                )
+            }
 
         private fun firstRunState(
             hub: HubResponse,

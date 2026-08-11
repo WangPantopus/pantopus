@@ -466,6 +466,34 @@ public struct RowEngagement: Sendable {
     }
 }
 
+// MARK: - Destructive row action
+
+/// Optional destructive action attached to a row. The shell surfaces it
+/// with the platform idiom on each side so parity holds without forcing
+/// one gesture onto both: iOS renders a trailing swipe action **and** a
+/// long-press context menu; Android renders a long-press dropdown
+/// (`combinedClickable(onLongClick:)`).
+///
+/// The handler should open a confirmation before destroying anything —
+/// the shell never confirms on the screen's behalf.
+public struct RowDestructiveAction: Sendable {
+    public let label: String
+    /// Optional `accessibilityIdentifier` for the rendered control —
+    /// mirror the Android `Modifier.testTag(…)` string.
+    public let identifier: String?
+    public let handler: @Sendable () -> Void
+
+    public init(
+        label: String,
+        identifier: String? = nil,
+        handler: @escaping @Sendable () -> Void
+    ) {
+        self.label = label
+        self.identifier = identifier
+        self.handler = handler
+    }
+}
+
 // MARK: - Body emphasis
 
 /// Render emphasis for the `body` field on a row. Default `.secondary`
@@ -603,6 +631,10 @@ public struct RowModel: Identifiable, Sendable {
     /// hidden.
     public let archetypeOverline: String?
 
+    /// Optional destructive row action (Notifications "Delete"). Surfaced
+    /// as a trailing swipe + long-press context menu by the shell.
+    public let destructiveAction: RowDestructiveAction?
+
     public init(
         id: String,
         title: String,
@@ -627,7 +659,8 @@ public struct RowModel: Identifiable, Sendable {
         engagement: RowEngagement? = nil,
         bidderStack: BidderStackData? = nil,
         splitWith: SplitStackData? = nil,
-        archetypeOverline: String? = nil
+        archetypeOverline: String? = nil,
+        destructiveAction: RowDestructiveAction? = nil
     ) {
         self.id = id
         self.title = title
@@ -653,6 +686,7 @@ public struct RowModel: Identifiable, Sendable {
         self.bidderStack = bidderStack
         self.splitWith = splitWith
         self.archetypeOverline = archetypeOverline
+        self.destructiveAction = destructiveAction
     }
 }
 

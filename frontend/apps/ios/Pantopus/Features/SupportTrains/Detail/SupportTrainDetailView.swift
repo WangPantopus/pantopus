@@ -49,6 +49,10 @@ public struct SupportTrainDetailView: View {
         self.onMessageHost = onMessageHost
     }
 
+    /// Confirm target for "Leave this slot" — RN gates the cancel behind
+    /// an alert naming the slot (`src/app/support-trains/[id].tsx:331`).
+    @State private var pendingLeave: SlotRowContent?
+
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             topBar
@@ -58,6 +62,74 @@ public struct SupportTrainDetailView: View {
         .accessibilityIdentifier("supportTrainDetail")
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .overlay(alignment: .bottom) { toastOverlay }
+        .sheet(item: $viewModel.reserveSelection) { selection in
+            reserveSheet(selection)
+        }
+        .alert(
+            "Leave this slot?",
+            isPresented: Binding(
+                get: { pendingLeave != nil },
+                set: { if !$0 { pendingLeave = nil } }
+            ),
+            presenting: pendingLeave
+        ) { row in
+            Button("Keep signup", role: .cancel) { pendingLeave = nil }
+            Button("Leave slot", role: .destructive) {
+                let reservationId = row.reservationId
+                pendingLeave = nil
+                guard let reservationId else { return }
+                Task { await viewModel.leaveSlot(reservationId: reservationId, reason: nil) }
+            }
+        } message: { row in
+            Text("Leave \(row.title) on \(row.dayLabel) \(row.dateLabel)? This reopens the date for someone else.")
+        }
+        .alert(
+            "Something went wrong",
+            isPresented: Binding(
+                get: { viewModel.actionError != nil },
+                set: { if !$0 { viewModel.acknowledgeActionError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { viewModel.acknowledgeActionError() }
+        } message: {
+            Text(viewModel.actionError ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func reserveSheet(_ selection: ReserveSheetSelection) -> some View {
+        if let content = viewModel.currentContent {
+            ReserveSlotSheet(
+                selection: selection,
+                options: content.reserveOptions,
+                context: content.reserveContext,
+                isSubmitting: viewModel.isSubmitting,
+                onSubmit: { slotId, body in
+                    await viewModel.reserve(slotId: slotId, body: body)
+                },
+                onClose: { viewModel.dismissReserve() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            Text(toast)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s2)
+                .background(Capsule().fill(Theme.Color.appText))
+                .padding(.bottom, Spacing.s12)
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    viewModel.acknowledgeToast()
+                }
+                .transition(.opacity)
+                .accessibilityIdentifier("supportTrainDetailToast")
+        }
     }
 
     @ViewBuilder
@@ -95,13 +167,21 @@ public struct SupportTrainDetailView: View {
                         overline(section.overline, action: section.actionLabel)
                         VStack(spacing: Spacing.s2) {
                             ForEach(section.rows) { row in
-                                SlotRow(
-                                    content: row,
-                                    onSignUp: signUpAction(for: row),
-                                    onEdit: editAction(for: row)
-                                )
+                                VStack(spacing: Spacing.s2) {
+                                    SlotRow(
+                                        content: row,
+                                        onSignUp: signUpAction(for: row),
+                                        onEdit: editAction(for: row)
+                                    )
+                                    commitmentActions(for: row, content: content)
+                                }
                             }
                         }
+                    }
+
+                    if let address = content.exactAddress {
+                        overline("Delivery address")
+                        exactAddressCard(address, instructions: content.deliveryInstructions)
                     }
 
                     HostedByRow(content: content.hostedBy, onMessageHost: onMessageHost)
@@ -120,7 +200,113 @@ public struct SupportTrainDetailView: View {
 
     private func signUpAction(for row: SlotRowContent) -> (@MainActor () -> Void)? {
         guard row.state == .open else { return nil }
-        return { onSignUp?() }
+        return {
+            viewModel.startReserve(slotId: row.slotId)
+            onSignUp?()
+        }
+    }
+
+    /// Helper-side actions under the viewer's own commitment rows —
+    /// `POST …/deliver` and `POST …/cancel` with `helper_reason`
+    /// (RN `handleLeaveSlot`, `src/app/support-trains/[id].tsx:322`).
+    /// Recipients / organizers get `POST …/confirm` on a delivered row.
+    @ViewBuilder
+    private func commitmentActions(
+        for row: SlotRowContent,
+        content: SupportTrainDetailContent
+    ) -> some View {
+        if row.mine, let reservationId = row.reservationId {
+            HStack(spacing: Spacing.s2) {
+                if row.canMarkDelivered {
+                    rowActionButton(
+                        title: "Mark delivered",
+                        icon: .check,
+                        identifier: "supportTrainMarkDeliveredButton"
+                    ) {
+                        Task { await viewModel.markDelivered(reservationId: reservationId) }
+                    }
+                }
+                if row.reservationStatus == "delivered",
+                   content.viewerRole == .recipient || content.viewerRole.isOrganizer {
+                    rowActionButton(
+                        title: "Confirm delivery",
+                        icon: .checkCircle,
+                        identifier: "supportTrainConfirmDeliveryButton"
+                    ) {
+                        Task { await viewModel.confirmDelivery(reservationId: reservationId) }
+                    }
+                }
+                if row.canLeaveSlot {
+                    rowActionButton(
+                        title: "Leave slot",
+                        icon: .x,
+                        identifier: "supportTrainLeaveSlotButton",
+                        destructive: true
+                    ) {
+                        pendingLeave = row
+                    }
+                }
+                Spacer(minLength: Spacing.s0)
+            }
+            .padding(.bottom, Spacing.s1)
+        }
+    }
+
+    private func rowActionButton(
+        title: String,
+        icon: PantopusIcon,
+        identifier: String,
+        destructive: Bool = false,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s1) {
+                Icon(icon, size: 13, color: destructive ? Theme.Color.error : Theme.Color.appText)
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(destructive ? Theme.Color.error : Theme.Color.appText)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .frame(height: 34)
+            .background(destructive ? Theme.Color.errorBg : Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(destructive ? Theme.Color.errorLight : Theme.Color.appBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isSubmitting)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// The exact address only ever renders from the server payload — it
+    /// is re-fetched (and re-gated) on every load, never cached locally.
+    private func exactAddressCard(_ address: String, instructions: String?) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.mapPin, size: 15, color: Theme.Color.primary600)
+                Text(address)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let instructions, !instructions.isEmpty {
+                Text(instructions)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .accessibilityIdentifier("supportTrainExactAddressCard")
     }
 
     private func editAction(for row: SlotRowContent) -> (@MainActor () -> Void)? {
@@ -159,7 +345,7 @@ public struct SupportTrainDetailView: View {
 
     private func calendarCard(days: [SlotCalendarDay]) -> some View {
         VStack {
-            SlotCalendar(days: days) { _ in onSignUp?() }
+            SlotCalendar(days: days) { _ in viewModel.startReserve() }
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .center)
@@ -178,7 +364,10 @@ public struct SupportTrainDetailView: View {
             Group {
                 switch dock {
                 case let .signUp(label):
-                    PrimarySignUpCTA(label: label) { onSignUp?() }
+                    PrimarySignUpCTA(label: label) {
+                        viewModel.startReserve()
+                        onSignUp?()
+                    }
                 case .sendCardAndBackup:
                     SplitCoveredDock(onSendCard: onSendCard, onJoinAsBackup: onJoinAsBackup)
                 }
@@ -351,7 +540,7 @@ private struct HostedByRow: View {
                 .frame(width: 24, height: 24)
                 .accessibilityHidden(true)
 
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Text("Hosted by ")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)

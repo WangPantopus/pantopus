@@ -51,10 +51,10 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     private func stub(mine: String, nearby: String? = nil) {
         var routes: [String: [SequencedURLProtocol.Response]] = [
-            "/api/support-trains/me/support-trains": [.status(200, body: mine)]
+            "/api/activities/support-trains/me/support-trains": [.status(200, body: mine)]
         ]
         if let nearby {
-            routes["/api/support-trains/nearby"] = [.status(200, body: nearby)]
+            routes["/api/activities/support-trains/nearby"] = [.status(200, body: nearby)]
         }
         SequencedURLProtocol.routeResponses = routes
     }
@@ -128,11 +128,11 @@ final class SupportTrainsViewModelTests: XCTestCase {
 
     func testBothFetchesFailingTransitionsToError() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/support-trains/me/support-trains": [.status(500, body: "{}")]
+            "/api/activities/support-trains/me/support-trains": [.status(500, body: "{}")]
         ]
         // swiftlint:disable:next trailing_closure
         let vm = makeVM(locationProvider: { (latitude: 40.0, longitude: -73.0) })
-        SequencedURLProtocol.routeResponses["/api/support-trains/nearby"] = [.status(500, body: "{}")]
+        SequencedURLProtocol.routeResponses["/api/activities/support-trains/nearby"] = [.status(500, body: "{}")]
         await vm.load()
         guard case .error = vm.state else {
             XCTFail("Expected .error, got \(vm.state)")

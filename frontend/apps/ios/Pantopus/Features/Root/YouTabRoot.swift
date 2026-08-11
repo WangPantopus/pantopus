@@ -1488,10 +1488,20 @@ public struct YouTabRoot: View {
                             items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onConfirm: { _ in
-                        // POST `/api/support-trains/:id/reservations/:id/confirm`
-                        // wiring lands with the editor surface — the VM's
-                        // optimistic patch is the visible feedback today.
+                    onConfirm: { reservationId in
+                        // S1 — the optimistic row flip is paired with the
+                        // real `POST …/reservations/:reservationId/confirm`
+                        // (`backend/routes/supportTrains.js:3214`), matching
+                        // the same route in `HubTabRoot`.
+                        Task { @MainActor in
+                            _ = try? await APIClient.shared.request(
+                                SupportTrainActionsEndpoints.confirmDelivery(
+                                    supportTrainId: supportTrainId,
+                                    reservationId: reservationId
+                                ),
+                                as: EmptyResponse.self
+                            )
+                        }
                     },
                     onMessage: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Message helper")) }
@@ -1638,6 +1648,12 @@ public struct YouTabRoot: View {
                         case .item: path.append(.listingDetail(listingId: entity.id))
                         case .post: path.append(.pulsePost(postId: entity.id))
                         case .spot: path.append(.businessProfile(businessId: entity.id))
+                        // `homes` markers are neighborhood addresses, not homes
+                        // the viewer owns — the backend has no viewer-facing
+                        // detail route for someone else's home, so the tap
+                        // selects the pin and the rail card carries the
+                        // address + locality. Mirrors HubTabRoot.swift:2499.
+                        case .home: break
                         }
                     }
                 },

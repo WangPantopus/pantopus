@@ -67,6 +67,12 @@ public struct TopBarContent: Sendable {
     public let identity: IdentityPillar
     public let ringProgress: Double
     public let unreadCount: Int
+    /// S5 — unread count in the Beacon (audience) firewall zone, read
+    /// from `GET /api/notifications/unread-count`'s `byContext.audience`
+    /// (`backend/routes/notifications.js:187-193`). Drives the megaphone
+    /// shortcut next to the bell, mirroring RN's
+    /// `hub-bell-audience` button. `0` hides the shortcut.
+    public let audienceUnreadCount: Int
 
     public init(
         greeting: String,
@@ -74,7 +80,8 @@ public struct TopBarContent: Sendable {
         avatarInitials: String,
         identity: IdentityPillar = .personal,
         ringProgress: Double,
-        unreadCount: Int
+        unreadCount: Int,
+        audienceUnreadCount: Int = 0
     ) {
         self.greeting = greeting
         self.name = name
@@ -82,6 +89,7 @@ public struct TopBarContent: Sendable {
         self.identity = identity
         self.ringProgress = ringProgress
         self.unreadCount = unreadCount
+        self.audienceUnreadCount = audienceUnreadCount
     }
 }
 
@@ -184,6 +192,33 @@ public enum DiscoveryKind: String, Sendable {
     public init(rawType: String) {
         self = DiscoveryKind(rawValue: rawType) ?? .unknown
     }
+}
+
+/// The Discover section's filter tabs. Each case is a `filter` query
+/// value accepted by `GET /api/hub/discovery`
+/// (`backend/routes/hub.js:783-1009`) — the handler 400s on anything
+/// outside `gigs | people | businesses | posts | listings`.
+/// Mirrors RN `src/components/hub/HubDiscovery.tsx:9-14`.
+public enum HubDiscoveryFilter: String, Sendable, Hashable, CaseIterable, Identifiable {
+    case gigs
+    case people
+    case businesses
+    case posts
+
+    public var id: String { rawValue }
+
+    /// Tab label — RN labels the `gigs` filter "Tasks".
+    public var label: String {
+        switch self {
+        case .gigs: "Tasks"
+        case .people: "People"
+        case .businesses: "Businesses"
+        case .posts: "Posts"
+        }
+    }
+
+    /// Value sent as `?filter=`.
+    public var queryValue: String { rawValue }
 }
 
 /// Discovery rail card.

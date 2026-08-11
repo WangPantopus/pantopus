@@ -305,6 +305,7 @@ import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
+import app.pantopus.android.ui.screens.notifications.NotificationsZone
 import app.pantopus.android.ui.screens.offers.OffersScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
@@ -345,6 +346,8 @@ import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
+import app.pantopus.android.ui.screens.universal_search.UniversalSearchDestination
+import app.pantopus.android.ui.screens.universal_search.UniversalSearchScreen
 import app.pantopus.android.ui.screens.wallet.WalletActivityListScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
@@ -816,6 +819,21 @@ private object ChildRoutes {
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
 
+    /**
+     * S5 — the same screen with the optional identity-firewall zone arg.
+     * The NavHost registers this pattern, so a plain `NOTIFICATIONS`
+     * navigate still matches with `context == null`. The Hub megaphone
+     * navigates with `context=audience` so the Beacon stream opens
+     * directly (RN `?context=audience`).
+     */
+    const val NOTIFICATIONS_ROUTE = "notifications?context={context}"
+
+    /** Query-arg key for [NOTIFICATIONS_ROUTE]. */
+    const val NOTIFICATIONS_CONTEXT_KEY = "context"
+
+    /** Builder for the zone-scoped notifications route. */
+    fun notificationsZone(context: String): String = "notifications?context=$context"
+
     /** P1.5 — Recent activity log. Reached from the Hub
      *  `HubRecentActivity` "See all" CTA. */
     const val RECENT_ACTIVITY = "recent-activity"
@@ -1052,6 +1070,14 @@ private object ChildRoutes {
 
     /** Gig Search (P4.4). Pushed from the Gigs feed search bar. */
     const val GIG_SEARCH = "gigs/search"
+
+    /**
+     * S2 — Universal search (All / Tasks / People / Beacons /
+     * Businesses / Homes). Pushed from the navigation drawer's "Search"
+     * row; gig-only search stays reachable from its Tasks tab and from
+     * the Gigs feed search bar.
+     */
+    const val UNIVERSAL_SEARCH = "search"
 
     /** Gig detail target — placeholder until T2.6 Transactional Detail. */
     const val GIG_DETAIL_ID_KEY = "gigId"
@@ -1995,6 +2021,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             when (intent) {
                                 HubNavigationIntent.OpenNotifications ->
                                     navController.navigate(ChildRoutes.NOTIFICATIONS)
+                                HubNavigationIntent.OpenAudienceNotifications ->
+                                    navController.navigate(
+                                        ChildRoutes.notificationsZone(NotificationsZone.Audience.rawValue),
+                                    )
                                 HubNavigationIntent.OpenMenu ->
                                     navDrawerScope.launch { navDrawerState.open() }
                                 HubNavigationIntent.OpenProfile ->
@@ -2027,6 +2057,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     routeForDiscovery(intent.item).also { navController.navigate(it) }
                                 HubNavigationIntent.OpenDiscoverHub ->
                                     navController.navigate(ChildRoutes.DISCOVER_HUB)
+                                HubNavigationIntent.OpenExploreMap ->
+                                    navController.navigate(ChildRoutes.EXPLORE)
+                                HubNavigationIntent.OpenFindBusinesses ->
+                                    navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
                                 is HubNavigationIntent.JumpBackTapped ->
                                     if (intent.item.route.startsWith("/app/chat")) {
                                         navController.navigateToRootTab(PantopusRoute.Messages)
@@ -3503,6 +3537,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                     )
                 }
+                composable(ChildRoutes.UNIVERSAL_SEARCH) {
+                    UniversalSearchScreen(
+                        onOpen = { destination ->
+                            navController.navigate(routeForUniversalSearch(destination))
+                        },
+                        onBrowseNearbyBusinesses = {
+                            navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
                 composable(
                     route = ChildRoutes.GIG_DETAIL,
                     arguments = listOf(navArgument(ChildRoutes.GIG_DETAIL_ID_KEY) { type = NavType.StringType }),
@@ -3617,7 +3662,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         editingPostId = entry.arguments?.getString(ChildRoutes.EDIT_POST_POST_ID_KEY),
                     )
                 }
-                composable(ChildRoutes.NOTIFICATIONS) {
+                composable(
+                    route = ChildRoutes.NOTIFICATIONS_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.NOTIFICATIONS_CONTEXT_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) {
+                    // The VM reads `context` from SavedStateHandle; a plain
+                    // `notifications` navigate leaves it null (unscoped list).
                     NotificationsScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.RECENT_ACTIVITY) {
@@ -4336,6 +4393,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ExploreKind.Item -> navController.navigate(ChildRoutes.listingDetail(entity.id))
                                 ExploreKind.Post -> navController.navigate(ChildRoutes.pulsePost(entity.id))
                                 ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
+                                // `homes` markers are neighborhood addresses,
+                                // not homes the viewer owns — the backend has
+                                // no viewer-facing detail route for someone
+                                // else's home, so the tap selects the pin and
+                                // the rail card carries the address.
+                                ExploreKind.Home -> Unit
                             }
                         },
                         onOpenSaved = { navController.navigate(ChildRoutes.SAVED_PLACES) },
@@ -4887,7 +4950,7 @@ private fun routeForDrawer(
         NavigationDrawerDestination.Mailbox -> ChildRoutes.MAILBOX_ROOT
         NavigationDrawerDestination.ProfileAndPrivacy -> ChildRoutes.IDENTITY_CENTER
         NavigationDrawerDestination.BeaconUpdates -> ChildRoutes.BEACONS_FEED
-        NavigationDrawerDestination.Search -> ChildRoutes.GIG_SEARCH
+        NavigationDrawerDestination.Search -> ChildRoutes.UNIVERSAL_SEARCH
         NavigationDrawerDestination.DiscoverNeighbors -> ChildRoutes.DISCOVER_HUB
         NavigationDrawerDestination.MyBeacon -> ChildRoutes.MY_BEACON
         NavigationDrawerDestination.MyListings -> ChildRoutes.MY_LISTINGS
@@ -4969,6 +5032,24 @@ private fun routeForDrawer(
         -> ChildRoutes.placeholder("Coming soon")
     }
 }
+
+/**
+ * S2 — maps a universal-search result onto the route that opens it.
+ * Mirrors iOS `HubTabRoot.route(forUniversalSearch:)`.
+ *
+ * Home rows come from `api/homes/discover`, which only returns
+ * `public_preview` homes the viewer may not belong to. The home
+ * dashboard falls back to the public profile for non-members, so it is
+ * the correct landing surface for both cases.
+ */
+private fun routeForUniversalSearch(destination: UniversalSearchDestination): String =
+    when (destination) {
+        is UniversalSearchDestination.Task -> ChildRoutes.gigDetail(destination.gigId)
+        is UniversalSearchDestination.Person -> ChildRoutes.publicProfile(destination.userId)
+        is UniversalSearchDestination.Beacon -> ChildRoutes.beaconProfile(destination.handle)
+        is UniversalSearchDestination.Business -> ChildRoutes.businessProfile(destination.businessId)
+        is UniversalSearchDestination.Home -> ChildRoutes.homeDashboard(destination.homeId)
+    }
 
 /**
  * Backend `jumpBackIn` items carry a canonical web route (e.g.

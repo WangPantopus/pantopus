@@ -424,6 +424,7 @@ private struct LoadedList: View {
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .rowDestructiveSwipe(row.destructiveAction)
             }
             if let footer = section.footer {
                 sectionFooter(section.id, text: footer)
@@ -875,6 +876,7 @@ struct RowView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(a11yLabel)
                 .accessibilityAddTraits(.isButton)
+                .rowDestructiveMenu(row.destructiveAction)
         } else {
             // With a footer, tap-the-card still routes to row.onTap, but
             // the inner buttons capture their own taps.
@@ -882,6 +884,7 @@ struct RowView: View {
                 .onTapGesture(perform: row.onTap)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(a11yLabel)
+                .rowDestructiveMenu(row.destructiveAction)
         }
     }
 
@@ -1072,6 +1075,41 @@ struct RowView: View {
         if let time = row.timeMeta { parts.append(time) }
         if row.highlight == .unread { parts.append("unread") }
         return parts.joined(separator: ", ")
+    }
+}
+
+// MARK: - Destructive row affordances
+
+/// Long-press context menu + trailing swipe action for a row that
+/// carries a `RowDestructiveAction`. Rows without one are returned
+/// untouched, so no existing screen changes gesture behaviour.
+private extension View {
+    @ViewBuilder
+    func rowDestructiveMenu(_ action: RowDestructiveAction?) -> some View {
+        if let action {
+            contextMenu {
+                Button(role: .destructive, action: action.handler) {
+                    Label(action.label, systemImage: "trash")
+                }
+                .accessibilityIdentifier(action.identifier ?? "rowDestructiveAction")
+            }
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func rowDestructiveSwipe(_ action: RowDestructiveAction?) -> some View {
+        if let action {
+            swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive, action: action.handler) {
+                    Label(action.label, systemImage: "trash")
+                }
+                .accessibilityIdentifier(action.identifier ?? "rowDestructiveAction")
+            }
+        } else {
+            self
+        }
     }
 }
 

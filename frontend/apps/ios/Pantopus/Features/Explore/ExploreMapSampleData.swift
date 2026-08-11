@@ -341,19 +341,21 @@ public enum ExploreMapSampleData {
             .task: "Help wanted nearby",
             .item: "For sale nearby",
             .post: "Neighbor asked a question",
-            .spot: "Local spot"
+            .spot: "Local spot",
+            .home: "Neighborhood home"
         ]
         let metas: [ExploreKind: String] = [
             .task: "$35",
             .item: "$30",
             .post: "Asked today",
-            .spot: "Open"
+            .spot: "Open",
+            .home: "Home"
         ]
         let tones: [ExploreKind: ExploreBadge.Tone] = [
-            .task: .bids, .item: .new, .post: .replies, .spot: .rating
+            .task: .bids, .item: .new, .post: .replies, .spot: .rating, .home: .new
         ]
         let badgeText: [ExploreKind: String] = [
-            .task: "1 bid", .item: "New", .post: "2 replies", .spot: "4.5★"
+            .task: "1 bid", .item: "New", .post: "2 replies", .spot: "4.5★", .home: "Home"
         ]
         return (0..<count).map { i in
             let global = startIndex + i
