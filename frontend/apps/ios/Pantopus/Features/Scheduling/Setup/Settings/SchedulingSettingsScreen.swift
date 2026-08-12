@@ -238,7 +238,22 @@ struct SchedulingSettingsScreen: View {
 
     private var savedToast: some View {
         Group {
-            if model.showSavedToast {
+            if let dangerError = model.dangerError {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.alertCircle, size: 15, color: Theme.Color.error)
+                    Text(dangerError)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .lineLimit(2)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, 10)
+                .background(Theme.Color.appText)
+                .clipShape(Capsule())
+                .pantopusShadow(.lg)
+                .padding(.top, Spacing.s3)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            } else if model.showSavedToast {
                 HStack(spacing: Spacing.s2) {
                     Icon(.check, size: 15, strokeWidth: 3, color: Theme.Color.success)
                     Text("Changes saved")
@@ -255,6 +270,7 @@ struct SchedulingSettingsScreen: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: model.showSavedToast)
+        .animation(.easeInOut(duration: 0.2), value: model.dangerError)
     }
 }
 

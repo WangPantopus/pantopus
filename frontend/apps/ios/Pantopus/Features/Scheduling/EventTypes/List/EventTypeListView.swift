@@ -45,7 +45,11 @@ struct EventTypeListView: View {
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            filterHeader
+            if viewModel.isReordering {
+                reorderHintBar
+            } else {
+                filterHeader
+            }
             content
         }
         .background(Theme.Color.appBg)
@@ -114,7 +118,8 @@ struct EventTypeListView: View {
 
     private var topBar: some View {
         ZStack {
-            Text(viewModel.screenTitle)
+            // FRAME 6 retitles the bar while reordering.
+            Text(viewModel.isReordering ? "Reorder" : viewModel.screenTitle)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
             HStack {
@@ -123,7 +128,17 @@ struct EventTypeListView: View {
                         .frame(width: 32, height: 32)
                 }
                 .accessibilityLabel("Back")
+                .opacity(viewModel.isReordering ? 0 : 1)
+                .disabled(viewModel.isReordering)
                 Spacer()
+                if viewModel.canReorder, !viewModel.isReordering {
+                    Button { viewModel.startReordering() } label: {
+                        Icon(.move, size: 19, strokeWidth: 2.2, color: Theme.Color.primary600)
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel("Reorder event types")
+                    .accessibilityIdentifier("schedulingEventTypes_reorderEntry")
+                }
                 Button { viewModel.createNew() } label: {
                     Icon(
                         .plus,
@@ -133,7 +148,8 @@ struct EventTypeListView: View {
                     )
                     .frame(width: 32, height: 32)
                 }
-                .disabled(!viewModel.canEdit)
+                .disabled(!viewModel.canEdit || viewModel.isReordering)
+                .opacity(viewModel.isReordering ? 0 : 1)
                 .accessibilityLabel("New event type")
                 .accessibilityIdentifier("scheduling.eventTypes.create")
             }
@@ -193,6 +209,48 @@ struct EventTypeListView: View {
     }
 
     private var rowsList: some View {
+        Group {
+            if viewModel.isReordering {
+                reorderList
+            } else {
+                staticRowsList
+            }
+        }
+    }
+
+    /// FRAME 6 — drag-to-order. A plain `List` in permanent edit mode gives the
+    /// system drag affordance and reduces this to `onMove`, which the view-model
+    /// translates into `sort_order` writes.
+    private var reorderList: some View {
+        List {
+            ForEach(viewModel.visibleTypes) { eventType in
+                EventTypeRowCard(
+                    eventType: eventType,
+                    meta: viewModel.rowMeta(for: eventType),
+                    isHidden: viewModel.isHidden(eventType),
+                    isSecret: viewModel.isSecret(eventType),
+                    canEdit: viewModel.canEdit,
+                    isReordering: true,
+                    onTap: {},
+                    onToggle: {},
+                    onMenu: {}
+                )
+                .accessibilityIdentifier("schedulingEventTypes_reorderRow_\(eventType.id)")
+                .listRowInsets(EdgeInsets(top: 4, leading: Spacing.s3, bottom: 4, trailing: Spacing.s3))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+            .onMove { source, destination in
+                viewModel.moveRows(fromOffsets: source, toOffset: destination)
+            }
+        }
+        .listStyle(.plain)
+        .environment(\.editMode, .constant(.active))
+        .scrollContentBackground(.hidden)
+        .background(Theme.Color.appBg)
+    }
+
+    private var staticRowsList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 if !viewModel.canEdit {
@@ -222,6 +280,32 @@ struct EventTypeListView: View {
             .padding(.bottom, Spacing.s6)
         }
         .refreshable { await viewModel.refresh() }
+    }
+
+    /// Design FRAME 6 hint bar: sky-tinted strip, move glyph, instruction, Done.
+    private var reorderHintBar: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.move, size: 15, color: Theme.Color.primary700)
+            Text("Drag to set the order people see")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary700)
+            Spacer(minLength: Spacing.s2)
+            Button {
+                Task { await viewModel.doneReordering() }
+            } label: {
+                Text("Done")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Color.primary700)
+            }
+            .accessibilityIdentifier("schedulingEventTypes_reorderDone")
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.primary50)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.primary100).frame(height: 1)
+        }
     }
 
     // MARK: Empty + error
@@ -345,12 +429,17 @@ private struct EventTypeRowCard: View {
     let isHidden: Bool
     let isSecret: Bool
     var canEdit: Bool = true
+    /// FRAME 6: leading grip, no overflow, inert toggle.
+    var isReordering: Bool = false
     let onTap: () -> Void
     let onToggle: () -> Void
     let onMenu: () -> Void
 
     var body: some View {
         HStack(spacing: 9) {
+            if isReordering {
+                Icon(.gripVertical, size: 16, color: Theme.Color.appTextMuted)
+            }
             Circle()
                 .fill(EventTypeSwatch.match(eventType.color).color)
                 .frame(width: 6, height: 6)
@@ -374,18 +463,20 @@ private struct EventTypeRowCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             EventTypeToggle(on: !isHidden, action: onToggle)
-                .disabled(!canEdit)
+                .disabled(!canEdit || isReordering)
                 .opacity(canEdit ? 1 : 0.5)
                 .accessibilityIdentifier("scheduling.eventTypes.toggle.\(eventType.id)")
-            Button(action: onMenu) {
-                Icon(.ellipsisVertical, size: 17, color: canEdit ? Theme.Color.appTextSecondary : Theme.Color.appTextMuted)
-                    .frame(width: 26, height: 26)
-                    // Report this button's frame so the floating popover can
-                    // position itself right-anchored below the tapped button.
-                    .anchorPreference(key: OverflowAnchorKey.self, value: .bounds) { [eventType.id: $0] }
+            if !isReordering {
+                Button(action: onMenu) {
+                    Icon(.ellipsisVertical, size: 17, color: canEdit ? Theme.Color.appTextSecondary : Theme.Color.appTextMuted)
+                        .frame(width: 26, height: 26)
+                        // Report this button's frame so the floating popover can
+                        // position itself right-anchored below the tapped button.
+                        .anchorPreference(key: OverflowAnchorKey.self, value: .bounds) { [eventType.id: $0] }
+                }
+                .disabled(!canEdit)
+                .accessibilityLabel("More")
             }
-            .disabled(!canEdit)
-            .accessibilityLabel("More")
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)

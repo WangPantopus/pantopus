@@ -295,7 +295,10 @@ struct HubPausedBanner: View {
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            setupIconTile(.pause, bg: Theme.Color.warningBg, fg: Theme.Color.warning)
+            // Design: `P.warningBg` (amber-100) tile with a `P.warning`
+            // (amber-700) glyph — warmAmberBg/warmAmber, not the lighter
+            // semantic warning pair.
+            setupIconTile(.pause, bg: Theme.Color.warmAmberBg, fg: Theme.Color.warmAmber)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Bookings are paused").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.appText)
                 Text("New bookings are turned off").font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary)
@@ -307,14 +310,14 @@ struct HubPausedBanner: View {
                     .foregroundStyle(Theme.Color.appTextInverse)
                     .padding(.horizontal, 14)
                     .padding(.vertical, Spacing.s2)
-                    .background(Theme.Color.warning)
+                    .background(Theme.Color.warmAmber)
                     .clipShape(Capsule())
             }
             .accessibilityIdentifier("schedulingHubResume")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 13)
-        .background(Theme.Color.warningBg.opacity(0.4))
+        .background(Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
         .padding(.horizontal, Spacing.s4)
@@ -399,6 +402,15 @@ struct HubBookingRowCard: View {
                 HStack(spacing: 5) {
                     Icon(.clock, size: 11, color: Theme.Color.appTextMuted)
                     Text(row.metaLabel).font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1)
+                    // Cross-owner host attribution on composed hubs — 11pt
+                    // `user` glyph + host first name (FrameHome `crossOwner`).
+                    if let host = row.hostName {
+                        HStack(spacing: 3) {
+                            Icon(.user, size: 11, color: Theme.Color.appTextSecondary)
+                            Text(host).font(.system(size: 11.5)).foregroundStyle(Theme.Color.appTextSecondary).lineLimit(1)
+                        }
+                        .padding(.leading, 2)
+                    }
                 }
                 .padding(.bottom, Spacing.s2)
 
@@ -462,7 +474,7 @@ struct HubManageRows: View {
                         if let value = item.value {
                             Text(value)
                                 .font(.system(size: 12, weight: item.alert ? .bold : .medium))
-                                .foregroundStyle(item.alert ? Theme.Color.warning : Theme.Color.appTextSecondary)
+                                .foregroundStyle(item.alert ? Theme.Color.warmAmber : Theme.Color.appTextSecondary)
                                 .lineLimit(1)
                         }
                         if !readOnly {
@@ -567,7 +579,7 @@ struct HubEmptyState: View {
     private var banner: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             HStack(alignment: .top, spacing: Spacing.s3) {
-                setupIconTile(.wandSparkles, bg: Theme.Color.warningBg, fg: Theme.Color.warning, size: 38, glyph: 19)
+                setupIconTile(.wandSparkles, bg: Theme.Color.warmAmberBg, fg: Theme.Color.warmAmber, size: 38, glyph: 19)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Three quick steps").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.Color.appText)
                     Text(stepsLine)
@@ -582,7 +594,7 @@ struct HubEmptyState: View {
                 .padding(.top, 14)
         }
         .padding(Spacing.s4)
-        .background(Theme.Color.warningBg.opacity(0.4))
+        .background(Theme.Color.warningBg)
         .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous).stroke(Theme.Color.warningLight, lineWidth: 1))
         .padding(.horizontal, Spacing.s4)
@@ -622,7 +634,7 @@ struct HubEmptyState: View {
 
     // swiftlint:disable:next large_tuple
     private var placeholderRows: [(Int, String, PantopusIcon)] {
-        [(0, "Event types", .layoutGrid), (1, "Availability", .clock), (2, "Connected calendars", .calendarClock)]
+        [(0, "Event types", .layoutGrid), (1, "Availability", .clock), (2, "Connected calendars", .calendarSync)]
     }
 }
 

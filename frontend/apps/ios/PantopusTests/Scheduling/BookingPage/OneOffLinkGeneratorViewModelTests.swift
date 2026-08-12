@@ -87,4 +87,52 @@ final class OneOffLinkGeneratorViewModelTests: XCTestCase {
         XCTAssertEqual(OneOffExpiry.d30.minutes, 43200)
         XCTAssertNil(OneOffExpiry.never.minutes)
     }
+
+    /// "No expiry" must reach the wire as an EXPLICIT `expires_in_min: null`
+    /// (backend `allow(null)` = never) — omitting the key silently applies the
+    /// server's 7-day default instead.
+    func testNeverExpiryEncodesExplicitNull() async {
+        let viewModel = await loadedVM()
+        viewModel.expiry = .never
+        SequencedURLProtocol.sequence = [
+            .status(200, body: #"{"token":"abc123","path":"/book/o/abc123","expires_at":null,"single_use":true}"#)
+        ]
+        await viewModel.generate()
+
+        guard let post = SequencedURLProtocol.capturedRequests.last(where: { $0.httpMethod == "POST" }),
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: post)) as? [String: Any]
+        else { return XCTFail("Missing one-off POST body") }
+        XCTAssertTrue(json.keys.contains("expires_in_min"), "the key must be present, not omitted")
+        XCTAssertTrue(json["expires_in_min"] is NSNull, "Never must encode an explicit JSON null")
+    }
+
+    /// A timed chip still encodes its minutes; an omitted expiry (other
+    /// construction sites, e.g. follow-up links) keeps the key absent so the
+    /// server default applies.
+    func testTimedExpiryEncodesMinutesAndOmissionStaysAbsent() throws {
+        let timed = OneOffLinkRequest(eventTypeId: "et1", expiresInMin: OneOffExpiry.d30.minutes)
+        let timedJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(timed)) as? [String: Any]
+        XCTAssertEqual(timedJSON?["expires_in_min"] as? Int, 43200)
+
+        let omitted = OneOffLinkRequest(eventTypeId: "et1")
+        let omittedJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(omitted)) as? [String: Any]
+        XCTAssertEqual(omittedJSON?.keys.contains("expires_in_min"), false)
+    }
+
+    /// URLProtocol-stubbed sessions expose the body via httpBodyStream.
+    private static func bodyData(from request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        var data = Data()
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 4096
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
 }

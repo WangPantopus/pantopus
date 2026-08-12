@@ -7,8 +7,8 @@
 //  where (+ the price block when priced and the paid flag is on), and commits
 //  the booking via `POST /api/public/book/:slug/:eventTypeSlug`.
 //
-//  On success it PERSISTS the one-time `manageToken` (ManageTokenStore) and
-//  routes to D3 (Confirmed). A 409 surfaces the Foundation `SlotTakenSheet`
+//  On success it routes to D3 (Confirmed), which carries the one-time
+//  `manageToken` in its route. A 409 surfaces the Foundation `SlotTakenSheet`
 //  with the backend's nearest open times — never a dead end. Paid surfaces stay
 //  behind `SchedulingFeatureFlags.paidEnabled` + Stripe TEST mode (settlement is
 //  deferred server-side → D3 shows a processing/pending receipt).
@@ -247,13 +247,10 @@ final class InviteeReviewConfirmViewModel {
             let response: PublicBookingCreateResponse = try await client.request(
                 SchedulingPublicEndpoints.createBooking(slug: slug, eventTypeSlug: eventTypeSlug, request)
             )
-            ManageTokenStore.shared.save(
-                bookingId: response.booking.id,
-                manageToken: response.manageToken,
-                eventTypeName: response.eventType?.name ?? event.name,
-                startAt: response.booking.startAt
-            )
             InviteeBookingDraftStore.shared.clear(slug: slug, eventTypeSlug: eventTypeSlug, start: bookingStart)
+            // Restore .ready BEFORE pushing D3: its Done/X pops back onto this
+            // screen, which otherwise stays frozen in the .confirming shimmer.
+            state = .ready
             // Paid path: settlement is deferred server-side (Stripe TEST). The
             // booking is created; D3 reflects the processing/pending receipt.
             push(.inviteeConfirmed(manageToken: response.manageToken))
@@ -313,6 +310,15 @@ final class InviteeReviewConfirmViewModel {
 
     func presentSlotTaken() {
         showSlotTakenSheet = true
+    }
+
+    /// "Pick another time" from the slot-taken sheet. Records the conflicted
+    /// slot on the relay so the unwind continues past D1 back onto the C6
+    /// picker (which shows the Frame 6 taken treatment); the view follows this
+    /// with `dismiss()`.
+    func pickAnotherTime() {
+        showSlotTakenSheet = false
+        SlotTakenRelay.shared.signal(slug: slug, eventTypeSlug: eventTypeSlug, start: bookingStart)
     }
 
     func selectAlternative(_ alternative: SchedulingSlotAlternative) async {

@@ -71,6 +71,18 @@ struct WorkflowEditorView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .confirmationDialog(
+            "Delete \"\(model.name.isEmpty ? "this workflow" : model.name)\"?",
+            isPresented: $model.showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete workflow", role: .destructive) {
+                Task { if await model.delete() { dismiss() } }
+            }
+            Button("Keep", role: .cancel) {}
+        } message: {
+            Text("This workflow will be permanently removed and can't be undone.")
+        }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.workflows.editor")
     }
@@ -109,6 +121,12 @@ struct WorkflowEditorView: View {
                     enableSection
                     if let saveError = model.saveError {
                         AutoNote(tone: .error, icon: .alertTriangle, text: saveError)
+                    }
+                    if let deleteError = model.deleteError {
+                        AutoNote(tone: .error, icon: .alertTriangle, text: deleteError)
+                    }
+                    if !model.isNew {
+                        deleteWorkflowButton
                     }
                     Color.clear.frame(height: Spacing.s4)
                 }
@@ -261,6 +279,25 @@ struct WorkflowEditorView: View {
                     .accessibilityLabel("Workflow active")
             }
         }
+    }
+
+    /// Destructive delete row — visible only when editing an existing workflow
+    /// (mirrors the template editor's delete pattern).
+    private var deleteWorkflowButton: some View {
+        Button(role: .destructive) {
+            model.showDeleteConfirm = true
+        } label: {
+            HStack(spacing: Spacing.s2) {
+                Icon(.trash2, size: 14, color: Theme.Color.error)
+                Text("Delete workflow")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.error)
+            }
+            .frame(maxWidth: .infinity, minHeight: 38)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, Spacing.s2)
+        .accessibilityIdentifier("workflowEditor.delete")
     }
 
     // MARK: Activity tab

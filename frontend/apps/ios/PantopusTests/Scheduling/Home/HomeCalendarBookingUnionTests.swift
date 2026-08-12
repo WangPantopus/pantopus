@@ -38,7 +38,15 @@ final class HomeCalendarBookingUnionTests: XCTestCase {
         // the real `Date()` — which buckets the 2025-10-12 fixtures into the
         // past so the agenda comes back empty.
         let now: @Sendable () -> Date = { frozen }
-        return HomeCalendarViewModel(homeId: "home-1", api: makeAPI(), now: now)
+        // Pin UTC (production now defaults to the device-local calendar) so
+        // the 2025-10-12 fixtures bucket deterministically on any machine.
+        return HomeCalendarViewModel(
+            homeId: "home-1",
+            api: makeAPI(),
+            now: now,
+            calendar: HomeCalendarViewModel.utcCalendar,
+            timeZone: TimeZone(identifier: "UTC") ?? .current
+        )
     }
 
     private static let bookingBody = """

@@ -86,6 +86,10 @@ struct HubBookingRow: Identifiable {
     let title: String
     let timeLabel: String
     let metaLabel: String
+    /// Cross-owner host attribution — the assigned member's first name, shown
+    /// after the duration on composed (non-personal) hubs. Nil on personal
+    /// hubs or when the host can't be resolved. (FrameHome `crossOwner`.)
+    var hostName: String?
     let bookerName: String
     let bookerInitials: String
     let bookerBg: Color
@@ -118,6 +122,10 @@ final class SchedulingHubModel {
     private(set) var page: BookingPageDTO?
     private(set) var summary: HubSummary?
     private(set) var summaryFailed = false
+    private(set) var summaryRetrying = false
+    /// Member user-id → display name, resolved for non-personal owners so
+    /// agenda rows can attribute their host (FrameHome `crossOwner`).
+    private(set) var memberNames: [String: String] = [:]
     private(set) var upcoming: [BookingDTO] = []
     private(set) var pending: [BookingDTO] = []
     private(set) var eventTypes: [EventTypeDTO] = []
@@ -152,18 +160,33 @@ final class SchedulingHubModel {
     func selectPillar(_ choice: SchedulingPillarChoice) async {
         guard !choice.matches(owner) else { return }
         phase = .loading
+        // Resolve the owner id BEFORE mutating `owner` — an unresolved id must
+        // never produce a malformed `/api/homes//scheduling` request, and the
+        // failure copy is pillar-specific (mirrors Android SchedulingHubViewModel).
         switch choice {
         case .personal:
             owner = .personal
         case .home:
-            owner = await .home(homeId: resolveFirstHomeId() ?? "")
+            guard let homeId = await resolveFirstHomeId(), !homeId.isEmpty else {
+                phase = .error("No household yet. Create one to share a family booking link.")
+                return
+            }
+            owner = .home(homeId: homeId)
         case .business:
-            owner = await .business(id: resolveCurrentUserId() ?? "")
+            guard let userId = await resolveCurrentUserId(), !userId.isEmpty else {
+                phase = .error("Couldn't load your business scheduling.")
+                return
+            }
+            owner = .business(id: userId)
         }
         await fetch()
     }
 
     private func fetch() async {
+        // Re-arm edit affordances on every fetch — a 403 from one pillar must
+        // not latch view-only mode onto the others (mirrors Android's
+        // `canEdit = true` at the top of fetch).
+        canEdit = true
         let pageResult: BookingPageResponse
         do {
             pageResult = try await client.request(SchedulingEndpoints.getBookingPage(owner: owner))
@@ -184,10 +207,12 @@ final class SchedulingHubModel {
         async let pendingR: BookingsResponse? = try? api.request(SchedulingEndpoints.getBookings(owner: owner, status: "pending"))
         async let availR: AvailabilityResponse? = isPersonal ? (try? api.request(SchedulingEndpoints.getAvailability())) : nil
         async let calR: ConnectedCalendarsResponse? = isPersonal ? (try? api.request(SchedulingEndpoints.getConnectedCalendars())) : nil
+        async let namesR: [String: String] = resolveMemberNames()
 
         page = pageResult.page
         isPaused = pageResult.page.isPaused
-        eventTypes = await (typesR)?.eventTypes ?? []
+        let typesResponse = await typesR
+        eventTypes = typesResponse?.eventTypes ?? []
         let s = await summaryR
         summary = s
         summaryFailed = (s == nil)
@@ -195,8 +220,27 @@ final class SchedulingHubModel {
         pending = await (pendingR)?.bookings ?? []
         availabilityRules = await (availR)?.rules ?? []
         connectedCalendars = await (calR)?.calendars ?? []
+        memberNames = await namesR
 
-        phase = eventTypes.isEmpty ? .empty : .loaded
+        // A failed /event-types fetch is an error with retry — never the
+        // first-run empty state. Enter .empty only on a successful zero-row
+        // response (a 500/timeout must not render "set up your page").
+        if typesResponse == nil {
+            phase = .error("Couldn't load your scheduling hub.")
+        } else {
+            phase = eventTypes.isEmpty ? .empty : .loaded
+        }
+    }
+
+    /// Refetch just the summary after a summary-card Retry tap — the rest of
+    /// the hub is already loaded, so no full-screen reload.
+    func retrySummary() async {
+        guard summary == nil, !summaryRetrying else { return }
+        summaryRetrying = true
+        let s: HubSummary? = try? await api.request(SchedulingEndpoints.getBookingsSummary(owner: owner))
+        summary = s
+        summaryFailed = (s == nil)
+        summaryRetrying = false
     }
 
     // MARK: Pause / resume
@@ -372,6 +416,9 @@ final class SchedulingHubModel {
         let meta = metaParts.isEmpty ? (location.isEmpty ? "Booking" : location) : metaParts.joined(separator: " · ")
         let name = dto.inviteeName ?? dto.inviteeEmail ?? "Invitee"
         let tone = Self.avatarTone(for: name)
+        let host: String? = owner.isPersonal
+            ? nil
+            : dto.hostUserId.flatMap { memberNames[$0] }.map(Self.firstName)
         return HubBookingRow(
             id: dto.id,
             icon: kind.icon,
@@ -380,6 +427,7 @@ final class SchedulingHubModel {
             title: et?.name ?? "Booking",
             timeLabel: Self.clockLabel(date, tz: tz),
             metaLabel: meta,
+            hostName: host,
             bookerName: name,
             bookerInitials: setupInitials(name),
             bookerBg: tone.bg,
@@ -389,6 +437,34 @@ final class SchedulingHubModel {
     }
 
     // MARK: Owner resolution
+
+    /// Host attribution for composed hubs — resolves the owner's member roster
+    /// (home occupants / business team) into a user-id → name map so agenda
+    /// rows can render the design's `user` glyph + host first name. Personal
+    /// hubs skip the fetch; failures degrade to no attribution.
+    private func resolveMemberNames() async -> [String: String] {
+        switch owner {
+        case .personal:
+            return [:]
+        case let .home(homeId):
+            guard !homeId.isEmpty else { return [:] }
+            let r: OccupantsResponse? = try? await api.request(HomesEndpoints.listOccupants(homeId: homeId))
+            var names: [String: String] = [:]
+            for occupant in r?.occupants ?? [] where occupant.isActive {
+                names[occupant.userId] = occupant.displayName ?? occupant.username
+            }
+            return names
+        case let .business(id):
+            guard !id.isEmpty else { return [:] }
+            let r: BusinessTeamMembersResponse? = try? await api.request(BusinessTeamEndpoints.members(businessId: id))
+            var names: [String: String] = [:]
+            for member in r?.members ?? [] {
+                guard let user = member.user else { continue }
+                names[user.id] = user.name ?? user.username
+            }
+            return names
+        }
+    }
 
     private func resolveFirstHomeId() async -> String? {
         let r: MyHomesResponse? = try? await api.request(HomesEndpoints.myHomes())
@@ -423,11 +499,17 @@ final class SchedulingHubModel {
         }
     }
 
+    /// First token of a display name — the design's cross-owner chip labels
+    /// hosts by first name only ("John", "Maria").
+    static func firstName(_ name: String) -> String {
+        name.split(separator: " ").first.map(String.init) ?? name
+    }
+
     static func avatarTone(for name: String) -> (bg: Color, fg: Color) {
         let tones: [(Color, Color)] = [
             (Theme.Color.primary100, Theme.Color.primary700),
             (Theme.Color.homeBg, Theme.Color.homeDark),
-            (Theme.Color.warmAmberBg, Theme.Color.warning),
+            (Theme.Color.warmAmberBg, Theme.Color.warmAmber),
             (Theme.Color.roseBg, Theme.Color.rose),
             (Theme.Color.businessBg, Theme.Color.businessDark)
         ]

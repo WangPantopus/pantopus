@@ -141,7 +141,8 @@ final class TeamPerformanceViewModel {
         if case .forbidden = error { return .permissionGated }
         let message = (error.userMessage ?? "").uppercased()
         if message.contains("BUSINESS_ONLY") { return .businessOnly }
-        if case let .unknown(msg) = error, (msg ?? "").uppercased().contains("BUSINESS_ONLY") { return .businessOnly }
+        if error.code == "BUSINESS_ONLY" { return .businessOnly }
+        if case let .unknown(_, msg) = error, (msg ?? "").uppercased().contains("BUSINESS_ONLY") { return .businessOnly }
         return .error(error.userMessage ?? "Couldn't load team performance.")
     }
 

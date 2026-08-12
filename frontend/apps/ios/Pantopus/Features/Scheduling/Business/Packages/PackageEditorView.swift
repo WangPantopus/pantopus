@@ -95,6 +95,12 @@ struct PackageEditorView: View {
             }
             expiryCard
             activeCard
+            // Inline save failure keeps the form (and the user's edits)
+            // mounted — a full-screen error here would discard them on Retry.
+            if let saveError = model.saveError {
+                PkgNote(tone: .error, icon: .alertTriangle, text: saveError)
+                    .accessibilityIdentifier("packageEditorSaveError")
+            }
             Color.clear.frame(height: Spacing.s8)
         }
         .padding(.horizontal, Spacing.s4)

@@ -94,6 +94,37 @@ final class MemberWorkingHoursViewModelTests: XCTestCase {
         await model.load()
         let ok = await model.save()
         XCTAssertTrue(ok)
+        XCTAssertNil(model.saveError)
+    }
+
+    /// A failed rules PUT must surface inline instead of silently leaving the
+    /// sheet open with a stopped spinner.
+    func testSaveFailureSurfacesError() async {
+        let model = editVM([
+            "/api/scheduling/availability": [.status(200, body: availability)],
+            "/api/scheduling/availability/sched1/rules": [.status(500, body: #"{"error":"boom"}"#)]
+        ])
+        await model.load()
+        let ok = await model.save()
+        XCTAssertFalse(ok)
+        XCTAssertNotNil(model.saveError)
+    }
+
+    /// Rules land, timezone PUT fails → partial-success copy (the hours ARE
+    /// saved server-side; implying total failure invited stale re-edits).
+    func testTimezoneFailureAfterRulesReportsPartialSuccess() async {
+        let model = editVM([
+            "/api/scheduling/availability": [.status(200, body: availability)],
+            "/api/scheduling/availability/sched1/rules": [
+                .status(200, body: #"{"rules":[]}"#)
+            ],
+            "/api/scheduling/availability/sched1": [.status(500, body: #"{"error":"boom"}"#)]
+        ])
+        await model.load()
+        model.changeTimezone("America/New_York")
+        let ok = await model.save()
+        XCTAssertFalse(ok)
+        XCTAssertEqual(model.saveError?.contains("hours were saved"), true)
     }
 
     func testEditSelfErrorWhenNoSchedule() async {

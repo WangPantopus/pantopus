@@ -11,7 +11,7 @@
 import SwiftUI
 
 /// Stripe-not-connected inline card — the design's Stripe-branded `StripeCard`
-/// (stripeBg `#f5f4ff` surface, `#e0ddff` border, `#635bff` tile) with a
+/// (stripeBg surface, brand-purple border, Stripe-purple tile) with a
 /// credit-card tile, the connect copy, and a full-width sky "Connect Stripe"
 /// button carrying an external-link glyph. Uses the dedicated Stripe brand mark
 /// token rather than the business pillar violet.
@@ -54,9 +54,9 @@ struct StripeConnectCard: View {
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Stripe brand tint (design stripeBg `#f5f4ff`) + brand-purple border
-        // (`#e0ddff`), both derived from the Stripe brand mark token so no raw
-        // hex reaches a Color initialiser.
+        // Stripe brand tint (design stripeBg) + brand-purple border, both
+        // derived from the Stripe brand mark token so no raw hex reaches a
+        // Color initialiser.
         .background(Theme.Color.stripeBrand.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         .overlay(

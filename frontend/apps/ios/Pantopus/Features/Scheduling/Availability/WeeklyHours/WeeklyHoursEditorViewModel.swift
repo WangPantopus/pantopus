@@ -268,8 +268,8 @@ final class WeeklyHoursEditorViewModel {
     func makeBlockOffViewModel() -> BlockOffTimeViewModel {
         BlockOffTimeViewModel(client: client) { [weak self] bookingId in
             guard let self else { return }
-            self.activeSheet = nil
-            self.push(.bookingDetail(owner: .personal, bookingId: bookingId))
+            activeSheet = nil
+            push(.bookingDetail(owner: .personal, bookingId: bookingId))
         }
     }
 

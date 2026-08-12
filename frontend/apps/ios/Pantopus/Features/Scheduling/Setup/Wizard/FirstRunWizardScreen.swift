@@ -55,7 +55,13 @@ struct FirstRunWizardScreen: View {
 
     @ViewBuilder
     private var content: some View {
-        WizardStepRail(steps: steps, current: model.step.rawValue, accent: model.theme.accent, accentBg: model.theme.accentBg)
+        WizardStepRail(
+            steps: steps,
+            current: model.step.rawValue,
+            accent: model.theme.accent,
+            accentBg: model.theme.accentBg,
+            allComplete: model.step == .success
+        )
         switch model.step {
         case .link:
             WizardHeadline(

@@ -305,6 +305,19 @@ enum ResourceTime {
         return formatter
     }()
 
+    /// Fixed-format label formatter pinned to `en_US_POSIX` (QA1480): without
+    /// the pin, the user's 12/24-hour override rewrites the designed pattern
+    /// and non-Gregorian/non-latn locales leak calendars and digits — drifting
+    /// from the POSIX-pinned peers on the same Home surfaces
+    /// (`HomeAgendaBuilder`, `FindATimeFormat`).
+    private static func fixedFormatter(_ pattern: String, in timeZone: TimeZone) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = pattern
+        return formatter
+    }
+
     /// "HH:mm" (24h) → "7 AM" clock label.
     static func clockLabel(hhmm: String) -> String {
         let parts = hhmm.split(separator: ":")
@@ -315,8 +328,9 @@ enum ResourceTime {
         comps.minute = minute
         let cal = Calendar(identifier: .gregorian)
         guard let date = cal.date(from: comps) else { return hhmm }
-        let formatter = DateFormatter()
-        formatter.dateFormat = minute == 0 ? "h a" : "h:mm a"
+        // The components date was built in the current zone — format in the
+        // same zone so the wall time round-trips.
+        let formatter = fixedFormatter(minute == 0 ? "h a" : "h:mm a", in: .current)
         return formatter.string(from: date)
     }
 
@@ -324,10 +338,8 @@ enum ResourceTime {
     static func rangeLabel(startISO: String?, endISO: String?) -> String {
         guard let startISO, let start = SchedulingTime.parseUTC(startISO) else { return "" }
         let end = endISO.flatMap(SchedulingTime.parseUTC)
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
         let sameMeridiem = end.map { Self.sameMeridiem(start, $0) } ?? true
-        formatter.dateFormat = sameMeridiem ? "h:mm" : "h:mm a"
+        let formatter = fixedFormatter(sameMeridiem ? "h:mm" : "h:mm a", in: zone)
         let startText = formatter.string(from: start)
         guard let end else { return "\(startText) \(Self.meridiem(start))" }
         formatter.dateFormat = "h:mm a"
@@ -337,10 +349,7 @@ enum ResourceTime {
     /// "9:00 AM" single instant.
     static func timeLabel(_ iso: String?) -> String {
         guard let iso, let date = SchedulingTime.parseUTC(iso) else { return "" }
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
+        return fixedFormatter("h:mm a", in: zone).string(from: date)
     }
 
     /// Day-section header: "Today · Mon Jun 16" / "Tomorrow · Tue Jun 17" /
@@ -349,10 +358,7 @@ enum ResourceTime {
         guard let date = SchedulingTime.parseUTC(iso) else { return "" }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = zone
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "EEE MMM d"
-        let stamp = formatter.string(from: date)
+        let stamp = fixedFormatter("EEE MMM d", in: zone).string(from: date)
         if cal.isDateInToday(date) { return "Today · \(stamp)" }
         if cal.isDateInTomorrow(date) { return "Tomorrow · \(stamp)" }
         return stamp
@@ -360,19 +366,13 @@ enum ResourceTime {
 
     /// "Sat · Jun 21" header for the F12 day strip.
     static func dayStripLabel(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "EEE · MMM d"
-        return formatter.string(from: date)
+        fixedFormatter("EEE · MMM d", in: zone).string(from: date)
     }
 
     /// "Sat Jun 21 · 9:00–10:00 AM" header used on the visit detail time pill.
     static func longRangeLabel(startISO: String?, endISO: String?) -> String {
         guard let startISO, let start = SchedulingTime.parseUTC(startISO) else { return "" }
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "EEE MMM d"
-        let day = formatter.string(from: start)
+        let day = fixedFormatter("EEE MMM d", in: zone).string(from: start)
         let range = rangeLabel(startISO: startISO, endISO: endISO)
         return range.isEmpty ? day : "\(day) · \(range)"
     }
@@ -380,10 +380,7 @@ enum ResourceTime {
     /// "Jun 12" short date for terminal/done headers.
     static func shortDate(_ iso: String?) -> String {
         guard let iso, let date = SchedulingTime.parseUTC(iso) else { return "" }
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+        return fixedFormatter("MMM d", in: zone).string(from: date)
     }
 
     /// Day key (start-of-day in `tz`) for grouping bookings under day headers.
@@ -402,10 +399,7 @@ enum ResourceTime {
     }
 
     private static func meridiem(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateFormat = "a"
-        return formatter.string(from: date)
+        fixedFormatter("a", in: zone).string(from: date)
     }
 
     private static func sameMeridiem(_ lhs: Date, _ rhs: Date) -> Bool {

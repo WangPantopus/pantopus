@@ -178,8 +178,10 @@ final class FindATimeSuggestedViewModel {
             requiredMemberIds: resolved.map(\.id),
             mode: .collective,
             durationMin: 30,
-            from: SchedulingTime.isoDay(today),
-            to: SchedulingTime.isoDay(weekEnd),
+            // Day keys rendered in the SAME zone the start-of-day above was
+            // computed in — the UTC overload is off by one for non-UTC devices.
+            from: SchedulingTime.isoDay(today, tz: SchedulingTime.deviceTimeZoneIdentifier),
+            to: SchedulingTime.isoDay(weekEnd, tz: SchedulingTime.deviceTimeZoneIdentifier),
             tz: tz,
             precomputedSlots: nil
         )

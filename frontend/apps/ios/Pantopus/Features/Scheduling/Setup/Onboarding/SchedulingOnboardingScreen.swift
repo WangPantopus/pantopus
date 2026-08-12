@@ -57,7 +57,28 @@ struct SchedulingOnboardingScreen: View {
             }
             WizardStepRail(steps: model.steps, current: model.displayStep, accent: model.accent, accentBg: model.accentBg)
             if model.flow == .home { homeStep } else { businessStep }
+            if let submitError = model.submitError {
+                submitErrorNote(submitError)
+            }
         }
+    }
+
+    /// Inline finish failure above the wizard footer — the user stays on the
+    /// last input step with their entries intact and can retry the CTA.
+    private func submitErrorNote(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Icon(.alertTriangle, size: 16, color: Theme.Color.error).padding(.top, 1)
+            Text(message)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.error)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 11)
+        .background(Theme.Color.errorBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("onboardingSubmitError")
     }
 
     // MARK: Home steps
@@ -72,10 +93,7 @@ struct SchedulingOnboardingScreen: View {
             )
             OnboardingMemberList(model: model)
         case 2:
-            WizardHeadline(
-                title: "How should times combine?",
-                sub: "Choose how members' availability turns into one set of bookable times."
-            )
+            WizardHeadline(title: "How should times combine?", sub: combineSub)
             OnboardingModePicker(model: model)
             if model.combineMode == "round_robin" {
                 OnboardingRoundRobinRule(model: model)
@@ -88,6 +106,19 @@ struct SchedulingOnboardingScreen: View {
         default:
             EmptyView()
         }
+    }
+
+    /// Design has two distinct step-2 subcopies (`onboarding-home-frames.jsx`
+    /// HomeCollective / HomeRoundRobin), with the live member count
+    /// interpolated in the collective case. Mirrors Android's
+    /// `OnboardingHomeBusinessScreen` branch.
+    private var combineSub: String {
+        if model.combineMode == "round_robin" {
+            return "Whoever's free gets the booking. Pick a rule for who hosts when more than one person is open."
+        }
+        let count = model.selectedMembers.count
+        let memberWord = count == 1 ? "Member is" : "\(count) members are"
+        return "\(memberWord) scheduled. Choose how their availability turns into one set of bookable times."
     }
 
     // MARK: Business steps
@@ -143,10 +174,17 @@ struct SchedulingOnboardingScreen: View {
 
     private var successBody: some View {
         // Design BizSuccess (and the Home success frame) keep the StepRail —
-        // all steps progressed — above the success hero. displayStep == the
-        // final step on success, so the rail reads fully advanced.
+        // all steps done — above the success hero. The design passes `done`
+        // including the current step (`done={[1,2,3,4]}`), so every disc
+        // renders the check glyph; `allComplete` mirrors that.
         VStack(spacing: Spacing.s5) {
-            WizardStepRail(steps: model.steps, current: model.displayStep, accent: model.accent, accentBg: model.accentBg)
+            WizardStepRail(
+                steps: model.steps,
+                current: model.displayStep,
+                accent: model.accent,
+                accentBg: model.accentBg,
+                allComplete: true
+            )
             WizardSuccessHero(
                 accent: model.accent,
                 accentBg: model.accentBg,

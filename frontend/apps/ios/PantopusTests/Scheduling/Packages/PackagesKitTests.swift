@@ -33,6 +33,29 @@ final class PackagesKitTests: XCTestCase {
         XCTAssertNil(SchedulingMoney.parseCents("abc"))
     }
 
+    func testParseCentsCommaDecimalLocale() {
+        // A comma-decimal keypad emits "240,50" — must parse as 240.50, not
+        // inflate 100x by dropping the separator.
+        let german = Locale(identifier: "de_DE")
+        XCTAssertEqual(SchedulingMoney.parseCents("240,50", locale: german), 24050)
+        XCTAssertEqual(SchedulingMoney.parseCents("240", locale: german), 24000)
+        // Dot-locale input is unaffected by the locale plumbing.
+        XCTAssertEqual(SchedulingMoney.parseCents("240.50", locale: Locale(identifier: "en_US")), 24050)
+    }
+
+    func testParseCentsRejectsNonASCIIDigitsAndOverflow() {
+        // Arabic-Indic digits must fail to nil (surfaced upstream), never
+        // mis-parse.
+        XCTAssertNil(SchedulingMoney.parseCents("٢٤٠"))
+        // 17+ digit input would overflow Int once scaled to cents — clamp to
+        // nil instead of trapping.
+        XCTAssertNil(SchedulingMoney.parseCents("99999999999999999999"))
+        // Knife-edge: a product rounding to exactly 2^63 passes a
+        // `<= Double(Int.max)` guard (Int.max rounds UP to 2^63 as a Double)
+        // but still traps Int(_:) — Int(exactly:) must reject it.
+        XCTAssertNil(SchedulingMoney.parseCents("92233720368547758.08"))
+    }
+
     // MARK: Invoice line items
 
     private func jsonValue(_ raw: String) throws -> JSONValue {

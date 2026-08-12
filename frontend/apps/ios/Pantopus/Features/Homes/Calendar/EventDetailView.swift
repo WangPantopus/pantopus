@@ -525,7 +525,7 @@ private struct EventHeader: View {
             return event.startAt
         }
         let end = event.endAt.flatMap(AddEventFormViewModel.parseIsoInstant)
-        if end == nil, isMidnight(start, calendar: calendar) {
+        if end == nil, isMidnightUTC(start) {
             return "\(longDateLabel(start, calendar: calendar)) · All day"
         }
         let date = longDateLabel(start, calendar: calendar)
@@ -533,22 +533,32 @@ private struct EventHeader: View {
         return "\(date) · \(time)"
     }
 
-    private func isMidnight(_ date: Date, calendar: Calendar) -> Bool {
+    /// All-day events are stored at midnight **UTC** + nil end, so the
+    /// heuristic is pinned to UTC even though display uses the local zone.
+    private func isMidnightUTC(_ date: Date) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        if let utc = TimeZone(secondsFromGMT: 0) {
+            calendar.timeZone = utc
+        }
         let parts = calendar.dateComponents([.hour, .minute, .second], from: date)
         return (parts.hour ?? 0) == 0 && (parts.minute ?? 0) == 0 && (parts.second ?? 0) == 0
     }
 
     private func longDateLabel(_ date: Date, calendar: Calendar) -> String {
         let fmt = DateFormatter()
-        fmt.locale = .current
+        // Design `EventHeader` shows "Mon Jun 16 · 6:30 PM" — 3-letter
+        // weekday (`event-detail-frames.jsx:46`), rendered in the device's
+        // local zone like the rest of the home-calendar surfaces. POSIX
+        // locale keeps the stamp byte-identical with Android's Locale.US.
+        fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.timeZone = calendar.timeZone
-        fmt.dateFormat = "EEEE MMM d"
+        fmt.dateFormat = "EEE MMM d"
         return fmt.string(from: date)
     }
 
     private func formattedTime(start: Date, end: Date?, calendar: Calendar) -> String {
         let fmt = DateFormatter()
-        fmt.locale = .current
+        fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.timeZone = calendar.timeZone
         fmt.dateFormat = "h:mm a"
         let startLabel = fmt.string(from: start)
@@ -735,8 +745,8 @@ private struct AttendeesSection: View {
                 ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                     let name = nameLookup[id] ?? "Member"
                     AttendeeRow(
+                        memberId: id,
                         name: name,
-                        initials: initials(for: name),
                         isYou: id == currentUserId,
                         rsvp: rsvpFor?(id) ?? .noReply
                     )
@@ -754,11 +764,6 @@ private struct AttendeesSection: View {
             RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
         )
-    }
-
-    private func initials(for name: String) -> String {
-        let parts = name.split(separator: " ").prefix(2)
-        return parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
     }
 }
 
@@ -778,21 +783,20 @@ private struct SectionOverline: View {
 }
 
 private struct AttendeeRow: View {
+    let memberId: String
     let name: String
-    let initials: String
     var isYou: Bool = false
     var rsvp: HomeRsvpChoice?
 
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(Theme.Color.homeBg)
-                Text(initials.isEmpty ? "·" : initials)
-                    .pantopusTextStyle(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.Color.home)
-            }
-            .frame(width: 30, height: 30)
+            // Design `AttendeeRow` uses the per-member gradient `Avatar`
+            // (home-shell.jsx) — same `HomeMemberAvatar` the F1 agenda rows
+            // render, and Android's F2 AttendeeRow.
+            HomeMemberAvatar(
+                member: HomeMember(id: memberId, name: name),
+                size: 30
+            )
             // JSX name = 13/600 fg1, with a "· you" suffix in fg4 for self.
             (
                 Text(name)
@@ -824,14 +828,24 @@ private struct YourRsvpCard: View {
     var pending: Bool = false
     let onSelect: @MainActor (HomeRsvpChoice) -> Void
 
+    /// The design's OFFLINE frame drops the pending emphasis entirely —
+    /// plain dimmed card, muted overline, no hint (event-detail-frames.jsx
+    /// `FrameOffline`) — so the green border/glow/hint only render online.
+    private var emphasized: Bool {
+        pending && enabled
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            SectionOverline(text: "Your RSVP", color: Theme.Color.homeDark)
+            SectionOverline(
+                text: "Your RSVP",
+                color: enabled ? Theme.Color.homeDark : Theme.Color.appTextMuted
+            )
             if let selected, selected != .noReply {
                 recorded(selected)
             } else {
                 control
-                if pending {
+                if emphasized {
                     HStack(spacing: 5) {
                         Icon(.hand, size: 12, color: Theme.Color.homeDark)
                         Text("Tap to let everyone know")
@@ -853,14 +867,14 @@ private struct YourRsvpCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: Radii.xl)
                 .stroke(
-                    pending ? Theme.Color.home : Theme.Color.appBorderSubtle,
-                    lineWidth: pending ? 1.5 : 1
+                    emphasized ? Theme.Color.home : Theme.Color.appBorderSubtle,
+                    lineWidth: emphasized ? 1.5 : 1
                 )
         )
         .background(
             // The design's `0 0 0 4px H.bg50` green glow around the pending card.
             RoundedRectangle(cornerRadius: Radii.xl)
-                .stroke(Theme.Color.homeBg, lineWidth: pending ? 4 : 0)
+                .stroke(Theme.Color.homeBg, lineWidth: emphasized ? 4 : 0)
                 .padding(-2)
         )
         .accessibilityIdentifier("eventDetail_yourRsvp")
@@ -918,7 +932,9 @@ private struct YourRsvpCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .disabled(saving)
+            // "Change" is disabled offline (the POST would fail and silently
+            // revert) — matches Android's offline-disabled Change affordance.
+            .disabled(saving || !enabled)
             .accessibilityIdentifier("eventDetail_rsvpChange")
         }
     }

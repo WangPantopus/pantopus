@@ -228,12 +228,6 @@ private struct OneOffEventTypeCard: View {
                     eventRow
                 }
                 .accessibilityIdentifier("oneOffLinkGenerator.eventTypePicker")
-
-                Rectangle()
-                    .fill(Theme.Color.appBorder)
-                    .frame(height: 1)
-
-                durationSection
             }
         }
     }
@@ -250,7 +244,10 @@ private struct OneOffEventTypeCard: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                         .lineLimit(1)
-                    Text("\(BookingDuration.label(viewModel.selectedDurationMin)) · \(selected.modalityLabel)")
+                    // The event type's real default duration — the invitee
+                    // always books this; a chip-selected duration was a no-op
+                    // (the one-off API has no duration field).
+                    Text("\(selected.durationLabel) · \(selected.modalityLabel)")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
@@ -268,30 +265,9 @@ private struct OneOffEventTypeCard: View {
         .contentShape(Rectangle())
     }
 
-    private var durationSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Custom duration")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Spacer(minLength: Spacing.s2)
-                Text("minutes")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            }
-            OneOffFlowLayout(spacing: Spacing.s2) {
-                ForEach(viewModel.durationOptions, id: \.self) { minutes in
-                    BookingPillChip(
-                        title: "\(minutes)",
-                        isSelected: viewModel.selectedDurationMin == minutes
-                    ) { viewModel.selectDuration(minutes) }
-                }
-            }
-            .accessibilityIdentifier("oneOffLinkGenerator.durationChips")
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-    }
+    // NOTE: the design's "Custom duration" chip row is intentionally not
+    // rendered — the one-off API has no duration field, so the chips were a
+    // silent no-op (see OneOffEventTypeOption).
 }
 
 // MARK: - Availability (toggle row + removable proposed slots + add a time)
@@ -463,25 +439,15 @@ private struct OneOffOptionsCard: View {
 
     var body: some View {
         BookingCard(padding: Spacing.s0) {
-            VStack(spacing: Spacing.s0) {
-                OneOffOptionRow(
-                    icon: .ticket,
-                    title: "Single use",
-                    subtitle: "Link stops working after one booking.",
-                    isOn: $viewModel.singleUse,
-                    identifier: "oneOffLinkGenerator.singleUseToggle"
-                )
-                Rectangle()
-                    .fill(Theme.Color.appBorder)
-                    .frame(height: 1)
-                OneOffOptionRow(
-                    icon: .clipboardList,
-                    title: "Ask intake questions",
-                    subtitle: "Collect details before they book.",
-                    isOn: $viewModel.askIntakeQuestions,
-                    identifier: "oneOffLinkGenerator.intakeToggle"
-                )
-            }
+            // "Ask intake questions" is intentionally absent — oneOffSchema
+            // has no intake field, so the toggle was a silent no-op.
+            OneOffOptionRow(
+                icon: .ticket,
+                title: "Single use",
+                subtitle: "Link stops working after one booking.",
+                isOn: $viewModel.singleUse,
+                identifier: "oneOffLinkGenerator.singleUseToggle"
+            )
         }
     }
 }
@@ -869,9 +835,7 @@ private struct OneOffFlowLayout: Layout {
             durationLabel: "30 min",
             icon: .video,
             slug: "intro",
-            durations: [15, 30, 45, 60],
-            modalityLabel: "video",
-            defaultDurationMin: 30
+            modalityLabel: "video"
         )
     ])
     return OneOffLinkGeneratorView(viewModel: viewModel)

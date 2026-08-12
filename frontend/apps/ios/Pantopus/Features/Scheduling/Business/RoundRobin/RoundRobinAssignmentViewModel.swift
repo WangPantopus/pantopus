@@ -11,6 +11,17 @@
 //
 //  Backend note: there is no dedicated "rule" column — Balanced/Priority/Strict
 //  are expressed through the assignees' weight/priority and inferred on reload.
+//  The encoding is a lossless sentinel scheme so the chosen rule survives a
+//  save→reload round-trip even when every value is at its default:
+//    · strict   → weight 1, priority 0            (the neutral shape)
+//    · priority → weight 1, priority index+1      (1-based rank; >0 marks the rule)
+//    · balanced → user weights, priority -1       (<0 marks the rule; weights carry the data)
+//  All three are behavior-neutral for the backend's host pick
+//  (bookingService.pickRoundRobinHost sorts by assigned_count, then priority
+//  DESC — equal priorities don't reorder, and +1 on every rank preserves the
+//  relative order the old 0-based encoding produced). `weight` is not read by
+//  the pick at all. Joi (weight min 0, priority any integer) and the DB column
+//  (plain integer, no CHECK) both accept the sentinel values.
 //
 
 import Foundation
@@ -149,12 +160,17 @@ final class RoundRobinAssignmentViewModel {
         defer { isSaving = false }
 
         let checked = picks.filter(\.checked)
+        // Sentinel encoding (see header): the rule must survive save→reload,
+        // so each rule writes a shape the other two can never produce —
+        // balanced marks every row priority -1, priority ranks 1-based, strict
+        // stays all-zero. Previously balanced-with-default-weights and
+        // single-member priority round-tripped back as "Strict".
         let assignees: [AssigneesRequest.Assignee] = checked.enumerated().map { index, pick in
             switch selectedRule {
             case .balanced:
-                AssigneesRequest.Assignee(subjectId: pick.id, subjectType: "user", weight: pick.weight, priority: 0)
+                AssigneesRequest.Assignee(subjectId: pick.id, subjectType: "user", weight: pick.weight, priority: -1)
             case .priority:
-                AssigneesRequest.Assignee(subjectId: pick.id, subjectType: "user", weight: 1, priority: index)
+                AssigneesRequest.Assignee(subjectId: pick.id, subjectType: "user", weight: 1, priority: index + 1)
             case .strict:
                 AssigneesRequest.Assignee(subjectId: pick.id, subjectType: "user", weight: 1, priority: 0)
             }
@@ -182,8 +198,13 @@ final class RoundRobinAssignmentViewModel {
 
     private static func inferRule(_ assignees: [EventTypeAssigneeDTO]) -> Rule {
         guard !assignees.isEmpty else { return .balanced }
+        // Sentinel decode (see header). Negative priority = balanced marker;
+        // positive = priority rank. Non-default weights also read as balanced
+        // so rows saved by older clients (priority 0 + custom weights) keep
+        // their rule.
+        if assignees.contains(where: { ($0.priority ?? 0) < 0 }) { return .balanced }
         if assignees.contains(where: { ($0.weight ?? 1) != 1 }) { return .balanced }
-        if assignees.contains(where: { ($0.priority ?? 0) != 0 }) { return .priority }
+        if assignees.contains(where: { ($0.priority ?? 0) > 0 }) { return .priority }
         return .strict
     }
 }

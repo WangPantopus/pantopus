@@ -183,6 +183,9 @@ struct BizChip: View {
 /// stable hash (tokens only — no arbitrary gradients).
 struct BizAvatar: View {
     let name: String
+    /// Stable identity for the tint hash — pass the member's user-id so the
+    /// colour survives renames and app relaunches; falls back to `name`.
+    var tintKey: String?
     var imageURL: String?
     var size: CGFloat = 34
 
@@ -192,8 +195,16 @@ struct BizAvatar: View {
     ]
 
     private var tint: Color {
-        let idx = abs(name.hashValue) % Self.tints.count
-        return Self.tints[idx]
+        // FNV-1a over UTF-8: deterministic across launches. `String.hashValue`
+        // is SipHash with a per-process random seed (Swift ≥4.2), so the same
+        // member drew a different colour every cold start; `abs()` also traps
+        // on Int.min, so index via `.magnitude`.
+        var hash: UInt64 = 0xCBF2_9CE4_8422_2325
+        for byte in (tintKey ?? name).utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01B3
+        }
+        return Self.tints[Int(hash % UInt64(Self.tints.count))]
     }
 
     private var initials: String {

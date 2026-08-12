@@ -57,6 +57,41 @@ final class DateOverridesAndBlockOffViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.overrides.first?.isUnavailable, true)
     }
 
+    /// Flipping the holiday set must strip only IMPORT-SHAPED entries — a
+    /// hand-authored custom-hours override that falls on a holiday date
+    /// survives both enabling (skipped, not replaced by a full-day block) and
+    /// disabling (not deleted with the imports).
+    func testHolidayToggleSparesCustomOverridesOnHolidayDates() async {
+        let year = Calendar.current.component(.year, from: Date())
+        let july4 = "\(year)-07-04"
+        // A custom-hours (partial-day) override on Independence Day.
+        // swiftlint:disable:next line_length
+        let composite = #"{"schedules":[],"rules":[],"overrides":[{"schedule_id":"s1","date":"\#(july4)","is_unavailable":false,"start_time":"09:00","end_time":"12:00"}]}"#
+        // Echo endpoint: the VM re-reads its own PUT payload's shape, so a
+        // minimal echo keeps the local list consistent for the assert.
+        // swiftlint:disable:next line_length
+        let echo = #"{"overrides":[{"schedule_id":"s1","date":"\#(july4)","is_unavailable":false,"start_time":"09:00","end_time":"12:00"}]}"#
+        SequencedURLProtocol.sequence = [
+            .status(200, body: composite),
+            .status(200, body: echo)
+        ]
+        let viewModel = DateOverridesViewModel(scheduleId: "s1", client: makeClient())
+        await viewModel.load()
+        await viewModel.toggleHolidays(true)
+
+        guard let put = SequencedURLProtocol.capturedRequests.last,
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any],
+              let sent = json["overrides"] as? [[String: Any]]
+        else { return XCTFail("Missing overrides payload") }
+        let july4Rows = sent.filter { ($0["date"] as? String) == july4 }
+        XCTAssertEqual(july4Rows.count, 1, "the user's July 4 override must not be duplicated by the import")
+        XCTAssertEqual(july4Rows.first?["is_unavailable"] as? Bool, false, "custom hours survive enabling the set")
+        XCTAssertEqual(july4Rows.first?["start_time"] as? String, "09:00")
+        // Every other holiday arrives as the import shape.
+        let holidayCount = USHolidays.forYear(year).count
+        XCTAssertEqual(sent.count, holidayCount, "one row per holiday — July 4 stays the user's own entry")
+    }
+
     /// A blocked date range must serialize a contiguous YYYY-MM-DD span, all
     /// marked unavailable.
     func testRangeBlockSendsContiguousDates() async {

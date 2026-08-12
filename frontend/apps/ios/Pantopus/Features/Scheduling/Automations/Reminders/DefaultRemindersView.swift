@@ -84,6 +84,14 @@ struct DefaultRemindersView: View {
 
                     if model.showCustom { customStepper } else { addCustomChip }
 
+                    if model.atCap {
+                        Text("Up to 5 reminders.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .padding(.horizontal, 2)
+                            .accessibilityIdentifier("reminderCapNote")
+                    }
+
                     if let saveError = model.saveError {
                         AutoNote(tone: .error, icon: .alertTriangle, text: saveError)
                     }
@@ -116,6 +124,9 @@ struct DefaultRemindersView: View {
 
     private func reminderRow(minutes: Int, label: String) -> some View {
         let on = model.isOn(minutes)
+        // Backend caps reminders at 5 — once there, unselected rows disable
+        // (selected rows stay tappable so the user can free a slot).
+        let capped = !on && model.atCap
         return Button { model.toggle(minutes) } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 11) {
@@ -137,9 +148,11 @@ struct DefaultRemindersView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(capped)
+        .opacity(capped ? 0.45 : 1)
         .accessibilityIdentifier("reminderRow_\(minutes)")
         .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)
-        .accessibilityLabel("\(label), \(on ? "on" : "off")")
+        .accessibilityLabel("\(label), \(on ? "on" : capped ? "unavailable, up to 5 reminders" : "off")")
     }
 
     private var channelChips: some View {
@@ -163,6 +176,8 @@ struct DefaultRemindersView: View {
             .overlay(Capsule().stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])).foregroundStyle(Theme.Color.appBorderStrong))
         }
         .buttonStyle(.plain)
+        .disabled(model.atCap)
+        .opacity(model.atCap ? 0.45 : 1)
         .accessibilityIdentifier("reminderAddCustom")
     }
 

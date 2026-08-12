@@ -19,6 +19,7 @@ import UIKit
 struct SchedulingNotificationPrefsScreen: View {
     @State private var model: SchedulingNotificationPrefsModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     init(owner: SchedulingOwner, push: @escaping @MainActor (SchedulingRoute) -> Void) {
         _model = State(wrappedValue: SchedulingNotificationPrefsModel(owner: owner, push: push))
@@ -40,6 +41,12 @@ struct SchedulingNotificationPrefsScreen: View {
         .background(Theme.Color.appBg)
         .navigationBarBackButtonHidden(true)
         .task { await model.load() }
+        // Push permission is an OS setting the user can flip in Settings while this screen
+        // is backgrounded, so re-read it on the way back rather than trusting load()'s value.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task { await model.refreshPushAuthorization() }
+        }
     }
 
     @ViewBuilder
@@ -195,8 +202,11 @@ struct SchedulingNotificationPrefsScreen: View {
             }
             .frame(width: 32, height: 32)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Notifications paused").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.warning)
-                Text("Emergency alerts still come through").font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
+                // Design copy is "Paused for 2 hours" / "Resumes 11:42 AM · …" —
+                // the model degrades to the untimed pair while the wire only
+                // carries `is_paused` (see `pausedUntil` DTO-gap note).
+                Text(model.pauseBannerTitle).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.warning)
+                Text(model.pauseBannerSubtitle).font(.system(size: 11.5)).foregroundStyle(Theme.Color.warning)
             }
             Spacer(minLength: Spacing.s2)
             Button { model.resume() } label: {

@@ -26,20 +26,31 @@ struct BookingActions {
 
     // MARK: - Reads
 
-    /// `GET /bookings?status&q` — the inbox list for the active tab.
-    func list(status: BookingStatusFilter, search: String?) async throws -> [BookingDTO] {
+    /// `GET /bookings?status&event_type_id&from&to&q` — the inbox list for the
+    /// active tab, optionally narrowed by the E9 filter facets.
+    func list(
+        status: BookingStatusFilter,
+        search: String?,
+        eventTypeId: String? = nil,
+        from: String? = nil,
+        to: String? = nil
+    ) async throws -> [BookingDTO] {
         let trimmed = search?.trimmingCharacters(in: .whitespacesAndNewlines)
         let response: BookingsResponse = try await client.request(
             SchedulingEndpoints.getBookings(
                 owner: owner,
                 status: status.rawValue,
+                eventTypeId: eventTypeId,
+                from: from,
+                to: to,
                 search: (trimmed?.isEmpty == false) ? trimmed : nil
             )
         )
         return response.bookings
     }
 
-    /// `GET /bookings/summary` — counts for the Pending badge.
+    /// `GET /bookings/summary` — month counts + delta + sparkline. Note: no
+    /// `pendingCount` on the wire; derive Pending badges from the pending list.
     func summary() async throws -> SchedulingSummaryDTO {
         try await client.request(SchedulingEndpoints.getBookingsSummary(owner: owner))
     }

@@ -84,11 +84,29 @@ public enum SchedulingTime {
     }
 
     /// Format a `Date` as a `YYYY-MM-DD` UTC day key (for `from`/`to` slot
-    /// queries, which the backend reads as ISO dates).
+    /// queries, which the backend reads as ISO dates). The locale is pinned to
+    /// `en_US_POSIX` (QA1480): this is a wire value, and `Locale.current`'s
+    /// numbering system (e.g. ar/fa digits) would otherwise leak into the
+    /// fixed format and NaN out server-side date parsing.
     public static func isoDay(_ date: Date) -> String {
+        isoDay(date, in: TimeZone(identifier: "UTC"))
+    }
+
+    /// Format a `Date` as a `YYYY-MM-DD` day key in the given IANA timezone.
+    /// Use this when the instant was derived with a tz-pinned calendar (e.g.
+    /// `startOfDay` in the home's zone) — formatting that instant with the UTC
+    /// overload shifts the day string by one for non-UTC zones. The unknown-tz
+    /// fallback is `.current`, matching the `Calendar` fallback at the call
+    /// sites that compute the instant.
+    public static func isoDay(_ date: Date, tz: String) -> String {
+        isoDay(date, in: TimeZone(identifier: tz) ?? .current)
+    }
+
+    private static func isoDay(_ date: Date, in timeZone: TimeZone?) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .iso8601)
-        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.timeZone = timeZone ?? TimeZone(identifier: "UTC")
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }

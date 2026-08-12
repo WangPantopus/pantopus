@@ -20,6 +20,9 @@ enum SlugFieldState: Equatable {
     case checking
     case available
     case taken(suggestions: [String])
+    /// Claim/check failed for a non-"taken" reason (offline, server error). Distinct from
+    /// `.taken` so a network blip doesn't misreport the handle as unavailable.
+    case error(message: String)
 }
 
 // MARK: - Overline + headline
@@ -64,6 +67,10 @@ struct WizardStepRail: View {
     let current: Int
     let accent: Color
     let accentBg: Color
+    /// Success frames mark every disc done — the design passes `done` including
+    /// the current step (`StepRail current={4} done={[1,2,3,4]}`), so the final
+    /// disc renders the check glyph, not its numeral. Pass `true` on success.
+    var allComplete: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -88,7 +95,7 @@ struct WizardStepRail: View {
     }
 
     private func disc(_ step: (Int, String)) -> some View {
-        let isDone = step.0 < current
+        let isDone = allComplete || step.0 < current
         let active = step.0 == current
         let filled = isDone || active
         return VStack(spacing: Spacing.s1) {
@@ -208,6 +215,15 @@ struct WizardHandleField: View {
                         FlowChips(suggestions: suggestions, accent: accent, accentBg: accentBg, onPick: onPick)
                     }
                 }
+            }
+            .padding(.top, 10)
+        case let .error(message):
+            HStack(spacing: 6) {
+                Icon(.alertCircle, size: 13, color: Theme.Color.error)
+                Text(message)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.error)
+                    .lineLimit(2)
             }
             .padding(.top, 10)
         }

@@ -113,10 +113,12 @@ final class DateOverridesViewModel {
         currentYearHolidays
     }
 
-    /// True when every current-year holiday is already present as an
-    /// unavailable override.
+    /// True when every current-year holiday is already covered by an override.
+    /// Any override on the date counts — enabling the set skips dates that
+    /// carry a hand-authored override (see `toggleHolidays`), so requiring
+    /// `isUnavailable` on those would snap the switch straight back off.
     var holidaysEnabled: Bool {
-        let present = Set(overrides.filter(\.isUnavailable).map(\.date))
+        let present = Set(overrides.map(\.date))
         return currentYearHolidays.allSatisfy { present.contains($0.date) }
     }
 
@@ -187,11 +189,23 @@ final class DateOverridesViewModel {
 
     func toggleHolidays(_ enable: Bool) async {
         let holidayDates = Set(currentYearHolidays.map(\.date))
-        var list = overrides.filter { !holidayDates.contains($0.date) }
+        // Strip only IMPORT-SHAPED entries (full-day unavailable, no times).
+        // A hand-authored override that happens to fall on a holiday date —
+        // e.g. custom half-day hours on Jul 4 — must survive the switch in
+        // both directions: persist() replaces the whole set server-side, so
+        // dropping it here destroyed it permanently.
+        var list = overrides.filter { entry in
+            !(holidayDates.contains(entry.date)
+                && entry.isUnavailable
+                && entry.start == nil
+                && entry.end == nil)
+        }
         if enable {
-            list.append(contentsOf: currentYearHolidays.map {
-                OverrideEntry(date: $0.date, isUnavailable: true, start: nil, end: nil)
-            })
+            // Skip holiday dates that already carry a user override.
+            let occupied = Set(list.map(\.date))
+            list.append(contentsOf: currentYearHolidays
+                .filter { !occupied.contains($0.date) }
+                .map { OverrideEntry(date: $0.date, isUnavailable: true, start: nil, end: nil) })
         }
         await persist(list)
     }

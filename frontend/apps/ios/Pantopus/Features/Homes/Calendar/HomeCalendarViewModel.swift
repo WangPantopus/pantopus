@@ -148,8 +148,8 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         onAddEvent: @escaping @Sendable () -> Void = {},
         onOpenEvent: @escaping @Sendable (String) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
-        calendar: Calendar = HomeCalendarViewModel.utcCalendar,
-        timeZone: TimeZone = TimeZone(identifier: "UTC") ?? .current
+        calendar: Calendar = HomeCalendarViewModel.localCalendar,
+        timeZone: TimeZone = .current
     ) {
         self.homeId = homeId
         subtitle = homeSubtitle
@@ -583,11 +583,23 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         case next
     }
 
-    /// UTC-anchored Gregorian calendar — default for production VMs and
-    /// tests so date math is timezone-stable.
+    /// UTC-anchored Gregorian calendar — used by tests so date math is
+    /// timezone-stable, and by the all-day heuristic (the wire stores
+    /// all-day events at 00:00Z).
     public static var utcCalendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        cal.firstWeekday = 1 // Sunday — matches design's week strip.
+        return cal
+    }
+
+    /// Device-local Gregorian calendar (Sunday-first, matching the design's
+    /// week strip) — the production default so agenda times render at the
+    /// same wall time the add-event form composes instants from. Mirrors
+    /// Android's `ZoneId.systemDefault()` display zone.
+    public static var localCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
         cal.firstWeekday = 1 // Sunday — matches design's week strip.
         return cal
     }
@@ -700,9 +712,10 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
     /// "All day" heuristic — backend doesn't expose an explicit flag,
     /// so we treat events whose `start_at` lands at exactly midnight
-    /// UTC and that carry no `end_at` as all-day.
-    static func isAllDay(start: Date, calendar cal: Calendar) -> Bool {
-        let parts = cal.dateComponents([.hour, .minute, .second], from: start)
+    /// UTC and that carry no `end_at` as all-day. Pinned to UTC (the wire
+    /// convention) regardless of the display calendar passed by callers.
+    static func isAllDay(start: Date, calendar _: Calendar) -> Bool {
+        let parts = utcCalendar.dateComponents([.hour, .minute, .second], from: start)
         return (parts.hour ?? 0) == 0 && (parts.minute ?? 0) == 0 && (parts.second ?? 0) == 0
     }
 

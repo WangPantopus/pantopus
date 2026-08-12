@@ -39,12 +39,27 @@ enum SchedulingMoney {
         return format(cents: per, currency: currency)
     }
 
-    /// Parse a user-typed price string ("$240.00", "240", "240.5") to cents.
-    /// Returns nil when the field is empty / unparseable.
-    static func parseCents(_ raw: String) -> Int? {
-        let cleaned = raw.filter { $0.isNumber || $0 == "." }
+    /// Parse a user-typed price string ("$240.00", "240", "240.5" — or
+    /// "240,50" from a comma-decimal locale's keypad) to cents. Locale-aware:
+    /// the locale's decimal separator is normalised to "." before cleaning, so
+    /// a de/fr/es "240,50" parses as 240.50 instead of inflating 100x to
+    /// 24050. Only ASCII digits are accepted (non-Latin digits fail to nil
+    /// rather than silently mis-parsing) and the scaled value is clamped so
+    /// oversized input can never trap `Int(_:)`. Returns nil when the field is
+    /// empty / unparseable.
+    static func parseCents(_ raw: String, locale: Locale = .current) -> Int? {
+        var normalized = raw
+        if let separator = locale.decimalSeparator, separator != "." {
+            normalized = normalized.replacingOccurrences(of: separator, with: ".")
+        }
+        let cleaned = normalized.filter { ($0.isASCII && $0.isNumber) || $0 == "." }
         guard !cleaned.isEmpty, let value = Double(cleaned) else { return nil }
-        return Int((value * 100).rounded())
+        let scaled = (value * 100).rounded()
+        // Int(exactly:) rather than `<= Double(Int.max)`: Double(Int.max)
+        // rounds up to 2^63, so a product landing exactly on 2^63 would pass
+        // that comparison and still trap in Int(_:).
+        guard scaled >= 0, let cents = Int(exactly: scaled) else { return nil }
+        return cents
     }
 }
 

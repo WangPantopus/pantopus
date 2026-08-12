@@ -114,8 +114,11 @@ final class WhosFreeViewModel {
             let free: MemberFreeResponse = try await client.request(
                 SchedulingEndpoints.whosFree(
                     owner: owner,
-                    from: SchedulingTime.isoDay(startOfDay),
-                    to: SchedulingTime.isoDay(end),
+                    // Day keys must be formatted in the same zone the
+                    // start-of-day was computed in — the UTC overload shifts
+                    // the requested window by a day for non-UTC homes.
+                    from: SchedulingTime.isoDay(startOfDay, tz: tz),
+                    to: SchedulingTime.isoDay(end, tz: tz),
                     tz: tz
                 )
             )
@@ -200,8 +203,8 @@ final class WhosFreeViewModel {
             requiredMemberIds: [member.id],
             mode: .collective,
             durationMin: 30,
-            from: SchedulingTime.isoDay(startOfDay),
-            to: SchedulingTime.isoDay(to),
+            from: SchedulingTime.isoDay(startOfDay, tz: tz),
+            to: SchedulingTime.isoDay(to, tz: tz),
             tz: tz,
             precomputedSlots: nil
         )

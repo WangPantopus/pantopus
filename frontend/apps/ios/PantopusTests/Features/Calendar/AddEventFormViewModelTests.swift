@@ -62,7 +62,8 @@ final class AddEventFormViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isValid)
         XCTAssertEqual(vm.category, .generic)
         XCTAssertFalse(vm.allDay)
-        XCTAssertNil(vm.endDate)
+        // Design FrameCreate prefills "Ends" at start + 1h (matches Android).
+        XCTAssertEqual(vm.endDate, Self.fixedStart.addingTimeInterval(3600))
         XCTAssertEqual(vm.recurrence, .none)
         // Stream I10: a fresh event preselects the 10-minute reminder.
         XCTAssertEqual(vm.reminderOffsets, [.tenMin])

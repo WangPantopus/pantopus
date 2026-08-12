@@ -136,7 +136,7 @@ final class TeamBookingAvailabilityViewModel {
             )
             let members = membersResult.members
 
-            let window = Self.weekWindow()
+            let window = Self.weekWindow(tz: tz)
             async let freeR: MemberFreeResponse? = try? client.request(
                 SchedulingEndpoints.teamAvailability(owner: owner, from: window.fromISO, to: window.toISO, tz: tz)
             )
@@ -153,7 +153,7 @@ final class TeamBookingAvailabilityViewModel {
             rows = members.compactMap { member in
                 guard let user = member.user else { return nil }
                 let slots = freeByMember[user.id] ?? []
-                let dayCount = Self.distinctDayCount(slots)
+                let dayCount = Self.distinctDayCount(slots, tz: tz)
                 let bookable = dayCount > 0
                 let name = user.name ?? user.username ?? "Member"
                 return MemberRow(
@@ -167,7 +167,7 @@ final class TeamBookingAvailabilityViewModel {
                     usesPersonalHours: true
                 )
             }
-            coverage = Self.coverage(window: window, freeByMember: freeByMember)
+            coverage = Self.coverage(window: window, freeByMember: freeByMember, tz: tz)
             phase = rows.isEmpty ? .empty : .loaded
         } catch let error as SchedulingError {
             if error.code == "BUSINESS_ONLY" { phase = .businessOnly
@@ -207,12 +207,16 @@ final class TeamBookingAvailabilityViewModel {
     private struct Window {
         let fromISO: String
         let toISO: String
-        let days: [String] // YYYY-MM-DD (UTC)
+        let days: [String] // YYYY-MM-DD, rendered in the requested `tz`
     }
 
-    private static func utcCalendar() -> Calendar {
+    /// Calendar pinned to the requested `tz` — window day keys must share one
+    /// zone with the slots' `startLocal` (rendered server-side in that tz), or
+    /// the window's edge day can never be covered (e.g. UTC is already
+    /// "tomorrow" after 5 PM in America/Los_Angeles → spurious "no coverage").
+    private static func tzCalendar(_ tz: String) -> Calendar {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        cal.timeZone = TimeZone(identifier: tz) ?? .current
         return cal
     }
 
@@ -221,8 +225,8 @@ final class TeamBookingAvailabilityViewModel {
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
-    private static func weekWindow() -> Window {
-        let cal = utcCalendar()
+    private static func weekWindow(tz: String) -> Window {
+        let cal = tzCalendar(tz)
         let start = cal.startOfDay(for: Date())
         let days = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
         let iso = ISO8601DateFormatter() // local instance — no shared state
@@ -231,18 +235,26 @@ final class TeamBookingAvailabilityViewModel {
         return Window(fromISO: from, toISO: to, days: days.map { ymd($0, cal) })
     }
 
-    private static func distinctDayCount(_ slots: [SlotDTO]) -> Int {
-        Set(slots.compactMap { String(($0.startLocal ?? $0.start).prefix(10)) }).count
+    /// Day key (YYYY-MM-DD in `tz`) for one slot: `startLocal` is already
+    /// rendered in the requested tz; convert the UTC `start` when it's absent.
+    private static func slotDayKey(_ slot: SlotDTO, tz: String) -> String? {
+        if let local = slot.startLocal { return String(local.prefix(10)) }
+        guard let date = SchedulingTime.parseUTC(slot.start) else { return nil }
+        return ymd(date, tzCalendar(tz))
     }
 
-    private static func coverage(window: Window, freeByMember: [String: [SlotDTO]]) -> Coverage? {
+    private static func distinctDayCount(_ slots: [SlotDTO], tz: String) -> Int {
+        Set(slots.compactMap { slotDayKey($0, tz: tz) }).count
+    }
+
+    private static func coverage(window: Window, freeByMember: [String: [SlotDTO]], tz: String) -> Coverage? {
         guard !freeByMember.isEmpty else { return nil }
-        let coveredDays = Set(freeByMember.values.flatMap { $0 }.compactMap { String(($0.startLocal ?? $0.start).prefix(10)) })
+        let coveredDays = Set(freeByMember.values.flatMap { $0 }.compactMap { slotDayKey($0, tz: tz) })
         let uncovered = window.days.filter { !coveredDays.contains($0) }
         guard !uncovered.isEmpty else {
             return .ok("Your team has open hours every day this week.")
         }
-        let cal = utcCalendar()
+        let cal = tzCalendar(tz)
         let names: [(weekday: Int, name: String)] = uncovered.compactMap { day in
             guard let weekday = Self.weekday(fromYMD: day, cal) else { return nil }
             return (weekday, Self.weekdayPlural(weekday))

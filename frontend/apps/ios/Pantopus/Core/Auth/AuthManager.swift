@@ -461,7 +461,6 @@ final class AuthManager {
         logger.warning("Handling 401 after failed refresh — signing out")
         await signOut()
     }
-
 }
 
 // MARK: - Preview helper

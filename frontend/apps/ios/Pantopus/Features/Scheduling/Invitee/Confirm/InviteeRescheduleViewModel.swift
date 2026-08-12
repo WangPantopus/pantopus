@@ -127,7 +127,17 @@ final class InviteeRescheduleViewModel {
     func changeMonth(_ delta: Int) async {
         let cal = DiscoveryCalendar.calendar(tz: timezoneId)
         guard let newAnchor = cal.date(byAdding: .month, value: delta, to: monthAnchor) else { return }
+        // Never page before the current month — past days are all unbookable and
+        // `monthRange` would collapse the query to an empty window (mirrors
+        // DiscoverySlotPickerViewModel.changeMonth).
+        let currentMonthStart = cal.dateInterval(of: .month, for: Date())?.start ?? cal.startOfDay(for: Date())
+        guard let newMonthStart = cal.dateInterval(of: .month, for: newAnchor)?.start,
+              newMonthStart >= currentMonthStart else { return }
         monthAnchor = newAnchor
+        // Keep the selected day inside the visible month (never before today).
+        if let interval = cal.dateInterval(of: .month, for: newAnchor) {
+            selectedDate = max(interval.start, cal.startOfDay(for: Date()))
+        }
         selectedSlotStart = nil
         await fetchMonth()
     }
@@ -138,9 +148,16 @@ final class InviteeRescheduleViewModel {
         await fetchMonth()
     }
 
+    /// Move to the next day with availability AFTER the current selection —
+    /// within the loaded month first, then paging forward (mirrors
+    /// DiscoverySlotPickerViewModel.jumpNextAvailable; a bare `.min()` would
+    /// jump backwards to the month's earliest open day).
     func jumpNextAvailable() async {
-        if let firstDay = availableDays.min() {
-            selectedDate = firstDay
+        let cal = DiscoveryCalendar.calendar(tz: timezoneId)
+        let afterStart = cal.startOfDay(for: selectedDate)
+        if let next = availableDays.filter({ $0 > afterStart }).min() {
+            selectedDate = next
+            selectedSlotStart = nil
         } else {
             await changeMonth(1)
         }

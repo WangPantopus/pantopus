@@ -33,6 +33,7 @@ struct DiscoverySlotPickerView: View {
         .navigationTitle("Pick a time")
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
+        .onAppear { viewModel.consumeSlotTakenSignal() }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.slotPicker")
         .sheet(isPresented: $showTimezoneSheet) {

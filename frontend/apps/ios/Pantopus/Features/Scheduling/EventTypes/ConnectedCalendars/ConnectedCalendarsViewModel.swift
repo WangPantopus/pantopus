@@ -36,7 +36,7 @@ struct CalendarProvider: Identifiable, Hashable {
     ]
 
     /// Per-provider brand tint for the glyph (design `ProviderTile` `p.color`:
-    /// Google `#1a73e8`, Apple `#1d1d1f`, Outlook `#0f6cbd`). Mapped to the
+    /// Google brand blue, Apple near-black, Outlook deep blue). Mapped to the
     /// closest existing semantic tokens so no raw hex reaches a Color and the
     /// tile reads brand-differentiated rather than uniform grey. See sharedTodos
     /// — dedicated `calendarGoogle/Apple/Outlook` tokens give the exact hues.

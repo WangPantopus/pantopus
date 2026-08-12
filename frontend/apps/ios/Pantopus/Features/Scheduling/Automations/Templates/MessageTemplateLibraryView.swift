@@ -45,6 +45,12 @@ struct MessageTemplateLibraryView: View {
         .overlay(alignment: .bottomTrailing) { fab }
         .overlay(alignment: .bottom) { toast }
         .task { await model.load() }
+        .task(id: model.actionError) {
+            // Android-parity auto-dismiss (2.2s warning AutoToast).
+            guard model.actionError != nil else { return }
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            withAnimation { model.actionError = nil }
+        }
         .onAppear { if case .loaded = model.phase { Task { await model.refresh() } } }
         .refreshable { await model.refresh() }
         .alert("Delete template?", isPresented: deletePresented, presenting: model.deleteTarget) { _ in
@@ -52,11 +58,6 @@ struct MessageTemplateLibraryView: View {
             Button("Cancel", role: .cancel) { model.deleteTarget = nil }
         } message: { template in
             Text("\u{201C}\(template.name)\u{201D} will be removed. This can't be undone.")
-        }
-        .alert("Heads up", isPresented: actionErrorPresented) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.actionError ?? "")
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.templates.library")
@@ -215,9 +216,16 @@ struct MessageTemplateLibraryView: View {
         }
     }
 
+    /// Bottom toast stack: a transient mutation error takes priority — the dark
+    /// AutoToast pill with a warning tint (Android `actionError` parity) instead
+    /// of an alert dialog — else the success toast.
     @ViewBuilder
     private var toast: some View {
-        if model.showToast {
+        if let actionError = model.actionError {
+            AutoToast(text: actionError, icon: .alertTriangle, tint: Theme.Color.warning)
+                .padding(.bottom, Spacing.s10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if model.showToast {
             AutoToast(text: model.toastText)
                 .padding(.bottom, Spacing.s10)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -243,10 +251,6 @@ struct MessageTemplateLibraryView: View {
 
     private var deletePresented: Binding<Bool> {
         Binding(get: { model.deleteTarget != nil }, set: { if !$0 { model.deleteTarget = nil } })
-    }
-
-    private var actionErrorPresented: Binding<Bool> {
-        Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
     }
 }
 

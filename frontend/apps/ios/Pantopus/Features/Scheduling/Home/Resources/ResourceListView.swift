@@ -268,6 +268,8 @@ private struct ResourceRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(item.name), \(item.kind.label), \(item.statusLabel)")
         .accessibilityAddTraits(.isButton)
+        // Mirrors Android's `scheduling.resourceList.row.<id>` testTag.
+        .accessibilityIdentifier("scheduling.resourceList.row.\(item.id)")
     }
 }
 

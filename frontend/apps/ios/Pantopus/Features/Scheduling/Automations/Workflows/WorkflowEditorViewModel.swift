@@ -48,6 +48,9 @@ final class WorkflowEditorViewModel {
     var saveError: String?
     /// Set true once the user attempts to save with an empty message.
     private(set) var didAttemptSave = false
+    var showDeleteConfirm = false
+    private(set) var isDeleting = false
+    var deleteError: String?
 
     var isNew: Bool {
         workflowId == nil
@@ -225,6 +228,29 @@ final class WorkflowEditorViewModel {
             return false
         } catch {
             saveError = "Couldn't save this workflow. Try again."
+            return false
+        }
+    }
+
+    // MARK: Delete
+
+    /// Deletes the current workflow. Returns `true` on success so the view can dismiss.
+    func delete() async -> Bool {
+        guard let workflowId, !isDeleting else { return false }
+        isDeleting = true
+        deleteError = nil
+        defer { isDeleting = false }
+        do {
+            _ = try await client.request(
+                SchedulingEndpoints.deleteWorkflow(owner: owner, id: workflowId),
+                as: SchedulingOkResponse.self
+            )
+            return true
+        } catch let error as SchedulingError {
+            deleteError = error.userMessage ?? "Couldn't delete this workflow. Try again."
+            return false
+        } catch {
+            deleteError = "Couldn't delete this workflow. Try again."
             return false
         }
     }

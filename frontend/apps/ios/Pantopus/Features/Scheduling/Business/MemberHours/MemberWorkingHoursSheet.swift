@@ -37,11 +37,17 @@ struct MemberWorkingHoursSheet: View {
             content
             if !model.isReadOnly, case .ready = model.phase {
                 BizSheetFooter {
-                    BizPrimaryButton(
-                        title: model.isSaving ? "Saving" : "Save hours",
-                        isSaving: model.isSaving,
-                        isDisabled: !model.formValid
-                    ) { Task { if await model.save() { onClose() } } }
+                    VStack(spacing: Spacing.s2) {
+                        if let saveError = model.saveError {
+                            BizNote(tone: .error, icon: .alertTriangle, text: saveError)
+                                .accessibilityIdentifier("memberHoursSaveError")
+                        }
+                        BizPrimaryButton(
+                            title: model.isSaving ? "Saving" : "Save hours",
+                            isSaving: model.isSaving,
+                            isDisabled: !model.formValid
+                        ) { Task { if await model.save() { onClose() } } }
+                    }
                 }
             }
         }

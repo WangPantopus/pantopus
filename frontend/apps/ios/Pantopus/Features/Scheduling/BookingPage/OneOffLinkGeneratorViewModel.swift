@@ -41,18 +41,20 @@ public enum OneOffExpiry: String, CaseIterable, Sendable, Equatable {
 }
 
 /// One picker option for the event-type row.
+///
+/// NOTE: the design's "Custom duration" chips and "Ask intake questions"
+/// toggle are intentionally absent — `POST /booking-page/one-off-links`
+/// (oneOffSchema) carries no duration or intake field, so both controls were
+/// silent no-ops: the invitee always books the event type's default duration.
+/// Reintroduce them only alongside backend support.
 public struct OneOffEventTypeOption: Identifiable, Sendable, Equatable {
     public let id: String
     public let name: String
     public let durationLabel: String
     public let icon: PantopusIcon
     public let slug: String?
-    /// Selectable durations for the in-card "Custom duration" chip row.
-    public var durations: [Int]
     /// Short modality word for the row subline, e.g. "video".
     public var modalityLabel: String
-    /// Default duration in minutes (seeds the custom-duration chip selection).
-    public var defaultDurationMin: Int
 
     public init(
         id: String,
@@ -60,18 +62,14 @@ public struct OneOffEventTypeOption: Identifiable, Sendable, Equatable {
         durationLabel: String,
         icon: PantopusIcon,
         slug: String?,
-        durations: [Int] = [],
-        modalityLabel: String = "video",
-        defaultDurationMin: Int = 30
+        modalityLabel: String = "video"
     ) {
         self.id = id
         self.name = name
         self.durationLabel = durationLabel
         self.icon = icon
         self.slug = slug
-        self.durations = durations
         self.modalityLabel = modalityLabel
-        self.defaultDurationMin = defaultDurationMin
     }
 }
 
@@ -144,16 +142,13 @@ public enum OneOffState: Sendable, Equatable {
 public final class OneOffLinkGeneratorViewModel {
     public private(set) var state: OneOffState = .loading
 
-    // Config (bound by the view)
+    // Config (bound by the view). The design's duration chips and intake
+    // toggle are deliberately not modelled — the one-off API carries neither
+    // field, so they were dead controls (see OneOffEventTypeOption note).
     public var selectedEventTypeId: String?
     public var offerSpecificTimes = false
     public var expiry: OneOffExpiry = .d7
     public var singleUse = true
-    /// Options-card second toggle (design default OFF). Collects intake
-    /// questions before the invitee books.
-    public var askIntakeQuestions = false
-    /// In-card "Custom duration" chip selection for the chosen event type.
-    public var selectedDurationMin: Int = 30
 
     public private(set) var eventTypeOptions: [OneOffEventTypeOption] = []
     public private(set) var slotOptions: [OneOffSlotOption] = []
@@ -192,22 +187,10 @@ public final class OneOffLinkGeneratorViewModel {
         selectedEventTypeId != nil
     }
 
-    /// Duration chips for the selected event type's in-card "Custom duration"
-    /// row. Falls back to the standard ladder if the event type omits durations.
-    public var durationOptions: [Int] {
-        let durations = selectedEventType?.durations ?? []
-        return durations.isEmpty ? [15, 30, 45, 60] : durations
-    }
-
     /// Proposed slots (the ones the invitee will pick from) as ordered rows.
     /// Mirrors the design's removable "Tue · Jun 17 / 9:00 – 11:00 AM" rows.
     public var selectedSlots: [OneOffSlotOption] {
         slotOptions.filter { selectedSlotIds.contains($0.id) }
-    }
-
-    /// Set the in-card custom-duration chip selection.
-    public func selectDuration(_ minutes: Int) {
-        selectedDurationMin = minutes
     }
 
     /// Remove a proposed slot (design: trailing "x" on each slot row).
@@ -237,13 +220,10 @@ public final class OneOffLinkGeneratorViewModel {
                     durationLabel: BookingDuration.label(defaultMin),
                     icon: BookingLocationMode.icon(event.locationMode),
                     slug: event.slug,
-                    durations: event.durations,
-                    modalityLabel: BookingLocationMode.shortLabel(event.locationMode),
-                    defaultDurationMin: defaultMin
+                    modalityLabel: BookingLocationMode.shortLabel(event.locationMode)
                 )
             }
             selectedEventTypeId = eventTypeOptions.first?.id
-            selectedDurationMin = eventTypeOptions.first?.defaultDurationMin ?? 30
             loadedOnce = true
             state = .configuring
         } catch {
@@ -255,7 +235,6 @@ public final class OneOffLinkGeneratorViewModel {
     public func selectEventType(_ id: String) {
         guard id != selectedEventTypeId else { return }
         selectedEventTypeId = id
-        selectedDurationMin = eventTypeOptions.first { $0.id == id }?.defaultDurationMin ?? selectedDurationMin
         slotOptions = []
         selectedSlotIds = []
         if offerSpecificTimes { Task { await loadSlots() } }
@@ -310,6 +289,9 @@ public final class OneOffLinkGeneratorViewModel {
         guard let date = SchedulingTime.parseUTC(utcISO),
               let zone = TimeZone(identifier: timeZoneIdentifier) else { return nil }
         let formatter = DateFormatter()
+        // Fixed designed pattern — pin en_US_POSIX (QA1480) so locale digits /
+        // calendar rewrites can't leak in.
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = zone
         formatter.dateFormat = "EEE · MMM d"
         return formatter.string(from: date)
@@ -395,7 +377,6 @@ public final class OneOffLinkGeneratorViewModel {
     func setStateForPreview(_ state: OneOffState, options: [OneOffEventTypeOption]) {
         eventTypeOptions = options
         selectedEventTypeId = options.first?.id
-        selectedDurationMin = options.first?.defaultDurationMin ?? selectedDurationMin
         self.state = state
         loadedOnce = true
     }

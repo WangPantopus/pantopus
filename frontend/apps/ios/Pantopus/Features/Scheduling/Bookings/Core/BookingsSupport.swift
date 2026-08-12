@@ -163,8 +163,12 @@ enum BookingsTime {
     }
 
     private static func timeString(_ date: Date, tz: String) -> String {
-        format(date, tz: tz) { $0.timeStyle = .short
-            $0.dateStyle = .none
+        format(date, tz: tz) { fmt in
+            // Pinned 12-hour clock (QA1480), matching `timeStringNoMeridiem` —
+            // `timeStyle = .short` follows the user's 24-hour override, which
+            // mixed the two clock conventions inside one range ("2:00–14:30").
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            fmt.dateFormat = "h:mm a"
         }
     }
 

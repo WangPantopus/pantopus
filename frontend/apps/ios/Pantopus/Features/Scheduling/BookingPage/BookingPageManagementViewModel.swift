@@ -453,17 +453,22 @@ public final class BookingPageManagementViewModel {
             )
             page = response.page
             hydrate(from: response.page)
-            await flashSavedToast()
+            flashSavedToast()
         } catch {
             saveError = SchedulingError.from(error as? APIError ?? .invalidResponse).userMessage
                 ?? "Couldn't save your changes."
         }
     }
 
-    private func flashSavedToast() async {
+    /// Fire-and-forget: awaiting the toast's 2s sleep inside `save()` kept the
+    /// `defer { isSaving = false }` from running, pinning the commit button in
+    /// its spinner state for 2 extra seconds after every successful save.
+    private func flashSavedToast() {
         showSavedToast = true
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
-        showSavedToast = false
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            showSavedToast = false
+        }
     }
 }
 

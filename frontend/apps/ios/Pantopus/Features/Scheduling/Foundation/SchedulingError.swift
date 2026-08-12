@@ -78,23 +78,43 @@ public enum SchedulingError: Error, Sendable, Equatable {
     case conflict(code: String, message: String?)
     /// 400 validation failure with per-field `details`.
     case validation(message: String?, details: [SchedulingValidationDetail])
-    /// 404 — resource / page / token not found or expired.
-    case notFound(message: String?)
-    /// 403 — authenticated but not permitted.
-    case forbidden(message: String?)
+    /// 404 — resource / page / token not found or expired. Carries the body's
+    /// machine `error` code when one was supplied.
+    case notFound(code: String?, message: String?)
+    /// 403 — authenticated but not permitted. Carries the body's machine
+    /// `error` code when one was supplied.
+    case forbidden(code: String?, message: String?)
     /// 401 — token missing / expired.
     case unauthorized
     /// 501 — a deferred feature (e.g. connected-calendar connect). Render
     /// "coming soon".
     case notImplemented(message: String?)
-    /// 5xx (other than 501) after retries.
-    case server(status: Int, message: String?)
+    /// 5xx (other than 501) after retries. Carries the body's machine `error`
+    /// code when one was supplied.
+    case server(status: Int, code: String?, message: String?)
     /// Network-layer failure (offline / timeout).
     case transport
     /// Response decoded into an unexpected shape.
     case decoding
-    /// Anything else, with the server message if we have one.
-    case unknown(message: String?)
+    /// Anything else, with the server code/message if we have one. Coded
+    /// non-409 bodies (e.g. `BUSINESS_ONLY`, `BAD_RANGE`, `INVALID_ASSIGNEE`,
+    /// `SLOT_NOT_OFFERED`) land here — the code stays machine-readable via
+    /// `code` instead of being folded into the message only.
+    case unknown(code: String?, message: String?)
+
+    /// Back-compat factories for call sites that predate the `code` associated
+    /// value — construct the case with a nil machine code.
+    public static func notFound(message: String?) -> SchedulingError {
+        .notFound(code: nil, message: message)
+    }
+
+    public static func forbidden(message: String?) -> SchedulingError {
+        .forbidden(code: nil, message: message)
+    }
+
+    public static func unknown(message: String?) -> SchedulingError {
+        .unknown(code: nil, message: message)
+    }
 
     /// Map the app-wide `APIError` to a scheduling-typed error, re-decoding the
     /// 4xx/5xx body for `alternatives` / `details` / status code.
@@ -109,16 +129,18 @@ public enum SchedulingError: Error, Sendable, Equatable {
         case .unauthorized:
             return .unauthorized
         case .forbidden:
-            return .forbidden(message: decodeBody(data)?.message)
+            let parsed = decodeBody(data)
+            return .forbidden(code: parsed?.error, message: parsed?.message)
         case .notFound:
-            return .notFound(message: decodeBody(data)?.message)
+            let parsed = decodeBody(data)
+            return .notFound(code: parsed?.error, message: parsed?.message)
         case let .clientError(status, message):
             let bodyData = message.map { Data($0.utf8) } ?? data
             return classify(status: status, body: decodeBody(bodyData))
         case let .server(status, body):
             let parsed = decodeBody(Data(body.utf8))
             if status == 501 { return .notImplemented(message: parsed?.message) }
-            return .server(status: status, message: parsed?.message)
+            return .server(status: status, code: parsed?.error, message: parsed?.message)
         case .transport:
             return .transport
         case .decoding:
@@ -142,11 +164,19 @@ public enum SchedulingError: Error, Sendable, Equatable {
         return []
     }
 
-    /// The backend `error` code when one was supplied (e.g. `SLOT_TAKEN`).
+    /// The backend `error` code when one was supplied (e.g. `SLOT_TAKEN`,
+    /// `BUSINESS_ONLY`, `BAD_RANGE`, `INVALID_ASSIGNEE`) — carried on every
+    /// classified case so call sites can branch on machine codes for any
+    /// status class, not just 409s.
     public var code: String? {
         switch self {
-        case let .slotConflict(code, _, _), let .conflict(code, _): code
-        default: nil
+        case let .slotConflict(code, _, _), let .conflict(code, _):
+            code
+        case let .notFound(code, _), let .forbidden(code, _),
+             let .unknown(code, _), let .server(_, code, _):
+            code
+        default:
+            nil
         }
     }
 
@@ -156,11 +186,11 @@ public enum SchedulingError: Error, Sendable, Equatable {
         case let .slotConflict(_, message, _),
              let .conflict(_, message),
              let .validation(message, _),
-             let .notFound(message),
-             let .forbidden(message),
+             let .notFound(_, message),
+             let .forbidden(_, message),
              let .notImplemented(message),
-             let .server(_, message),
-             let .unknown(message):
+             let .server(_, _, message),
+             let .unknown(_, message):
             message
         case .unauthorized:
             "Your session has expired. Please sign in again."
@@ -201,9 +231,12 @@ public enum SchedulingError: Error, Sendable, Equatable {
         if !details.isEmpty || code == "Validation failed" {
             return .validation(message: message, details: details)
         }
-        if status == 404 { return .notFound(message: message) }
-        if status == 403 { return .forbidden(message: message) }
-        return .unknown(message: message ?? (code.isEmpty ? nil : code))
+        let machineCode = code.isEmpty ? nil : code
+        if status == 404 { return .notFound(code: machineCode, message: message) }
+        if status == 403 { return .forbidden(code: machineCode, message: message) }
+        // Keep the code folded into the display message (legacy behavior) but
+        // also carry it machine-readable so `error.code` checks stay live.
+        return .unknown(code: machineCode, message: message ?? machineCode)
     }
 
     private static func decodeBody(_ data: Data?) -> ParsedBody? {

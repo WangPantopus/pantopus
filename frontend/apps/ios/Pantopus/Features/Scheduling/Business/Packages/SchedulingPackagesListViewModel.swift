@@ -28,6 +28,9 @@ final class SchedulingPackagesListViewModel {
     // MARK: State
 
     private(set) var phase: Phase = .loading
+    /// Inline archive/restore failure — keeps the loaded list mounted (phase
+    /// `.error` is reserved for load failures).
+    private(set) var actionError: String?
     private(set) var packages: [SchedulingPackageDTO] = []
     /// Stripe connection — nil while unknown; drives the payouts gate.
     private(set) var paymentsConnected = false
@@ -118,28 +121,32 @@ final class SchedulingPackagesListViewModel {
 
     /// Soft-delete (archive) a live package — `DELETE /packages/:id` sets
     /// is_active=false. Optimistically flips the local flag, then reloads.
+    /// A failed mutation surfaces inline (`actionError`) — flipping `phase`
+    /// to `.error` here blanked the already-loaded list.
     func archive(_ package: SchedulingPackageDTO) async {
+        actionError = nil
         do {
             try await client.send(SchedulingEndpoints.deletePackage(owner: owner, id: package.id))
             await load()
         } catch let error as SchedulingError {
-            phase = .error(error.userMessage ?? "Couldn't archive that package.")
+            actionError = error.userMessage ?? "Couldn't archive that package."
         } catch {
-            phase = .error("Couldn't archive that package.")
+            actionError = "Couldn't archive that package."
         }
     }
 
     /// Restore an archived package — `PUT /packages/:id { is_active:true }`.
     func restore(_ package: SchedulingPackageDTO) async {
+        actionError = nil
         do {
             let _: PackageResponse = try await client.request(
                 SchedulingEndpoints.updatePackage(owner: owner, id: package.id, SchedulingUpdatePackageRequest(isActive: true))
             )
             await load()
         } catch let error as SchedulingError {
-            phase = .error(error.userMessage ?? "Couldn't restore that package.")
+            actionError = error.userMessage ?? "Couldn't restore that package."
         } catch {
-            phase = .error("Couldn't restore that package.")
+            actionError = "Couldn't restore that package."
         }
     }
 

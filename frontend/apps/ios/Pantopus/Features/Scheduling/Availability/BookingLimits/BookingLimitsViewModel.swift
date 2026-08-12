@@ -82,10 +82,16 @@ final class BookingLimitsViewModel {
 
     // Raw loaded values + the stepper values shown at load, so per-field-dirty
     // save never clobbers an untouched value (and never imposes a cap the
-    // backend didn't have).
+    // backend didn't have). Notice/interval MUST be compared against the
+    // value-shown-at-load (initial*) rather than the raw wire value — the UI
+    // projection is lossy (90 min rounds to 2 h; a 20-min interval snaps to
+    // the 15-min chip), so comparing the re-derived value to the raw one made
+    // untouched fields look dirty and silently rewrote them server-side.
     private var loadedMinNoticeMin: Int?
     private var loadedHorizonDays: Int?
     private var loadedSlotIntervalMin: Int?
+    private var initialMinNoticeHours = 4
+    private var initialSlotInterval: SlotInterval = .every15
     private var initialDailyCap = 8
     private var initialPerBookerCap = 2
 
@@ -157,6 +163,8 @@ final class BookingLimitsViewModel {
         if let cap = eventType.perBookerCap { perBookerCap = max(1, cap) }
         slotInterval = SlotInterval.from(minutes: eventType.slotIntervalMin)
 
+        initialMinNoticeHours = minNoticeHours
+        initialSlotInterval = slotInterval
         initialDailyCap = dailyCap
         initialPerBookerCap = perBookerCap
     }
@@ -173,16 +181,19 @@ final class BookingLimitsViewModel {
         var request = UpdateEventTypeRequest()
         var hasChanges = false
 
-        let noticeMin = minNoticeHours * 60
-        if noticeMin != loadedMinNoticeMin {
-            request.minNoticeMin = noticeMin
+        // Compare against the value SHOWN at load (not the raw wire value):
+        // the hour/chip projection is lossy, so re-deriving minutes from an
+        // untouched stepper can differ from the server value (90 → 2 h → 120)
+        // and must not count as a user change.
+        if minNoticeHours != initialMinNoticeHours {
+            request.minNoticeMin = minNoticeHours * 60
             hasChanges = true
         }
         if horizonDays != loadedHorizonDays {
             request.maxHorizonDays = horizonDays
             hasChanges = true
         }
-        if slotInterval.rawValue != loadedSlotIntervalMin {
+        if slotInterval != initialSlotInterval {
             request.slotIntervalMin = slotInterval.rawValue
             hasChanges = true
         }
@@ -204,9 +215,13 @@ final class BookingLimitsViewModel {
                     as: EventTypeResponse.self
                 )
             }
-            loadedMinNoticeMin = noticeMin
+            // Advance the raw baselines only for fields we actually sent —
+            // untouched lossy values stay at the server's truth.
+            if let sent = request.minNoticeMin { loadedMinNoticeMin = sent }
+            if let sent = request.slotIntervalMin { loadedSlotIntervalMin = sent }
             loadedHorizonDays = horizonDays
-            loadedSlotIntervalMin = slotInterval.rawValue
+            initialMinNoticeHours = minNoticeHours
+            initialSlotInterval = slotInterval
             initialDailyCap = dailyCap
             initialPerBookerCap = perBookerCap
             baselineSignature = signature()

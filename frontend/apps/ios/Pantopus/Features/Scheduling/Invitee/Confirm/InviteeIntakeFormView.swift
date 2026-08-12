@@ -30,6 +30,12 @@ struct InviteeIntakeFormView: View {
             .navigationTitle("Your details")
             .navigationBarTitleDisplayMode(.inline)
             .task { await viewModel.load() }
+            .onAppear {
+                // D2's "Pick another time" unwind (slot taken): keep popping so
+                // the booker lands back on the C6 picker, which consumes the
+                // relay entry and shows the taken-slot treatment.
+                if viewModel.shouldUnwindForSlotTaken { dismiss() }
+            }
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
             .accessibilityIdentifier("scheduling.inviteeIntakeForm")
             .sheet(isPresented: $showTimezoneSheet) {
@@ -370,16 +376,18 @@ struct InviteeIntakeFormView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.Color.appText)
                 }
-                ForEach(Array(viewModel.guests.enumerated()), id: \.offset) { index, _ in
+                // Value-stable row identity: an offset id re-points surviving
+                // rows' live TextFields at different guests after a removal.
+                ForEach(viewModel.guests) { guest in
                     HStack(spacing: Spacing.s2) {
                         IntakeField(
                             label: "",
-                            value: guestBinding(index),
+                            value: guestBinding(guest.id),
                             placeholder: "guest@email.com",
                             keyboard: .emailAddress,
                             textContentType: .emailAddress
                         )
-                        Button { viewModel.removeGuest(at: index) } label: {
+                        Button { viewModel.removeGuest(id: guest.id) } label: {
                             Icon(.x, size: 15, color: Theme.Color.appTextSecondary)
                                 .frame(width: 32, height: 32)
                                 .background(Theme.Color.appSurface)
@@ -507,10 +515,10 @@ struct InviteeIntakeFormView: View {
         Binding(get: { viewModel.flagAnswer(key) }, set: { viewModel.setFlag(key, $0) })
     }
 
-    private func guestBinding(_ index: Int) -> Binding<String> {
+    private func guestBinding(_ id: InviteeIntakeFormViewModel.GuestEntry.ID) -> Binding<String> {
         Binding(
-            get: { viewModel.guests.indices.contains(index) ? viewModel.guests[index] : "" },
-            set: { viewModel.setGuest(index, $0) }
+            get: { viewModel.guestEmail(id: id) },
+            set: { viewModel.setGuest(id: id, email: $0) }
         )
     }
 

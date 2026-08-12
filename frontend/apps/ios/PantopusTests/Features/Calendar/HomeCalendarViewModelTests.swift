@@ -42,10 +42,14 @@ final class HomeCalendarViewModelTests: XCTestCase {
     private func makeVM(api: APIClient? = nil) -> HomeCalendarViewModel {
         let frozen = Self.fixedNow
         let now: @Sendable () -> Date = { frozen }
+        // Pin UTC (production now defaults to the device-local calendar) so
+        // the fixed-instant fixtures bucket deterministically on any machine.
         return HomeCalendarViewModel(
             homeId: "home-1",
             api: api ?? makeAPI(),
-            now: now
+            now: now,
+            calendar: HomeCalendarViewModel.utcCalendar,
+            timeZone: TimeZone(identifier: "UTC") ?? .current
         )
     }
 

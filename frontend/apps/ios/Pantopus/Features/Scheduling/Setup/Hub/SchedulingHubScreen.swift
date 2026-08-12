@@ -83,6 +83,7 @@ struct SchedulingHubScreen: View {
                     if !model.canEdit {
                         viewOnlyBanner
                     }
+                    summaryCard
                     if !model.owner.isPersonal {
                         HubComposedNote(owner: model.owner, members: composedMembers)
                             .padding(.top, 14)
@@ -98,9 +99,6 @@ struct SchedulingHubScreen: View {
                         onShare: shareLink
                     )
                     statusRow
-                    if model.isPaused {
-                        pausedInfoLine.padding(.top, Spacing.s3)
-                    }
                     agenda
                     manageSection
                     Color.clear.frame(height: model.canEdit ? 96 : Spacing.s6)
@@ -111,6 +109,28 @@ struct SchedulingHubScreen: View {
                 HubFooterCTA(owner: model.owner, isPaused: model.isPaused, action: footerAction)
             }
         }
+    }
+
+    /// A5 summary card — embedded at the top of the loaded hub, above the
+    /// booking-link card (`summary-card-frames.jsx`). Data / empty (share CTA) /
+    /// error (retry) come from the already-fetched summary; the hub skeleton
+    /// covers the initial loading frame, and the card's own shimmer covers a
+    /// summary-only retry.
+    private var summaryCard: some View {
+        HubSummaryCard(
+            content: summaryContent,
+            owner: model.owner,
+            nameFor: { model.eventTypeName(for: $0) },
+            onShare: shareLink,
+            onRetry: { Task { await model.retrySummary() } },
+            onInsights: { model.openInsights() }
+        )
+    }
+
+    private var summaryContent: HubSummaryCard.Content {
+        if model.summaryRetrying { return .loading }
+        if let summary = model.summary { return .data(summary) }
+        return .error
     }
 
     @ViewBuilder
@@ -166,6 +186,12 @@ struct SchedulingHubScreen: View {
                 actionTitle: model.canEdit ? "See all bookings" : nil,
                 action: model.canEdit ? { model.openBookings() } : nil
             )
+            // FramePaused puts the "existing bookings stay" explainer inside the
+            // agenda section, directly under its header (design info strip at
+            // `4px 16px 0`; mirrors Android SchedulingHubScreen.kt).
+            if model.isPaused {
+                pausedInfoLine
+            }
             ForEach(sections) { section in
                 HubAgendaDateHeader(label: section.header, sub: section.sub)
                 VStack(spacing: Spacing.s2) {

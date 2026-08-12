@@ -36,6 +36,15 @@ final class BookingLimitsViewModelTests: XCTestCase {
      "assignees":[],"questions":[]}
     """
 
+    /// Values the steppers can't represent exactly: 90 min notice rounds to
+    /// the 2 h stepper; a 20-min interval snaps to the 15-min chip. Untouched,
+    /// neither may be re-sent.
+    private static let detailLossyValues = """
+    {"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30],
+     "min_notice_min":90,"max_horizon_days":30,"slot_interval_min":20,"daily_cap":5,"per_booker_cap":2},
+     "assignees":[],"questions":[]}
+    """
+
     private static let updated = #"{"eventType":{"id":"et1","name":"Intro call","slug":"intro","durations":[30]}}"#
 
     func testLoadAppliesFields() async {
@@ -113,6 +122,28 @@ final class BookingLimitsViewModelTests: XCTestCase {
             return XCTFail("Missing body")
         }
         XCTAssertEqual(json["daily_cap"] as? Int, 10)
+    }
+
+    /// Lossy wire values (sub-hour notice, off-chip interval) must survive a
+    /// save that only touched the horizon — the UI can't represent 90/20
+    /// exactly, so re-deriving them from the untouched steppers (120/15) and
+    /// sending that silently rewrote the server's values.
+    func testLossyUntouchedNoticeAndIntervalNotResent() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.detailLossyValues), .status(200, body: Self.updated)]
+        let viewModel = BookingLimitsViewModel(owner: .personal, eventTypeId: "et1", client: makeClient())
+        await viewModel.load()
+        XCTAssertEqual(viewModel.minNoticeHours, 2) // 90 min rounds to 2 h
+        XCTAssertEqual(viewModel.slotInterval, .every15) // 20 min snaps to the 15 chip
+        viewModel.horizonDays = 45
+        XCTAssertTrue(viewModel.canSave)
+        _ = await viewModel.save()
+
+        guard let put = SequencedURLProtocol.capturedRequests.last,
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any]
+        else { return XCTFail("Missing body") }
+        XCTAssertEqual(json["max_horizon_days"] as? Int, 45)
+        XCTAssertNil(json["min_notice_min"], "untouched lossy notice must not be re-sent")
+        XCTAssertNil(json["slot_interval_min"], "untouched lossy interval must not be re-sent")
     }
 
     /// A no-cap event type whose cap stepper is untouched must NOT acquire a cap

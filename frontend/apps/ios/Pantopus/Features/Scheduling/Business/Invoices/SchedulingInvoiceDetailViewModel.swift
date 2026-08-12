@@ -32,6 +32,10 @@ final class SchedulingInvoiceDetailViewModel {
     private(set) var lineItems: [InvoiceLineItem] = []
     private(set) var sending = false
     private(set) var showSentToast = false
+    /// Inline send failure — keeps the loaded invoice mounted (phase `.error`
+    /// is reserved for load failures; blanking a loaded invoice on a failed
+    /// send discarded the whole detail).
+    private(set) var sendError: String?
 
     var theme: SchedulingIdentityTheme {
         owner.theme
@@ -101,10 +105,17 @@ final class SchedulingInvoiceDetailViewModel {
 
     struct TimelineEvent: Identifiable {
         enum Tone { case neutral, accent, success }
-        let id = UUID()
         let label: String
         let time: String
         let tone: Tone
+
+        /// Deterministic identity: `timelineEvents` is computed fresh on every
+        /// body evaluation, and a `UUID()` per construction made SwiftUI tear
+        /// down and rebuild every rail row on unrelated state flips. Labels are
+        /// unique within the rail ("Created", "Sent to customer").
+        var id: String {
+            label
+        }
     }
 
     private(set) var didSend = false
@@ -215,6 +226,7 @@ final class SchedulingInvoiceDetailViewModel {
     /// invoice state server-side).
     func send() async {
         sending = true
+        sendError = nil
         defer { sending = false }
         do {
             try await client.send(SchedulingEndpoints.sendInvoice(owner: owner, id: invoiceId))
@@ -227,9 +239,9 @@ final class SchedulingInvoiceDetailViewModel {
             )
             flashSent()
         } catch let error as SchedulingError {
-            phase = .error(error.userMessage ?? "Couldn't send the invoice.")
+            sendError = error.userMessage ?? "Couldn't send the invoice."
         } catch {
-            phase = .error("Couldn't send the invoice.")
+            sendError = "Couldn't send the invoice."
         }
     }
 

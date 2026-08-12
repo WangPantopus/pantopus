@@ -280,18 +280,26 @@ extension EventTypeEditorViewModel {
         EventTypeFormat.isValidSlug(slug)
     }
 
+    /// Backend bounds (scheduling.js `durations` Joi min 5 / max 1440) — one
+    /// constant drives both the validation and the error copy so they can't
+    /// drift apart again.
+    static let durationBounds = 5...1440
+
     var durationsValid: Bool {
         !durations.isEmpty
-            && durations.allSatisfy { (5...1440).contains($0) }
+            && durations.allSatisfy { Self.durationBounds.contains($0) }
             && durations.contains(defaultDuration)
     }
 
     var parsedPriceCents: Int? {
-        let cleaned = priceDollars
-            .replacingOccurrences(of: currency, with: "")
-            .trimmingCharacters(in: CharacterSet(charactersIn: " $€£,"))
-        guard let value = Double(cleaned), value >= 0 else { return nil }
-        return Int((value * 100).rounded())
+        // Shared locale-aware money parser (SchedulingMoney.parseCents): the
+        // old trim-based cleanup only stripped LEADING/TRAILING separators, so
+        // a comma-locale decimal ("120,50" from a de/fr keypad) survived into
+        // Double(), failed, and silently disabled Save with no price error.
+        // parseCents normalises the locale decimal separator, accepts ASCII
+        // digits only, and clamps the scaled value so oversized input can
+        // never trap `Int(_:)`.
+        SchedulingMoney.parseCents(priceDollars)
     }
 
     var priceValid: Bool {
@@ -384,7 +392,9 @@ extension EventTypeEditorViewModel {
     private func validateBeforeSave() -> Bool {
         nameError = nameValid ? nil : "Give this a name."
         slugError = slugValid ? nil : "Use lowercase letters, numbers and hyphens."
-        durationError = durationsValid ? nil : "Enter a length between 5 and 480 minutes."
+        durationError = durationsValid
+            ? nil
+            : "Enter a length between \(Self.durationBounds.lowerBound) and \(Self.durationBounds.upperBound) minutes."
         return formValid
     }
 

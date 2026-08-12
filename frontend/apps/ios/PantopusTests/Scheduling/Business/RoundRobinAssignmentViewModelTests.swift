@@ -69,6 +69,50 @@ final class RoundRobinAssignmentViewModelTests: XCTestCase {
         XCTAssertEqual(model.checkedCount, 2)
     }
 
+    /// Balanced with all-default weights must survive save→reload — the wire
+    /// sentinel (priority -1) is what distinguishes it from Strict.
+    func testBalancedWithDefaultWeightsRoundTrips() async {
+        let strictShaped = #"[{"id":"a1","subject_id":"u1","subject_type":"user","weight":1,"priority":0}]"#
+        let model = vm(routes(detail(strictShaped)))
+        await model.load()
+        model.selectRule(.balanced)
+        let ok = await model.save()
+        XCTAssertTrue(ok)
+
+        guard let put = SequencedURLProtocol.capturedRequests.last(where: { $0.httpMethod == "PUT" }),
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any],
+              let sent = json["assignees"] as? [[String: Any]]
+        else { return XCTFail("Missing assignees PUT body") }
+        XCTAssertEqual(sent.first?["priority"] as? Int, -1, "Balanced marks rows with the -1 sentinel")
+        XCTAssertEqual(sent.first?["weight"] as? Int, 1)
+
+        // Reload with the sentinel shape the save just produced.
+        let reloaded = vm(routes(detail(#"[{"id":"a1","subject_id":"u1","subject_type":"user","weight":1,"priority":-1}]"#)))
+        await reloaded.load()
+        XCTAssertEqual(reloaded.selectedRule, .balanced)
+    }
+
+    /// Single-member Priority must survive save→reload — ranks are 1-based on
+    /// the wire so priority [1] is distinguishable from Strict's [0].
+    func testSingleMemberPriorityRoundTrips() async {
+        let strictShaped = #"[{"id":"a1","subject_id":"u1","subject_type":"user","weight":1,"priority":0}]"#
+        let model = vm(routes(detail(strictShaped)))
+        await model.load()
+        model.selectRule(.priority)
+        let ok = await model.save()
+        XCTAssertTrue(ok)
+
+        guard let put = SequencedURLProtocol.capturedRequests.last(where: { $0.httpMethod == "PUT" }),
+              let json = try? JSONSerialization.jsonObject(with: Self.bodyData(from: put)) as? [String: Any],
+              let sent = json["assignees"] as? [[String: Any]]
+        else { return XCTFail("Missing assignees PUT body") }
+        XCTAssertEqual(sent.first?["priority"] as? Int, 1, "Priority ranks are 1-based on the wire")
+
+        let reloaded = vm(routes(detail(#"[{"id":"a1","subject_id":"u1","subject_type":"user","weight":1,"priority":1}]"#)))
+        await reloaded.load()
+        XCTAssertEqual(reloaded.selectedRule, .priority)
+    }
+
     func testNoneSelectedDisablesDone() async {
         let assignees = #"[{"id":"a1","subject_id":"u1","subject_type":"user","weight":1,"priority":0}]"#
         let model = vm(routes(detail(assignees)))
@@ -109,5 +153,22 @@ final class RoundRobinAssignmentViewModelTests: XCTestCase {
         let ok = await model.save()
         XCTAssertFalse(ok)
         XCTAssertNotNil(model.saveError)
+    }
+
+    /// URLProtocol-stubbed sessions expose the body via httpBodyStream.
+    private static func bodyData(from request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        var data = Data()
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 4096
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

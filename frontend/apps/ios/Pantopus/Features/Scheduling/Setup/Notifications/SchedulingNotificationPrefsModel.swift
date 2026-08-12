@@ -48,6 +48,14 @@ final class SchedulingNotificationPrefsModel {
 
     private(set) var pushOff = false
     private(set) var paused = false
+    /// When the pause lifts. Design PauseBanner reads "Paused for 2 hours" /
+    /// "Resumes 11:42 AM · …" (`scheduling-notif-frames.jsx` A14.5) — but the
+    /// backend booking page exposes only the `is_paused` boolean (no
+    /// `paused_until` on the wire, checked backend/routes/scheduling.js), so
+    /// this stays nil and the banner falls back to the untimed copy. DTO gap:
+    /// when `BookingPageDTO` gains a pause window, decode it here and the
+    /// designed copy lights up unchanged.
+    private(set) var pausedUntil: Date?
     /// Whether the "SMS coming soon" tooltip is showing over the locked S column.
     var showSmsHint = false
 
@@ -85,8 +93,22 @@ final class SchedulingNotificationPrefsModel {
         page = pageResult?.page
         reminderMinutes = pageResult?.page.reminderMinutes ?? []
         paused = pageResult?.page.isPaused ?? false
+        await refreshPushAuthorization()
         rebuildRows()
         phase = .loaded
+    }
+
+    /// Read the real OS push authorization so the design's permission-gated frame
+    /// (`scheduling-notif-frames.jsx` `PushOffNotice`) can actually render. `pushOff` was
+    /// previously declared and rendered against but never assigned, making the notice and
+    /// the greyed-out push column dead code. Android already reads the real value via
+    /// `NotificationManagerCompat.areNotificationsEnabled()`.
+    ///
+    /// Call again when the screen returns to the foreground — the user can flip this in
+    /// Settings while the app is backgrounded.
+    func refreshPushAuthorization() async {
+        pushOff = await NotificationChannelService.shared.pushStatus() != .authorized
+        if phase == .loaded { rebuildRows() }
     }
 
     private func rebuildRows() {
@@ -108,11 +130,16 @@ final class SchedulingNotificationPrefsModel {
             Row(key: "reschedule", label: "Reschedule", sub: nil, enabled: b(me, "reschedule", default: true)),
             Row(key: "reminder", label: "Reminder sent", sub: "When your reminder goes out", enabled: b(me, "reminder", default: true)),
             Row(key: "no_show", label: "No-show", sub: "Attendee missed the booking", enabled: b(me, "no_show", default: false)),
+            // booking_request is the approval-flow alert, NOT a daily digest —
+            // the old "Daily agenda" label toggled a key the server treats as
+            // "someone requested a time", silently muting approval alerts for
+            // anyone who turned it off. Copy + default mirror Android
+            // (NotificationPrefsViewModel).
             Row(
                 key: "booking_request",
-                label: "Daily agenda",
-                sub: "Each morning at 8am",
-                enabled: b(me, "booking_request", default: false)
+                label: "Booking request",
+                sub: "Someone requests a time that needs your approval",
+                enabled: b(me, "booking_request", default: true)
             )
         ]
         notifyAttendees = [
@@ -149,6 +176,42 @@ final class SchedulingNotificationPrefsModel {
         }
         reminderMinutes.sort(by: >)
         Task { await persistReminders() }
+    }
+
+    // MARK: Pause banner copy
+
+    /// Design title: "Paused for {duration}". Without a pause window on the
+    /// wire (see `pausedUntil`) the duration is unknowable, so fall back to
+    /// the untimed variant rather than inventing a number.
+    var pauseBannerTitle: String {
+        guard let until = pausedUntil else { return "Notifications paused" }
+        return "Paused for \(Self.pauseDurationLabel(until: until))"
+    }
+
+    /// Design subtitle: "Resumes {time} · Emergency alerts still come
+    /// through". The trailing clause is the only part the wire data can back
+    /// today, so it renders alone until `pausedUntil` exists.
+    var pauseBannerSubtitle: String {
+        guard let until = pausedUntil else { return "Emergency alerts still come through" }
+        return "Resumes \(Self.resumeTimeLabel(until)) · Emergency alerts still come through"
+    }
+
+    /// "2 hours" / "45 min" / "1 hr 30 min" — how long until the pause lifts.
+    static func pauseDurationLabel(until: Date, from now: Date = Date()) -> String {
+        let mins = max(Int(until.timeIntervalSince(now) / 60), 1)
+        if mins < 60 { return "\(mins) min" }
+        let hours = mins / 60
+        let rem = mins % 60
+        if rem == 0 { return hours == 1 ? "1 hour" : "\(hours) hours" }
+        return "\(hours) hr \(rem) min"
+    }
+
+    /// "11:42 AM" — the design's resume-time format.
+    static func resumeTimeLabel(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
     }
 
     /// Immediately resumes notifications (sets isPaused = false). Optimistic.

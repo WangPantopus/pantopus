@@ -164,6 +164,7 @@ struct HubSummaryCard: View {
                 }
                 .foregroundStyle(theme.accent)
             }
+            .accessibilityIdentifier("schedulingSummarySeeInsights")
         }
     }
 
@@ -240,6 +241,7 @@ struct HubSummaryCard: View {
                     .padding(.vertical, Spacing.s2)
                     .overlay(Capsule().stroke(Theme.Color.appBorder, lineWidth: 1))
                 }
+                .accessibilityIdentifier("schedulingSummaryRetry")
             }
             .padding(.top, 14)
         }

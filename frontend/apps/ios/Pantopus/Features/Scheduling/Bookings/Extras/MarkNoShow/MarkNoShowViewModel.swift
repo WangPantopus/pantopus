@@ -70,35 +70,48 @@ final class MarkNoShowViewModel {
         }
     }
 
-    /// Marks each selected target a no-show. Returns `true` when every selected
-    /// booking flipped successfully.
+    /// Marks each selected target a no-show, tracking per-target outcomes.
+    /// Successfully marked targets are removed from `selectedIds` as they land,
+    /// so a retry after a partial failure only re-sends the failed ones (a
+    /// re-POST for an already-`no_show` booking would 409 `BAD_STATE` forever).
+    /// Returns `true` when every selected booking flipped successfully.
     func confirm() async -> Bool {
         guard !isSubmitting, canConfirm else { return false }
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
-        do {
-            for target in targets where selectedIds.contains(target.bookingId) {
+        let pending = targets.filter { selectedIds.contains($0.bookingId) }
+        var firstError: Error?
+        var failedCount = 0
+        for target in pending {
+            do {
                 let _: BookingResponse = try await client.request(
                     SchedulingEndpoints.markNoShow(owner: owner, id: target.bookingId)
                 )
+                selectedIds.remove(target.bookingId)
+            } catch {
+                failedCount += 1
+                if firstError == nil { firstError = error }
             }
-            return true
-        } catch let error as SchedulingError {
-            errorMessage = Self.message(for: error)
-            return false
-        } catch {
-            errorMessage = "Couldn't update — try again"
-            return false
         }
+        guard let firstError else { return true }
+        let detail = Self.message(for: firstError)
+        let markedCount = pending.count - failedCount
+        errorMessage = markedCount > 0
+            ? "Marked \(markedCount) of \(pending.count) — retry the rest. \(detail)"
+            : detail
+        return false
     }
 
-    static func message(for error: SchedulingError) -> String {
-        switch error.code {
-        case "NOT_APPLICABLE_YET", "BAD_STATE":
-            "You can mark a no-show only after the booking's start time."
+    static func message(for error: Error) -> String {
+        guard let scheduling = error as? SchedulingError else { return "Couldn't update — try again" }
+        switch scheduling.code {
+        case "NOT_APPLICABLE_YET":
+            return "You can mark a no-show only after the booking's start time."
+        case "BAD_STATE":
+            return "This booking can't be marked — it may already be closed or marked."
         default:
-            error.userMessage ?? "Couldn't update — try again"
+            return scheduling.userMessage ?? "Couldn't update — try again"
         }
     }
 }

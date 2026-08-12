@@ -126,6 +126,7 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: "Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications."
         NSCameraUsageDescription: "Pantopus uses the camera for profile photos, listing images, mail capture, and taking photos to send in chat."
         NSPhotoLibraryUsageDescription: "Pantopus uses your photo library to upload profile photos, listing images, and mail."
+        NSPhotoLibraryAddUsageDescription: "Pantopus saves images you export, like your booking QR code, to your photo library."
         NSMicrophoneUsageDescription: "Pantopus uses the microphone for voice messages in chat."
         NSFaceIDUsageDescription: "Pantopus uses Face ID to lock sensitive actions like payments."
         UIBackgroundModes:

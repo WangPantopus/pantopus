@@ -30,7 +30,15 @@ final class FirstRunWizardModel: WizardModel {
 
     /// Step 1 — handle.
     var slug: String = "" {
-        didSet { if slug != oldValue { onSlugEdited() } }
+        didSet {
+            // Keep typed input inside the backend's slug charset (lowercase letters, digits,
+            // hyphens) — anything else 400s INVALID_SLUG server-side and previously
+            // dead-ended the checker with no feedback. Android filters keystrokes the same
+            // way. (Assigning inside didSet replaces the value without re-firing.)
+            let cleaned = String(slug.lowercased().filter { "abcdefghijklmnopqrstuvwxyz0123456789-".contains($0) })
+            if cleaned != slug { slug = cleaned }
+            if slug != oldValue { onSlugEdited() }
+        }
     }
 
     private(set) var slugState: SlugFieldState = .idle
@@ -254,10 +262,12 @@ final class FirstRunWizardModel: WizardModel {
             if error.code == "SLUG_TAKEN" {
                 await runSlugCheck(candidate) // surface suggestions
             } else {
-                slugState = .taken(suggestions: [])
+                // Not a taken slug — saying "taken" here sent people hunting for a new
+                // handle when the real problem was the request itself.
+                slugState = .error(message: error.userMessage ?? "Couldn't save the link. Try again.")
             }
         } catch {
-            slugState = .taken(suggestions: [])
+            slugState = .error(message: "Couldn't save the link. Check your connection and try again.")
         }
     }
 
@@ -306,10 +316,29 @@ final class FirstRunWizardModel: WizardModel {
         isSubmitting = true
         defer { isSubmitting = false }
         if !seededTimezone {
+            // Also publishes: pages insert with is_live=false, and the success step this
+            // advances to invites the user to share a link that 404s while unpublished.
             _ = try? await client.request(SchedulingEndpoints.updateBookingPage(
                 owner: owner,
-                BookingPageUpdateRequest(timezone: timezoneIdentifier)
+                BookingPageUpdateRequest(timezone: timezoneIdentifier, isLive: true, isPaused: false)
             )) as BookingPageResponse
+            // Persist the hours grid to the default schedule. Without this the step is
+            // decorative: the server seeds Mon–Fri 09-17 in America/New_York, so any day the
+            // user toggled — and their real timezone — never reached availability.
+            if let availability = try? await client.request(SchedulingEndpoints.getAvailability()) as AvailabilityResponse,
+               let schedule = availability.schedules.first(where: { $0.isDefault == true }) ?? availability.schedules.first {
+                _ = try? await client.request(SchedulingEndpoints.updateSchedule(
+                    id: schedule.id,
+                    UpdateScheduleRequest(timezone: timezoneIdentifier)
+                )) as AvailabilityScheduleResponse
+                let rules = hoursEnabled.filter(\.value).keys.sorted().map {
+                    RulesRequest.Rule(weekday: $0, startTime: "09:00", endTime: "17:00")
+                }
+                _ = try? await client.request(SchedulingEndpoints.setRules(
+                    scheduleId: schedule.id,
+                    RulesRequest(rules: rules)
+                )) as RulesResponse
+            }
             seededTimezone = true
         }
         step = .success

@@ -19,7 +19,7 @@
 
 import SwiftUI
 
-/// The 12 designed event categories + a `generic` fallback for any
+/// The designed event categories + a `generic` fallback for any
 /// `event_type` the inference helper can't classify.
 public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case chore
@@ -34,6 +34,8 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
     case medical
     case meal
     case trash
+    /// Vendor/guest visits scheduled via F13 (`event_type` vendor|guest).
+    case visit
     case generic
 
     /// User-facing label rendered in the inline event-type chip.
@@ -51,6 +53,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical: "Medical"
         case .meal: "Meal"
         case .trash: "Trash day"
+        case .visit: "Visit"
         case .generic: "Event"
         }
     }
@@ -86,6 +89,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .medical: .stethoscope
         case .meal: .utensils
         case .trash: .trash2
+        case .visit: .doorOpen
         case .generic: .calendar
         }
     }
@@ -129,6 +133,9 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .trash:
             // CSS e2e8f0
             Color(red: 0xE2 / 255.0, green: 0xE8 / 255.0, blue: 0xF0 / 255.0)
+        case .visit:
+            // CSS ccfbf1 — soft teal, pairs with the design visit dot 0d9488.
+            Color(red: 0xCC / 255.0, green: 0xFB / 255.0, blue: 0xF1 / 255.0)
         case .generic:
             // primary50
             Color(red: 0xF0 / 255.0, green: 0xF9 / 255.0, blue: 0xFF / 255.0)
@@ -174,6 +181,9 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .trash:
             // CSS 334155
             Color(red: 0x33 / 255.0, green: 0x41 / 255.0, blue: 0x55 / 255.0)
+        case .visit:
+            // CSS 0f766e — teal 700
+            Color(red: 0x0F / 255.0, green: 0x76 / 255.0, blue: 0x6E / 255.0)
         case .generic:
             // primary600
             Color(red: 0x02 / 255.0, green: 0x84 / 255.0, blue: 0xC7 / 255.0)
@@ -200,6 +210,9 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         case .school:
             // CSS 2980b9 — design "school" dot.
             Color(red: 0x29 / 255.0, green: 0x80 / 255.0, blue: 0xB9 / 255.0)
+        case .visit:
+            // CSS 0d9488 — design "visit" dot (CAT.visit, home-shell.jsx:34).
+            Color(red: 0x0D / 255.0, green: 0x94 / 255.0, blue: 0x88 / 255.0)
         default:
             foreground
         }
@@ -207,7 +220,7 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
 
     // MARK: - Inference
 
-    /// Map a backend `event_type` string to one of the 12 designed
+    /// Map a backend `event_type` string to one of the designed
     /// categories. Case-insensitive substring match — unknown strings
     /// fall back to `.generic`. Mirrors the iOS / Android / web inference
     /// pattern documented in `docs/t6-buildout-plan.md`.
@@ -251,38 +264,37 @@ public enum CalendarEventCategory: String, CaseIterable, Sendable {
         "trash": .trash,
         "garbage": .trash,
         "recycling": .trash,
+        "visit": .visit,
+        "vendor": .visit,
+        "guest": .visit,
         "general": .generic
+    ]
+
+    /// Ordered keyword table backing `heuristicCategory` — first rule whose
+    /// keyword substring-matches wins, so ordering is load-bearing (e.g.
+    /// "vet_visit" must hit `.pet` before the `.visit` rule).
+    private static let heuristicRules: [(keywords: [String], category: CalendarEventCategory)] = [
+        (["birthday", "anniversary"], .birthday),
+        (["vet", "pet"], .pet),
+        (["bill", "payment"], .bill),
+        (["doctor", "medical", "dentist"], .medical),
+        (["trash", "garbage", "recycling"], .trash),
+        (["school", "class"], .school),
+        (["delivery", "package", "amazon"], .delivery),
+        (["meal", "breakfast", "lunch", "dinner", "brunch", "supper"], .meal),
+        (["party", "social"], .social),
+        (["visit", "vendor", "guest"], .visit),
+        (["repair", "maintenance", "plumber", "electrician", "hvac"], .maintenance),
+        (["chore", "clean"], .chore),
+        (["family", "kids"], .family)
     ]
 
     /// Fallback heuristics for noisier backend strings (`"vet_appt"`,
     /// `"birthday_party"`, etc.). First substring match wins.
     private static func heuristicCategory(for raw: String) -> CalendarEventCategory {
-        if raw.contains("birthday") || raw.contains("anniversary") { return .birthday }
-        if raw.contains("vet") || raw.contains("pet") { return .pet }
-        if raw.contains("bill") || raw.contains("payment") { return .bill }
-        if raw.contains("doctor") || raw.contains("medical") || raw.contains("dentist") {
-            return .medical
+        for rule in heuristicRules where rule.keywords.contains(where: raw.contains) {
+            return rule.category
         }
-        if raw.contains("trash") || raw.contains("garbage") || raw.contains("recycling") {
-            return .trash
-        }
-        if raw.contains("school") || raw.contains("class") { return .school }
-        if raw.contains("delivery") || raw.contains("package") || raw.contains("amazon") {
-            return .delivery
-        }
-        if raw.contains("meal") || raw.contains("breakfast") || raw.contains("lunch") ||
-            raw.contains("dinner") || raw.contains("brunch") || raw.contains("supper") {
-            return .meal
-        }
-        if raw.contains("party") || raw.contains("social") {
-            return .social
-        }
-        if raw.contains("repair") || raw.contains("maintenance") || raw.contains("plumber") ||
-            raw.contains("electrician") || raw.contains("hvac") {
-            return .maintenance
-        }
-        if raw.contains("chore") || raw.contains("clean") { return .chore }
-        if raw.contains("family") || raw.contains("kids") { return .family }
         return .generic
     }
 }

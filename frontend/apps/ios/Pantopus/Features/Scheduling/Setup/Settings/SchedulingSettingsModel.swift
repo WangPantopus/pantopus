@@ -32,6 +32,10 @@ final class SchedulingSettingsModel {
     private(set) var showSavedToast = false
     private(set) var isDisabling = false
     private(set) var isResetting = false
+    /// Danger-zone failure surface. These are destructive, deliberate actions — a silent
+    /// no-op (e.g. tapping "Disable scheduling" offline) left the page live with zero
+    /// feedback. Android shows a failure toast here; this is its mirror.
+    private(set) var dangerError: String?
 
     /// Per-row write fidelity (matches the JSX 'saving'/'saved' frames): the row
     /// id whose value is being written (shows a Shimmer in its trailing slot) and
@@ -172,7 +176,7 @@ final class SchedulingSettingsModel {
             page = result.page
             flashSaved()
         } catch {
-            // Surface nothing blocking; the footer still shows the old slug.
+            flashDangerError((error as? SchedulingError)?.userMessage ?? "Couldn't reset the link. Try again.")
         }
     }
 
@@ -185,7 +189,7 @@ final class SchedulingSettingsModel {
             page = result.page
             flashSaved()
         } catch {
-            // No-op on failure.
+            flashDangerError((error as? SchedulingError)?.userMessage ?? "Couldn't disable scheduling. The page is still live.")
         }
     }
 
@@ -194,6 +198,14 @@ final class SchedulingSettingsModel {
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             showSavedToast = false
+        }
+    }
+
+    private func flashDangerError(_ message: String) {
+        dangerError = message
+        Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            dangerError = nil
         }
     }
 

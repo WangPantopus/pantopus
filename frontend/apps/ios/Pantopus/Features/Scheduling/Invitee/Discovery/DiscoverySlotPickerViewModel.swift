@@ -219,13 +219,20 @@ final class DiscoverySlotPickerViewModel {
         ))
     }
 
-    /// Called by the parent navigator when the intake form returns a 409 conflict
-    /// (the slot was booked by someone else between pick and confirm). Marks the
-    /// slot as just-taken so the picker shows the Frame 6 WARN toast and the
-    /// taken row treatment. The booker stays on the picker to pick another time.
+    /// Called when the confirm flow returns a 409 conflict (the slot was booked
+    /// by someone else between pick and confirm). Marks the slot as just-taken
+    /// so the picker shows the Frame 6 WARN toast and the taken row treatment.
+    /// The booker stays on the picker to pick another time.
     func markSlotTaken(_ slotStart: String) {
         takenSlotStart = slotStart
         selectedSlotStart = nil
+    }
+
+    /// Consume a pending D2 "Pick another time" hand-off for this flow (the
+    /// `SlotTakenRelay` seam) when the picker re-appears after the unwind.
+    func consumeSlotTakenSignal() {
+        guard let start = SlotTakenRelay.shared.consume(slug: slug, eventTypeSlug: eventTypeSlug) else { return }
+        markSlotTaken(start)
     }
 
     func changeMonth(_ delta: Int) async {

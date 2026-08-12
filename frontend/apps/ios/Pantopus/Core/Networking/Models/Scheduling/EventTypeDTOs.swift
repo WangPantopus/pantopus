@@ -324,6 +324,9 @@ public struct UpdateEventTypeRequest: Encodable, Sendable {
     public var allowInviteeReschedule: Bool?
     public var scheduleId: String?
     public var isActive: Bool?
+    /// B1 reorder mode persists catalog position here (backend accepts sort_order
+    /// on PUT /event-types/:id; the list endpoint already orders by it).
+    public var sortOrder: Int?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -357,6 +360,7 @@ public struct UpdateEventTypeRequest: Encodable, Sendable {
         case allowInviteeReschedule = "allow_invitee_reschedule"
         case scheduleId = "schedule_id"
         case isActive = "is_active"
+        case sortOrder = "sort_order"
     }
 
     public init(
@@ -390,7 +394,8 @@ public struct UpdateEventTypeRequest: Encodable, Sendable {
         allowInviteeCancel: Bool? = nil,
         allowInviteeReschedule: Bool? = nil,
         scheduleId: String? = nil,
-        isActive: Bool? = nil
+        isActive: Bool? = nil,
+        sortOrder: Int? = nil
     ) {
         self.name = name
         self.slug = slug
@@ -423,6 +428,7 @@ public struct UpdateEventTypeRequest: Encodable, Sendable {
         self.allowInviteeReschedule = allowInviteeReschedule
         self.scheduleId = scheduleId
         self.isActive = isActive
+        self.sortOrder = sortOrder
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -458,6 +464,7 @@ public struct UpdateEventTypeRequest: Encodable, Sendable {
         try c.encodeIfPresent(allowInviteeReschedule, forKey: .allowInviteeReschedule)
         try c.encodeIfPresent(scheduleId, forKey: .scheduleId)
         try c.encodeIfPresent(isActive, forKey: .isActive)
+        try c.encodeIfPresent(sortOrder, forKey: .sortOrder)
     }
 }
 

@@ -66,6 +66,40 @@ final class DefaultRemindersViewModelTests: XCTestCase {
         XCTAssertTrue(vm.reminderMinutes.contains(180))
     }
 
+    /// The backend rejects a 6th reminder (`reminder_minutes` Joi `.max(5)`)
+    /// and any offset past 30 days (items `.max(43200)`) — the VM caps
+    /// client-side so Save can never 400.
+    func testCapAtFiveRemindersAndClampCustomOffset() async {
+        SequencedURLProtocol.sequence = [.status(200, body: emptyPage)]
+        let vm = DefaultRemindersViewModel(owner: .personal, client: makeClient())
+        await vm.load() // smart default: [1440, 60]
+        vm.toggle(10080)
+        vm.toggle(30)
+        vm.toggle(15)
+        XCTAssertEqual(vm.reminderMinutes.count, 5)
+        XCTAssertTrue(vm.atCap)
+
+        vm.toggle(0) // a sixth selection must not add
+        XCTAssertEqual(vm.reminderMinutes.count, 5)
+        XCTAssertFalse(vm.isOn(0))
+
+        vm.customValue = 2
+        vm.customUnit = .hours
+        vm.addCustom() // Add custom is capped too
+        XCTAssertEqual(vm.reminderMinutes.count, 5)
+        XCTAssertFalse(vm.reminderMinutes.contains(120))
+
+        // Selected rows still toggle OFF at cap (freeing a slot).
+        vm.toggle(15)
+        XCTAssertEqual(vm.reminderMinutes.count, 4)
+        XCTAssertFalse(vm.atCap)
+
+        // Custom offsets clamp to the 30-day per-item ceiling.
+        vm.customValue = 999
+        vm.customUnit = .days
+        XCTAssertEqual(vm.customResolvedMinutes, 43200)
+    }
+
     func testSavePutsReminders() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: emptyPage),

@@ -9,24 +9,37 @@
 
 import Foundation
 
-/// The next upcoming booking, surfaced on the summary card.
-public struct NextBookingDTO: Decodable, Sendable, Hashable {
-    public let startAt: String?
-    public let inviteeName: String?
+/// One `{date, count}` point in the summary's 30-day sparkline.
+public struct SummarySparkPointDTO: Decodable, Sendable, Hashable {
+    public let date: String?
+    public let count: Int?
+}
+
+/// One `{event_type_id, count}` row in the summary's per-event-type breakdown.
+public struct SummaryEventTypeCountDTO: Decodable, Sendable, Hashable {
+    public let eventTypeId: String?
+    public let count: Int?
 
     enum CodingKeys: String, CodingKey {
-        case startAt = "start_at"
-        case inviteeName = "invitee_name"
+        case eventTypeId = "event_type_id"
+        case count
     }
 }
 
-/// `GET /bookings/summary` → counts + next booking for the Hub summary card.
+/// `GET /bookings/summary` → month counts + delta + 30-day sparkline. Mirrors
+/// the deployed `bookingMetricsService.getSummary` shape (top-level keys are
+/// camelCase on the wire): `{bookingsThisMonth, bookingsLastMonth, deltaPct,
+/// upcomingCount, noShowCount, sparkline, byEventType}`. Note there is NO
+/// `pendingCount` — a Pending badge must be derived from the pending bookings
+/// list. Fields stay optional for lenient decode.
 public struct SchedulingSummaryDTO: Decodable, Sendable, Hashable {
+    public let bookingsThisMonth: Int?
+    public let bookingsLastMonth: Int?
+    public let deltaPct: Int?
     public let upcomingCount: Int?
-    public let pendingCount: Int?
-    public let totalThisMonth: Int?
-    public let noShowRate: Double?
-    public let nextBooking: NextBookingDTO?
+    public let noShowCount: Int?
+    public let sparkline: [SummarySparkPointDTO]?
+    public let byEventType: [SummaryEventTypeCountDTO]?
 }
 
 /// One per-event-type or per-host no-show row.

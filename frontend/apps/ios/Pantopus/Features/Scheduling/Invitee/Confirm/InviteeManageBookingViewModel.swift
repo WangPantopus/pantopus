@@ -245,12 +245,9 @@ final class InviteeManageBookingViewModel {
         let trimmed = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = PublicCancelRequest(reason: (trimmed?.isEmpty ?? true) ? nil : trimmed)
         do {
-            let result: PublicBookingResponse = try await client.request(
+            let _: PublicBookingResponse = try await client.request(
                 SchedulingPublicEndpoints.cancel(token: token, request)
             )
-            if let booking = response?.booking, booking.id == result.booking.id {
-                if let id = response?.booking.id { ManageTokenStore.shared.remove(bookingId: id) }
-            }
             showCancelSheet = false
             await fetch()
         } catch let error as SchedulingError {

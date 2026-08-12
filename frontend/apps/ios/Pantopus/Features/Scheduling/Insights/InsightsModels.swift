@@ -79,13 +79,19 @@ struct InsightsFilter: Hashable {
         }
     }
 
-    /// `from`/`to` UTC day keys for `GET /bookings?from&to`.
+    /// `from`/`to` UTC day keys for `GET /bookings?from&to`. `to` is EXCLUSIVE
+    /// (the day after the last included day): the backend parses a date-only
+    /// bound as UTC midnight, so an inclusive `to` would exclude every booking
+    /// on the final day — including all of today.
     func range(now: Date = Date(), calendar: Calendar = .current) -> (from: String, to: String) {
         if period == .custom, let start = customStart, let end = customEnd {
-            return (SchedulingTime.isoDay(min(start, end)), SchedulingTime.isoDay(max(start, end)))
+            let hi = max(start, end)
+            let hiExclusive = calendar.date(byAdding: .day, value: 1, to: hi) ?? hi
+            return (SchedulingTime.isoDay(min(start, end)), SchedulingTime.isoDay(hiExclusive))
         }
         let from = calendar.date(byAdding: .day, value: -days(now: now, calendar: calendar), to: now) ?? now
-        return (SchedulingTime.isoDay(from), SchedulingTime.isoDay(now))
+        let toExclusive = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+        return (SchedulingTime.isoDay(from), SchedulingTime.isoDay(toExclusive))
     }
 
     /// Number of non-date filters applied (for the Apply-button badge).

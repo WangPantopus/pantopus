@@ -41,7 +41,6 @@ enum BlockRepeat: String, CaseIterable, Identifiable {
         case .monthly: "FREQ=MONTHLY"
         }
     }
-
 }
 
 /// A detected booking-overlap warning. Best-effort: the hold never cancels a
@@ -64,17 +63,21 @@ final class BlockOffTimeViewModel {
     var date = Date() {
         didSet { scheduleConflictCheck() }
     }
+
     var allDay = false {
         didSet {
             if allDay { conflict = nil } else { scheduleConflictCheck() }
         }
     }
+
     var startTime = TimeOfDay(hour: 14, minute: 0) {
         didSet { scheduleConflictCheck() }
     }
+
     var endTime = TimeOfDay(hour: 15, minute: 0) {
         didSet { scheduleConflictCheck() }
     }
+
     var repeats: BlockRepeat = .never
 
     /// Set when the chosen window overlaps an active booking. Drives the
@@ -139,6 +142,11 @@ final class BlockOffTimeViewModel {
         let day = date
         let window = TimeRange(start: startTime, end: endTime)
         conflictTask = Task { [weak self] in
+            // Debounce inside the task: the wheel picker fires a didSet per
+            // detent, and dispatching a GET /bookings for each one was a
+            // request storm. Cancellation (the next detent) lands here first.
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
             await self?.detectConflict(day: day, window: window)
         }
     }
@@ -181,6 +189,10 @@ final class BlockOffTimeViewModel {
                 conflict = nil
             }
         } catch {
+            // A cancelled check (superseded by a newer detent) must not touch
+            // state — URLError.cancelled lands here in nondeterministic order
+            // and could erase the warning a fresher task just set.
+            if Task.isCancelled { return }
             // Detection is best-effort; never block the user on a fetch failure.
             conflict = nil
         }
@@ -195,8 +207,13 @@ final class BlockOffTimeViewModel {
     }
 
     private static func timeLabel(_ date: Date) -> String {
+        // User copy ("This overlaps a confirmed 2:30 PM booking"): use the
+        // locale-aware short time style. A fixed "h:mm a" with `Locale.current`
+        // is rewritten by the 24-hour override (QA1480) and would render
+        // non-latn digits mid-sentence. Device zone matches the sheet's pickers.
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
         return formatter.string(from: date)
     }
 

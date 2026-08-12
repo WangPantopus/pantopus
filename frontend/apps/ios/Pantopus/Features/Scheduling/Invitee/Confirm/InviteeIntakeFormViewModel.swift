@@ -50,12 +50,20 @@ final class InviteeIntakeFormViewModel {
     /// header chip lets them change it before reviewing).
     var selectedTz: String
 
+    /// One guest email row. Identity is value-stable (not the array offset) so
+    /// removing a row never re-points a still-mounted TextField — with its
+    /// focus and uncommitted edit buffer — at a different guest's slot.
+    struct GuestEntry: Identifiable, Hashable {
+        let id = UUID()
+        var email: String = ""
+    }
+
     // Form fields
     var firstName = ""
     var lastName = ""
     var email = ""
     var answers: [String: InviteeAnswer] = [:]
-    var guests: [String] = []
+    var guests: [GuestEntry] = []
     var showGuests = false
 
     /// Logged-in invitee: collapse name/email into a "Booking as" chip.
@@ -317,17 +325,20 @@ final class InviteeIntakeFormViewModel {
 
     func addGuest() {
         if !showGuests { showGuests = true }
-        if guests.count < 5 { guests.append("") }
+        if guests.count < 5 { guests.append(GuestEntry()) }
     }
 
-    func removeGuest(at index: Int) {
-        guard guests.indices.contains(index) else { return }
-        guests.remove(at: index)
+    func removeGuest(id: GuestEntry.ID) {
+        guests.removeAll { $0.id == id }
     }
 
-    func setGuest(_ index: Int, _ value: String) {
-        guard guests.indices.contains(index) else { return }
-        guests[index] = value
+    func guestEmail(id: GuestEntry.ID) -> String {
+        guests.first { $0.id == id }?.email ?? ""
+    }
+
+    func setGuest(id: GuestEntry.ID, email: String) {
+        guard let index = guests.firstIndex(where: { $0.id == id }) else { return }
+        guests[index].email = email
     }
 
     // MARK: - Validation
@@ -380,6 +391,13 @@ final class InviteeIntakeFormViewModel {
 
     // MARK: - Navigation
 
+    /// Whether the D2 "Pick another time" unwind should pop this screen too
+    /// (D2 → D1 → C6). Checked on re-appear; the C6 picker consumes the relay
+    /// entry, so this only peeks.
+    var shouldUnwindForSlotTaken: Bool {
+        SlotTakenRelay.shared.hasPending(slug: slug, eventTypeSlug: eventTypeSlug)
+    }
+
     /// Build the draft, stash it for D2, and push the review route.
     func reviewBooking() {
         guard isValid, let event = eventType, let page else { return }
@@ -388,7 +406,7 @@ final class InviteeIntakeFormViewModel {
             lastName: lastName.trimmingCharacters(in: .whitespaces),
             email: (isPrefilled ? (prefill?.email ?? email) : email).trimmingCharacters(in: .whitespaces),
             answers: answers,
-            guests: guests
+            guests: guests.map(\.email)
         )
         if isPrefilled, let prefill {
             let parts = prefill.name.split(separator: " ", maxSplits: 1).map(String.init)

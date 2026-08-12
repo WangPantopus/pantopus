@@ -38,9 +38,10 @@ final class BookingsInboxViewModel {
     var activeSheet: BookingActionSheet?
     /// Drives the E9 filter bottom sheet, presented from the top-bar filter icon.
     var filterSheetVisible = false
-    /// The most recently applied filter set (event-type / date-range facets are
-    /// recorded for the inbox to honor once `BookingActions.list` accepts them —
-    /// see `sharedChangesNeeded`). `nil` until the host applies a filter.
+    /// The most recently applied filter set. The event-type / date-range facets
+    /// are forwarded on every `fetch()` (tab switches and refreshes included) so
+    /// the list matches the sheet CTA's "Show N bookings" count. `nil` until the
+    /// host applies a filter.
     private(set) var appliedFilters: BookingFilters?
 
     private var didLoad = false
@@ -159,10 +160,9 @@ final class BookingsInboxViewModel {
     }
 
     /// Apply a filter set returned by the E9 sheet. The status facet maps onto
-    /// the inbox tab and the text facet onto the search field — both honored by
-    /// the existing `GET /bookings?status&q` path. Event-type / date-range facets
-    /// are recorded (`appliedFilters`) but need a richer `BookingActions.list`
-    /// to reach the wire (see `sharedChangesNeeded`).
+    /// the inbox tab and the text facet onto the search field; the event-type /
+    /// date-range facets are stored in `appliedFilters` and forwarded to
+    /// `GET /bookings?status&event_type_id&from&to&q` by `fetch()`.
     ///
     /// The status is read via its `queryValue` string (not the facet enum type)
     /// to stay clear of the inbox-vs-facet `BookingStatusFilter` name collision.
@@ -184,8 +184,20 @@ final class BookingsInboxViewModel {
         fetchGeneration &+= 1
         let generation = fetchGeneration
         phase = .loading
+        let bounds = appliedFilters?.dateBounds() ?? (from: nil, to: nil)
         do {
-            let result = try await actions.list(status: selectedTab, search: searchText)
+            var result = try await actions.list(
+                status: selectedTab,
+                search: searchText,
+                eventTypeId: appliedFilters?.eventTypeId,
+                from: bounds.from,
+                to: bounds.to
+            )
+            // The facet-only No-show status queries `past` then narrows
+            // client-side, mirroring the sheet's live count.
+            if appliedFilters?.status == .noShow, selectedTab == .past {
+                result = result.filter { $0.status == "no_show" }
+            }
             guard generation == fetchGeneration else { return }
             bookings = result
             phase = .ready
@@ -198,10 +210,12 @@ final class BookingsInboxViewModel {
         }
     }
 
-    /// Best-effort Pending badge count. Failure leaves the badge at 0.
+    /// Best-effort Pending badge count, derived from the pending bookings list
+    /// — the summary endpoint carries no `pendingCount` on the wire. Failure
+    /// leaves the badge unchanged.
     private func loadSummary() async {
-        guard let summary = try? await actions.summary() else { return }
-        pendingCount = summary.pendingCount ?? 0
+        guard let pending = try? await actions.list(status: .pending, search: nil) else { return }
+        pendingCount = pending.count
     }
 
     /// Best-effort event-type name map so rows can show the event title (the
@@ -215,17 +229,22 @@ final class BookingsInboxViewModel {
 
     /// Optimistic approve: drop the row, confirm server-side, restore + surface
     /// on failure. PAST_DEADLINE / ALREADY_APPROVED come back as a typed message.
+    /// The rollback is generation-guarded: a tab switch / filter apply while the
+    /// approve is in flight refetches the list, and restoring the stale snapshot
+    /// would resurrect the previous tab's rows into the new one.
     func approve(_ booking: BookingDTO) async {
         actionError = nil
         let snapshot = bookings
+        let generation = fetchGeneration
         bookings.removeAll { $0.id == booking.id }
         if pendingCount > 0 { pendingCount -= 1 }
         do {
             _ = try await actions.approve(id: booking.id)
         } catch {
-            bookings = snapshot
             await loadSummary()
             actionError = approveErrorMessage(error, verb: "approve")
+            guard generation == fetchGeneration else { return }
+            bookings = snapshot
         }
     }
 

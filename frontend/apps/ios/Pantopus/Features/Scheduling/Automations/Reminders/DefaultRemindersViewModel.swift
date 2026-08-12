@@ -47,6 +47,19 @@ final class DefaultRemindersViewModel {
 
     private var lastSaved: [Int] = []
 
+    /// Backend caps (`PUT /booking-page` — scheduling.js `reminder_minutes`
+    /// Joi `.max(5)`, items `.max(43200)`): at most 5 lead-times, each within
+    /// 30 days of the start. Enforced client-side so Save can never 400 on a
+    /// selection the sheet happily allowed.
+    static let maxReminders = 5
+    static let maxLeadTimeMinutes = 43200
+
+    /// True once the selection hits the backend's 5-reminder cap — unselected
+    /// rows and "Add custom time" disable with the "Up to 5 reminders" note.
+    var atCap: Bool {
+        reminderMinutes.count >= Self.maxReminders
+    }
+
     // MARK: Derived
 
     var theme: SchedulingIdentityTheme {
@@ -72,9 +85,11 @@ final class DefaultRemindersViewModel {
         Set(reminderMinutes) != Set(lastSaved)
     }
 
-    /// Custom value resolves to this many minutes-before-start.
+    /// Custom value resolves to this many minutes-before-start, clamped to the
+    /// backend's 30-day per-item ceiling (43200) so e.g. "999 hours" saves as
+    /// the max instead of failing validation.
     var customResolvedMinutes: Int {
-        max(0, customValue) * customUnit.multiplier
+        min(max(0, customValue) * customUnit.multiplier, Self.maxLeadTimeMinutes)
     }
 
     init(owner: SchedulingOwner, client: SchedulingClient) {
@@ -125,6 +140,7 @@ final class DefaultRemindersViewModel {
         if let idx = reminderMinutes.firstIndex(of: minutes) {
             reminderMinutes.remove(at: idx)
         } else {
+            guard !atCap else { return } // backend rejects a 6th reminder
             reminderMinutes.append(minutes)
         }
         reminderMinutes.sort(by: >)
@@ -140,7 +156,7 @@ final class DefaultRemindersViewModel {
 
     func addCustom() {
         let minutes = customResolvedMinutes
-        guard minutes > 0, !reminderMinutes.contains(minutes) else {
+        guard minutes > 0, !reminderMinutes.contains(minutes), !atCap else {
             showCustom = false
             return
         }

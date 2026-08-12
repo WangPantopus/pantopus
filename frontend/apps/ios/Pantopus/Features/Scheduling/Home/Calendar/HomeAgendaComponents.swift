@@ -106,7 +106,9 @@ public enum HomeAgendaBuilder {
         members: [String: HomeMember],
         calendar cal: Calendar
     ) -> HomeAgendaItem {
-        let allDay = dto.endAt == nil && isMidnight(start, calendar: cal)
+        // All-day rows are stored at midnight UTC + nil end — the heuristic
+        // is pinned to UTC no matter which zone the agenda displays in.
+        let allDay = dto.endAt == nil && isMidnight(start, calendar: utcHeuristicCalendar)
         let (time, ampm) = timeParts(start, allDay: allDay, calendar: cal)
         let assignees = (dto.assignedTo ?? []).compactMap { members[$0] }
         let isBooking = dto.source == "booking"
@@ -160,6 +162,15 @@ public enum HomeAgendaBuilder {
     static func isMidnight(_ date: Date, calendar cal: Calendar) -> Bool {
         let parts = cal.dateComponents([.hour, .minute, .second], from: date)
         return (parts.hour ?? 0) == 0 && (parts.minute ?? 0) == 0 && (parts.second ?? 0) == 0
+    }
+
+    /// UTC calendar backing the all-day heuristic (wire stores 00:00Z).
+    private static var utcHeuristicCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        if let utc = TimeZone(identifier: "UTC") {
+            cal.timeZone = utc
+        }
+        return cal
     }
 
     static func isoDay(_ date: Date, calendar cal: Calendar) -> String {

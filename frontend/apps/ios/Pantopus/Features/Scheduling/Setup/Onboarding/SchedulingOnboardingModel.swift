@@ -16,6 +16,7 @@ import SwiftUI
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class SchedulingOnboardingModel: WizardModel {
     enum Flow { case home, business }
 
@@ -27,6 +28,12 @@ final class SchedulingOnboardingModel: WizardModel {
     private(set) var isFinished = false
     var pendingShareURL: URL?
     private(set) var isSubmitting = false
+    /// Inline failure copy for the wizard footer when finishSetup couldn't
+    /// create the event type. The wizard stays on the last input step so the
+    /// user can retry — advancing to the success frame on failure showed
+    /// "taking bookings" over a page with zero event types. Mirrors Android's
+    /// `OnboardingHomeBusinessViewModel.submitError`.
+    private(set) var submitError: String?
 
     // Home state.
     var selectedMembers: Set<String> = ["you"]
@@ -35,7 +42,13 @@ final class SchedulingOnboardingModel: WizardModel {
 
     /// Business state.
     var slug = "" {
-        didSet { if slug != oldValue { onSlugEdited() } }
+        didSet {
+            // Backend slug charset only (lowercase letters, digits, hyphens) — see
+            // FirstRunWizardModel.slug for the rationale; both wizards share the behavior.
+            let cleaned = String(slug.lowercased().filter { "abcdefghijklmnopqrstuvwxyz0123456789-".contains($0) })
+            if cleaned != slug { slug = cleaned }
+            if slug != oldValue { onSlugEdited() }
+        }
     }
 
     private(set) var slugState: SlugFieldState = .idle
@@ -93,8 +106,23 @@ final class SchedulingOnboardingModel: WizardModel {
         steps.count
     }
 
+    /// Steps that actually collect input, which is not always `totalSteps`.
+    ///
+    /// The Home flow's third rail step ("Share") IS the success frame — see
+    /// `onboarding-home-frames.jsx` `HomeSuccess`, which draws the rail at step 3 of 3 with
+    /// every step done and no input below it. Treating it as an input step left step 3
+    /// rendering an empty body under a live "Continue" button. Business genuinely has four
+    /// input steps, so the two counts coincide there. Mirrors Android's
+    /// `inputSteps`/`railSteps` split in `OnboardingHomeBusinessViewModel`.
+    var inputSteps: Int {
+        switch flow {
+        case .home: 2
+        case .business: 4
+        }
+    }
+
     var isSuccess: Bool {
-        stepIndex > totalSteps
+        stepIndex > inputSteps
     }
 
     var displayStep: Int {
@@ -106,10 +134,17 @@ final class SchedulingOnboardingModel: WizardModel {
     var shareLink: String {
         let s = slug.isEmpty ? "your-link" : slug
         switch flow {
-        case .home: return "pantopus.com/book/family"
+        // The home's real page slug, captured at finishSetup — a hardcoded guess here
+        // ("family") produced a link that 404'd or opened a stranger's page.
+        case .home:
+            if let pageSlug, !pageSlug.isEmpty { return "pantopus.com/book/\(pageSlug)" }
+            return "pantopus.com/book/…"
         case .business: return "pantopus.com/book/\(s)"
         }
     }
+
+    /// The owner's real BookingPage slug, from the finishSetup page-update response.
+    private(set) var pageSlug: String?
 
     private var bizStep1Ready: Bool {
         if case .available = slugState { return true }
@@ -192,10 +227,14 @@ final class SchedulingOnboardingModel: WizardModel {
     }
 
     func leadingTapped() {
-        if isSuccess { stepIndex = totalSteps
+        if isSuccess {
+            // Back out of success to the last step that takes input. Using `totalSteps` here
+            // would leave Home stuck (rail step 3 is itself the success frame).
+            stepIndex = inputSteps
             return
         }
         if stepIndex == 1 { isFinished = true } else { stepIndex -= 1 }
+        submitError = nil
     }
 
     func discardConfirmed() {
@@ -208,7 +247,7 @@ final class SchedulingOnboardingModel: WizardModel {
             pendingShareURL = URL(string: "https://\(shareLink)")
             return
         }
-        if stepIndex < totalSteps {
+        if stepIndex < inputSteps {
             if flow == .business && stepIndex == 1 {
                 Task { await claimSlug() }
             } else {
@@ -223,8 +262,9 @@ final class SchedulingOnboardingModel: WizardModel {
         if isSuccess { isFinished = true
             return
         }
-        // Defaults / skip simply advance.
-        if stepIndex < totalSteps { stepIndex += 1 } else { Task { await finishSetup() } }
+        // Defaults / skip simply advance. Gate on `inputSteps`, not `totalSteps`, or Home's
+        // skip would jump straight to the success frame without ever running finishSetup().
+        if stepIndex < inputSteps { stepIndex += 1 } else { Task { await finishSetup() } }
     }
 
     func finishAfterShare() {
@@ -285,9 +325,14 @@ final class SchedulingOnboardingModel: WizardModel {
             )) as BookingPageResponse
             stepIndex = 2
         } catch let error as SchedulingError {
-            if error.code == "SLUG_TAKEN" { await runSlugCheck(candidate) } else { slugState = .taken(suggestions: []) }
+            if error.code == "SLUG_TAKEN" {
+                await runSlugCheck(candidate)
+            } else {
+                // Not a taken slug — misreporting "taken" sent people hunting for a new handle.
+                slugState = .error(message: error.userMessage ?? "Couldn't save the link. Try again.")
+            }
         } catch {
-            slugState = .taken(suggestions: [])
+            slugState = .error(message: "Couldn't save the link. Check your connection and try again.")
         }
     }
 
@@ -295,18 +340,23 @@ final class SchedulingOnboardingModel: WizardModel {
 
     private func finishSetup() async {
         isSubmitting = true
+        submitError = nil
         defer { isSubmitting = false }
-        // Seed page timezone (best-effort).
-        _ = try? await client.request(SchedulingEndpoints.updateBookingPage(
-            owner: owner,
-            BookingPageUpdateRequest(timezone: timezoneIdentifier)
-        )) as BookingPageResponse
 
         let assignment = flow == .home ? (combineMode == "round_robin" ? "round_robin" : "collective") : "one_on_one"
         let requiresApproval = flow == .business ? (confirmMode == "approve") : false
-        let priceCents: Int? = (flow == .business && paidEnabled) ? (Int(priceText).map { $0 * 100 }) : nil
+        // Overflow-safe: `Int(priceText).map { $0 * 100 }` trapped on 17+ digit
+        // input (the numpad field has no length cap). Oversized input degrades
+        // to "no price" instead of crashing mid-finish.
+        let priceCents: Int? = (flow == .business && paidEnabled)
+            ? Int(priceText).flatMap { dollars -> Int? in
+                let result = dollars.multipliedReportingOverflow(by: 100)
+                return result.overflow ? nil : result.partialValue
+            }
+            : nil
 
         let name = flow == .home ? "Household meeting" : "\(serviceTypeLabel)"
+        var created = false
         var attempt = 0
         while attempt < 4 {
             let suffix = attempt == 0 ? "" : "-\(attempt + 1)"
@@ -323,19 +373,37 @@ final class SchedulingOnboardingModel: WizardModel {
             )
             do {
                 _ = try await client.request(SchedulingEndpoints.createEventType(owner: owner, request)) as EventTypeResponse
-                stepIndex = totalSteps + 1
-                return
+                created = true
+                break
             } catch let error as SchedulingError {
                 if error.code == "SLUG_TAKEN" { attempt += 1
                     continue
                 }
-                stepIndex = totalSteps + 1
+                submitError = error.userMessage ?? "Couldn't finish setup. Try again."
                 return
             } catch {
-                stepIndex = totalSteps + 1
+                submitError = "Couldn't finish setup. Check your connection and try again."
                 return
             }
         }
+        guard created else {
+            submitError = "Couldn't finish setup. Try again."
+            return
+        }
+
+        // Seed page timezone and publish only AFTER the event type exists. Pages insert
+        // with is_live=false and the success frame tells the user their link is live, so
+        // the wizard must flip it — otherwise the shared link 404s until Booking Page
+        // Management is visited. Publishing BEFORE creation left a live page with zero
+        // event types whenever creation failed. Web's wizards send the same trio
+        // (SetupWizard.tsx / OnboardingWizard.tsx).
+        let pageResult = try? await client.request(SchedulingEndpoints.updateBookingPage(
+            owner: owner,
+            BookingPageUpdateRequest(timezone: timezoneIdentifier, isLive: true, isPaused: false)
+        )) as BookingPageResponse
+        // Capture the real slug — the Home success screen's share link derives from it.
+        pageSlug = pageResult?.page.slug
+
         stepIndex = totalSteps + 1
     }
 

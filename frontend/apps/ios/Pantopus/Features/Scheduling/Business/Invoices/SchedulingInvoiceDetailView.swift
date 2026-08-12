@@ -74,6 +74,11 @@ struct SchedulingInvoiceDetailView: View {
                     lineItemsSection.padding(.top, 16)
                     timelineSection.padding(.top, 16)
                     paymentTermsSection.padding(.top, 16)
+                    if let sendError = model.sendError {
+                        PkgNote(tone: .error, icon: .alertTriangle, text: sendError)
+                            .padding(.top, Spacing.s4)
+                            .accessibilityIdentifier("invoiceSendError")
+                    }
                     Color.clear.frame(height: Spacing.s2)
                 }
                 .padding(.horizontal, Spacing.s4)

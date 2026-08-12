@@ -50,6 +50,17 @@ struct TriggerPickerSheet: View {
         usesOffset && amount <= 0
     }
 
+    /// Backend `workflowSchema` caps `offset_minutes` at 525600 (365 days —
+    /// backend/routes/scheduling.js:1081); the per-unit stepper ceiling keeps
+    /// `resolvedMinutes` within it.
+    private var maxAmount: Int {
+        switch unit {
+        case .minutes: 999
+        case .hours: 8760
+        case .days: 365
+        }
+    }
+
     var body: some View {
         VStack(spacing: Spacing.s0) {
             AutoSheetHeader(title: "When should this run?", onClose: onClose)
@@ -107,14 +118,18 @@ struct TriggerPickerSheet: View {
                     accent: accent,
                     isInvalid: isInvalid,
                     canDecrement: amount > 0,
+                    canIncrement: amount < maxAmount,
                     onDecrement: { amount = max(0, amount - 1) },
-                    onIncrement: { amount = min(999, amount + 1) }
+                    onIncrement: { amount = min(maxAmount, amount + 1) }
                 )
                 AutoSegmented(
                     options: ReminderPreset.Unit.allCases.map { unitShort($0) },
                     selectedIndex: ReminderPreset.Unit.allCases.firstIndex(of: unit) ?? 1,
                     accent: accent
-                ) { unit = ReminderPreset.Unit.allCases[$0] }
+                ) {
+                    unit = ReminderPreset.Unit.allCases[$0]
+                    amount = min(amount, maxAmount)
+                }
             }
         }
     }

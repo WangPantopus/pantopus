@@ -143,15 +143,22 @@ struct WeekdayHoursRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             HStack(spacing: Spacing.s3) {
-                Toggle(isOn: Binding(get: { day.isEnabled }, set: onToggle)) {
-                    Text(Weekday.longName(day.weekday))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(day.isEnabled ? Theme.Color.appText : Theme.Color.appTextSecondary)
-                }
-                .toggleStyle(.switch)
-                .tint(Theme.Color.primary600)
-                .disabled(disabled)
-                .accessibilityIdentifier("scheduling.weeklyHours.toggle.\(day.weekday)")
+                // Design weekly-hours-frames.jsx DayRow:146-147 puts the switch FIRST and the
+                // day label after it. A labelled SwiftUI Toggle renders the inverse (label
+                // leading, switch trailing), so the control order is built explicitly here.
+                // `labelsHidden()` drops the VoiceOver name, hence the explicit label.
+                Toggle("", isOn: Binding(get: { day.isEnabled }, set: onToggle))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Theme.Color.primary600)
+                    .disabled(disabled)
+                    .accessibilityLabel(Weekday.longName(day.weekday))
+                    .accessibilityIdentifier("scheduling.weeklyHours.toggle.\(day.weekday)")
+
+                Text(Weekday.longName(day.weekday))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(day.isEnabled ? Theme.Color.appText : Theme.Color.appTextSecondary)
+                    .accessibilityHidden(true)
 
                 Spacer(minLength: Spacing.s2)
 

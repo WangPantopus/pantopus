@@ -4,8 +4,8 @@
 //
 //  Stream I6 — D2 Review & Confirm view-model. Seeds the draft store, then drives
 //  `POST /api/public/book/:slug/:eventTypeSlug` with stubbed 201 (manageToken) /
-//  409 (slot conflict) bodies and asserts token persistence + the confirmed-route
-//  hand-off and the 409 → slot-taken recovery.
+//  409 (slot conflict) bodies and asserts the confirmed-route hand-off and the
+//  409 → slot-taken recovery.
 //
 
 import XCTest
@@ -27,7 +27,6 @@ final class InviteeReviewConfirmViewModelTests: XCTestCase {
     override func tearDown() {
         SequencedURLProtocol.reset()
         InviteeBookingDraftStore.shared.clear(slug: slug, eventTypeSlug: eventTypeSlug, start: start)
-        ManageTokenStore.shared.remove(bookingId: "b1")
         super.tearDown()
     }
 
@@ -69,7 +68,7 @@ final class InviteeReviewConfirmViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.needsDetails)
     }
 
-    func testConfirmPersistsTokenAndPushesConfirmed() async {
+    func testConfirmPushesConfirmedAndRestoresReady() async {
         var pushed: [SchedulingRoute] = []
         let createBody = """
         {"booking":{"id":"b1","status":"confirmed","start_at":"2026-06-17T16:30:00Z","end_at":"2026-06-17T17:00:00Z"},
@@ -83,7 +82,9 @@ final class InviteeReviewConfirmViewModelTests: XCTestCase {
         await viewModel.confirm()
 
         XCTAssertEqual(pushed, [.inviteeConfirmed(manageToken: "mt_abc123")])
-        XCTAssertEqual(ManageTokenStore.shared.token(forBookingId: "b1"), "mt_abc123")
+        // D3's Done/X pops back onto this screen: it must not stay frozen in
+        // the .confirming shimmer after a successful push.
+        XCTAssertEqual(viewModel.state, .ready)
     }
 
     func testConflictSurfacesSlotTakenWithAlternatives() async {

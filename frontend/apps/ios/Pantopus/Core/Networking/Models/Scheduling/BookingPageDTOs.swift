@@ -165,7 +165,14 @@ public struct CheckSlugResponse: Decodable, Sendable, Hashable {
 /// the endpoint builder via `OwnerScopedBody`.
 public struct OneOffLinkRequest: Encodable, Sendable {
     public let eventTypeId: String
-    public var expiresInMin: Int?
+    /// Double-optional on purpose — the backend distinguishes the two nils
+    /// (`oneOffSchema.expires_in_min` is `.allow(null).default(10080)`):
+    ///   · `nil` (outer) → key OMITTED → server applies the 7-day default
+    ///   · `.some(nil)` → EXPLICIT JSON `null` → the link never expires
+    /// Passing an `Int?` argument (e.g. `expiry.minutes`) wraps to
+    /// `.some(value)`, so a "Never" chip's nil minutes encodes the explicit
+    /// null instead of silently becoming a 7-day link.
+    public var expiresInMin: Int??
     public var singleUse: Bool?
     public var offeredSlots: [OfferedSlot]?
 
@@ -188,7 +195,7 @@ public struct OneOffLinkRequest: Encodable, Sendable {
 
     public init(
         eventTypeId: String,
-        expiresInMin: Int? = nil,
+        expiresInMin: Int?? = nil,
         singleUse: Bool? = nil,
         offeredSlots: [OfferedSlot]? = nil
     ) {
@@ -196,6 +203,21 @@ public struct OneOffLinkRequest: Encodable, Sendable {
         self.expiresInMin = expiresInMin
         self.singleUse = singleUse
         self.offeredSlots = offeredSlots
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(eventTypeId, forKey: .eventTypeId)
+        switch expiresInMin {
+        case .none:
+            break // omit → server's 7-day default
+        case .some(.none):
+            try container.encodeNil(forKey: .expiresInMin) // explicit null → never expires
+        case let .some(.some(minutes)):
+            try container.encode(minutes, forKey: .expiresInMin)
+        }
+        try container.encodeIfPresent(singleUse, forKey: .singleUse)
+        try container.encodeIfPresent(offeredSlots, forKey: .offeredSlots)
     }
 }
 

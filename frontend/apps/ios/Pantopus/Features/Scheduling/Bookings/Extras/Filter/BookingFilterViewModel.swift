@@ -87,6 +87,48 @@ struct BookingFilters: Equatable {
     var scope: BookingScopeFilter
 }
 
+extension BookingFilters {
+    /// Wire-ready `from`/`to` day bounds for the date-range facet. The upper
+    /// bound is EXCLUSIVE next-day midnight: the backend casts a bare day
+    /// string to midnight on both `gte`/`lte`, so an inclusive same-day upper
+    /// would match nothing. Shared by the E9 sheet's live count and the inbox
+    /// fetch so the CTA's "Show N bookings" matches what the list renders.
+    func dateBounds(now: Date = Date()) -> (from: String?, to: String?) {
+        guard let dateRange else { return (nil, nil) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        switch dateRange {
+        case .today:
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            return (Self.isoDay(now), Self.isoDay(nextDay))
+        case .thisWeek:
+            if let interval = calendar.dateInterval(of: .weekOfYear, for: now) {
+                return (Self.isoDay(interval.start), Self.isoDay(interval.end))
+            }
+        case .thisMonth:
+            if let interval = calendar.dateInterval(of: .month, for: now) {
+                return (Self.isoDay(interval.start), Self.isoDay(interval.end))
+            }
+        case .custom:
+            let lower = min(customFrom, customTo)
+            let upper = max(customFrom, customTo)
+            // +1 day so the last selected day is included (upper is midnight).
+            let upperExclusive = calendar.date(byAdding: .day, value: 1, to: upper) ?? upper
+            return (Self.isoDay(lower), Self.isoDay(upperExclusive))
+        }
+        return (nil, nil)
+    }
+
+    static func isoDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+}
+
 @Observable
 @MainActor
 final class BookingFilterViewModel {
@@ -294,35 +336,10 @@ final class BookingFilterViewModel {
     }
 
     private func dateBounds() -> (from: String?, to: String?) {
-        guard let selectedDateRange else { return (nil, nil) }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
-        let now = Date()
-        switch selectedDateRange {
-        case .today:
-            return (isoDay(now), isoDay(now))
-        case .thisWeek:
-            if let interval = calendar.dateInterval(of: .weekOfYear, for: now) {
-                return (isoDay(interval.start), isoDay(interval.end))
-            }
-        case .thisMonth:
-            if let interval = calendar.dateInterval(of: .month, for: now) {
-                return (isoDay(interval.start), isoDay(interval.end))
-            }
-        case .custom:
-            let lower = min(customFrom, customTo)
-            let upper = max(customFrom, customTo)
-            return (isoDay(lower), isoDay(upper))
-        }
-        return (nil, nil)
+        currentFilters().dateBounds()
     }
 
     private func isoDay(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        BookingFilters.isoDay(date)
     }
 }

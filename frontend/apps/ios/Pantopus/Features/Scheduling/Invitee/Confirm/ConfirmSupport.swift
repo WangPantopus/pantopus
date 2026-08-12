@@ -177,7 +177,7 @@ struct InviteeReviewContext {
 }
 
 /// In-memory bridge for the D1 → D2 hand-off (not persisted — this is a
-/// within-session draft, unlike the durable `ManageTokenStore`).
+/// within-session draft).
 @MainActor
 final class InviteeBookingDraftStore {
     static let shared = InviteeBookingDraftStore()
@@ -200,6 +200,52 @@ final class InviteeBookingDraftStore {
 
     func clear(slug: String, eventTypeSlug: String, start: String) {
         contexts[Self.key(slug: slug, eventTypeSlug: eventTypeSlug, start: start)] = nil
+    }
+}
+
+/// One-shot in-session relay for the D2 → C6 "Pick another time" hand-off.
+///
+/// The frozen router hands screens only `push`, so D2 cannot rewind the
+/// navigation path itself. Instead D2 signals here and dismisses; D1 sees the
+/// pending entry on re-appear and continues the unwind; the C6 slot picker
+/// consumes the entry and marks the conflicted slot as just-taken (Frame 6
+/// WARN toast + taken-row treatment) so the booker lands on the picker, not a
+/// dead-ended D1 whose route still carries the lost start time.
+@MainActor
+final class SlotTakenRelay {
+    static let shared = SlotTakenRelay()
+
+    struct Entry {
+        let slug: String
+        let eventTypeSlug: String
+        let start: String
+    }
+
+    private var pending: Entry?
+
+    private init() {}
+
+    /// Record the conflicted slot for this booking flow (D2, on 409).
+    func signal(slug: String, eventTypeSlug: String, start: String) {
+        pending = Entry(slug: slug, eventTypeSlug: eventTypeSlug, start: start)
+    }
+
+    /// Whether an unwind is pending for this flow (D1, without consuming —
+    /// the picker below still needs the entry).
+    func hasPending(slug: String, eventTypeSlug: String) -> Bool {
+        matches(slug: slug, eventTypeSlug: eventTypeSlug)
+    }
+
+    /// Consume the pending entry for this flow (C6), returning the taken start.
+    func consume(slug: String, eventTypeSlug: String) -> String? {
+        guard matches(slug: slug, eventTypeSlug: eventTypeSlug), let entry = pending else { return nil }
+        pending = nil
+        return entry.start
+    }
+
+    private func matches(slug: String, eventTypeSlug: String) -> Bool {
+        guard let pending else { return false }
+        return pending.slug == slug && pending.eventTypeSlug == eventTypeSlug
     }
 }
 

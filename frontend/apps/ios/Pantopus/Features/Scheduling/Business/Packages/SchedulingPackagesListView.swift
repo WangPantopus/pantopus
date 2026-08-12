@@ -58,6 +58,10 @@ struct SchedulingPackagesListView: View {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 filterSegment
                 if model.filter == .active { intro }
+                if let actionError = model.actionError {
+                    PkgNote(tone: .error, icon: .alertTriangle, text: actionError)
+                        .accessibilityIdentifier("packagesListActionError")
+                }
                 stateForFilter
                 Color.clear.frame(height: Spacing.s8)
             }

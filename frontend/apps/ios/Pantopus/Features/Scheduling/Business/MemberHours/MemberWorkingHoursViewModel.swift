@@ -59,6 +59,10 @@ final class MemberWorkingHoursViewModel {
     private(set) var upcomingException: DatedException?
     var showTimezoneSheet = false
     private(set) var isSaving = false
+    /// Inline save failure rendered in the sheet footer — a silent `return
+    /// false` left the spinner stopping with no explanation. Distinguishes
+    /// total failure from "hours saved, timezone didn't" partial success.
+    private(set) var saveError: String?
 
     // MARK: Derived
 
@@ -170,10 +174,14 @@ final class MemberWorkingHoursViewModel {
 
     // MARK: Save
 
-    /// Returns true on success so the view can dismiss.
+    /// Returns true on success so the view can dismiss. The rules PUT and the
+    /// timezone PUT are tracked separately so a timezone failure after the
+    /// rules landed reports the partial success honestly instead of implying
+    /// nothing saved.
     func save() async -> Bool {
         guard let scheduleId, !isSaving, formValid else { return false }
         isSaving = true
+        saveError = nil
         defer { isSaving = false }
         do {
             let rules = days.flatMap { day in
@@ -183,17 +191,27 @@ final class MemberWorkingHoursViewModel {
                 SchedulingEndpoints.setRules(scheduleId: scheduleId, RulesRequest(rules: rules)),
                 as: RulesResponse.self
             )
-            if timezoneId != loadedTimezone {
+        } catch let error as SchedulingError {
+            saveError = error.userMessage ?? "Couldn't save your hours. Try again."
+            return false
+        } catch {
+            saveError = "Couldn't save your hours. Try again."
+            return false
+        }
+        if timezoneId != loadedTimezone {
+            do {
                 _ = try await client.request(
                     SchedulingEndpoints.updateSchedule(id: scheduleId, UpdateScheduleRequest(timezone: timezoneId)),
                     as: AvailabilityScheduleResponse.self
                 )
                 loadedTimezone = timezoneId
+            } catch {
+                // The rules PUT already landed — report the partial success.
+                saveError = "Your hours were saved, but the timezone change didn't stick. Try saving again."
+                return false
             }
-            return true
-        } catch {
-            return false
         }
+        return true
     }
 
     // MARK: Builders

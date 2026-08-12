@@ -153,8 +153,11 @@ final class FindATimeSetupViewModel {
             durationMode = .custom
             customMinutes = draft.durationMin
         }
-        if let from = SchedulingTime.parseUTC("\(draft.from)T00:00:00Z") { fromDate = from }
-        if let to = SchedulingTime.parseUTC("\(draft.to)T00:00:00Z") { toDate = to }
+        // Parse day strings at DEVICE-zone midnight: `fromDate`/`toDate` live in
+        // the device zone (defaults + DatePicker edits), and `currentDraft`
+        // re-serializes them in that zone — UTC midnights would drift a day.
+        if let from = Self.parseDay(draft.from) { fromDate = from }
+        if let to = Self.parseDay(draft.to) { toDate = to }
         let required = Set(draft.requiredMemberIds)
         rows = members.map {
             FindATimePickRow(member: $0, requirement: required.contains($0.id) ? .required : .optional)
@@ -226,8 +229,11 @@ final class FindATimeSetupViewModel {
             requiredMemberIds: requiredMemberIds,
             mode: mode,
             durationMin: durationMin,
-            from: SchedulingTime.isoDay(fromDate),
-            to: SchedulingTime.isoDay(toDate),
+            // `fromDate`/`toDate` are device-zone instants (defaults + picker
+            // edits) — serialize the day in the SAME zone; the UTC overload
+            // shifts the window by a day for non-UTC devices.
+            from: SchedulingTime.isoDay(fromDate, tz: SchedulingTime.deviceTimeZoneIdentifier),
+            to: SchedulingTime.isoDay(toDate, tz: SchedulingTime.deviceTimeZoneIdentifier),
             tz: tz,
             precomputedSlots: precomputed
         )
@@ -245,6 +251,17 @@ final class FindATimeSetupViewModel {
     }
 
     // MARK: - Helpers
+
+    /// Parse a `YYYY-MM-DD` day string at device-zone midnight (the zone
+    /// `fromDate`/`toDate` are computed and re-serialized in).
+    private static func parseDay(_ day: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: day)
+    }
 
     private static func dayString(_ date: Date, tz: String) -> String {
         let formatter = DateFormatter()

@@ -147,8 +147,11 @@ final class AddEventFormViewModel {
             let resolvedCategory = prefilledCategory ?? .generic
             startDate = now
             originalStart = now
-            endDate = nil
-            originalEnd = nil
+            // Design FrameCreate prefills "Ends" at start + 1h
+            // (`add-event-frames.jsx:68`) — matches Android's defaultEnd.
+            let prefilledEnd = now.addingTimeInterval(60 * 60)
+            endDate = prefilledEnd
+            originalEnd = prefilledEnd
             allDay = false
             originalAllDay = false
             category = resolvedCategory
@@ -184,8 +187,10 @@ final class AddEventFormViewModel {
         "Save"
     }
 
-    /// Load the household roster + (when editing) re-fetch the source
-    /// event so a stale prefill doesn't get committed.
+    /// Load the household roster. When editing, the form hydrates
+    /// synchronously in `init` from the passed `CalendarEventDTO` — there is
+    /// no re-fetch here (Android re-fetches instead and blocks Save when
+    /// that read fails).
     func load() async {
         state = .loading
         do {
@@ -249,6 +254,9 @@ final class AddEventFormViewModel {
             if let snapped = cal.date(from: comps) {
                 startDate = snapped
             }
+            // Restore a 1-hour end when leaving all-day, matching Android's
+            // setAllDay(false) and the design's prefilled "Ends" value.
+            endDate = startDate.addingTimeInterval(60 * 60)
         }
     }
 

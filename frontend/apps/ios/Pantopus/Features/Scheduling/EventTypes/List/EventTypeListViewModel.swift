@@ -72,6 +72,9 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
     /// drives the read-only lock banner + disabled +/toggles/overflow (design
     /// `event-types-frames.jsx` FrameGated).
     private(set) var canEdit = true
+    /// B1 FRAME 6 — reorder mode. Entered from the top-bar "Reorder" action;
+    /// rows grow a grip, hide their overflow, and inert their toggle while it's on.
+    private(set) var isReordering = false
 
     // MARK: Dependencies + data
 
@@ -301,6 +304,65 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         shareItem = ShareLinkItem(link: link)
     }
 
+    // MARK: Reorder (design `event-types-frames.jsx` FRAME 6)
+
+    /// Only offered when the catalog is editable and there is something to
+    /// reorder — mirrors the web entry condition (`canEdit && 2+ rows`).
+    var canReorder: Bool {
+        canEdit && visibleTypes.count > 1
+    }
+
+    func startReordering() {
+        guard canReorder else { return }
+        isReordering = true
+    }
+
+    /// "Done" in the hint bar — leave reorder mode and persist any pending move.
+    func doneReordering() async {
+        isReordering = false
+        await persistOrder()
+    }
+
+    /// Live drag preview: splice the moved row into its new slot within the FULL
+    /// catalog. The visible list is a filtered projection whose relative order
+    /// matches, so translating through ids keeps hidden rows undisturbed.
+    func moveRows(fromOffsets source: IndexSet, toOffset destination: Int) {
+        var visible = visibleTypes
+        visible.move(fromOffsets: source, toOffset: destination)
+        let reorderedIds = visible.map(\.id)
+        var cursor = 0
+        eventTypes = eventTypes.map { current in
+            // Rewrite only the rows belonging to the visible tab, in their new order.
+            guard reorderedIds.contains(current.id) else { return current }
+            defer { cursor += 1 }
+            return visible[cursor]
+        }
+    }
+
+    /// Persist every row whose position no longer matches its stored `sort_order`.
+    /// Optimistic: positions are stamped locally first, so a failure refetches
+    /// rather than leaving the list lying about the saved order.
+    private func persistOrder() async {
+        let changed = eventTypes.enumerated().filter { index, type in type.sortOrder != index }
+        guard !changed.isEmpty else { return }
+        do {
+            for (index, type) in changed {
+                _ = try await client.request(
+                    SchedulingEndpoints.updateEventType(
+                        owner: owner,
+                        id: type.id,
+                        UpdateEventTypeRequest(sortOrder: index)
+                    ),
+                    as: EventTypeResponse.self
+                )
+            }
+            await fetch(showLoading: false)
+        } catch {
+            actionError = "Couldn't save the new order."
+            await fetch(showLoading: false)
+        }
+    }
+
     // MARK: Mutations
 
     func toggleHidden(_ eventType: EventTypeDTO) async {
@@ -350,7 +412,9 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
 
     private static func message(for error: SchedulingError) -> String {
         switch error.code {
-        case "HAS_UPCOMING_BOOKINGS":
+        // The backend emits HAS_BOOKINGS (routes/scheduling.js DELETE /event-types/:id);
+        // HAS_UPCOMING_BOOKINGS never existed on the wire and is kept only as a legacy alias.
+        case "HAS_BOOKINGS", "HAS_UPCOMING_BOOKINGS":
             "This has upcoming bookings. Hide it instead to keep those on the calendar."
         case "SLUG_TAKEN":
             "That booking link is taken. Rename the copy and try again."

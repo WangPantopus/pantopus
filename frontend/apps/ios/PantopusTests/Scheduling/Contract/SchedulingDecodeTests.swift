@@ -112,14 +112,24 @@ final class SchedulingDecodeTests: XCTestCase {
     // MARK: - Bookings + summary
 
     func testBookingsSummaryDecodes() async throws {
+        // Fixture mirrors the deployed `bookingMetricsService.getSummary`
+        // payload — camelCase top-level keys, snake_case `event_type_id` rows.
         let json = """
-        {"upcomingCount":3,"pendingCount":1,"totalThisMonth":12,"noShowRate":0.08,
-        "nextBooking":{"start_at":"2026-07-01T15:00:00Z","invitee_name":"Sam"}}
+        {"bookingsThisMonth":12,"bookingsLastMonth":9,"deltaPct":33,"upcomingCount":3,"noShowCount":1,
+        "sparkline":[{"date":"2026-07-01","count":2},{"date":"2026-07-02","count":0}],
+        "byEventType":[{"event_type_id":"et1","count":7},{"event_type_id":"et2","count":5}]}
         """
         let summary = try await decode(json, SchedulingEndpoints.getBookingsSummary(owner: .personal), as: SchedulingSummaryDTO.self)
+        XCTAssertEqual(summary.bookingsThisMonth, 12)
+        XCTAssertEqual(summary.bookingsLastMonth, 9)
+        XCTAssertEqual(summary.deltaPct, 33)
         XCTAssertEqual(summary.upcomingCount, 3)
-        XCTAssertEqual(summary.noShowRate, 0.08)
-        XCTAssertEqual(summary.nextBooking?.inviteeName, "Sam")
+        XCTAssertEqual(summary.noShowCount, 1)
+        XCTAssertEqual(summary.sparkline?.count, 2)
+        XCTAssertEqual(summary.sparkline?.first?.date, "2026-07-01")
+        XCTAssertEqual(summary.sparkline?.first?.count, 2)
+        XCTAssertEqual(summary.byEventType?.first?.eventTypeId, "et1")
+        XCTAssertEqual(summary.byEventType?.first?.count, 7)
     }
 
     func testBookingDetailDecodes() async throws {

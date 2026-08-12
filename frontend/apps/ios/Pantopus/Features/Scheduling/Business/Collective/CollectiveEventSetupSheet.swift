@@ -183,7 +183,7 @@ struct CollectiveEventSetupSheet: View {
         HStack(spacing: 11) {
             Button { model.toggle(pick.id) } label: { BizCheckbox(on: pick.checked) }
                 .buttonStyle(.plain)
-            BizAvatar(name: pick.name, imageURL: pick.avatarURL, size: 34)
+            BizAvatar(name: pick.name, tintKey: pick.id, imageURL: pick.avatarURL, size: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(pick.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.Color.appText).lineLimit(1)
                 Text(pick.role ?? "Uses personal availability")

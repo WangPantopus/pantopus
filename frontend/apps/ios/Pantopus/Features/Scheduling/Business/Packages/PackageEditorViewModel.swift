@@ -77,6 +77,11 @@ final class PackageEditorViewModel {
     private(set) var saving = false
     private(set) var eventTypes: [EventTypeDTO] = []
     private(set) var nameError = false
+    /// Inline save failure. Mutation errors must NOT flip `phase` to `.error`
+    /// — that unmounts the form, and the error screen's Retry re-runs `load()`,
+    /// which re-seeds every field from the server and silently discards the
+    /// user's in-progress edits. `phase = .error` is reserved for load failures.
+    private(set) var saveError: String?
     private var snapshot = Snapshot()
 
     var isEditing: Bool {
@@ -188,6 +193,7 @@ final class PackageEditorViewModel {
             return
         }
         nameError = false
+        saveError = nil
         saving = true
         defer { saving = false }
         let priceCents = SchedulingMoney.parseCents(priceText) ?? 0
@@ -229,9 +235,9 @@ final class PackageEditorViewModel {
             if case .validation = error, error.validationDetails.contains(where: { $0.field == "name" }) {
                 nameError = true
             }
-            phase = .error(error.userMessage ?? "Couldn't save the package.")
+            saveError = error.userMessage ?? "Couldn't save the package."
         } catch {
-            phase = .error("Couldn't save the package.")
+            saveError = "Couldn't save the package."
         }
     }
 

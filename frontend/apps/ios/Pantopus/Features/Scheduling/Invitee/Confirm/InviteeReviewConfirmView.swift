@@ -338,7 +338,9 @@ struct InviteeReviewConfirmView: View {
             accent: viewModel.accent,
             onSelect: { alternative in Task { await viewModel.selectAlternative(alternative) } },
             onPickAnotherTime: {
-                viewModel.showSlotTakenSheet = false
+                // Signal the relay, then start the D2 → D1 → C6 unwind; D1
+                // continues it and the picker consumes the taken slot.
+                viewModel.pickAnotherTime()
                 dismiss()
             }
         )

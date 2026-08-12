@@ -9,7 +9,9 @@
 //  functional controls stay product sky. A draft banner leads when not live.
 //
 
+// swiftlint:disable file_length
 import CoreImage.CIFilterBuiltins
+import Photos
 import SwiftUI
 import UIKit
 
@@ -33,8 +35,23 @@ public struct ShareLinkSheet: View {
     private let onTurnOnPage: (() -> Void)?
 
     @State private var copied = false
+    @State private var copiedResetTask: Task<Void, Never>?
     @State private var showQR = false
     @State private var confirmRegenerate = false
+    /// Print-resolution QR render, produced once per `url` by `.task(id:)` —
+    /// body evaluations must never rasterize (CoreImage work on every state
+    /// flip froze layout).
+    @State private var qrCG: CGImage?
+    /// Photos-denied alert (Save to Photos with photo access switched off).
+    @State private var showSaveDenied = false
+    /// Transient Save-to-Photos outcome toast (success and failure).
+    @State private var saveFeedback: SaveFeedback?
+    @State private var saveFeedbackTask: Task<Void, Never>?
+
+    private struct SaveFeedback {
+        let text: String
+        let isError: Bool
+    }
 
     public init(
         url: String,
@@ -88,6 +105,7 @@ public struct ShareLinkSheet: View {
         .background(Theme.Color.appSurface)
         .accessibilityIdentifier("scheduling.shareLinkSheet")
         .overlay(alignment: .bottom) { copiedToast }
+        .task(id: url) { qrCG = Self.qrCGImage(url, size: Self.qrRenderSize) }
         .fullScreenCover(isPresented: $showQR) { qrFullScreen }
         .alert("Regenerate this link?", isPresented: $confirmRegenerate) {
             Button("Cancel", role: .cancel) {}
@@ -175,6 +193,14 @@ public struct ShareLinkSheet: View {
             Button {
                 UIPasteboard.general.string = url
                 withAnimation(.easeOut(duration: 0.15)) { copied = true }
+                // Transient toast (design Frame 3): reset after 1.8s, mirroring
+                // SchedulingHubScreen.copyLink(), so repeat copies give feedback.
+                copiedResetTask?.cancel()
+                copiedResetTask = Task {
+                    try? await Task.sleep(for: .seconds(1.8))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.15)) { copied = false }
+                }
                 onCopy()
             } label: {
                 HStack(spacing: Spacing.s1) {
@@ -239,7 +265,7 @@ public struct ShareLinkSheet: View {
 
     private var qrCard: some View {
         HStack(spacing: 11) {
-            qrImage(url, size: 32)
+            qrImage
                 .frame(width: 32, height: 32)
                 .padding(4)
                 .background(Color.white)
@@ -374,7 +400,7 @@ public struct ShareLinkSheet: View {
             VStack(spacing: 0) {
                 overline
                 Spacer().frame(height: 18)
-                qrImage(url, size: 184)
+                qrImage
                     .frame(width: 184, height: 184)
                     .padding(18)
                     .background(Color.white)
@@ -422,19 +448,97 @@ public struct ShareLinkSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.appSurface)
+        .overlay(alignment: .bottom) { saveFeedbackToast }
+        .alert("Allow access to save", isPresented: $showSaveDenied) {
+            Button("Open Settings") {
+                if let settings = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settings)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Photos access is off for Pantopus. Turn on \"Add Photos Only\" in Settings to save the QR code.")
+        }
+    }
+
+    /// Transient Save-to-Photos outcome pill (success and failure), floating
+    /// above the fullscreen QR's home indicator like the copied toast.
+    @ViewBuilder
+    private var saveFeedbackToast: some View {
+        if let saveFeedback {
+            let tint = saveFeedback.isError ? Theme.Color.warning : Theme.Color.success
+            HStack(spacing: Spacing.s2) {
+                Icon(
+                    saveFeedback.isError ? .triangleAlert : .checkCircle2,
+                    size: 15,
+                    strokeWidth: 2.4,
+                    color: tint
+                )
+                Text(saveFeedback.text)
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundStyle(tint)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(saveFeedback.isError ? Theme.Color.warningBg : Theme.Color.successBg)
+            .overlay(
+                Capsule().stroke(tint.opacity(0.35), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+            .pantopusShadow(PantopusShadow.md)
+            .padding(.bottom, Spacing.s5)
+            .transition(.opacity)
+        }
     }
 
     /// Renders the booking-link QR at print resolution and writes it to the
-    /// user's photo library. Self-contained — the QR is generated locally via
-    /// CoreImage, so no callback/endpoint is required.
+    /// user's photo library, requesting add-only authorization first. Denied /
+    /// restricted access routes to a Settings alert; both save outcomes flash a
+    /// toast (the previous nil-completion `UIImageWriteToSavedPhotosAlbum` was
+    /// silently unobservable either way).
     private func saveQRToPhotos() {
-        guard let cg = Self.qrCGImage(url, size: 1024) else { return }
-        UIImageWriteToSavedPhotosAlbum(UIImage(cgImage: cg), nil, nil, nil)
+        guard let cg = qrCG ?? Self.qrCGImage(url, size: Self.qrRenderSize) else {
+            flashSaveFeedback("Couldn't render the QR code", isError: true)
+            return
+        }
+        let image = UIImage(cgImage: cg)
+        Task { @MainActor in
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            switch status {
+            case .authorized, .limited:
+                do {
+                    try await PHPhotoLibrary.shared().performChanges {
+                        PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }
+                    flashSaveFeedback("Saved to Photos", isError: false)
+                } catch {
+                    flashSaveFeedback("Couldn't save — try again", isError: true)
+                }
+            case .denied, .restricted:
+                showSaveDenied = true
+            case .notDetermined:
+                break
+            @unknown default:
+                break
+            }
+        }
     }
 
+    private func flashSaveFeedback(_ text: String, isError: Bool) {
+        withAnimation(.easeOut(duration: 0.15)) { saveFeedback = SaveFeedback(text: text, isError: isError) }
+        saveFeedbackTask?.cancel()
+        saveFeedbackTask = Task {
+            try? await Task.sleep(for: .seconds(1.8))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.15)) { saveFeedback = nil }
+        }
+    }
+
+    /// The cached QR render (`.task(id: url)`), downscaled per surface with no
+    /// interpolation; the sunken placeholder covers the pre-render frame.
     @ViewBuilder
-    private func qrImage(_ string: String, size: CGFloat) -> some View {
-        if let cg = Self.qrCGImage(string, size: size) {
+    private var qrImage: some View {
+        if let cg = qrCG {
             Image(decorative: cg, scale: 1)
                 .interpolation(.none)
                 .resizable()
@@ -445,15 +549,21 @@ public struct ShareLinkSheet: View {
         }
     }
 
+    /// One shared Metal-backed context — CIContext is documented-expensive and
+    /// Apple guidance is create-once/reuse; it is immutable + thread-safe, so
+    /// sharing is safe under strict concurrency.
+    private nonisolated(unsafe) static let qrContext = CIContext()
+    /// Print-resolution edge, reused by both on-screen sizes and Save to Photos.
+    private static let qrRenderSize: CGFloat = 1024
+
     private static func qrCGImage(_ string: String, size: CGFloat) -> CGImage? {
-        let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
         filter.correctionLevel = "M"
         guard let ciImage = filter.outputImage, ciImage.extent.width > 0 else { return nil }
         let scale = max(size / ciImage.extent.width, 1)
         let scaled = ciImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        return context.createCGImage(scaled, from: scaled.extent)
+        return qrContext.createCGImage(scaled, from: scaled.extent)
     }
 }
 

@@ -143,7 +143,7 @@ struct TeamBookingAvailabilityView: View {
     private func rosterRow(_ row: TeamBookingAvailabilityViewModel.MemberRow) -> some View {
         Button { model.tapMember(row) } label: {
             HStack(spacing: 11) {
-                BizAvatar(name: row.name, imageURL: row.avatarURL, size: 36)
+                BizAvatar(name: row.name, tintKey: row.id, imageURL: row.avatarURL, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.name)
                         .font(.system(size: 13, weight: .semibold))

@@ -48,7 +48,14 @@ struct WorkflowsListView: View {
         .background(Theme.Color.appBg)
         .navigationBarBackButtonHidden(true)
         .overlay(alignment: .bottomTrailing) { fab }
+        .overlay(alignment: .bottom) { actionToast }
         .task { await model.load() }
+        .task(id: model.actionError) {
+            // Android-parity auto-dismiss (2.2s warning AutoToast).
+            guard model.actionError != nil else { return }
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            withAnimation { model.actionError = nil }
+        }
         .onAppear { if case .loaded = model.phase { Task { await model.refresh() } } }
         .refreshable { await model.refresh() }
         .sheet(isPresented: $model.showRemindersSheet, onDismiss: { model.remindersSheetDismissed() }, content: {
@@ -56,13 +63,19 @@ struct WorkflowsListView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         })
-        .alert("Heads up", isPresented: actionErrorPresented) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.actionError ?? "")
-        }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("scheduling.workflows.list")
+    }
+
+    /// Transient mutation-error surface — the dark AutoToast pill with a warning
+    /// tint (Android `actionError` parity) instead of an alert dialog.
+    @ViewBuilder
+    private var actionToast: some View {
+        if let actionError = model.actionError {
+            AutoToast(text: actionError, icon: .alertTriangle, tint: Theme.Color.warning)
+                .padding(.bottom, Spacing.s10)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     @ViewBuilder
@@ -304,10 +317,6 @@ struct WorkflowsListView: View {
             .padding(.horizontal, Spacing.s3)
             .padding(.top, Spacing.s3)
         }
-    }
-
-    private var actionErrorPresented: Binding<Bool> {
-        Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
     }
 }
 
