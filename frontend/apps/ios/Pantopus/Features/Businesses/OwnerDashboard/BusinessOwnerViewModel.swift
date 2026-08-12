@@ -192,8 +192,16 @@ public final class BusinessOwnerViewModel {
             profileStrength: profileStrength(from: dashboard.onboarding),
             reviewsToReplyLabel: pending > 0 ? "\(pending) to reply" : nil,
             reviews: mappedReviews,
-            publicProfile: publicProfile
+            publicProfile: publicProfile,
+            canPostAsBusiness: canPost(dashboard.access?.roleBase)
         )
+    }
+
+    /// RN gate: `access.role_base && ['owner','admin','editor'].includes(...)`
+    /// (`src/app/businesses/[id]/index.tsx:67`).
+    private func canPost(_ roleBase: String?) -> Bool {
+        guard let roleBase, !roleBase.isEmpty else { return false }
+        return BusinessOwnerContent.postingRoles.contains(roleBase)
     }
 
     private func insightTiles(from insights: BusinessInsightsResponse?) -> [OwnerInsightTile] {

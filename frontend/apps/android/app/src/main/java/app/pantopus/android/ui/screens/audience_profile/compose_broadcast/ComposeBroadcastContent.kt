@@ -32,25 +32,90 @@ enum class BroadcastAudience(
     val isRestricted: Boolean get() = this != AllBeacons
 }
 
-/** One attached media item. Rendered as a tinted placeholder + caption. */
+/**
+ * One attached media item. [bytes] carries the picked file — rendered
+ * inline for images and uploaded verbatim to
+ * `POST /api/upload/post-media/:messageId` after the broadcast is
+ * published. Sample / snapshot data leaves it null so the preview falls
+ * back to a tinted placeholder, keeping baselines deterministic.
+ * [remoteUrl] is set only for already-hosted media, which rides the
+ * publish body's `media[]` field instead of the upload leg.
+ */
 @Immutable
 data class ComposeMediaPreview(
     val id: String,
     val kind: Kind,
     val caption: String?,
+    val bytes: ByteArray? = null,
+    val remoteUrl: String? = null,
+    val fileName: String? = null,
+    val mimeType: String? = null,
 ) {
     enum class Kind { Image, Video }
+
+    val resolvedMimeType: String
+        get() = mimeType ?: if (kind == Kind.Video) "video/mp4" else "image/jpeg"
+
+    /** Randomised so the picker's `IMG_xxxx` never reaches S3. */
+    val resolvedFileName: String
+        get() =
+            fileName ?: "broadcast-${id.filter { it.isLetterOrDigit() }.takeLast(8)}." +
+                if (kind == Kind.Video) "mp4" else "jpg"
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            (
+                other is ComposeMediaPreview &&
+                    id == other.id &&
+                    kind == other.kind &&
+                    caption == other.caption &&
+                    remoteUrl == other.remoteUrl &&
+                    fileName == other.fileName &&
+                    mimeType == other.mimeType &&
+                    bytesEqual(bytes, other.bytes)
+            )
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + kind.hashCode()
+        result = 31 * result + (caption?.hashCode() ?: 0)
+        result = 31 * result + (remoteUrl?.hashCode() ?: 0)
+        result = 31 * result + (bytes?.contentHashCode() ?: 0)
+        return result
+    }
 }
+
+private fun bytesEqual(
+    left: ByteArray?,
+    right: ByteArray?,
+): Boolean =
+    when {
+        left == null -> right == null
+        right == null -> false
+        else -> left.contentEquals(right)
+    }
 
 /** The mutable composer payload — what would be POSTed on send. */
 @Immutable
 data class ComposeBroadcastDraft(
     val body: String = "",
     val audience: BroadcastAudience = BroadcastAudience.AllBeacons,
-    val media: ComposeMediaPreview? = null,
+    val media: List<ComposeMediaPreview> = emptyList(),
 ) {
     /** Nothing worth sending — empty body and no media. */
-    val isEmpty: Boolean get() = body.isBlank() && media == null
+    val isEmpty: Boolean get() = body.isBlank() && media.isEmpty()
+
+    /** Free attachment slots left before the nine-item cap. */
+    val remainingMediaSlots: Int get() = (MEDIA_LIMIT - media.size).coerceAtLeast(0)
+
+    companion object {
+        /**
+         * RN caps a broadcast at nine attachments (`postMediaComposer.ts`
+         * → `.slice(0, 9)`), matching `upload.array('files', 9)` on
+         * `/api/upload/post-media/:postId`.
+         */
+        const val MEDIA_LIMIT = 9
+    }
 }
 
 /** The persona a broadcast is sent as — drives the composer PersonaRow. */

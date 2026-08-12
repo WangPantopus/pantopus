@@ -18,6 +18,7 @@ import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPagesRepository
 import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import io.mockk.coEvery
@@ -42,6 +43,12 @@ class BusinessProfileViewModelTest {
     private val businesses: BusinessesRepository = mockk()
     private val profiles: ProfileRepository = mockk()
 
+    /**
+     * C4 — only reached when the `pageSlug` nav arg is present, which these
+     * tests never set; a relaxed mock keeps the constructor satisfied.
+     */
+    private val businessPages: BusinessPagesRepository = mockk(relaxed = true)
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
     }
@@ -54,6 +61,7 @@ class BusinessProfileViewModelTest {
         BusinessProfileViewModel(
             businesses = businesses,
             profiles = profiles,
+            businessPages = businessPages,
             savedStateHandle = SavedStateHandle(mapOf(BUSINESS_PROFILE_BUSINESS_ID_KEY to "biz-1")),
         )
 

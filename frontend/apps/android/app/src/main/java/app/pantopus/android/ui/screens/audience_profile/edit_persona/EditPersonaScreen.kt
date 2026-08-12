@@ -3,6 +3,10 @@
 
 package app.pantopus.android.ui.screens.audience_profile.edit_persona
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,29 +23,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,103 +58,207 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * A13.12 — Edit Beacon. Every control writes into
+ * [EditPersonaViewModel]'s form and is persisted by `save()` →
+ * `POST /api/personas` / `PATCH /api/personas/:id` plus
+ * `POST /api/upload/persona-media/:id`.
+ *
+ * Sections the persona write contract does not cover (tiers, Stripe
+ * Connect, posting cap, quiet hours, analytics) are intentionally absent
+ * rather than rendered from a fixture — they belong to the tier and
+ * monetization routes.
+ */
+/**
+ * Every editing intent the scaffold needs, bundled so the Paparazzi
+ * snapshots can render the loaded frame without a Hilt view-model.
+ */
+@Suppress("LongParameterList")
+data class EditPersonaCallbacks(
+    val onHandleChange: (String) -> Unit = {},
+    val onDisplayNameChange: (String) -> Unit = {},
+    val onBioChange: (String) -> Unit = {},
+    val onCategorySelected: (String) -> Unit = {},
+    val onAudienceLabelSelected: (PersonaAudienceLabel) -> Unit = {},
+    val onAudienceModeSelected: (PersonaAudienceMode) -> Unit = {},
+    val onAddLink: () -> Unit = {},
+    val onRemoveLink: (String) -> Unit = {},
+    val onLinkLabelChange: (String, String) -> Unit = { _, _ -> },
+    val onLinkUrlChange: (String, String) -> Unit = { _, _ -> },
+    val onAvatarPicked: (PersonaImagePick) -> Unit = {},
+    val onBannerPicked: (PersonaImagePick) -> Unit = {},
+    val onRemoveAvatarPick: () -> Unit = {},
+    val onRemoveBannerPick: () -> Unit = {},
+    val onSave: () -> Unit = {},
+    val onRetry: () -> Unit = {},
+)
 
 @Composable
 fun EditPersonaScreen(
     onClose: () -> Unit = {},
+    onViewBeacon: (String) -> Unit = {},
     viewModel: EditPersonaViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
-    when (val current = state) {
+    EditPersonaScaffold(
+        state = state,
+        callbacks =
+            EditPersonaCallbacks(
+                onHandleChange = viewModel::setHandle,
+                onDisplayNameChange = viewModel::setDisplayName,
+                onBioChange = viewModel::setBio,
+                onCategorySelected = viewModel::setCategory,
+                onAudienceLabelSelected = viewModel::setAudienceLabel,
+                onAudienceModeSelected = viewModel::setAudienceMode,
+                onAddLink = viewModel::addLink,
+                onRemoveLink = viewModel::removeLink,
+                onLinkLabelChange = { id, value -> viewModel.updateLink(id, label = value) },
+                onLinkUrlChange = { id, value -> viewModel.updateLink(id, url = value) },
+                onAvatarPicked = viewModel::attachAvatar,
+                onBannerPicked = viewModel::attachBanner,
+                onRemoveAvatarPick = viewModel::removeAvatarPick,
+                onRemoveBannerPick = viewModel::removeBannerPick,
+                onSave = { viewModel.save(onSaved = onViewBeacon) },
+                onRetry = viewModel::refresh,
+            ),
+        onClose = onClose,
+        onViewBeacon = onViewBeacon,
+    )
+}
+
+/** State-driven body — no Hilt, so Paparazzi can render every frame. */
+@Composable
+internal fun EditPersonaScaffold(
+    state: EditPersonaUiState,
+    callbacks: EditPersonaCallbacks = EditPersonaCallbacks(),
+    onClose: () -> Unit = {},
+    onViewBeacon: (String) -> Unit = {},
+) {
+    when (state) {
         is EditPersonaUiState.Loading ->
-            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, stickyBottom = null) {
-                LoadingFrame()
-            }
-        is EditPersonaUiState.Live ->
-            EditPersonaLoadedContent(
-                content = current.content,
-                variant = EditPersonaVariant.Live,
+            EditPersonaShell(
+                title = "Edit Beacon",
+                subtitle = null,
+                isValid = false,
+                isDirty = false,
                 onClose = onClose,
-            )
-        is EditPersonaUiState.Setup ->
-            EditPersonaLoadedContent(
-                content = current.content,
-                variant = EditPersonaVariant.Setup,
-                stepsDone = current.stepsDone,
-                stepsTotal = current.stepsTotal,
+                stickyBottom = null,
+            ) { LoadingFrame() }
+
+        is EditPersonaUiState.Editing ->
+            EditPersonaEditingContent(
+                state = state,
+                callbacks = callbacks,
                 onClose = onClose,
+                onViewBeacon = onViewBeacon,
             )
+
         is EditPersonaUiState.Error ->
-            EditPersonaShell(subtitle = null, isDirty = false, onClose = onClose, stickyBottom = null) {
-                ErrorFrame(message = current.message, onRetry = viewModel::load)
-            }
+            EditPersonaShell(
+                title = "Edit Beacon",
+                subtitle = null,
+                isValid = false,
+                isDirty = false,
+                onClose = onClose,
+                stickyBottom = null,
+            ) { ErrorFrame(state.message, callbacks.onRetry) }
     }
 }
 
-/**
- * VM-free loaded surface — rendered by [EditPersonaScreen] for the Live /
- * Setup states and directly by the Paparazzi snapshots.
- */
 @Composable
-internal fun EditPersonaLoadedContent(
-    content: EditPersonaContent,
-    variant: EditPersonaVariant,
-    stepsDone: Int = 0,
-    stepsTotal: Int = 0,
-    onClose: () -> Unit = {},
+private fun EditPersonaEditingContent(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+    onClose: () -> Unit,
+    onViewBeacon: (String) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     EditPersonaShell(
-        subtitle = content.atHandle,
-        isDirty = variant == EditPersonaVariant.Setup,
+        title = if (state.mode.isCreate) "Create Beacon" else "Edit Beacon",
+        subtitle = state.form.atHandle.ifEmpty { null },
+        isValid = state.isValid,
+        isDirty = state.isDirty,
         onClose = onClose,
-        stickyBottom = { StickyBar(variant = variant, onDiscard = onClose) },
+        stickyBottom = {
+            PersonaStickyBar(
+                label = state.saveButtonLabel,
+                isSaving = state.isSaving,
+                isEnabled = state.isValid && !state.isSaving,
+                statusMessage = state.statusMessage,
+                errorMessage = state.saveError,
+                onDiscard = onClose,
+                onSave = callbacks.onSave,
+            )
+        },
     ) {
-        EditPersonaEditor(
-            content = content,
-            variant = variant,
-            stepsDone = stepsDone,
-            stepsTotal = stepsTotal,
-        )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.s4)
+                    .testTag("editPersonaContent"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+        ) {
+            if (state.mode.isCreate) CreateHero()
+            MediaSection(state = state, callbacks = callbacks, scope = scope)
+            IdentitySection(state = state, callbacks = callbacks)
+            CategorySection(state = state, callbacks = callbacks)
+            AudienceSection(state = state, callbacks = callbacks)
+            LinksSection(state = state, callbacks = callbacks)
+            if (!state.mode.isCreate && state.form.shareUrl.isNotEmpty()) {
+                ShareSection(url = state.form.shareUrl) { onViewBeacon(state.form.normalizedHandle) }
+            }
+        }
     }
 }
 
 @Composable
 private fun EditPersonaShell(
+    title: String,
     subtitle: String?,
+    isValid: Boolean,
     isDirty: Boolean,
     onClose: () -> Unit,
     stickyBottom: (@Composable () -> Unit)?,
     body: @Composable () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize().testTag("editPersona")) {
-        FormShell(
-            title = "Edit persona",
-            subtitle = subtitle,
-            isValid = true,
-            isDirty = isDirty,
-            onClose = onClose,
-            onCommit = {},
-            rightActionLabel = null,
-            stickyBottom = stickyBottom,
-            body = body,
-        )
-    }
+    FormShell(
+        title = title,
+        subtitle = subtitle,
+        rightActionLabel = null,
+        isValid = isValid,
+        isDirty = isDirty,
+        onClose = onClose,
+        onCommit = {},
+        stickyBottom = stickyBottom,
+        body = body,
+    )
 }
 
-// MARK: - States
+// MARK: - Loading / error
 
 @Composable
 private fun LoadingFrame() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).testTag("editPersonaLoading"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .testTag("editPersonaLoading"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s5),
     ) {
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
-        Shimmer(width = 360.dp, height = 160.dp, cornerRadius = Radii.lg)
-        Shimmer(width = 360.dp, height = 200.dp, cornerRadius = Radii.lg)
-        Shimmer(width = 360.dp, height = 120.dp, cornerRadius = Radii.lg)
+        Shimmer(height = 120.dp, cornerRadius = Radii.lg, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 160.dp, cornerRadius = Radii.lg, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 200.dp, cornerRadius = Radii.lg, modifier = Modifier.fillMaxWidth())
+        Shimmer(height = 120.dp, cornerRadius = Radii.lg, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -161,7 +268,11 @@ private fun ErrorFrame(
     onRetry: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s10).testTag("editPersonaError"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s10)
+                .testTag("editPersonaError"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
@@ -169,71 +280,762 @@ private fun ErrorFrame(
             icon = PantopusIcon.AlertCircle,
             contentDescription = null,
             size = 40.dp,
-            strokeWidth = 2f,
             tint = PantopusColors.error,
         )
         Text(
-            text = "Couldn't load persona",
+            text = "Couldn't load Beacon",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
             modifier = Modifier.semantics { heading() },
         )
-        Text(text = message, fontSize = 13.5.sp, color = PantopusColors.appTextSecondary, textAlign = TextAlign.Center)
-        PrimaryButton(title = "Try again", onClick = onRetry, modifier = Modifier.testTag("editPersonaRetry"))
+        Text(text = message, fontSize = 13.sp, color = PantopusColors.appTextSecondary)
+        PrimaryButton(
+            title = "Try again",
+            onClick = onRetry,
+            modifier = Modifier.testTag("editPersonaRetry"),
+        )
     }
 }
 
-// MARK: - Editor body
+// MARK: - Create hero
 
 @Composable
-private fun EditPersonaEditor(
-    content: EditPersonaContent,
-    variant: EditPersonaVariant,
-    stepsDone: Int,
-    stepsTotal: Int,
-) {
-    var cap by remember(content.personaId) { mutableStateOf(content.cap) }
-    var quietHoursOn by remember(content.personaId) { mutableStateOf(content.quietHoursOn) }
-    var analyticsOn by remember(content.personaId) { mutableStateOf(content.analyticsOn) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4).testTag("editPersonaContent"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+private fun CreateHero() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("editPersonaCreateHero"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        when (variant) {
-            EditPersonaVariant.Live -> LiveHero(content)
-            EditPersonaVariant.Setup -> SetupHero(content, stepsDone, stepsTotal)
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary600),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Radio,
+                contentDescription = null,
+                size = 18.dp,
+                tint = PantopusColors.appTextInverse,
+            )
         }
-        IdentitySection(content)
-        PolicySection(content)
-        TiersSection(content)
-        BroadcastSection(
-            cap = cap,
-            onSelectCap = { cap = it },
-            quietHoursOn = quietHoursOn,
-            onToggleQuietHours = { quietHoursOn = it },
-            range = content.quietHoursRange,
-        )
-        ShareSection(content)
-        AnalyticsSection(isOn = analyticsOn, onToggle = { analyticsOn = it }, scope = content.analyticsScope)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Create your Beacon",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "A public identity, separate from your personal profile. Pick a handle and you're live.",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.primary700,
+            )
+        }
     }
 }
 
-// MARK: - Section scaffold
+// MARK: - Media
+
+@Composable
+private fun MediaSection(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+    scope: CoroutineScope,
+) {
+    PersonaSection("Beacon media") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+            BannerPicker(
+                pick = state.form.bannerPick,
+                remoteUrl = state.form.bannerUrl,
+                scope = scope,
+                onPicked = callbacks.onBannerPicked,
+                onRemove = callbacks.onRemoveBannerPick,
+            )
+            AvatarPicker(
+                pick = state.form.avatarPick,
+                remoteUrl = state.form.avatarUrl,
+                scope = scope,
+                onPicked = callbacks.onAvatarPicked,
+                onRemove = callbacks.onRemoveAvatarPick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BannerPicker(
+    pick: PersonaImagePick?,
+    remoteUrl: String?,
+    scope: CoroutineScope,
+    onPicked: (PersonaImagePick) -> Unit,
+    onRemove: () -> Unit,
+) {
+    val openPicker = rememberImagePicker(kind = "banner", scope = scope, onPicked = onPicked)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        PLabel(text = "Banner", hint = "16:6")
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                        .clickable(onClick = openPicker)
+                        .testTag("editPersonaBannerPicker")
+                        .semantics { contentDescription = "Choose banner image" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PersonaImagePreview(
+                    pick = pick,
+                    remoteUrl = remoteUrl,
+                    emptyLabel = "Add a banner",
+                )
+            }
+            if (pick != null) {
+                RemovePickButton(
+                    onClick = onRemove,
+                    tag = "editPersonaBannerRemove",
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.s1),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarPicker(
+    pick: PersonaImagePick?,
+    remoteUrl: String?,
+    scope: CoroutineScope,
+    onPicked: (PersonaImagePick) -> Unit,
+    onRemove: () -> Unit,
+) {
+    val openPicker = rememberImagePicker(kind = "avatar", scope = scope, onPicked = onPicked)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            Box(
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(1.dp, PantopusColors.appBorder, CircleShape)
+                        .clickable(onClick = openPicker)
+                        .testTag("editPersonaAvatarPicker")
+                        .semantics { contentDescription = "Choose avatar image" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PersonaImagePreview(pick = pick, remoteUrl = remoteUrl, emptyLabel = null)
+            }
+            if (pick != null) {
+                RemovePickButton(
+                    onClick = onRemove,
+                    tag = "editPersonaAvatarRemove",
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Avatar",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+            )
+            Text(
+                text = "Use an image that isn't your personal profile photo — your Beacon is a separate identity.",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PersonaImagePreview(
+    pick: PersonaImagePick?,
+    remoteUrl: String?,
+    emptyLabel: String?,
+) {
+    when {
+        pick != null ->
+            SubcomposeAsyncImage(
+                model = pick.bytes,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {},
+                error = {},
+            )
+        !remoteUrl.isNullOrBlank() ->
+            SubcomposeAsyncImage(
+                model = remoteUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {},
+                error = {},
+            )
+        else ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Image,
+                    contentDescription = null,
+                    size = 20.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+                if (emptyLabel != null) {
+                    Text(
+                        text = emptyLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+    }
+}
+
+@Composable
+private fun RemovePickButton(
+    onClick: () -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(PantopusColors.appTextStrong)
+                .clickable(onClick = onClick)
+                .testTag(tag)
+                .semantics { contentDescription = "Remove picked image" },
+        contentAlignment = Alignment.Center,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.X,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.appTextInverse,
+        )
+    }
+}
+
+/**
+ * Android Photo Picker — out-of-process, so no `READ_MEDIA_IMAGES` grant is
+ * needed. Opening the returned `Uri` can still fail (revoked grant, cloud
+ * file that won't materialise); that path simply drops the pick.
+ */
+@Composable
+private fun rememberImagePicker(
+    kind: String,
+    scope: CoroutineScope,
+    onPicked: (PersonaImagePick) -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            scope.launch {
+                val bytes =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        }.getOrNull()
+                    } ?: return@launch
+                onPicked(
+                    PersonaImagePick(
+                        bytes = bytes,
+                        // Randomised name — the picker's IMG_xxxx never reaches S3.
+                        fileName = "beacon-$kind-${System.currentTimeMillis()}.${extensionFor(mimeType)}",
+                        mimeType = mimeType,
+                    ),
+                )
+            }
+        }
+    return { launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+}
+
+private fun extensionFor(mimeType: String): String =
+    when (mimeType.lowercase()) {
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        "image/heic", "image/heif" -> "heic"
+        else -> "jpg"
+    }
+
+// MARK: - Identity
+
+@Composable
+private fun IdentitySection(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+) {
+    PersonaSection("Identity") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+            Column {
+                PLabel(text = "Handle", required = true, hint = "3–40 chars · letters, numbers, . _ -")
+                PersonaField(
+                    value = state.form.handle,
+                    onValueChange = callbacks.onHandleChange,
+                    placeholder = "yourhandle",
+                    tag = "editPersonaHandle",
+                    monospace = true,
+                    prefix = "@",
+                )
+            }
+            Column {
+                PLabel(text = "Display name", required = true)
+                PersonaField(
+                    value = state.form.displayName,
+                    onValueChange = callbacks.onDisplayNameChange,
+                    placeholder = "What your audience sees",
+                    tag = "editPersonaDisplayName",
+                )
+            }
+            Column {
+                PLabel(text = "Bio")
+                PersonaField(
+                    value = state.form.bio,
+                    onValueChange = callbacks.onBioChange,
+                    placeholder = "What do you post about?",
+                    tag = "editPersonaBio",
+                    singleLine = false,
+                    minHeight = 96.dp,
+                )
+                Text(
+                    text = state.form.bioCharCount,
+                    fontSize = 11.sp,
+                    color =
+                        if (state.form.bio.length > EditPersonaForm.BIO_LIMIT) {
+                            PantopusColors.error
+                        } else {
+                            PantopusColors.appTextMuted
+                        },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.s1)
+                            .testTag("editPersonaBioCount"),
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Category
+
+@Composable
+private fun CategorySection(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+) {
+    PersonaSection("Category") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Text(
+                text =
+                    "What this Beacon is for. Sensitive professional categories stay gated " +
+                        "until credentials are verified.",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                state.categories.forEach { option ->
+                    PersonaChoiceChip(
+                        label = if (option.enabled) option.label else "${option.label} (gated)",
+                        icon = if (option.enabled) null else PantopusIcon.Lock,
+                        selected = state.form.category == option.value,
+                        enabled = option.enabled,
+                        tag = "editPersonaCategory_${option.value}",
+                        onClick = { callbacks.onCategorySelected(option.value) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Audience
+
+@Composable
+private fun AudienceSection(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+) {
+    PersonaSection("Audience") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+            Column {
+                PLabel(text = "What you call them")
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    PersonaAudienceLabel.entries.forEach { option ->
+                        PersonaChoiceChip(
+                            label = option.label,
+                            icon = null,
+                            selected = state.form.audienceLabel == option,
+                            enabled = true,
+                            tag = "editPersonaAudienceLabel_${option.wire}",
+                            onClick = { callbacks.onAudienceLabelSelected(option) },
+                        )
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                PLabel(text = "How they join")
+                PersonaAudienceMode.entries.forEach { option ->
+                    PersonaModeRow(
+                        option = option,
+                        selected = state.form.audienceMode == option,
+                        onClick = { callbacks.onAudienceModeSelected(option) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Public links
+
+@Composable
+private fun LinksSection(
+    state: EditPersonaUiState.Editing,
+    callbacks: EditPersonaCallbacks,
+) {
+    PersonaSection("Public links") {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            if (state.form.links.isEmpty()) {
+                Text(
+                    text = "Add up to 8 links your audience can open from your Beacon.",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            state.form.links.forEach { link ->
+                PersonaLinkRow(
+                    link = link,
+                    onLabel = { callbacks.onLinkLabelChange(link.id, it) },
+                    onUrl = { callbacks.onLinkUrlChange(link.id, it) },
+                    onRemove = { callbacks.onRemoveLink(link.id) },
+                )
+            }
+            if (state.form.hasIncompleteLink) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.testTag("editPersonaLinkError"),
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = null,
+                        size = 12.dp,
+                        tint = PantopusColors.error,
+                    )
+                    Text(
+                        text = "Each public link needs both a label and a URL.",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.error,
+                    )
+                }
+            }
+            AddLinkRow(enabled = state.canAddLink, onClick = callbacks.onAddLink)
+        }
+    }
+}
+
+@Composable
+private fun PersonaLinkRow(
+    link: PersonaLinkDraft,
+    onLabel: (String) -> Unit,
+    onUrl: (String) -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurfaceSunken)
+                .padding(Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PersonaField(
+                value = link.label,
+                onValueChange = onLabel,
+                placeholder = "Label",
+                tag = "editPersonaLinkLabel",
+            )
+            PersonaField(
+                value = link.url,
+                onValueChange = onUrl,
+                placeholder = "https://",
+                tag = "editPersonaLinkUrl",
+                monospace = true,
+                keyboardType = KeyboardType.Uri,
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clickable(onClick = onRemove)
+                    .testTag("editPersonaRemoveLink")
+                    .semantics { contentDescription = "Remove link ${link.label}" },
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Trash,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddLinkRow(
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .clip(RoundedCornerShape(Radii.lg))
+                .border(
+                    width = 1.dp,
+                    color = if (enabled) PantopusColors.primary200 else PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.lg),
+                )
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = Spacing.s4)
+                .testTag("editPersonaAddLink")
+                .semantics { contentDescription = "Add link, up to 8" },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.PlusCircle,
+            contentDescription = null,
+            size = 15.dp,
+            tint = if (enabled) PantopusColors.primary700 else PantopusColors.appTextMuted,
+        )
+        Text(
+            text = "Add link",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (enabled) PantopusColors.primary700 else PantopusColors.appTextMuted,
+            modifier = Modifier.weight(1f),
+        )
+        Text(text = "up to 8", fontSize = 10.sp, color = PantopusColors.appTextMuted)
+    }
+}
+
+// MARK: - Share
+
+@Composable
+private fun ShareSection(
+    url: String,
+    onOpen: () -> Unit,
+) {
+    PersonaSection("Share") {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3)
+                    .testTag("editPersonaShareCard"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = "PUBLIC LINK · ANYONE CAN FOLLOW",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary700,
+            )
+            Text(
+                text = url,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.appTextStrong,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .background(PantopusColors.appSurfaceMuted)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
+                        .padding(horizontal = Spacing.s2, vertical = 6.dp),
+            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 34.dp)
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
+                        .clickable(onClick = onOpen)
+                        .testTag("editPersonaShareView")
+                        .semantics { contentDescription = "View Beacon" },
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ExternalLink,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.appText,
+                )
+                Text(
+                    text = "View",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Sticky bar
+
+@Composable
+private fun PersonaStickyBar(
+    label: String,
+    isSaving: Boolean,
+    isEnabled: Boolean,
+    statusMessage: String?,
+    errorMessage: String?,
+    onDiscard: () -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        val banner = errorMessage ?: statusMessage
+        if (banner != null) {
+            val isError = errorMessage != null
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(if (isError) PantopusColors.errorBg else PantopusColors.successBg)
+                        .border(
+                            width = 1.dp,
+                            color = if (isError) PantopusColors.errorLight else PantopusColors.successLight,
+                            shape = RoundedCornerShape(Radii.md),
+                        )
+                        .padding(horizontal = Spacing.s2, vertical = 6.dp)
+                        .testTag("editPersonaStatusBanner"),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PantopusIconImage(
+                    icon = if (isError) PantopusIcon.AlertCircle else PantopusIcon.CheckCircle,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = if (isError) PantopusColors.error else PantopusColors.success,
+                )
+                Text(
+                    text = banner,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isError) PantopusColors.error else PantopusColors.success,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Cancel",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextStrong,
+                modifier =
+                    Modifier
+                        .heightIn(min = 42.dp)
+                        .clickable(onClick = onDiscard)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
+                        .testTag("editPersonaDiscard"),
+            )
+            Box(modifier = Modifier.weight(1f))
+            PrimaryButton(
+                title = label,
+                onClick = onSave,
+                modifier = Modifier.testTag("editPersonaSave"),
+                isLoading = isSaving,
+                isEnabled = isEnabled,
+            )
+        }
+    }
+}
+
+// MARK: - Shared primitives
 
 @Composable
 private fun PersonaSection(
     overline: String,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
         Text(
             text = overline.uppercase(),
-            fontSize = 10.5.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appTextSecondary,
-            letterSpacing = 0.7.sp,
             modifier = Modifier.semantics { heading() },
         )
         content()
@@ -247,367 +1049,48 @@ private fun PLabel(
     hint: String? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = Spacing.s2),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextStrong,
+        )
         if (required) {
-            Text(text = "*", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary600)
+            Text(
+                text = "*",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+            )
         }
         if (hint != null) {
             Text(
                 text = hint,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = PantopusColors.appTextMuted,
             )
         }
     }
 }
 
-// MARK: - Heroes
-
 @Composable
-private fun LiveHero(content: EditPersonaContent) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.primary600)
-                .padding(Spacing.s3)
-                .semantics {
-                    contentDescription =
-                        "${content.displayName}, live persona. ${content.followers} followers, " +
-                        "${content.posts} posts in 30 days, ${content.rating} average rating."
-                }
-                .testTag("editPersonaLiveHero"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.appTextInverse.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Radio,
-                    contentDescription = null,
-                    size = 19.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.appTextInverse,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = content.displayName,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appTextInverse,
-                )
-                Text(
-                    text = "Live persona · published & broadcasting",
-                    fontSize = 11.sp,
-                    color = PantopusColors.appTextInverse.copy(alpha = 0.8f),
-                )
-            }
-            Text(
-                text = content.liveBadge.uppercase(),
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextInverse,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.xs))
-                        .background(PantopusColors.appTextInverse.copy(alpha = 0.22f))
-                        .padding(horizontal = 7.dp, vertical = 3.dp),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            StatTile(content.followers, "Followers", Modifier.weight(1f))
-            StatTile(content.posts, "Posts · 30d", Modifier.weight(1f))
-            StatTile(content.rating, "Avg rating", Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun StatTile(
+private fun PersonaField(
     value: String,
-    label: String,
-    modifier: Modifier = Modifier,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    tag: String,
+    monospace: Boolean = false,
+    prefix: String? = null,
+    singleLine: Boolean = true,
+    minHeight: Dp = 44.dp,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
-    Column(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appTextInverse.copy(alpha = 0.14f))
-                .padding(horizontal = Spacing.s2, vertical = Spacing.s2),
-        verticalArrangement = Arrangement.spacedBy(1.dp),
-    ) {
-        Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appTextInverse)
-        Text(
-            text = label.uppercase(),
-            fontSize = 9.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appTextInverse.copy(alpha = 0.8f),
-        )
-    }
-}
-
-@Composable
-private fun SetupHero(
-    content: EditPersonaContent,
-    stepsDone: Int,
-    stepsTotal: Int,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
-                .padding(Spacing.s3)
-                .testTag("editPersonaSetupHero"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .background(PantopusColors.primary600),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Sparkles,
-                    contentDescription = null,
-                    size = 18.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.appTextInverse,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    text = "Finish your persona",
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                )
-                Text(
-                    text = content.checklistSummary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = PantopusColors.primary700,
-                )
-            }
-            Text(
-                text = "DRAFT",
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appTextInverse,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.xs))
-                        .background(PantopusColors.primary600)
-                        .padding(horizontal = 7.dp, vertical = 3.dp),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            repeat(stepsTotal.coerceAtLeast(1)) { index ->
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (index < stepsDone) PantopusColors.primary600 else PantopusColors.primary100),
-                )
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-            content.checklist.forEach { ChecklistRow(it) }
-        }
-    }
-}
-
-@Composable
-private fun ChecklistRow(step: PersonaChecklistStep) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        modifier =
-            Modifier.semantics {
-                contentDescription =
-                    step.label +
-                    when {
-                        step.done -> ", done"
-                        step.isNext -> ", next"
-                        else -> ""
-                    }
-            },
-    ) {
-        if (step.done) {
-            PantopusIconImage(
-                icon = PantopusIcon.CheckCircle,
-                contentDescription = null,
-                size = Radii.lg,
-                strokeWidth = 2f,
-                tint = PantopusColors.success,
-            )
-        } else {
-            Box(
-                modifier =
-                    Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(if (step.isNext) PantopusColors.primary50 else Color.Transparent)
-                        .border(
-                            1.5.dp,
-                            if (step.isNext) PantopusColors.primary600 else PantopusColors.appBorderStrong,
-                            CircleShape,
-                        ),
-            )
-        }
-        Text(
-            text = step.label,
-            fontSize = 11.5.sp,
-            fontWeight = if (step.isNext) FontWeight.SemiBold else FontWeight.Medium,
-            color = stepColor(step),
-            modifier = Modifier.weight(1f),
-        )
-        if (step.isNext) {
-            Text(text = "NEXT", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.primary700)
-        }
-    }
-}
-
-private fun stepColor(step: PersonaChecklistStep): Color =
-    when {
-        step.isNext -> PantopusColors.primary700
-        step.done -> PantopusColors.appTextStrong
-        else -> PantopusColors.appTextSecondary
-    }
-
-// MARK: - Identity
-
-@Composable
-private fun IdentitySection(content: EditPersonaContent) {
-    PersonaSection("Identity") {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
-            Column {
-                PLabel("Handle", required = true, hint = "lowercase · 3–24 chars")
-                HandleField(handle = content.handle, status = content.handleStatus)
-                content.handleNote?.let { note ->
-                    Row(
-                        modifier = Modifier.padding(top = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-                    ) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.CheckCircle,
-                            contentDescription = null,
-                            size = 11.dp,
-                            strokeWidth = 2f,
-                            tint = PantopusColors.success,
-                        )
-                        Text(text = note, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = PantopusColors.success)
-                    }
-                }
-            }
-            Column {
-                PLabel("Display name", required = true)
-                TextDisplay(text = content.displayName, testTag = "editPersonaDisplayName")
-            }
-            Column {
-                PLabel("Bio")
-                TextDisplay(text = content.bio, minHeight = 88.dp, testTag = "editPersonaBio")
-                Text(
-                    text = content.bioCharCount,
-                    fontSize = 11.sp,
-                    color = PantopusColors.appTextMuted,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.s1),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HandleField(
-    handle: String,
-    status: PersonaHandleStatus,
-) {
-    val borderColor =
-        when (status) {
-            PersonaHandleStatus.Available -> PantopusColors.success
-            PersonaHandleStatus.Reserved -> PantopusColors.primary300
-            PersonaHandleStatus.Taken -> PantopusColors.error
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurface)
-                .border(1.5.dp, borderColor, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3)
-                .testTag("editPersonaHandle"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        Text(
-            text = "@",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = PantopusColors.primary600,
-        )
-        Text(
-            text = handle,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            color = PantopusColors.appText,
-            modifier = Modifier.weight(1f),
-        )
-        HandleStatusPill(status)
-    }
-}
-
-@Composable
-private fun HandleStatusPill(status: PersonaHandleStatus) {
-    val (icon, label, tint) =
-        when (status) {
-            PersonaHandleStatus.Available -> Triple(PantopusIcon.CheckCircle, "Available", PantopusColors.success)
-            PersonaHandleStatus.Reserved -> Triple(PantopusIcon.Lock, "Reserved", PantopusColors.primary700)
-            PersonaHandleStatus.Taken -> Triple(PantopusIcon.AlertCircle, "Taken", PantopusColors.error)
-        }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, strokeWidth = 2f, tint = tint)
-        Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = tint)
-    }
-}
-
-@Composable
-private fun TextDisplay(
-    text: String,
-    testTag: String,
-    minHeight: androidx.compose.ui.unit.Dp = 44.dp,
-) {
-    Text(
-        text = text,
-        fontSize = 14.sp,
-        color = PantopusColors.appText,
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -615,924 +1098,127 @@ private fun TextDisplay(
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
-                .testTag(testTag),
-    )
-}
-
-// MARK: - Category policy
-
-private enum class PersonaPolicyKind { Allow, Off }
-
-@Composable
-private fun PolicySection(content: EditPersonaContent) {
-    PersonaSection("Category policy") {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            PolicyRow(
-                kind = PersonaPolicyKind.Allow,
-                title = "Allowed on this persona",
-                sub = content.categoriesAllowSub,
-                chips = content.categoriesAllow,
-            )
-            PolicyRow(
-                kind = PersonaPolicyKind.Off,
-                title = "Off-topic — blocked auto-suggest",
-                sub = content.categoriesOffSub,
-                chips = content.categoriesOff,
-            )
-            content.policyNote?.let {
-                Text(
-                    text = it,
-                    fontSize = 11.sp,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    color = PantopusColors.appTextSecondary,
-                    modifier = Modifier.padding(top = Spacing.s1),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PolicyRow(
-    kind: PersonaPolicyKind,
-    title: String,
-    sub: String,
-    chips: List<PersonaCategoryChip>,
-) {
-    val isAllow = kind == PersonaPolicyKind.Allow
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(if (isAllow) PantopusColors.successBg else PantopusColors.appSurfaceSunken)
-                .border(
-                    1.dp,
-                    if (isAllow) PantopusColors.successLight else PantopusColors.appBorder,
-                    RoundedCornerShape(Radii.lg),
-                )
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                .testTag("editPersonaPolicyRow_${if (isAllow) "allow" else "off"}"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+                .padding(horizontal = Spacing.s3),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(if (isAllow) PantopusColors.success else PantopusColors.appTextMuted),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = if (isAllow) PantopusIcon.Check else PantopusIcon.X,
-                    contentDescription = null,
-                    size = 11.dp,
-                    strokeWidth = 3f,
-                    tint = PantopusColors.appTextInverse,
-                )
-            }
+        if (prefix != null) {
             Text(
-                text = title,
-                fontSize = 12.sp,
+                text = prefix,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isAllow) PantopusColors.success else PantopusColors.appTextStrong,
-                modifier = Modifier.weight(1f),
+                fontFamily = FontFamily.Monospace,
+                color = PantopusColors.primary600,
+                modifier = Modifier.padding(vertical = 11.dp),
             )
-            Text(text = sub, fontSize = 10.5.sp, color = PantopusColors.appTextSecondary)
         }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            chips.forEach { CatChip(it, kind) }
-        }
-    }
-}
-
-@Composable
-private fun CatChip(
-    chip: PersonaCategoryChip,
-    kind: PersonaPolicyKind,
-) {
-    val isAllow = kind == PersonaPolicyKind.Allow
-    val fg = if (isAllow) PantopusColors.primary700 else PantopusColors.appTextSecondary
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(if (isAllow) PantopusColors.primary50 else PantopusColors.appSurfaceSunken)
-                .border(
-                    1.dp,
-                    if (isAllow) PantopusColors.primary200 else PantopusColors.appBorder,
-                    RoundedCornerShape(Radii.pill),
-                )
-                .padding(horizontal = Spacing.s3, vertical = 6.dp)
-                .semantics { contentDescription = if (isAllow) chip.label else "${chip.label}, off-topic" },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        PantopusIconImage(icon = chip.icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = fg)
-        Text(
-            text = chip.label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = fg,
-            textDecoration = if (isAllow) TextDecoration.None else TextDecoration.LineThrough,
-        )
-    }
-}
-
-// MARK: - Tiers
-
-@Composable
-private fun TiersSection(content: EditPersonaContent) {
-    PersonaSection("Tiers") {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            StripeConnectCard(content.stripe)
-            content.tiers.forEach { TierCardView(it) }
-            AddTierRow(disabled = !content.canAddTier)
-        }
-    }
-}
-
-@Composable
-private fun TierCardView(tier: PersonaTierCard) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .alpha(if (tier.kind == PersonaTierCard.Kind.PaidLocked) 0.6f else 1f)
-                .background(PantopusColors.appSurface)
-                .border(
-                    1.dp,
-                    if (tier.isFresh) PantopusColors.primary200 else PantopusColors.appBorder,
-                    RoundedCornerShape(Radii.lg),
-                )
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                .testTag("editPersonaTier_${tier.id}"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(Radii.md))
-                        .background(
-                            if (tier.kind == PersonaTierCard.Kind.Free) {
-                                PantopusColors.appSurfaceSunken
-                            } else {
-                                PantopusColors.primary50
-                            },
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                PantopusIconImage(
-                    icon = tierIcon(tier.kind),
-                    contentDescription = null,
-                    size = Radii.xl,
-                    strokeWidth = 2f,
-                    tint =
-                        if (tier.kind == PersonaTierCard.Kind.Free) {
-                            PantopusColors.appTextStrong
-                        } else {
-                            PantopusColors.primary700
-                        },
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                    Text(text = tier.name, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PantopusColors.appText)
-                    TierPrice(tier)
-                }
-                Text(text = tier.blurb, fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
-            }
-            if (tier.kind != PersonaTierCard.Kind.PaidLocked) {
-                PantopusIconImage(
-                    icon = PantopusIcon.SlidersHorizontal,
-                    contentDescription = null,
-                    size = 15.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.appTextMuted,
-                )
-            }
-        }
-        if (tier.perks.isNotEmpty()) {
-            Column(modifier = Modifier.padding(start = 46.dp), verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                tier.perks.forEach { perk ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                        PantopusIconImage(
-                            icon = PantopusIcon.Check,
-                            contentDescription = null,
-                            size = Radii.lg,
-                            strokeWidth = 2f,
-                            tint = PantopusColors.primary600,
-                        )
-                        Text(text = perk, fontSize = 11.5.sp, color = PantopusColors.appTextStrong)
-                    }
-                }
-            }
-        }
-        TierStripeFooter(tier.stripeState)
-    }
-}
-
-@Composable
-private fun TierPrice(tier: PersonaTierCard) {
-    when (tier.kind) {
-        PersonaTierCard.Kind.Free ->
-            Text(text = "Always free", fontSize = 11.sp, color = PantopusColors.appTextSecondary)
-        PersonaTierCard.Kind.Paid, PersonaTierCard.Kind.PaidLocked ->
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "\$${tier.priceLabel ?: "—"}",
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = singleLine,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            textStyle =
+                TextStyle(
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color =
-                        if (tier.kind == PersonaTierCard.Kind.PaidLocked) {
-                            PantopusColors.appTextMuted
-                        } else {
-                            PantopusColors.appText
-                        },
-                )
-                tier.period?.let {
-                    Text(text = " / $it", fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+                    color = PantopusColors.appText,
+                    fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
+                    fontWeight = if (monospace) FontWeight.SemiBold else FontWeight.Normal,
+                ),
+            cursorBrush = SolidColor(PantopusColors.primary600),
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(text = placeholder, fontSize = 14.sp, color = PantopusColors.appTextMuted)
                 }
-            }
+                inner()
+            },
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(vertical = 11.dp)
+                    .testTag(tag),
+        )
     }
 }
 
 @Composable
-private fun TierStripeFooter(state: PersonaTierCard.StripeState) {
-    if (state == PersonaTierCard.StripeState.None) return
-    val (icon, text, color) =
-        when (state) {
-            PersonaTierCard.StripeState.Ready ->
-                Triple(PantopusIcon.ShieldCheck, "Stripe ready · payouts every Friday", PantopusColors.success)
-            else ->
-                Triple(PantopusIcon.Link, "Connect Stripe to enable paid tiers", PantopusColors.primary700)
+private fun PersonaChoiceChip(
+    label: String,
+    icon: PantopusIcon?,
+    selected: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    val foreground =
+        when {
+            !enabled -> PantopusColors.appTextMuted
+            selected -> PantopusColors.primary700
+            else -> PantopusColors.appTextStrong
         }
-    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = color)
-        Text(text = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
-    }
-}
-
-private fun tierIcon(kind: PersonaTierCard.Kind): PantopusIcon =
-    when (kind) {
-        PersonaTierCard.Kind.Free -> PantopusIcon.Users
-        PersonaTierCard.Kind.Paid -> PantopusIcon.Star
-        PersonaTierCard.Kind.PaidLocked -> PantopusIcon.Lock
-    }
-
-@Composable
-private fun AddTierRow(disabled: Boolean) {
+    val background =
+        when {
+            !enabled -> PantopusColors.appSurfaceSunken
+            selected -> PantopusColors.primary50
+            else -> PantopusColors.appSurface
+        }
+    val border = if (selected && enabled) PantopusColors.primary200 else PantopusColors.appBorder
     Row(
         modifier =
             Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .clip(RoundedCornerShape(Radii.lg))
-                .border(
-                    1.5.dp,
-                    if (disabled) PantopusColors.appBorder else PantopusColors.primary200,
-                    RoundedCornerShape(Radii.lg),
-                )
-                .then(if (disabled) Modifier else Modifier.clickable {})
-                .padding(horizontal = 14.dp, vertical = 11.dp)
-                .testTag("editPersonaAddTier")
-                .semantics { contentDescription = "Add paid tier, up to 4" },
+                .heightIn(min = 34.dp)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(background)
+                .border(1.dp, border, RoundedCornerShape(Radii.pill))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = Spacing.s3)
+                .testTag(tag),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.PlusCircle,
-            contentDescription = null,
-            size = 15.dp,
-            strokeWidth = 2f,
-            tint = if (disabled) PantopusColors.appTextMuted else PantopusColors.primary700,
-        )
-        Text(
-            text = "Add paid tier",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (disabled) PantopusColors.appTextMuted else PantopusColors.primary700,
-            modifier = Modifier.weight(1f),
-        )
-        Text(text = "up to 4", fontSize = 10.sp, color = PantopusColors.appTextMuted)
-    }
-}
-
-// MARK: - Stripe connect card
-
-@Composable
-private fun StripeConnectCard(state: PersonaStripeState) {
-    when (state) {
-        is PersonaStripeState.Connected -> StripeConnectedCard(state.account)
-        PersonaStripeState.NotConnected -> StripeNotConnectedCard()
+        if (icon != null) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 11.dp, tint = foreground)
+        }
+        Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = foreground)
     }
 }
 
 @Composable
-private fun StripeConnectedCard(account: String) {
+private fun PersonaModeRow(
+    option: PersonaAudienceMode,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.successBg)
-                .border(1.dp, PantopusColors.successLight, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                .testTag("editPersonaStripeConnected"),
-        verticalAlignment = Alignment.CenterVertically,
+                .background(if (selected) PantopusColors.primary50 else PantopusColors.appSurface)
+                .border(
+                    width = 1.dp,
+                    color = if (selected) PantopusColors.primary200 else PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.md),
+                )
+                .clickable(onClick = onClick)
+                .padding(Spacing.s3)
+                .testTag("editPersonaAudienceMode_${option.wire}"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        StripeBadge()
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        PantopusIconImage(
+            icon = if (selected) PantopusIcon.CheckCircle else PantopusIcon.Circle,
+            contentDescription = null,
+            size = 18.dp,
+            tint = if (selected) PantopusColors.primary600 else PantopusColors.appBorderStrong,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
-                text = "Connected · $account",
-                fontSize = 12.5.sp,
+                text = option.label,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = PantopusColors.appText,
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                PantopusIconImage(
-                    icon = PantopusIcon.CheckCircle,
-                    contentDescription = null,
-                    size = 10.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.success,
-                )
-                Text(
-                    text = "Charges enabled · payouts enabled",
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PantopusColors.success,
-                )
-            }
-        }
-        Text(text = "Manage", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary600)
-    }
-}
-
-@Composable
-private fun StripeNotConnectedCard() {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                .testTag("editPersonaStripeCard"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-            StripeBadge()
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    text = "Connect Stripe to charge for tiers",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PantopusColors.appText,
-                )
-                Text(
-                    text = "~3 min · ID + bank account · we never touch the money.",
-                    fontSize = 10.5.sp,
-                    color = PantopusColors.appTextSecondary,
-                )
-            }
-        }
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.primary600)
-                    .clickable {}
-                    .testTag("editPersonaStripeConnect")
-                    .semantics { contentDescription = "Connect with Stripe" },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Spacer(modifier = Modifier.weight(1f))
-            PantopusIconImage(
-                icon = PantopusIcon.ExternalLink,
-                contentDescription = null,
-                size = 13.dp,
-                strokeWidth = 2f,
-                tint = PantopusColors.appTextInverse,
-            )
-            Text(
-                text = "Connect with Stripe",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.appTextInverse,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun StripeBadge() {
-    Box(
-        modifier =
-            Modifier
-                .size(width = 32.dp, height = 22.dp)
-                .clip(RoundedCornerShape(Radii.xs))
-                .background(PantopusColors.primary600),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = "stripe", fontSize = 9.sp, fontWeight = FontWeight.Black, color = PantopusColors.appTextInverse)
-    }
-}
-
-// MARK: - Broadcast
-
-@Composable
-private fun BroadcastSection(
-    cap: PersonaCapOption,
-    onSelectCap: (PersonaCapOption) -> Unit,
-    quietHoursOn: Boolean,
-    onToggleQuietHours: (Boolean) -> Unit,
-    range: String,
-) {
-    PersonaSection("Broadcast") {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
-            Column {
-                PLabel("Posts per week", hint = "hard cap, not a target")
-                CapSelector(selection = cap, onSelect = onSelectCap)
-            }
-            QuietHoursRow(isOn = quietHoursOn, onToggle = onToggleQuietHours, range = range)
-        }
-    }
-}
-
-@Composable
-private fun CapSelector(
-    selection: PersonaCapOption,
-    onSelect: (PersonaCapOption) -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(3.dp)
-                .testTag("editPersonaCapSelector"),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s0),
-    ) {
-        PersonaCapOption.entries.forEach { option ->
-            val isOn = option == selection
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .background(if (isOn) PantopusColors.appSurface else Color.Transparent)
-                        .clickable { onSelect(option) }
-                        .testTag("editPersonaCap_${option.label}"),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = option.label,
-                    fontSize = 12.sp,
-                    fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isOn) PantopusColors.appText else PantopusColors.appTextSecondary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuietHoursRow(
-    isOn: Boolean,
-    onToggle: (Boolean) -> Unit,
-    range: String,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(horizontal = Spacing.s3, vertical = Spacing.s3),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Clock,
-            contentDescription = null,
-            size = Radii.xl,
-            strokeWidth = 2f,
-            tint = PantopusColors.appTextSecondary,
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(text = "Quiet hours", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
-            Text(
-                text = if (isOn) range.ifEmpty { "10:00 PM → 7:00 AM" } else "Broadcasts allowed any time",
-                fontSize = 11.sp,
-                fontFamily = if (isOn) FontFamily.Monospace else FontFamily.Default,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        Switch(
-            checked = isOn,
-            onCheckedChange = onToggle,
-            colors =
-                SwitchDefaults.colors(
-                    checkedThumbColor = PantopusColors.appTextInverse,
-                    checkedTrackColor = PantopusColors.primary600,
-                ),
-            modifier = Modifier.testTag("editPersonaQuietHoursToggle"),
-        )
-    }
-}
-
-// MARK: - Share
-
-@Composable
-private fun ShareSection(content: EditPersonaContent) {
-    PersonaSection("Share") {
-        ShareCard(url = content.shareUrl, isPublic = content.shareIsPublic)
-    }
-}
-
-@Composable
-private fun ShareCard(
-    url: String,
-    isPublic: Boolean,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .padding(Spacing.s3)
-                .testTag("editPersonaShareCard"),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
-    ) {
-        QrStamp(isPublic)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Text(
-                text = (if (isPublic) "Public link · scan to follow" else "Private preview · only you").uppercase(),
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isPublic) PantopusColors.primary700 else PantopusColors.appTextSecondary,
-            )
-            Text(
-                text = url,
-                fontSize = 11.5.sp,
-                fontFamily = FontFamily.Monospace,
-                color = PantopusColors.appTextStrong,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radii.sm))
-                        .background(PantopusColors.appSurfaceMuted)
-                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
-                        .padding(horizontal = Spacing.s2, vertical = 6.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ShareButton(PantopusIcon.Copy, "Copy", isPublic, "editPersonaShareCopy", Modifier.weight(1f))
-                ShareButton(PantopusIcon.Share, "Share", isPublic, "editPersonaShareShare", Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun QrStamp(isPublic: Boolean) {
-    val glyph = if (isPublic) PantopusColors.primary600 else PantopusColors.appTextMuted
-    Box(
-        modifier =
-            Modifier
-                .size(84.dp)
-                .clip(RoundedCornerShape(Radii.md))
-                .background(if (isPublic) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .padding(6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Three finder squares evoke a QR without an encoder dependency.
-        Box(modifier = Modifier.fillMaxSize()) {
-            QrFinder(glyph, Modifier.align(Alignment.TopStart))
-            QrFinder(glyph, Modifier.align(Alignment.TopEnd))
-            QrFinder(glyph, Modifier.align(Alignment.BottomStart))
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(22.dp)
-                    .clip(RoundedCornerShape(Radii.sm))
-                    .background(glyph),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Radio,
-                contentDescription = null,
-                size = Radii.lg,
-                strokeWidth = 2f,
-                tint = PantopusColors.appTextInverse,
-            )
-        }
-    }
-}
-
-@Composable
-private fun QrFinder(
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier.size(16.dp).border(2.dp, color, RoundedCornerShape(2.dp)))
-}
-
-@Composable
-private fun ShareButton(
-    icon: PantopusIcon,
-    label: String,
-    enabled: Boolean,
-    testTag: String,
-    modifier: Modifier = Modifier,
-) {
-    val tint = if (enabled) PantopusColors.appText else PantopusColors.appTextMuted
-    Row(
-        modifier =
-            modifier
-                .height(30.dp)
-                .clip(RoundedCornerShape(Radii.sm))
-                .background(if (enabled) PantopusColors.appSurface else PantopusColors.appSurfaceSunken)
-                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.sm))
-                .then(if (enabled) Modifier.clickable {} else Modifier)
-                .testTag(testTag)
-                .semantics { contentDescription = label },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Spacer(modifier = Modifier.weight(1f))
-        PantopusIconImage(icon = icon, contentDescription = null, size = Radii.lg, strokeWidth = 2f, tint = tint)
-        Text(text = label, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = tint)
-        Spacer(modifier = Modifier.weight(1f))
-    }
-}
-
-// MARK: - Analytics
-
-@Composable
-private fun AnalyticsSection(
-    isOn: Boolean,
-    onToggle: (Boolean) -> Unit,
-    scope: List<String>,
-) {
-    PersonaSection("Analytics") {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appSurface)
-                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                    .padding(horizontal = Spacing.s3, vertical = Spacing.s3)
-                    .testTag("editPersonaAnalyticsRow"),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(Radii.md))
-                            .background(if (isOn) PantopusColors.primary50 else PantopusColors.appSurfaceSunken),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.ArrowUpRight,
-                        contentDescription = null,
-                        size = Radii.xl,
-                        strokeWidth = 2f,
-                        tint = if (isOn) PantopusColors.primary600 else PantopusColors.appTextMuted,
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "Audience analytics",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PantopusColors.appText,
-                    )
-                    Text(
-                        text = "Aggregated reach & growth — never individual followers.",
-                        fontSize = 11.sp,
-                        color = PantopusColors.appTextSecondary,
-                    )
-                }
-                Switch(
-                    checked = isOn,
-                    onCheckedChange = onToggle,
-                    colors =
-                        SwitchDefaults.colors(
-                            checkedThumbColor = PantopusColors.appTextInverse,
-                            checkedTrackColor = PantopusColors.primary600,
-                        ),
-                    modifier = Modifier.testTag("editPersonaAnalyticsToggle"),
-                )
-            }
-            if (isOn && scope.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    scope.forEach { ScopeChip(it) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScopeChip(label: String) {
-    Row(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(Radii.pill))
-                .background(PantopusColors.primary50)
-                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.pill))
-                .padding(horizontal = 9.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Check,
-            contentDescription = null,
-            size = 10.dp,
-            strokeWidth = 2f,
-            tint = PantopusColors.primary700,
-        )
-        Text(text = label, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary700)
-    }
-}
-
-// MARK: - Sticky bar
-
-@Composable
-private fun StickyBar(
-    variant: EditPersonaVariant,
-    onDiscard: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().background(PantopusColors.appSurface)) {
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
-        when (variant) {
-            EditPersonaVariant.Live -> LiveStickyBar()
-            EditPersonaVariant.Setup -> SetupStickyBar(onDiscard = onDiscard)
-        }
-    }
-}
-
-@Composable
-private fun LiveStickyBar() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(PantopusColors.success))
-        Text(text = "Live · saved 2m ago", fontSize = 11.5.sp, color = PantopusColors.appTextSecondary)
-        Spacer(modifier = Modifier.weight(1f))
-        Row(
-            modifier =
-                Modifier
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .clickable {}
-                    .padding(horizontal = Spacing.s3)
-                    .testTag("editPersonaPreview")
-                    .semantics { contentDescription = "Preview" },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Eye,
-                contentDescription = null,
-                size = 14.dp,
-                strokeWidth = 2f,
-                tint = PantopusColors.appTextStrong,
-            )
-            Text(text = "Preview", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
-        }
-        Box(
-            modifier =
-                Modifier
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(Radii.lg))
-                    .background(PantopusColors.appBorder)
-                    .padding(horizontal = Spacing.s5)
-                    .testTag("editPersonaSave")
-                    .semantics { contentDescription = "Save, no changes" },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "Save", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextMuted)
-        }
-    }
-}
-
-@Composable
-private fun SetupStickyBar(onDiscard: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radii.md))
-                    .background(PantopusColors.primary50)
-                    .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.md))
-                    .padding(horizontal = Spacing.s2, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.Info,
-                contentDescription = null,
-                size = 13.dp,
-                strokeWidth = 2f,
-                tint = PantopusColors.primary700,
-            )
-            Text(
-                text = "Save anytime — publish unlocks after Stripe + schedule",
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PantopusColors.primary700,
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-            Row(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(Radii.pill))
-                        .background(PantopusColors.warningBg)
-                        .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
-                        .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(PantopusColors.warning))
-                Text(text = "7 UNSAVED", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PantopusColors.warning)
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Box(
-                modifier =
-                    Modifier
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .clickable(onClick = onDiscard)
-                        .padding(horizontal = Spacing.s3)
-                        .testTag("editPersonaDiscard")
-                        .semantics { contentDescription = "Discard draft" },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(text = "Discard", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
-            }
-            Row(
-                modifier =
-                    Modifier
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.primary600)
-                        .clickable {}
-                        .padding(horizontal = Spacing.s5)
-                        .testTag("editPersonaSaveDraft")
-                        .semantics { contentDescription = "Save draft" },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                PantopusIconImage(
-                    icon = PantopusIcon.Check,
-                    contentDescription = null,
-                    size = 15.dp,
-                    strokeWidth = 2f,
-                    tint = PantopusColors.appTextInverse,
-                )
-                Text(text = "Save draft", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextInverse)
-            }
+            Text(text = option.blurb, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
         }
     }
 }

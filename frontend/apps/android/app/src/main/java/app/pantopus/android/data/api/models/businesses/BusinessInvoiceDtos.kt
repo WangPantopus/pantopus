@@ -53,6 +53,12 @@ data class BusinessInvoiceDto(
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "paid_at") val paidAt: String? = null,
     val business: BusinessInvoicePartyDto? = null,
+    /**
+     * Joined only on the biller-side list/detail reads
+     * (`recipient:recipient_user_id(…)`, `businesses.js:4863`). Null on the
+     * recipient-side routes, which join [business] instead.
+     */
+    val recipient: BusinessInvoicePartyDto? = null,
 )
 
 /**
@@ -77,10 +83,17 @@ data class BusinessInvoicePartyDto(
 ) {
     /** Best display name for the billing business. */
     val displayName: String
-        get() =
-            name?.trim()?.takeIf { it.isNotEmpty() }
-                ?: username?.trim()?.takeIf { it.isNotEmpty() }
-                ?: "Business"
+        get() = displayName("Business")
+
+    /**
+     * Best display name with a caller-chosen fallback — the same join is
+     * reused for the *recipient* on the biller-side reads, where "Business"
+     * would be the wrong word.
+     */
+    fun displayName(fallback: String): String =
+        name?.trim()?.takeIf { it.isNotEmpty() }
+            ?: username?.trim()?.takeIf { it.isNotEmpty() }
+            ?: fallback
 }
 
 /**

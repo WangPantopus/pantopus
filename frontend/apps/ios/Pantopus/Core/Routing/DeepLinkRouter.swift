@@ -69,6 +69,12 @@ final class DeepLinkRouter {
         /// Public business profile reached from a share / push.
         /// `pantopus://businesses/:id`.
         case businessProfile(businessId: String)
+        /// C4 — `pantopus://b/:username/:slug` (and
+        /// `pantopus://business/:username?pageSlug=…`): the public profile
+        /// with one named custom page opened. RN redirects the short link to
+        /// `/business/:username?pageSlug=slug`; dropping the slug here would
+        /// silently land the user on the plain profile.
+        case businessPage(businessId: String, pageSlug: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -332,7 +338,11 @@ final class DeepLinkRouter {
             return businessesDestination(url: url, segments: segments)
         case "business":
             // Singular `business/:username` is the A10.6 public profile.
+            // `?pageSlug=` is RN's redirect target for `/b/:username/:slug`.
             guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if let slug = queryValue("pageSlug", in: comps), !slug.isEmpty {
+                return .businessPage(businessId: id, pageSlug: slug)
+            }
             return .businessProfile(businessId: id)
         case "identity":
             // `pantopus://identity/preview` — A18.5 "View as" preview.
@@ -346,8 +356,15 @@ final class DeepLinkRouter {
             if let id = segments.dropFirst().first { return .user(id: id) }
             return .unknown(url)
         case "b":
-            // Public business short link `pantopus://b/:username`.
-            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            // Public business short link `pantopus://b/:username` and its
+            // named-page variant `pantopus://b/:username/:slug`. RN redirects
+            // the latter to `/business/:username?pageSlug=slug`, so the slug
+            // has to survive the parse (C4).
+            let businessSegments = Array(segments.dropFirst())
+            guard let id = businessSegments.first else { return .unknown(url) }
+            if let slug = businessSegments.dropFirst().first, !slug.isEmpty {
+                return .businessPage(businessId: id, pageSlug: slug)
+            }
             return .businessProfile(businessId: id)
         case "persona":
             // `pantopus://persona/:handle` is the public Beacon profile — the

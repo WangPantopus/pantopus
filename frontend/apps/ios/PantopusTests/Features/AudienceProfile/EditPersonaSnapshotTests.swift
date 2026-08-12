@@ -3,7 +3,8 @@
 //  PantopusTests
 //
 //  A13.12 — design-reference baseline tripwire for the creator-facing Edit
-//  persona editor. Same shape as `MembershipDetailSnapshotTests.swift`:
+//  Beacon editor. Slugs mirror the two states the editor opens in:
+//  `create` (no Beacon yet) and `edit` (existing Beacon). Same shape as `MembershipDetailSnapshotTests.swift`:
 //  asserts the baseline PNG exists at
 //  `PantopusTests/__Snapshots__/a13-12-edit-persona/<state>-ios.png` and is a
 //  non-trivial PNG. Tests `XCTSkip` when the baseline is missing so the gate
@@ -24,12 +25,12 @@ final class EditPersonaSnapshotTests: XCTestCase {
             .appendingPathComponent("a13-12-edit-persona")
     }
 
-    func test_edit_persona_live_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("live")
+    func test_edit_persona_create_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("create")
     }
 
-    func test_edit_persona_setup_ios_baseline_is_present() throws {
-        try assertBaselineOrSkip("setup")
+    func test_edit_persona_edit_ios_baseline_is_present() throws {
+        try assertBaselineOrSkip("edit")
     }
 
     func test_edit_persona_loading_ios_baseline_is_present() throws {

@@ -151,7 +151,8 @@ public struct RootTabView: View {
              .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
-             .notifications, .createBusiness, .businessProfile, .editBusinessPage,
+             .notifications, .createBusiness, .businessProfile, .businessPage,
+             .editBusinessPage,
              .vacationHold, .wallet, .mailDay, .paymentsSettings,
              // B1.6 — batch-2 routing seam destinations all resolve inside the
              // Hub tab's stack (deep links open them on the placeholder).

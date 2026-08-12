@@ -121,6 +121,10 @@ public enum YouRoute: Hashable {
     /// `BusinessProfileView` overflow when the viewer owns the business
     /// and from the `pantopus://businesses/:id/page-editor` deep link.
     case editBusinessPage(businessId: String)
+    /// C4 — the custom Pages CMS index for a business.
+    case businessPages(businessId: String)
+    /// C4 — the block builder for one custom page.
+    case businessPageBlocks(businessId: String, pageId: String, pageTitle: String)
     /// Legacy waitlist route — forwards to the Create Business wizard.
     case businessWaitlist
     /// A12.10 — Create Business wizard. Reached from the My Businesses
@@ -162,9 +166,13 @@ public enum YouRoute: Hashable {
     /// Audience Profile Threads tab "View all messages" CTA also lands
     /// here.
     case creatorInbox
-    /// P1.2 — Conversation push from a Creator Inbox row tap. Reuses
-    /// the existing `ChatConversationView` shell in `.person` mode.
-    case creatorInboxConversation(CreatorInboxConversationDestination)
+    /// C5 — Persona DM thread push from a Creator Inbox row tap. Persona
+    /// DMs are a distinct surface from generic chat: addressed by thread
+    /// id, with no counterparty user id on the wire.
+    case creatorInboxConversation(CreatorInboxThreadDestination)
+    /// C5 — Fan-side persona inbox for one persona (A15.5). Reached from
+    /// the membership screen's "Open inbox" CTA.
+    case fanInbox(personaId: String)
     /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
     /// row push here with the primary home id resolved by the VM.
     case homeBills(homeId: String)
@@ -333,6 +341,15 @@ public enum YouRoute: Hashable {
     case businessOwner(businessId: String)
     /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
     case businessTeam(businessId: String)
+    /// C3 — Business Stripe Connect payouts.
+    /// `pantopus://businesses/:id/payments`.
+    case businessPaymentsOwner(businessId: String)
+    /// C3 — Business invoicing (list / create / void).
+    /// `pantopus://businesses/:id/invoices`.
+    case businessInvoicesOwner(businessId: String)
+    /// C3 — Business legal record + verification.
+    /// `pantopus://businesses/:id/legal`.
+    case businessLegal(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
     case viewAs
     /// A18.4 — Persistent "waiting for approval" room.
@@ -1136,25 +1153,31 @@ public struct YouTabRoot: View {
                 onOpenPersona: {
                     Task { @MainActor in path.append(.placeholder(label: "Creator profile")) }
                 },
-                onChangeTier: {
-                    Task { @MainActor in path.append(.placeholder(label: "Change tier")) }
-                },
                 onUpdatePayment: {
                     Task { @MainActor in path.append(.placeholder(label: "Update payment")) }
                 },
                 onCancel: {
                     Task { @MainActor in path.append(.placeholder(label: "Membership cancelled")) }
                 },
-                onRequestRefund: {
-                    Task { @MainActor in path.append(.placeholder(label: "Request refund")) }
+                // Change tier + refund request are real in-screen flows now
+                // (tier picker sheet / refund sheet), not placeholder pushes.
+                onOpenInbox: { resolvedPersonaId in
+                    Task { @MainActor in
+                        path.append(
+                            .fanInbox(personaId: resolvedPersonaId.isEmpty ? personaId : resolvedPersonaId)
+                        )
+                    }
                 }
             )
         case .professionalProfile:
             ProfessionalProfileView { Task { @MainActor in pop() } }
-        case let .editPersona(personaId):
-            EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
-                if !path.isEmpty { path.removeLast() }
-            }
+        case .editPersona:
+            // The editor resolves the signed-in user's Beacon itself via
+            // GET /api/personas/me, so the route payload is advisory only.
+            EditPersonaView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onViewBeacon: { handle in Task { @MainActor in path.append(.beaconProfile(handle: handle)) } }
+            )
         case let .composeBroadcast(personaId):
             ComposeBroadcastView(
                 viewModel: .live(personaId: personaId) {
@@ -1587,7 +1610,7 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
                 },
                 onOpenEditPersona: {
-                    Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    Task { @MainActor in path.append(.editPersona(personaId: "")) }
                 },
                 onOpenFollowing: {
                     Task { @MainActor in path.append(.following) }
@@ -1702,8 +1725,11 @@ public struct YouTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenThread: { row in
                     Task { @MainActor in
-                        let dest = CreatorInboxConversationDestination(
-                            userId: row.counterpartyUserId ?? row.id,
+                        // The row id IS the PersonaDmThread id — persona DMs
+                        // carry no counterparty user id to fall back to.
+                        let dest = CreatorInboxThreadDestination(
+                            personaId: row.personaId,
+                            threadId: row.id,
                             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
                             initials: row.initials,
                             verified: row.verifiedLocal,
@@ -1721,24 +1747,20 @@ public struct YouTabRoot: View {
                 }
             )
         case let .creatorInboxConversation(dest):
-            ChatConversationView(
-                viewModel: ChatConversationViewModel(
-                    mode: .person(otherUserId: dest.userId),
-                    counterparty: .person(
-                        name: dest.displayName,
-                        initials: dest.initials,
-                        locality: nil,
-                        verified: dest.verified,
-                        online: false
-                    ),
-                    currentUserId: currentUserId ?? ""
-                ),
-                mode: .creatorThread,
-                creatorContext: .defaults(fanTierName: dest.tierName, fanTierRank: dest.tierRank),
-                onOpenAudienceProfile: {
-                    path.append(.audienceProfile)
-                },
+            PersonaDmThreadView(
+                personaId: dest.personaId,
+                threadId: dest.threadId,
                 onBack: { Task { @MainActor in pop() } }
+            )
+        case let .fanInbox(personaId):
+            FanInboxView(
+                personaId: personaId,
+                onBack: { Task { @MainActor in pop() } },
+                onChangeTier: {
+                    Task { @MainActor in
+                        pop()
+                    }
+                }
             )
         case let .chatConversation(dest):
             ChatConversationView(
@@ -2344,6 +2366,27 @@ public struct YouTabRoot: View {
                     }
                 }
             )
+        case let .businessPages(businessId):
+            BusinessPagesView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenPage: { row in
+                    Task { @MainActor in
+                        path.append(.businessPageBlocks(
+                            businessId: businessId,
+                            pageId: row.id,
+                            pageTitle: row.title
+                        ))
+                    }
+                }
+            )
+        case let .businessPageBlocks(businessId, pageId, pageTitle):
+            BusinessPageBlocksView(
+                businessId: businessId,
+                pageId: pageId,
+                pageTitle: pageTitle,
+                onBack: { Task { @MainActor in pop() } }
+            )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
                 viewModel: PrivacyHandshakeViewModel(
@@ -2441,10 +2484,26 @@ public struct YouTabRoot: View {
                 onEditPage: { Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) } },
                 onOpenInsights: { Task { @MainActor in path.append(.placeholder(label: "Insights")) } },
                 onOpenSettings: { Task { @MainActor in path.append(.placeholder(label: "Business settings")) } },
-                onOpenTeam: { Task { @MainActor in path.append(.businessTeam(businessId: businessId)) } }
+                onOpenTeam: { Task { @MainActor in path.append(.businessTeam(businessId: businessId)) } },
+                onOpenPages: { Task { @MainActor in path.append(.businessPages(businessId: businessId)) } },
+                onOpenPayments: {
+                    Task { @MainActor in path.append(.businessPaymentsOwner(businessId: businessId)) }
+                },
+                onOpenInvoices: {
+                    Task { @MainActor in path.append(.businessInvoicesOwner(businessId: businessId)) }
+                },
+                onOpenLegal: {
+                    Task { @MainActor in path.append(.businessLegal(businessId: businessId)) }
+                }
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)
+        case let .businessPaymentsOwner(businessId):
+            BusinessPaymentsView(businessId: businessId)
+        case let .businessInvoicesOwner(businessId):
+            BusinessInvoicesView(businessId: businessId)
+        case let .businessLegal(businessId):
+            BusinessLegalView(businessId: businessId)
         case .viewAs:
             ViewAsView(
                 onBack: { Task { @MainActor in pop() } },

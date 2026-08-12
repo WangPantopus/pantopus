@@ -60,8 +60,41 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
         XCTAssertTrue(vm.canSend)
         XCTAssertEqual(vm.state, .composing(vm.draft))
         vm.removeMedia()
-        XCTAssertNil(vm.draft.media)
+        XCTAssertTrue(vm.draft.media.isEmpty)
         XCTAssertEqual(vm.state, .empty)
+    }
+
+    func testMultiSelectAppendsUpToNineAttachments() {
+        let vm = makeVM()
+        vm.attachMedia((0..<5).map { ComposeMediaPreview(id: "a\($0)", kind: .image, caption: nil) })
+        XCTAssertEqual(vm.draft.media.count, 5)
+        XCTAssertEqual(vm.remainingMediaSlots, 4)
+
+        // Overflowing batch is truncated at the nine-item cap, not rejected.
+        vm.attachMedia((0..<6).map { ComposeMediaPreview(id: "b\($0)", kind: .video, caption: nil) })
+        XCTAssertEqual(vm.draft.media.count, ComposeBroadcastDraft.mediaLimit)
+        XCTAssertEqual(vm.remainingMediaSlots, 0)
+
+        vm.removeMedia(id: "a0")
+        XCTAssertEqual(vm.draft.media.count, 8)
+        XCTAssertFalse(vm.draft.media.contains { $0.id == "a0" })
+    }
+
+    func testPickedMediaBecomesAMultipartFile() {
+        let picked = ComposeMediaPreview(
+            kind: .image,
+            caption: "boule.jpg",
+            data: Data([0x1, 0x2, 0x3]),
+            mimeType: "image/heic"
+        )
+        let file = picked.uploadFile
+        XCTAssertEqual(file?.fieldName, "files", "post-media expects the `files` part name")
+        XCTAssertEqual(file?.mimeType, "image/heic")
+        XCTAssertFalse(file?.filename.contains("IMG_") ?? true, "Picker filenames never reach S3")
+        XCTAssertNil(
+            ComposeMediaPreview(kind: .image, caption: nil).uploadFile,
+            "Sample media with no bytes has nothing to upload"
+        )
     }
 
     func testSetAudienceUpdatesDraftAndReach() {
@@ -170,7 +203,7 @@ final class ComposeBroadcastViewModelTests: XCTestCase {
 
         let populated = ComposeBroadcastViewModel.previewPopulated()
         XCTAssertEqual(populated.state, .composing(populated.draft))
-        XCTAssertNotNil(populated.draft.media)
+        XCTAssertFalse(populated.draft.media.isEmpty)
 
         let scheduled = ComposeBroadcastViewModel.previewScheduled()
         guard case .scheduled = scheduled.state else {

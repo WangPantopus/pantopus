@@ -26,12 +26,16 @@ public struct PulseComposeView: View {
     private let onCancel: @MainActor () -> Void
     private let managesDismiss: Bool
 
+    /// - Parameter businessAuthorId: C2 — when non-nil the submit posts to
+    ///   `POST /api/businesses/:businessId/posts` so the row is authored by
+    ///   the business. Used by the Business owner dashboard's compose FAB.
     public init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
         postingTarget: PulsePostingTarget? = nil,
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
+        businessAuthorId: String? = nil,
         managesDismiss: Bool = true,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
@@ -41,7 +45,8 @@ public struct PulseComposeView: View {
             identity: identity,
             postingTarget: postingTarget,
             composePurpose: composePurpose,
-            postId: postId
+            postId: postId,
+            businessAuthorId: businessAuthorId
         ))
         self.managesDismiss = managesDismiss
         self.onCancel = onCancel

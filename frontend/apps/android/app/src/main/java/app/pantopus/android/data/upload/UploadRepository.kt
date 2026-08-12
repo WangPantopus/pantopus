@@ -1,5 +1,6 @@
 package app.pantopus.android.data.upload
 
+import app.pantopus.android.data.api.models.audience.PersonaMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
@@ -98,6 +99,47 @@ class UploadRepository
                         )
                     }
                 uploadApi.uploadListingMedia(listingId, parts)
+            }
+
+        /**
+         * Beacon avatar / banner. Single part named `file` (singular) and a
+         * `type` query param — `avatar` or `banner`. The server writes the URL
+         * onto the persona row itself, so no follow-up PATCH is needed.
+         * Route `backend/routes/upload.js:312`.
+         */
+        suspend fun uploadPersonaMedia(
+            personaId: String,
+            type: String,
+            file: UploadFile,
+        ): NetworkResult<PersonaMediaUploadResponse> =
+            safeApiCall {
+                uploadApi.uploadPersonaMedia(
+                    personaId = personaId,
+                    type = type,
+                    file =
+                        MultipartBody.Part.createFormData(
+                            name = "file",
+                            filename = file.filename,
+                            body = file.bytes.toRequestBody(file.mimeType.toMediaTypeOrNull()),
+                        ),
+                )
+            }
+
+        /** Attach broadcast/post media given raw [UploadFile]s (image or video). */
+        suspend fun uploadPostMediaFiles(
+            postId: String,
+            files: List<UploadFile>,
+        ): NetworkResult<PostMediaUploadResponse> =
+            safeApiCall {
+                val parts =
+                    files.map { file ->
+                        MultipartBody.Part.createFormData(
+                            name = "files",
+                            filename = file.filename,
+                            body = file.bytes.toRequestBody(file.mimeType.toMediaTypeOrNull()),
+                        )
+                    }
+                uploadApi.uploadPostMedia(postId, parts)
             }
     }
 

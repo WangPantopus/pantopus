@@ -97,6 +97,12 @@ fun PulseComposeScreen(
     onPosted: (String?) -> Unit = {},
     flowTarget: PulsePostingTarget? = null,
     flowPurpose: PulseComposePurpose? = null,
+    /**
+     * C2 — when non-null the create submit posts to
+     * `POST /api/businesses/:businessId/posts` so the row is authored by the
+     * business. Used by the Business owner dashboard's compose FAB.
+     */
+    businessAuthorId: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
@@ -119,6 +125,12 @@ fun PulseComposeScreen(
     LaunchedEffect(flowTarget, flowPurpose) {
         if (flowTarget != null) {
             viewModel.applyFlowContext(flowTarget, flowPurpose)
+        }
+    }
+
+    LaunchedEffect(businessAuthorId) {
+        if (businessAuthorId != null) {
+            viewModel.applyBusinessAuthor(businessAuthorId)
         }
     }
 

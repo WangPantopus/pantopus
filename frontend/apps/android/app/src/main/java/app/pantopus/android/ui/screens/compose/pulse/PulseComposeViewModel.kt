@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LargeClass", "ComplexCondition")
+@file:Suppress(
+    "MagicNumber",
+    "PackageNaming",
+    "TooManyFunctions",
+    "LargeClass",
+    "ComplexCondition",
+    "LongParameterList",
+)
 
 package app.pantopus.android.ui.screens.compose.pulse
 
@@ -12,6 +19,7 @@ import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostDetailDto
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPostsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.network.NetworkMonitor
@@ -208,6 +216,8 @@ class PulseComposeViewModel
         private val postsRefresh: PulsePostsRefreshNotifier,
         private val locationProvider: LocationProvider,
         savedStateHandle: SavedStateHandle,
+        /** C2 — "post as this business" create route. */
+        private val businessPosts: BusinessPostsRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseComposeUiState>(PulseComposeUiState.Idle)
         val state: StateFlow<PulseComposeUiState> = _state.asStateFlow()
@@ -297,6 +307,15 @@ class PulseComposeViewModel
         private var flowConfigured = false
 
         /**
+         * C2 — when non-null the create submit goes to
+         * `POST /api/businesses/:businessId/posts` instead of `POST /api/posts`,
+         * so the row lands with `business_author_id` set. Set by the Business
+         * owner dashboard's "Post as this business" FAB; the backend gates it
+         * on `profile.edit` (owner / admin / editor).
+         */
+        private var businessAuthorId: String? = null
+
+        /**
          * Fresh device fix captured at submit time so the backend's
          * 5-minute GPS-freshness gate passes even when drafting takes a
          * while. Pick-time coordinates remain the fallback.
@@ -309,6 +328,20 @@ class PulseComposeViewModel
         val flowPurpose: PulseComposePurpose? get() = composePurpose
 
         val flowTargetLabel: String? get() = postingTarget?.displayLabel
+
+        /**
+         * C2 — route the create submit through the business-post endpoint.
+         * Idempotent; called from a `LaunchedEffect` on the compose screen.
+         */
+        fun applyBusinessAuthor(businessId: String) {
+            if (businessAuthorId == businessId) return
+            businessAuthorId = businessId
+            _identity.value = PulseComposeIdentity.Business
+            baselineIdentity = PulseComposeIdentity.Business
+        }
+
+        /** True when composing from the Business owner dashboard. */
+        val isBusinessAuthored: Boolean get() = businessAuthorId != null
 
         fun applyFlowContext(
             target: PulsePostingTarget,
@@ -361,8 +394,17 @@ class PulseComposeViewModel
         /** True iff this view-model is wired to edit an existing post. */
         val isEditing: Boolean get() = editingPostId != null
 
-        /** Top-bar title — "Edit post" in edit mode, "New post" otherwise. */
-        val displayTitle: String get() = if (isEditing) "Edit post" else "New post"
+        /**
+         * Top-bar title — "Edit post" in edit mode, "Post as business" when
+         * composing from the Business owner dashboard, "New post" otherwise.
+         */
+        val displayTitle: String
+            get() =
+                when {
+                    isEditing -> "Edit post"
+                    isBusinessAuthored -> "Post as business"
+                    else -> "New post"
+                }
 
         /** Right-action label — "Save" in edit mode, intent-driven otherwise. */
         val ctaLabel: String get() = if (isEditing) "Save" else _activeIntent.value.ctaLabel
@@ -675,7 +717,16 @@ class PulseComposeViewModel
         }
 
         private suspend fun handleCreate() {
-            when (val result = repo.createPost(buildRequest())) {
+            val request = buildRequest()
+            val authorId = businessAuthorId
+            // C2 — "Post as this business": same body, business route.
+            val createResult =
+                if (authorId != null) {
+                    businessPosts.createBusinessPost(authorId, request)
+                } else {
+                    repo.createPost(request)
+                }
+            when (val result = createResult) {
                 is NetworkResult.Success -> {
                     val postId = result.data.post?.id ?: result.data.postId
                     val (toastText, toastError) = uploadPhotosIfNeeded(postId, isEditing = false)

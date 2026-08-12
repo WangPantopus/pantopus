@@ -78,6 +78,56 @@ data class MembershipSLAAlert(
 )
 
 /**
+ * The "Inbox" card on the membership screen — the fan's entry point into
+ * persona DMs, with the remaining message-thread credits as its footnote.
+ */
+@Immutable
+data class MembershipInboxCard(
+    /**
+     * Null credits and a zero/absent allowance are different states: the
+     * first is unlimited, the second is "no messaging on this tier".
+     */
+    val remainingThreads: Int?,
+    val threadsPerPeriod: Int?,
+) {
+    /** Mirrors RN's footnote under the "Open inbox" CTA. */
+    val footnote: String
+        get() {
+            val perPeriod = threadsPerPeriod
+            if (perPeriod == null || perPeriod == 0) {
+                return "No messaging on this tier — upgrade to send a DM."
+            }
+            if (perPeriod < 0 || remainingThreads == null) {
+                return "Unlimited message threads on this tier."
+            }
+            val noun = if (remainingThreads == 1) "message thread" else "message threads"
+            return "$remainingThreads $noun left this period."
+        }
+}
+
+/**
+ * Direction of a tier change. The label is the honest one — an upgrade lands
+ * immediately, a downgrade is scheduled at period end.
+ */
+enum class MembershipTierDirection(
+    val label: String,
+    val timingNote: String,
+) {
+    Upgrade("Upgrade", "Takes effect immediately"),
+    Downgrade("Downgrade", "Scheduled for the end of this period"),
+}
+
+/** One row in the change-tier picker. */
+@Immutable
+data class MembershipTierOption(
+    val id: String,
+    val rank: Int,
+    val name: String,
+    val priceLabel: String,
+    val direction: MembershipTierDirection,
+)
+
+/**
  * Composed content for the membership detail surface. [slaAlert] is non-null
  * only in the `SlaMissed` state (the amber banner + warn-tone renewal row
  * read from it).
@@ -93,6 +143,14 @@ data class MembershipDetailContent(
     val benefits: List<MembershipBenefit>,
     val policyFootnote: String,
     val slaAlert: MembershipSLAAlert? = null,
+    /** Persona UUID — the `:id` path segment for the inbox push. */
+    val personaId: String = "",
+    val inbox: MembershipInboxCard = MembershipInboxCard(remainingThreads = null, threadsPerPeriod = null),
+    /** True once a tier change is queued for the end of the current period. */
+    val hasScheduledTierChange: Boolean = false,
+    /** Terminal memberships (`canceled` / `expired`) hide every mutation. */
+    val isTerminal: Boolean = false,
+    val cancelAtPeriodEnd: Boolean = false,
 ) {
     /** Same content with the SLA banner dropped — used by "give it a week". */
     fun clearingSlaAlert(): MembershipDetailContent = copy(slaAlert = null)

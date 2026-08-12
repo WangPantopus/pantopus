@@ -124,6 +124,15 @@ public enum HubRoute: Hashable {
     /// `BusinessProfileView`'s overflow when the viewer owns the business
     /// and from the `pantopus://businesses/:id/page-editor` deep link.
     case editBusinessPage(businessId: String)
+    /// C4 — the custom Pages CMS index (create / delete a page, revision
+    /// history, restore). Distinct from `editBusinessPage`, which edits
+    /// business *profile* fields.
+    case businessPages(businessId: String)
+    /// C4 — the block builder for one custom page.
+    case businessPageBlocks(businessId: String, pageId: String, pageTitle: String)
+    /// C4 — the public profile opened on a named custom page, reached from
+    /// `pantopus://b/:username/:slug`.
+    case businessProfilePage(businessId: String, pageSlug: String)
     /// A12.10 — Create Business wizard. Reached from the My Businesses
     /// FAB / empty-state CTA and from the `pantopus://businesses/new`
     /// deep link.
@@ -417,6 +426,15 @@ public enum HubRoute: Hashable {
     case businessOwner(businessId: String)
     /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
     case businessTeam(businessId: String)
+    /// C3 — Business Stripe Connect payouts.
+    /// `pantopus://businesses/:id/payments`.
+    case businessPaymentsOwner(businessId: String)
+    /// C3 — Business invoicing (list / create / void).
+    /// `pantopus://businesses/:id/invoices`.
+    case businessInvoicesOwner(businessId: String)
+    /// C3 — Business legal record + verification.
+    /// `pantopus://businesses/:id/legal`.
+    case businessLegal(businessId: String)
     /// Locations & Hours list MVP. `pantopus://businesses/:id/locations`.
     case businessLocations(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
@@ -681,12 +699,16 @@ public struct HubTabRoot: View {
         case .businessProfileRow: return .businessProfile(businessId: businessId)
         case .businessLocations: return .businessLocations(businessId: businessId)
         case .businessCatalog: return .placeholder(label: "Catalog")
-        case .businessPages: return .editBusinessPage(businessId: businessId)
+        // C4 — the drawer's "Pages" row now opens the custom-pages CMS, not
+        // the profile-field editor it used to alias.
+        case .businessPages: return .businessPages(businessId: businessId)
         case .businessPostTask: return .quickPostGig(category: GigsCategory.all.rawValue)
         case .businessChat: return .placeholder(label: "Business Chat")
         case .businessTeam: return .businessTeam(businessId: businessId)
         case .businessReviews: return .placeholder(label: "Reviews")
-        case .businessPayments: return .paymentsSettings
+        // C3 — the business drawer's Payments row belongs on the business's
+        // own Stripe Connect surface, not on the personal payout settings.
+        case .businessPayments: return .businessPaymentsOwner(businessId: businessId)
         case .businessSettings: return .placeholder(label: "Business Settings")
         }
     }
@@ -819,6 +841,11 @@ public struct HubTabRoot: View {
             _ = router.consume()
         case let .businessProfile(businessId):
             path.append(.businessProfile(businessId: businessId))
+            _ = router.consume()
+        case let .businessPage(businessId, pageSlug):
+            // C4 — `pantopus://b/:username/:slug` keeps the slug so the named
+            // custom page opens, matching RN's `?pageSlug=` redirect.
+            path.append(.businessProfilePage(businessId: businessId, pageSlug: pageSlug))
             _ = router.consume()
         case let .editBusinessPage(businessId):
             path.append(.editBusinessPage(businessId: businessId))
@@ -1712,6 +1739,7 @@ public struct HubTabRoot: View {
         case let .businessProfile(businessId):
             BusinessProfileDestination(
                 businessId: businessId,
+                pageSlug: nil,
                 onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { destination in
                     Task { @MainActor in push(.chatConversation(destination)) }
@@ -1723,6 +1751,43 @@ public struct HubTabRoot: View {
                 },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
                 onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .businessProfilePage(businessId, pageSlug):
+            BusinessProfileDestination(
+                businessId: businessId,
+                pageSlug: pageSlug,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenMessages: { destination in
+                    Task { @MainActor in push(.chatConversation(destination)) }
+                },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
+                onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .businessPages(businessId):
+            BusinessPagesView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenPage: { row in
+                    Task { @MainActor in
+                        push(.businessPageBlocks(
+                            businessId: businessId,
+                            pageId: row.id,
+                            pageTitle: row.title
+                        ))
+                    }
+                }
+            )
+        case let .businessPageBlocks(businessId, pageId, pageTitle):
+            BusinessPageBlocksView(
+                businessId: businessId,
+                pageId: pageId,
+                pageTitle: pageTitle,
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .editBusinessPage(businessId):
             EditBusinessPageView(
@@ -1833,7 +1898,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenInsights: { Task { @MainActor in push(.beaconInsights) } },
                 onCreateBeacon: {
-                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    // Empty id = "create" — the editor resolves the real
+                    // Beacon (or an empty create form) from GET /api/personas/me.
+                    Task { @MainActor in push(.editPersona(personaId: "")) }
                 },
                 onOpenLink: { url in UIApplication.shared.open(url) }
             )
@@ -1843,10 +1910,13 @@ public struct HubTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenLink: { url in UIApplication.shared.open(url) }
             )
-        case let .editPersona(personaId):
-            EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
-                if !path.isEmpty { path.removeLast() }
-            }
+        case .editPersona:
+            // The editor resolves the signed-in user's Beacon itself via
+            // GET /api/personas/me, so the route payload is advisory only.
+            EditPersonaView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onViewBeacon: { handle in Task { @MainActor in push(.beaconProfile(handle: handle)) } }
+            )
         case let .composeBroadcast(personaId):
             ComposeBroadcastView(
                 viewModel: .live(personaId: personaId) {
@@ -1862,7 +1932,7 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.composeBroadcast(personaId: personaId)) }
                 },
                 onOpenEditPersona: {
-                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    Task { @MainActor in push(.editPersona(personaId: "")) }
                 },
                 onOpenBeacons: { Task { @MainActor in push(.beaconsFeed) } }
             )
@@ -2686,10 +2756,20 @@ public struct HubTabRoot: View {
                 onEditPage: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } },
                 onOpenInsights: { Task { @MainActor in push(.placeholder(label: "Insights")) } },
                 onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } },
-                onOpenTeam: { Task { @MainActor in push(.businessTeam(businessId: businessId)) } }
+                onOpenTeam: { Task { @MainActor in push(.businessTeam(businessId: businessId)) } },
+                onOpenPages: { Task { @MainActor in push(.businessPages(businessId: businessId)) } },
+                onOpenPayments: { Task { @MainActor in push(.businessPaymentsOwner(businessId: businessId)) } },
+                onOpenInvoices: { Task { @MainActor in push(.businessInvoicesOwner(businessId: businessId)) } },
+                onOpenLegal: { Task { @MainActor in push(.businessLegal(businessId: businessId)) } }
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)
+        case let .businessPaymentsOwner(businessId):
+            BusinessPaymentsView(businessId: businessId)
+        case let .businessInvoicesOwner(businessId):
+            BusinessInvoicesView(businessId: businessId)
+        case let .businessLegal(businessId):
+            BusinessLegalView(businessId: businessId)
         case let .businessLocations(businessId):
             BusinessLocationsView(businessId: businessId)
         case .viewAs:
@@ -2906,6 +2986,9 @@ extension HubRoute: Identifiable {
 @MainActor
 private struct BusinessProfileDestination: View {
     let businessId: String
+    /// C4 — non-nil when the `pantopus://b/:username/:slug` link named a
+    /// custom page; the profile then loads that page's published blocks.
+    var pageSlug: String?
     let onBack: @MainActor () -> Void
     let onOpenMessages: @MainActor (InboxConversationDestination) -> Void
     let onShare: @MainActor () -> Void
@@ -2917,6 +3000,7 @@ private struct BusinessProfileDestination: View {
     var body: some View {
         BusinessProfileView(
             businessId: businessId,
+            pageSlug: pageSlug,
             onBack: onBack,
             onOpenMessages: onOpenMessages,
             onShare: onShare,

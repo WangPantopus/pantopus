@@ -203,6 +203,16 @@ object DeepLinkRouter {
         data class BusinessProfile(val businessId: String) : Destination
 
         /**
+         * C4 — `pantopus://b/:username/:slug` (and
+         * `pantopus://business/:username?pageSlug=…`): the public profile with
+         * one named custom page opened. RN redirects the short link to
+         * `/business/:username?pageSlug=slug`; dropping the slug here would
+         * silently land the user on the plain profile. Mirrors iOS
+         * `businessPage`.
+         */
+        data class BusinessPage(val businessId: String, val pageSlug: String) : Destination
+
+        /**
          * `pantopus://businesses/:id/page-editor` — A13.10 Edit Business Page
          * (owner-only). Mirrors iOS `editBusinessPage`.
          */
@@ -451,8 +461,14 @@ object DeepLinkRouter {
             }
             "business" -> {
                 // Singular `business/:username` is the A10.6 public profile.
+                // `?pageSlug=` is RN's redirect target for `/b/:username/:slug`.
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
+                val pageSlug = Paths.queryParam(queryPart, "pageSlug")
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
             }
             "chat", "message", "messages", "conversation" -> {
                 val id = segments.getOrNull(1)
@@ -467,8 +483,17 @@ object DeepLinkRouter {
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.User(id)
             }
             "b" -> {
+                // Public business short link `pantopus://b/:username` and its
+                // named-page variant `pantopus://b/:username/:slug`. RN
+                // redirects the latter to `/business/:username?pageSlug=slug`,
+                // so the slug has to survive the parse (C4).
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
+                val pageSlug = segments.getOrNull(2)
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
             }
             "persona" -> {
                 val handle = segments.getOrNull(1)

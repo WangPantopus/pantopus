@@ -186,7 +186,10 @@ final class CreatorInboxViewModelTests: XCTestCase {
         XCTAssertEqual(vm.activeFilter, .all)
     }
 
-    func testConversationDestinationPrefersCounterpartyUserId() async {
+    /// Persona DMs are addressed by thread id — never by a user id (the
+    /// serializer emits none). The destination must therefore carry the
+    /// row id verbatim, plus the persona whose inbox this is.
+    func testThreadDestinationRoutesOnThreadIdNotUserId() async {
         SequencedURLProtocol.sequence = loadedSequence()
         let vm = CreatorInboxViewModel(api: makeAPI())
         await vm.load()
@@ -198,8 +201,10 @@ final class CreatorInboxViewModelTests: XCTestCase {
             XCTFail("Expected gold thread")
             return
         }
-        let dest = vm.conversationDestination(for: row)
-        XCTAssertEqual(dest.userId, "u_derek")
+        let dest = vm.threadDestination(for: row)
+        XCTAssertEqual(dest.threadId, "th_gold")
+        XCTAssertFalse(dest.personaId.isEmpty)
+        XCTAssertNotEqual(dest.threadId, row.counterpartyUserId)
         XCTAssertEqual(dest.displayName, "Derek Tan")
         XCTAssertTrue(dest.verified)
     }

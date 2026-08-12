@@ -12,8 +12,12 @@ import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BeaconProfileApi
 import app.pantopus.android.data.api.services.BlocksApi
+import app.pantopus.android.data.api.services.BusinessCatalogApi
 import app.pantopus.android.data.api.services.BusinessDiscoveryApi
+import app.pantopus.android.data.api.services.BusinessFinanceApi
 import app.pantopus.android.data.api.services.BusinessInvoicesApi
+import app.pantopus.android.data.api.services.BusinessPagesApi
+import app.pantopus.android.data.api.services.BusinessPostsApi
 import app.pantopus.android.data.api.services.BusinessTeamApi
 import app.pantopus.android.data.api.services.BusinessesApi
 import app.pantopus.android.data.api.services.ChatApi
@@ -62,6 +66,8 @@ import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PaymentHistoryApi
 import app.pantopus.android.data.api.services.PaymentsApi
+import app.pantopus.android.data.api.services.PersonaDmApi
+import app.pantopus.android.data.api.services.PersonaEditApi
 import app.pantopus.android.data.api.services.PlaceApi
 import app.pantopus.android.data.api.services.PostsApi
 import app.pantopus.android.data.api.services.PostsMapApi
@@ -129,6 +135,9 @@ object NetworkModule {
             // hours are cleared.
             .add(app.pantopus.android.data.api.models.hub.NotificationPreferencesPatchJsonAdapter())
             .add(app.pantopus.android.data.api.models.businesses.BusinessServiceAreaJsonAdapter())
+            // C2 catalog item write: a full-form editor body whose cleared
+            // fields must reach the backend as explicit JSON null.
+            .add(app.pantopus.android.data.api.models.businesses.BusinessCatalogItemRequestJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
             // Place Intelligence: the envelope's payload type depends on
@@ -278,7 +287,21 @@ object NetworkModule {
     fun provideBusinessInvoicesApi(retrofit: Retrofit): BusinessInvoicesApi = retrofit.create(BusinessInvoicesApi::class.java)
 
     @Provides @Singleton
+    fun provideBusinessFinanceApi(retrofit: Retrofit): BusinessFinanceApi = retrofit.create(BusinessFinanceApi::class.java)
+
+    @Provides @Singleton
     fun provideBusinessTeamApi(retrofit: Retrofit): BusinessTeamApi = retrofit.create(BusinessTeamApi::class.java)
+
+    /** C2 — owner catalog CRUD (categories + items + reorder). */
+    @Provides @Singleton
+    fun provideBusinessCatalogApi(retrofit: Retrofit): BusinessCatalogApi = retrofit.create(BusinessCatalogApi::class.java)
+
+    /** C2 — "post as this business" from the owner dashboard. */
+    @Provides @Singleton
+    fun provideBusinessPostsApi(retrofit: Retrofit): BusinessPostsApi = retrofit.create(BusinessPostsApi::class.java)
+
+    @Provides @Singleton
+    fun provideBusinessPagesApi(retrofit: Retrofit): BusinessPagesApi = retrofit.create(BusinessPagesApi::class.java)
 
     @Provides @Singleton
     fun provideHomesApi(retrofit: Retrofit): HomesApi = retrofit.create(HomesApi::class.java)
@@ -461,11 +484,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun providePersonaEditApi(retrofit: Retrofit): PersonaEditApi = retrofit.create(PersonaEditApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideBeaconProfileApi(retrofit: Retrofit): BeaconProfileApi = retrofit.create(BeaconProfileApi::class.java)
 
     @Provides
     @Singleton
     fun provideMembershipApi(retrofit: Retrofit): MembershipApi = retrofit.create(MembershipApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePersonaDmApi(retrofit: Retrofit): PersonaDmApi = retrofit.create(PersonaDmApi::class.java)
 
     @Provides
     @Singleton

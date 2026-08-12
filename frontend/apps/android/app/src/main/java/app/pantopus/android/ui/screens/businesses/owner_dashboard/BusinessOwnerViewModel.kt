@@ -177,8 +177,16 @@ class BusinessOwnerViewModel
                 reviewsToReplyLabel = if (pending > 0) "$pending to reply" else null,
                 reviews = mappedReviews,
                 publicProfile = publicProfile,
+                canPostAsBusiness = canPost(dashboard.access?.roleBase),
             )
         }
+
+        /**
+         * RN gate: `access.role_base && ['owner','admin','editor'].includes(...)`
+         * (`src/app/businesses/[id]/index.tsx:67`).
+         */
+        private fun canPost(roleBase: String?): Boolean =
+            !roleBase.isNullOrEmpty() && roleBase in BusinessOwnerContent.POSTING_ROLES
 
         private fun insightTiles(insights: BusinessInsightsResponse?): List<OwnerInsightTile> {
             if (insights == null) return emptyList()

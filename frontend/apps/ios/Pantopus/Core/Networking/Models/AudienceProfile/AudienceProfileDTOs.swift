@@ -27,13 +27,16 @@ public struct PersonaSummaryDTO: Decodable, Sendable, Hashable {
     public let bio: String?
     public let category: String?
     public let audienceLabel: String?
+    /// `open / approval_required / invite_only / organization_managed`.
+    public let audienceMode: String?
+    public let publicLinks: [PersonaPublicLinkDTO]?
     public let followerCount: Int?
     public let postCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, handle, bio, category
         case displayName, avatarUrl, bannerUrl
-        case audienceLabel
+        case audienceLabel, audienceMode, publicLinks
         case followerCount, postCount
     }
 }

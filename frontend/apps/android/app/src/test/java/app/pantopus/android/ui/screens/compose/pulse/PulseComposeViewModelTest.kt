@@ -14,6 +14,7 @@ import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateResponsePost
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPostsRepository
 import app.pantopus.android.data.location.FallbackLocationProvider
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.posts.PostsRepository
@@ -52,6 +53,7 @@ class PulseComposeViewModelTest {
     private val networkMonitor: NetworkMonitor = mockk()
     private val postsRefresh = PulsePostsRefreshNotifier()
     private val locationProvider = FallbackLocationProvider()
+    private val businessPosts: BusinessPostsRepository = mockk()
     private val isOnline = MutableStateFlow(true)
 
     @Before fun setUp() {
@@ -69,7 +71,15 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.INTENT_KEY, intent.key)
             }
-        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, locationProvider, savedState)
+        return PulseComposeViewModel(
+            repo,
+            uploadRepo,
+            networkMonitor,
+            postsRefresh,
+            locationProvider,
+            savedState,
+            businessPosts,
+        )
     }
 
     // MARK: - Defaults
@@ -363,7 +373,15 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.POST_ID_KEY, postId)
             }
-        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, locationProvider, savedState)
+        return PulseComposeViewModel(
+            repo,
+            uploadRepo,
+            networkMonitor,
+            postsRefresh,
+            locationProvider,
+            savedState,
+            businessPosts,
+        )
     }
 
     private data class SamplePost(

@@ -108,6 +108,7 @@ fun BusinessProfileScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
+    val namedPage by viewModel.namedPage.collectAsStateWithLifecycle()
     val savedPlaces by savedPlacesStore.saved.collectAsStateWithLifecycle()
     val pendingSave by savedPlacesStore.pendingSave.collectAsStateWithLifecycle()
     val undo by savedPlacesStore.undo.collectAsStateWithLifecycle()
@@ -168,6 +169,7 @@ fun BusinessProfileScreen(
                         onContact = viewModel::startInquiry,
                         onBook = onBook,
                         onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
+                        namedPage = namedPage,
                     )
                 }
         }
@@ -264,6 +266,9 @@ internal fun BusinessProfileLoadedFrame(
     onContact: () -> Unit,
     onBook: () -> Unit,
     onCall: () -> Unit,
+    // C4 — the named custom page from `pantopus://b/:username/:slug`.
+    // Defaults to `None` so every existing call site is untouched.
+    namedPage: BusinessProfileNamedPageState = BusinessProfileNamedPageState.None,
 ) {
     Box(modifier = Modifier.fillMaxSize().testTag("businessProfile.loaded")) {
         Column(
@@ -286,6 +291,7 @@ internal fun BusinessProfileLoadedFrame(
                         .padding(horizontal = Spacing.s4)
                         .padding(top = 14.dp, bottom = 132.dp),
             ) {
+                BusinessProfileNamedPageSection(state = namedPage)
                 Sections(content)
             }
         }

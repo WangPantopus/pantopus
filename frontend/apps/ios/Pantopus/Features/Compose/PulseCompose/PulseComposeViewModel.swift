@@ -331,16 +331,25 @@ public final class PulseComposeViewModel {
     /// Step 2 purpose — nil for connections-only posts.
     public let composePurpose: PulseComposePurpose?
 
+    /// C2 — when non-nil the create submit goes to
+    /// `POST /api/businesses/:businessId/posts` instead of `POST /api/posts`,
+    /// so the row lands with `business_author_id` set. Set by the Business
+    /// owner dashboard's "Post as this business" FAB; the backend gates it
+    /// on `profile.edit` (owner / admin / editor).
+    public let businessAuthorId: String?
+
     init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
         postingTarget: PulsePostingTarget? = nil,
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
+        businessAuthorId: String? = nil,
         api: APIClient = .shared,
         multipartUploader: MultipartUploader = .shared,
         locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
+        self.businessAuthorId = businessAuthorId
         self.locationProvider = locationProvider
         activeIntent = composePurpose?.legacyIntent ?? intent
         self.postingTarget = postingTarget
@@ -372,9 +381,11 @@ public final class PulseComposeViewModel {
         editingPostId != nil
     }
 
-    /// Top-bar title — "Edit post" in edit mode, "New post" otherwise.
+    /// Top-bar title — "Edit post" in edit mode, "Post as business" when
+    /// composing from the Business owner dashboard, "New post" otherwise.
     public var displayTitle: String {
-        isEditing ? "Edit post" : "New post"
+        if isEditing { return "Edit post" }
+        return businessAuthorId == nil ? "New post" : "Post as business"
     }
 
     /// Right-action label — "Save" in edit mode, intent-driven otherwise.
@@ -627,6 +638,13 @@ public final class PulseComposeViewModel {
                     PostsEndpoints.updatePost(id: editingPostId, body: request)
                 )
                 postId = response.postId ?? editingPostId
+            } else if let businessAuthorId {
+                // C2 — "Post as this business": same body, business route.
+                let request = buildRequest()
+                let response: PostCreateResponse = try await api.request(
+                    BusinessPostsEndpoints.createPost(businessId: businessAuthorId, body: request)
+                )
+                postId = response.postId
             } else {
                 let request = buildRequest()
                 let response: PostCreateResponse = try await api.request(

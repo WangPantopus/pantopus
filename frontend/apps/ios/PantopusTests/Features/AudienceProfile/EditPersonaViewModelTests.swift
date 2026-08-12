@@ -2,9 +2,9 @@
 //  EditPersonaViewModelTests.swift
 //  PantopusTests
 //
-//  A13.12 — covers the Edit persona VM projection. No backend: `load()`
-//  emits `.live` or `.setup` from the deterministic fixtures, and the SETUP
-//  frame carries the 3-of-7 checklist counters + locked monetization.
+//  A13.12 — covers the Edit Beacon VM against the real persona write
+//  contract: `GET /api/personas/me` decides create vs. edit, and `save()`
+//  routes to `POST /api/personas` or `PATCH /api/personas/:id`.
 //
 
 import XCTest
@@ -12,50 +12,186 @@ import XCTest
 
 @MainActor
 final class EditPersonaViewModelTests: XCTestCase {
-    func testLoadProjectsLiveFrame() async {
-        let vm = EditPersonaViewModel(personaId: EditPersonaSampleData.personaId, variant: .live)
-        await vm.load()
-        guard case let .live(content) = vm.state else {
-            return XCTFail("Expected .live, got \(vm.state)")
-        }
-        XCTAssertEqual(content.handle, "elmpark.watch")
-        XCTAssertEqual(content.handleStatus, .reserved)
-        XCTAssertEqual(content.cap, .weekly3, "Cap selector defaults to 3/wk per design")
-        XCTAssertTrue(content.canAddTier)
-        XCTAssertTrue(content.quietHoursOn)
-        // Stripe connected → no locked tiers.
-        if case .connected = content.stripe {} else { XCTFail("Expected Stripe connected") }
-        XCTAssertFalse(content.tiers.contains { $0.kind == .paidLocked })
-        XCTAssertEqual(content.tiers.filter { $0.kind == .paid }.count, 2)
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
     }
 
-    func testLoadProjectsSetupFrame() async {
-        let vm = EditPersonaViewModel(personaId: "persona_sourdough_sat", variant: .setup)
-        await vm.load()
-        guard case let .setup(content, stepsDone, stepsTotal) = vm.state else {
-            return XCTFail("Expected .setup, got \(vm.state)")
-        }
-        XCTAssertEqual(stepsDone, 3)
-        XCTAssertEqual(stepsTotal, 7)
-        XCTAssertEqual(content.checklist.count, 7)
-        XCTAssertEqual(content.checklist.filter(\.done).count, 3)
-        XCTAssertEqual(content.checklist.first(where: \.isNext)?.id, "stripe")
-        XCTAssertEqual(content.handleStatus, .available)
-        XCTAssertEqual(content.cap, .weekly1)
-        XCTAssertFalse(content.quietHoursOn)
-        XCTAssertFalse(content.canAddTier, "Add-tier disabled until Stripe is connected")
-        // Stripe not connected → the paid tier is locked.
-        if case .notConnected = content.stripe {} else { XCTFail("Expected Stripe not connected") }
-        XCTAssertTrue(content.tiers.contains { $0.kind == .paidLocked })
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
     }
 
-    func testSeededContentOverridesSample() async {
-        let seed = EditPersonaSampleData.live
-        let vm = EditPersonaViewModel(personaId: "x", variant: .live, content: seed)
+    // MARK: - Load
+
+    func testLoadWithNoPersonaOpensCreateForm() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: #"{"persona":null,"channel":null}"#),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
         await vm.load()
-        guard case let .live(content) = vm.state else {
-            return XCTFail("Expected .live")
-        }
-        XCTAssertEqual(content.displayName, seed.displayName)
+        XCTAssertEqual(vm.state, .editing(.create))
+        XCTAssertTrue(vm.isCreate)
+        XCTAssertEqual(vm.form.handle, "")
+        XCTAssertEqual(vm.form.category, "creator")
+        XCTAssertEqual(vm.saveButtonLabel, "Publish Beacon")
+        XCTAssertFalse(vm.isValid, "An empty create form has no handle / display name yet")
     }
+
+    func testLoadProjectsExistingPersonaIntoTheForm() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.meJSON),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.state, .editing(.edit(personaId: "p_1")))
+        XCTAssertEqual(vm.form.handle, "elmpark.watch")
+        XCTAssertEqual(vm.form.displayName, "Elm Park Watch")
+        XCTAssertEqual(vm.form.bio, "Neighborhood updates.")
+        XCTAssertEqual(vm.form.category, "community_leader")
+        XCTAssertEqual(vm.form.audienceLabel, .members)
+        XCTAssertEqual(vm.form.audienceMode, .approvalRequired)
+        XCTAssertEqual(vm.form.links.count, 1)
+        XCTAssertEqual(vm.form.links.first?.url, "https://elmpark.org")
+        XCTAssertEqual(vm.form.shareURL, "https://pantopus.com/@elmpark.watch")
+        XCTAssertEqual(vm.saveButtonLabel, "Save Beacon")
+        XCTAssertFalse(vm.isDirty)
+        XCTAssertTrue(vm.isValid)
+    }
+
+    func testLoadFailureSurfacesRetryableError() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        guard case .error = vm.state else {
+            return XCTFail("Expected .error, got \(vm.state)")
+        }
+    }
+
+    func testCategoryPoliciesOverrideTheFallbackLadder() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.meJSON),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.categories.map(\.value), ["creator", "community_leader", "doctor"])
+        XCTAssertEqual(vm.categories.last?.isEnabled, false, "Sensitive categories stay gated")
+        XCTAssertEqual(vm.categories.first?.label, "Creator")
+    }
+
+    // MARK: - Validation
+
+    func testIncompleteLinkBlocksSave() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.meJSON),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        vm.addLink()
+        vm.updateLink(id: vm.form.links.last?.id ?? "", label: "Newsletter")
+        XCTAssertTrue(vm.form.hasIncompleteLink)
+        XCTAssertFalse(vm.isValid)
+
+        SequencedURLProtocol.sequence = []
+        let saved = await vm.save()
+        XCTAssertNil(saved)
+        XCTAssertEqual(vm.saveError, "Each public link needs both a label and a URL.")
+    }
+
+    func testBareHostGetsHttpsSchemeOnTheWire() {
+        var form = EditPersonaForm(handle: "@sourdough", displayName: "Sourdough Sat")
+        form.links = [PersonaLinkDraft(label: "Site", url: "sourdough.example")]
+        let body = form.wireBody
+        XCTAssertEqual(body.handle, "sourdough", "Leading @ is stripped before the wire")
+        XCTAssertEqual(body.publicLinks.first?.url, "https://sourdough.example")
+    }
+
+    // MARK: - Save
+
+    func testSaveCreatesWhenThereIsNoPersonaYet() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: #"{"persona":null,"channel":null}"#),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        vm.form.handle = "sourdough.sat"
+        vm.form.displayName = "Sourdough Saturdays"
+
+        SequencedURLProtocol.sequence = [.status(201, body: Self.createdJSON)]
+        let handle = await vm.save()
+        XCTAssertEqual(handle, "sourdough.sat")
+        XCTAssertEqual(vm.statusMessage, "Beacon created.")
+        XCTAssertEqual(vm.state, .editing(.edit(personaId: "p_2")))
+        XCTAssertFalse(vm.isCreate)
+        XCTAssertFalse(vm.isDirty)
+    }
+
+    func testSaveUpdatesAnExistingPersona() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.meJSON),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        vm.form.displayName = "Elm Park Neighborhood Watch"
+
+        SequencedURLProtocol.sequence = [.status(200, body: Self.meJSON)]
+        let handle = await vm.save()
+        XCTAssertEqual(handle, "elmpark.watch")
+        XCTAssertEqual(vm.statusMessage, "Beacon saved.")
+        XCTAssertNil(vm.saveError)
+    }
+
+    func testHandleConflictSurfacesTheServerMessage() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: #"{"persona":null,"channel":null}"#),
+            .status(200, body: Self.categoriesJSON)
+        ]
+        let vm = EditPersonaViewModel(api: makeAPI())
+        await vm.load()
+        vm.form.handle = "taken"
+        vm.form.displayName = "Taken"
+
+        SequencedURLProtocol.sequence = [
+            .status(409, body: #"{"error":"That Beacon handle is already taken."}"#)
+        ]
+        let handle = await vm.save()
+        XCTAssertNil(handle)
+        XCTAssertEqual(vm.saveError, "That Beacon handle is already taken.")
+        XCTAssertFalse(vm.isSaving)
+    }
+
+    // MARK: - Fixtures
+
+    private static let meJSON = """
+    {"persona":{"id":"p_1","handle":"elmpark.watch","displayName":"Elm Park Watch",
+    "avatarUrl":null,"bannerUrl":null,"bio":"Neighborhood updates.",
+    "category":"community_leader","audienceLabel":"members","audienceMode":"approval_required",
+    "publicLinks":[{"label":"Site","url":"https://elmpark.org"}],
+    "followerCount":128,"postCount":9},"channel":{"id":"c_1"}}
+    """
+
+    private static let createdJSON = """
+    {"persona":{"id":"p_2","handle":"sourdough.sat","displayName":"Sourdough Saturdays",
+    "avatarUrl":null,"bannerUrl":null,"bio":null,"category":"creator",
+    "audienceLabel":"followers","audienceMode":"open","publicLinks":[],
+    "followerCount":0,"postCount":0},"channel":{"id":"c_2"}}
+    """
+
+    private static let categoriesJSON = """
+    {"categories":[
+      {"category":"creator","label":"creator","sensitive":false,"enabled":true,"requirements":[]},
+      {"category":"community_leader","label":"community leader","sensitive":false,"enabled":true,"requirements":[]},
+      {"category":"doctor","label":"Doctor","sensitive":true,"enabled":false,
+       "requirements":["credential_verification"]}
+    ],"sensitiveCategoriesEnabled":false}
+    """
 }

@@ -54,19 +54,29 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.ComposeBroadcastScreen
-import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaSampleData
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EDIT_PERSONA_CREATE_ARG
 import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaScreen
 import app.pantopus.android.ui.screens.beacon_profile.BEACON_HANDLE_KEY
 import app.pantopus.android.ui.screens.beacon_profile.BeaconProfileScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_PAGE_SLUG_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
+import app.pantopus.android.ui.screens.businesses.invoices.BusinessInvoicesScreen
+import app.pantopus.android.ui.screens.businesses.legal.BusinessLegalScreen
 import app.pantopus.android.ui.screens.businesses.locations.BUSINESS_LOCATIONS_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.businesses.locations.BusinessLocationsScreen
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.BusinessOwnerScreen
+import app.pantopus.android.ui.screens.businesses.page_blocks.BusinessPageBlocksScreen
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_PAGE_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_PAGE_TITLE_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
+import app.pantopus.android.ui.screens.businesses.pages.BUSINESS_PAGES_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.pages.BusinessPagesScreen
+import app.pantopus.android.ui.screens.businesses.payments.BusinessPaymentsScreen
 import app.pantopus.android.ui.screens.businesses.team.BusinessTeamScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
@@ -80,7 +90,6 @@ import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
 import app.pantopus.android.ui.screens.creator_audience.YourAudienceScreen
-import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxRowContent
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
@@ -103,6 +112,8 @@ import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
+import app.pantopus.android.ui.screens.persona_dm.FanInboxScreen
+import app.pantopus.android.ui.screens.persona_dm.PersonaDmThreadScreen
 import app.pantopus.android.ui.screens.place.HomeLanding
 import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
 import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
@@ -805,6 +816,33 @@ private object ChildRoutes {
     /** Build the concrete path for the Edit Business Page editor. */
     fun editBusinessPage(businessId: String): String = "businesses/$businessId/page-editor"
 
+    /** C4 — the custom Pages CMS index (create / delete / revision history).
+     *  Distinct from [EDIT_BUSINESS_PAGE], which edits business profile fields. */
+    const val BUSINESS_PAGES = "businesses/{$BUSINESS_PAGES_BUSINESS_ID_KEY}/pages"
+
+    fun businessPages(businessId: String): String = "businesses/$businessId/pages"
+
+    /** C4 — the block builder for one custom page. */
+    const val BUSINESS_PAGE_BLOCKS =
+        "businesses/{$PAGE_BLOCKS_BUSINESS_ID_KEY}/pages/{$PAGE_BLOCKS_PAGE_ID_KEY}/blocks" +
+            "?pageTitle={$PAGE_BLOCKS_PAGE_TITLE_KEY}"
+
+    fun businessPageBlocks(
+        businessId: String,
+        pageId: String,
+        pageTitle: String,
+    ): String = "businesses/$businessId/pages/$pageId/blocks?pageTitle=${Uri.encode(pageTitle)}"
+
+    /** C4 — the public profile opened on a named custom page, reached from
+     *  `pantopus://b/:username/:slug`. */
+    const val BUSINESS_PROFILE_PAGE =
+        "business/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}/page/{$BUSINESS_PROFILE_PAGE_SLUG_KEY}"
+
+    fun businessProfilePage(
+        businessId: String,
+        pageSlug: String,
+    ): String = "business/$businessId/page/${Uri.encode(pageSlug)}"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
 
     const val INVITE_OWNER =
@@ -1336,25 +1374,11 @@ private object ChildRoutes {
             "&$CHAT_GIG_ID_KEY=${enc(row.gigId ?: "")}"
     }
 
-    /** Build the creator-side fan thread path from a Creator Inbox row. */
-    fun creatorThreadConversation(row: CreatorInboxRowContent): String {
-        val userId = row.counterpartyUserId ?: row.id
-
-        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
-        return "chat/creator/${enc(userId)}?" +
-            "$CHAT_NAME_KEY=${enc(row.displayName.ifEmpty { row.handle })}" +
-            "&$CHAT_INITIALS_KEY=${enc(row.initials)}" +
-            "&$CHAT_VERIFIED_KEY=${row.verifiedLocal}" +
-            "&$CHAT_IDENTITY_KEY=business" +
-            "&$CHAT_LOCALITY_KEY=" +
-            "&$CHAT_ONLINE_KEY=false" +
-            "&$CHAT_TIER_NAME_KEY=${enc(row.tierName ?: "Free")}" +
-            "&$CHAT_TIER_RANK_KEY=${row.tierRank}" +
-            "&$CHAT_SCROLL_TO_KEY=" +
-            "&$CHAT_TOPIC_TYPE_KEY=" +
-            "&$CHAT_TOPIC_REF_ID_KEY=" +
-            "&$CHAT_TOPIC_TITLE_KEY="
-    }
+    // A Creator Inbox row no longer builds a generic-chat path. Persona DMs
+    // are addressed by thread id (`personaDmThread`) because the DM
+    // serializer emits no user_id for either party — the previous
+    // `counterpartyUserId ?: row.id` fallback pushed a thread/membership id
+    // into chat as if it were a user id.
 
     /** Build the chat-conversation path for a New Message picker
      *  selection. The picker emits `userId / displayName / initials /
@@ -1541,6 +1565,27 @@ private object ChildRoutes {
 
     fun membershipDetail(personaId: String): String = "personas/$personaId/membership"
 
+    /**
+     * C5 — Persona DM thread (A15.4 creator side / A15.5 fan side). Addressed
+     * by thread id: persona DMs carry no counterparty user id on the wire, so
+     * there is nothing else to route on.
+     */
+    const val PERSONA_DM_PERSONA_ID_KEY = "personaId"
+    const val PERSONA_DM_THREAD_ID_KEY = "threadId"
+    const val PERSONA_DM_THREAD =
+        "personas/{$PERSONA_DM_PERSONA_ID_KEY}/dms/{$PERSONA_DM_THREAD_ID_KEY}"
+
+    fun personaDmThread(
+        personaId: String,
+        threadId: String,
+    ): String = "personas/$personaId/dms/$threadId"
+
+    /** C5 — Fan-side persona inbox for one persona (A15.5). */
+    const val FAN_INBOX_PERSONA_ID_KEY = "personaId"
+    const val FAN_INBOX = "personas/{$FAN_INBOX_PERSONA_ID_KEY}/inbox"
+
+    fun fanInbox(personaId: String): String = "personas/$personaId/inbox"
+
     /** A.5 — Professional profile. */
     const val PROFESSIONAL_PROFILE = "professional-profile"
 
@@ -1636,6 +1681,21 @@ private object ChildRoutes {
     const val BUSINESS_TEAM = "businesses/{$BUSINESS_OWNER_ID_KEY}/team"
 
     fun businessTeam(businessId: String): String = "businesses/$businessId/team"
+
+    /** C3 — Business Stripe Connect payouts. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_PAYMENTS_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}/payments"
+
+    fun businessPaymentsOwner(businessId: String): String = "businesses/$businessId/payments"
+
+    /** C3 — Business invoicing (list / create / void). Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_INVOICES_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}/invoices"
+
+    fun businessInvoicesOwner(businessId: String): String = "businesses/$businessId/invoices"
+
+    /** C3 — Business legal record + verification. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_LEGAL = "businesses/{$BUSINESS_OWNER_ID_KEY}/legal"
+
+    fun businessLegal(businessId: String): String = "businesses/$businessId/legal"
 
     /** Locations & Hours list MVP. Reuses [BUSINESS_OWNER_ID_KEY]. */
     const val BUSINESS_LOCATIONS = "businesses/{$BUSINESS_LOCATIONS_BUSINESS_ID_KEY}/locations"
@@ -1929,6 +1989,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.BusinessProfile -> {
                 navController.navigate(ChildRoutes.businessProfile(pending.businessId))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.BusinessPage -> {
+                // C4 — `pantopus://b/:username/:slug` keeps the slug so the
+                // named custom page opens, matching RN's `?pageSlug=` redirect.
+                navController.navigate(
+                    ChildRoutes.businessProfilePage(pending.businessId, pending.pageSlug),
+                )
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.EditBusinessPage -> {
@@ -3157,6 +3225,76 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onPreview = { navController.popBackStack() },
                     )
                 }
+                // C4 — public profile opened on a named custom page
+                // (`pantopus://b/:username/:slug`).
+                composable(
+                    route = ChildRoutes.BUSINESS_PROFILE_PAGE,
+                    arguments =
+                        listOf(
+                            navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType },
+                            navArgument(BUSINESS_PROFILE_PAGE_SLUG_KEY) { type = NavType.StringType },
+                        ),
+                ) { backStackEntry ->
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
+                    BusinessProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { roomId, displayName, initials, verified ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = displayName,
+                                    initials = initials,
+                                    verified = verified,
+                                ),
+                            )
+                        },
+                        onShare = {
+                            appContext.shareText(
+                                "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share business",
+                            )
+                        },
+                        onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
+                        onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                        onBook = { navController.navigate(ChildRoutes.placeholder("Book")) },
+                        onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                    )
+                }
+                // C4 — custom Pages CMS index.
+                composable(
+                    route = ChildRoutes.BUSINESS_PAGES,
+                    arguments = listOf(navArgument(BUSINESS_PAGES_BUSINESS_ID_KEY) { type = NavType.StringType }),
+                ) { backStackEntry ->
+                    val businessId = backStackEntry.arguments?.getString(BUSINESS_PAGES_BUSINESS_ID_KEY) ?: ""
+                    BusinessPagesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenPage = { row ->
+                            navController.navigate(
+                                ChildRoutes.businessPageBlocks(
+                                    businessId = businessId,
+                                    pageId = row.id,
+                                    pageTitle = row.title,
+                                ),
+                            )
+                        },
+                    )
+                }
+                // C4 — block builder for one custom page.
+                composable(
+                    route = ChildRoutes.BUSINESS_PAGE_BLOCKS,
+                    arguments =
+                        listOf(
+                            navArgument(PAGE_BLOCKS_BUSINESS_ID_KEY) { type = NavType.StringType },
+                            navArgument(PAGE_BLOCKS_PAGE_ID_KEY) { type = NavType.StringType },
+                            navArgument(PAGE_BLOCKS_PAGE_TITLE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
+                    BusinessPageBlocksScreen(onBack = { navController.popBackStack() })
+                }
                 composable(
                     route = ChildRoutes.PULSE_POST,
                     arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
@@ -4023,7 +4161,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.composeBroadcast(personaId))
                         },
                         onOpenEditPersona = {
-                            navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                            // The editor resolves the signed-in user's Beacon from
+                            // GET /api/personas/me, so the arg is advisory only.
+                            navController.navigate(ChildRoutes.editPersona(EDIT_PERSONA_CREATE_ARG))
                         },
                         onOpenBeacons = {
                             navController.navigate(ChildRoutes.BEACONS_FEED)
@@ -4056,10 +4196,42 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     CreatorInboxScreen(
                         onBack = { navController.popBackStack() },
                         onOpenThread = { row ->
-                            navController.navigate(ChildRoutes.creatorThreadConversation(row))
+                            // The row id IS the PersonaDmThread id — persona DMs
+                            // carry no counterparty user id to fall back to.
+                            navController.navigate(
+                                ChildRoutes.personaDmThread(row.personaId, row.id),
+                            )
                         },
                         onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                         onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PERSONA_DM_THREAD,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PERSONA_DM_PERSONA_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.PERSONA_DM_THREAD_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PersonaDmThreadScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.FAN_INBOX,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.FAN_INBOX_PERSONA_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val personaId = entry.arguments?.getString(ChildRoutes.FAN_INBOX_PERSONA_ID_KEY).orEmpty()
+                    FanInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onChangeTier = { navController.popBackStack() },
+                        onOpenThread = { threadId ->
+                            // Replace the resolver so Back lands on the
+                            // membership screen, not on this screen again.
+                            navController.navigate(ChildRoutes.personaDmThread(personaId, threadId)) {
+                                popUpTo(ChildRoutes.FAN_INBOX) { inclusive = true }
+                            }
+                        },
                     )
                 }
                 composable(ChildRoutes.IDENTITY_CENTER) {
@@ -4597,6 +4769,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
                         onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
                         onOpenTeam = { navController.navigate(ChildRoutes.businessTeam(businessId)) },
+                        onOpenPages = { navController.navigate(ChildRoutes.businessPages(businessId)) },
+                        onOpenPayments = {
+                            navController.navigate(ChildRoutes.businessPaymentsOwner(businessId))
+                        },
+                        onOpenInvoices = {
+                            navController.navigate(ChildRoutes.businessInvoicesOwner(businessId))
+                        },
+                        onOpenLegal = { navController.navigate(ChildRoutes.businessLegal(businessId)) },
                     )
                 }
                 composable(
@@ -4604,6 +4784,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
                 ) {
                     BusinessTeamScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_PAYMENTS_OWNER,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessPaymentsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_INVOICES_OWNER,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessInvoicesScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_LEGAL,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessLegalScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.BUSINESS_LOCATIONS,
@@ -4660,17 +4858,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenPersona = {
                             navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
                         },
-                        onChangeTier = {
-                            navController.navigate(ChildRoutes.placeholder("Change tier"))
-                        },
                         onUpdatePayment = {
                             navController.navigate(ChildRoutes.placeholder("Update payment"))
                         },
                         onCancel = {
                             navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
                         },
-                        onRequestRefund = {
-                            navController.navigate(ChildRoutes.placeholder("Request refund"))
+                        // Change tier + refund request are real in-screen flows
+                        // now (tier picker sheet / refund sheet), not
+                        // placeholder pushes.
+                        onOpenInbox = { resolvedPersonaId ->
+                            navController.navigate(ChildRoutes.fanInbox(resolvedPersonaId))
                         },
                     )
                 }
@@ -4684,6 +4882,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) {
                     EditPersonaScreen(
                         onClose = { navController.popBackStack() },
+                        onViewBeacon = { handle -> navController.navigate(ChildRoutes.beaconProfile(handle)) },
                     )
                 }
                 composable(
@@ -4702,7 +4901,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onEditPersona = { personaId -> navController.navigate(ChildRoutes.editPersona(personaId)) },
                         onComposeBroadcast = { personaId -> navController.navigate(ChildRoutes.composeBroadcast(personaId)) },
                         onOpenInsights = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
-                        onCreateBeacon = { navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID)) },
+                        onCreateBeacon = { navController.navigate(ChildRoutes.editPersona(EDIT_PERSONA_CREATE_ARG)) },
                     )
                 }
                 composable(
@@ -4962,7 +5161,14 @@ private fun routeForDrawer(
         NavigationDrawerDestination.WalletAndPayments -> ChildRoutes.WALLET
         NavigationDrawerDestination.Settings -> ChildRoutes.MENU
         NavigationDrawerDestination.HelpSupport -> ChildRoutes.SETTINGS_HELP
-        NavigationDrawerDestination.BusinessPayments -> ChildRoutes.SETTINGS_PAYMENTS
+        // C3 — the business drawer's Payments row belongs on the business's
+        // own Stripe Connect surface, not on the personal payout settings.
+        NavigationDrawerDestination.BusinessPayments ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessPaymentsOwner(businessId)
+            } else {
+                ChildRoutes.SETTINGS_PAYMENTS
+            }
         NavigationDrawerDestination.HomeProperty ->
             if (homeId.isNotEmpty()) {
                 ChildRoutes.propertyDetails(homeId)

@@ -93,22 +93,50 @@ public enum AudienceProfileEndpoints {
     }
 }
 
+/// One already-hosted media item riding along with the publish call.
+/// `broadcastMediaItemsFromPayload` (`backend/routes/broadcastChannels.js:113`)
+/// reads `url` + `type` (+ optional `thumbnailUrl` / `liveVideoUrl`) and
+/// fans them out onto the Post's parallel media arrays.
+public struct BroadcastMediaPayload: Encodable, Sendable, Hashable {
+    public var url: String
+    public var type: String
+    public var thumbnailUrl: String?
+    public var liveVideoUrl: String?
+
+    public init(url: String, type: String, thumbnailUrl: String? = nil, liveVideoUrl: String? = nil) {
+        self.url = url
+        self.type = type
+        self.thumbnailUrl = thumbnailUrl
+        self.liveVideoUrl = liveVideoUrl
+    }
+}
+
 /// Body for the broadcast-publish route. `visibility` valid values:
 /// `public / followers / tier_or_above / subscribers`. When `tier_or_above`
-/// is selected, `target_tier_rank` (1-4) is required.
+/// is selected, `target_tier_rank` (1-4) is required. `media` carries
+/// already-uploaded items (max 10); locally-picked files are attached
+/// after publish via `POST /api/upload/post-media/:messageId`, because a
+/// broadcast message *is* a Post row and that route needs its id.
 public struct PublishUpdateBody: Encodable, Sendable {
     public var body: String
     public var visibility: String
     public var targetTierRank: Int?
+    public var media: [BroadcastMediaPayload]?
 
-    public init(body: String, visibility: String, targetTierRank: Int? = nil) {
+    public init(
+        body: String,
+        visibility: String,
+        targetTierRank: Int? = nil,
+        media: [BroadcastMediaPayload]? = nil
+    ) {
         self.body = body
         self.visibility = visibility
         self.targetTierRank = targetTierRank
+        self.media = media?.isEmpty == true ? nil : media
     }
 
     enum CodingKeys: String, CodingKey {
-        case body, visibility
+        case body, visibility, media
         case targetTierRank = "target_tier_rank"
     }
 }

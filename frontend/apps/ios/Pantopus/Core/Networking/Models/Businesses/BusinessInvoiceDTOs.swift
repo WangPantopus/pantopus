@@ -47,6 +47,10 @@ public struct BusinessInvoiceDTO: Decodable, Sendable, Hashable, Identifiable {
     public let createdAt: String?
     public let paidAt: String?
     public let business: BusinessInvoicePartyDTO?
+    /// Joined only on the biller-side list/detail reads
+    /// (`recipient:recipient_user_id(…)`, `businesses.js:4863`). Nil on the
+    /// recipient-side routes, which join `business` instead.
+    public let recipient: BusinessInvoicePartyDTO?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -64,6 +68,7 @@ public struct BusinessInvoiceDTO: Decodable, Sendable, Hashable, Identifiable {
         case createdAt = "created_at"
         case paidAt = "paid_at"
         case business
+        case recipient
     }
 
     public init(from decoder: any Decoder) throws {
@@ -83,6 +88,7 @@ public struct BusinessInvoiceDTO: Decodable, Sendable, Hashable, Identifiable {
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         paidAt = try container.decodeIfPresent(String.self, forKey: .paidAt)
         business = try container.decodeIfPresent(BusinessInvoicePartyDTO.self, forKey: .business)
+        recipient = try container.decodeIfPresent(BusinessInvoicePartyDTO.self, forKey: .recipient)
     }
 
     public init(
@@ -100,7 +106,8 @@ public struct BusinessInvoiceDTO: Decodable, Sendable, Hashable, Identifiable {
         memo: String? = nil,
         createdAt: String? = nil,
         paidAt: String? = nil,
-        business: BusinessInvoicePartyDTO? = nil
+        business: BusinessInvoicePartyDTO? = nil,
+        recipient: BusinessInvoicePartyDTO? = nil
     ) {
         self.id = id
         self.businessUserId = businessUserId
@@ -117,6 +124,7 @@ public struct BusinessInvoiceDTO: Decodable, Sendable, Hashable, Identifiable {
         self.createdAt = createdAt
         self.paidAt = paidAt
         self.business = business
+        self.recipient = recipient
     }
 }
 
@@ -171,11 +179,18 @@ public struct BusinessInvoicePartyDTO: Decodable, Sendable, Hashable {
 
     /// Best display name for the billing business.
     public var displayName: String {
+        displayName(fallback: "Business")
+    }
+
+    /// Best display name with a caller-chosen fallback — the same join is
+    /// reused for the *recipient* on the biller-side reads, where "Business"
+    /// would be the wrong word.
+    public func displayName(fallback: String) -> String {
         let trimmedName = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedName.isEmpty { return trimmedName }
         let handle = (username ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !handle.isEmpty { return handle }
-        return "Business"
+        return fallback
     }
 }
 

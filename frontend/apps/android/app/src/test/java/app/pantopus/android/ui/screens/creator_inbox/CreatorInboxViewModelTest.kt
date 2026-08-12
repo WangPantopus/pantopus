@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.audience.PersonaThreadsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.data.personadm.PersonaDmRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -29,12 +31,14 @@ import org.junit.Test
 /**
  * Mirrors [CreatorInboxViewModelTests] (iOS): load → loaded / empty /
  * error, filter chip counts derive from the loaded thread list,
- * selecting a filter narrows the visible rows, and the conversation
- * peer prefers `counterpartyUserId` over the membership id.
+ * selecting a filter narrows the visible rows, and a row routes into the
+ * persona-DM thread by thread id (never by a user id — the DM serializer
+ * emits none).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CreatorInboxViewModelTest {
     private val repository: AudienceProfileRepository = mockk()
+    private val dmRepository: PersonaDmRepository = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -120,14 +124,14 @@ class CreatorInboxViewModelTest {
     private fun stubLoaded() {
         coEvery { repository.me() } returns
             NetworkResult.Success(PersonaMeResponse(persona = fullPersona(), channel = null))
-        coEvery { repository.threads("p_demo") } returns
+        coEvery { dmRepository.threads("p_demo") } returns
             NetworkResult.Success(PersonaThreadsResponse(threads = sampleThreads()))
     }
 
     @Test fun load_projectsThreadsAndChipCounts() =
         runTest {
             stubLoaded()
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             val state = vm.state.value as CreatorInboxUiState.Loaded
             assertEquals("@mariak", state.content.header.handle)
@@ -145,7 +149,7 @@ class CreatorInboxViewModelTest {
     @Test fun filterUnread_narrowsRows() =
         runTest {
             stubLoaded()
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             vm.selectFilter(CreatorInboxFilter.Unread)
             val state = vm.state.value as CreatorInboxUiState.Loaded
@@ -156,7 +160,7 @@ class CreatorInboxViewModelTest {
     @Test fun filterBronzePlus_excludesFreeTier() =
         runTest {
             stubLoaded()
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             vm.selectFilter(CreatorInboxFilter.BronzePlus)
             val state = vm.state.value as CreatorInboxUiState.Loaded
@@ -167,7 +171,7 @@ class CreatorInboxViewModelTest {
     @Test fun filterFlagged_isolatesFlaggedRow() =
         runTest {
             stubLoaded()
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             vm.selectFilter(CreatorInboxFilter.Flagged)
             val state = vm.state.value as CreatorInboxUiState.Loaded
@@ -180,7 +184,7 @@ class CreatorInboxViewModelTest {
         runTest {
             coEvery { repository.me() } returns
                 NetworkResult.Success(PersonaMeResponse(persona = null, channel = null))
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             val state = vm.state.value as CreatorInboxUiState.Empty
             assertNull(state.header.handle)
@@ -190,9 +194,9 @@ class CreatorInboxViewModelTest {
         runTest {
             coEvery { repository.me() } returns
                 NetworkResult.Success(PersonaMeResponse(persona = fullPersona(), channel = null))
-            coEvery { repository.threads("p_demo") } returns
+            coEvery { dmRepository.threads("p_demo") } returns
                 NetworkResult.Success(PersonaThreadsResponse(threads = emptyList()))
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             val state = vm.state.value as CreatorInboxUiState.Empty
             assertEquals("@mariak", state.header.handle)
@@ -201,27 +205,29 @@ class CreatorInboxViewModelTest {
     @Test fun loadFailure_transitionsError() =
         runTest {
             coEvery { repository.me() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             val state = vm.state.value
             assertTrue(state is CreatorInboxUiState.Error)
         }
 
     @Test fun activeFilter_defaultsToAll() {
-        val vm = CreatorInboxViewModel(repository)
+        val vm = CreatorInboxViewModel(repository, dmRepository)
         assertEquals(CreatorInboxFilter.All, vm.activeFilter.value)
     }
 
-    @Test fun conversationPeer_prefersCounterpartyUserId() =
+    @Test fun threadDestination_routesOnThreadIdNotUserId() =
         runTest {
             stubLoaded()
-            val vm = CreatorInboxViewModel(repository)
+            val vm = CreatorInboxViewModel(repository, dmRepository)
             vm.load()
             val loaded = vm.state.value as CreatorInboxUiState.Loaded
             val row = loaded.content.rows.first { it.id == "th_gold" }
-            val peer = vm.conversationPeer(row)
-            assertEquals("u_derek", peer.userId)
-            assertEquals("Derek Tan", peer.displayName)
-            assertTrue(peer.verified)
+            val destination = vm.threadDestination(row)
+            assertEquals("th_gold", destination.threadId)
+            assertEquals("p_demo", destination.personaId)
+            assertNotEquals(row.counterpartyUserId, destination.threadId)
+            assertEquals("Derek Tan", destination.displayName)
+            assertTrue(destination.verified)
         }
 }

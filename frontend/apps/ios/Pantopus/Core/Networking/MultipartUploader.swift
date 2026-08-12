@@ -306,6 +306,52 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Upload a Beacon avatar or banner via
+    /// `POST /api/upload/persona-media/:personaId?type=avatar|banner`
+    /// (`backend/routes/upload.js:312`). Single file, field name `file`,
+    /// images only — the route resizes (800×800 for avatars, 1600×600 for
+    /// banners), writes `avatar_url` / `banner_url` on the persona row and
+    /// echoes the new URL. Owner-only: 403 when the Beacon isn't yours.
+    /// Mirrors RN `api.upload.uploadPersonaMedia`.
+    public func uploadPersonaMedia(
+        personaId: String,
+        kind: PersonaMediaKind,
+        file: MultipartFile
+    ) async throws -> PersonaMediaUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        var components = URLComponents(
+            url: environment.apiBaseURL.appendingPathComponent("/api/upload/persona-media/\(personaId)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "type", value: kind.rawValue)]
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        // The route also accepts `type` as a form field; send both so a
+        // proxy that strips the query string still resolves the slot.
+        let body = Self.buildBody(boundary: boundary, file: file, fields: ["type": kind.rawValue])
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(PersonaMediaUploadResponse.self, from: data)
+            } catch {
+                logger.error("Beacon media upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 403:
+            throw APIError.clientError(status: 403, message: "You do not have permission to edit this Beacon.")
+        case 413:
+            throw APIError.clientError(status: 413, message: "That image is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Beacon media must be an image.")
+        case 400..<500:
+            throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload images to `POST /api/upload/ai-media` for AI vision prompts.
     public func uploadAIMedia(files: [MultipartFile]) async throws -> AIMediaUploadResponse {
         guard !files.isEmpty else {

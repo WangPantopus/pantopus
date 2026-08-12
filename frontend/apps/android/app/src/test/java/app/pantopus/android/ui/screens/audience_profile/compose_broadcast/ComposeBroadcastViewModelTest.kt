@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.audience_profile.compose_broadcast
 
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.data.upload.UploadRepository
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,7 @@ class ComposeBroadcastViewModelTest {
     // (send-success uses the default no-op performSend, send-failure overrides
     // it), so an unstubbed mock repository is never invoked.
     private val repository: AudienceProfileRepository = mockk()
+    private val uploadRepository: UploadRepository = mockk()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
@@ -44,6 +46,7 @@ class ComposeBroadcastViewModelTest {
         ComposeBroadcastViewModel(
             SavedStateHandle(mapOf(COMPOSE_BROADCAST_PERSONA_ID_KEY to personaId)),
             repository,
+            uploadRepository,
         )
 
     @Test
@@ -80,8 +83,53 @@ class ComposeBroadcastViewModelTest {
         assertFalse(vm.state.value.draft.isEmpty)
         assertTrue(vm.state.value.canSend)
         vm.removeMedia()
-        assertNull(vm.state.value.draft.media)
+        assertTrue(vm.state.value.draft.media.isEmpty())
         assertEquals(ComposeBroadcastState.Empty, vm.state.value.composeState())
+    }
+
+    @Test
+    fun `multi select appends up to nine attachments`() {
+        val vm = buildVm()
+        vm.attachMedia(
+            (0 until 5).map {
+                ComposeMediaPreview(id = "a$it", kind = ComposeMediaPreview.Kind.Image, caption = null)
+            },
+        )
+        assertEquals(5, vm.state.value.draft.media.size)
+        assertEquals(4, vm.state.value.draft.remainingMediaSlots)
+
+        // Overflowing batch is truncated at the cap, not rejected.
+        vm.attachMedia(
+            (0 until 6).map {
+                ComposeMediaPreview(id = "b$it", kind = ComposeMediaPreview.Kind.Video, caption = null)
+            },
+        )
+        assertEquals(ComposeBroadcastDraft.MEDIA_LIMIT, vm.state.value.draft.media.size)
+        assertEquals(0, vm.state.value.draft.remainingMediaSlots)
+
+        vm.removeMedia("a0")
+        assertEquals(8, vm.state.value.draft.media.size)
+        assertFalse(vm.state.value.draft.media.any { it.id == "a0" })
+    }
+
+    @Test
+    fun `picked media becomes a multipart upload file`() {
+        val picked =
+            ComposeMediaPreview(
+                id = "content://media/42",
+                kind = ComposeMediaPreview.Kind.Image,
+                caption = "boule.jpg",
+                bytes = byteArrayOf(1, 2, 3),
+                mimeType = "image/heic",
+            )
+        val file = uploadFileFor(picked)
+        assertEquals("image/heic", file?.mimeType)
+        assertFalse(file?.filename?.contains("IMG_") ?: true)
+        assertNull(
+            uploadFileFor(
+                ComposeMediaPreview(id = "sample", kind = ComposeMediaPreview.Kind.Image, caption = null),
+            ),
+        )
     }
 
     @Test

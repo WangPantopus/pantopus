@@ -136,6 +136,70 @@ public struct MembershipSLAAlert: Sendable, Hashable {
     }
 }
 
+/// The "Inbox" card on the membership screen — the fan's entry point into
+/// persona DMs, with the remaining message-thread credits as its footnote.
+public struct MembershipInboxCard: Sendable, Hashable {
+    /// `nil` message credits and a zero/absent allowance are different
+    /// states: the first is unlimited, the second is "no messaging here".
+    public let remainingThreads: Int?
+    public let threadsPerPeriod: Int?
+
+    public init(remainingThreads: Int?, threadsPerPeriod: Int?) {
+        self.remainingThreads = remainingThreads
+        self.threadsPerPeriod = threadsPerPeriod
+    }
+
+    /// Mirrors RN's footnote under the "Open inbox" CTA.
+    public var footnote: String {
+        guard let threadsPerPeriod, threadsPerPeriod != 0 else {
+            return "No messaging on this tier — upgrade to send a DM."
+        }
+        if threadsPerPeriod < 0 { return "Unlimited message threads on this tier." }
+        guard let remainingThreads else { return "Unlimited message threads on this tier." }
+        let noun = remainingThreads == 1 ? "message thread" : "message threads"
+        return "\(remainingThreads) \(noun) left this period."
+    }
+}
+
+/// One row in the change-tier picker. `direction` is the *honest* label —
+/// an upgrade lands immediately, a downgrade is scheduled at period end.
+public struct MembershipTierOption: Sendable, Hashable, Identifiable {
+    public enum Direction: String, Sendable, Hashable {
+        case upgrade
+        case downgrade
+
+        public var label: String {
+            switch self {
+            case .upgrade: "Upgrade"
+            case .downgrade: "Downgrade"
+            }
+        }
+
+        /// When the change takes effect — surfaced on the row so the fan
+        /// isn't surprised by a delayed downgrade.
+        public var timingNote: String {
+            switch self {
+            case .upgrade: "Takes effect immediately"
+            case .downgrade: "Scheduled for the end of this period"
+            }
+        }
+    }
+
+    public let id: String
+    public let rank: Int
+    public let name: String
+    public let priceLabel: String
+    public let direction: Direction
+
+    public init(id: String, rank: Int, name: String, priceLabel: String, direction: Direction) {
+        self.id = id
+        self.rank = rank
+        self.name = name
+        self.priceLabel = priceLabel
+        self.direction = direction
+    }
+}
+
 /// Composed content for the membership detail surface. `slaAlert` is
 /// non-nil only in the `.slaMissed` state (the amber banner + warn-tone
 /// renewal row read from it).
@@ -149,6 +213,15 @@ public struct MembershipDetailContent: Sendable, Hashable {
     public let benefits: [MembershipBenefit]
     public let policyFootnote: String
     public let slaAlert: MembershipSLAAlert?
+    /// Persona UUID — the `:id` path segment for the inbox push.
+    public let personaId: String
+    public let inbox: MembershipInboxCard
+    /// True once a downgrade (or other tier change) is queued for the end
+    /// of the current period.
+    public let hasScheduledTierChange: Bool
+    /// Terminal memberships (`canceled` / `expired`) hide every mutation.
+    public let isTerminal: Bool
+    public let cancelAtPeriodEnd: Bool
 
     public init(
         persona: MembershipPersona,
@@ -159,7 +232,12 @@ public struct MembershipDetailContent: Sendable, Hashable {
         paymentLabel: String,
         benefits: [MembershipBenefit],
         policyFootnote: String,
-        slaAlert: MembershipSLAAlert? = nil
+        slaAlert: MembershipSLAAlert? = nil,
+        personaId: String = "",
+        inbox: MembershipInboxCard = MembershipInboxCard(remainingThreads: nil, threadsPerPeriod: nil),
+        hasScheduledTierChange: Bool = false,
+        isTerminal: Bool = false,
+        cancelAtPeriodEnd: Bool = false
     ) {
         self.persona = persona
         self.tier = tier
@@ -170,6 +248,11 @@ public struct MembershipDetailContent: Sendable, Hashable {
         self.benefits = benefits
         self.policyFootnote = policyFootnote
         self.slaAlert = slaAlert
+        self.personaId = personaId
+        self.inbox = inbox
+        self.hasScheduledTierChange = hasScheduledTierChange
+        self.isTerminal = isTerminal
+        self.cancelAtPeriodEnd = cancelAtPeriodEnd
     }
 
     /// Same content with the SLA banner dropped — used when the fan picks
@@ -184,7 +267,12 @@ public struct MembershipDetailContent: Sendable, Hashable {
             paymentLabel: paymentLabel,
             benefits: benefits,
             policyFootnote: policyFootnote,
-            slaAlert: nil
+            slaAlert: nil,
+            personaId: personaId,
+            inbox: inbox,
+            hasScheduledTierChange: hasScheduledTierChange,
+            isTerminal: isTerminal,
+            cancelAtPeriodEnd: cancelAtPeriodEnd
         )
     }
 }

@@ -133,6 +133,12 @@ public struct BusinessOwnerContent: Sendable, Hashable {
     /// The shared public render — reused verbatim for "preview as neighbor"
     /// and read by the owner frame for the business's own data.
     public let publicProfile: BusinessProfileContent
+    /// True when `access.role_base` ∈ `owner | admin | editor` — the same
+    /// gate React Native puts on its "Post as this business" composer
+    /// (`src/app/businesses/[id]/index.tsx:67`). `POST
+    /// /api/businesses/:businessId/posts` requires `profile.edit`, so a
+    /// staff / viewer seat never sees the affordance.
+    public let canPostAsBusiness: Bool
 
     public init(
         businessId: String,
@@ -142,7 +148,8 @@ public struct BusinessOwnerContent: Sendable, Hashable {
         profileStrength: OwnerProfileStrength,
         reviewsToReplyLabel: String?,
         reviews: [OwnerReviewItem],
-        publicProfile: BusinessProfileContent
+        publicProfile: BusinessProfileContent,
+        canPostAsBusiness: Bool = false
     ) {
         self.businessId = businessId
         self.isLive = isLive
@@ -152,7 +159,12 @@ public struct BusinessOwnerContent: Sendable, Hashable {
         self.reviewsToReplyLabel = reviewsToReplyLabel
         self.reviews = reviews
         self.publicProfile = publicProfile
+        self.canPostAsBusiness = canPostAsBusiness
     }
+
+    /// Roles the backend's `profile.edit` permission resolves to for the
+    /// business-post route (`backend/routes/businesses.js:4198`).
+    public static let postingRoles: Set<String> = ["owner", "admin", "editor"]
 
     /// Returns a copy with `reply` set on the review matching `reviewId`.
     /// Backs the local-state reply stub (no backend in B3.2).
@@ -177,7 +189,8 @@ public struct BusinessOwnerContent: Sendable, Hashable {
             profileStrength: profileStrength,
             reviewsToReplyLabel: recomputeReplyLabel(after: updated),
             reviews: updated,
-            publicProfile: publicProfile
+            publicProfile: publicProfile,
+            canPostAsBusiness: canPostAsBusiness
         )
     }
 

@@ -60,6 +60,7 @@ enum BusinessOwnerSampleData {
                     + "See you next visit."
             )
         ],
-        publicProfile: BusinessProfileSampleData.populated
+        publicProfile: BusinessProfileSampleData.populated,
+        canPostAsBusiness: true
     )
 }

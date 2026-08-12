@@ -15,8 +15,11 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Paparazzi snapshots for A13.12 Edit persona. The two frames mirror the
- * design source: published & monetized (live) and mid-setup draft (setup).
+ * Paparazzi snapshots for A13.12 Edit Beacon. Two frames mirror the two
+ * real states the editor can open in: an empty create form (no Beacon yet)
+ * and a filled edit form for an existing Beacon. State is built by hand —
+ * these are render fixtures for the snapshot, never a data source the
+ * shipped screen reads.
  */
 class EditPersonaSnapshotTest {
     @get:Rule
@@ -30,26 +33,47 @@ class EditPersonaSnapshotTest {
         )
 
     @Test
-    fun edit_persona_live() {
+    fun edit_persona_create() {
         paparazzi.snapshot {
             Frame {
-                EditPersonaLoadedContent(
-                    content = EditPersonaSampleData.live,
-                    variant = EditPersonaVariant.Live,
+                EditPersonaScaffold(
+                    state =
+                        EditPersonaUiState.Editing(
+                            mode = EditPersonaMode.Create,
+                            form = EditPersonaForm(),
+                        ),
                 )
             }
         }
     }
 
     @Test
-    fun edit_persona_setup() {
+    fun edit_persona_edit() {
         paparazzi.snapshot {
             Frame {
-                EditPersonaLoadedContent(
-                    content = EditPersonaSampleData.setup,
-                    variant = EditPersonaVariant.Setup,
-                    stepsDone = EditPersonaSampleData.SETUP_STEPS_DONE,
-                    stepsTotal = EditPersonaSampleData.SETUP_STEPS_TOTAL,
+                EditPersonaScaffold(
+                    state =
+                        EditPersonaUiState.Editing(
+                            mode = EditPersonaMode.Edit("p_1"),
+                            form =
+                                EditPersonaForm(
+                                    handle = "elmpark.watch",
+                                    displayName = "Elm Park Watch",
+                                    bio = "Neighborhood updates, twice a week.",
+                                    category = "community_leader",
+                                    audienceLabel = PersonaAudienceLabel.Members,
+                                    audienceMode = PersonaAudienceMode.ApprovalRequired,
+                                    links =
+                                        listOf(
+                                            PersonaLinkDraft(
+                                                id = "link_1",
+                                                label = "Site",
+                                                url = "https://elmpark.org",
+                                            ),
+                                        ),
+                                ),
+                            isDirty = true,
+                        ),
                 )
             }
         }
