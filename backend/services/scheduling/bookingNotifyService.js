@@ -96,7 +96,7 @@ async function buildBookingIcs({ booking, eventType, method, organizer }) {
     attendeeEmail: booking.invitee_email || undefined,
     method,
     // SEQUENCE bumps on each change so calendar clients accept the update.
-    sequence: booking.previous_start_at ? 1 : 0,
+    sequence: booking.ics_sequence || 0, // monotonic iTIP revision (migration 167)
   });
   return {
     filename: 'invite.ics',
@@ -308,7 +308,7 @@ async function sendBookingReminder({ booking, eventType, page, kind, offsetMinut
       metadata: { booking_id: booking.id, kind },
     });
   } else if (booking.invitee_email) {
-    if (await isEmailSuppressed(booking.invitee_email)) return;
+    if (await isEmailSuppressed(booking.invitee_email, booking.owner_type, booking.owner_id)) return;
     const organizer = await getUserContact(booking.host_user_id || booking.owner_user_id);
     const attachments = [await buildBookingIcs({ booking, eventType, method: 'REQUEST', organizer })];
     const html = bookingEmailHtml({

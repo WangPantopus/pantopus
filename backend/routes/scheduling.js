@@ -137,7 +137,13 @@ const pageUpdateSchema = Joi.object({
   is_live: Joi.boolean(),
   is_paused: Joi.boolean(),
   reminder_minutes: Joi.array().items(Joi.number().integer().min(0).max(43200)).max(5),
-  cancellation_policy: Joi.string().allow('', null).max(1000),
+  // Structured policies (preset + windows, saved by the mobile custom-policy editors) or a
+  // plain text blurb. Column is jsonb since migration 166; plain strings are stored as JSON
+  // strings, so both shapes round-trip unchanged.
+  cancellation_policy: Joi.alternatives().try(
+    Joi.string().allow('', null).max(1000),
+    Joi.object().unknown(true)
+  ),
   visibility: Joi.string().valid('listed', 'unlisted'),
   branding: Joi.object().unknown(true),
 });
@@ -178,11 +184,18 @@ router.get('/booking-page/check-slug', withOwner('view'), asyncHandler(async (re
     return res.status(400).json({ available: false, error: 'INVALID_SLUG', message: 'Use 3–50 letters, numbers, or hyphens.' });
   }
   const { ownerType, ownerId } = req.scheduling;
-  const [{ data: existing }, { data: ownPage }] = await Promise.all([
+  const [{ data: existing }, { data: ownPages }] = await Promise.all([
     supabaseAdmin.from('BookingPage').select('id').ilike('slug', slug).maybeSingle(),
-    supabaseAdmin.from('BookingPage').select('id').eq('owner_type', ownerType).eq('owner_id', ownerId).maybeSingle(),
+    // Same duplicate-tolerance as findPage: oldest row wins, and limit(1) keeps a stray
+    // duplicate from erroring the whole check.
+    supabaseAdmin.from('BookingPage').select('id').eq('owner_type', ownerType).eq('owner_id', ownerId)
+      .order('created_at', { ascending: true }).limit(1),
   ]);
-  const available = !existing || (ownPage && existing.id === ownPage.id);
+  const ownPage = (ownPages || [])[0] || null;
+  // `!!` matters: with no own page this expression is `null`, and `res.json({available:null})`
+  // reads as falsy on some clients and as "missing key" on others — the mobile apps then
+  // showed "taken" for every slug a NEW user checked.
+  const available = !existing || !!(ownPage && existing.id === ownPage.id);
   const suggestions = available ? [] : [`${slug}-1`, `${slug}-2`, `${slug}${Math.floor(Math.random() * 90 + 10)}`];
   res.json({ available, suggestions });
 }));
@@ -593,12 +606,26 @@ const blockSchema = Joi.object({
   start_at: Joi.string().isoDate().required(),
   end_at: Joi.string().isoDate().required(),
   recurrence_rule: Joi.string().allow('', null).max(500),
+  timezone: Joi.string().max(64).allow('', null),
 });
 
 router.post('/availability/blocks', validate(blockSchema), asyncHandler(async (req, res) => {
+  // Persist the zone the block was authored in so a RECURRING block expands at the intended
+  // wall-clock time across DST (migration 167 §5). Default: the creator's default schedule's
+  // timezone — the zone their working hours already live in.
+  let timezone = req.body.timezone || null;
+  if (!timezone) {
+    const { data: sched } = await supabaseAdmin
+      .from('AvailabilitySchedule')
+      .select('timezone')
+      .eq('user_id', req.user.id)
+      .eq('is_default', true)
+      .maybeSingle();
+    timezone = (sched && sched.timezone) || 'UTC';
+  }
   const { data, error } = await supabaseAdmin
     .from('AvailabilityBlock')
-    .insert({ ...req.body, user_id: req.user.id })
+    .insert({ ...req.body, timezone, user_id: req.user.id })
     .select('*')
     .single();
   if (error) throw error;
@@ -618,7 +645,9 @@ router.delete('/availability/blocks/:blockId', asyncHandler(async (req, res) => 
 
 router.get('/bookings', withOwner('view'), asyncHandler(async (req, res) => {
   const { ownerType, ownerId } = req.scheduling;
-  let q = supabaseAdmin.from('Booking').select('*').eq('owner_type', ownerType).eq('owner_id', ownerId);
+  // Collective co-host reservation shadows (cohost_of_booking_id) mirror a primary row that is
+  // already in this owner-scoped list — including them would show one meeting N times.
+  let q = supabaseAdmin.from('Booking').select('*').eq('owner_type', ownerType).eq('owner_id', ownerId).is('cohost_of_booking_id', null);
   const status = req.query.status;
   const nowIso = new Date().toISOString();
   if (status === 'upcoming') q = q.in('status', ['confirmed']).gte('start_at', nowIso).order('start_at', { ascending: true });
@@ -626,11 +655,22 @@ router.get('/bookings', withOwner('view'), asyncHandler(async (req, res) => {
   else if (status === 'past') q = q.in('status', ['confirmed', 'completed', 'no_show']).lt('start_at', nowIso).order('start_at', { ascending: false });
   else if (status === 'cancelled') q = q.in('status', ['cancelled', 'declined']).order('start_at', { ascending: false });
   else q = q.order('start_at', { ascending: false });
-  // Optional filters (Booking Search & Filter screen).
-  if (req.query.event_type_id) q = q.eq('event_type_id', req.query.event_type_id);
-  if (req.query.from) q = q.gte('start_at', req.query.from);
-  if (req.query.to) q = q.lte('start_at', req.query.to);
-  if (req.query.q) q = q.ilike('invitee_name', `%${String(req.query.q).replace(/[%_]/g, '')}%`);
+  // Optional filters (Booking Search & Filter screen). Malformed values 400 instead of
+  // reaching PostgREST, where a bad uuid/timestamp becomes an opaque 500.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (req.query.event_type_id) {
+    if (!UUID_RE.test(String(req.query.event_type_id))) return res.status(400).json({ error: 'BAD_FILTER', message: 'event_type_id must be a UUID.' });
+    q = q.eq('event_type_id', req.query.event_type_id);
+  }
+  if (req.query.from) {
+    if (!Number.isFinite(Date.parse(req.query.from))) return res.status(400).json({ error: 'BAD_FILTER', message: 'from must be an ISO datetime.' });
+    q = q.gte('start_at', req.query.from);
+  }
+  if (req.query.to) {
+    if (!Number.isFinite(Date.parse(req.query.to))) return res.status(400).json({ error: 'BAD_FILTER', message: 'to must be an ISO datetime.' });
+    q = q.lte('start_at', req.query.to);
+  }
+  if (req.query.q) q = q.ilike('invitee_name', `%${String(req.query.q).slice(0, 200).replace(/[%_]/g, '')}%`);
   const { data, error } = await q.limit(200);
   if (error) throw error;
   res.json({ bookings: data || [] });
@@ -919,8 +959,9 @@ router.put('/resources/:rid', withOwner('edit'), validate(resourcePatchSchema), 
     .eq('id', req.params.rid)
     .eq('home_id', req.scheduling.ownerId)
     .select('*')
-    .single();
+    .maybeSingle(); // .single() turned "no such resource in this home" into an opaque 500
   if (error) throw error;
+  if (!data) return res.status(404).json({ error: 'RESOURCE_NOT_FOUND' });
   res.json({ resource: data });
 }));
 
@@ -1039,7 +1080,9 @@ const oneOffSchema = Joi.object({
   owner_type: Joi.string().valid('user', 'home', 'business'),
   owner_id: Joi.string(),
   event_type_id: Joi.string().uuid().required(),
-  expires_in_min: Joi.number().integer().min(5).max(525600).default(10080), // default 7 days
+  // Explicit null = never expires (BookingToken.expires_at NULL; the public redemption
+  // checks are already null-tolerant). Omitting the key keeps the 7-day default.
+  expires_in_min: Joi.number().integer().min(5).max(525600).allow(null).default(10080),
   single_use: Joi.boolean().default(true),
   offered_slots: Joi.array()
     .items(Joi.object({ start: Joi.string().isoDate().required(), end: Joi.string().isoDate().required() }))
@@ -1059,7 +1102,7 @@ router.post('/booking-page/one-off-links', withOwner('edit'), validate(oneOffSch
       token_hash: hash,
       kind: 'one_off',
       single_use: req.body.single_use,
-      expires_at: new Date(Date.now() + req.body.expires_in_min * 60 * 1000).toISOString(),
+      expires_at: req.body.expires_in_min == null ? null : new Date(Date.now() + req.body.expires_in_min * 60 * 1000).toISOString(),
       offered_slots: req.body.offered_slots && req.body.offered_slots.length ? req.body.offered_slots : null,
     })
     .select('id, expires_at, single_use')
@@ -1101,7 +1144,21 @@ async function loadOwnedRow(req, table) {
   await assertCanManageOwner(data.owner_type, data.owner_id, req.user.id, 'edit');
   return data;
 }
-router.put('/workflows/:id', validate(workflowSchema.fork(['name', 'trigger', 'action'], (s) => s.optional())), asyncHandler(async (req, res) => {
+// Partial-update schema. Deliberately NOT `workflowSchema.fork(...)`: fork only lifts
+// `required()`, it keeps every `.default()` — so a body of `{is_active:false}` would be
+// validated into `{is_active:false, offset_minutes:0}` and silently zero the trigger offset
+// on every pause/resume. Same pattern as eventTypePatchSchema.
+const workflowPatchSchema = Joi.object({
+  event_type_id: Joi.string().uuid().allow(null),
+  name: Joi.string().trim().min(1).max(200),
+  trigger: Joi.string().valid('booking_created', 'cancelled', 'rescheduled', 'before_start', 'after_end'),
+  offset_minutes: Joi.number().integer().min(0).max(525600),
+  action: Joi.string().valid('email', 'push', 'in_app', 'sms'),
+  message_template: Joi.string().allow('', null).max(5000),
+  is_active: Joi.boolean(),
+}).min(1);
+
+router.put('/workflows/:id', validate(workflowPatchSchema), asyncHandler(async (req, res) => {
   const row = await loadOwnedRow(req, 'SchedulingWorkflow');
   const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
   const { data, error } = await supabaseAdmin.from('SchedulingWorkflow').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
@@ -1141,7 +1198,17 @@ router.post('/message-templates/preview', validate(Joi.object({ subject: Joi.str
   const fill = (str) => String(str || '').replace(/\{\{?\s*([\w.]+)\s*\}?\}/g, (m, k) => (req.body.variables[k] != null ? String(req.body.variables[k]) : m));
   res.json({ subject: fill(req.body.subject), body: fill(req.body.body) });
 }));
-router.put('/message-templates/:id', validate(templateSchema.fork(['name', 'body'], (s) => s.optional())), asyncHandler(async (req, res) => {
+// Defaults-free partial update — see workflowPatchSchema for why fork() is wrong here
+// (fork keeps defaults; `{subject:'x'}` would also flip channel back to 'email').
+const templatePatchSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(200),
+  channel: Joi.string().valid('email', 'push', 'in_app', 'sms'),
+  subject: Joi.string().allow('', null).max(300),
+  body: Joi.string().trim().min(1).max(5000),
+  is_active: Joi.boolean(),
+}).min(1);
+
+router.put('/message-templates/:id', validate(templatePatchSchema), asyncHandler(async (req, res) => {
   const row = await loadOwnedRow(req, 'MessageTemplate');
   const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
   const { data, error } = await supabaseAdmin.from('MessageTemplate').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
@@ -1232,7 +1299,19 @@ router.post('/packages', withOwner('edit'), validate(packageSchema), asyncHandle
   if (error) throw error;
   res.status(201).json({ package: data });
 }));
-router.put('/packages/:id', validate(packageSchema.fork(['name', 'sessions_count'], (s) => s.optional())), asyncHandler(async (req, res) => {
+// Defaults-free partial update — see workflowPatchSchema for why fork() is wrong here.
+// With fork, restoring an archived package (`{is_active:true}`) also validated in
+// `price_cents:0` + `currency:'USD'` and wiped the package's real price.
+const packagePatchSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(200),
+  sessions_count: Joi.number().integer().min(1).max(1000),
+  price_cents: Joi.number().integer().min(0),
+  currency: Joi.string().length(3).uppercase(),
+  event_type_id: Joi.string().uuid().allow(null),
+  is_active: Joi.boolean(),
+}).min(1);
+
+router.put('/packages/:id', validate(packagePatchSchema), asyncHandler(async (req, res) => {
   const row = await loadOwnedRow(req, 'BookingPackage');
   const body = { ...req.body }; delete body.owner_type; delete body.owner_id;
   const { data, error } = await supabaseAdmin.from('BookingPackage').update({ ...body, updated_at: new Date().toISOString() }).eq('id', row.id).select('*').single();
@@ -1403,7 +1482,13 @@ router.post('/polls', withOwner('edit'), validate(pollSchema), asyncHandler(asyn
   const { data: poll, error } = await supabaseAdmin.from('SchedulingPoll').insert({ ...req.scheduling.oc, title: req.body.title, description: req.body.description || null, duration_min: req.body.duration_min, created_by: req.user.id }).select('*').single();
   if (error) throw error;
   const options = req.body.options.map((o) => ({ poll_id: poll.id, start_at: o.start, end_at: o.end }));
-  const { data: opts } = await supabaseAdmin.from('SchedulingPollOption').insert(options).select('*');
+  const { data: opts, error: optErr } = await supabaseAdmin.from('SchedulingPollOption').insert(options).select('*');
+  if (optErr) {
+    // A poll without its options is unusable and unfixable from the client (options are only
+    // written here) — roll back the parent rather than 201-ing a half-created poll.
+    await supabaseAdmin.from('SchedulingPoll').delete().eq('id', poll.id);
+    throw optErr;
+  }
   res.status(201).json({ poll, options: opts || [] });
 }));
 router.get('/polls', withOwner('view'), asyncHandler(async (req, res) => {

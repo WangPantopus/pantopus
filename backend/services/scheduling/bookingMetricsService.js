@@ -25,7 +25,9 @@ async function getSummary({ ownerType, ownerId, now }) {
   const lastMonth = prevMonthStart(nowDate);
   const windowStart = new Date(nowDate.getTime() - 30 * DAY_MS).toISOString();
 
-  const base = () => supabaseAdmin.from('Booking').select('id', { count: 'exact', head: true }).eq('owner_type', ownerType).eq('owner_id', ownerId);
+  // Collective co-host reservation shadows (cohost_of_booking_id) mirror a primary row with
+  // the same owner — counting them would report one meeting N times.
+  const base = () => supabaseAdmin.from('Booking').select('id', { count: 'exact', head: true }).eq('owner_type', ownerType).eq('owner_id', ownerId).is('cohost_of_booking_id', null);
 
   const [thisMonthRes, lastMonthRes, upcomingRes, noShowRes] = await Promise.all([
     base().gte('created_at', thisMonth).in('status', ['pending', 'confirmed', 'completed', 'no_show']),
@@ -46,6 +48,7 @@ async function getSummary({ ownerType, ownerId, now }) {
     .select('event_type_id, start_at, created_at, status')
     .eq('owner_type', ownerType)
     .eq('owner_id', ownerId)
+    .is('cohost_of_booking_id', null)
     .gte('created_at', windowStart)
     .in('status', ['pending', 'confirmed', 'completed', 'no_show'])
     .limit(2000);
@@ -83,6 +86,7 @@ async function getNoShowReport({ ownerType, ownerId, days = 90 }) {
     .select('id, start_at, status, invitee_name, event_type_id')
     .eq('owner_type', ownerType)
     .eq('owner_id', ownerId)
+    .is('cohost_of_booking_id', null)
     .gte('start_at', since)
     .in('status', ['completed', 'no_show', 'cancelled'])
     .order('start_at', { ascending: false })
@@ -110,6 +114,7 @@ async function getTeamPerformance({ businessUserId, days = 90 }) {
     .select('host_user_id, status')
     .eq('owner_type', 'business')
     .eq('owner_id', businessUserId)
+    .is('cohost_of_booking_id', null)
     .gte('start_at', since)
     .limit(2000);
   const byHost = new Map();

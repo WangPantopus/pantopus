@@ -13,9 +13,10 @@ const availabilityService = require('./availabilityService');
 const notify = require('./bookingNotifyService');
 const payments = require('./schedulingPaymentsService');
 const packages = require('./packageService');
-const { ownerColumns, generateToken } = require('./schedulingShared');
+const { ownerColumns, generateToken, normalizeEmail } = require('./schedulingShared');
 
 const MIN_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * MIN_MS;
 
 class BookingError extends Error {
   constructor(message, statusCode = 400, code) {
@@ -62,6 +63,27 @@ async function getBookingContext(bookingId) {
   return { booking, eventType, page };
 }
 
+/**
+ * Who may legitimately host this booking: the owner themselves (personal pages, and the
+ * owning user of a home/business page) plus the event type's active assignees — the same set
+ * the availability engine draws from in `resolveMembers`.
+ * @returns {Promise<Set<string>>}
+ */
+async function eligibleHostIds(booking, eventType) {
+  const ids = new Set();
+  if (booking.owner_user_id) ids.add(booking.owner_user_id);
+  if (booking.owner_type === 'user' && booking.owner_id) ids.add(booking.owner_id);
+  if (eventType && eventType.id) {
+    const { data: assignees } = await supabaseAdmin
+      .from('EventTypeAssignee')
+      .select('subject_id')
+      .eq('event_type_id', eventType.id)
+      .eq('is_active', true);
+    for (const a of assignees || []) if (a.subject_id) ids.add(a.subject_id);
+  }
+  return ids;
+}
+
 /** Fair round-robin pick among eligible hosts: lowest assigned_count, then highest priority, then oldest last_assigned_at. */
 async function pickRoundRobinHost(eventTypeId, eligibleHosts) {
   if (!eligibleHosts.length) return null;
@@ -106,6 +128,47 @@ async function bumpAssigneeRotation(eventTypeId, hostId) {
  * @param {string} [args.requestedHostId]  (round-robin: a specific eligible host)
  * @returns {Promise<{ booking, manageToken, clientSecret }>}
  */
+/**
+ * Booking-limit gate (EventType.daily_cap / per_booker_cap). Friendly 409s; the
+ * booking_daily_cap_trg trigger (migration 167) is the atomic backstop for daily_cap.
+ * Cap-day = UTC date of start_at, matching the trigger and the slot grid.
+ */
+async function assertBookingLimits(eventType, startMs, invitee = {}) {
+  const dailyCap = eventType.daily_cap || 0;
+  const bookerCap = eventType.per_booker_cap || 0;
+  if (dailyCap <= 0 && bookerCap <= 0) return;
+  const dayStartIso = new Date(Math.floor(startMs / DAY_MS) * DAY_MS).toISOString();
+  const dayEndIso = new Date(Math.floor(startMs / DAY_MS) * DAY_MS + DAY_MS).toISOString();
+  if (dailyCap > 0) {
+    const { count } = await supabaseAdmin
+      .from('Booking')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_type_id', eventType.id)
+      .in('status', ['pending', 'confirmed'])
+      .is('cohost_of_booking_id', null) // co-host shadows are the same meeting, not extra bookings
+      .gte('start_at', dayStartIso)
+      .lt('start_at', dayEndIso);
+    if ((count || 0) >= dailyCap) {
+      throw new BookingError('This day is fully booked for this event type.', 409, 'DAILY_CAP_REACHED');
+    }
+  }
+  if (bookerCap > 0) {
+    let q = supabaseAdmin
+      .from('Booking')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_type_id', eventType.id)
+      .in('status', ['pending', 'confirmed'])
+      .is('cohost_of_booking_id', null);
+    if (invitee.user_id) q = q.eq('invitee_user_id', invitee.user_id);
+    else if (invitee.email) q = q.eq('invitee_email', normalizeEmail(invitee.email));
+    else return; // anonymous with no identity to count against
+    const { count } = await q;
+    if ((count || 0) >= bookerCap) {
+      throw new BookingError('You already have the maximum number of active bookings for this event.', 409, 'PER_BOOKER_CAP_REACHED');
+    }
+  }
+}
+
 async function createBooking({ eventType, page, startIso, durationMin, invitee = {}, intakeAnswers = {}, createdVia = 'public_link', actorUserId = null, requestedHostId = null, recurrenceGroupId = null }) {
   if (!eventType || !eventType.is_active) throw new BookingError('Event type is not available.', 404, 'EVENT_TYPE_UNAVAILABLE');
   const duration = durationMin || eventType.default_duration;
@@ -138,6 +201,8 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     throw new BookingError('That time is no longer available.', 409, 'SLOT_UNAVAILABLE');
   }
 
+  await assertBookingLimits(eventType, startMs, invitee);
+
   // Resolve host + attendees by assignment mode.
   const mode = eventType.assignment_mode || 'one_on_one';
   let hostUserId = null;
@@ -145,7 +210,12 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
   let attendees = [];
   if (mode === 'group') {
     hostUserId = oc.owner_user_id || avail.eligibleHosts[0] || null;
-    enforceExclusive = false; // group events allow multiple bookings per slot (up to capacity)
+    // Only opt out of the exclusion constraint when the slot genuinely holds more than one
+    // seat. A group event left at the default seat_cap=1 would otherwise fall through BOTH
+    // guards — the constraint skips enforce_exclusive=false rows, and the
+    // booking_enforce_group_cap trigger returns early for cap<=1 on the assumption that the
+    // constraint covers it — leaving concurrent bookings completely unguarded.
+    enforceExclusive = Math.max(1, eventType.seat_cap || 1) <= 1;
   } else if (mode === 'collective') {
     hostUserId = avail.eligibleHosts[0] || oc.owner_user_id || null;
     attendees = avail.eligibleHosts; // all required members
@@ -201,6 +271,39 @@ async function createBooking({ eventType, page, startIso, durationMin, invitee =
     }
     logger.error('[bookingService] insert failed', { error: error.message, code: error.code });
     throw new BookingError('Could not create the booking.', 500, 'CREATE_FAILED');
+  }
+
+  // Collective events: every required co-host must hold a DB-visible reservation. Both overlap
+  // guards key on host_user_id (the Booking_no_overlap constraint and the busy engine), and
+  // neither sees BookingAttendee rows — so without sibling rows the co-hosts' time stayed
+  // bookable everywhere else. One sibling Booking per non-primary required member, linked via
+  // cohost_of_booking_id (FK ON DELETE CASCADE: siblings die with the primary, including the
+  // payment-failure rollback delete below). NOT best-effort: a co-host who lost their slot in
+  // the pre-check race means the meeting cannot be held, so the whole booking aborts.
+  if (mode === 'collective') {
+    const coHosts = [...new Set(attendees)].filter((uid) => uid && uid !== hostUserId);
+    if (coHosts.length) {
+      const { error: sibErr } = await supabaseAdmin.from('Booking').insert(
+        coHosts.map((uid) => ({
+          ...row,
+          host_user_id: uid,
+          cohost_of_booking_id: booking.id,
+          // Reservation shadows keep the meeting facts but no invitee identity/contact —
+          // notify + reminder fan-outs key on these and would double-send to the invitee.
+          invitee_user_id: null,
+          invitee_email: null,
+          invitee_phone: null,
+        }))
+      );
+      if (sibErr) {
+        await supabaseAdmin.from('Booking').delete().eq('id', booking.id); // cascades to any siblings
+        if (isOverlapViolation(sibErr)) {
+          throw new BookingError('That time was just taken. Please pick another.', 409, 'SLOT_TAKEN');
+        }
+        logger.error('[bookingService] co-host reservation insert failed', { bookingId: booking.id, error: sibErr.message });
+        throw new BookingError('Could not create the booking.', 500, 'CREATE_FAILED');
+      }
+    }
   }
 
   // Post-insert side effects (best-effort — never undo a committed booking).
@@ -308,6 +411,44 @@ function assertTransition(booking, allowedFrom, action) {
   }
 }
 
+/**
+ * Atomically flip a booking's status, succeeding only while the row is still in one of
+ * `allowedFrom`. Returns the updated row, or null when a concurrent actor already moved it.
+ *
+ * This guarded UPDATE is the single serialization point for transition side effects
+ * (refunds, credit restores, captures): assertTransition alone is a read-then-act race —
+ * two concurrent cancels both read 'confirmed', both pass, and both issue a refund. Only
+ * the caller that gets a row back here may run side effects.
+ */
+async function transitionBooking(bookingId, allowedFrom, patch) {
+  const { data } = await supabaseAdmin
+    .from('Booking')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .in('status', allowedFrom)
+    .select('*')
+    .maybeSingle();
+  return data || null;
+}
+
+/**
+ * Collective co-host reservation rows (cohost_of_booking_id) mirror their primary booking.
+ * Keep them in lockstep after a status transition so a cancelled/declined meeting releases
+ * every co-host's time (the exclusion predicate only covers pending/confirmed rows).
+ * Zero-row for non-collective bookings; failures are logged loudly, never unwound — a stale
+ * sibling blocks time (annoying) rather than double-booking it (unsafe).
+ */
+async function syncCohostSiblings(bookingId, patch) {
+  const { error } = await supabaseAdmin
+    .from('Booking')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('cohost_of_booking_id', bookingId);
+  if (error) {
+    logger.error('[bookingService] co-host sibling sync failed', { bookingId, error: error.message });
+  }
+  return error || null;
+}
+
 async function approveBooking(bookingId, actorUserId) {
   const ctx = await getBookingContext(bookingId);
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
@@ -320,12 +461,16 @@ async function approveBooking(bookingId, actorUserId) {
       throw new BookingError('Could not capture payment; booking left pending.', 402, 'CAPTURE_FAILED');
     }
   }
-  const { data: updated } = await supabaseAdmin
-    .from('Booking')
-    .update({ status: 'confirmed', updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select('*')
-    .single();
+  const updated = await transitionBooking(bookingId, ['pending'], { status: 'confirmed' });
+  if (!updated) {
+    // Someone declined/cancelled between our capture and the flip — release the funds we
+    // just took so the terminal state (declined/cancelled) keeps its refund invariant.
+    if (ctx.booking.payment_id) {
+      await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'booking_declined' });
+    }
+    throw new BookingError('Cannot approve: the booking is no longer pending.', 409, 'BAD_STATE');
+  }
+  await syncCohostSiblings(bookingId, { status: 'confirmed' });
   await notify.notifyBookingEvent({ booking: updated, eventType: ctx.eventType, page: ctx.page, kind: 'confirmed' });
   return updated;
 }
@@ -334,14 +479,16 @@ async function declineBooking(bookingId, actorUserId, reason) {
   const ctx = await getBookingContext(bookingId);
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   assertTransition(ctx.booking, ['pending'], 'decline');
+  const updated = await transitionBooking(bookingId, ['pending'], {
+    status: 'declined', cancel_reason: reason || null, cancelled_by: actorUserId || null,
+    ics_sequence: (ctx.booking.ics_sequence || 0) + 1, // iTIP CANCEL must outrank prior REQUESTs
+  });
+  if (!updated) throw new BookingError('Cannot decline: the booking is no longer pending.', 409, 'BAD_STATE');
+  await syncCohostSiblings(bookingId, { status: 'declined' });
+  // Side effects only for the transition winner; refundForBooking never throws (logs and
+  // returns {refunded:false} on gateway failure), so ordering after the flip loses nothing.
   if (ctx.booking.payment_id) await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'booking_declined' });
   if (ctx.booking.package_credit_id) await packages.restoreForBooking(ctx.booking);
-  const { data: updated } = await supabaseAdmin
-    .from('Booking')
-    .update({ status: 'declined', cancel_reason: reason || null, cancelled_by: actorUserId || null, updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select('*')
-    .single();
   await notify.notifyBookingEvent({ booking: updated, eventType: ctx.eventType, page: ctx.page, kind: 'declined' });
   return updated;
 }
@@ -357,14 +504,15 @@ async function cancelBooking(bookingId, actorUserId, reason, actorRole = 'host')
   if (actorRole === 'invitee' && ctx.eventType && ctx.eventType.allow_invitee_cancel === false) {
     throw new BookingError('This booking cannot be cancelled by the guest.', 403, 'INVITEE_CANCEL_DISABLED');
   }
+  const updated = await transitionBooking(bookingId, ['pending', 'confirmed'], {
+    status: 'cancelled', cancel_reason: reason || null, cancelled_by: actorUserId || null,
+    ics_sequence: (ctx.booking.ics_sequence || 0) + 1, // iTIP CANCEL must outrank prior REQUESTs
+  });
+  if (!updated) throw new BookingError('Cannot cancel: the booking already reached a terminal state.', 409, 'BAD_STATE');
+  await syncCohostSiblings(bookingId, { status: 'cancelled' });
+  // Winner-only side effects — a concurrent cancel/decline can no longer refund twice.
   if (ctx.booking.payment_id) await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'booking_cancelled' });
   if (ctx.booking.package_credit_id) await packages.restoreForBooking(ctx.booking);
-  const { data: updated } = await supabaseAdmin
-    .from('Booking')
-    .update({ status: 'cancelled', cancel_reason: reason || null, cancelled_by: actorUserId || null, updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select('*')
-    .single();
   await notify.notifyBookingEvent({ booking: updated, eventType: ctx.eventType, page: ctx.page, kind: 'cancelled' });
   return updated;
 }
@@ -423,6 +571,9 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     nextHost = (await pickRoundRobinHost(eventType.id, eligible)) || booking.host_user_id;
   }
 
+  // Moving into a different day must respect that day's cap (the trigger backstops this).
+  await assertBookingLimits(eventType, newStartMs, {});
+
   const { data: updated, error } = await supabaseAdmin
     .from('Booking')
     .update({
@@ -430,6 +581,9 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
       end_at: newEndIso,
       previous_start_at: booking.start_at,
       host_user_id: nextHost,
+      // iTIP revision: strictly increasing, so calendar clients apply the update. The old
+      // boolean (`previous_start_at ? 1 : 0`) re-issued SEQUENCE:1 on every later move.
+      ics_sequence: (booking.ics_sequence || 0) + 1,
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId)
@@ -437,9 +591,39 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
     .single();
   if (error) {
     if (/GROUP_SLOT_FULL/.test(error.message || '')) throw new BookingError('This time is fully booked.', 409, 'SLOT_FULL');
+    if (/DAILY_CAP_REACHED/.test(error.message || '')) throw new BookingError('This day is fully booked for this event type.', 409, 'DAILY_CAP_REACHED');
     if (isOverlapViolation(error)) throw new BookingError('That time was just taken.', 409, 'SLOT_TAKEN');
     throw new BookingError('Could not reschedule.', 500, 'RESCHEDULE_FAILED');
   }
+
+  // Move collective co-host reservations with the primary (single statement — all-or-nothing).
+  // If a co-host's new time was taken between the pre-check and now, the meeting cannot move:
+  // revert the primary so the reservation never splits across two times, then 409.
+  const { error: sibMoveErr } = await supabaseAdmin
+    .from('Booking')
+    .update({ start_at: newStartIso, end_at: newEndIso, updated_at: new Date().toISOString() })
+    .eq('cohost_of_booking_id', bookingId);
+  if (sibMoveErr) {
+    const { error: revertErr } = await supabaseAdmin
+      .from('Booking')
+      .update({
+        start_at: booking.start_at,
+        end_at: booking.end_at,
+        previous_start_at: booking.previous_start_at,
+        host_user_id: booking.host_user_id,
+        ics_sequence: booking.ics_sequence || 0, // nothing was mailed for the failed move
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+    if (revertErr) {
+      // Should be unreachable (our own old slot); log loudly — primary and siblings disagree.
+      logger.error('[bookingService] reschedule revert failed after sibling move error', { bookingId, error: revertErr.message });
+    }
+    if (isOverlapViolation(sibMoveErr)) throw new BookingError('That time was just taken.', 409, 'SLOT_TAKEN');
+    logger.error('[bookingService] co-host sibling move failed', { bookingId, error: sibMoveErr.message });
+    throw new BookingError('Could not reschedule.', 500, 'RESCHEDULE_FAILED');
+  }
+
   // Round-robin fairness: count the rotation against the newly-assigned host.
   if (mode === 'round_robin' && nextHost && nextHost !== booking.host_user_id) {
     await bumpAssigneeRotation(eventType.id, nextHost);
@@ -451,14 +635,12 @@ async function rescheduleBooking(bookingId, actorUserId, newStartIso, actorRole 
 async function markNoShow(bookingId, actorUserId) {
   const ctx = await getBookingContext(bookingId);
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
-  assertTransition(ctx.booking, ['confirmed'], 'mark no-show');
+  assertTransition(ctx.booking, ['confirmed', 'completed'], 'mark no-show');
+  const updated = await transitionBooking(bookingId, ['confirmed', 'completed'], { status: 'no_show' });
+  if (!updated) throw new BookingError('Cannot mark no-show: the booking already reached a terminal state.', 409, 'BAD_STATE');
+  await syncCohostSiblings(bookingId, { status: 'no_show' });
+  // Winner-only, so a double-tap can't issue the no-show fee/refund adjustment twice.
   if (ctx.booking.payment_id) await payments.refundForBooking({ booking: ctx.booking, initiatedBy: actorUserId, reason: 'no_show', noShow: true });
-  const { data: updated } = await supabaseAdmin
-    .from('Booking')
-    .update({ status: 'no_show', updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select('*')
-    .single();
   return updated;
 }
 
@@ -466,6 +648,15 @@ async function reassignBooking(bookingId, actorUserId, newHostId) {
   const ctx = await getBookingContext(bookingId);
   if (!ctx) throw new BookingError('Booking not found.', 404, 'NOT_FOUND');
   assertTransition(ctx.booking, ['pending', 'confirmed'], 'reassign');
+  if (!newHostId) throw new BookingError('A new host is required.', 400, 'HOST_REQUIRED');
+  // The caller is authorized to manage this booking, but that says nothing about WHO they may
+  // hand it to. Without this check any manageable booking could be assigned to an arbitrary
+  // user id — someone outside the home/business entirely — putting a stranger's id on the
+  // booking and onto the host's calendar surfaces.
+  const eligible = await eligibleHostIds(ctx.booking, ctx.eventType);
+  if (!eligible.has(newHostId)) {
+    throw new BookingError('That person is not an eligible host for this booking.', 403, 'HOST_NOT_ELIGIBLE');
+  }
   const { data: updated, error } = await supabaseAdmin
     .from('Booking')
     .update({ host_user_id: newHostId, updated_at: new Date().toISOString() })

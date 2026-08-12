@@ -29,6 +29,23 @@ function escapeText(value) {
     .replace(/\r?\n/g, '\\n');
 }
 
+/**
+ * Sanitize a value in PARAMETER position (e.g. ORGANIZER;CN=...). TEXT-style backslash
+ * escaping does NOT apply there: parsers either render the backslashes literally or split the
+ * property on the raw ; , : anyway. Per RFC 5545 §3.2 a param value may not contain CTLs or
+ * DQUOTE at all (strip them — also closes header/line injection via CR/LF), and a value
+ * containing : ; , must be double-quoted.
+ */
+function escapeParam(value) {
+  const cleaned = String(value == null ? '' : value).replace(/[\u0000-\u001f\u007f"]/g, '');
+  return /[;:,]/.test(cleaned) ? `"${cleaned}"` : cleaned;
+}
+
+/** CAL-ADDRESS values (mailto:) — strip CTLs so a hostile address can't break/inject lines. */
+function sanitizeCalAddress(email) {
+  return String(email == null ? '' : email).replace(/[\u0000-\u001f\u007f]/g, '');
+}
+
 /** Fold a content line to <=75 octets per RFC 5545 (continuation lines start with a space). */
 function foldLine(line) {
   if (Buffer.byteLength(line, 'utf8') <= 75) return line;
@@ -95,11 +112,12 @@ function buildIcs({
   if (description) lines.push(`DESCRIPTION:${escapeText(description)}`);
   if (location) lines.push(`LOCATION:${escapeText(location)}`);
   if (organizerEmail) {
-    const cn = organizerName ? `;CN=${escapeText(organizerName)}` : '';
-    lines.push(`ORGANIZER${cn}:mailto:${organizerEmail}`);
+    // CN sits in PARAM position — TEXT escaping (escapeText) is wrong there; see escapeParam.
+    const cn = organizerName ? `;CN=${escapeParam(organizerName)}` : '';
+    lines.push(`ORGANIZER${cn}:mailto:${sanitizeCalAddress(organizerEmail)}`);
   }
   if (attendeeEmail) {
-    lines.push(`ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${attendeeEmail}`);
+    lines.push(`ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${sanitizeCalAddress(attendeeEmail)}`);
   }
   lines.push(`STATUS:${status}`);
   lines.push('END:VEVENT');
@@ -108,4 +126,4 @@ function buildIcs({
   return lines.map(foldLine).join('\r\n') + '\r\n';
 }
 
-module.exports = { buildIcs, toIcsUtc, escapeText };
+module.exports = { buildIcs, toIcsUtc, escapeText, escapeParam };

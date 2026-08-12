@@ -31,11 +31,24 @@ const { hashToken, normalizeEmail, hashEmail } = require('../services/scheduling
 
 // ---------- page lookup helpers ----------
 
+/**
+ * Slugs are `[a-z0-9-]` only (see the Joi patterns in routes/scheduling.js), so anything
+ * else is not a real slug. This matters because these lookups use `ilike`, where `%` and `_`
+ * are WILDCARDS — without this guard `GET /book/acme/v%25` matches a `visibility:'secret'`
+ * event type, and prefix probing enumerates slugs that are supposed to be unguessable.
+ * Reject up front rather than escaping, since no legitimate slug is affected.
+ */
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;
+function isValidSlug(slug) {
+  return typeof slug === 'string' && SLUG_RE.test(slug);
+}
+
 async function loadLivePage(slug) {
+  if (!isValidSlug(slug)) return null;
   const { data } = await supabaseAdmin
     .from('BookingPage')
     .select('*')
-    .ilike('slug', slug) // lower(slug) unique index; ilike is case-insensitive exact here
+    .ilike('slug', slug) // lower(slug) unique index; input is charset-guarded above
     .maybeSingle();
   if (!data || !data.is_live) return null;
   return data;
@@ -52,6 +65,21 @@ function publicPageView(page) {
     branding: page.branding,
     owner_type: page.owner_type,
   };
+}
+
+/**
+ * Attach the host's intake questions to a public event-type payload. Custom questions are a
+ * real feature (B3 editor, PUT /event-types/:id/questions) but the public flow never sent
+ * them, so invitees only ever saw the built-in name/email/phone fields and every custom
+ * (even required) question was silently skipped. Clients read `eventType.questions`.
+ */
+async function withQuestions(etView, eventTypeId) {
+  const { data: questions } = await supabaseAdmin
+    .from('EventTypeQuestion')
+    .select('id, label, field_type, options, required, sort_order')
+    .eq('event_type_id', eventTypeId)
+    .order('sort_order');
+  return { ...etView, questions: questions || [] };
 }
 
 function publicEventTypeView(et) {
@@ -102,7 +130,9 @@ function bookingActionState(booking, eventType, paymentAmountTotal) {
 // ---------- GET /book/:slug ----------
 
 router.get('/book/:slug', previewLimiter, asyncHandler(async (req, res) => {
-  const { data: page } = await supabaseAdmin.from('BookingPage').select('*').ilike('slug', req.params.slug).maybeSingle();
+  const page = isValidSlug(req.params.slug)
+    ? (await supabaseAdmin.from('BookingPage').select('*').ilike('slug', req.params.slug).maybeSingle()).data
+    : null;
   // Distinguish unavailable (offline/not-found) from paused so the invitee sees the right state.
   if (!page || !page.is_live) {
     return res.status(404).json({ error: 'NOT_FOUND', status: 'unavailable', message: 'This booking page is not available.' });
@@ -125,6 +155,7 @@ router.get('/book/:slug', previewLimiter, asyncHandler(async (req, res) => {
 async function loadPageEventType(slug, eventTypeSlug) {
   const page = await loadLivePage(slug);
   if (!page) return { page: null, eventType: null };
+  if (!isValidSlug(eventTypeSlug)) return { page, eventType: null };
   const { data: et } = await supabaseAdmin
     .from('EventType')
     .select('*')
@@ -148,6 +179,10 @@ router.get('/book/:slug/:eventTypeSlug/slots', previewLimiter, asyncHandler(asyn
   if (page.is_paused) {
     return res.json({ eventType: publicEventTypeView(eventType), timezone: tz, status: 'paused', slots: [] });
   }
+  // Multi-duration event types: the grid must be generated at the length the invitee picked,
+  // otherwise the slots offered here can't be booked. Ignored unless it is one of
+  // eventType.durations.
+  const requestedDuration = Number.parseInt(req.query.duration_min, 10);
   const slots = await availabilityService.computeSlots({
     ownerType: eventType.owner_type,
     ownerId: eventType.owner_id,
@@ -155,10 +190,11 @@ router.get('/book/:slug/:eventTypeSlug/slots', previewLimiter, asyncHandler(asyn
     from,
     to,
     viewerTimezone: tz,
+    durationMin: Number.isFinite(requestedDuration) ? requestedDuration : undefined,
   });
   // Redact host identity from the public payload (eligibility set is internal).
   res.json({
-    eventType: publicEventTypeView(eventType),
+    eventType: await withQuestions(publicEventTypeView(eventType), eventType.id),
     timezone: tz,
     status: 'active',
     slots: slots.map((s) => ({ start: s.start, end: s.end, startLocal: s.startLocal })),
@@ -224,10 +260,14 @@ router.get('/book/o/:token', previewLimiter, asyncHandler(async (req, res) => {
     const computed = await availabilityService.computeSlots({ ownerType: eventType.owner_type, ownerId: eventType.owner_id, eventType, from, to, viewerTimezone: tz });
     slots = computed.map((s) => ({ start: s.start, end: s.end, startLocal: s.startLocal }));
   }
-  res.json({ eventType: publicEventTypeView(eventType), single_use: tok.single_use, slots });
+  res.json({ eventType: await withQuestions(publicEventTypeView(eventType), eventType.id), single_use: tok.single_use, slots });
 }));
 
-router.post('/book/o/:token', bookingWriteLimiter, optionalAuth, validate(createSchema), asyncHandler(async (req, res) => {
+// optionalAuth must run BEFORE bookingWriteLimiter on these write chains: the limiter keys on
+// req.user?.id || req.ip, so with the old order a signed-in caller was always keyed by IP —
+// one NAT'd office shared a single 20-writes/10-min bucket and one abuser could exhaust it
+// for every neighbor. (Token-manage routes have no auth and stay IP-keyed by design.)
+router.post('/book/o/:token', optionalAuth, bookingWriteLimiter, validate(createSchema), asyncHandler(async (req, res) => {
   const ctx = await loadByOneOffToken(req.params.token);
   if (!ctx) return res.status(404).json({ error: 'NOT_FOUND', message: 'This link is invalid, already used, or expired.' });
   const { tok, eventType } = ctx;
@@ -274,7 +314,7 @@ router.post('/book/o/:token', bookingWriteLimiter, optionalAuth, validate(create
   }
 }));
 
-router.post('/book/:slug/:eventTypeSlug', bookingWriteLimiter, optionalAuth, validate(createSchema), asyncHandler(async (req, res) => {
+router.post('/book/:slug/:eventTypeSlug', optionalAuth, bookingWriteLimiter, validate(createSchema), asyncHandler(async (req, res) => {
   const { page, eventType } = await loadPageEventType(req.params.slug, req.params.eventTypeSlug);
   if (!page || !eventType) return res.status(404).json({ error: 'NOT_FOUND' });
   if (page.is_paused) return res.status(409).json({ error: 'PAGE_PAUSED', message: 'This page is not accepting bookings right now.' });
@@ -412,7 +452,7 @@ router.get('/booking/:token/ics', previewLimiter, asyncHandler(async (req, res) 
     location: booking.location_detail || '',
     attendeeEmail: booking.invitee_email || undefined,
     method: cancelled ? 'CANCEL' : 'REQUEST',
-    sequence: booking.previous_start_at ? 1 : 0,
+    sequence: booking.ics_sequence || 0, // monotonic iTIP revision (migration 167)
   });
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="invite.ics"');
@@ -451,10 +491,21 @@ router.post('/booking/:token/cancel', bookingWriteLimiter, validate(tokenCancelS
 router.post('/booking/:token/unsubscribe', bookingWriteLimiter, asyncHandler(async (req, res) => {
   const ctx = await loadByManageToken(req.params.token);
   if (!ctx || !ctx.booking.invitee_email) return res.status(404).json({ error: 'NOT_FOUND' });
+  // Scoped to this booking's owner: invitee_email is caller-supplied at booking time, so an
+  // email_hash-only suppression would let anyone who books with a victim's address mute the
+  // victim's reminders platform-wide. Scoping bounds the blast radius to the one page the
+  // token actually belongs to.
   const emailHash = hashEmail(ctx.booking.invitee_email);
-  const { data: existing } = await supabaseAdmin.from('EmailSuppression').select('id').eq('email_hash', emailHash).maybeSingle();
+  const scope = { owner_type: ctx.booking.owner_type, owner_id: ctx.booking.owner_id };
+  const { data: existing } = await supabaseAdmin
+    .from('EmailSuppression')
+    .select('id')
+    .eq('email_hash', emailHash)
+    .eq('owner_type', scope.owner_type)
+    .eq('owner_id', scope.owner_id)
+    .maybeSingle();
   if (!existing) {
-    await supabaseAdmin.from('EmailSuppression').insert({ email_hash: emailHash, reason: 'invitee_unsubscribe' });
+    await supabaseAdmin.from('EmailSuppression').insert({ email_hash: emailHash, ...scope, reason: 'invitee_unsubscribe' });
   }
   res.json({ ok: true });
 }));
@@ -466,7 +517,7 @@ const waitlistSchema = Joi.object({
   desired_from: Joi.string().isoDate().allow(null),
   desired_to: Joi.string().isoDate().allow(null),
 });
-router.post('/book/:slug/:eventTypeSlug/waitlist', bookingWriteLimiter, optionalAuth, validate(waitlistSchema), asyncHandler(async (req, res) => {
+router.post('/book/:slug/:eventTypeSlug/waitlist', optionalAuth, bookingWriteLimiter, validate(waitlistSchema), asyncHandler(async (req, res) => {
   const { page, eventType } = await loadPageEventType(req.params.slug, req.params.eventTypeSlug);
   if (!page || !eventType) return res.status(404).json({ error: 'NOT_FOUND' });
   const email = normalizeEmail(req.body.email);
@@ -514,7 +565,10 @@ router.get('/poll/:id', previewLimiter, asyncHandler(async (req, res) => {
   if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
   const [{ data: options }, { data: votes }] = await Promise.all([
     supabaseAdmin.from('SchedulingPollOption').select('id, start_at, end_at').eq('poll_id', poll.id).order('start_at'),
-    supabaseAdmin.from('SchedulingPollVote').select('option_id, voter_name, value').eq('poll_id', poll.id),
+    // No voter_name on the public payload: this endpoint is unauthenticated and id-guessable,
+    // and names attached to availability answers are personal data the voters never agreed
+    // to publish. Tallies are all the public grid renders.
+    supabaseAdmin.from('SchedulingPollVote').select('option_id, value').eq('poll_id', poll.id),
   ]);
   res.json({ poll, options: options || [], votes: votes || [] });
 }));
@@ -524,7 +578,7 @@ const pollVoteSchema = Joi.object({
   email: Joi.string().email().max(320).allow('', null),
   votes: Joi.array().items(Joi.object({ option_id: Joi.string().uuid().required(), value: Joi.string().valid('yes', 'maybe', 'no').default('yes') })).min(1).required(),
 });
-router.post('/poll/:id/vote', bookingWriteLimiter, optionalAuth, validate(pollVoteSchema), asyncHandler(async (req, res) => {
+router.post('/poll/:id/vote', optionalAuth, bookingWriteLimiter, validate(pollVoteSchema), asyncHandler(async (req, res) => {
   const { data: poll } = await supabaseAdmin.from('SchedulingPoll').select('id, status').eq('id', req.params.id).maybeSingle();
   if (!poll) return res.status(404).json({ error: 'NOT_FOUND' });
   if (poll.status !== 'open') return res.status(409).json({ error: 'POLL_CLOSED' });
@@ -539,14 +593,25 @@ router.post('/poll/:id/vote', bookingWriteLimiter, optionalAuth, validate(pollVo
       return res.status(400).json({ error: 'INVALID_OPTION', message: 'One or more options do not belong to this poll.' });
     }
   }
+  // One vote per (option, voter). Signed-in voters may revise their answers — their key is
+  // a verified identity. The email path is INSERT-ONLY: a bare emailed key proves nothing,
+  // so letting it update would let anyone overwrite an existing vote just by typing the
+  // voter's address. Changed answers via email require the organizer to clear the old vote.
+  let conflicted = false;
   for (const v of req.body.votes) {
-    // Upsert one vote per (option, voter).
-    const { data: existing } = await supabaseAdmin.from('SchedulingPollVote').select('id').eq('option_id', v.option_id).eq('voter_key', voterKey).maybeSingle();
+    const { data: existing } = await supabaseAdmin.from('SchedulingPollVote').select('id, voter_user_id').eq('option_id', v.option_id).eq('voter_key', voterKey).maybeSingle();
     if (existing) {
-      await supabaseAdmin.from('SchedulingPollVote').update({ value: v.value, voter_name: voterName }).eq('id', existing.id);
+      if (req.user && req.user.id && existing.voter_user_id === req.user.id) {
+        await supabaseAdmin.from('SchedulingPollVote').update({ value: v.value, voter_name: voterName }).eq('id', existing.id);
+      } else {
+        conflicted = true;
+      }
     } else {
       await supabaseAdmin.from('SchedulingPollVote').insert({ poll_id: poll.id, option_id: v.option_id, voter_user_id: req.user ? req.user.id : null, voter_name: voterName, voter_key: voterKey, value: v.value });
     }
+  }
+  if (conflicted) {
+    return res.status(409).json({ error: 'ALREADY_VOTED', message: 'A response already exists for this email. Ask the organizer to reset it if it needs changing.' });
   }
   res.json({ ok: true });
 }));

@@ -111,12 +111,15 @@ function hashEmail(email) {
 }
 
 /** Is this email on the reminder-suppression list? (transactional confirmations are always sent.) */
-async function isEmailSuppressed(email) {
-  if (!email) return false;
+/** Suppression is owner-scoped (see the unsubscribe route) — always pass the booking's owner. */
+async function isEmailSuppressed(email, ownerType, ownerId) {
+  if (!email || !ownerType || !ownerId) return false;
   const { data } = await supabaseAdmin
     .from('EmailSuppression')
     .select('id')
     .eq('email_hash', hashEmail(email))
+    .eq('owner_type', ownerType)
+    .eq('owner_id', ownerId)
     .maybeSingle();
   return !!data;
 }

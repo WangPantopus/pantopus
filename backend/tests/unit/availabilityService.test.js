@@ -215,4 +215,59 @@ describe('computeSlotsCore — composition modes', () => {
     });
     expect(slots.length).toBe(0);
   });
+
+  // Regression: a group booking used to mark the host busy, so the first attendee removed the
+  // slot for everyone and a seat_cap of N could only ever sell 1 seat.
+  describe('group seat capacity', () => {
+    const window = { m1: [{ start: utc('2026-07-06T09:00:00Z'), end: utc('2026-07-06T10:00:00Z') }] };
+    const groupEvent = { ...baseEvent, id: 'et-group', seat_cap: 3, assignment_mode: 'group' };
+    const slotAt = utc('2026-07-06T09:00:00Z');
+
+    const run = (groupSeatCounts) => computeSlotsCore({
+      membersFree: window, memberIds: ['m1'], requiredMemberIds: ['m1'], mode: 'group',
+      eventType: groupEvent, refTz: 'UTC', fromMs: from, toMs: to, nowMs: now, groupSeatCounts,
+    });
+
+    it('keeps a group slot open while seats remain', () => {
+      expect(run(new Map()).some((s) => s.startMs === slotAt)).toBe(true);
+      expect(run(new Map([[slotAt, 1]])).some((s) => s.startMs === slotAt)).toBe(true);
+      expect(run(new Map([[slotAt, 2]])).some((s) => s.startMs === slotAt)).toBe(true);
+    });
+
+    it('drops the slot once seat_cap is reached', () => {
+      expect(run(new Map([[slotAt, 3]])).some((s) => s.startMs === slotAt)).toBe(false);
+      expect(run(new Map([[slotAt, 9]])).some((s) => s.startMs === slotAt)).toBe(false);
+    });
+
+    it('only closes the full instant, leaving other slots bookable', () => {
+      const slots = run(new Map([[slotAt, 3]]));
+      expect(slots.some((s) => s.startMs === utc('2026-07-06T09:30:00Z'))).toBe(true);
+    });
+  });
+
+  // Regression: the grid was always built at default_duration, so booking any other allowed
+  // duration could never match a slot and always 409'd SLOT_UNAVAILABLE.
+  describe('multi-duration event types', () => {
+    const membersFree = { m1: [{ start: utc('2026-07-06T09:00:00Z'), end: utc('2026-07-06T11:00:00Z') }] };
+    const multi = { ...baseEvent, durations: [30, 60], default_duration: 30, slot_interval_min: 30 };
+    const lengthsMin = (slots) => [...new Set(slots.map((s) => (s.endMs - s.startMs) / 60000))];
+
+    const run = (durationMin) => computeSlotsCore({
+      membersFree, memberIds: ['m1'], requiredMemberIds: ['m1'], mode: 'one_on_one',
+      eventType: multi, refTz: 'UTC', fromMs: from, toMs: to, nowMs: now, durationMin,
+    });
+
+    it('builds the grid at the requested duration', () => {
+      expect(lengthsMin(run(60))).toEqual([60]);
+    });
+
+    it('defaults to default_duration when none is requested', () => {
+      expect(lengthsMin(run(undefined))).toEqual([30]);
+    });
+
+    it('ignores a duration the event type does not offer', () => {
+      expect(lengthsMin(run(45))).toEqual([30]);
+      expect(lengthsMin(run(-5))).toEqual([30]);
+    });
+  });
 });

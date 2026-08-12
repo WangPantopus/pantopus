@@ -5036,6 +5036,7 @@ router.get('/:id/events', verifyToken, async (req, res) => {
         .select('id, home_id, event_type_id, resource_id, host_user_id, invitee_name, start_at, end_at, status, location_detail, created_by')
         .eq('owner_type', 'home')
         .eq('owner_id', homeId)
+        .is('cohost_of_booking_id', null) // co-host shadows mirror a primary row already in this list
         .in('status', ['pending', 'confirmed']);
       if (start_after) bq = bq.gte('start_at', start_after);
       if (start_before) bq = bq.lte('start_at', start_before);
@@ -5100,6 +5101,20 @@ router.post('/:id/events', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'event_type, title, and start_at are required' });
     }
 
+    // Persist the zone a RECURRING event was authored in so the availability engine expands
+    // it at the intended wall-clock time across DST (migration 167 §5). Default: the
+    // creator's default availability-schedule timezone.
+    let timezone = typeof req.body.timezone === 'string' && req.body.timezone ? req.body.timezone.slice(0, 64) : null;
+    if (!timezone && recurrence_rule) {
+      const { data: sched } = await supabaseAdmin
+        .from('AvailabilitySchedule')
+        .select('timezone')
+        .eq('user_id', userId)
+        .eq('is_default', true)
+        .maybeSingle();
+      timezone = (sched && sched.timezone) || 'UTC';
+    }
+
     const { data, error } = await supabaseAdmin
       .from('HomeCalendarEvent')
       .insert({
@@ -5115,6 +5130,7 @@ router.post('/:id/events', verifyToken, async (req, res) => {
         alerts_enabled: alerts_enabled !== false,
         request_rsvp: request_rsvp === true,
         reminders: Array.isArray(reminders) ? reminders : [],
+        timezone,
         created_by: userId,
       })
       .select()
@@ -5143,7 +5159,7 @@ router.put('/:id/events/:eventId', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId);
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled', 'request_rsvp', 'reminders'];
+    const allowed = ['title', 'description', 'event_type', 'start_at', 'end_at', 'location_notes', 'recurrence_rule', 'assigned_to', 'alerts_enabled', 'request_rsvp', 'reminders', 'timezone'];
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];

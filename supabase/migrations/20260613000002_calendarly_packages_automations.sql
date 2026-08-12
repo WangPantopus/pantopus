@@ -94,6 +94,12 @@ ALTER TABLE "public"."BookingReminderLog" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."EmailSuppression" (
     "id"         "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "email_hash" "text" NOT NULL,
+    -- Suppression is scoped to one scheduling owner. The unsubscribe route is
+    -- unauthenticated (proof = possession of a manage token), and the invitee_email on a
+    -- booking is caller-supplied — an attacker who books with a victim's address must not
+    -- be able to mute the victim's reminders for every page on the platform.
+    "owner_type" "public"."scheduling_owner_type" NOT NULL,
+    "owner_id"   "uuid" NOT NULL,
     "reason"     "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "EmailSuppression_pkey" PRIMARY KEY ("id")
@@ -209,7 +215,8 @@ CREATE INDEX IF NOT EXISTS "PackageCredit_package_idx" ON "public"."PackageCredi
 CREATE INDEX IF NOT EXISTS "SchedulingWorkflow_owner_idx" ON "public"."SchedulingWorkflow" ("owner_type", "owner_id");
 CREATE INDEX IF NOT EXISTS "SchedulingWorkflow_event_type_idx" ON "public"."SchedulingWorkflow" ("event_type_id") WHERE ("event_type_id" IS NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS "BookingReminderLog_unique" ON "public"."BookingReminderLog" ("booking_id", "kind");
-CREATE UNIQUE INDEX IF NOT EXISTS "EmailSuppression_email_unique" ON "public"."EmailSuppression" ("email_hash");
+CREATE UNIQUE INDEX IF NOT EXISTS "EmailSuppression_email_owner_unique"
+  ON "public"."EmailSuppression" ("email_hash", "owner_type", "owner_id");
 CREATE INDEX IF NOT EXISTS "ConnectedCalendar_user_idx" ON "public"."ConnectedCalendar" ("user_id");
 
 -- ============================================================
@@ -227,6 +234,9 @@ DO $$ BEGIN
       'gig_payment'::character varying, 'tip_income'::character varying, 'tip_sent'::character varying,
       'refund'::character varying, 'adjustment'::character varying, 'transfer_in'::character varying,
       'transfer_out'::character varying, 'cancellation_fee'::character varying,
+      -- 'withdrawal_reversal' predates this migration (097_fix_withdrawal_reversal_counter):
+      -- dropping it here would make every failed-withdrawal refund insert violate the CHECK.
+      'withdrawal_reversal'::character varying,
       'booking_income'::character varying, 'package_income'::character varying
     ])::"text"[])));
 END $$;

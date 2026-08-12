@@ -45,6 +45,7 @@ async function createPaymentForBooking({ booking, eventType }) {
     payeeId,
     gigId: null,
     amount: eventType.price_cents,
+    currency: eventType.currency || 'USD',
     homeId: null,
     metadata: { kind: 'booking', booking_id: booking.id, event_type_id: booking.event_type_id },
     description: `Pantopus booking — ${eventType.name || 'Appointment'}`,

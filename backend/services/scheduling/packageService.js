@@ -37,6 +37,7 @@ async function purchasePackage({ pkg, buyerUserId }) {
     payeeId,
     gigId: null,
     amount: pkg.price_cents,
+    currency: pkg.currency || 'USD',
     metadata: { kind: 'package', package_id: pkg.id },
     description: `Pantopus package — ${pkg.name || 'Sessions'}`,
   });
@@ -68,11 +69,19 @@ async function redeemForBooking({ bookingId, creditId, userId }) {
     .eq('remaining', credit.remaining)
     .select('id');
   if (!dec || !dec.length) return { success: false, error: 'REDEEM_CONFLICT', message: 'Please try again.' };
-  const { data: linked, error: bErr } = await supabaseAdmin.from('Booking').update({ package_credit_id: creditId }).eq('id', bookingId).select('id');
+  // `.is('package_credit_id', null)` makes this write the serialization point for the
+  // booking↔credit link. Without it, two concurrent applies both link (the second
+  // silently overwrites the first) while both decrements stand — one credit is lost.
+  const { data: linked, error: bErr } = await supabaseAdmin
+    .from('Booking')
+    .update({ package_credit_id: creditId })
+    .eq('id', bookingId)
+    .is('package_credit_id', null)
+    .select('id');
   if (bErr || !linked || !linked.length) {
-    // Booking gone/modified — restore the credit we just decremented so it isn't lost.
+    // Booking gone, or a credit is already applied — restore the decrement so it isn't lost.
     await supabaseAdmin.from('PackageCredit').update({ remaining: credit.remaining }).eq('id', creditId);
-    return { success: false, error: 'BOOKING_UPDATE_FAILED', message: 'Could not apply the credit.' };
+    return { success: false, error: 'ALREADY_APPLIED', message: 'A credit is already applied to this booking.' };
   }
   return { success: true, remaining: credit.remaining - 1 };
 }
@@ -80,10 +89,21 @@ async function redeemForBooking({ bookingId, creditId, userId }) {
 /** Restore a session credit when a credit-redeemed booking is cancelled. Best-effort. */
 async function restoreForBooking(booking) {
   if (!booking || !booking.package_credit_id) return;
-  const { data: credit } = await supabaseAdmin.from('PackageCredit').select('id, remaining, total').eq('id', booking.package_credit_id).maybeSingle();
-  if (credit && credit.remaining < credit.total) {
-    await supabaseAdmin.from('PackageCredit').update({ remaining: credit.remaining + 1 }).eq('id', credit.id);
+  // One credit row is a pack of N sessions shared by many bookings, so concurrent restores
+  // (decline + cancel on sibling bookings) are ordinary. CAS + bounded retry mirrors
+  // redeemForBooking's guarded decrement; a plain read-add-write drops increments.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: credit } = await supabaseAdmin.from('PackageCredit').select('id, remaining, total').eq('id', booking.package_credit_id).maybeSingle();
+    if (!credit || credit.remaining >= credit.total) return;
+    const { data: bumped } = await supabaseAdmin
+      .from('PackageCredit')
+      .update({ remaining: credit.remaining + 1 })
+      .eq('id', credit.id)
+      .eq('remaining', credit.remaining)
+      .select('id');
+    if (bumped && bumped.length) return;
   }
+  logger.warn('[packageService] credit restore lost CAS race 3x — leaving un-restored', { creditId: booking.package_credit_id, bookingId: booking.id });
 }
 
 module.exports = { purchasePackage, redeemForBooking, restoreForBooking };

@@ -110,22 +110,44 @@ function intervalsCover(intervals, s, e) {
  * Expand a recurrence_rule into busy instances overlapping [fromMs, toMs].
  * `anchorMs`/`durationMs` describe the series' first occurrence. Falls back to the single
  * stored interval if the rule is absent or unparseable (so we never drop busy).
+ *
+ * `timezone` (optional, from the row's stored zone) makes the expansion WALL-CLOCK correct
+ * across DST: rrule iterates naive (UTC-labeled) timestamps, so a series expanded on bare
+ * UTC instants drifts by an hour after each DST change ("every Monday 09:00" became 08:00 or
+ * 10:00 local). We hand rrule the anchor's wall clock as fake-UTC and map each occurrence's
+ * wall clock back to a real instant in the zone. With zone=UTC (legacy rows: no stored
+ * timezone) this degrades to exactly the previous behavior.
  */
-function expandRecurrence(rule, anchorMs, durationMs, fromMs, toMs) {
+function expandRecurrence(rule, anchorMs, durationMs, fromMs, toMs, timezone) {
   if (!rule || typeof rule !== 'string' || !rule.trim()) {
     return [{ start: anchorMs, end: anchorMs + durationMs }];
   }
   try {
-    const dtstart = new Date(anchorMs);
+    const zone = timezone && DateTime.fromMillis(anchorMs, { zone: timezone }).isValid ? timezone : 'UTC';
+    const anchorWall = DateTime.fromMillis(anchorMs, { zone });
+    const dtstart = new Date(Date.UTC(
+      anchorWall.year, anchorWall.month - 1, anchorWall.day,
+      anchorWall.hour, anchorWall.minute, anchorWall.second
+    ));
     const ruleObj = rrulestr(rule.trim(), { dtstart });
     // Search window padded back by one duration so an occurrence that STARTS before `from`
-    // but ends inside the window is still captured.
+    // but ends inside the window is still captured. The DAY_MS pad also absorbs the fake-UTC
+    // wall-clock offset (at most ±14h) since `after`/`before` compare fake-UTC stamps.
     const after = new Date(Math.max(0, fromMs - durationMs - DAY_MS));
     const before = new Date(toMs + DAY_MS);
     const occurrences = ruleObj.between(after, before, true).slice(0, MAX_RECURRENCE_INSTANCES);
     const out = [];
     for (const occ of occurrences) {
-      const s = occ.getTime();
+      // Fake-UTC wall clock -> real instant in the series' zone (nonexistent spring-forward
+      // times shift forward; ambiguous fall-back times take the earlier offset).
+      const s = DateTime.fromObject(
+        {
+          year: occ.getUTCFullYear(), month: occ.getUTCMonth() + 1, day: occ.getUTCDate(),
+          hour: occ.getUTCHours(), minute: occ.getUTCMinutes(), second: occ.getUTCSeconds(),
+        },
+        { zone }
+      ).toMillis();
+      if (!Number.isFinite(s)) continue;
       const e = s + durationMs;
       if (e > fromMs && s < toMs) out.push({ start: s, end: e });
     }
@@ -161,9 +183,14 @@ function parseHm(timeStr) {
 function buildWeeklyWindows(schedule, fromMs, toMs) {
   const tz = schedule.timezone || 'UTC';
   const rules = schedule.rules || [];
+  // date -> override[] — a date may carry SEVERAL partial windows (split days, e.g. 9–11 +
+  // 14–16 from the web multi-block composer). A Map<date, override> silently kept only the
+  // last row, dropping every other window for that day.
   const overridesByDate = new Map();
   for (const ov of schedule.overrides || []) {
-    overridesByDate.set(ov.date, ov);
+    const list = overridesByDate.get(ov.date);
+    if (list) list.push(ov);
+    else overridesByDate.set(ov.date, [ov]);
   }
 
   const windows = [];
@@ -176,14 +203,16 @@ function buildWeeklyWindows(schedule, fromMs, toMs) {
     guard += 1;
     const dateKey = day.toFormat('yyyy-MM-dd');
     const jsWeekday = day.weekday % 7; // luxon Mon=1..Sun=7 -> Sun=0..Sat=6
-    const override = overridesByDate.get(dateKey);
+    const dayOverrides = overridesByDate.get(dateKey);
 
     let dayWindows = [];
-    if (override) {
-      if (override.is_unavailable) {
-        dayWindows = []; // whole day off
-      } else if (override.start_time && override.end_time) {
-        dayWindows = [{ start_time: override.start_time, end_time: override.end_time }];
+    if (dayOverrides && dayOverrides.length) {
+      if (dayOverrides.some((ov) => ov.is_unavailable)) {
+        dayWindows = []; // whole day off (an unavailable marker wins over any partial windows)
+      } else {
+        dayWindows = dayOverrides
+          .filter((ov) => ov.start_time && ov.end_time)
+          .map((ov) => ({ start_time: ov.start_time, end_time: ov.end_time }));
       }
     } else {
       dayWindows = rules
@@ -227,19 +256,22 @@ function memberFreeIntervals({ schedule, busy, eventType }, fromMs, toMs) {
 
 function gridStartsInInterval(iv, intervalMin, durationMin, refTz, out) {
   const durMs = durationMin * MIN_MS;
-  const stepMs = intervalMin * MIN_MS;
-  // Align the first candidate to the next slot_interval boundary from midnight (refTz).
+  // Align to slot_interval boundaries in WALL-CLOCK minutes (refTz) and step the cursor in
+  // wall-clock units too. Elapsed-ms math breaks on DST-change days: after spring-forward,
+  // 9:00 AM is 480 wall minutes but 420 elapsed ms-minutes past midnight, so every slot that
+  // day landed off the designed grid (e.g. :20/:50 for a 30-min interval).
   const startDt = DateTime.fromMillis(iv.start, { zone: refTz });
   const midnight = startDt.startOf('day');
-  const minutesIn = (startDt.toMillis() - midnight.toMillis()) / MIN_MS;
+  const minutesIn = startDt.hour * 60 + startDt.minute + (startDt.second > 0 || startDt.millisecond > 0 ? 1 : 0);
   const alignedMinutes = Math.ceil(minutesIn / intervalMin) * intervalMin;
-  let cursor = midnight.plus({ minutes: alignedMinutes }).toMillis();
-  // (midnight+alignedMinutes is >= iv.start by construction)
+  let cursorDt = midnight.plus({ minutes: alignedMinutes });
   let guard = 0;
-  while (cursor + durMs <= iv.end && guard < 5000) {
+  while (cursorDt.toMillis() + durMs <= iv.end && guard < 5000) {
     guard += 1;
-    out.push(cursor);
-    cursor += stepMs;
+    // A nonexistent wall time (inside the spring-forward gap) shifts; only emit real instants
+    // that still sit inside the free interval.
+    if (cursorDt.toMillis() >= iv.start) out.push(cursorDt.toMillis());
+    cursorDt = cursorDt.plus({ minutes: intervalMin });
   }
 }
 
@@ -260,8 +292,14 @@ function gridStartsInInterval(iv, intervalMin, durationMin, refTz, out) {
  * @param {number}   args.nowMs
  * @returns {Array<{startMs,endMs,eligibleHosts:string[]}>}
  */
-function computeSlotsCore({ membersFree, memberIds, requiredMemberIds, mode, eventType, refTz, fromMs, toMs, nowMs }) {
-  const D = eventType.default_duration;
+function computeSlotsCore({ membersFree, memberIds, requiredMemberIds, mode, eventType, refTz, fromMs, toMs, nowMs, durationMin, groupSeatCounts, cappedDays }) {
+  // Honour the invitee's chosen duration when the event type offers several
+  // (`durations[]`); fall back to the default. Without this, booking any non-default
+  // duration can never match a generated slot and always 409s SLOT_UNAVAILABLE.
+  const allowed = Array.isArray(eventType.durations) && eventType.durations.length
+    ? eventType.durations
+    : [eventType.default_duration];
+  const D = durationMin && allowed.includes(durationMin) ? durationMin : eventType.default_duration;
   const I = eventType.slot_interval_min;
   const durMs = D * MIN_MS;
   const minNoticeMs = (eventType.min_notice_min || 0) * MIN_MS;
@@ -295,6 +333,19 @@ function computeSlotsCore({ membersFree, memberIds, requiredMemberIds, mode, eve
     if (seen.has(s)) continue;
     seen.add(s);
 
+    // Group events: the host stays free across the slot until seat_cap is reached, so drop
+    // only the slots that are actually full. The DB trigger (booking_enforce_group_cap) is
+    // still the atomic authority — this just avoids offering a slot that will be rejected.
+    if (mode === 'group' && groupSeatCounts) {
+      const taken = groupSeatCounts.get(s) || 0;
+      if (taken >= Math.max(1, eventType.seat_cap || 1)) continue;
+    }
+
+    // Days already at the event type's daily_cap never render bookable slots — booking one
+    // would only 409 DAILY_CAP_REACHED (assertBookingLimits + booking_daily_cap_trg).
+    // Day key = UTC date of the start instant, the same definition those guards use.
+    if (cappedDays && cappedDays.size && cappedDays.has(Math.floor(s / DAY_MS))) continue;
+
     let eligibleHosts;
     if (mode === 'round_robin') {
       eligibleHosts = memberIds.filter((id) => intervalsCover(membersFree[id] || [], s, e));
@@ -317,7 +368,15 @@ function computeSlotsCore({ membersFree, memberIds, requiredMemberIds, mode, eve
 async function loadScheduleForUser(userId, scheduleId) {
   let schedule = null;
   if (scheduleId) {
-    const { data } = await supabaseAdmin.from('AvailabilitySchedule').select('*').eq('id', scheduleId).maybeSingle();
+    // Ownership-scoped: schedule_id on an event type is host-settable input. Without the
+    // user_id predicate a foreign schedule id silently drove another user's hours into this
+    // host's availability; scoping degrades a foreign pointer to the owner's default.
+    const { data } = await supabaseAdmin
+      .from('AvailabilitySchedule')
+      .select('*')
+      .eq('id', scheduleId)
+      .eq('user_id', userId)
+      .maybeSingle();
     schedule = data || null;
   }
   if (!schedule) {
@@ -343,15 +402,19 @@ async function resolveMembers(ownerType, ownerId, eventType, memberOverride) {
     return { memberIds: [ownerId], schedules: { [ownerId]: schedule }, requiredMemberIds: [ownerId] };
   }
   // home / business — explicit members (ephemeral find-a-time) or active assignees of the event type.
+  // Deterministic ordering matters: one_on_one picks memberIds[0] as the slot's host, so an
+  // unordered SELECT made host assignment (and round-robin tie-breaks) vary run to run.
   let memberIds;
   if (memberOverride && memberOverride.length) {
-    memberIds = [...new Set(memberOverride)];
+    memberIds = [...new Set(memberOverride)].sort();
   } else {
     const { data: assignees } = await supabaseAdmin
       .from('EventTypeAssignee')
       .select('subject_id')
       .eq('event_type_id', eventType.id)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+      .order('subject_id', { ascending: true });
     memberIds = [...new Set((assignees || []).map((a) => a.subject_id))];
   }
   const schedules = {};
@@ -363,10 +426,19 @@ async function resolveMembers(ownerType, ownerId, eventType, memberOverride) {
   return { memberIds, schedules, requiredMemberIds: memberIds };
 }
 
-async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, excludeBookingId }) {
+/**
+ * @param {string|null} args.groupEventTypeId  When computing slots for a group event, seats
+ *   already taken on THAT event type do not make the host busy — the point of a group event
+ *   is that several invitees share one slot. Those rows are counted per start instant instead
+ *   and returned as `groupSeatCounts` so the caller can drop slots that are already full.
+ *   Bookings on any OTHER event type still occupy the host normally.
+ * @returns {Promise<{ busy: Object<string, Array<{start,end}>>, groupSeatCounts: Map<number, number> }>}
+ */
+async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, excludeBookingId, groupEventTypeId = null }) {
   const busy = {};
+  const groupSeatCounts = new Map();
   for (const id of memberIds) busy[id] = [];
-  if (!memberIds.length) return busy;
+  if (!memberIds.length) return { busy, groupSeatCounts };
 
   const fromIso = new Date(fromMs).toISOString();
   const toIso = new Date(toMs).toISOString();
@@ -376,15 +448,28 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, 
   //    exclusion constraint (which guards each booking's buffer-padded occupied range).
   let bookingsQuery = supabaseAdmin
     .from('Booking')
-    .select('id, host_user_id, start_at, end_at, buffer_before_min, buffer_after_min')
+    .select('id, host_user_id, event_type_id, enforce_exclusive, start_at, end_at, buffer_before_min, buffer_after_min')
     .in('host_user_id', memberIds)
     .in('status', ['pending', 'confirmed'])
     .lt('start_at', toIso)
     .gt('end_at', fromIso);
-  // When rescheduling, ignore the booking being moved so it doesn't block its own new time.
-  if (excludeBookingId) bookingsQuery = bookingsQuery.neq('id', excludeBookingId);
+  // When rescheduling, ignore the booking being moved so it doesn't block its own new time —
+  // including its collective co-host reservation shadows, which move with it.
+  if (excludeBookingId) {
+    bookingsQuery = bookingsQuery
+      .neq('id', excludeBookingId)
+      .or(`cohost_of_booking_id.is.null,cohost_of_booking_id.neq.${excludeBookingId}`);
+  }
   const { data: bookings } = await bookingsQuery;
   for (const b of bookings || []) {
+    // Seats on the group event we are computing for: count, don't block. Without this the
+    // first attendee makes the host busy and every later seat disappears from the grid, so
+    // a seat_cap of 10 could only ever sell 1.
+    if (groupEventTypeId && b.event_type_id === groupEventTypeId && b.enforce_exclusive === false) {
+      const startMs = Date.parse(b.start_at);
+      groupSeatCounts.set(startMs, (groupSeatCounts.get(startMs) || 0) + 1);
+      continue;
+    }
     if (!busy[b.host_user_id]) continue;
     busy[b.host_user_id].push({
       start: Date.parse(b.start_at) - (b.buffer_before_min || 0) * MIN_MS,
@@ -406,13 +491,13 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, 
   }
   const { data: blocksRec } = await supabaseAdmin
     .from('AvailabilityBlock')
-    .select('user_id, start_at, end_at, recurrence_rule')
+    .select('user_id, start_at, end_at, recurrence_rule, timezone')
     .in('user_id', memberIds)
     .not('recurrence_rule', 'is', null);
   for (const blk of blocksRec || []) {
     if (!busy[blk.user_id]) continue;
     const startMs = Date.parse(blk.start_at);
-    busy[blk.user_id].push(...expandRecurrence(blk.recurrence_rule, startMs, Date.parse(blk.end_at) - startMs, fromMs, toMs));
+    busy[blk.user_id].push(...expandRecurrence(blk.recurrence_rule, startMs, Date.parse(blk.end_at) - startMs, fromMs, toMs, blk.timezone));
   }
 
   // 3. Home shared calendar — busy for whole-home (assigned_to null) or assigned members.
@@ -428,7 +513,7 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, 
       .or(`end_at.gt.${fromIso},end_at.is.null`);
     const { data: eventsRec } = await supabaseAdmin
       .from('HomeCalendarEvent')
-      .select('start_at, end_at, recurrence_rule, assigned_to')
+      .select('start_at, end_at, recurrence_rule, assigned_to, timezone')
       .eq('home_id', ownerId)
       .not('recurrence_rule', 'is', null);
     for (const ev of [...(eventsOnce || []), ...(eventsRec || [])]) {
@@ -436,7 +521,7 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, 
       const endMs = ev.end_at ? Date.parse(ev.end_at) : startMs + DAY_MS; // open-ended event -> all-day (24h) busy
       const duration = endMs - startMs;
       const instances = ev.recurrence_rule
-        ? expandRecurrence(ev.recurrence_rule, startMs, duration, fromMs, toMs)
+        ? expandRecurrence(ev.recurrence_rule, startMs, duration, fromMs, toMs, ev.timezone)
         : [{ start: startMs, end: endMs }];
       const targets = ev.assigned_to && ev.assigned_to.length ? ev.assigned_to : memberIds; // null -> whole home
       for (const id of targets) {
@@ -445,16 +530,20 @@ async function fetchBusyByMember({ memberIds, ownerType, ownerId, fromMs, toMs, 
     }
   }
 
-  return busy;
+  return { busy, groupSeatCounts };
 }
 
 /**
  * Main entry. Returns slots in the viewer's timezone plus UTC instants.
  * @returns {Promise<Array<{ start: string, end: string, startLocal: string, eligibleHosts: string[] }>>}
  */
-async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTimezone, now, memberOverride, excludeBookingId }) {
+async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTimezone, now, memberOverride, excludeBookingId, durationMin }) {
   const nowMs = now ? new Date(now).getTime() : Date.now();
-  const fromMs = new Date(from).getTime();
+  // Clamp `from` to now: slots can't start in the past, and a deeply back-dated `from`
+  // otherwise exhausts buildWeeklyWindows' fixed expansion guard before reaching the
+  // present, returning [] for a fully-available host. (Math.max propagates NaN into the
+  // finite check below.)
+  const fromMs = Math.max(new Date(from).getTime(), nowMs);
   // Hard server-side clamp on the horizon so an unauthenticated caller can't request years.
   const horizonMs = nowMs + (eventType.max_horizon_days || 60) * DAY_MS;
   const toMs = Math.min(new Date(to).getTime(), horizonMs);
@@ -464,7 +553,38 @@ async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTim
   const activeMemberIds = memberIds.filter((id) => schedules[id]); // members without a schedule contribute nothing
   if (!activeMemberIds.length) return [];
 
-  const busy = await fetchBusyByMember({ memberIds: activeMemberIds, ownerType, ownerId, fromMs, toMs, excludeBookingId });
+  const mode = eventType.assignment_mode || 'one_on_one';
+  const { busy, groupSeatCounts } = await fetchBusyByMember({
+    memberIds: activeMemberIds,
+    ownerType,
+    ownerId,
+    fromMs,
+    toMs,
+    excludeBookingId,
+    groupEventTypeId: mode === 'group' ? eventType.id : null,
+  });
+
+  // daily_cap: pre-compute which UTC days in the window are already full for this event
+  // type so the grid never offers a slot the cap guards would reject.
+  let cappedDays = null;
+  if ((eventType.daily_cap || 0) > 0) {
+    let dayQuery = supabaseAdmin
+      .from('Booking')
+      .select('start_at')
+      .eq('event_type_id', eventType.id)
+      .in('status', ['pending', 'confirmed'])
+      .is('cohost_of_booking_id', null) // co-host shadows are the same meeting, not extra bookings
+      .gte('start_at', new Date(fromMs).toISOString())
+      .lt('start_at', new Date(toMs).toISOString());
+    if (excludeBookingId) dayQuery = dayQuery.neq('id', excludeBookingId);
+    const { data: dayRows } = await dayQuery;
+    const counts = new Map();
+    for (const r of dayRows || []) {
+      const d = Math.floor(Date.parse(r.start_at) / DAY_MS);
+      counts.set(d, (counts.get(d) || 0) + 1);
+    }
+    cappedDays = new Set([...counts].filter(([, c]) => c >= eventType.daily_cap).map(([d]) => d));
+  }
 
   const membersFree = {};
   for (const id of activeMemberIds) {
@@ -478,12 +598,15 @@ async function computeSlots({ ownerType, ownerId, eventType, from, to, viewerTim
     membersFree,
     memberIds: activeMemberIds,
     requiredMemberIds: requiredMemberIds.filter((id) => schedules[id]),
-    mode: eventType.assignment_mode || 'one_on_one',
+    mode,
     eventType,
     refTz,
     fromMs,
     toMs,
     nowMs,
+    durationMin,
+    groupSeatCounts,
+    cappedDays,
   });
 
   const vtz = viewerTimezone || refTz;
@@ -510,6 +633,9 @@ async function isSlotAvailable({ ownerType, ownerId, eventType, startIso, endIso
     to: new Date(endMs + 1).toISOString(),
     viewerTimezone,
     excludeBookingId,
+    // The caller already resolved the booking's real length; generate the grid at that
+    // duration so an off-default booking can match a slot instead of always 409ing.
+    durationMin: Math.round((endMs - startMs) / MIN_MS),
   });
   const match = slots.find((s) => new Date(s.start).getTime() === startMs && new Date(s.end).getTime() === endMs);
   if (!match) return { available: false, eligibleHosts: [] };
