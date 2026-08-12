@@ -1518,6 +1518,28 @@ private fun routeForAIDraft(draft: ChatAIDraftCard): String =
         else -> ChildRoutes.composePost(PulseIntent.Ask.key)
     }
 
+/** An optional (nullable, default-null) string nav arg — query-style args on scheduling routes. */
+private fun optionalStringNavArg(name: String) =
+    navArgument(name) {
+        type = NavType.StringType
+        nullable = true
+        defaultValue = null
+    }
+
+/**
+ * The optional `ownerKind`/`ownerId` query args every owner-scoped Calendarly
+ * route declares (see `SchedulingRoutes.ARG_OWNER_KIND`). ViewModels rebuild the
+ * owner via `SchedulingOwner.fromRoute(SavedStateHandle)`; absent args mean Personal.
+ */
+private fun schedulingOwnerNavArgs() =
+    listOf(
+        optionalStringNavArg(SchedulingRoutes.ARG_OWNER_KIND),
+        optionalStringNavArg(SchedulingRoutes.ARG_OWNER_ID),
+    )
+
+/** The optional `homeId` query arg carried by the F8/F9–F14 home scheduling routes. */
+private fun schedulingHomeNavArg() = optionalStringNavArg(SchedulingRoutes.ARG_HOME_ID)
+
 /**
  * Signed-in root. Hosts [PantopusBottomBar] + a [NavHost] with the five
  * top-level destinations from [PantopusRoute] plus drill-down destinations
@@ -2340,25 +2362,37 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.SETTINGS) {
+                composable(
+                    SchedulingRoutes.SETTINGS,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     SchedulingSettingsRootScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.NOTIFICATIONS) {
+                composable(
+                    SchedulingRoutes.NOTIFICATIONS,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     NotificationPrefsScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.ONBOARDING) {
+                composable(
+                    SchedulingRoutes.ONBOARDING,
+                    arguments = listOf(optionalStringNavArg(SchedulingRoutes.ARG_FLOW)) + schedulingOwnerNavArgs(),
+                ) {
                     OnboardingHomeBusinessScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.EVENT_TYPE_LIST) {
+                composable(
+                    SchedulingRoutes.EVENT_TYPE_LIST,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     EventTypeListScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2428,13 +2462,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.BOOKING_PAGE_MANAGE) {
+                composable(
+                    SchedulingRoutes.BOOKING_PAGE_MANAGE,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     BookingPageManageScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.PUBLIC_PAGE_PREVIEW) {
+                composable(
+                    SchedulingRoutes.PUBLIC_PAGE_PREVIEW,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     PublicPagePreviewScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2526,7 +2566,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.MANUAL_BOOKING) {
+                composable(
+                    SchedulingRoutes.MANUAL_BOOKING,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     ManualBookingScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2548,7 +2591,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.HOUSEHOLD_AVAILABILITY) {
+                composable(
+                    SchedulingRoutes.HOUSEHOLD_AVAILABILITY,
+                    arguments = listOf(schedulingHomeNavArg()),
+                ) {
                     HouseholdAvailabilityScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2588,7 +2634,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.RESOURCE_LIST) {
+                composable(
+                    SchedulingRoutes.RESOURCE_LIST,
+                    arguments = listOf(schedulingHomeNavArg()),
+                ) {
                     ResourceListScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2596,7 +2645,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.RESOURCE_EDITOR,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(
+                            navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType },
+                            schedulingHomeNavArg(),
+                        ),
                 ) { entry ->
                     ResourceEditorScreen(
                         resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
@@ -2606,7 +2659,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.RESOURCE_DETAIL,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(
+                            navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType },
+                            schedulingHomeNavArg(),
+                        ),
                 ) { entry ->
                     ResourceDetailScreen(
                         resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
@@ -2616,7 +2673,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.BOOK_RESOURCE,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(
+                            navArgument(SchedulingRoutes.ARG_RESOURCE_ID) { type = NavType.StringType },
+                            schedulingHomeNavArg(),
+                        ),
                 ) { entry ->
                     BookResourceScreen(
                         resourceId = entry.arguments?.getString(SchedulingRoutes.ARG_RESOURCE_ID).orEmpty(),
@@ -2624,7 +2685,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.VISIT_SETUP) {
+                composable(
+                    SchedulingRoutes.VISIT_SETUP,
+                    arguments = listOf(schedulingHomeNavArg()),
+                ) {
                     VisitSetupScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2632,7 +2696,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.VISIT_DETAIL,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_VISIT_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(
+                            navArgument(SchedulingRoutes.ARG_VISIT_ID) { type = NavType.StringType },
+                            schedulingHomeNavArg(),
+                        ),
                 ) { entry ->
                     VisitDetailScreen(
                         visitId = entry.arguments?.getString(SchedulingRoutes.ARG_VISIT_ID).orEmpty(),
@@ -2738,13 +2806,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.REMINDERS_QUICK_SETUP) {
+                composable(
+                    SchedulingRoutes.REMINDERS_QUICK_SETUP,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     RemindersQuickSetupScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.WORKFLOWS_LIST) {
+                composable(
+                    SchedulingRoutes.WORKFLOWS_LIST,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     WorkflowsListScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },
@@ -2752,7 +2826,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.WORKFLOW_EDITOR,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_WORKFLOW_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(navArgument(SchedulingRoutes.ARG_WORKFLOW_ID) { type = NavType.StringType }) +
+                            schedulingOwnerNavArgs(),
                 ) { entry ->
                     WorkflowEditorScreen(
                         workflowId = entry.arguments?.getString(SchedulingRoutes.ARG_WORKFLOW_ID).orEmpty(),
@@ -2762,7 +2838,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 composable(
                     route = SchedulingRoutes.MESSAGE_TEMPLATE_EDITOR,
-                    arguments = listOf(navArgument(SchedulingRoutes.ARG_TEMPLATE_ID) { type = NavType.StringType }),
+                    arguments =
+                        listOf(navArgument(SchedulingRoutes.ARG_TEMPLATE_ID) { type = NavType.StringType }) +
+                            schedulingOwnerNavArgs(),
                 ) { entry ->
                     MessageTemplateEditorScreen(
                         templateId = entry.arguments?.getString(SchedulingRoutes.ARG_TEMPLATE_ID).orEmpty(),
@@ -2770,7 +2848,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onNavigate = { route -> navController.navigate(route) },
                     )
                 }
-                composable(SchedulingRoutes.TEMPLATE_LIBRARY) {
+                composable(
+                    SchedulingRoutes.TEMPLATE_LIBRARY,
+                    arguments = schedulingOwnerNavArgs(),
+                ) {
                     TemplateLibraryScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) },

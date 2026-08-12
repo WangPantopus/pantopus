@@ -38,6 +38,22 @@ class AvailabilityFormatTest {
     }
 
     @Test
+    fun `hhmm stays ASCII under an Arabic-digit default locale`() {
+        // hhmm() is the wire format the backend validates with an ASCII-only
+        // \d{2}:\d{2} pattern — a localized-digit default locale (ar-EG uses
+        // Arabic-Indic digits) must not leak into it.
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ar-EG"))
+            assertEquals("09:05", hhmm(9, 5))
+            assertEquals("09:05", normalizeHHmm("09:05:00"))
+            assertEquals("9:05 AM", formatTime12("09:05"))
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
+
+    @Test
     fun `formatDayRange collapses contiguous runs`() {
         assertEquals("Mon–Fri", formatDayRange(setOf(1, 2, 3, 4, 5)))
         assertEquals("Sat–Sun", formatDayRange(setOf(6, 0)))

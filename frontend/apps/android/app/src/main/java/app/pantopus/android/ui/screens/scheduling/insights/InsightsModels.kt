@@ -74,15 +74,20 @@ data class InsightsFilter(
             }
         }
 
-    /** `from`/`to` UTC day keys (`yyyy-MM-dd`) for `GET /bookings?from&to`. */
+    /**
+     * `from`/`to` UTC day keys (`yyyy-MM-dd`) for `GET /bookings?from&to`. `to`
+     * is EXCLUSIVE (the day after the last included day): the backend parses a
+     * date-only bound as UTC midnight, so an inclusive `to` would exclude every
+     * booking on the final day — including all of today.
+     */
     fun range(today: LocalDate = LocalDate.now()): Pair<String, String> {
         if (period == InsightsPeriod.Custom && customStart != null && customEnd != null) {
             val lo = minOf(customStart, customEnd)
             val hi = maxOf(customStart, customEnd)
-            return lo.toString() to hi.toString()
+            return lo.toString() to hi.plusDays(1).toString()
         }
         val from = today.minusDays(days(today).toLong())
-        return from.toString() to today.toString()
+        return from.toString() to today.plusDays(1).toString()
     }
 
     /** Number of non-date filters applied (for the Apply-button badge). */

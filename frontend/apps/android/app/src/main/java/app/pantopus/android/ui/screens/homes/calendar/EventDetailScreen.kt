@@ -49,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.OfflineBannerHost
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
@@ -65,7 +66,14 @@ import java.util.Locale
 
 const val EVENT_DETAIL_SCREEN_TAG = "eventDetail"
 
-private val DISPLAY_ZONE: ZoneId = ZoneId.of("UTC")
+/**
+ * Home-calendar surfaces render date/times in the device's local zone on
+ * both platforms (mirrors iOS `Calendar.current`); only the all-day
+ * heuristic stays pinned to UTC (the wire stores all-day at 00:00Z).
+ */
+private val DISPLAY_ZONE: ZoneId = ZoneId.systemDefault()
+
+private val UTC_ZONE: ZoneId = ZoneId.of("UTC")
 
 /**
  * F2 — Event Detail + RSVP. Mirrors iOS `EventDetailView`. Renders the
@@ -88,19 +96,23 @@ fun EventDetailScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().testTag(EVENT_DETAIL_SCREEN_TAG)) {
-        when (val current = state) {
-            is EventDetailUiState.Loading -> LoadingShell(onBack = onBack)
-            is EventDetailUiState.Error ->
-                ErrorShell(message = current.message, onBack = onBack, onRetry = { viewModel.load() })
-            is EventDetailUiState.Loaded ->
-                LoadedShell(
-                    snapshot = current,
-                    rsvpEnabled = online,
-                    onBack = onBack,
-                    onEdit = { onEdit(current.event) },
-                    onDelete = { viewModel.delete() },
-                    onRsvp = viewModel::setRsvp,
-                )
+        // Offline strip in the chrome stack — mirrors iOS
+        // `.offlineBanner(isOffline:)` on the F2 shell.
+        OfflineBannerHost(isOffline = !online) {
+            when (val current = state) {
+                is EventDetailUiState.Loading -> LoadingShell(onBack = onBack)
+                is EventDetailUiState.Error ->
+                    ErrorShell(onBack = onBack, onRetry = { viewModel.load() })
+                is EventDetailUiState.Loaded ->
+                    LoadedShell(
+                        snapshot = current,
+                        rsvpEnabled = online,
+                        onBack = onBack,
+                        onEdit = { onEdit(current.event) },
+                        onDelete = { viewModel.delete() },
+                        onRsvp = viewModel::setRsvp,
+                    )
+            }
         }
     }
 }
@@ -184,7 +196,6 @@ private fun SkeletonAvatarRow() {
 
 @Composable
 private fun ErrorShell(
-    message: String,
     onBack: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -193,10 +204,12 @@ private fun ErrorShell(
         onBack = onBack,
         header = {},
         body = {
+            // Design FrameError renders a FIXED subcopy line (never the raw
+            // server message) — matches iOS ErrorShell.
             EmptyState(
                 icon = PantopusIcon.CloudOff,
                 headline = "Couldn't load this event",
-                subcopy = message.ifBlank { "It may have been deleted, or your connection dropped." },
+                subcopy = "It may have been deleted, or your connection dropped.",
                 ctaTitle = "Retry",
                 onCta = onRetry,
                 tint = PantopusColors.errorBg,
@@ -486,10 +499,12 @@ private fun YourRsvpCard(
     onRsvp: (HomeRsvpChoice) -> Unit,
 ) {
     val recorded = snapshot.myRsvp
-    val pending = recorded == null
     // JSX `FramePending` (event-detail-frames.jsx:200-204): the pending card gets
     // a green border + a 4px home-bg glow ring (boxShadow 0 0 0 4px H.bg50). The
-    // glow is drawn as an outer home-bg ring behind the card.
+    // glow is drawn as an outer home-bg ring behind the card. The design's
+    // OFFLINE frame drops the emphasis entirely — plain card, muted overline,
+    // dimmed control — so the pending treatment is gated on being online.
+    val pending = recorded == null && enabled
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
         modifier =
@@ -517,7 +532,7 @@ private fun YourRsvpCard(
             text = "YOUR RSVP",
             fontSize = 9.5.sp,
             fontWeight = FontWeight.Bold,
-            color = PantopusColors.homeDark,
+            color = if (enabled) PantopusColors.homeDark else PantopusColors.appTextMuted,
         )
         if (recorded != null) {
             RecordedRsvp(choice = recorded, enabled = enabled, onChange = { onRsvp(HomeRsvpChoice.NoReply) })
@@ -589,7 +604,9 @@ private fun RsvpSegmented(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurfaceSunken)
-                .padding(3.dp),
+                .padding(3.dp)
+                // Design FrameOffline dims the disabled control to 0.5.
+                .alpha(if (enabled) 1f else 0.5f),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         HomeRsvpChoice.selectable.forEach { choice ->
@@ -688,13 +705,17 @@ private fun formattedTimeRange(event: CalendarEventDto): String {
     val start = startInstant.atZone(DISPLAY_ZONE)
     val endInstant = event.endAt?.let { HomeAgendaBuilder.parseInstant(it) }
     val end = endInstant?.atZone(DISPLAY_ZONE)
-    if (end == null && isMidnight(start)) {
+    if (end == null && isMidnightUtc(start)) {
         return "${longDateLabel(start)} · All day"
     }
     return "${longDateLabel(start)} · ${formattedTime(start, end)}"
 }
 
-private fun isMidnight(date: ZonedDateTime): Boolean = date.hour == 0 && date.minute == 0 && date.second == 0
+/** All-day rows are stored at midnight UTC + nil end — check in UTC. */
+private fun isMidnightUtc(date: ZonedDateTime): Boolean {
+    val utc = date.withZoneSameInstant(UTC_ZONE)
+    return utc.hour == 0 && utc.minute == 0 && utc.second == 0
+}
 
 private fun longDateLabel(date: ZonedDateTime): String = DateTimeFormatter.ofPattern("EEE MMM d", Locale.US).format(date)
 

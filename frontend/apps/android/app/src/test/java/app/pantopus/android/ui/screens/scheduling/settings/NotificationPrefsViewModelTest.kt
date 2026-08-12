@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.settings
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageResponse
 import app.pantopus.android.data.api.models.scheduling.NotificationPrefsResponse
@@ -34,7 +35,7 @@ class NotificationPrefsViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = NotificationPrefsViewModel(repo)
+    private fun vm() = NotificationPrefsViewModel(repo, SavedStateHandle())
 
     private fun stub(
         prefs: Map<String, Any?>,

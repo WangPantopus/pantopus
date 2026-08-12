@@ -26,9 +26,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,19 +70,28 @@ fun OnboardingHomeBusinessScreen(
     }
 
     WizardShell(model = viewModel, identity = pillar.wizardIdentity) {
-        if (state.isSuccess) {
-            OnboardingSuccess(state)
-            return@WizardShell
-        }
-        if (state.stepIndex == 1) {
-            SetupPillarChip(pillar = pillar, label = if (state.flow == OnboardingFlow.Home) "Home" else "Business")
-        }
         val steps =
             if (state.flow == OnboardingFlow.Home) {
                 listOf("Members", "Combine", "Share")
             } else {
                 listOf("Link", "Service", "Team", "Confirm")
             }
+        if (state.isSuccess) {
+            // The design keeps the rail above the success hero with every step marked done
+            // (onboarding-home-frames.jsx HomeSuccess: StepRail current={3} done={[1,2,3]};
+            // business done={[1,2,3,4]}), so the final disc renders a check, not a numeral.
+            WizardStepRail(
+                steps = steps,
+                current = state.displayStep,
+                pillar = pillar,
+                done = (1..steps.size).toSet(),
+            )
+            OnboardingSuccess(state)
+            return@WizardShell
+        }
+        if (state.stepIndex == 1) {
+            SetupPillarChip(pillar = pillar, label = if (state.flow == OnboardingFlow.Home) "Home" else "Business")
+        }
         WizardStepRail(steps = steps, current = state.displayStep, pillar = pillar)
         if (state.flow == OnboardingFlow.Home) HomeStep(state, viewModel, pillar) else BusinessStep(state, viewModel, pillar)
     }
@@ -152,6 +163,7 @@ private fun BusinessStep(
                 serviceType = state.serviceType,
                 duration = state.duration,
                 priceText = state.priceText,
+                paidEnabled = state.paidEnabled,
                 pillar = pillar,
                 onSelect = vm::setServiceType,
                 onDuration = vm::setDuration,
@@ -196,7 +208,13 @@ private fun OnboardingSuccess(state: OnboardingUiState) {
                 "Your link is live with your first service and seated team. $confirm"
             },
     )
-    WizardSuccessLinkCard(link = state.shareLink, pillar = state.pillar, onCopy = {})
+    // Copy puts the live link on the clipboard (the hub's clipboard pattern).
+    val clipboard = LocalClipboardManager.current
+    WizardSuccessLinkCard(
+        link = state.shareLink,
+        pillar = state.pillar,
+        onCopy = { clipboard.setText(AnnotatedString("https://${state.shareLink}")) },
+    )
 }
 
 /**

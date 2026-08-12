@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -62,7 +63,6 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * Stream A15 — shared local primitives + formatters for the Packages & Invoices
@@ -115,15 +115,11 @@ object PackagesMoney {
     }
 
     /**
-     * Parse a user-typed price string ("$240.00", "240", "240.5") to cents.
+     * Parse a user-typed price string ("$240.00", "240", "240.5", "240,50") to
+     * cents. Decimal-aware (delegates to the shared [MoneyAndFlag.parseCents]).
      * Returns null when the field is empty / unparseable.
      */
-    fun parseCents(raw: String): Int? {
-        val cleaned = raw.filter { it.isDigit() || it == '.' }
-        if (cleaned.isBlank()) return null
-        val value = cleaned.toDoubleOrNull() ?: return null
-        return (value * CENTS_PER_UNIT).roundToInt()
-    }
+    fun parseCents(raw: String): Int? = MoneyAndFlag.parseCents(raw)
 }
 
 /**
@@ -146,6 +142,9 @@ object PackagesFormat {
 
     /** Epoch millis for an ISO timestamp (for upcoming/past comparisons), or null. */
     fun epochMillis(iso: String?): Long? = iso?.let { parse(it)?.toEpochMilli() }
+
+    /** Tolerant ISO → [Instant]; null when unparseable. */
+    fun instant(iso: String?): Instant? = iso?.let { parse(it) }
 
     private fun parse(iso: String): Instant? =
         runCatching { Instant.parse(iso) }.getOrNull()

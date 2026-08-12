@@ -144,6 +144,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -156,6 +157,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Park
@@ -635,6 +637,11 @@ enum class PantopusIcon(
     PauseCircle("pause-circle"),
     BellPlus("bell-plus"),
 
+    // F1 Home calendar — filtered-empty hero (`calendar-search`). iOS falls
+    // back to SF `magnifyingglass`; Material has no calendar+search glyph
+    // either, so the closest plain search vector backs it below.
+    CalendarSearch("calendar-search"),
+
     // Scheduling payments/setup glyphs: `percent` (tax / refund-after-cutoff),
     // `type` (statement descriptor), plus the `Calendarly` brand mark used by
     // the "open in app" handoff interstitial.
@@ -676,6 +683,23 @@ enum class PantopusIcon(
     // F8 — Household Availability: quiet-hours DisclosureRow. Lucide `moon`
     // (crescent moon) — Material `DarkMode` is the closest available.
     Moon("moon"),
+
+    // B1 event-type list reorder mode (`event-types-frames.jsx` FRAME 6 hint
+    // bar) — Lucide `move` (four-direction arrows); Material `OpenWith` is the
+    // closest available.
+    Move("move"),
+
+    // B9 date overrides (`date-overrides-frames.jsx`) — Lucide `calendar-range`
+    // ("Block a date range" link tile) and `calendar-off` (blocked-day override
+    // rows + holiday rows + "Block this date" CTA). Material `DateRange` /
+    // `EventBusy` are the closest available.
+    CalendarRange("calendar-range"),
+    CalendarOff("calendar-off"),
+
+    // G2 collective setup (`collective-frames.jsx` EXPLAIN note) — Lucide
+    // `git-merge` (branch merging into one); Material `MergeType` is the
+    // closest available.
+    GitMerge("git-merge"),
     ;
 
     companion object {
@@ -1080,6 +1104,9 @@ internal fun PantopusIcon.source(): IconSource =
         PantopusIcon.SearchX -> IconSource.Material(Icons.Filled.SearchOff)
         PantopusIcon.PauseCircle -> IconSource.Material(Icons.Filled.PauseCircle)
         PantopusIcon.BellPlus -> IconSource.Material(Icons.Filled.AddAlert)
+        // `calendar-search` — no calendar+search composite in Material; plain
+        // `Search` mirrors iOS's `magnifyingglass` fallback.
+        PantopusIcon.CalendarSearch -> IconSource.Material(Icons.Filled.Search)
         // G8 packages-list row/empty/gate icon (stacked layers). Material ships
         // a direct `Layers` vector in the extended icon set.
         PantopusIcon.Layers -> IconSource.Material(Icons.Filled.Layers)
@@ -1094,6 +1121,17 @@ internal fun PantopusIcon.source(): IconSource =
         // F8 — Quiet-hours DisclosureRow: crescent moon. Material `DarkMode`
         // (moon/dark-mode icon) is the closest available vector.
         PantopusIcon.Moon -> IconSource.Material(Icons.Filled.DarkMode)
+        // B1 reorder-mode hint bar: four-direction move arrows. Material
+        // `OpenWith` is the closest available vector.
+        PantopusIcon.Move -> IconSource.Material(Icons.Filled.OpenWith)
+        // B9 date overrides: `calendar-range` (span of days) → `DateRange`;
+        // `calendar-off` (calendar struck out) → `EventBusy` (shared with
+        // `calendar-x`, the closest Material has to either Lucide glyph).
+        PantopusIcon.CalendarRange -> IconSource.Material(Icons.Filled.DateRange)
+        PantopusIcon.CalendarOff -> IconSource.Material(Icons.Filled.EventBusy)
+        // G2 collective explainer: git-merge branch glyph. Material `MergeType`
+        // (two paths merging) is the closest available vector.
+        PantopusIcon.GitMerge -> IconSource.Material(Icons.Filled.MergeType)
     }
 
 /**

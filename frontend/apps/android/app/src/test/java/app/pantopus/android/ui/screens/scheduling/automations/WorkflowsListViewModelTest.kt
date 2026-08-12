@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.automations
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageResponse
 import app.pantopus.android.data.api.models.scheduling.GetWorkflowsResponse
@@ -11,6 +12,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -38,9 +40,28 @@ class WorkflowsListViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = WorkflowsListViewModel(repo, errors)
+    private fun vm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = WorkflowsListViewModel(
+        repo,
+        errors,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
 
     private val page = BookingPageResponse(BookingPageDto(id = "p1", reminderMinutes = listOf(1440, 60)))
+
+    @Test
+    fun `route owner args flow into the editor route builders`() {
+        val vm = vm(ownerKind = "business", ownerId = "biz-1")
+        assertEquals("scheduling/workflows/new?ownerKind=business&ownerId=biz-1", vm.createWorkflowRoute())
+        assertEquals("scheduling/workflows/w1?ownerKind=business&ownerId=biz-1", vm.workflowRoute("w1"))
+    }
 
     @Test
     fun `load empty keeps the reminders summary`() =

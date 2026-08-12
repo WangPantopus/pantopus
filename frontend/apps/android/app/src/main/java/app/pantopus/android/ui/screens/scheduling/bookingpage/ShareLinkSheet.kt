@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +44,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.launch
 
 /**
  * C3 — the local "Share your link" bottom sheet. A rounded-top sheet over the
@@ -113,7 +113,7 @@ fun ShareLinkSheet(
                     onMessages = onMessages,
                     onEmail = onEmail,
                 )
-                QrThumbCard(onShow = { showQr = true })
+                QrThumbCard(url = url, onShow = { showQr = true })
                 ShareSettingsCard(
                     showOnProfile = showOnProfile,
                     addToSignature = addToSignature,
@@ -250,7 +250,10 @@ internal fun ShareTargetButton(
 }
 
 @Composable
-private fun QrThumbCard(onShow: () -> Unit) {
+private fun QrThumbCard(
+    url: String,
+    onShow: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
@@ -271,7 +274,7 @@ private fun QrThumbCard(onShow: () -> Unit) {
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
                     .padding(4.dp),
         ) {
-            QrCanvas(modifier = Modifier.fillMaxSize())
+            QrCanvas(url = url, modifier = Modifier.fillMaxSize())
         }
         Column(Modifier.weight(1f)) {
             Text("Scan to book", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
@@ -394,6 +397,7 @@ private fun QrFullscreenDialog(
     onDone: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     Dialog(onDismissRequest = onDone) {
         Column(
             modifier =
@@ -423,7 +427,7 @@ private fun QrFullscreenDialog(
                         .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl3))
                         .padding(Spacing.s5),
             ) {
-                QrCanvas(modifier = Modifier.size(184.dp))
+                QrCanvas(url = url, modifier = Modifier.size(184.dp))
             }
             Text(
                 displayName.ifBlank { "Your booking page" },
@@ -447,7 +451,7 @@ private fun QrFullscreenDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = Spacing.s3),
             )
-            SaveToPhotosButton(onSave = { saveQrToPhotos(context) })
+            SaveToPhotosButton(onSave = { scope.launch { saveQrToPhotos(context, url) } })
         }
     }
 }
@@ -472,18 +476,41 @@ private fun SaveToPhotosButton(onSave: () -> Unit) {
     }
 }
 
-/** Renders the decorative QR plate to a bitmap and writes it to the device gallery. */
-private fun saveQrToPhotos(context: android.content.Context) {
+/** Renders the scannable QR plate to a bitmap and writes it to the device gallery (off-main). */
+private suspend fun saveQrToPhotos(
+    context: android.content.Context,
+    url: String,
+) {
+    // NonCancellable: dismissing the dialog mid-save must not abandon a
+    // half-written MediaStore row.
+    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+        val saved =
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { writeQrPng(context, url) }.getOrDefault(false)
+            }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            val message = if (saved) "Saved to Photos" else "Couldn't save the QR code"
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+/** Blocking render + MediaStore write; call on an IO dispatcher. Returns true on success. */
+private fun writeQrPng(
+    context: android.content.Context,
+    url: String,
+): Boolean {
+    val matrix = qrMatrix(url)
+    val n = matrix.width
     val px = 720
     val bitmap = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
     canvas.drawColor(android.graphics.Color.WHITE)
-    val cells = qrCells()
-    val cell = px.toFloat() / QR_N
-    val paint = android.graphics.Paint().apply { color = PantopusColors.appText.toArgb() }
-    for (r in 0 until QR_N) {
-        for (c in 0 until QR_N) {
-            if (cells[r * QR_N + c]) {
+    val cell = px.toFloat() / n
+    val paint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
+    for (r in 0 until n) {
+        for (c in 0 until n) {
+            if (matrix.get(c, r)) {
                 canvas.drawRect(c * cell, r * cell, (c + 1) * cell, (r + 1) * cell, paint)
             }
         }
@@ -495,15 +522,11 @@ private fun saveQrToPhotos(context: android.content.Context) {
             put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
         }
     val resolver = context.contentResolver
-    val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-    if (uri != null) {
-        resolver.openOutputStream(uri)?.use { out ->
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-        }
-        android.widget.Toast.makeText(context, "Saved to Photos", android.widget.Toast.LENGTH_SHORT).show()
-    } else {
-        android.widget.Toast.makeText(context, "Couldn't save the QR code", android.widget.Toast.LENGTH_SHORT).show()
-    }
+    val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    resolver.openOutputStream(uri)?.use { out ->
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+    } ?: return false
+    return true
 }
 
 // ─── Regenerate confirm ─────────────────────────────────────────────────────
@@ -579,22 +602,41 @@ private fun ConfirmButton(
     }
 }
 
-// ─── Synthetic (decorative) QR ──────────────────────────────────────────────
+// ─── Scannable QR ───────────────────────────────────────────────────────────
 
-private const val QR_N = 25
+/** Quiet-zone modules around the code — the QR spec's 4-module margin. */
+private const val QR_QUIET_ZONE = 4
 
-/** A deterministic, decorative QR grid (not scannable) — mirrors the design mock. */
+/**
+ * Encodes [url] as a real QR (ECC M, matching iOS ShareLinkSheet.swift's
+ * CIFilter qrCodeGenerator) at the matrix's natural module size, quiet zone
+ * included. Rendering scales the modules to the target canvas.
+ */
+private fun qrMatrix(url: String): com.google.zxing.common.BitMatrix {
+    val hints =
+        mapOf(
+            com.google.zxing.EncodeHintType.ERROR_CORRECTION to
+                com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M,
+            com.google.zxing.EncodeHintType.MARGIN to QR_QUIET_ZONE,
+        )
+    return com.google.zxing.qrcode.QRCodeWriter()
+        .encode(url, com.google.zxing.BarcodeFormat.QR_CODE, 1, 1, hints)
+}
+
+/** Draws the encoded booking URL as square cells — same visual style as the mock. */
 @Composable
 internal fun QrCanvas(
+    url: String,
     modifier: Modifier = Modifier,
     foreground: Color = PantopusColors.appText,
 ) {
-    val cells = remember { qrCells() }
+    val matrix = remember(url) { qrMatrix(url) }
     Canvas(modifier = modifier) {
-        val cell = size.minDimension / QR_N
-        for (r in 0 until QR_N) {
-            for (c in 0 until QR_N) {
-                if (cells[r * QR_N + c]) {
+        val n = matrix.width
+        val cell = size.minDimension / n
+        for (r in 0 until n) {
+            for (c in 0 until n) {
+                if (matrix.get(c, r)) {
                     drawRect(
                         color = foreground,
                         topLeft = androidx.compose.ui.geometry.Offset(c * cell, r * cell),
@@ -604,29 +646,4 @@ internal fun QrCanvas(
             }
         }
     }
-}
-
-private fun qrCells(): BooleanArray {
-    val out = BooleanArray(QR_N * QR_N)
-    var seed = 13L
-    for (i in out.indices) {
-        seed = (seed * 9301 + 49297) % 233280
-        out[i] = seed.toDouble() / 233280.0 > 0.5
-    }
-
-    fun finder(
-        r0: Int,
-        c0: Int,
-    ) {
-        for (r in 0 until 7) {
-            for (c in 0 until 7) {
-                val on = r == 0 || r == 6 || c == 0 || c == 6 || (r in 2..4 && c in 2..4)
-                out[(r0 + r) * QR_N + (c0 + c)] = on
-            }
-        }
-    }
-    finder(0, 0)
-    finder(0, QR_N - 7)
-    finder(QR_N - 7, 0)
-    return out
 }

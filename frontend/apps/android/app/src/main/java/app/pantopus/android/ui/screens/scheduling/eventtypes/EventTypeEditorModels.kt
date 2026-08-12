@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.eventtypes
 
 import app.pantopus.android.data.api.models.scheduling.EventTypeDto
+import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 
 /** Slug shape the backend enforces: `^[a-z0-9][a-z0-9-]{0,60}$`. */
@@ -40,6 +41,8 @@ data class EditorForm(
     val assignmentMode: String = "one_on_one",
     val chargeEnabled: Boolean = false,
     val priceCents: Int = 0,
+    /** Raw text in the Price field; kept so decimals survive typing (parsed into [priceCents]). */
+    val priceText: String = "",
     val currency: String = "USD",
     // Collect = Full amount vs Deposit (design PricingCard "Collect" segmented).
     // A non-null deposit (carried from the DTO's `deposit_cents`) means the
@@ -82,6 +85,7 @@ internal fun EventTypeDto.toForm(): EditorForm {
         assignmentMode = assignmentMode ?: "one_on_one",
         chargeEnabled = (priceCents ?: 0) > 0,
         priceCents = priceCents ?: 0,
+        priceText = MoneyAndFlag.editText(priceCents ?: 0),
         currency = currency ?: "USD",
         depositCents = depositCents,
     )

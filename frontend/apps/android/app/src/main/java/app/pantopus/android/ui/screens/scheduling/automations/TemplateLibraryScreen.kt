@@ -17,6 +17,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +57,7 @@ private const val ACTION_TOAST_MS = 2200L
  * backend, editable). A create FAB; per-row overflow menu for edit / duplicate /
  * delete on owned templates. Empty keeps the starter card.
  */
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun TemplateLibraryScreen(
     onBack: () -> Unit = {},
@@ -63,8 +68,10 @@ fun TemplateLibraryScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val actionError by viewModel.actionError.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<MessageTemplateDto?>(null) }
+    val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = viewModel::refresh)
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(actionError) {
@@ -97,7 +104,7 @@ fun TemplateLibraryScreen(
             if (searchActive) {
                 SearchField(query = query, onQueryChange = viewModel::setQuery)
             }
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().pullRefresh(pullState)) {
                 when (val s = state) {
                     TemplateLibraryUiState.Loading -> LibraryLoading()
                     is TemplateLibraryUiState.Error ->
@@ -111,6 +118,12 @@ fun TemplateLibraryScreen(
                             onDelete = { deleteTarget = it },
                         )
                 }
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    contentColor = PantopusColors.primary600,
+                )
             }
         }
 

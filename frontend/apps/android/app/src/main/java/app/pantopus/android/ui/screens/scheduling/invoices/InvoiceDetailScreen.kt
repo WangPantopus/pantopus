@@ -81,8 +81,8 @@ fun InvoiceDetailScreen(
             ).testTag("scheduling.invoiceDetail"),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Trailing pill: show invoice status when loaded and DTO has a status value.
-            // Deferred: invoiceStatus is always null until InvoiceDto gains a `status` field.
+            // Trailing pill: the invoice lifecycle status (draft/sent/viewed/paid/
+            // void/overdue) once loaded; hidden for legacy rows without one.
             val loadedStatus = (state as? InvoiceDetailUiState.Loaded)?.invoiceStatus
             PkgTopBar(
                 title = "Invoice",
@@ -222,9 +222,7 @@ private fun LoadedBody(
                 ItemsTable(state, modifier = Modifier.padding(top = Spacing.s2))
             }
             // Timeline section — design invoicedetail-frames.jsx:166
-            // Created event derives from created_at (available in DTO).
-            // Sent/Paid/Deposit/Refunded/Voided events deferred until DTO exposes
-            // `status` / `paid_at`.
+            // Events derive from created_at / status / paid_at / due_date.
             SectionHeader(
                 title = "Timeline",
                 icon = PantopusIcon.Activity,
@@ -241,7 +239,9 @@ private fun LoadedBody(
                 modifier = Modifier.padding(top = Spacing.s4),
             )
             Text(
-                text = "Net 14 from issue. Pantopus Pay, card, or ACH.",
+                text =
+                    state.dueLabel?.let { "Due $it. Pantopus Pay, card, or ACH." }
+                        ?: "Net 14 from issue. Pantopus Pay, card, or ACH.",
                 color = PantopusColors.appTextStrong,
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,
@@ -316,8 +316,8 @@ private fun IdentityCard(
 
 /**
  * Invoice lifecycle timeline (invoicedetail-frames.jsx lines 109–126). Each event has
- * a dot + connecting rail + label/time row. Shows at minimum the "Created" event;
- * additional events (Sent, Paid, etc.) are added when the DTO gains `status`/`paid_at`.
+ * a dot + connecting rail + label/time row. Shows at minimum the "Created" event,
+ * plus Sent / Paid / Voided / Due events derived from `status`, `paid_at`, `due_date`.
  */
 @Composable
 private fun InvoiceTimeline(
@@ -482,28 +482,61 @@ private fun ItemsTable(
             }
             HorizontalDivider(color = PantopusColors.appBorderSubtle)
         }
-        // Total row
-        Row(
+        // Subtotal / fee breakdown + total (rows render only when the DTO
+        // carries the corresponding cents fields).
+        Column(
             modifier =
                 Modifier.fillMaxWidth().background(
                     PantopusColors.appSurfaceRaised,
                 ).padding(horizontal = 11.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = "Total",
-                color = PantopusColors.appText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = state.totalLabel,
-                color = PantopusColors.appText,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Black,
-            )
+            state.subtotalLabel?.let { BreakdownRow(label = "Subtotal", value = it) }
+            state.feeLabel?.let { BreakdownRow(label = "Platform fee", value = it) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Total",
+                    color = PantopusColors.appText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = state.totalLabel,
+                    color = PantopusColors.appText,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun BreakdownRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

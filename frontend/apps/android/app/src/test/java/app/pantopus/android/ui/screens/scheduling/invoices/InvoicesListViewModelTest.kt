@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -55,11 +56,15 @@ class InvoicesListViewModelTest {
     private fun invoice(
         id: String,
         cents: Int,
+        status: String? = null,
+        paidAt: String? = null,
     ) = InvoiceDto(
         id = id,
         recipientUserId = "cust-9",
         totalCents = cents,
         currency = "USD",
+        status = status,
+        paidAt = paidAt,
         createdAt = "2026-06-11T12:00:00Z",
     )
 
@@ -106,10 +111,70 @@ class InvoicesListViewModelTest {
             val loaded = model.state.value as InvoicesListUiState.Loaded
             assertEquals(1, loaded.sections.size)
             assertEquals(2, loaded.sections.first().invoices.size)
-            // outstandingLabel = sum of all invoice totals (deferred: DTO has no status to exclude paid)
+            // Status-less legacy rows count as outstanding (not settled).
             assertEquals("$316.00", loaded.outstandingLabel)
-            // collectedMonthLabel = $0.00 placeholder (deferred: DTO has no paid_at)
+            // Nothing carries a paid_at → collected this month is zero.
             assertEquals("$0.00", loaded.collectedMonthLabel)
+            assertFalse(loaded.hasOverdue)
+        }
+
+    @Test
+    fun `outstanding excludes settled and collected uses paid_at month`() =
+        runTest(dispatcher) {
+            val paidNow = java.time.Instant.now().toString()
+            coEvery { repo.getInvoices(any()) } returns
+                NetworkResult.Success(
+                    GetInvoicesResponse(
+                        listOf(
+                            invoice("aaa111x", 22000, status = "paid", paidAt = paidNow),
+                            invoice("bbb222y", 9600, status = "sent"),
+                            invoice("ccc333z", 5000, status = "void"),
+                            invoice("ddd444w", 1500, status = "overdue"),
+                        ),
+                    ),
+                )
+            val model = vm()
+            model.start()
+            advanceUntilIdle()
+            val loaded = model.state.value as InvoicesListUiState.Loaded
+            // paid + void drop out of Outstanding: 9600 + 1500.
+            assertEquals("$111.00", loaded.outstandingLabel)
+            // Only the invoice paid this calendar month counts as collected.
+            assertEquals("$220.00", loaded.collectedMonthLabel)
+            assertTrue(loaded.hasOverdue)
+        }
+
+    @Test
+    fun `status filter narrows sections but keeps KPIs global`() =
+        runTest(dispatcher) {
+            coEvery { repo.getInvoices(any()) } returns
+                NetworkResult.Success(
+                    GetInvoicesResponse(
+                        listOf(
+                            invoice("aaa111x", 22000, status = "paid", paidAt = "2026-01-05T10:00:00Z"),
+                            invoice("bbb222y", 9600, status = "sent"),
+                            invoice("ccc333z", 4400, status = "viewed"),
+                        ),
+                    ),
+                )
+            val model = vm()
+            model.start()
+            advanceUntilIdle()
+
+            model.selectFilter(InvoiceFilter.Sent)
+            val sent = model.state.value as InvoicesListUiState.Loaded
+            // Sent chip covers sent + viewed.
+            assertEquals(2, sent.sections.sumOf { it.invoices.size })
+            // KPIs stay computed over the full list.
+            assertEquals("$140.00", sent.outstandingLabel)
+
+            model.selectFilter(InvoiceFilter.Refunded)
+            val refunded = model.state.value as InvoicesListUiState.Loaded
+            assertTrue(refunded.sections.isEmpty())
+
+            model.selectFilter(InvoiceFilter.All)
+            val all = model.state.value as InvoicesListUiState.Loaded
+            assertEquals(3, all.sections.sumOf { it.invoices.size })
         }
 
     @Test

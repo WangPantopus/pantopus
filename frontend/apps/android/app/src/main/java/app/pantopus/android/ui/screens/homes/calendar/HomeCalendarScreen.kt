@@ -112,7 +112,7 @@ fun HomeCalendarScreen(
                 when (val current = state) {
                     is HomeCalendarUiState.Loading -> LoadingAgenda()
                     is HomeCalendarUiState.Error ->
-                        CalendarErrorView(message = current.message, onRetry = { viewModel.load() })
+                        CalendarErrorView(onRetry = { viewModel.load() })
                     is HomeCalendarUiState.Loaded ->
                         when (val empty = current.empty) {
                             null -> AgendaList(sections = current.sections, dimmed = offline, onTap = viewModel::openAgendaItem)
@@ -292,10 +292,7 @@ private fun AgendaSkeletonHeader() {
 }
 
 @Composable
-private fun CalendarErrorView(
-    message: String,
-    onRetry: () -> Unit,
-) {
+private fun CalendarErrorView(onRetry: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.s6).testTag("homeCalendar_error"),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -315,7 +312,9 @@ private fun CalendarErrorView(
             modifier = Modifier.padding(top = Spacing.s3),
         )
         Text(
-            text = message.ifBlank { "Something went wrong on our side. Check your connection and try again." },
+            // Design FrameError renders a FIXED subcopy line (never the raw
+            // server message) — matches iOS errorView.
+            text = "Something went wrong on our side. Check your connection and try again.",
             style = PantopusTextStyle.small,
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
@@ -332,7 +331,9 @@ private fun CalendarErrorView(
 @Composable
 private fun FirstRunEmpty(onAdd: () -> Unit) {
     EmptyState(
-        icon = PantopusIcon.CalendarDays,
+        // Design FrameEmpty icon is `calendar` (not `calendar-days`) — iOS
+        // renders Icon(.calendar).
+        icon = PantopusIcon.Calendar,
         headline = "Nothing scheduled",
         subcopy = "Add your first event and it shows up here for the whole household.",
         ctaTitle = "Add an event",
@@ -378,7 +379,9 @@ private fun FilteredEmptyScaffold(
             modifier = Modifier.size(56.dp).clip(CircleShape).background(PantopusColors.homeBg),
             contentAlignment = Alignment.Center,
         ) {
-            PantopusIconImage(icon = PantopusIcon.SearchX, contentDescription = null, size = 26.dp, tint = PantopusColors.home)
+            // Design FrameFiltered icon is `calendar-search` — iOS renders
+            // Icon(.calendarSearch).
+            PantopusIconImage(icon = PantopusIcon.CalendarSearch, contentDescription = null, size = 26.dp, tint = PantopusColors.home)
         }
         Text(
             text = title,

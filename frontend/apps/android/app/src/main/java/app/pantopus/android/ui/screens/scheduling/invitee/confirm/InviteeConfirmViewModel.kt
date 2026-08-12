@@ -219,7 +219,15 @@ class InviteeConfirmViewModel
             val requiresApproval = data.booking.requiresApproval ?: a.eventType.requiresApproval ?: false
             if (paidEnabled && data.clientSecret != null) {
                 _state.update {
-                    it.copy(step = ConfirmStep.Payment, clientSecret = data.clientSecret, manageToken = token, submitting = false)
+                    it.copy(
+                        step = ConfirmStep.Payment,
+                        clientSecret = data.clientSecret,
+                        manageToken = token,
+                        // Keep the created id: confirmPayment() builds ConfirmedData
+                        // from it once the payment step completes.
+                        createdBookingId = data.booking.id,
+                        submitting = false,
+                    )
                 }
                 return
             }
@@ -227,6 +235,7 @@ class InviteeConfirmViewModel
                 it.copy(
                     step = ConfirmStep.Confirmed,
                     manageToken = token,
+                    createdBookingId = data.booking.id,
                     submitting = false,
                     confirmed =
                         ConfirmedData(
@@ -284,7 +293,7 @@ class InviteeConfirmViewModel
             val et = a.eventType
             val mode = ConfirmUtils.priceMode(et.priceCents, et.depositCents)
             _state.update {
-                val bookingId = it.confirmed?.bookingId ?: ""
+                val bookingId = it.confirmed?.bookingId ?: it.createdBookingId.orEmpty()
                 it.copy(
                     step = ConfirmStep.Confirmed,
                     submitting = false,

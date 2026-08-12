@@ -106,9 +106,12 @@ fun TimeRangeEditorSheet(
                     modifier = Modifier.weight(1f),
                 )
             }
+            // Inverted windows (start >= end) can't be confirmed — the backend
+            // would silently drop the rule and zero the day's availability.
             A3PrimaryButton(
                 label = "Set ${formatTime12(start)} – ${formatTime12(end)}",
                 onClick = { onConfirm(start, end) },
+                enabled = minutesOfDay(start) < minutesOfDay(end),
                 modifier = Modifier.padding(vertical = Spacing.s3),
             )
         }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
@@ -132,11 +133,15 @@ class WhosFreeViewModel
 
         private suspend fun fetchGrid(id: String) {
             val (from, to) = windowRange()
+            // Send full instants anchored on the viewer's LOCAL day boundaries: the
+            // backend parses date-only bounds as UTC midnight, which shifts the
+            // window by the zone offset and drops morning/evening blocks.
+            val zoneId = zoneId()
             val result =
                 repo.whosFree(
                     home = SchedulingOwner.Home(id),
-                    from = FindATimeFormat.isoDate(from),
-                    to = FindATimeFormat.isoDate(to),
+                    from = from.atStartOfDay(zoneId).toInstant().toString(),
+                    to = to.atStartOfDay(zoneId).toInstant().toString(),
                     tz = zone,
                 )
             when (result) {
@@ -145,28 +150,33 @@ class WhosFreeViewModel
             }
         }
 
+        /** Window as local dates; the second element is the EXCLUSIVE end day. */
         private fun windowRange(): Pair<LocalDate, LocalDate> =
             when (view) {
                 GridView.Day -> anchor to anchor.plusDays(1)
                 GridView.Week -> anchor to anchor.plusDays(WEEK_SPAN)
             }
 
+        private fun zoneId(): ZoneId = runCatching { ZoneId.of(zone) }.getOrDefault(ZoneId.systemDefault())
+
         private fun project(data: FreeByMemberResponse): WhosFreeUiState.Loaded {
-            val sharedIds = (data.members + data.freeByMember.keys).toSet()
+            // `members` lists EVERY active occupant (whether or not they share
+            // availability), so membership can't distinguish opted-out. An empty
+            // free-list across the whole window is the "hasn't shared" signal.
             val columns = if (view == GridView.Day) dayColumns() else weekColumns()
             val rows =
                 roster.map { member ->
                     val slots = data.freeByMember[member.userId].orEmpty()
                     val cells =
                         when {
-                            member.userId !in sharedIds -> List(columns.size) { CellState.Unknown }
+                            slots.isEmpty() -> List(columns.size) { CellState.Unknown }
                             view == GridView.Day -> dayCells(slots)
                             else -> weekCells(slots)
                         }
                     MemberRow(member = member, cells = cells)
                 }
             val hasFree = rows.any { row -> row.cells.any { it == CellState.Free } }
-            val optedOut = roster.filter { it.userId !in sharedIds }.map { it.name }
+            val optedOut = roster.filter { data.freeByMember[it.userId].isNullOrEmpty() }.map { it.name }
             val anyShared = rows.any { row -> row.cells.any { it != CellState.Unknown } }
             return WhosFreeUiState.Loaded(
                 grid = HeatGrid(columns = columns, rows = rows),
@@ -257,7 +267,9 @@ class WhosFreeViewModel
             const val BUCKET_SPAN = 2
             const val LAST_HOUR = 24
             const val WEEK_SPAN = 7L
-            const val DAY_STEP = 7L
+
+            /** "Try next" advances the Day view one day (the Week view steps a week). */
+            const val DAY_STEP = 1L
             val DAY_LABEL_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)
             val SHORT_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
         }

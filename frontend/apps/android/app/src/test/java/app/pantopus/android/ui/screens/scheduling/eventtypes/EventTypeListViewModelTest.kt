@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.eventtypes
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
@@ -20,6 +21,7 @@ import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -89,7 +91,34 @@ class EventTypeListViewModelTest {
         coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(types))
     }
 
-    private fun newVm() = EventTypeListViewModel(repo, homes, auth, errors, flags, relay)
+    private fun newVm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = EventTypeListViewModel(
+        repo,
+        homes,
+        auth,
+        errors,
+        flags,
+        relay,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
+
+    @Test
+    fun `route owner args seed the owner and pillar`() =
+        runTest(dispatcher) {
+            stub(emptyList())
+            val vm = newVm(ownerKind = "home", ownerId = "home-7")
+            vm.start()
+            advanceUntilIdle()
+            assertEquals(SchedulingPillar.Home, vm.pillar.value)
+            coVerify { repo.getEventTypes(SchedulingOwner.Home("home-7")) }
+        }
 
     @Test
     fun `no event types yields zero-count content`() =
@@ -142,7 +171,7 @@ class EventTypeListViewModelTest {
         runTest(dispatcher) {
             stub(listOf(et("e1")))
             coEvery { repo.deleteEventType(any(), "e1") } returns
-                NetworkResult.Failure(NetworkError.ClientError(409, """{"error":"HAS_UPCOMING_BOOKINGS","message":"x"}"""))
+                NetworkResult.Failure(NetworkError.ClientError(409, """{"error":"HAS_BOOKINGS","message":"x"}"""))
             val vm = newVm()
             vm.start()
             advanceUntilIdle()

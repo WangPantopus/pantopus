@@ -315,6 +315,22 @@ class IconTest {
             "shield-plus",
             // F8 — Quiet-hours DisclosureRow icon (crescent moon).
             "moon",
+            // A1 Scheduling Hub manage-row glyphs + B8 Connected calendars.
+            // Design: scheduling-hub-frames.jsx / connected-calendars-frames.jsx.
+            "calendar-sync",
+            "layout-grid",
+            "settings",
+            // A1 identity switcher Business pill + A5 summary card owner glyph.
+            "store",
+            // F1 Home calendar filtered-empty state (no events match the filters).
+            "calendar-search",
+            // B1 event-type list reorder-mode hint bar (event-types-frames.jsx FRAME 6).
+            "move",
+            // B9 date overrides — range link + blocked-day rows (date-overrides-frames.jsx).
+            "calendar-range",
+            "calendar-off",
+            // G2 collective setup explainer note (collective-frames.jsx EXPLAIN).
+            "git-merge",
         )
 
     @Test

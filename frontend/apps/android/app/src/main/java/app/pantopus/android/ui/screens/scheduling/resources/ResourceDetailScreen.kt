@@ -46,7 +46,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.theme.PantopusColors
@@ -86,7 +85,7 @@ fun ResourceDetailScreen(
                     if (loaded != null) {
                         TextButton(
                             onClick = {
-                                onNavigate(SchedulingRoutes.resourceEditor(viewModel.resourceId))
+                                onNavigate(viewModel.editorRoute())
                             },
                             modifier = Modifier.testTag(RESOURCE_DETAIL_EDIT_TAG),
                         ) {
@@ -118,7 +117,7 @@ fun ResourceDetailScreen(
                         onDecline = viewModel::decline,
                         onApprovalBadge = viewModel::openApprovalQueue,
                         onBookThis = {
-                            onNavigate(SchedulingRoutes.bookResource(viewModel.resourceId))
+                            onNavigate(viewModel.bookRoute())
                         },
                     )
             }

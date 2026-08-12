@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.eventtypes
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateEventTypeRequest
@@ -18,8 +19,10 @@ import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,13 +30,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * B1 Event Type / Service list. One owner-polymorphic catalog: the pillar pill
- * re-scopes via [HomesRepository]/[AuthRepository] (the A0 route is arg-less),
- * the Active/Hidden segment filters by `is_active`, the per-row toggle and the
- * overflow menu (copy link / duplicate / share / hide / delete) act through the
- * repository. `DELETE` that returns `409 HAS_UPCOMING_BOOKINGS` routes into the
- * deactivate-instead prompt (`PUT is_active=false`). Priced/business price
- * labels sit behind [SchedulingFeatureFlags].
+ * B1 Event Type / Service list. One owner-polymorphic catalog: the user arrives
+ * scoped to one owner — the route's ownerKind/ownerId query args carry the
+ * hub's resolved owner (Personal when absent), and the identity pill just
+ * renders it. [selectPillar] re-scopes via [HomesRepository]/[AuthRepository]
+ * when invoked. The Active/Hidden segment filters by `is_active`, the per-row
+ * toggle and the overflow menu (copy link / duplicate / share / hide / delete)
+ * act through the repository. `DELETE` that returns `409 HAS_BOOKINGS` routes
+ * into the deactivate-instead prompt (`PUT is_active=false`). Priced/business
+ * price labels sit behind [SchedulingFeatureFlags].
  */
 @HiltViewModel
 class EventTypeListViewModel
@@ -45,12 +50,23 @@ class EventTypeListViewModel
         private val errors: SchedulingErrorDecoder,
         private val flags: SchedulingFeatureFlags,
         private val ownerRelay: SchedulingEditorOwnerRelay,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val _pillar = MutableStateFlow(SchedulingPillar.Personal)
+        private var owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
+
+        private val _pillar = MutableStateFlow(owner.pillar())
         val pillar: StateFlow<SchedulingPillar> = _pillar.asStateFlow()
 
         private val _tab = MutableStateFlow(EventTypeTab.Active)
         val tab: StateFlow<EventTypeTab> = _tab.asStateFlow()
+
+        /** B1 FRAME 6 — reorder mode. Entered from the top-bar "Reorder" entry. */
+        private val _reordering = MutableStateFlow(false)
+        val reordering: StateFlow<Boolean> = _reordering.asStateFlow()
 
         private val _state = MutableStateFlow<EventTypeListUiState>(EventTypeListUiState.Loading)
         val state: StateFlow<EventTypeListUiState> = _state.asStateFlow()
@@ -79,7 +95,6 @@ class EventTypeListViewModel
         private val _navRequest = MutableStateFlow<String?>(null)
         val navRequest: StateFlow<String?> = _navRequest.asStateFlow()
 
-        private var owner: SchedulingOwner = SchedulingOwner.Personal
         private var started = false
         private var fetchJob: Job? = null
 
@@ -131,6 +146,65 @@ class EventTypeListViewModel
             if (target == _tab.value) return
             _tab.value = target
             rebuild()
+        }
+
+        // ─── Reorder mode (design event-types-frames.jsx FRAME 6; web
+        //     event-types/page.tsx is the behavioral reference) ────────────────
+
+        fun startReorder() {
+            if (!canEdit) return
+            _reordering.value = true
+        }
+
+        /** Hint-bar "Done" — persist any outstanding order change and exit. */
+        fun doneReordering() {
+            _reordering.value = false
+            persistOrder()
+        }
+
+        /**
+         * Live-preview move while dragging: splice the dragged row to the
+         * hovered row's position in the FULL catalog (the visible list is a
+         * filtered projection whose relative order matches), mirroring the
+         * web's `moveDragged`.
+         */
+        fun moveRow(
+            draggedId: String,
+            overId: String,
+        ) {
+            if (draggedId == overId) return
+            val from = allTypes.indexOfFirst { it.id == draggedId }
+            val to = allTypes.indexOfFirst { it.id == overId }
+            if (from < 0 || to < 0 || from == to) return
+            allTypes =
+                allTypes.toMutableList().apply {
+                    add(to, removeAt(from))
+                }
+            rebuild()
+        }
+
+        /**
+         * Persist every row whose position no longer matches its stored
+         * `sort_order` via `PUT /event-types/:id {sort_order}` — optimistic
+         * local stamp, refetch on any failure (web `persistOrder`).
+         */
+        fun persistOrder() {
+            val changed =
+                allTypes.mapIndexedNotNull { index, dto ->
+                    if (dto.sortOrder != index) dto.id to index else null
+                }
+            if (changed.isEmpty()) return
+            allTypes = allTypes.mapIndexed { index, dto -> dto.copy(sortOrder = index) }
+            viewModelScope.launch {
+                val results =
+                    changed.map { (id, index) ->
+                        async { repo.updateEventType(owner, id, UpdateEventTypeRequest(sortOrder = index)) }
+                    }.map { it.await() }
+                if (results.any { it is NetworkResult.Failure }) {
+                    _toast.value = "Couldn't save the new order."
+                    refresh()
+                }
+            }
         }
 
         private suspend fun resolveOwner(target: SchedulingPillar): SchedulingOwner? =
@@ -214,6 +288,9 @@ class EventTypeListViewModel
         fun duplicate(id: String) {
             val src = allTypes.firstOrNull { it.id == id } ?: return
             viewModelScope.launch {
+                // Carry the FULL scheduling config — buffers, notice, horizon,
+                // caps, interval, pricing, policies, schedule binding — not just
+                // the display fields, so a duplicate behaves like its source.
                 val body =
                     CreateEventTypeRequest(
                         name = "${src.name} copy",
@@ -224,8 +301,28 @@ class EventTypeListViewModel
                         defaultDuration = src.defaultDuration,
                         locationMode = src.locationMode,
                         locationDetail = src.locationDetail,
+                        assignmentMode = src.assignmentMode,
                         visibility = src.visibility,
                         requiresApproval = src.requiresApproval,
+                        bufferBeforeMin = src.bufferBeforeMin,
+                        bufferAfterMin = src.bufferAfterMin,
+                        minNoticeMin = src.minNoticeMin,
+                        maxHorizonDays = src.maxHorizonDays,
+                        slotIntervalMin = src.slotIntervalMin,
+                        dailyCap = src.dailyCap,
+                        perBookerCap = src.perBookerCap,
+                        seatCap = src.seatCap,
+                        priceCents = src.priceCents,
+                        currency = src.currency,
+                        depositCents = src.depositCents,
+                        depositRefundable = src.depositRefundable,
+                        cancellationWindowMin = src.cancellationWindowMin,
+                        rescheduleCutoffMin = src.rescheduleCutoffMin,
+                        noShowFeeCents = src.noShowFeeCents,
+                        refundPolicy = src.refundPolicy,
+                        allowInviteeCancel = src.allowInviteeCancel,
+                        allowInviteeReschedule = src.allowInviteeReschedule,
+                        scheduleId = src.scheduleId,
                     )
                 when (val r = repo.createEventType(owner, body)) {
                     is NetworkResult.Success -> {
@@ -391,7 +488,11 @@ class EventTypeListViewModel
 
         companion object {
             const val NEW_EVENT_TYPE_ID = "new"
-            private const val CODE_HAS_UPCOMING = "HAS_UPCOMING_BOOKINGS"
+
+            // Wire truth: backend DELETE /event-types/:id emits HAS_BOOKINGS. The previous
+            // value (HAS_UPCOMING_BOOKINGS) matched nothing, so the "hide instead" prompt
+            // never appeared and deletes surfaced as generic failures.
+            private const val CODE_HAS_UPCOMING = "HAS_BOOKINGS"
             private const val VISIBILITY_SECRET = "secret"
             private const val DEFAULT_DURATION = 30
         }

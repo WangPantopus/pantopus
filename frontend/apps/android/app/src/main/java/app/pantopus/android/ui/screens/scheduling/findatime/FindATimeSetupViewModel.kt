@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
+import kotlin.math.abs
 
 /** F4 date-window presets. */
 enum class WindowPreset(val days: Long) {
@@ -93,7 +95,12 @@ class FindATimeSetupViewModel
         private var started = false
 
         fun start() {
-            if (started) return
+            if (started) {
+                // Re-entered with a live form (e.g. reopened as F5's edit sheet):
+                // surface any no-overlap verdict F5 recorded since the last render.
+                consumeNoOverlap()
+                return
+            }
             started = true
             load()
         }
@@ -121,6 +128,12 @@ class FindATimeSetupViewModel
                         FindATimeSetupUiState.Error("No household members to coordinate with yet.")
                     return@launch
                 }
+                // F7 "Find a time here" seeds a window through the session (the
+                // route is arg-less): anchor the form on the tapped day and snap
+                // the preset to the seeded span.
+                val seed = session.takeSeed()
+                val seedFrom = seed?.first?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                val seedTo = seed?.second?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                 _state.value =
                     FindATimeSetupUiState.Loaded(
                         SetupForm(
@@ -132,12 +145,29 @@ class FindATimeSetupViewModel
                             mode = FindMode.Collective,
                             durationChoice = DurationChoice.Half,
                             customDurationMin = 45,
-                            windowPreset = WindowPreset.ThisWeek,
+                            windowPreset = closestPreset(seedFrom, seedTo) ?: WindowPreset.ThisWeek,
                             explainerExpanded = false,
-                            today = LocalDate.now(),
+                            today = seedFrom ?: LocalDate.now(),
+                            noOverlapMessage = session.takeNoOverlapMessage(),
                         ),
                     )
             }
+        }
+
+        /** Surface an F5-recorded no-overlap verdict on an already-loaded form. */
+        private fun consumeNoOverlap() {
+            val message = session.takeNoOverlapMessage() ?: return
+            mutate { it.copy(noOverlapMessage = message) }
+        }
+
+        /** The preset whose span best matches a seeded window; null without a seed. */
+        private fun closestPreset(
+            from: LocalDate?,
+            to: LocalDate?,
+        ): WindowPreset? {
+            if (from == null || to == null) return null
+            val span = ChronoUnit.DAYS.between(from, to)
+            return WindowPreset.entries.minByOrNull { abs(it.days - span) }
         }
 
         private fun mutate(block: (SetupForm) -> SetupForm) {
@@ -150,7 +180,12 @@ class FindATimeSetupViewModel
             userId: String,
             required: Boolean,
         ) = mutate { form ->
-            form.copy(members = form.members.map { if (it.userId == userId) it.copy(required = required) else it })
+            form.copy(
+                members = form.members.map { if (it.userId == userId) it.copy(required = required) else it },
+                // Any criteria change invalidates the recorded no-overlap verdict
+                // (mirrors iOS, which clears the banner on every mutation).
+                noOverlapMessage = null,
+            )
         }
 
         /** No-overlap quick action: drop the last required member to optional. */
@@ -160,20 +195,23 @@ class FindATimeSetupViewModel
                 if (target == null) {
                     form
                 } else {
-                    form.copy(members = form.members.map { if (it.userId == target.userId) it.copy(required = false) else it })
+                    form.copy(
+                        members = form.members.map { if (it.userId == target.userId) it.copy(required = false) else it },
+                        noOverlapMessage = null,
+                    )
                 }
             }
 
-        fun setMode(mode: FindMode) = mutate { it.copy(mode = mode) }
+        fun setMode(mode: FindMode) = mutate { it.copy(mode = mode, noOverlapMessage = null) }
 
-        fun setDuration(choice: DurationChoice) = mutate { it.copy(durationChoice = choice) }
+        fun setDuration(choice: DurationChoice) = mutate { it.copy(durationChoice = choice, noOverlapMessage = null) }
 
         fun adjustCustomDuration(deltaMin: Int) =
-            mutate { it.copy(customDurationMin = (it.customDurationMin + deltaMin).coerceIn(15, 240)) }
+            mutate { it.copy(customDurationMin = (it.customDurationMin + deltaMin).coerceIn(15, 240), noOverlapMessage = null) }
 
-        fun setWindow(preset: WindowPreset) = mutate { it.copy(windowPreset = preset) }
+        fun setWindow(preset: WindowPreset) = mutate { it.copy(windowPreset = preset, noOverlapMessage = null) }
 
-        fun widenWindow() = mutate { it.copy(windowPreset = WindowPreset.TwoWeeks) }
+        fun widenWindow() = mutate { it.copy(windowPreset = WindowPreset.TwoWeeks, noOverlapMessage = null) }
 
         fun toggleExplainer() = mutate { it.copy(explainerExpanded = !it.explainerExpanded) }
 
@@ -193,7 +231,10 @@ class FindATimeSetupViewModel
                     mode = form.mode,
                     durationMin = form.durationMin,
                     fromIso = FindATimeFormat.isoDate(from),
-                    toIso = FindATimeFormat.isoDate(to),
+                    // Exclusive end — see [FindATimeCriteria.toIso]: date-only bounds
+                    // parse server-side as UTC midnight, so the preset's last day
+                    // must be covered by sending the day after.
+                    toIso = FindATimeFormat.isoDate(to.plusDays(1)),
                     windowLabel = FindATimeFormat.windowPhrase(from, to),
                     timezone = FindATimeFormat.deviceZoneId(),
                 )

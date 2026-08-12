@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -119,6 +120,7 @@ fun EtTopBar(
     trailingEnabled: Boolean = true,
     trailingContentDescription: String? = null,
     onTrailing: () -> Unit = {},
+    preTrailing: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
         Box(
@@ -152,26 +154,32 @@ fun EtTopBar(
                 color = PantopusColors.appText,
                 modifier = Modifier.align(Alignment.Center),
             )
-            if (trailingIcon != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(ICON_BUTTON)
-                            .clip(RoundedCornerShape(Radii.md))
-                            .clickable(
-                                enabled = trailingEnabled,
-                                onClickLabel = trailingContentDescription,
-                                onClick = onTrailing,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PantopusIconImage(
-                        icon = trailingIcon,
-                        contentDescription = trailingContentDescription,
-                        size = 22.dp,
-                        tint = if (trailingEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted,
-                    )
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                preTrailing?.invoke()
+                if (trailingIcon != null) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(ICON_BUTTON)
+                                .clip(RoundedCornerShape(Radii.md))
+                                .clickable(
+                                    enabled = trailingEnabled,
+                                    onClickLabel = trailingContentDescription,
+                                    onClick = onTrailing,
+                                ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PantopusIconImage(
+                            icon = trailingIcon,
+                            contentDescription = trailingContentDescription,
+                            size = 22.dp,
+                            tint = if (trailingEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted,
+                        )
+                    }
                 }
             }
         }
@@ -210,6 +218,11 @@ fun EtSegmented(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     small: Boolean = false,
+    // The list FilterHeader frame draws a 30dp / 12sp segment
+    // (event-types-frames.jsx:122-133), while the editor-shell default is
+    // 32dp / 11.5sp — callers on the list screen override these two.
+    itemHeight: Dp? = null,
+    labelSize: TextUnit? = null,
 ) {
     Row(
         modifier =
@@ -226,7 +239,7 @@ fun EtSegmented(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(if (small) 28.dp else 32.dp)
+                        .height(itemHeight ?: if (small) 28.dp else 32.dp)
                         .clip(RoundedCornerShape(7.dp))
                         .background(if (on) PantopusColors.appSurface else Color.Transparent)
                         .clickable(enabled = enabled) { onSelect(option) },
@@ -234,7 +247,7 @@ fun EtSegmented(
             ) {
                 Text(
                     text = option,
-                    fontSize = if (small) 11.sp else 11.5.sp,
+                    fontSize = labelSize ?: if (small) 11.sp else 11.5.sp,
                     fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (on) PantopusColors.primary700 else PantopusColors.appTextSecondary,
                     maxLines = 1,
@@ -610,11 +623,14 @@ fun EtPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     leadingIcon: PantopusIcon? = null,
+    // The empty-state CTA hugs its content (event-types-frames.jsx FrameEmpty
+    // inline-flex button); editors keep the full-width default.
+    fullWidth: Boolean = true,
 ) {
     Box(
         modifier =
             modifier
-                .fillMaxWidth()
+                .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
                 .heightIn(min = 44.dp)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(if (enabled) PantopusColors.primary600 else PantopusColors.appBorderStrong)

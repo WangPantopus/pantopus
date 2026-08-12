@@ -193,7 +193,13 @@ private fun LoadedBody(
             ServicesCard(form.services, pillar, viewModel::toggleService)
             CopyCard(form, !saving, pillar, viewModel::setIntro, viewModel::setConfirmation)
             VisibilityCard(form.listed, pillar, viewModel::setListed)
-            LinksCard(form, pillar, onNavigate)
+            LinksCard(
+                form = form,
+                pillar = pillar,
+                previewRoute = viewModel.previewRoute(),
+                eventTypesRoute = viewModel.eventTypesRoute(),
+                onNavigate = onNavigate,
+            )
             FooterRow(enabled = form.slug.isNotBlank(), onCopy = onCopy, onShare = onShare, onViewQr = onViewQr)
         }
         BLSaveBar(
@@ -424,13 +430,16 @@ private fun VisibilityCard(
 private fun LinksCard(
     form: BookingPageForm,
     pillar: SchedulingPillar,
+    previewRoute: String,
+    eventTypesRoute: String,
     onNavigate: (String) -> Unit,
 ) {
     BLCard(pillar = pillar) {
         LinkRowItem(
             icon = PantopusIcon.Eye,
             label = "Preview your page",
-            onClick = { onNavigate(SchedulingRoutes.PUBLIC_PAGE_PREVIEW) },
+            // VM-built route: carries this screen's owner into the preview.
+            onClick = { onNavigate(previewRoute) },
         )
         LinkRowItem(
             icon = PantopusIcon.ListChecks,
@@ -438,7 +447,7 @@ private fun LinksCard(
             value = if (form.firstEventTypeId == null) "Add an event type first" else null,
             onClick = {
                 val id = form.firstEventTypeId
-                if (id != null) onNavigate(SchedulingRoutes.intakeQuestionsEditor(id)) else onNavigate(SchedulingRoutes.EVENT_TYPE_LIST)
+                if (id != null) onNavigate(SchedulingRoutes.intakeQuestionsEditor(id)) else onNavigate(eventTypesRoute)
             },
         )
         LinkRowItem(

@@ -3,6 +3,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.BookingDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageResponse
@@ -16,8 +17,11 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
+import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -59,7 +63,19 @@ class ManualBookingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() = ManualBookingViewModel(repo, errors)
+    private fun vm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = ManualBookingViewModel(
+        repo,
+        errors,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
 
     @Test
     fun `loads active event types on start`() =
@@ -144,5 +160,30 @@ class ManualBookingViewModelTest {
             val state = vm.state.value
             assertEquals(ManualStep.Created, state.step)
             assertEquals("b9", state.createdBookingId)
+        }
+
+    @Test
+    fun `route owner args scope event types and create to the home owner`() =
+        runTest(dispatcher) {
+            coEvery { repo.createBooking(any(), any()) } returns
+                NetworkResult.Success(CreateBookingResponse(booking = BookingDto(id = "b1"), manageToken = "mt"))
+            val home = SchedulingOwner.Home("home-1")
+
+            val vm = vm(ownerKind = "home", ownerId = "home-1")
+            vm.start()
+            advanceUntilIdle()
+            assertEquals(app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar.Home, vm.state.value.pillar)
+            coVerify { repo.getEventTypes(home) }
+
+            vm.selectEventType("et1")
+            vm.next()
+            advanceUntilIdle()
+            vm.selectSlot(slotA.start)
+            vm.next()
+            vm.setName("Dana")
+            vm.next()
+            vm.next()
+            advanceUntilIdle()
+            coVerify { repo.createBooking(home, any()) }
         }
 }

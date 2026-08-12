@@ -19,6 +19,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -26,7 +27,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
@@ -114,9 +114,12 @@ class VisitDetailViewModelTest {
             model.start()
             advanceUntilIdle()
 
-            val ok = model.cancelVisit()
+            model.cancelVisit()
+            advanceUntilIdle()
 
-            assertTrue(ok)
+            // Runs in viewModelScope; the one-shot cancelled event is buffered
+            // for the screen to dismiss on.
+            assertEquals(Unit, model.cancelled.first())
             coVerify { homes.deleteHomeEvent("home-1", "v1") }
         }
 }

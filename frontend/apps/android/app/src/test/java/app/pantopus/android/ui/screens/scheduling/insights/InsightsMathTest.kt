@@ -51,15 +51,17 @@ class InsightsMathTest {
     }
 
     @Test
-    fun `range returns from minus days through today for presets`() {
+    fun `range spans from minus days through an exclusive day-after-today end`() {
         val (from, to) =
             InsightsFilter(period = InsightsPeriod.Last30).range(today = LocalDate.of(2026, 6, 17))
         assertEquals("2026-05-18", from)
-        assertEquals("2026-06-17", to)
+        // Exclusive end: the backend parses date-only bounds as UTC midnight, so
+        // covering today requires sending tomorrow.
+        assertEquals("2026-06-18", to)
     }
 
     @Test
-    fun `range returns the ordered custom bounds`() {
+    fun `range returns the ordered custom bounds with an exclusive end`() {
         val (from, to) =
             InsightsFilter(
                 period = InsightsPeriod.Custom,
@@ -67,7 +69,7 @@ class InsightsMathTest {
                 customEnd = LocalDate.of(2026, 6, 1),
             ).range()
         assertEquals("2026-06-01", from)
-        assertEquals("2026-06-10", to)
+        assertEquals("2026-06-11", to)
     }
 
     @Test

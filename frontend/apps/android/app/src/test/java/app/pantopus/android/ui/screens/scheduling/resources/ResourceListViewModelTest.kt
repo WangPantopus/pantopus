@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.resources
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.scheduling.BookingDto
@@ -11,12 +12,14 @@ import app.pantopus.android.data.api.models.scheduling.ResourceDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -34,9 +37,11 @@ class ResourceListViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val homes: HomesRepository = mockk(relaxed = true)
+    private val networkMonitor: NetworkMonitor = mockk()
 
     @Before fun setup() {
         Dispatchers.setMain(dispatcher)
+        every { networkMonitor.isOnline } returns MutableStateFlow(true)
         val home = mockk<MyHome>(relaxed = true)
         every { home.id } returns "home-1"
         every { home.isPrimaryOwner } returns true
@@ -46,7 +51,19 @@ class ResourceListViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = ResourceListViewModel(repo, homes)
+    private fun vm(routeHomeId: String? = null) =
+        ResourceListViewModel(
+            repo,
+            homes,
+            networkMonitor,
+            SavedStateHandle(
+                buildMap {
+                    routeHomeId?.let {
+                        put(app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes.ARG_HOME_ID, it)
+                    }
+                },
+            ),
+        )
 
     @Test
     fun `no resources renders the empty state`() =
@@ -107,5 +124,18 @@ class ResourceListViewModelTest {
             model.start()
             advanceUntilIdle()
             assertTrue(model.state.value is ResourceListUiState.Error)
+        }
+
+    @Test
+    fun `route homeId pins the home and skips inference`() =
+        runTest(dispatcher) {
+            coEvery { repo.getResources(any()) } returns NetworkResult.Success(GetResourcesResponse(emptyList()))
+            val model = vm(routeHomeId = "home-route")
+            model.start()
+            advanceUntilIdle()
+            io.mockk.coVerify(exactly = 0) { homes.myHomes() }
+            io.mockk.coVerify {
+                repo.getResources(app.pantopus.android.data.scheduling.SchedulingOwner.Home("home-route"))
+            }
         }
 }

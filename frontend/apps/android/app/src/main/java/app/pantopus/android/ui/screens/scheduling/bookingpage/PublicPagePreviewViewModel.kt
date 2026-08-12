@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookingpage
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.PublicEventTypeView
@@ -11,6 +12,7 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,9 +48,16 @@ class PublicPagePreviewViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
-        private val ownerRelay: BookingPageOwnerRelay,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = ownerRelay.consume() ?: SchedulingOwner.Personal
+        // Owner comes from the route's ownerKind/ownerId query args (survives
+        // process death; Manage → Preview chaining keeps the owner); absent args
+        // mean Personal.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
         /** The resolved pillar for UI accent — derived from owner at init time. */
         val pillar: SchedulingPillar = owner.pillar()

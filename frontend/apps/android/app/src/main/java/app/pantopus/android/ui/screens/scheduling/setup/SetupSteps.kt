@@ -78,6 +78,10 @@ fun SetupOverline(text: String) {
 /**
  * Numbered-disc progress rail with "You're on step N of M" overline.
  * Steps before [current] render a check; [current] is the active accent disc.
+ *
+ * [done] mirrors the design StepRail's explicit `done` list
+ * (`isDone = done.includes(n) || n < current`) — success frames pass the full
+ * set so every disc, including the current one, renders the check glyph.
  */
 @Composable
 fun WizardStepRail(
@@ -85,6 +89,7 @@ fun WizardStepRail(
     current: Int,
     pillar: SchedulingPillar,
     modifier: Modifier = Modifier,
+    done: Set<Int> = emptySet(),
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -106,7 +111,7 @@ fun WizardStepRail(
         ) {
             steps.forEachIndexed { index, label ->
                 val stepNumber = index + 1
-                val done = stepNumber < current
+                val isDone = stepNumber in done || stepNumber < current
                 val active = stepNumber == current
                 Column(
                     modifier = Modifier.wrapContentWidth(),
@@ -117,10 +122,10 @@ fun WizardStepRail(
                             Modifier
                                 .size(22.dp)
                                 .clip(CircleShape)
-                                .background(if (done || active) pillar.accent else PantopusColors.appSurfaceSunken),
+                                .background(if (isDone || active) pillar.accent else PantopusColors.appSurfaceSunken),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (done) {
+                        if (isDone) {
                             PantopusIconImage(
                                 icon = PantopusIcon.Check,
                                 contentDescription = null,
@@ -142,7 +147,7 @@ fun WizardStepRail(
                         color =
                             when {
                                 active -> pillar.accent
-                                done -> PantopusColors.appTextStrong
+                                isDone -> PantopusColors.appTextStrong
                                 else -> PantopusColors.appTextMuted
                             },
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,

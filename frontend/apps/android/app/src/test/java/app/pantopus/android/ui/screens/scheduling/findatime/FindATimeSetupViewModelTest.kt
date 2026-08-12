@@ -143,6 +143,51 @@ class FindATimeSetupViewModelTest {
             assertEquals(13L, java.time.temporal.ChronoUnit.DAYS.between(from, to))
         }
 
+    @Test
+    fun f7_seed_anchors_the_window_and_is_consumed() =
+        runTest(dispatcher) {
+            session.seedFromIso = "2026-06-20"
+            session.seedToIso = "2026-06-26" // 6-day span → ThisWeek preset
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            val form = (vm.state.value as FindATimeSetupUiState.Loaded).form
+            assertEquals(java.time.LocalDate.of(2026, 6, 20), form.today)
+            assertEquals(WindowPreset.ThisWeek, form.windowPreset)
+            assertEquals(null, session.seedFromIso) // consumed
+            assertEquals(null, session.seedToIso)
+        }
+
+    @Test
+    fun submit_sends_an_exclusive_end_date() =
+        runTest(dispatcher) {
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            assertTrue(vm.submit())
+            val form = (vm.state.value as FindATimeSetupUiState.Loaded).form
+            val (from, to) = form.range
+            val criteria = session.criteria!!
+            assertEquals(FindATimeFormat.isoDate(from), criteria.fromIso)
+            assertEquals(FindATimeFormat.isoDate(to.plusDays(1)), criteria.toIso)
+        }
+
+    @Test
+    fun f5_no_overlap_note_applies_on_reentry_and_clears_on_mutation() =
+        runTest(dispatcher) {
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            session.noOverlapMessage = "Try making Mom optional, or widen the date window."
+            vm.start() // re-entry (e.g. reopened as F5's edit sheet)
+            var form = (vm.state.value as FindATimeSetupUiState.Loaded).form
+            assertEquals("Try making Mom optional, or widen the date window.", form.noOverlapMessage)
+            assertEquals(null, session.noOverlapMessage) // consumed
+            vm.widenWindow()
+            form = (vm.state.value as FindATimeSetupUiState.Loaded).form
+            assertEquals(null, form.noOverlapMessage)
+        }
+
     private fun occupant(
         userId: String,
         name: String,

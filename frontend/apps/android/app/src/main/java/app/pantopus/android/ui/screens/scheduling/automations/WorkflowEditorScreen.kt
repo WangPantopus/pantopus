@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,15 +61,23 @@ fun WorkflowEditorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tab by viewModel.tab.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     var showTrigger by remember { mutableStateOf(false) }
     var showVariable by remember { mutableStateOf(false) }
     var showPreview by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val accent = viewModel.pillar.accent
 
     LaunchedEffect(Unit) { viewModel.start() }
     LaunchedEffect(saved) {
         if (saved) {
             viewModel.consumeSaved()
+            onBack()
+        }
+    }
+    LaunchedEffect(deleted) {
+        if (deleted) {
+            viewModel.consumeDeleted()
             onBack()
         }
     }
@@ -103,6 +114,7 @@ fun WorkflowEditorScreen(
                         WorkflowEditorViewModel.Tab.Build ->
                             BuildTab(
                                 state = s,
+                                isNew = viewModel.isNew,
                                 accent = accent,
                                 accentBg = viewModel.pillar.accentBg,
                                 onName = viewModel::onName,
@@ -110,6 +122,7 @@ fun WorkflowEditorScreen(
                                 onSetChannel = viewModel::setChannel,
                                 onSetActive = viewModel::setActive,
                                 onSave = viewModel::save,
+                                onDelete = { showDeleteConfirm = true },
                                 onOpenTrigger = { showTrigger = true },
                                 onOpenVariable = { showVariable = true },
                                 onOpenPreview = { showPreview = true },
@@ -150,11 +163,27 @@ fun WorkflowEditorScreen(
             onDismiss = { showPreview = false },
         )
     }
+    if (showDeleteConfirm && loaded != null) {
+        val name = loaded.form.name.trim().ifBlank { "this workflow" }
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete “$name”?") },
+            text = { Text("This workflow will be permanently removed and can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.delete()
+                }) { Text("Delete workflow", color = PantopusColors.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Keep") } },
+        )
+    }
 }
 
 @Composable
 private fun BuildTab(
     state: WorkflowEditorUiState.Loaded,
+    isNew: Boolean,
     accent: Color,
     accentBg: Color,
     onName: (String) -> Unit,
@@ -162,6 +191,7 @@ private fun BuildTab(
     onSetChannel: (WorkflowChannel) -> Unit,
     onSetActive: (Boolean) -> Unit,
     onSave: () -> Unit,
+    onDelete: () -> Unit,
     onOpenTrigger: () -> Unit,
     onOpenVariable: () -> Unit,
     onOpenPreview: () -> Unit,
@@ -265,6 +295,12 @@ private fun BuildTab(
             if (state.saveError != null) {
                 AutoNote(tone = AutoTone.Error, icon = PantopusIcon.AlertTriangle, text = state.saveError)
             }
+            if (state.deleteError != null) {
+                AutoNote(tone = AutoTone.Error, icon = PantopusIcon.AlertTriangle, text = state.deleteError)
+            }
+            if (!isNew) {
+                DeleteWorkflowRow(onDelete = onDelete)
+            }
             Box(modifier = Modifier.size(Spacing.s4))
         }
         AutoSheetFooter {
@@ -277,6 +313,25 @@ private fun BuildTab(
                 modifier = Modifier.testTag("automationsPrimaryButton"),
             )
         }
+    }
+}
+
+/** Destructive delete row — visible only when editing an existing workflow. */
+@Composable
+private fun DeleteWorkflowRow(onDelete: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s2)
+                .heightIn(min = 38.dp)
+                .clickable(onClickLabel = "Delete workflow", onClick = onDelete)
+                .testTag("workflowEditor.delete"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2, Alignment.CenterHorizontally),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = null, size = 14.dp, tint = PantopusColors.error)
+        Text(text = "Delete workflow", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.error)
     }
 }
 

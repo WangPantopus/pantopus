@@ -97,7 +97,9 @@ sealed interface AgendaEmpty {
 
 /**
  * Pure agenda/month-strip projection. Mirrors iOS `HomeAgendaBuilder` —
- * UTC-anchored, Sunday-first, deterministic for unit tests.
+ * zone-parameterised (callers pass their display zone; production uses the
+ * device zone, tests pin UTC), Sunday-first, deterministic for unit tests.
+ * The all-day heuristic is always UTC-anchored (wire stores 00:00Z).
  */
 object HomeAgendaBuilder {
     private val isoDate = DateTimeFormatter.ISO_DATE
@@ -105,7 +107,13 @@ object HomeAgendaBuilder {
     private val timeFmt = DateTimeFormatter.ofPattern("h:mm", Locale.US)
     private val ampmFmt = DateTimeFormatter.ofPattern("a", Locale.US)
     private val monthFmt = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
-    private val dowFmt = DateTimeFormatter.ofPattern("EEE", Locale.US)
+
+    // Narrow weekday — single initial ("S M T W T F S"), matching the
+    // home-shell `MonthStrip` design and iOS's `EEEEE` (NOT the 3-letter
+    // `EEE` abbreviation).
+    private val dowFmt = DateTimeFormatter.ofPattern("EEEEE", Locale.US)
+
+    private val utcZone = ZoneId.of("UTC")
 
     fun parseInstant(iso: String?): Instant? {
         if (iso.isNullOrBlank()) return null
@@ -129,7 +137,9 @@ object HomeAgendaBuilder {
         zone: ZoneId,
     ): HomeAgendaItem {
         val zoned = start.atZone(zone)
-        val allDay = dto.endAt == null && isMidnight(zoned)
+        // All-day rows are stored at midnight UTC + nil end — the heuristic
+        // is pinned to UTC no matter which zone the agenda displays in.
+        val allDay = dto.endAt == null && isMidnight(start.atZone(utcZone))
         val time = if (allDay) "All day" else timeFmt.format(zoned)
         val ampm = if (allDay) "" else ampmFmt.format(zoned)
         val assigned = dto.assignedTo.orEmpty().mapNotNull { members[it] }

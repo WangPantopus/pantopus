@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -54,6 +58,7 @@ private const val ACTION_TOAST_MS = 2200L
  * and a create FAB. Frames: populated · empty · loading shimmer · error retry ·
  * permission-gated.
  */
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun WorkflowsListScreen(
     onBack: () -> Unit = {},
@@ -63,8 +68,10 @@ fun WorkflowsListScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val scope by viewModel.scope.collectAsStateWithLifecycle()
     val actionError by viewModel.actionError.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showReminders by remember { mutableStateOf(false) }
     val accent = viewModel.pillar.accent
+    val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = viewModel::refresh)
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(actionError) {
@@ -105,7 +112,7 @@ fun WorkflowsListScreen(
                 accent = accent,
                 onSelect = viewModel::selectScope,
             )
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().pullRefresh(pullState)) {
                 when (val s = state) {
                     WorkflowsListUiState.Loading -> WorkflowsLoading()
                     is WorkflowsListUiState.Error ->
@@ -128,6 +135,12 @@ fun WorkflowsListScreen(
                             onToggle = viewModel::toggleActive,
                         )
                 }
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    contentColor = PantopusColors.primary600,
+                )
             }
         }
 
@@ -155,7 +168,8 @@ fun WorkflowsListScreen(
         RemindersQuickSetupSheet(
             onDismiss = {
                 showReminders = false
-                viewModel.refresh()
+                // Silent refetch (keeps Loaded content, no pull indicator).
+                viewModel.load()
             },
         )
     }

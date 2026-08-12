@@ -3,12 +3,14 @@
 package app.pantopus.android.ui.screens.scheduling.home
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,7 +68,16 @@ class HouseholdAvailabilityViewModel
         private val homes: HomesRepository,
         private val networkMonitor: NetworkMonitor,
         private val prefs: HomeSchedulingPrefs,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
+        /**
+         * The home the user navigated from — the route's `homeId` query arg
+         * (iOS parity: `.householdAvailability(homeId:)`). Null on legacy/deep
+         * links, where [resolveHome] falls back to the first-active-home inference.
+         */
+        private val routeHomeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
+
         private val _state =
             MutableStateFlow<HouseholdAvailabilityUiState>(HouseholdAvailabilityUiState.Loading)
         val state: StateFlow<HouseholdAvailabilityUiState> = _state.asStateFlow()
@@ -110,12 +121,20 @@ class HouseholdAvailabilityViewModel
         fun refresh() = load()
 
         /**
-         * Resolve the active home and seed [homeId] for prefs scoping. Returns
-         * the display name. Falls back to "This household" with a stable home id
-         * when the user has no homes or the request fails.
+         * Resolve the home and seed [homeId] for prefs scoping. Returns the
+         * display name. The route's [routeHomeId] is authoritative (that home's
+         * detail is fetched, mirroring iOS); without it we fall back to the
+         * first-active-home inference. Falls back to "This household" with a
+         * stable home id when nothing resolves.
          */
         private suspend fun resolveHome(): String {
             homeId = FALLBACK_HOME_ID
+            routeHomeId?.let { id ->
+                // Prefs stay scoped to the navigated home even if the name read fails.
+                homeId = id
+                val name = (homes.detail(id) as? NetworkResult.Success)?.data?.home?.name
+                return name ?: "This household"
+            }
             return when (val result = homes.myHomes()) {
                 is NetworkResult.Success -> {
                     val home =

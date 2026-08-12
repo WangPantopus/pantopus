@@ -295,7 +295,10 @@ class PackageEditorViewModel
             PackageEditorForm(
                 name = pkg.name,
                 sessionsCount = (pkg.sessionsCount).coerceAtLeast(1),
-                priceText = pkg.priceCents.takeIf { it > 0 }?.let { "%.2f".format(it / CENTS_PER_UNIT) } ?: "",
+                priceText =
+                    pkg.priceCents.takeIf { it > 0 }
+                        ?.let { String.format(java.util.Locale.US, "%.2f", it / CENTS_PER_UNIT) }
+                        ?: "",
                 selectedEventTypeId = pkg.eventTypeId,
                 isActive = pkg.isActive ?: true,
             )

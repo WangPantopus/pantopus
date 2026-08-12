@@ -45,7 +45,13 @@ class WorkflowEditorViewModel
     ) : ViewModel() {
         enum class Tab { Build, Activity }
 
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        // Owner comes from the route's ownerKind/ownerId args (threaded by the
+        // workflows list); Personal when absent.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
         val pillar: SchedulingPillar = owner.pillar()
 
         private val workflowId: String? =
@@ -63,6 +69,9 @@ class WorkflowEditorViewModel
 
         private val _saved = MutableStateFlow(false)
         val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+        private val _deleted = MutableStateFlow(false)
+        val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
 
         fun start() {
             if (workflowId == null) {
@@ -166,6 +175,29 @@ class WorkflowEditorViewModel
             _saved.value = false
         }
 
+        // ── Delete ───────────────────────────────────────────────────────────
+
+        /** DELETE `/workflows/:id` — the screen navigates back via [deleted]. */
+        fun delete() {
+            val id = workflowId ?: return
+            val loaded = _state.value as? WorkflowEditorUiState.Loaded ?: return
+            if (loaded.isDeleting) return
+            _state.value = loaded.copy(isDeleting = true, deleteError = null)
+            viewModelScope.launch {
+                val result = repo.deleteWorkflow(owner, id)
+                val current = _state.value as? WorkflowEditorUiState.Loaded ?: return@launch
+                when (result) {
+                    is NetworkResult.Success -> _deleted.value = true
+                    is NetworkResult.Failure ->
+                        _state.value = current.copy(isDeleting = false, deleteError = errors.decode(result.error).deleteMessage())
+                }
+            }
+        }
+
+        fun consumeDeleted() {
+            _deleted.value = false
+        }
+
         private inline fun updateForm(transform: (WorkflowForm) -> WorkflowForm) {
             val loaded = _state.value as? WorkflowEditorUiState.Loaded ?: return
             _state.value = loaded.copy(form = transform(loaded.form))
@@ -186,6 +218,9 @@ class WorkflowEditorViewModel
         }
 
         private fun SchedulingError.loadMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't load this workflow."
+
+        private fun SchedulingError.deleteMessage(): String =
+            (this as? SchedulingError.Generic)?.message ?: "Couldn't delete this workflow. Try again."
 
         private fun SchedulingError.saveMessage(): String =
             when (this) {
@@ -233,6 +268,8 @@ sealed interface WorkflowEditorUiState {
         val isSaving: Boolean = false,
         val saveError: String? = null,
         val didAttemptSave: Boolean = false,
+        val isDeleting: Boolean = false,
+        val deleteError: String? = null,
     ) : WorkflowEditorUiState {
         val canSave: Boolean get() = !form.messageIsEmpty && !isSaving
         val canPreview: Boolean get() = !form.messageIsEmpty

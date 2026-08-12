@@ -93,13 +93,14 @@ class BookingLimitsViewModelTest {
         }
 
     @Test
-    fun `save writes converted event-type fields`() =
+    fun `save writes only the fields that moved off their loaded values`() =
         runTest(dispatcher) {
             coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(listOf(eventType())))
             coEvery { repo.updateEventType(any(), any(), any()) } returns NetworkResult.Success(EventTypeResponse(eventType()))
             val vm = vm()
             vm.load()
             advanceUntilIdle()
+            vm.changeBookUpTo(5) // 60 → 65: the only touched control
             vm.events.test {
                 vm.save()
                 advanceUntilIdle()
@@ -110,13 +111,64 @@ class BookingLimitsViewModelTest {
                     any(),
                     "e1",
                     match {
-                        it.minNoticeMin == 240 &&
-                            it.maxHorizonDays == 60 &&
-                            it.slotIntervalMin == 60 &&
-                            it.dailyCap == 8 &&
-                            it.perBookerCap == 2
+                        it.maxHorizonDays == 65 &&
+                            it.minNoticeMin == null &&
+                            it.slotIntervalMin == null &&
+                            it.dailyCap == null &&
+                            it.perBookerCap == null
                     },
                 )
             }
+        }
+
+    @Test
+    fun `save never stamps a default cap onto an unlimited event type`() =
+        runTest(dispatcher) {
+            // No caps on the server (null = "no limit"); the form seeds visible
+            // defaults, but an untouched control must not be written back.
+            val unlimited = eventType().copy(dailyCap = null, perBookerCap = null, minNoticeMin = 30)
+            coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(listOf(unlimited)))
+            coEvery { repo.updateEventType(any(), any(), any()) } returns NetworkResult.Success(EventTypeResponse(unlimited))
+            val vm = vm()
+            vm.load()
+            advanceUntilIdle()
+            vm.changeBookUpTo(1) // 60 → 61
+            vm.events.test {
+                vm.save()
+                advanceUntilIdle()
+                assertEquals(BookingLimitsEvent.Saved, awaitItem())
+            }
+            coVerify {
+                repo.updateEventType(
+                    any(),
+                    "e1",
+                    match {
+                        it.maxHorizonDays == 61 &&
+                            // 30-min notice renders as 0 h (lossy display) but must
+                            // NOT be written back as 0 while untouched.
+                            it.minNoticeMin == null &&
+                            it.dailyCap == null &&
+                            it.perBookerCap == null
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `a second save uses the previously saved values as its baseline`() =
+        runTest(dispatcher) {
+            coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(listOf(eventType())))
+            coEvery { repo.updateEventType(any(), any(), any()) } returns NetworkResult.Success(EventTypeResponse(eventType()))
+            val vm = vm()
+            vm.load()
+            advanceUntilIdle()
+            vm.changeMaxPerDay(1) // 8 → 9
+            vm.save()
+            advanceUntilIdle()
+            vm.changeMaxPerDay(-1) // 9 → 8: dirty against the saved 9
+            vm.save()
+            advanceUntilIdle()
+            coVerify { repo.updateEventType(any(), "e1", match { it.dailyCap == 9 }) }
+            coVerify { repo.updateEventType(any(), "e1", match { it.dailyCap == 8 }) }
         }
 }

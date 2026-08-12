@@ -51,8 +51,13 @@ data class FindATimeCriteria(
     val members: List<FindMember>,
     val mode: FindMode,
     val durationMin: Int,
-    /** Inclusive ISO dates (`yyyy-MM-dd`) sent as `from`/`to`. */
+    /** First covered day, as an ISO date (`yyyy-MM-dd`) sent as `from`. */
     val fromIso: String,
+    /**
+     * EXCLUSIVE end (the day after the last covered day), sent as `to`. The
+     * backend parses a date-only bound as UTC midnight, so an inclusive last
+     * day would silently drop that entire day's slots.
+     */
     val toIso: String,
     val windowLabel: String,
     /** IANA tz sent on the read and used to render `startLocal`. */
@@ -74,12 +79,19 @@ class FindATimeSession
         @Volatile
         var criteria: FindATimeCriteria? = null
 
-        /** Optional window seed (ISO dates) from F7 "Find a time here". */
+        /** Optional window seed (inclusive ISO dates) from F7 "Find a time here". */
         @Volatile
         var seedFromIso: String? = null
 
         @Volatile
         var seedToIso: String? = null
+
+        /**
+         * Set by F5 when `POST /find-a-time` returns zero slots; consumed by the
+         * F4 setup editor so its no-overlap banner + quick fixes render.
+         */
+        @Volatile
+        var noOverlapMessage: String? = null
 
         fun takeSeed(): Pair<String, String>? {
             val from = seedFromIso
@@ -87,5 +99,11 @@ class FindATimeSession
             seedFromIso = null
             seedToIso = null
             return if (from != null && to != null) from to to else null
+        }
+
+        fun takeNoOverlapMessage(): String? {
+            val message = noOverlapMessage
+            noOverlapMessage = null
+            return message
         }
     }

@@ -102,7 +102,8 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.SchedulingApi
 import app.pantopus.android.data.api.services.SchedulingPublicApi
-import okhttp3.ResponseBody
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -618,7 +619,17 @@ open class SchedulingRepository
             tz: String? = null,
         ): NetworkResult<AvailableSlotsResponse> = safeApiCall { publicApi.getManageAvailableSlots(token, from, to, tz) }
 
-        open suspend fun publicGetIcs(token: String): NetworkResult<ResponseBody> = safeApiCall { publicApi.getIcs(token) }
+        /**
+         * Fetch the booking's .ics and decode it to text. The `@Streaming` body is
+         * consumed (and closed) on IO here so callers never touch the raw socket
+         * on the main thread — `ResponseBody.string()` is a blocking read.
+         */
+        open suspend fun publicGetIcs(token: String): NetworkResult<String> =
+            safeApiCall {
+                withContext(Dispatchers.IO) {
+                    publicApi.getIcs(token).use { it.string() }
+                }
+            }
 
         open suspend fun publicReschedule(
             token: String,

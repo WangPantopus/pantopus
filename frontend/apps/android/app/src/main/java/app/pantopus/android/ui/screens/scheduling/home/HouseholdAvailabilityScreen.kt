@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.OfflineBannerHost
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.OwnerPillarHeader
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
@@ -65,6 +66,7 @@ fun HouseholdAvailabilityScreen(
 ) {
     val viewModel: HouseholdAvailabilityViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val online by viewModel.isOnline.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -80,22 +82,26 @@ fun HouseholdAvailabilityScreen(
             pillar = SchedulingPillar.Home,
             onBack = onBack,
         )
-        when (val current = state) {
-            is HouseholdAvailabilityUiState.Loading -> LoadingBody()
-            is HouseholdAvailabilityUiState.Error ->
-                EmptyState(
-                    icon = PantopusIcon.AlertCircle,
-                    headline = "Couldn't load settings",
-                    subcopy = current.message,
-                    ctaTitle = "Try again",
-                    onCta = { viewModel.load() },
-                )
-            is HouseholdAvailabilityUiState.Ready ->
-                ReadyBody(
-                    data = current.data,
-                    onNavigate = onNavigate,
-                    onSetExposure = viewModel::setExposure,
-                )
+        // Offline strip in the chrome stack — mirrors iOS
+        // `.offlineBanner(isOffline:)` on MyHouseholdAvailabilityView.
+        OfflineBannerHost(isOffline = !online) {
+            when (val current = state) {
+                is HouseholdAvailabilityUiState.Loading -> LoadingBody()
+                is HouseholdAvailabilityUiState.Error ->
+                    EmptyState(
+                        icon = PantopusIcon.AlertCircle,
+                        headline = "Couldn't load settings",
+                        subcopy = current.message,
+                        ctaTitle = "Try again",
+                        onCta = { viewModel.load() },
+                    )
+                is HouseholdAvailabilityUiState.Ready ->
+                    ReadyBody(
+                        data = current.data,
+                        onNavigate = onNavigate,
+                        onSetExposure = viewModel::setExposure,
+                    )
+            }
         }
     }
 }
@@ -142,7 +148,6 @@ private fun ReadyBody(
 
         ExposureSection(
             data = data,
-            onNavigate = onNavigate,
             onSetExposure = onSetExposure,
         )
 
@@ -353,7 +358,6 @@ private fun NotSetUpBlock(onNavigate: (String) -> Unit) {
 @Composable
 private fun ExposureSection(
     data: ReadyData,
-    onNavigate: (String) -> Unit,
     onSetExposure: (Exposure, Boolean) -> Unit,
 ) {
     var confirmHideShare by remember { mutableStateOf(false) }
@@ -393,11 +397,11 @@ private fun ExposureSection(
                     icon = PantopusIcon.Moon,
                     title = "Household quiet hours",
                     value = data.quietHoursLabel,
-                    // Route TBD: quiet-hours editor screen not yet registered.
-                    // Wired as tappable per design (cursor:pointer) — navigate
-                    // target will be a dedicated "scheduling/home/quiet-hours"
-                    // route once that screen is built.
-                    onClick = { onNavigate("scheduling/home/quiet-hours") },
+                    // Deliberate no-op (mirrors iOS `openQuietHours()`): the F8b
+                    // quiet-hours editor route does not exist yet, and navigating
+                    // to an unregistered route crashes with IllegalArgumentException.
+                    // Wire a real "scheduling/home/quiet-hours" destination first.
+                    onClick = {},
                 )
             }
             ToggleRow(

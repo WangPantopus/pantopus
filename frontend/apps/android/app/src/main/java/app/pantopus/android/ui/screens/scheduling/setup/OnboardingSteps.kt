@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,7 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.PantopusMiniToggle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling.hub.HubAvatarTone
+import app.pantopus.android.ui.screens.scheduling.hub.hubToneColors
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -209,10 +210,12 @@ internal fun OnboardingMemberList(
                 SeededPersonRow(
                     person = person,
                     trailing = {
-                        Switch(
+                        // Design 32×18 mini toggle, not the Material 3 Switch
+                        // (onboarding-shell.jsx "iOS 32×18 toggles"; iOS SetupMiniToggle).
+                        PantopusMiniToggle(
                             checked = person.id in selected,
                             onCheckedChange = { onToggle(person.id) },
-                            colors = pillarSwitchColors(pillar),
+                            accent = pillar.accent,
                             modifier = Modifier.testTag("onboardingMember_${person.id}"),
                         )
                     },
@@ -246,10 +249,12 @@ internal fun OnboardingTeamList(
                     rolePillar = pillar,
                     statusSub = if (on) "Seated · bookable" else "Not seated",
                     trailing = {
-                        Switch(
+                        // Design 32×18 mini toggle, not the Material 3 Switch
+                        // (onboarding-shell.jsx "iOS 32×18 toggles"; iOS SetupMiniToggle).
+                        PantopusMiniToggle(
                             checked = on,
                             onCheckedChange = { onToggle(person.id) },
-                            colors = pillarSwitchColors(pillar),
+                            accent = pillar.accent,
                             modifier = Modifier.testTag("onboardingSeat_${person.id}"),
                         )
                     },
@@ -287,12 +292,17 @@ private fun SeededPersonRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Per-person tinted avatar — the design gives every member/teammate a
+        // distinct colored disc (onboarding-home-frames.jsx MemberRow `grad`,
+        // onboarding-business-frames.jsx TeamRow). Reuses the hub avatar-tone
+        // cycle, keyed by name like iOS `SchedulingHubModel.avatarTone(for:)`.
+        val (avatarBg, avatarFg) = hubToneColors(seededAvatarTone(person.name))
         Box(contentAlignment = Alignment.BottomEnd) {
             Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(PantopusColors.appSurfaceSunken),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(avatarBg),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(person.initials, color = PantopusColors.appTextStrong, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(person.initials, color = avatarFg, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
             if (verified) {
                 Box(
@@ -546,6 +556,7 @@ internal fun OnboardingServicePicker(
     serviceType: String,
     duration: Int,
     priceText: String,
+    paidEnabled: Boolean,
     pillar: SchedulingPillar,
     onSelect: (String) -> Unit,
     onDuration: (Int) -> Unit,
@@ -564,7 +575,9 @@ internal fun OnboardingServicePicker(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp)) {
             DurationDropdownField(duration, onDuration, Modifier.weight(1f))
-            PriceField(priceText, onPrice, Modifier.weight(1f))
+            // Paid gate: the price input only renders where paid scheduling is
+            // enabled (iOS parity — production creates a free service).
+            if (paidEnabled) PriceField(priceText, onPrice, Modifier.weight(1f))
         }
     }
 }
@@ -689,8 +702,16 @@ private fun PriceField(
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Monospace,
                     ),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f).testTag("onboardingPrice"),
+            )
+            // Design `Field` renders a 14px fg4 trailing glyph whenever `adorn` is set;
+            // onboarding-business-frames.jsx gives Price `adorn="pencil"`. iOS already has it.
+            PantopusIconImage(
+                icon = PantopusIcon.Pencil,
+                contentDescription = null,
+                size = 14.dp,
+                tint = PantopusColors.appTextMuted,
             )
         }
     }
@@ -791,14 +812,15 @@ internal fun OnboardingApproveExplainer(pillar: SchedulingPillar) {
     }
 }
 
-@Composable
-private fun pillarSwitchColors(pillar: SchedulingPillar) =
-    SwitchDefaults.colors(
-        checkedThumbColor = PantopusColors.appSurface,
-        checkedTrackColor = pillar.accent,
-        uncheckedThumbColor = PantopusColors.appSurface,
-        uncheckedTrackColor = PantopusColors.appBorderStrong,
-    )
+/**
+ * Deterministic per-name tone from the hub avatar cycle — same hash as iOS
+ * `SchedulingHubModel.avatarTone(for:)` (sum of scalar values mod tone count)
+ * so the two platforms color the same person the same way.
+ */
+private fun seededAvatarTone(name: String): HubAvatarTone {
+    val tones = HubAvatarTone.entries
+    return tones[name.sumOf { it.code } % tones.size]
+}
 
 internal fun composedMessage(flow: OnboardingFlow): String =
     if (flow == OnboardingFlow.Home) {

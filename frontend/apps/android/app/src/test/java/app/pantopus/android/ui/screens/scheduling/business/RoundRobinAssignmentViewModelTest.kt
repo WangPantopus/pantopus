@@ -111,9 +111,15 @@ class RoundRobinAssignmentViewModelTest {
                 repo.setAssignees(
                     any(),
                     "e1",
-                    match {
-                            req ->
-                        req.assignees.any { it.subjectId == "u1" && it.weight == 2 && it.priority == 0 }
+                    // Balanced writes the negative sentinel so a reload can tell it apart from
+                    // Strict — previously "balanced with default weights" round-tripped as
+                    // Strict and silently changed the host rotation.
+                    match { req ->
+                        req.assignees.any {
+                            it.subjectId == "u1" &&
+                                it.weight == 2 &&
+                                it.priority == RoundRobinAssignmentViewModel.BALANCED_PRIORITY_SENTINEL
+                        }
                     },
                 )
             }
@@ -138,9 +144,10 @@ class RoundRobinAssignmentViewModelTest {
                 repo.setAssignees(
                     any(),
                     "e1",
-                    match {
-                            req ->
-                        req.assignees.all { it.weight == 1 } && req.assignees.map { it.priority }.toSet() == setOf(0, 1)
+                    // Priority ranks are 1-based: >0 is what marks the rule on reload
+                    // (0 stays reserved for Strict's neutral shape).
+                    match { req ->
+                        req.assignees.all { it.weight == 1 } && req.assignees.map { it.priority }.toSet() == setOf(1, 2)
                     },
                 )
             }

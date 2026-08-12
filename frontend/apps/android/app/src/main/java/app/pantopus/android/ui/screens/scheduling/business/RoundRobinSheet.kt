@@ -165,6 +165,14 @@ private fun RoundRobinBody(
                     tone = BizNoteTone.Info,
                     icon = PantopusIcon.Info,
                 )
+            } else if (content.checkedCount >= 2) {
+                // Design roundrobin-frames.jsx:157 closes the sheet with a Blurb confirming
+                // how the rotation will behave; only the single-member caveat was built.
+                BizNote(
+                    text = "New bookings rotate across ${content.checkedCount} members, weighted by your settings.",
+                    tone = BizNoteTone.Info,
+                    icon = PantopusIcon.ArrowsRepeat,
+                )
             }
             toast?.let { BizNote(text = it, tone = BizNoteTone.Error, icon = PantopusIcon.AlertCircle) }
         }

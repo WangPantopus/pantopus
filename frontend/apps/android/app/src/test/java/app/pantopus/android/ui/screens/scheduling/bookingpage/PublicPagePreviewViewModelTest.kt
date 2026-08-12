@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookingpage
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageResponse
 import app.pantopus.android.data.api.models.scheduling.PublicBookingPageResponse
@@ -10,9 +11,12 @@ import app.pantopus.android.data.api.models.scheduling.PublicPageView
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
+import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,13 +36,24 @@ class PublicPagePreviewViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
-    private val ownerRelay = BookingPageOwnerRelay()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = PublicPagePreviewViewModel(repo, errors, ownerRelay)
+    private fun vm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = PublicPagePreviewViewModel(
+        repo,
+        errors,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
 
     private fun hostPage(
         slug: String? = "maria-k",
@@ -125,5 +140,15 @@ class PublicPagePreviewViewModelTest {
             vm.load()
             advanceUntilIdle()
             assertTrue(vm.state.value is PreviewUiState.Error)
+        }
+
+    @Test
+    fun `route owner args scope the host page read to the business owner`() =
+        runTest(dispatcher) {
+            coEvery { repo.getBookingPage(any()) } returns hostPage(isLive = false)
+            val vm = vm(ownerKind = "business", ownerId = "biz-1")
+            vm.load()
+            advanceUntilIdle()
+            coVerify { repo.getBookingPage(SchedulingOwner.Business("biz-1")) }
         }
 }

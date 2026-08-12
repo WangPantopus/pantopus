@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.automations
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.UpdateBookingPageRequest
@@ -12,6 +13,7 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -22,7 +24,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val SAVED_TOAST_MS = 1900L
-private const val MAX_CUSTOM_VALUE = 999
+
+/** Backend `pageUpdateSchema` caps (backend/routes/scheduling.js:139). */
+private const val MAX_REMINDERS = 5
+private const val MAX_REMINDER_MINUTES = 43200
+
+private const val MINUTES_PER_HOUR = 60
+private const val MINUTES_PER_DAY = 1440
+
+/** Stepper ceiling for a raw minutes entry (the 30-day cap still applies on top). */
+private const val MAX_CUSTOM_MINUTES_ENTRY = 999
+
+/** Per-unit stepper ceiling so the custom value can never exceed 30 days. */
+private fun maxCustomValue(unit: ReminderPreset.Unit): Int =
+    when (unit) {
+        ReminderPreset.Unit.Minutes -> MAX_CUSTOM_MINUTES_ENTRY
+        ReminderPreset.Unit.Hours -> MAX_REMINDER_MINUTES / MINUTES_PER_HOUR
+        ReminderPreset.Unit.Days -> MAX_REMINDER_MINUTES / MINUTES_PER_DAY
+    }
 
 /**
  * Stream A16 — H1 Default Reminders Quick-Setup. The flagship simple reminder
@@ -30,8 +49,9 @@ private const val MAX_CUSTOM_VALUE = 999
  * Lead-times persist on the BOOKING PAGE (`reminder_minutes[]`) via
  * `PUT /booking-page` — there is no per-reminder channel store, so the Push /
  * Email chips on each active row are illustrative. On first open with no saved
- * reminders we pre-pick the smart default (1 day + 1 hour). Personal owner (the
- * arg-less route resolves to the signed-in user, like the A1 settings root).
+ * reminders we pre-pick the smart default (1 day + 1 hour). Owner comes from the
+ * route's ownerKind/ownerId args (like the A1 settings root) so a Business/Home
+ * settings root edits ITS booking page, never the personal one; Personal when absent.
  */
 @HiltViewModel
 class RemindersQuickSetupViewModel
@@ -39,8 +59,13 @@ class RemindersQuickSetupViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
         val pillar: SchedulingPillar = owner.pillar()
 
@@ -87,6 +112,9 @@ class RemindersQuickSetupViewModel
                     if (current.reminderMinutes.contains(minutes)) {
                         current.reminderMinutes - minutes
                     } else {
+                        // Backend caps reminder_minutes at 5 items — block a 6th
+                        // selection (the "Up to 5 reminders" note explains why).
+                        if (current.atLimit) return@updateLoaded current
                         current.reminderMinutes + minutes
                     }
                 current.copy(reminderMinutes = next.sortedDescending())
@@ -96,14 +124,20 @@ class RemindersQuickSetupViewModel
 
         fun hideCustom() = updateLoaded { it.copy(showCustom = false) }
 
-        fun stepCustom(delta: Int) = updateLoaded { it.copy(customValue = (it.customValue + delta).coerceIn(1, MAX_CUSTOM_VALUE)) }
+        fun stepCustom(delta: Int) = updateLoaded { it.copy(customValue = (it.customValue + delta).coerceIn(1, it.customMax)) }
 
-        fun setCustomUnit(unit: ReminderPreset.Unit) = updateLoaded { it.copy(customUnit = unit) }
+        fun setCustomUnit(unit: ReminderPreset.Unit) =
+            updateLoaded { it.copy(customUnit = unit, customValue = it.customValue.coerceIn(1, maxCustomValue(unit))) }
 
         fun addCustom() =
             updateLoaded { current ->
                 val minutes = current.customResolvedMinutes
-                if (minutes <= 0 || current.reminderMinutes.contains(minutes)) {
+                // Rejected when out of range, already present, or the 5-reminder cap is hit.
+                val rejected =
+                    minutes !in 1..MAX_REMINDER_MINUTES ||
+                        current.reminderMinutes.contains(minutes) ||
+                        current.atLimit
+                if (rejected) {
                     current.copy(showCustom = false)
                 } else {
                     current.copy(
@@ -174,6 +208,12 @@ sealed interface RemindersUiState {
         val isSaving: Boolean = false,
         val saveError: String? = null,
     ) : RemindersUiState {
+        /** Backend cap: at 5 selections further rows can't be turned on. */
+        val atLimit: Boolean get() = reminderMinutes.size >= MAX_REMINDERS
+
+        /** Per-unit stepper ceiling (30-day per-item backend cap). */
+        val customMax: Int get() = maxCustomValue(customUnit)
+
         /** Custom value resolves to this many minutes-before-start. */
         val customResolvedMinutes: Int get() = customValue.coerceAtLeast(0) * customUnit.multiplier
 

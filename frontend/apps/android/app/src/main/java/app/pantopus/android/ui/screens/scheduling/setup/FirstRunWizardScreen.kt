@@ -21,9 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,7 @@ fun FirstRunWizardScreen(
     val pendingShareUrl by viewModel.pendingShareUrl.collectAsStateWithLifecycle()
     val finished by viewModel.finished.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val pillar = SchedulingPillar.Personal
 
     LaunchedEffect(finished) { if (finished) onBack() }
@@ -67,7 +70,14 @@ fun FirstRunWizardScreen(
     }
 
     WizardShell(model = viewModel, identity = pillar.wizardIdentity) {
-        WizardStepRail(steps = listOf("Link", "Type", "Hours", "Share"), current = state.step, pillar = pillar)
+        WizardStepRail(
+            steps = listOf("Link", "Type", "Hours", "Share"),
+            current = state.step,
+            pillar = pillar,
+            // Success frame marks every disc done — the last renders a check, not
+            // "4" (scheduling-setup-frames.jsx FrameSuccess `done={[1,2,3,4]}`).
+            done = if (state.step > 3) setOf(1, 2, 3, 4) else emptySet(),
+        )
         when (state.step) {
             1 -> {
                 HeadlineBlock("Claim your booking link")
@@ -98,8 +108,16 @@ fun FirstRunWizardScreen(
                     FirstRunResumeBanner(pillar = pillar)
                 }
                 HeadlineBlock("Set your weekly hours")
-                SubcopyBlock("People can only book inside these windows. You can fine-tune any day, or just use the defaults.")
-                WizardTimezoneChip(timezoneId = state.timezoneId, pillar = pillar)
+                // FrameResume swaps the step-3 subcopy for the "last step" line
+                // (scheduling-setup-frames.jsx:557; iOS FirstRunWizardScreen parity).
+                SubcopyBlock(
+                    if (state.isResume) {
+                        "Last step. Set your hours, then share your link."
+                    } else {
+                        "People can only book inside these windows. You can fine-tune any day, or just use the defaults."
+                    },
+                )
+                WizardTimezoneChip(timezoneId = state.timezoneId)
                 WizardHoursGrid(hours = state.hours, pillar = pillar, onToggleDay = viewModel::onToggleDay)
             }
             else -> {
@@ -113,7 +131,9 @@ fun FirstRunWizardScreen(
                 WizardSuccessLinkCard(
                     link = state.shareLink,
                     pillar = pillar,
-                    onCopy = viewModel::onPrimary,
+                    // Copy really copies (the hub's clipboard pattern) — the
+                    // wizard's primary CTA separately opens the share sheet.
+                    onCopy = { clipboard.setText(AnnotatedString("https://${state.shareLink}")) },
                 )
             }
         }

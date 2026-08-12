@@ -270,6 +270,9 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
 
+    // QR encoding (ShareLinkSheet booking-link QR)
+    implementation(libs.zxing.core)
+
     // Realtime
     implementation(libs.socketio.client)
 

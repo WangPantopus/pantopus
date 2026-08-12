@@ -38,7 +38,13 @@ class MessageTemplateEditorViewModel
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        // Owner comes from the route's ownerKind/ownerId args (threaded by the
+        // template library); Personal when absent.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
         val pillar: SchedulingPillar = owner.pillar()
 
         private val templateId: String? =
@@ -53,6 +59,9 @@ class MessageTemplateEditorViewModel
 
         private val _saved = MutableStateFlow(false)
         val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+        private val _deleted = MutableStateFlow(false)
+        val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
 
         fun start() {
             if (templateId == null) {
@@ -74,6 +83,7 @@ class MessageTemplateEditorViewModel
                                         channel = WorkflowChannel.fromWire(template.channel),
                                         subject = template.subject.orEmpty(),
                                         body = template.body.orEmpty(),
+                                        isActive = template.isActive ?: true,
                                     ),
                                 )
                             }
@@ -96,6 +106,9 @@ class MessageTemplateEditorViewModel
             if (channel.isComingSoon) return
             updateForm { it.copy(channel = channel) }
         }
+
+        /** Mirrors the backend `is_active` field (iOS activeSection parity). */
+        fun setActive(value: Boolean) = updateForm { it.copy(isActive = value) }
 
         fun insertVariable(variable: TemplateVariable) =
             updateForm { form ->
@@ -122,6 +135,7 @@ class MessageTemplateEditorViewModel
                                 body = form.body,
                                 channel = form.channel.wire,
                                 subject = subjectValue,
+                                isActive = form.isActive,
                             ),
                         )
                     } else {
@@ -133,6 +147,7 @@ class MessageTemplateEditorViewModel
                                 body = form.body,
                                 channel = form.channel.wire,
                                 subject = subjectValue,
+                                isActive = form.isActive,
                             ),
                         )
                     }
@@ -149,12 +164,38 @@ class MessageTemplateEditorViewModel
             _saved.value = false
         }
 
+        // ── Delete ───────────────────────────────────────────────────────────
+
+        /** DELETE `/message-templates/:id` — the screen navigates back via [deleted]. */
+        fun delete() {
+            val id = templateId ?: return
+            val loaded = _state.value as? MessageTemplateEditorUiState.Loaded ?: return
+            if (loaded.isDeleting) return
+            _state.value = loaded.copy(isDeleting = true, deleteError = null)
+            viewModelScope.launch {
+                val result = repo.deleteMessageTemplate(owner, id)
+                val current = _state.value as? MessageTemplateEditorUiState.Loaded ?: return@launch
+                when (result) {
+                    is NetworkResult.Success -> _deleted.value = true
+                    is NetworkResult.Failure ->
+                        _state.value = current.copy(isDeleting = false, deleteError = errors.decode(result.error).deleteMessage())
+                }
+            }
+        }
+
+        fun consumeDeleted() {
+            _deleted.value = false
+        }
+
         private inline fun updateForm(transform: (TemplateForm) -> TemplateForm) {
             val loaded = _state.value as? MessageTemplateEditorUiState.Loaded ?: return
             _state.value = loaded.copy(form = transform(loaded.form))
         }
 
         private fun SchedulingError.loadMessage(): String = (this as? SchedulingError.Generic)?.message ?: "Couldn't load this template."
+
+        private fun SchedulingError.deleteMessage(): String =
+            (this as? SchedulingError.Generic)?.message ?: "Couldn't delete this template. Try again."
 
         private fun SchedulingError.saveMessage(): String =
             when (this) {
@@ -171,6 +212,8 @@ data class TemplateForm(
     val channel: WorkflowChannel = WorkflowChannel.Email,
     val subject: String = "",
     val body: String = "",
+    /** Backend `is_active` — off pauses the template so workflows skip it. */
+    val isActive: Boolean = true,
 ) {
     val showsSubject: Boolean get() = channel == WorkflowChannel.Email || channel == WorkflowChannel.Sms
     val subjectRequired: Boolean get() = channel == WorkflowChannel.Email
@@ -197,6 +240,8 @@ sealed interface MessageTemplateEditorUiState {
         val isSaving: Boolean = false,
         val saveError: String? = null,
         val didAttemptSave: Boolean = false,
+        val isDeleting: Boolean = false,
+        val deleteError: String? = null,
     ) : MessageTemplateEditorUiState {
         val canSave: Boolean get() = !form.nameIsEmpty && !form.bodyIsEmpty && !form.subjectMissing && !isSaving
         val canPreview: Boolean get() = !form.bodyIsEmpty

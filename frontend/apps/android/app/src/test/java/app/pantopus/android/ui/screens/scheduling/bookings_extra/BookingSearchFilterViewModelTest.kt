@@ -3,16 +3,22 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
+import app.pantopus.android.data.api.models.homes.MyHome
+import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.scheduling.BookingDto
 import app.pantopus.android.data.api.models.scheduling.GetBookingsResponse
 import app.pantopus.android.data.api.models.scheduling.GetEventTypesResponse
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -41,6 +47,9 @@ class BookingSearchFilterViewModelTest {
         Dispatchers.setMain(dispatcher)
         coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(GetEventTypesResponse(emptyList()))
         coEvery { repo.getBookings(any(), any(), any(), any(), any(), any()) } returns NetworkResult.Success(GetBookingsResponse(bookings))
+        // The All scope fans out across resolvable pillars; no home/business by default.
+        coEvery { homes.myHomes() } returns NetworkResult.Success(MyHomesResponse(homes = emptyList(), message = null))
+        every { auth.state } returns MutableStateFlow(AuthRepository.State.SignedOut)
     }
 
     @After
@@ -84,4 +93,49 @@ class BookingSearchFilterViewModelTest {
             advanceUntilIdle()
             assertTrue(vm.results.value is BookingSearchUiState.Empty)
         }
+
+    @Test
+    fun `the All scope fans out to every resolvable owner and concatenates`() =
+        runTest(dispatcher) {
+            coEvery { homes.myHomes() } returns
+                NetworkResult.Success(MyHomesResponse(homes = listOf(home("home-1")), message = null))
+            coEvery { repo.getBookings(SchedulingOwner.Personal, any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(GetBookingsResponse(bookings))
+            coEvery { repo.getBookings(SchedulingOwner.Home("home-1"), any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    GetBookingsResponse(
+                        listOf(BookingDto(id = "b3", status = "confirmed", inviteeName = "Cy", startAt = "2026-06-21T17:00:00Z")),
+                    ),
+                )
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            val state = vm.results.value as BookingSearchUiState.Loaded
+            assertEquals(3, state.rows.size)
+            assertTrue(state.rows.any { it.id == "b3" })
+        }
+
+    @Test
+    fun `a partial fan-out failure still shows the successful scopes`() =
+        runTest(dispatcher) {
+            coEvery { homes.myHomes() } returns
+                NetworkResult.Success(MyHomesResponse(homes = listOf(home("home-1")), message = null))
+            coEvery { repo.getBookings(SchedulingOwner.Personal, any(), any(), any(), any(), any()) } returns
+                NetworkResult.Success(GetBookingsResponse(bookings))
+            coEvery { repo.getBookings(SchedulingOwner.Home("home-1"), any(), any(), any(), any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            val state = vm.results.value as BookingSearchUiState.Loaded
+            assertEquals(2, state.rows.size)
+        }
+
+    private fun home(id: String) =
+        MyHome(
+            id = id, name = "Birch Ln", address = null, city = null, state = null, zipcode = null,
+            homeType = null, visibility = null, description = null, createdAt = null, updatedAt = null,
+            occupancy = null, ownershipStatus = null, verificationTier = null, isPrimaryOwner = null,
+            pendingClaimId = null,
+        )
 }

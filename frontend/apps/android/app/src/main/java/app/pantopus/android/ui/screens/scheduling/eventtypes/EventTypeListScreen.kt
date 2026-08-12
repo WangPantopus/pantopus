@@ -6,6 +6,8 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,15 +32,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -48,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -56,10 +67,12 @@ import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import app.pantopus.android.ui.theme.pantopusShadow
 import kotlinx.coroutines.delay
 
 private const val TOAST_MS = 1800L
@@ -70,6 +83,12 @@ object EventTypeListTags {
     const val ROW_PREFIX = "eventTypeRow_"
     const val TOGGLE_PREFIX = "eventTypeToggle_"
     const val LOCK_BANNER = "eventTypesLockBanner"
+
+    // B1 FRAME 6 reorder mode — ids shared verbatim with iOS
+    // accessibilityIdentifiers and the web implementation.
+    const val REORDER_ENTRY = "schedulingEventTypes_reorderEntry"
+    const val REORDER_DONE = "schedulingEventTypes_reorderDone"
+    const val REORDER_ROW_PREFIX = "schedulingEventTypes_reorderRow_"
 }
 
 @Composable
@@ -139,18 +158,35 @@ fun EventTypeListScreen(
     }
 
     val canEdit = (state as? EventTypeListUiState.Content)?.canEdit ?: true
+    val reordering by viewModel.reordering.collectAsStateWithLifecycle()
+    val shownRows = (state as? EventTypeListUiState.Content)?.rows ?: emptyList()
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             EtTopBar(
-                title = if (pillar == SchedulingPillar.Business) "Services" else "Event types",
+                title =
+                    when {
+                        reordering -> "Reorder"
+                        pillar == SchedulingPillar.Business -> "Services"
+                        else -> "Event types"
+                    },
                 onBack = onBack,
                 trailingIcon = PantopusIcon.Plus,
-                trailingEnabled = canEdit,
+                trailingEnabled = canEdit && !reordering,
                 trailingContentDescription = "New event type",
                 onTrailing = { onNavigate(viewModel.createRoute()) },
+                preTrailing =
+                    if (!reordering && canEdit && shownRows.size > 1) {
+                        { ReorderEntry(onClick = viewModel::startReorder) }
+                    } else {
+                        null
+                    },
             )
-            FilterHeader(pillar = pillar, tab = tab, onSelectPillar = viewModel::selectPillar, onSelectTab = viewModel::selectTab)
+            if (reordering) {
+                ReorderHintBar(onDone = viewModel::doneReordering)
+            } else {
+                FilterHeader(pillar = pillar, tab = tab, onSelectPillar = viewModel::selectPillar, onSelectTab = viewModel::selectTab)
+            }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (val s = state) {
                     EventTypeListUiState.Loading -> EventTypeListSkeleton()
@@ -167,6 +203,10 @@ fun EventTypeListScreen(
                             onDuplicate = viewModel::duplicate,
                             onDelete = viewModel::requestDelete,
                             onViewHidden = { viewModel.selectTab(EventTypeTab.Hidden) },
+                            reordering = reordering,
+                            liveRows = { (viewModel.state.value as? EventTypeListUiState.Content)?.rows ?: emptyList() },
+                            onMoveRow = viewModel::moveRow,
+                            onDragEnd = viewModel::persistOrder,
                         )
                 }
             }
@@ -200,6 +240,80 @@ fun EventTypeListScreen(
     }
 }
 
+/**
+ * Top-bar "Reorder" entry (web event-types page header button). Visible when
+ * the catalog is editable and shows 2+ rows; tapping enters FRAME 6 mode.
+ */
+@Composable
+private fun ReorderEntry(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .clickable(onClick = onClick)
+                .testTag(EventTypeListTags.REORDER_ENTRY)
+                .padding(horizontal = Spacing.s2, vertical = Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Move,
+            contentDescription = null,
+            size = 14.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.primary700,
+        )
+        Text("Reorder", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.primary700)
+    }
+}
+
+/**
+ * FRAME 6 hint bar — replaces the FilterHeader while reordering: sky-50 strip,
+ * sky-100 bottom border, move glyph, "Drag to set the order people see", and a
+ * bold trailing Done.
+ */
+@Composable
+private fun ReorderHintBar(onDone: () -> Unit) {
+    Column {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(PantopusColors.primary50)
+                    .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Move,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.primary700,
+            )
+            Text(
+                text = "Drag to set the order people see",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary700,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "Done",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary700,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .clickable(onClick = onDone)
+                        .testTag(EventTypeListTags.REORDER_DONE)
+                        .padding(horizontal = Spacing.s1, vertical = 2.dp),
+            )
+        }
+        HorizontalDivider(thickness = 1.dp, color = PantopusColors.primary100)
+    }
+}
+
 @Composable
 private fun FilterHeader(
     pillar: SchedulingPillar,
@@ -226,6 +340,10 @@ private fun FilterHeader(
                 options = EventTypeTab.entries.map { it.label },
                 selected = tab.label,
                 onSelect = { label -> EventTypeTab.entries.firstOrNull { it.label == label }?.let(onSelectTab) },
+                // FilterHeader frame: 30dp segment height, 12sp labels
+                // (event-types-frames.jsx:122-133) vs the 32dp/11.5sp editor default.
+                itemHeight = 30.dp,
+                labelSize = 12.sp,
             )
         }
         HorizontalDivider(thickness = 1.dp, color = PantopusColors.appBorder)
@@ -293,6 +411,10 @@ internal fun ContentBody(
     onDuplicate: (String) -> Unit,
     onDelete: (String) -> Unit,
     onViewHidden: () -> Unit,
+    reordering: Boolean = false,
+    liveRows: () -> List<EventTypeRowUi> = { emptyList() },
+    onMoveRow: (String, String) -> Unit = { _, _ -> },
+    onDragEnd: () -> Unit = {},
 ) {
     if (state.rows.isEmpty() && state.canEdit) {
         when {
@@ -305,6 +427,51 @@ internal fun ContentBody(
         }
         return
     }
+
+    // ── FRAME 6 drag state (screen-local; the VM owns the order) ────────────
+    var dragId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val rowHeights = remember { mutableStateMapOf<String, Int>() }
+    val gapPx = with(LocalDensity.current) { Spacing.s2.toPx() }
+    val liftPx = with(LocalDensity.current) { 2.dp.toPx() }
+    val currentRows by rememberUpdatedState(liveRows)
+    val currentMove by rememberUpdatedState(onMoveRow)
+    val currentEnd by rememberUpdatedState(onDragEnd)
+
+    // One reorder step per drag event; reads the VM's synchronous row order so
+    // fast drags never act on a stale projection (web `moveDragged`).
+    val dragBy: (Float) -> Unit = { dy ->
+        dragOffset += dy
+        val id = dragId
+        val rows = if (id == null) emptyList() else currentRows()
+        val index = rows.indexOfFirst { it.id == id }
+        val forward = dragOffset > 0f
+        // The row we would trade places with, given the drag direction — null at
+        // either end of the list (and when nothing is being dragged).
+        val neighbour =
+            when {
+                index < 0 -> null
+                forward && index < rows.lastIndex -> rows[index + 1]
+                !forward && index > 0 -> rows[index - 1]
+                else -> null
+            }
+        if (id != null && neighbour != null) {
+            // Swap once the drag passes half of the neighbour's height + gap, then
+            // rebase the offset so a long drag keeps stepping row by row.
+            val step = (rowHeights[neighbour.id] ?: 0) + gapPx
+            val passedHalf = if (forward) dragOffset > step / 2f else dragOffset < -step / 2f
+            if (step > 0f && passedHalf) {
+                currentMove(id, neighbour.id)
+                dragOffset += if (forward) -step else step
+            }
+        }
+    }
+    val finishDrag: () -> Unit = {
+        dragId = null
+        dragOffset = 0f
+        currentEnd()
+    }
+
     Column(
         modifier =
             Modifier
@@ -322,18 +489,132 @@ internal fun ContentBody(
             modifier = Modifier.padding(start = Spacing.s1, bottom = Spacing.s1),
         )
         state.rows.forEach { row ->
-            EventTypeRowCard(
-                row = row,
-                canEdit = state.canEdit,
-                onOpen = { onOpen(row.id) },
-                onToggle = { onToggle(row.id, it) },
-                onCopy = { onCopy(row.id) },
-                onShare = { onShare(row.id) },
-                onDuplicate = { onDuplicate(row.id) },
-                onDelete = { onDelete(row.id) },
-            )
+            key(row.id) {
+                if (reordering) {
+                    EventTypeReorderRow(
+                        row = row,
+                        lifted = dragId == row.id,
+                        dimmed = dragId != null && dragId != row.id,
+                        dragTranslation = if (dragId == row.id) dragOffset - liftPx else 0f,
+                        onHeight = { rowHeights[row.id] = it },
+                        onDragStart = {
+                            dragId = row.id
+                            dragOffset = 0f
+                        },
+                        onDragBy = dragBy,
+                        onDragEnd = finishDrag,
+                    )
+                } else {
+                    EventTypeRowCard(
+                        row = row,
+                        canEdit = state.canEdit,
+                        onOpen = { onOpen(row.id) },
+                        onToggle = { onToggle(row.id, it) },
+                        onCopy = { onCopy(row.id) },
+                        onShare = { onShare(row.id) },
+                        onDuplicate = { onDuplicate(row.id) },
+                        onDelete = { onDelete(row.id) },
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(Spacing.s6))
+    }
+}
+
+/**
+ * FRAME 6 reorder row — leading grip, dot + name/meta, inert toggle, no
+ * overflow. Long-press anywhere (or drag the grip immediately) to lift; the
+ * lifted row gets the primary-200 border, xl shadow, 1.012 scale and a -2dp
+ * rise while the others dim to 55%.
+ */
+@Composable
+private fun EventTypeReorderRow(
+    row: EventTypeRowUi,
+    lifted: Boolean,
+    dimmed: Boolean,
+    dragTranslation: Float,
+    onHeight: (Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDragBy: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    val shape = RoundedCornerShape(ROW_RADIUS)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onSizeChanged { onHeight(it.height) }
+                .zIndex(if (lifted) 3f else 1f)
+                .graphicsLayer {
+                    translationY = dragTranslation
+                    scaleX = if (lifted) 1.012f else 1f
+                    scaleY = if (lifted) 1.012f else 1f
+                    alpha = if (dimmed) 0.55f else 1f
+                }.then(if (lifted) Modifier.pantopusShadow(PantopusElevations.xl, shape) else Modifier)
+                .clip(shape)
+                .background(PantopusColors.appSurface)
+                .border(1.dp, if (lifted) PantopusColors.primary200 else PantopusColors.appBorder, shape)
+                .pointerInput(row.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            onDragBy(amount.y)
+                        },
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragEnd,
+                    )
+                }.testTag("${EventTypeListTags.REORDER_ROW_PREFIX}${row.id}")
+                .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier.pointerInput(row.id) {
+                    detectDragGestures(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            onDragBy(amount.y)
+                        },
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragEnd,
+                    )
+                },
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.GripVertical,
+                contentDescription = "Drag to reorder ${row.name}",
+                size = ICON_16,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
+        EtColorDot(color = eventDotColor(row.colorHex, row.id))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.name,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (row.isActive) PantopusColors.appText else PantopusColors.appTextStrong,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val sub = listOfNotNull(row.meta.takeIf { it.isNotEmpty() }, row.priceLabel).joinToString(" · ")
+            if (sub.isNotEmpty()) {
+                Text(
+                    text = sub,
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        // Inert while reordering (FRAME 6): rendered at its live value, no-op on tap.
+        EtToggle(checked = row.isActive, onToggle = {})
     }
 }
 
@@ -448,7 +729,9 @@ private fun EventTypeRowCard(
                 )
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                OverflowItem(PantopusIcon.Link, "Copy booking link") {
+                // Design OverflowMenu highlights the first (primary) action —
+                // sky-50 fill, sky-tinted icon + bold label (event-types-frames.jsx:246-253).
+                OverflowItem(PantopusIcon.Link, "Copy booking link", primary = true) {
                     menuOpen = false
                     onCopy()
                 }
@@ -486,21 +769,40 @@ private fun OverflowItem(
     icon: PantopusIcon,
     label: String,
     danger: Boolean = false,
+    primary: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val iconTint =
+        when {
+            danger -> PantopusColors.error
+            primary -> PantopusColors.primary600
+            else -> PantopusColors.appTextSecondary
+        }
+    val labelColor =
+        when {
+            danger -> PantopusColors.error
+            primary -> PantopusColors.primary700
+            else -> PantopusColors.appText
+        }
     DropdownMenuItem(
         leadingIcon = {
             PantopusIconImage(
                 icon = icon,
                 contentDescription = null,
                 size = 15.dp,
-                tint = if (danger) PantopusColors.error else PantopusColors.appTextSecondary,
+                tint = iconTint,
             )
         },
         text = {
-            Text(text = label, fontSize = 12.5.sp, color = if (danger) PantopusColors.error else PantopusColors.appText)
+            Text(
+                text = label,
+                fontSize = 12.5.sp,
+                fontWeight = if (primary) FontWeight.Bold else FontWeight.Normal,
+                color = labelColor,
+            )
         },
         onClick = onClick,
+        modifier = if (primary) Modifier.background(PantopusColors.primary50) else Modifier,
     )
 }
 
@@ -543,10 +845,12 @@ private fun EventTypesEmptyTemplates(
             modifier = Modifier.padding(horizontal = Spacing.s2),
         )
         Spacer(Modifier.height(Spacing.s4))
+        // Design FrameEmpty: the CTA hugs its content (inline-flex), not full width.
         EtPrimaryButton(
             label = "Create your first event type",
             onClick = onCreate,
             leadingIcon = PantopusIcon.Plus,
+            fullWidth = false,
             modifier = Modifier.testTag(EventTypeListTags.CREATE),
         )
         Spacer(Modifier.height(Spacing.s4))

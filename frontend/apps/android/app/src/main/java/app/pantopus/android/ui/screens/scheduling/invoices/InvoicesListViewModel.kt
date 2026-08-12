@@ -15,19 +15,21 @@ import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
+import app.pantopus.android.ui.screens.scheduling.packages.PackagesFormat
 import app.pantopus.android.ui.screens.scheduling.packages.PackagesMoney
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 
 /**
- * Status filter chips (`invoiceslist-frames.jsx` `FilterChips`). The DTO carries
- * no `status`, so selecting a status chip cannot yet filter the list (deferred);
- * `All` is the only chip with data behind it. The chip row + selection render
- * now so the structure matches the design.
+ * Status filter chips (`invoiceslist-frames.jsx` `FilterChips`). Each chip
+ * filters the list on the DTO's `status` (BusinessInvoice lifecycle:
+ * draft/sent/viewed/paid/void/overdue); `Sent` also covers `viewed`.
  */
 enum class InvoiceFilter(val label: String) {
     All("All"),
@@ -35,6 +37,19 @@ enum class InvoiceFilter(val label: String) {
     Sent("Sent"),
     Overdue("Overdue"),
     Refunded("Refunded"),
+    ;
+
+    /** True when an invoice with [status] belongs under this chip. */
+    fun matches(status: String?): Boolean {
+        val normalized = status?.lowercase()
+        return when (this) {
+            All -> true
+            Paid -> normalized == "paid"
+            Sent -> normalized == "sent" || normalized == "viewed"
+            Overdue -> normalized == "overdue"
+            Refunded -> normalized == "refunded"
+        }
+    }
 }
 
 /** G12 Invoices List UI state. */
@@ -51,15 +66,15 @@ sealed interface InvoicesListUiState {
     data class Error(val message: String) : InvoicesListUiState
 
     data class Loaded(
+        /** Day-grouped invoices, narrowed to the active [InvoiceFilter] chip. */
         val sections: List<InvoiceDaySection>,
-        /** Formatted outstanding (unpaid) amount — "Outstanding" KPI left column. */
+        /** Formatted outstanding (not paid / not void) amount — "Outstanding" KPI left column. */
         val outstandingLabel: String,
-        /** Formatted collected-this-month amount — "Collected · month" KPI right column. */
+        /** Formatted collected-this-calendar-month amount — "Collected · month" KPI right column. */
         val collectedMonthLabel: String,
         /**
-         * True when at least one invoice is overdue — drives amber tint on the
-         * "Outstanding" label + value. Always false until the DTO gains a `status`
-         * field (deferred: InvoiceDto carries no `status` / `paid_at`).
+         * True when at least one invoice's `status` is overdue — drives the amber
+         * tint on the "Outstanding" label + value.
          */
         val hasOverdue: Boolean,
         val pillar: SchedulingPillar,
@@ -69,9 +84,9 @@ sealed interface InvoicesListUiState {
 /**
  * G12 Invoices List (owner, business-only) — Stream A15. Lists `GET /invoices`
  * grouped by created day, with the Stripe-not-connected gate from
- * `GET /payments/status`. Behind [SchedulingFeatureFlags]. Mirrors iOS
- * `InvoicesListViewModel` / `invoiceslist-frames.jsx` (within the minimal
- * InvoiceDto — no status pills / status filters with data / overdue summary).
+ * `GET /payments/status`. Behind [SchedulingFeatureFlags]. Matches
+ * `invoiceslist-frames.jsx`: status pills, working status filter chips, and a
+ * real Outstanding / Collected · month KPI split from `status` / `paid_at`.
  */
 @HiltViewModel
 class InvoicesListViewModel
@@ -90,6 +105,9 @@ class InvoicesListViewModel
 
         private var owner: SchedulingOwner = SchedulingOwner.Personal
         private var started = false
+
+        /** Last successful fetch — the unfiltered list the KPIs are computed over. */
+        private var invoices: List<InvoiceDto> = emptyList()
 
         fun start() {
             if (started) {
@@ -113,31 +131,10 @@ class InvoicesListViewModel
                 val applicable = status?.applicable ?: true
                 when (val result = repo.getInvoices(owner)) {
                     is NetworkResult.Success -> {
-                        val invoices = result.data.invoices
+                        invoices = result.data.invoices
                         _state.value =
                             when {
-                                invoices.isNotEmpty() -> {
-                                    // The DTO has no `status` or `paid_at` field, so we
-                                    // cannot compute the real outstanding vs collected split.
-                                    // Outstanding = sum of all invoice totals (deferred: should
-                                    // exclude paid invoices once DTO gains `status`).
-                                    // Collected · month = $0 placeholder (deferred: needs
-                                    // `paid_at` to filter to current calendar month).
-                                    val currency = invoices.firstOrNull()?.currency
-                                    InvoicesListUiState.Loaded(
-                                        sections = InvoiceGrouping.byDay(invoices),
-                                        outstandingLabel =
-                                            PackagesMoney.format(
-                                                invoices.sumOf { it.totalCents ?: 0 },
-                                                currency,
-                                            ),
-                                        collectedMonthLabel =
-                                            PackagesMoney.format(0, currency),
-                                        // Deferred: always false until DTO has `status`
-                                        hasOverdue = false,
-                                        pillar = owner.pillar(),
-                                    )
-                                }
+                                invoices.isNotEmpty() -> loadedState()
                                 applicable && !connected -> InvoicesListUiState.Gate
                                 else -> InvoicesListUiState.Empty
                             }
@@ -155,6 +152,49 @@ class InvoicesListViewModel
 
         fun selectFilter(target: InvoiceFilter) {
             _filter.value = target
+            if (_state.value is InvoicesListUiState.Loaded) {
+                _state.value = loadedState()
+            }
+        }
+
+        /**
+         * Loaded state from the cached fetch: sections narrowed to the active
+         * filter chip, KPIs always computed over the full list. Outstanding =
+         * everything not yet settled (`status` not paid/void); Collected · month =
+         * invoices whose `paid_at` falls in the current calendar month (device
+         * zone); overdue drives the amber summary tint.
+         */
+        private fun loadedState(): InvoicesListUiState.Loaded {
+            val currency = invoices.firstOrNull()?.currency
+            val active = _filter.value
+            return InvoicesListUiState.Loaded(
+                sections = InvoiceGrouping.byDay(invoices.filter { active.matches(it.status) }),
+                outstandingLabel =
+                    PackagesMoney.format(
+                        invoices.filterNot { isSettled(it.status) }.sumOf { it.totalCents ?: 0 },
+                        currency,
+                    ),
+                collectedMonthLabel =
+                    PackagesMoney.format(
+                        invoices.filter { paidThisMonth(it) }.sumOf { it.totalCents ?: 0 },
+                        currency,
+                    ),
+                hasOverdue = invoices.any { it.status?.lowercase() == STATUS_OVERDUE },
+                pillar = owner.pillar(),
+            )
+        }
+
+        /** True when the invoice's `paid_at` falls inside the current calendar month. */
+        private fun paidThisMonth(invoice: InvoiceDto): Boolean {
+            val paidAt = PackagesFormat.instant(invoice.paidAt) ?: return false
+            val zone = ZoneId.systemDefault()
+            return YearMonth.from(paidAt.atZone(zone)) == YearMonth.now(zone)
+        }
+
+        /** Settled (paid or void) invoices drop out of the Outstanding KPI. */
+        private fun isSettled(status: String?): Boolean {
+            val normalized = status?.lowercase() ?: return false
+            return normalized in SETTLED_STATUSES
         }
 
         fun invoiceRoute(invoiceId: String): String = SchedulingRoutes.invoiceDetail(invoiceId)
@@ -192,5 +232,9 @@ class InvoicesListViewModel
         private companion object {
             const val REF_PREFIX_LEN = 6
             const val INITIALS_LEN = 2
+            const val STATUS_OVERDUE = "overdue"
+
+            /** Statuses excluded from the Outstanding KPI (settled or written off). */
+            val SETTLED_STATUSES = setOf("paid", "void")
         }
     }

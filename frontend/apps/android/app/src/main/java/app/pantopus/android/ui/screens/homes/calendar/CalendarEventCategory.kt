@@ -33,6 +33,9 @@ enum class CalendarEventCategory(val rawValue: String) {
     Medical("medical"),
     Meal("meal"),
     Trash("trash"),
+
+    /** Vendor/guest visits scheduled via F13 (`event_type` vendor|guest). */
+    Visit("visit"),
     Generic("generic"),
     ;
 
@@ -52,6 +55,7 @@ enum class CalendarEventCategory(val rawValue: String) {
                 Medical -> "Medical"
                 Meal -> "Meal"
                 Trash -> "Trash day"
+                Visit -> "Visit"
                 Generic -> "Event"
             }
 
@@ -85,6 +89,7 @@ enum class CalendarEventCategory(val rawValue: String) {
                 Medical -> PantopusIcon.Stethoscope
                 Meal -> PantopusIcon.Utensils
                 Trash -> PantopusIcon.Trash2
+                Visit -> PantopusIcon.DoorOpen
                 Generic -> PantopusIcon.Calendar
             }
 
@@ -116,6 +121,8 @@ enum class CalendarEventCategory(val rawValue: String) {
                 Meal -> Color(0xFFFEF3C7)
                 // CSS e2e8f0
                 Trash -> Color(0xFFE2E8F0)
+                // CSS ccfbf1 — soft teal, pairs with the design visit dot 0d9488.
+                Visit -> Color(0xFFCCFBF1)
                 // primary50 — f0f9ff
                 Generic -> Color(0xFFF0F9FF)
             }
@@ -148,6 +155,8 @@ enum class CalendarEventCategory(val rawValue: String) {
                 Meal -> Color(0xFFD97706)
                 // CSS 334155
                 Trash -> Color(0xFF334155)
+                // CSS 0f766e — teal 700
+                Visit -> Color(0xFF0F766E)
                 // primary600 — 0284c7
                 Generic -> Color(0xFF0284C7)
             }
@@ -170,6 +179,8 @@ enum class CalendarEventCategory(val rawValue: String) {
                 Medical -> Color(0xFFE11D48)
                 // CSS d97706
                 Meal -> Color(0xFFD97706)
+                // CSS 0d9488 — design "visit" dot (CAT.visit, home-shell.jsx:34).
+                Visit -> Color(0xFF0D9488)
                 else -> foreground
             }
 
@@ -219,6 +230,9 @@ enum class CalendarEventCategory(val rawValue: String) {
                 "trash" to Trash,
                 "garbage" to Trash,
                 "recycling" to Trash,
+                "visit" to Visit,
+                "vendor" to Visit,
+                "guest" to Visit,
                 "general" to Generic,
             )
 
@@ -233,6 +247,7 @@ enum class CalendarEventCategory(val rawValue: String) {
             if ("delivery" in raw || "package" in raw || "amazon" in raw) return Delivery
             if ("meal" in raw || "breakfast" in raw || "lunch" in raw || "dinner" in raw) return Meal
             if ("party" in raw || "social" in raw) return Social
+            if ("visit" in raw || "vendor" in raw || "guest" in raw) return Visit
             if ("repair" in raw || "maintenance" in raw || "plumber" in raw ||
                 "electrician" in raw || "hvac" in raw
             ) {

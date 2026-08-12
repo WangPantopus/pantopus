@@ -2,6 +2,9 @@
 
 package app.pantopus.android.ui.screens.scheduling.home
 
+import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.HomeDetail
+import app.pantopus.android.data.api.models.homes.HomeDetailResponse
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.scheduling.AvailabilityScheduleDto
@@ -11,7 +14,9 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +60,14 @@ class HouseholdAvailabilityViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm() = HouseholdAvailabilityViewModel(scheduling, homes, networkMonitor, prefs)
+    private fun makeVm(routeHomeId: String? = null) =
+        HouseholdAvailabilityViewModel(
+            scheduling,
+            homes,
+            networkMonitor,
+            prefs,
+            SavedStateHandle(buildMap { routeHomeId?.let { put(SchedulingRoutes.ARG_HOME_ID, it) } }),
+        )
 
     private fun stubAvailability(scheduleCount: Int) {
         val schedules = (0 until scheduleCount).map { AvailabilityScheduleDto(id = "s$it") }
@@ -111,5 +123,22 @@ class HouseholdAvailabilityViewModelTest {
             vm.setExposure(Exposure.AutoDecline, to = true)
             val ready = vm.state.value as HouseholdAvailabilityUiState.Ready
             assertTrue(ready.data.autoDecline)
+        }
+
+    @Test fun route_home_id_binds_to_that_home_not_the_first_active() =
+        runTest {
+            stubAvailability(1)
+            val detail = mockk<HomeDetail>()
+            every { detail.name } returns "Birch Lane"
+            coEvery { homes.detail("home-9") } returns NetworkResult.Success(HomeDetailResponse(home = detail))
+            val vm = makeVm(routeHomeId = "home-9")
+            vm.load()
+            val ready = vm.state.value as HouseholdAvailabilityUiState.Ready
+            assertEquals("Birch Lane", ready.data.homeName)
+            // The inference path is never consulted when the route pins the home.
+            coVerify(exactly = 0) { homes.myHomes() }
+            // Prefs keys scope to the navigated home.
+            vm.setExposure(Exposure.AutoDecline, to = true)
+            io.mockk.verify { prefs.setBool(HomeSchedulingPrefs.autoDeclineKey("home-9"), true) }
         }
 }

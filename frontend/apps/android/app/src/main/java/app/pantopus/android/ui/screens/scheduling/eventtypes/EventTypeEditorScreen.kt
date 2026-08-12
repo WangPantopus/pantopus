@@ -437,11 +437,11 @@ private fun PricingCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     EtTextField(
                         modifier = Modifier.weight(1.4f),
-                        value = (form.priceCents / 100).toString(),
+                        value = form.priceText,
                         onValueChange = viewModel::onPrice,
                         label = "Price",
                         mono = true,
-                        keyboardType = KeyboardType.Number,
+                        keyboardType = KeyboardType.Decimal,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         EtFieldLabel(text = "Currency")

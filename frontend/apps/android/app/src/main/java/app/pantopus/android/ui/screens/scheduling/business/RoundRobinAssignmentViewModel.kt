@@ -27,9 +27,20 @@ import javax.inject.Inject
  * G1 Round-Robin Assignment (Stream A13) — a local bottom sheet hung off a
  * business service. Picks which members take bookings and the fairness rule.
  * Saving REPLACES the whole assignee set via `PUT /event-types/:id/assignees`
- * (`INVALID_ASSIGNEE` surfaced). The rule is expressed through the assignees'
- * weight (Balanced) / priority (Priority order) / equal (Strict) and inferred
- * on reload. Mirrors iOS `RoundRobinAssignmentViewModel` + `roundrobin-frames.jsx`.
+ * (`INVALID_ASSIGNEE` surfaced). Mirrors iOS `RoundRobinAssignmentViewModel`
+ * + `roundrobin-frames.jsx`.
+ *
+ * Backend note: there is no dedicated "rule" column — Balanced/Priority/Strict
+ * are expressed through the assignees' weight/priority and inferred on reload.
+ * The encoding is a lossless sentinel scheme (identical to iOS) so the chosen
+ * rule survives a save→reload roundtrip:
+ *   · Strict   → weight 1, priority 0            (the neutral shape)
+ *   · Priority → weight 1, priority index+1      (1-based rank; >0 marks the rule)
+ *   · Balanced → user weights, priority -1       (<0 marks the rule; weights carry the data)
+ * (bookingService.pickRoundRobinHost sorts by assigned_count then priority, so
+ * a constant -1 across the set never changes the pick; Joi and the DB column
+ * both accept any integer priority.) Previously Balanced-with-default-weights
+ * and single-member Priority both round-tripped back as "Strict".
  */
 @HiltViewModel
 class RoundRobinAssignmentViewModel
@@ -178,6 +189,9 @@ class RoundRobinAssignmentViewModel
             val owner = businessOwner() ?: return
             viewModelScope.launch {
                 val checked = content.picks.filter { it.checked }
+                // Sentinel encoding (see class doc): each rule writes a shape the
+                // other two can never produce — Balanced marks every row with
+                // priority -1, Priority ranks 1-based, Strict stays all-zero.
                 val assignees =
                     checked.mapIndexed { index, pick ->
                         when (content.rule) {
@@ -186,9 +200,10 @@ class RoundRobinAssignmentViewModel
                                     subjectId = pick.id,
                                     subjectType = SUBJECT_USER,
                                     weight = pick.weight,
-                                    priority = 0,
+                                    priority = BALANCED_PRIORITY_SENTINEL,
                                 )
-                            Rule.Priority -> AssigneeInput(subjectId = pick.id, subjectType = SUBJECT_USER, weight = 1, priority = index)
+                            Rule.Priority ->
+                                AssigneeInput(subjectId = pick.id, subjectType = SUBJECT_USER, weight = 1, priority = index + 1)
                             Rule.Strict -> AssigneeInput(subjectId = pick.id, subjectType = SUBJECT_USER, weight = 1, priority = 0)
                         }
                     }
@@ -207,11 +222,16 @@ class RoundRobinAssignmentViewModel
         private fun businessOwner(): SchedulingOwner.Business? =
             (auth.state.value as? AuthRepository.State.SignedIn)?.user?.id?.let { SchedulingOwner.Business(it) }
 
+        // Sentinel decode (see class doc; mirrors iOS `inferRule`). Negative
+        // priority = Balanced marker; positive = Priority rank. Non-default
+        // weights also read as Balanced so rows saved by older clients
+        // (priority 0 + custom weights) keep their rule.
         private fun inferRule(assignees: List<EventTypeAssigneeDto>): Rule =
             when {
                 assignees.isEmpty() -> Rule.Balanced
+                assignees.any { (it.priority ?: 0) < 0 } -> Rule.Balanced
                 assignees.any { (it.weight ?: 1) != 1 } -> Rule.Balanced
-                assignees.any { (it.priority ?: 0) != 0 } -> Rule.Priority
+                assignees.any { (it.priority ?: 0) > 0 } -> Rule.Priority
                 else -> Rule.Strict
             }
 
@@ -231,8 +251,13 @@ class RoundRobinAssignmentViewModel
                 else -> fallback
             }
 
-        private companion object {
+        // Internal (not private) so tests can assert against the wire encoding itself
+        // rather than re-hardcoding the sentinel and drifting from it.
+        internal companion object {
             const val SUBJECT_USER = "user"
             const val CODE_INVALID_ASSIGNEE = "INVALID_ASSIGNEE"
+
+            /** Balanced marker (see class doc) — shared encoding with iOS. */
+            const val BALANCED_PRIORITY_SENTINEL = -1
         }
     }

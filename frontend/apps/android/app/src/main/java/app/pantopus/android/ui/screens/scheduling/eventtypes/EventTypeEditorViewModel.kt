@@ -13,6 +13,7 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -185,9 +186,14 @@ class EventTypeEditorViewModel
 
         fun onPrice(dollars: String) =
             update {
-                val cents = dollars.filter { c -> c.isDigit() }.toIntOrNull()?.times(100) ?: 0
+                val sanitized = dollars.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                val cents = MoneyAndFlag.parseCents(sanitized) ?: 0
                 // Keep the deposit at half the new price while Deposit mode is on.
-                it.copy(priceCents = cents, depositCents = if (it.collectDeposit) cents / 2 else it.depositCents)
+                it.copy(
+                    priceText = sanitized,
+                    priceCents = cents,
+                    depositCents = if (it.collectDeposit) cents / 2 else it.depositCents,
+                )
             }
 
         fun onCurrency(code: String) = update { it.copy(currency = code) }
@@ -278,7 +284,7 @@ class EventTypeEditorViewModel
 
         fun bookingLimitsRoute(): String = SchedulingRoutes.BOOKING_LIMITS
 
-        fun remindersRoute(): String = SchedulingRoutes.REMINDERS_QUICK_SETUP
+        fun remindersRoute(): String = SchedulingRoutes.remindersQuickSetup(owner.routeKind, owner.ownerRouteId)
 
         fun paymentsRoute(): String = SchedulingRoutes.PAYMENTS_SETUP
 

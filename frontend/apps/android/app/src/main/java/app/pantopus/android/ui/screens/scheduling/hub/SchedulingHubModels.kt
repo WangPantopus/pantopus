@@ -30,6 +30,8 @@ sealed interface SchedulingHubUiState {
         val isComposed: Boolean,
         val summary: HubSummaryUi?,
         val summaryFailed: Boolean,
+        /** True while a summary-card Retry refetch is in flight — the card renders its own shimmer. */
+        val summaryRetrying: Boolean = false,
         val agenda: List<HubAgendaSection>,
         val manageRows: List<HubManageItem>,
     ) : SchedulingHubUiState
@@ -97,6 +99,13 @@ data class HubBookingRowUi(
     val bookerInitials: String,
     val bookerTone: HubAvatarTone,
     val status: String,
+    /**
+     * Host first name for cross-owner attribution on composed hubs (which
+     * member a booking belongs to) — rendered as an 11dp user glyph + name
+     * after the duration (scheduling-hub-frames.jsx:440-444). Null on
+     * personal hubs or when the host can't be resolved.
+     */
+    val hostName: String? = null,
 )
 
 @Immutable

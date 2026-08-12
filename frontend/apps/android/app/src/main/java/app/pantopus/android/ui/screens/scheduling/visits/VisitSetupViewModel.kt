@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.visits
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateVisitRequest
@@ -13,6 +14,7 @@ import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling.resources.HomeMember
 import app.pantopus.android.ui.screens.scheduling.resources.ResourceTime
 import app.pantopus.android.ui.screens.scheduling.resources.VisitKind
@@ -65,6 +67,7 @@ class VisitSetupViewModel
         private val homes: HomesRepository,
         private val members: HomeMembersRepository,
         private val errors: SchedulingErrorDecoder,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val _loadState = MutableStateFlow<VisitSetupLoadState>(VisitSetupLoadState.Loading)
         val loadState: StateFlow<VisitSetupLoadState> = _loadState.asStateFlow()
@@ -84,8 +87,13 @@ class VisitSetupViewModel
         private val _didAttemptSave = MutableStateFlow(false)
         val didAttemptSave: StateFlow<Boolean> = _didAttemptSave.asStateFlow()
 
-        private var homeId: String? = null
+        // Route homeId pins the navigated home; absent → inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var started = false
+
+        /** Post-create hop into the visit's detail keeps the same home. */
+        fun detailRoute(visitId: String): String = SchedulingRoutes.visitDetail(visitId, homeId)
 
         fun start() {
             if (started) return

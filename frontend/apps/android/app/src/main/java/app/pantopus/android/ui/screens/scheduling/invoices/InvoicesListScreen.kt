@@ -178,33 +178,45 @@ private fun InvoicesLoadedBody(
             hasOverdue = state.hasOverdue,
         )
         FilterChips(selected = filter, accent = state.pillar.accent, onSelect = onSelectFilter)
-        PkgRowCard {
-            val lastSection = state.sections.lastIndex
-            state.sections.forEachIndexed { sectionIndex, section ->
-                if (sectionIndex > 0) {
-                    HorizontalDivider(color = PantopusColors.appBorder)
-                }
-                Text(
-                    text = section.day.uppercase(),
-                    color = PantopusColors.appTextMuted,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
-                    modifier = Modifier.padding(top = Spacing.s2, bottom = Spacing.s1),
-                )
-                section.invoices.forEachIndexed { index, invoice ->
-                    InvoiceRow(
-                        initials = initials(invoice),
-                        reference = reference(invoice),
-                        service = service(invoice),
-                        amount = amount(invoice),
-                        pillar = state.pillar,
-                        onClick = { onOpen(invoice.id) },
-                    )
-                    val lastRowOverall =
-                        sectionIndex == lastSection && index == section.invoices.lastIndex
-                    if (!lastRowOverall && index < section.invoices.lastIndex) {
+        if (state.sections.isEmpty()) {
+            // The active status chip matched nothing — keep the summary + chips
+            // and show a quiet inline notice instead of an empty row card.
+            Text(
+                text = "No ${filter.label.lowercase()} invoices.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s4),
+            )
+        } else {
+            PkgRowCard {
+                val lastSection = state.sections.lastIndex
+                state.sections.forEachIndexed { sectionIndex, section ->
+                    if (sectionIndex > 0) {
                         HorizontalDivider(color = PantopusColors.appBorder)
+                    }
+                    Text(
+                        text = section.day.uppercase(),
+                        color = PantopusColors.appTextMuted,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(top = Spacing.s2, bottom = Spacing.s1),
+                    )
+                    section.invoices.forEachIndexed { index, invoice ->
+                        InvoiceRow(
+                            initials = initials(invoice),
+                            reference = reference(invoice),
+                            service = service(invoice),
+                            amount = amount(invoice),
+                            pillar = state.pillar,
+                            onClick = { onOpen(invoice.id) },
+                            invoiceStatus = invoice.status,
+                        )
+                        val lastRowOverall =
+                            sectionIndex == lastSection && index == section.invoices.lastIndex
+                        if (!lastRowOverall && index < section.invoices.lastIndex) {
+                            HorizontalDivider(color = PantopusColors.appBorder)
+                        }
                     }
                 }
             }
@@ -322,9 +334,8 @@ private fun InvoiceRow(
     pillar: SchedulingPillar,
     onClick: () -> Unit,
     /**
-     * Invoice lifecycle status for the trailing pill (paid/sent/overdue/void/refunded).
-     * Null until the backend DTO exposes a `status` field — pill slot is structurally
-     * present but renders nothing when null (deferred: InvoiceDto has no `status`).
+     * Invoice lifecycle status for the trailing pill (draft/sent/viewed/paid/
+     * void/overdue). Renders nothing when null (legacy rows without a status).
      */
     invoiceStatus: String? = null,
 ) {
@@ -370,7 +381,6 @@ private fun InvoiceRow(
             )
         }
         // Trailing: amount + optional status pill (design: amount above, pill below).
-        // Pill is deferred until InvoiceDto gains a `status` field.
         Column(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(3.dp),

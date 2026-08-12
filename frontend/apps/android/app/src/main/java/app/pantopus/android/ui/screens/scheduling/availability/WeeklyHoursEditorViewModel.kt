@@ -30,6 +30,9 @@ data class TimeRange(
     val end: String,
 ) {
     fun label(): String = formatRange12(start, end)
+
+    /** A window is well-formed when it has positive duration (start < end). */
+    val isValid: Boolean get() = minutesOfDay(start) < minutesOfDay(end)
 }
 
 /** A weekday row in the editor — Monday-first display, ISO [weekday]. */
@@ -58,6 +61,18 @@ data class WeeklyHoursForm(
 ) {
     val allDaysOff: Boolean get() = days.none { it.enabled }
     val hasNoRules: Boolean get() = days.all { it.blocks.isEmpty() }
+
+    /**
+     * Every enabled day must carry >= 1 well-formed (start < end) block; an
+     * inverted range would 200-OK server-side but silently zero that day's
+     * availability. All-off is valid (it just clears the schedule and warns).
+     * Mirrors iOS `WeeklyHoursEditorViewModel.formValid`.
+     */
+    val isValid: Boolean
+        get() =
+            days.filter { it.enabled }.all { day ->
+                day.blocks.isNotEmpty() && day.blocks.all { it.isValid }
+            }
 
     /** Design Frame 4: show the "Set hours" / composition-gap hero state. */
     val isUnset: Boolean get() = allDaysOff && !isDirty
@@ -254,7 +269,7 @@ class WeeklyHoursEditorViewModel
 
         fun save() {
             val form = (_state.value as? WeeklyHoursUiState.Content)?.form ?: return
-            if (form.saving) return
+            if (form.saving || !form.isValid) return
             _state.value = WeeklyHoursUiState.Content(form.copy(saving = true))
             viewModelScope.launch {
                 val rules =

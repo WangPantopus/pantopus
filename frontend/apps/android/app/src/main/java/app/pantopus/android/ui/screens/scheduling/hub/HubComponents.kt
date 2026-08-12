@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.PantopusMiniToggle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.theme.PantopusColors
@@ -354,13 +353,15 @@ private fun LinkPreview(
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
+                        // Hub frames use the deep warm-amber trio (P.warning #b45309 /
+                        // warningBorder #fde68a), not the lighter semantic warning tokens.
+                        .border(1.dp, PantopusColors.warmAmberBorder, RoundedCornerShape(Radii.pill))
                         .padding(horizontal = 11.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
-                PantopusIconImage(icon = PantopusIcon.Pause, contentDescription = null, size = 12.dp, tint = PantopusColors.warning)
-                Text("Paused", color = PantopusColors.warning, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                PantopusIconImage(icon = PantopusIcon.Pause, contentDescription = null, size = 12.dp, tint = PantopusColors.warmAmber)
+                Text("Paused", color = PantopusColors.warmAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             }
         }
     }
@@ -379,16 +380,10 @@ internal fun HubPauseRow(
             Text("Accepting bookings", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
             Text("New bookings are open", color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
         }
-        Switch(
+        PantopusMiniToggle(
             checked = isAccepting,
             onCheckedChange = onToggle,
-            colors =
-                SwitchDefaults.colors(
-                    checkedThumbColor = PantopusColors.appSurface,
-                    checkedTrackColor = pillar.accent,
-                    uncheckedThumbColor = PantopusColors.appSurface,
-                    uncheckedTrackColor = PantopusColors.appBorderStrong,
-                ),
+            accent = pillar.accent,
             modifier =
                 Modifier
                     .testTag(HubTags.PAUSE_TOGGLE)
@@ -399,8 +394,10 @@ internal fun HubPauseRow(
 
 @Composable
 internal fun HubPausedBanner(onResume: () -> Unit) {
-    StatusCard(bg = PantopusColors.warningBg, border = PantopusColors.warningLight) {
-        IconTile(icon = PantopusIcon.Pause, bg = PantopusColors.warmAmberBg, fg = PantopusColors.warning)
+    // Frame palette: warningSoft surface + warningBorder outline + warningBg icon tile
+    // (scheduling-hub-frames.jsx:15, 332-336) — all deep warm-amber family.
+    StatusCard(bg = PantopusColors.warmAmberSoft, border = PantopusColors.warmAmberBorder) {
+        IconTile(icon = PantopusIcon.Pause, bg = PantopusColors.warmAmberBg, fg = PantopusColors.warmAmber)
         Spacer(Modifier.width(Spacing.s3))
         Column(Modifier.weight(1f)) {
             Text("Bookings are paused", color = PantopusColors.appText, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
@@ -410,7 +407,7 @@ internal fun HubPausedBanner(onResume: () -> Unit) {
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(Radii.pill))
-                    .background(PantopusColors.warning)
+                    .background(PantopusColors.warmAmber)
                     .clickable(onClick = onResume)
                     .padding(horizontal = 14.dp, vertical = Spacing.s2)
                     .testTag(HubTags.RESUME),
@@ -476,7 +473,11 @@ internal fun HubAgendaDateHeader(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
         Text(header.uppercase(Locale.US), color = PantopusColors.appText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        Text(sub, color = PantopusColors.appTextMuted, fontWeight = FontWeight.Medium, fontSize = 11.sp)
+        // Future-day sections carry the full date in the header and no sub —
+        // render a single "THU AUG 7" line (iOS HubAgendaDateHeader parity).
+        if (sub.isNotEmpty()) {
+            Text(sub, color = PantopusColors.appTextMuted, fontWeight = FontWeight.Medium, fontSize = 11.sp)
+        }
     }
 }
 
@@ -523,6 +524,24 @@ internal fun HubBookingRowCard(row: HubBookingRowUi) {
                         tint = PantopusColors.appTextMuted,
                     )
                     Text(row.metaLabel, color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
+                    // Cross-owner host attribution for composed hubs — inline 11dp user
+                    // glyph + host first name after the duration, in fg3
+                    // (scheduling-hub-frames.jsx:440-444, FrameHome :767-772).
+                    row.hostName?.let { host ->
+                        Row(
+                            modifier = Modifier.padding(start = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            PantopusIconImage(
+                                icon = PantopusIcon.User,
+                                contentDescription = null,
+                                size = 11.dp,
+                                tint = PantopusColors.appTextSecondary,
+                            )
+                            Text(host, color = PantopusColors.appTextSecondary, fontSize = 11.5.sp)
+                        }
+                    }
                 }
                 Spacer(Modifier.height(Spacing.s2))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -588,7 +607,7 @@ internal fun HubManageGroup(
                 item.value?.let { value ->
                     Text(
                         value,
-                        color = if (item.alert) PantopusColors.warning else PantopusColors.appTextSecondary,
+                        color = if (item.alert) PantopusColors.warmAmber else PantopusColors.appTextSecondary,
                         fontWeight = if (item.alert) FontWeight.Bold else FontWeight.Medium,
                         fontSize = 12.sp,
                     )

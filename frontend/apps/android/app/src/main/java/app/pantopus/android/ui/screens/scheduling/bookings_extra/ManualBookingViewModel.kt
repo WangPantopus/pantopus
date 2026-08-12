@@ -10,6 +10,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookings_extra
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateBookingRequest
@@ -21,6 +22,8 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,11 +97,21 @@ class ManualBookingViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val _state = MutableStateFlow(ManualBookingUiState())
-        val state: StateFlow<ManualBookingUiState> = _state.asStateFlow()
+        // Owner comes from the route's ownerKind/ownerId query args (the roster
+        // hands over the booking's resolved owner); absent args mean Personal.
+        // Hardcoding Personal here listed only personal event types and created
+        // the booking under owner_type='user', so a business/home roster's
+        // add-attendee never landed on that roster.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        private val _state = MutableStateFlow(ManualBookingUiState(pillar = owner.pillar()))
+        val state: StateFlow<ManualBookingUiState> = _state.asStateFlow()
         private val zone: ZoneId = ZoneId.systemDefault()
         private var pageSlug: String? = null
         private var eventTypesById: Map<String, EventTypeDto> = emptyMap()

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
@@ -38,13 +39,14 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
 /**
- * Stream A16 — H7 Message Preview (local sheet, no route). Shows the rendered
- * message per channel before saving, with all variables resolved to sample data.
- * A channel tab strip (Push / Email / In-app / SMS) swaps a realistic device mock
- * over a soft stage. "Send test to me" is a coming-soon affordance (no endpoint
- * yet). Reached inline from the workflow / template editors with a draft.
+ * Stream A16 — H7 Message Preview (sheet). Shows the rendered message per
+ * channel before saving, with all variables resolved to sample data. A channel
+ * tab strip (Push / Email / In-app / SMS) swaps a realistic device mock over a
+ * soft stage. "Send test to me" is a coming-soon affordance (no endpoint yet).
+ * Reached inline from the workflow / template editors with a draft, or by saved
+ * template id (iOS `messagePreview(owner:templateId:)` route parity — the A16
+ * route registration wires this entry).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessagePreviewSheet(
     subject: String?,
@@ -53,12 +55,40 @@ fun MessagePreviewSheet(
     onDismiss: () -> Unit,
     viewModel: MessagePreviewViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(subject, body, channel) { viewModel.start(subject, body, channel) }
+    PreviewSheetScaffold(
+        viewModel = viewModel,
+        onDismiss = onDismiss,
+        onRetry = { viewModel.start(subject, body, channel) },
+    )
+}
+
+/** Routed entry — renders a saved template resolved by id (H7 by template id). */
+@Composable
+fun MessagePreviewSheet(
+    templateId: String,
+    onDismiss: () -> Unit,
+    viewModel: MessagePreviewViewModel = hiltViewModel(),
+) {
+    LaunchedEffect(templateId) { viewModel.startFromTemplate(templateId) }
+    PreviewSheetScaffold(
+        viewModel = viewModel,
+        onDismiss = onDismiss,
+        onRetry = { viewModel.startFromTemplate(templateId) },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PreviewSheetScaffold(
+    viewModel: MessagePreviewViewModel,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeChannel by viewModel.activeChannel.collectAsStateWithLifecycle()
     val testNote by viewModel.testNote.collectAsStateWithLifecycle()
-
-    LaunchedEffect(subject, body, channel) { viewModel.start(subject, body, channel) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -69,10 +99,18 @@ fun MessagePreviewSheet(
         Column(modifier = Modifier.fillMaxWidth().testTag("scheduling.templates.preview")) {
             AutoSheetHeader(title = "Preview", onClose = onDismiss)
             when (val s = state) {
+                // Transient render wait — small accent spinner (iOS
+                // `ProgressView().tint(accent)` parity), not a screen skeleton.
                 MessagePreviewUiState.Loading ->
                     Box(modifier = Modifier.fillMaxWidth().padding(Spacing.s10), contentAlignment = Alignment.Center) {
-                        Text(text = "Rendering…", fontSize = 12.sp, color = PantopusColors.appTextSecondary)
+                        CircularProgressIndicator(
+                            color = viewModel.pillar.accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
+                is MessagePreviewUiState.Error ->
+                    AutoErrorView(message = s.message, onRetry = onRetry, headline = "Couldn't load message")
                 is MessagePreviewUiState.Loaded ->
                     PreviewLoaded(
                         loaded = s,

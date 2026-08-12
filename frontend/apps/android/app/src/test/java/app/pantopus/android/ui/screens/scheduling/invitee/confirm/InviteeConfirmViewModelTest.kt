@@ -173,6 +173,9 @@ class InviteeConfirmViewModelTest {
             vm.onPrimary() // confirm represented payment
             val s = vm.state.value
             assertEquals(ConfirmStep.Confirmed, s.step)
+            // The created booking id survives the payment detour (post-payment
+            // nav + receipt line depend on it).
+            assertEquals("b3", s.confirmed?.bookingId)
             assertNotNull(s.confirmed?.paid)
             assertEquals(PriceMode.Full, s.confirmed?.paid?.mode)
             assertEquals(4800, s.confirmed?.paid?.amountPaidCents)

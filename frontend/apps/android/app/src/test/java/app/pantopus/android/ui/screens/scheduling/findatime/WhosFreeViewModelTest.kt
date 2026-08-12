@@ -101,14 +101,42 @@ class WhosFreeViewModelTest {
     @Test
     fun everyone_busy_flags_empty() =
         runTest(dispatcher) {
+            // Mom and Dad share availability but their only free blocks fall outside
+            // the 8a–6p grid buckets → all Busy cells; no member is Free.
             coEvery { repo.whosFree(any(), any(), any(), any()) } returns
-                NetworkResult.Success(FreeByMemberResponse(members = listOf("u-mom", "u-dad"), freeByMember = emptyMap()))
+                NetworkResult.Success(
+                    FreeByMemberResponse(
+                        members = listOf("u-mom", "u-dad"),
+                        freeByMember = mapOf("u-mom" to listOf(freeBlock(6)), "u-dad" to listOf(freeBlock(6))),
+                    ),
+                )
             val vm = vm()
             vm.start()
             advanceUntilIdle()
             val loaded = vm.state.value as WhosFreeUiState.Loaded
             assertFalse(loaded.hasFree)
             assertTrue(loaded.emptyAllBusy)
+        }
+
+    @Test
+    fun empty_free_list_reads_as_not_shared() =
+        runTest(dispatcher) {
+            // The backend lists every active occupant in `members`, so an empty
+            // free-list (not absence from `members`) is the opted-out signal.
+            coEvery { repo.whosFree(any(), any(), any(), any()) } returns
+                NetworkResult.Success(
+                    FreeByMemberResponse(
+                        members = listOf("u-mom", "u-dad", "u-ava", "u-tomek"),
+                        freeByMember = mapOf("u-mom" to listOf(freeBlock(9)), "u-dad" to emptyList()),
+                    ),
+                )
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            val loaded = vm.state.value as WhosFreeUiState.Loaded
+            assertTrue(loaded.grid.rows.first { it.member.userId == "u-dad" }.cells.all { it == CellState.Unknown })
+            assertTrue(loaded.optedOutNames.containsAll(listOf("Dad", "Ava", "Tomek")))
+            assertFalse(loaded.optedOutNames.contains("Mom"))
         }
 
     @Test

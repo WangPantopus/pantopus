@@ -84,7 +84,14 @@ import java.util.Locale
 /** Test tag on the screen root. */
 const val ADD_EVENT_SCREEN_TAG = "addEventForm"
 
-private val FORM_ZONE: ZoneId = ZoneId.of("UTC")
+/**
+ * Material3's `DatePickerState` represents the selected day as UTC-midnight
+ * epoch millis, so the LocalDate ↔ millis codec below is pinned to UTC.
+ * This is picker-internal only — the FORM's semantic zone is the device's
+ * local zone (the view-model's `ZonedDateTime`s carry it), matching iOS's
+ * un-overridden SwiftUI DatePicker.
+ */
+private val PICKER_UTC_ZONE: ZoneId = ZoneId.of("UTC")
 
 /** Categories surfaced in the picker (matches design + iOS): Health, Chores, Meals, Family, School. */
 private val DESIGNED_CATEGORIES =
@@ -818,7 +825,7 @@ private fun SimpleDatePickerDialog(
     onSelect: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val initialMillis = initial.atStartOfDay(FORM_ZONE).toInstant().toEpochMilli()
+    val initialMillis = initial.atStartOfDay(PICKER_UTC_ZONE).toInstant().toEpochMilli()
     val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
     DatePickerDialog(
         onDismissRequest = onDismiss,
@@ -826,7 +833,7 @@ private fun SimpleDatePickerDialog(
             TextButton(onClick = {
                 val picked = state.selectedDateMillis
                 if (picked != null) {
-                    onSelect(Instant.ofEpochMilli(picked).atZone(FORM_ZONE).toLocalDate())
+                    onSelect(Instant.ofEpochMilli(picked).atZone(PICKER_UTC_ZONE).toLocalDate())
                 } else {
                     onDismiss()
                 }

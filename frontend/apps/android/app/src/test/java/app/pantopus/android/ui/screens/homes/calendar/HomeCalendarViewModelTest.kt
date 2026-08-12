@@ -11,6 +11,8 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.scheduling.SchedulingOwner
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingsOwnerRelay
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +46,7 @@ class HomeCalendarViewModelTest {
     private val membersRepo: HomeMembersRepository = mockk()
     private val authRepository: AuthRepository = mockk()
     private val networkMonitor: NetworkMonitor = mockk()
+    private val bookingsOwnerRelay = BookingsOwnerRelay()
 
     /** Sunday 2025-10-12 12:00 UTC. */
     private val fixedNow: Instant = Instant.parse("2025-10-12T12:00:00Z")
@@ -66,6 +69,7 @@ class HomeCalendarViewModelTest {
             membersRepo = membersRepo,
             authRepository = authRepository,
             networkMonitor = networkMonitor,
+            bookingsOwnerRelay = bookingsOwnerRelay,
             savedStateHandle = SavedStateHandle(mapOf(HOME_CALENDAR_HOME_ID_KEY to "home-1")),
             clock = { fixedNow },
             zone = zone,
@@ -154,6 +158,8 @@ class HomeCalendarViewModelTest {
             assertNull("booking rows never expose an event id", booking.eventId)
             vm.openAgendaItem(booking)
             assertEquals("scheduling/bookings/booking-77", navigated)
+            // The home owner context rides along for the arg-less detail route.
+            assertEquals(SchedulingOwner.Home("home-1"), bookingsOwnerRelay.consume())
         }
 
     @Test fun event_row_opens_event_detail() =

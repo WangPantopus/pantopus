@@ -73,7 +73,8 @@ fun OneOffLinkGeneratorScreen(
                     headline = "Create an event type first",
                     subcopy = "A one-off link points at one of your services. Add one, then mint a private link.",
                     ctaTitle = "Create event type",
-                    onCta = { onNavigate(SchedulingRoutes.EVENT_TYPE_LIST) },
+                    // One-off links are personal-only (VM pins Personal) — open the personal catalog.
+                    onCta = { onNavigate(SchedulingRoutes.eventTypeList(null, null)) },
                 )
             is OneOffUiState.Error -> ErrorState(headline = "Couldn't load", message = s.message, onRetry = viewModel::refresh)
             is OneOffUiState.Config -> ConfigBody(s.data, viewModel)

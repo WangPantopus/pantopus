@@ -212,7 +212,11 @@ class BusinessSchedulingSettingsViewModel
 
         // ─── Navigation routes (consumed by the screen) ────────────────────────
 
-        fun schedulingDefaultsRoute(): String = app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes.EVENT_TYPE_LIST
+        fun schedulingDefaultsRoute(): String {
+            val owner = businessOwner()
+            return app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+                .eventTypeList(owner?.routeKind, owner?.ownerRouteId)
+        }
 
         fun cancellationPolicyRoute(): String =
             app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes.CANCELLATION_REFUND_POLICY

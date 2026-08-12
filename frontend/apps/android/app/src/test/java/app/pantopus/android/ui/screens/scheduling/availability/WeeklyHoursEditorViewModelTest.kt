@@ -119,4 +119,36 @@ class WeeklyHoursEditorViewModelTest {
             }
             coVerify { repo.updateSchedule("s1", match { it.timezone == "America/Los_Angeles" }) }
         }
+
+    @Test
+    fun `an inverted range invalidates the form and blocks save`() =
+        runTest(dispatcher) {
+            coEvery { repo.getAvailability() } returns loadedResponse()
+            val vm = vm()
+            vm.load()
+            advanceUntilIdle()
+
+            vm.updateBlock(1, 0, "17:00", "09:00")
+            val form = (vm.state.value as WeeklyHoursUiState.Content).form
+            assertFalse(form.days.first { it.weekday == 1 }.blocks.single().isValid)
+            assertFalse(form.isValid)
+
+            vm.save()
+            advanceUntilIdle()
+            coVerify(exactly = 0) { repo.setRules(any(), any()) }
+        }
+
+    @Test
+    fun `fixing the inverted range re-validates the form`() =
+        runTest(dispatcher) {
+            coEvery { repo.getAvailability() } returns loadedResponse()
+            val vm = vm()
+            vm.load()
+            advanceUntilIdle()
+
+            vm.updateBlock(1, 0, "17:00", "09:00")
+            assertFalse((vm.state.value as WeeklyHoursUiState.Content).form.isValid)
+            vm.updateBlock(1, 0, "09:00", "17:00")
+            assertTrue((vm.state.value as WeeklyHoursUiState.Content).form.isValid)
+        }
 }

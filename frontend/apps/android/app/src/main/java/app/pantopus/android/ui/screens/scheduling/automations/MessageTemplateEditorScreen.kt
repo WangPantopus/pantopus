@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,14 +58,22 @@ fun MessageTemplateEditorScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     var showVariable by remember { mutableStateOf(false) }
     var showPreview by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val accent = viewModel.pillar.accent
 
     LaunchedEffect(Unit) { viewModel.start() }
     LaunchedEffect(saved) {
         if (saved) {
             viewModel.consumeSaved()
+            onBack()
+        }
+    }
+    LaunchedEffect(deleted) {
+        if (deleted) {
+            viewModel.consumeDeleted()
             onBack()
         }
     }
@@ -89,13 +102,16 @@ fun MessageTemplateEditorScreen(
                 is MessageTemplateEditorUiState.Loaded ->
                     TemplateBody(
                         state = s,
+                        isNew = viewModel.isNew,
                         accent = accent,
                         accentBg = viewModel.pillar.accentBg,
                         onName = viewModel::onName,
                         onSubject = viewModel::onSubject,
                         onBody = viewModel::onBody,
                         onSetChannel = viewModel::setChannel,
+                        onSetActive = viewModel::setActive,
                         onSave = viewModel::save,
+                        onDelete = { showDeleteConfirm = true },
                         onOpenVariable = { showVariable = true },
                         onOpenPreview = { showPreview = true },
                     )
@@ -121,18 +137,36 @@ fun MessageTemplateEditorScreen(
             onDismiss = { showPreview = false },
         )
     }
+    if (showDeleteConfirm && loaded != null) {
+        val name = loaded.form.name.trim().ifBlank { "this template" }
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete “$name”?") },
+            text = { Text("This template will be permanently removed and can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.delete()
+                }) { Text("Delete template", color = PantopusColors.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Keep") } },
+        )
+    }
 }
 
 @Composable
 private fun TemplateBody(
     state: MessageTemplateEditorUiState.Loaded,
+    isNew: Boolean,
     accent: Color,
     accentBg: Color,
     onName: (String) -> Unit,
     onSubject: (String) -> Unit,
     onBody: (String) -> Unit,
     onSetChannel: (WorkflowChannel) -> Unit,
+    onSetActive: (Boolean) -> Unit,
     onSave: () -> Unit,
+    onDelete: () -> Unit,
     onOpenVariable: () -> Unit,
     onOpenPreview: () -> Unit,
 ) {
@@ -182,6 +216,8 @@ private fun TemplateBody(
                     )
                 }
             }
+            // Active — mirrors iOS `activeSection` (backend `is_active`).
+            ActiveToggleCard(isActive = form.isActive, accent = accent, onSetActive = onSetActive)
             // Subject
             if (form.showsSubject) {
                 Section(header = if (form.subjectRequired) "Subject" else "Subject · optional") {
@@ -214,6 +250,12 @@ private fun TemplateBody(
             if (state.saveError != null) {
                 AutoNote(tone = AutoTone.Error, icon = PantopusIcon.AlertTriangle, text = state.saveError)
             }
+            if (state.deleteError != null) {
+                AutoNote(tone = AutoTone.Error, icon = PantopusIcon.AlertTriangle, text = state.deleteError)
+            }
+            if (!isNew) {
+                DeleteTemplateRow(onDelete = onDelete)
+            }
             Box(modifier = Modifier.size(Spacing.s4))
         }
         AutoSheetFooter {
@@ -226,6 +268,64 @@ private fun TemplateBody(
                 modifier = Modifier.testTag("automationsPrimaryButton"),
             )
         }
+    }
+}
+
+/** Active / Inactive toggle — mirrors iOS `activeSection` (web's `is_active` card). */
+@Composable
+private fun ActiveToggleCard(
+    isActive: Boolean,
+    accent: Color,
+    onSetActive: (Boolean) -> Unit,
+) {
+    AutoCard(horizontal = 14.dp, vertical = 12.dp, modifier = Modifier.testTag("templateEditor.activeToggle")) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+            PantopusIconImage(
+                icon = PantopusIcon.Zap,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 1.8f,
+                tint = if (isActive) accent else PantopusColors.appTextMuted,
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = "Active", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+                Text(
+                    text = if (isActive) "Workflows can use this template." else "Template is paused — no sends.",
+                    fontSize = 12.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            Switch(
+                checked = isActive,
+                onCheckedChange = onSetActive,
+                colors =
+                    SwitchDefaults.colors(
+                        checkedThumbColor = PantopusColors.appSurface,
+                        checkedTrackColor = accent,
+                        uncheckedThumbColor = PantopusColors.appSurface,
+                        uncheckedTrackColor = PantopusColors.appBorderStrong,
+                    ),
+            )
+        }
+    }
+}
+
+/** Destructive delete row — visible only when editing an existing template. */
+@Composable
+private fun DeleteTemplateRow(onDelete: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s2)
+                .heightIn(min = 38.dp)
+                .clickable(onClickLabel = "Delete template", onClick = onDelete)
+                .testTag("templateEditor.delete"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2, Alignment.CenterHorizontally),
+    ) {
+        PantopusIconImage(icon = PantopusIcon.Trash2, contentDescription = null, size = 14.dp, tint = PantopusColors.error)
+        Text(text = "Delete template", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PantopusColors.error)
     }
 }
 

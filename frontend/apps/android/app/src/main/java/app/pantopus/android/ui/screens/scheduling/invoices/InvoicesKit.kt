@@ -10,13 +10,10 @@ import app.pantopus.android.ui.screens.scheduling.packages.PackagesFormat
  * `line_items` JSON (gig-system shape varies) into renderable rows, and groups
  * invoices by created day for the list. Mirrors iOS `InvoicesKit.swift`.
  *
- * Backend/Foundation note: the shared `InvoiceDto` exposes id / business_user_id
- * / recipient_user_id / total_cents / currency / line_items / created_at only.
- * The BusinessInvoice table additionally has status / subtotal_cents / fee_cents
- * / due_date / memo / paid_at — those aren't in the DTO, so the design's status
- * pills, status filters, subtotal+fee breakdown, due date, payment timeline,
- * sender note, and payer display names can't be rendered yet. Flagged as a
- * Foundation DTO gap (see the PR) rather than patched locally.
+ * Backend note: `InvoiceDto` now carries status / subtotal_cents / fee_cents /
+ * due_date / paid_at from the BusinessInvoice row, powering the status pills,
+ * KPI split, timeline, and due-date rendering. `memo` and payer display names
+ * remain a Foundation DTO gap.
  */
 
 /** A single renderable invoice line item parsed from the untyped `line_items`. */
@@ -30,27 +27,35 @@ data class InvoiceLineItem(
 object InvoiceParsing {
     private val LABEL_KEYS = listOf("description", "name", "label", "title")
     private val QTY_KEYS = listOf("quantity", "qty")
-    private val UNIT_KEYS = listOf("unit_amount_cents", "unit_cents", "unit_price_cents")
-    private val TOTAL_KEYS =
-        listOf("total_cents", "amount_cents", "line_total_cents", "total", "amount")
+
+    // The canonical create-invoice schema (backend businesses.js
+    // createInvoiceSchema) carries a per-UNIT `amount_cents` plus `quantity`,
+    // and computes subtotal as `amount_cents * quantity` — so `amount_cents` /
+    // `amount` are unit prices, not line totals.
+    private val UNIT_KEYS =
+        listOf("unit_amount_cents", "unit_cents", "unit_price_cents", "amount_cents", "amount")
+    private val TOTAL_KEYS = listOf("total_cents", "line_total_cents", "total")
 
     /**
      * Parse `line_items` maps into rows. Tolerant of key naming and number
      * types (Moshi decodes untyped numbers as Double). Rows that carry no money
-     * at all (metadata-only) are skipped.
+     * at all (metadata-only) are skipped. When no explicit line-total key is
+     * present the total is `unit × quantity`, matching the backend's subtotal
+     * math (businesses.js:4789).
      */
     fun lineItems(items: List<Map<String, Any?>>?): List<InvoiceLineItem> {
         if (items.isNullOrEmpty()) return emptyList()
         return items.mapNotNull { dict ->
             val unit = firstInt(dict, UNIT_KEYS)
-            val total = firstInt(dict, TOTAL_KEYS)
+            val explicitTotal = firstInt(dict, TOTAL_KEYS)
             val hasMoneyKey = dict.keys.any { it.contains("amount") || it.contains("total") }
-            if (unit == null && total == null && !hasMoneyKey) return@mapNotNull null
+            if (unit == null && explicitTotal == null && !hasMoneyKey) return@mapNotNull null
+            val quantity = firstInt(dict, QTY_KEYS)
             InvoiceLineItem(
                 label = firstString(dict, LABEL_KEYS) ?: "Item",
-                quantity = firstInt(dict, QTY_KEYS),
+                quantity = quantity,
                 unitCents = unit,
-                totalCents = total,
+                totalCents = explicitTotal ?: unit?.times(quantity ?: 1),
             )
         }
     }

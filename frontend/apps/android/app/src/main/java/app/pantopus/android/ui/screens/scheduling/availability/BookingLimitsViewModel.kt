@@ -153,21 +153,65 @@ class BookingLimitsViewModel
 
         fun setStartInterval(interval: StartInterval) = mutate { it.copy(startInterval = interval) }
 
+        /**
+         * Per-field dirty patch: only controls the user actually moved are written,
+         * so an untouched field can't be stamped with a lossy `toForm()` default.
+         * Extracted from [save] to keep that function's branching readable.
+         */
+        private fun buildPatch(
+            form: BookingLimitsForm,
+            baseline: BookingLimitsForm?,
+        ): UpdateEventTypeRequest {
+            fun <T> T.ifMoved(
+                selector: (BookingLimitsForm) -> Any?,
+                extraCondition: Boolean = true,
+            ): T? = takeIf { (baseline == null || selector(form) != selector(baseline)) && extraCondition }
+
+            return UpdateEventTypeRequest(
+                minNoticeMin = (form.minNoticeHours * MIN_PER_HOUR).ifMoved({ it.minNoticeHours }),
+                maxHorizonDays = form.bookUpToDays.ifMoved({ it.bookUpToDays }),
+                slotIntervalMin = form.startInterval.minutes.ifMoved({ it.startInterval }),
+                dailyCap = form.maxPerDay.ifMoved({ it.maxPerDay }, form.maxPerDay > 0),
+                perBookerCap = form.perPerson.ifMoved({ it.perPerson }, form.perPerson > 0),
+            )
+        }
+
         fun save() {
             val form = (_state.value as? BookingLimitsUiState.Content)?.form ?: return
             if (!form.isValid || form.saving) return
             _state.value = BookingLimitsUiState.Content(form.copy(saving = true))
             viewModelScope.launch {
-                val body =
-                    UpdateEventTypeRequest(
-                        minNoticeMin = form.minNoticeHours * MIN_PER_HOUR,
-                        maxHorizonDays = form.bookUpToDays,
-                        slotIntervalMin = form.startInterval.minutes,
-                        dailyCap = form.maxPerDay.takeIf { it > 0 },
-                        perBookerCap = form.perPerson.takeIf { it > 0 },
-                    )
+                // Per-field dirty tracking against the values this form was seeded
+                // with: the backend PUT is a true partial patch (every key optional,
+                // caps .allow(null)), so an untouched control must not be written
+                // back — toForm() is lossy (integer-division notice, null caps
+                // seeding visible defaults, interval collapse), and blanket writes
+                // would e.g. stamp daily_cap=8 onto an unlimited event type or turn
+                // a web-configured 30-min notice into 0. Mirrors iOS
+                // BookingLimitsViewModel's loaded-value snapshots.
+                val baseline = eventTypes.firstOrNull { it.id == form.selectedId }?.toForm(eventTypes)
+                val body = buildPatch(form, baseline)
                 when (val result = repo.updateEventType(owner, form.selectedId, body)) {
-                    is NetworkResult.Success -> _events.send(BookingLimitsEvent.Saved)
+                    is NetworkResult.Success -> {
+                        // Fold the written fields into the cached DTO so the next
+                        // save's dirty baseline reflects what the server now holds.
+                        eventTypes =
+                            eventTypes.map { dto ->
+                                if (dto.id != form.selectedId) {
+                                    dto
+                                } else {
+                                    dto.copy(
+                                        minNoticeMin = body.minNoticeMin ?: dto.minNoticeMin,
+                                        maxHorizonDays = body.maxHorizonDays ?: dto.maxHorizonDays,
+                                        slotIntervalMin = body.slotIntervalMin ?: dto.slotIntervalMin,
+                                        dailyCap = body.dailyCap ?: dto.dailyCap,
+                                        perBookerCap = body.perBookerCap ?: dto.perBookerCap,
+                                    )
+                                }
+                            }
+                        _state.value = BookingLimitsUiState.Content(form.copy(saving = false))
+                        _events.send(BookingLimitsEvent.Saved)
+                    }
                     is NetworkResult.Failure -> {
                         _state.value = BookingLimitsUiState.Content(form.copy(saving = false))
                         _events.send(BookingLimitsEvent.Toast(errors.decode(result.error).displayMessage()))

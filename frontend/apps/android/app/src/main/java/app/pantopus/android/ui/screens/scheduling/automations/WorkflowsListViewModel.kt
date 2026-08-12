@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.automations
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.UpdateWorkflowRequest
@@ -29,7 +30,8 @@ import javax.inject.Inject
  * (`GET /workflows`), split by a Global / This-event-type scope. Each row's
  * toggle flips `is_active` via `PUT /workflows/:id`; a 403 means the caller can
  * view but not edit (Home/Business members), which dims the toggles into the
- * read-only gated state honestly. Personal owner (arg-less route).
+ * read-only gated state honestly. Owner comes from the route's ownerKind/ownerId
+ * args so Business/Home settings list + mutate THEIR rows; Personal when absent.
  */
 @HiltViewModel
 class WorkflowsListViewModel
@@ -37,10 +39,15 @@ class WorkflowsListViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         enum class Scope { Global, ThisType }
 
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
         val pillar: SchedulingPillar = owner.pillar()
 
@@ -52,6 +59,10 @@ class WorkflowsListViewModel
 
         private val _actionError = MutableStateFlow<String?>(null)
         val actionError: StateFlow<String?> = _actionError.asStateFlow()
+
+        /** True while a pull-to-refresh refetch is in flight (drives the indicator). */
+        private val _isRefreshing = MutableStateFlow(false)
+        val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
         fun load() {
             if (_state.value !is WorkflowsListUiState.Loaded) _state.value = WorkflowsListUiState.Loading
@@ -78,10 +89,15 @@ class WorkflowsListViewModel
                             )
                     }
                 }
+                _isRefreshing.value = false
             }
         }
 
-        fun refresh() = load()
+        /** Pull-to-refresh refetch — keeps Loaded content on screen while in flight. */
+        fun refresh() {
+            if (_state.value is WorkflowsListUiState.Loaded) _isRefreshing.value = true
+            load()
+        }
 
         fun selectScope(index: Int) {
             _scope.value = Scope.entries.getOrElse(index) { Scope.Global }
@@ -118,10 +134,10 @@ class WorkflowsListViewModel
             }
         }
 
-        // Navigation route builders (the screen calls onNavigate).
-        fun createWorkflowRoute(): String = SchedulingRoutes.workflowEditor("new")
+        // Navigation route builders (the screen calls onNavigate) — carry the owner.
+        fun createWorkflowRoute(): String = SchedulingRoutes.workflowEditor("new", owner.routeKind, owner.ownerRouteId)
 
-        fun workflowRoute(id: String): String = SchedulingRoutes.workflowEditor(id)
+        fun workflowRoute(id: String): String = SchedulingRoutes.workflowEditor(id, owner.routeKind, owner.ownerRouteId)
 
         private fun SchedulingError.listMessage(): String =
             when (this) {

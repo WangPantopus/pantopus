@@ -258,12 +258,19 @@ data class HomeMember(
             return letters.ifBlank { "?" }.uppercase(Locale.US)
         }
 
-    /** Stable palette tone so a member keeps the same avatar colour across screens. */
+    /**
+     * Stable palette tone so a member keeps the same avatar colour across
+     * screens. Runs djb2 in 64-bit (Long) over the UTF-8 bytes, then
+     * abs % count — byte-for-byte the iOS `ResourceHomeMember.toneIndex`
+     * algorithm, so the same member reads the same tone on both platforms.
+     */
     val tone: MemberTone
         get() {
-            var hash = 5381
-            for (byte in id.toByteArray()) hash = (hash shl 5) + hash + byte
-            val index = (if (hash < 0) -hash else hash) % MemberTone.entries.size
+            var hash = 5381L
+            for (byte in id.toByteArray(Charsets.UTF_8)) {
+                hash = (hash shl 5) + hash + (byte.toLong() and 0xFF)
+            }
+            val index = ((if (hash < 0) -hash else hash) % MemberTone.entries.size).toInt()
             return MemberTone.entries[index]
         }
 
@@ -288,9 +295,11 @@ data class HomeMember(
 // ─── Home context ─────────────────────────────────────────────────────────
 
 /**
- * A12 routes are arg-less for home context, so each view-model resolves the
- * home the same way the merged scheduling screens do: the primary owner home,
- * else the first home. Returns `null` when the user has no home.
+ * Fallback home inference for A12 view-models when the route carries no
+ * `homeId` query arg (deep links / legacy callers): the primary owner home,
+ * else the first home. Returns `null` when the user has no home. Callers that
+ * know the home (Home Calendar, sibling A12 screens) pass it explicitly via
+ * `SchedulingRoutes.ARG_HOME_ID` instead.
  */
 suspend fun resolvePrimaryHomeId(homes: HomesRepository): String? =
     when (val result = homes.myHomes()) {

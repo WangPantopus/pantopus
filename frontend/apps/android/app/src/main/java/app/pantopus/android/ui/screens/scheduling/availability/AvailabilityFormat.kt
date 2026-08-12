@@ -70,11 +70,22 @@ fun normalizeHHmm(raw: String): String {
     return hhmm(hour, minute)
 }
 
-/** `"HH:MM"` for an hour/minute pair. */
+/** Minutes since midnight for an `"HH:MM"` / `"HH:MM:SS"` time. */
+fun minutesOfDay(raw: String): Int {
+    val (hour, minute) = parseHourMinute(raw)
+    return hour * 60 + minute
+}
+
+/**
+ * `"HH:MM"` for an hour/minute pair. Locale.ROOT-pinned: this is the WIRE
+ * format (rules PUT bodies validate against an ASCII `\d{2}:\d{2}` pattern
+ * server-side), so locale digit substitution (e.g. Arabic-Indic) must never
+ * leak in from the device locale.
+ */
 fun hhmm(
     hour: Int,
     minute: Int,
-): String = "%02d:%02d".format(hour, minute)
+): String = "%02d:%02d".format(Locale.ROOT, hour, minute)
 
 /** `"9:00 AM"` for a `"HH:MM"` 24-hour time. */
 fun formatTime12(hhmm: String): String {
@@ -82,14 +93,14 @@ fun formatTime12(hhmm: String): String {
     return formatTime12(hour, minute)
 }
 
-/** `"9:00 AM"` for an hour/minute pair. */
+/** `"9:00 AM"` for an hour/minute pair (Locale.US display digits). */
 fun formatTime12(
     hour: Int,
     minute: Int,
 ): String {
     val period = if (hour < 12) "AM" else "PM"
     val hour12 = if (hour % 12 == 0) 12 else hour % 12
-    return "%d:%02d %s".format(hour12, minute, period)
+    return "%d:%02d %s".format(Locale.US, hour12, minute, period)
 }
 
 /** `"9:00 AM – 5:00 PM"` for a start/end `"HH:MM"` pair. */

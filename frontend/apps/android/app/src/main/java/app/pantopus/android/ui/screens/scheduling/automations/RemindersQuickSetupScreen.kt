@@ -194,6 +194,15 @@ private fun RemindersLoaded(
 
             ReminderCard(state = state, accent = accent, accentBg = accentBg, onToggle = onToggle)
 
+            if (state.atLimit) {
+                AutoNote(
+                    tone = AutoTone.Info,
+                    icon = PantopusIcon.Info,
+                    text = "Up to 5 reminders",
+                    modifier = Modifier.testTag("reminderLimitNote"),
+                )
+            }
+
             if (state.showCustom) {
                 CustomStepper(
                     state = state,
@@ -311,6 +320,7 @@ private fun CustomStepper(
                     value = state.customValue,
                     accent = accent,
                     canDecrement = state.customValue > 1,
+                    canIncrement = state.customValue < state.customMax,
                     onDecrement = { onStep(-1) },
                     onIncrement = { onStep(1) },
                 )

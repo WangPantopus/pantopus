@@ -104,7 +104,9 @@ class BookResourceViewModel
         private val _slotConflict = MutableStateFlow<SchedulingError.Conflict?>(null)
         val slotConflict: StateFlow<SchedulingError.Conflict?> = _slotConflict.asStateFlow()
 
-        private var homeId: String? = null
+        // Route homeId pins the navigated home; absent → inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var resourceName = ""
         private var ruleChips: List<ResourceRuleChip> = emptyList()
         private var maxDurationMin: Int? = null

@@ -101,6 +101,8 @@ class SuggestedSlotsViewModelTest {
             vm.start()
             advanceUntilIdle()
             assertTrue(vm.state.value is SuggestedSlotsUiState.Empty)
+            // The verdict is recorded for F4's no-overlap banner + quick fixes.
+            assertEquals("Try making Mom optional, or widen the date window.", session.noOverlapMessage)
         }
 
     @Test

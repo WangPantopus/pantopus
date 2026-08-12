@@ -28,8 +28,7 @@ import javax.inject.Inject
 
 /**
  * A single event in the invoice lifecycle timeline (invoicedetail-frames.jsx Timeline).
- * Derived from DTO fields available today; additional events (Sent, Paid, Refunded,
- * Voided) require `status` / `paid_at` which the DTO currently lacks.
+ * Derived from the DTO's `created_at` / `status` / `paid_at` / `due_date`.
  */
 data class InvoiceTimelineEvent(
     val label: String,
@@ -57,27 +56,30 @@ sealed interface InvoiceDetailUiState {
         val lineTotalLabels: Map<Int, String>,
         val pillar: SchedulingPillar,
         /**
-         * Invoice lifecycle status for the top-bar trailing pill and dock CTA variants.
-         * Null until the DTO exposes a `status` field (deferred: InvoiceDto has no `status`).
-         * When available, drives both the top-bar StatusPill and the 7-variant dock layout.
+         * Invoice lifecycle status (draft/sent/viewed/paid/void/overdue) for the
+         * top-bar trailing pill. Null when the row predates the status column.
          */
         val invoiceStatus: String?,
         /**
          * Lifecycle timeline events shown in the "Timeline" section.
-         * Always has at least the "Created" event (derived from `created_at`).
-         * Additional events (Sent, Paid, Deposit, Refunded, Voided) are deferred
-         * until the DTO exposes `status` / `paid_at`.
+         * Always has at least the "Created" event (derived from `created_at`);
+         * Sent / Paid / Voided / Due derive from `status`, `paid_at`, `due_date`.
          */
         val timelineEvents: List<InvoiceTimelineEvent>,
+        /** Formatted subtotal — breakdown row above Total (null when absent). */
+        val subtotalLabel: String?,
+        /** Formatted platform fee (deducted from the payout, not added to the total). */
+        val feeLabel: String?,
+        /** Formatted due date for the payment-terms section (null when none). */
+        val dueLabel: String?,
     ) : InvoiceDetailUiState
 }
 
 /**
  * G13 Invoice Detail (owner) — Stream A15. Renders `GET /invoices/:id` and the
  * owner "send" action (`POST /invoices/:id/send`). Behind [SchedulingFeatureFlags].
- * Mirrors iOS `InvoiceDetailViewModel` / `invoicedetail-frames.jsx` within the
- * InvoiceDto's fields (no status / timeline / due date / memo / payer name →
- * those design sections are omitted).
+ * Mirrors iOS `InvoiceDetailViewModel` / `invoicedetail-frames.jsx` (memo /
+ * payer display name remain DTO gaps and their design sections stay omitted).
  */
 @HiltViewModel
 class InvoiceDetailViewModel
@@ -187,19 +189,44 @@ class InvoiceDetailViewModel
                         )
                     },
                 pillar = owner.pillar(),
-                // Deferred: DTO has no `status` field — null until backend adds it.
-                invoiceStatus = null,
-                // "Created" is always present (from created_at). Sent/Paid/Refunded/Voided
-                // events are deferred until the DTO exposes `status` / `paid_at`.
-                timelineEvents =
-                    listOf(
-                        InvoiceTimelineEvent(
-                            label = "Created",
-                            timeLabel = issuedLabel,
-                            isDone = true,
-                        ),
-                    ),
+                invoiceStatus = invoice.status,
+                timelineEvents = timeline(invoice, issuedLabel),
+                subtotalLabel = invoice.subtotalCents?.let { PackagesMoney.format(it, invoice.currency) },
+                feeLabel = invoice.feeCents?.takeIf { it > 0 }?.let { PackagesMoney.format(it, invoice.currency) },
+                dueLabel = PackagesFormat.dayString(invoice.dueDate),
             )
+        }
+
+        /**
+         * Lifecycle timeline from the DTO's `created_at` / `status` / `paid_at` /
+         * `due_date`. "Created" is always present; "Sent" appears once the invoice
+         * left draft (the row carries no sent_at, so its time column is em-dash);
+         * then exactly one of Paid (with `paid_at`), Voided, or a pending "Due".
+         */
+        private fun timeline(
+            invoice: InvoiceDto,
+            issuedLabel: String,
+        ): List<InvoiceTimelineEvent> {
+            val status = invoice.status?.lowercase()
+            val events = mutableListOf(InvoiceTimelineEvent(label = "Created", timeLabel = issuedLabel, isDone = true))
+            if (status != null && status in SENT_STATUSES) {
+                events += InvoiceTimelineEvent(label = "Sent", timeLabel = "—", isDone = true)
+            }
+            val dueLabel = PackagesFormat.dayString(invoice.dueDate)
+            when {
+                status == STATUS_PAID || invoice.paidAt != null ->
+                    events +=
+                        InvoiceTimelineEvent(
+                            label = "Paid",
+                            timeLabel = PackagesFormat.dayString(invoice.paidAt) ?: "—",
+                            isDone = true,
+                        )
+                status == STATUS_VOID ->
+                    events += InvoiceTimelineEvent(label = "Voided", timeLabel = "—", isDone = true)
+                dueLabel != null ->
+                    events += InvoiceTimelineEvent(label = "Due", timeLabel = dueLabel, isDone = false)
+            }
+            return events
         }
 
         private fun unitLabel(
@@ -227,5 +254,10 @@ class InvoiceDetailViewModel
         private companion object {
             const val SENT_TOAST_MS = 1800L
             const val REF_PREFIX_LEN = 6
+            const val STATUS_PAID = "paid"
+            const val STATUS_VOID = "void"
+
+            /** Statuses that imply the invoice has been sent to its recipient. */
+            val SENT_STATUSES = setOf("sent", "viewed", "paid", "overdue")
         }
     }

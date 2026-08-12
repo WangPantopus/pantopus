@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookingpage
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
@@ -14,6 +15,7 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -78,9 +80,17 @@ class BookingPageManageViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
-        private val ownerRelay: BookingPageOwnerRelay,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = ownerRelay.consume() ?: SchedulingOwner.Personal
+        // Owner comes from the route's ownerKind/ownerId query args (survives
+        // process death and deep links); absent args mean Personal. This screen
+        // SAVES against the owner (updateSlug/updateBookingPage), so a wrong
+        // default would overwrite the personal page from a Business hub.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
         /** The resolved pillar for UI accent — derived from owner at init time. */
         val pillar: SchedulingPillar = owner.pillar()
@@ -114,7 +124,18 @@ class BookingPageManageViewModel
                             return@launch
                         }
                     }
-                val types = (typesDef.await() as? NetworkResult.Success)?.data?.eventTypes.orEmpty()
+                // A FAILED event-types fetch must surface Error + retry — folding
+                // it into an empty list would misclassify a configured account as
+                // needs-setup on any transient network blip.
+                val typesResult = typesDef.await()
+                val types =
+                    when (typesResult) {
+                        is NetworkResult.Success -> typesResult.data.eventTypes
+                        is NetworkResult.Failure -> {
+                            _state.value = BookingPageManageUiState.Error(message(typesResult.error))
+                            return@launch
+                        }
+                    }
                 if (types.isEmpty() && !page.isLive) {
                     _state.value = BookingPageManageUiState.NeedsSetup
                     return@launch
@@ -282,6 +303,14 @@ class BookingPageManageViewModel
         fun consumeToast() {
             _toast.value = null
         }
+
+        // ─── Navigation routes (carry this screen's owner onward) ───────────
+
+        /** Manage → owner-side preview keeps the same owner context. */
+        fun previewRoute(): String = SchedulingRoutes.publicPagePreview(owner.routeKind, owner.ownerRouteId)
+
+        /** Fallback link into the owner's event-type catalog. */
+        fun eventTypesRoute(): String = SchedulingRoutes.eventTypeList(owner.routeKind, owner.ownerRouteId)
 
         private fun message(error: app.pantopus.android.data.api.net.NetworkError): String =
             when (val decoded = errors.decode(error)) {

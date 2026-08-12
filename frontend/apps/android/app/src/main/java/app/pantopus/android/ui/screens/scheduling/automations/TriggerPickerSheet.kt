@@ -34,7 +34,17 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-private const val MAX_OFFSET_VALUE = 999
+/**
+ * Backend `workflowSchema` caps `offset_minutes` at 525600 (365 days —
+ * backend/routes/scheduling.js:1081); the per-unit stepper ceiling keeps the
+ * resolved minutes within it.
+ */
+private fun maxOffsetAmount(unit: ReminderPreset.Unit): Int =
+    when (unit) {
+        ReminderPreset.Unit.Minutes -> 999
+        ReminderPreset.Unit.Hours -> 8760
+        ReminderPreset.Unit.Days -> 365
+    }
 
 /**
  * Stream A16 — H4 Trigger Picker (local sheet, no route). Chooses what fires a
@@ -103,14 +113,18 @@ fun TriggerPickerSheet(
                                 accent = accent,
                                 isInvalid = isInvalid,
                                 canDecrement = amount > 0,
+                                canIncrement = amount < maxOffsetAmount(unit),
                                 onDecrement = { amount = (amount - 1).coerceAtLeast(0) },
-                                onIncrement = { amount = (amount + 1).coerceAtMost(MAX_OFFSET_VALUE) },
+                                onIncrement = { amount = (amount + 1).coerceAtMost(maxOffsetAmount(unit)) },
                             )
                             AutoSegmented(
                                 options = ReminderPreset.Unit.entries.map { unitShort(it) },
                                 selectedIndex = ReminderPreset.Unit.entries.indexOf(unit),
                                 accent = accent,
-                                onSelect = { unit = ReminderPreset.Unit.entries[it] },
+                                onSelect = {
+                                    unit = ReminderPreset.Unit.entries[it]
+                                    amount = amount.coerceAtMost(maxOffsetAmount(unit))
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }

@@ -330,8 +330,22 @@ internal fun NotifLegend() {
     }
 }
 
+/**
+ * Master-pause banner (A14.5). The design leads with the window — "Paused for
+ * 2 hours" / "Resumes 11:42 AM · Emergency alerts still come through"
+ * (scheduling-notif-frames.jsx:198-199); when no window is known the copy
+ * falls back to the static pair.
+ */
 @Composable
-internal fun NotifPauseBanner() {
+internal fun NotifPauseBanner(
+    pausedForLabel: String? = null,
+    resumesAtLabel: String? = null,
+    onResume: (() -> Unit)? = null,
+) {
+    val title = pausedForLabel?.let { "Paused for $it" } ?: "Notifications paused"
+    val sub =
+        resumesAtLabel?.let { "Resumes $it · Emergency alerts still come through" }
+            ?: "Emergency alerts still come through"
     Row(
         modifier =
             Modifier
@@ -351,8 +365,8 @@ internal fun NotifPauseBanner() {
             PantopusIconImage(icon = PantopusIcon.BellOff, contentDescription = null, size = 16.dp, tint = PantopusColors.warning)
         }
         Column(Modifier.weight(1f)) {
-            Text("Notifications paused", color = PantopusColors.warning, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
-            Text("Emergency alerts still come through", color = PantopusColors.warning, fontSize = 11.5.sp)
+            Text(title, color = PantopusColors.warning, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+            Text(sub, color = PantopusColors.warning, fontSize = 11.5.sp)
         }
         Box(
             modifier =
@@ -360,7 +374,12 @@ internal fun NotifPauseBanner() {
                     .clip(RoundedCornerShape(Radii.pill))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.warningLight, RoundedCornerShape(Radii.pill))
-                    .padding(horizontal = 11.dp, vertical = 5.dp),
+                    // The pill LOOKED tappable but did nothing — the only un-pause path was
+                    // the separate settings toggle, so people stayed muted believing they'd
+                    // resumed. Mirrors iOS.
+                    .let { m -> if (onResume != null) m.clickable(onClick = onResume) else m }
+                    .padding(horizontal = 11.dp, vertical = 5.dp)
+                    .testTag("notifResume"),
         ) {
             Text("Resume", color = PantopusColors.warning, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
         }

@@ -213,7 +213,10 @@ private fun SettingsBody(
                     onClick = { onNavigate(vm.paymentsRoute()) },
                     trailing = {
                         if (data.paymentsConnected) {
-                            SettingsChip("Connected", SettingsChipTone.Success, PantopusIcon.Check)
+                            // Row navigates, so the chip carries the trailing chevron like
+                            // every other navigable row (scheduling-settings-frames.jsx
+                            // ChipChevron; iOS `.chipChevron(...)`).
+                            SettingsChipChevron("Connected", SettingsChipTone.Success, PantopusIcon.Check)
                         } else {
                             SettingsConnectPill(accent = accent, onClick = { onNavigate(vm.paymentsRoute()) })
                         }

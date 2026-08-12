@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.screens.scheduling._shared.TimezoneOption
 import app.pantopus.android.ui.screens.scheduling._shared.defaultTimezoneOptions
+import app.pantopus.android.ui.screens.scheduling._shared.searchTimezoneOptions
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -212,8 +213,9 @@ private fun OverrideAwareTzContent(
             TzOverrideBanner(accent = accent, onReset = onResetToDetected)
         }
 
-        // Zone lists — filtered by query, same logic as shared TimezonePickerSheet.
-        val filtered = options.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+        // Zone lists — same logic as the shared TimezonePickerSheet: a non-blank
+        // query searches the full IANA database (capped), blank keeps Common.
+        val filtered = remember(query, options) { searchTimezoneOptions(query, options) }
         when {
             filtered.isEmpty() -> {
                 // No-match state (same as shared TimezonePickerSheet.NoMatch).

@@ -116,9 +116,16 @@ class ResourceDetailViewModel
         private val _isMutating = MutableStateFlow(false)
         val isMutating: StateFlow<Boolean> = _isMutating.asStateFlow()
 
-        private var homeId: String? = null
+        // Route homeId pins the navigated home; absent → inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var requiresApproval = false
         private var started = false
+
+        /** Sibling-route builders — keep the resolved home across A12 hops. */
+        fun editorRoute(): String = SchedulingRoutes.resourceEditor(resourceId, homeId)
+
+        fun bookRoute(): String = SchedulingRoutes.bookResource(resourceId, homeId)
 
         fun start() {
             if (started) {

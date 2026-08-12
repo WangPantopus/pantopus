@@ -15,7 +15,13 @@ data class InvoiceDto(
     @Json(name = "business_user_id") val businessUserId: String? = null,
     @Json(name = "recipient_user_id") val recipientUserId: String? = null,
     @Json(name = "total_cents") val totalCents: Int? = null,
+    @Json(name = "subtotal_cents") val subtotalCents: Int? = null,
+    @Json(name = "fee_cents") val feeCents: Int? = null,
     val currency: String? = null,
+    /** BusinessInvoice lifecycle: draft / sent / viewed / paid / void / overdue. */
+    val status: String? = null,
+    @Json(name = "due_date") val dueDate: String? = null,
+    @Json(name = "paid_at") val paidAt: String? = null,
     @Json(name = "line_items") val lineItems: List<Map<String, Any?>>? = null,
     @Json(name = "created_at") val createdAt: String? = null,
 )

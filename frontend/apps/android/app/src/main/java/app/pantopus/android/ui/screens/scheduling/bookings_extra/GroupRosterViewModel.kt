@@ -191,7 +191,10 @@ class GroupRosterViewModel
             if (seatedRows.isEmpty() && waitlistRows.isEmpty()) {
                 _state.value =
                     GroupRosterUiState.Empty(
-                        onShareLink = { _navRequest.value = SchedulingRoutes.BOOKING_PAGE_MANAGE },
+                        // Carry the roster's resolved owner into the booking-page hop.
+                        onShareLink = {
+                            _navRequest.value = SchedulingRoutes.bookingPageManage(owner.routeKind, owner.ownerRouteId)
+                        },
                         seatTotal = seatTotal,
                         pillar = owner.pillar(),
                     )
@@ -288,13 +291,16 @@ class GroupRosterViewModel
             val current = _noShow.value ?: return
             _noShow.value = current.copy(submitting = true, error = null)
             viewModelScope.launch {
+                val succeeded = mutableSetOf<String>()
                 var failure: String? = null
                 for (id in current.selectedIds) {
                     when (val r = repo.markNoShow(owner, id)) {
-                        is NetworkResult.Success -> Unit
-                        is NetworkResult.Failure -> {
-                            failure = noShowErrorMessage(r)
-                        }
+                        is NetworkResult.Success -> succeeded += id
+                        is NetworkResult.Failure ->
+                            // BAD_STATE = the booking already reached a terminal state
+                            // (e.g. an earlier partial attempt already marked it
+                            // no-show) — count it done, don't re-send it forever.
+                            if (isAlreadyTerminal(r)) succeeded += id else failure = noShowErrorMessage(r)
                     }
                 }
                 if (failure == null) {
@@ -302,7 +308,9 @@ class GroupRosterViewModel
                     _toast.value = "Marked no-show."
                     refresh()
                 } else {
-                    _noShow.value = current.copy(submitting = false, error = failure)
+                    // Keep only the failed ids selected so a retry re-sends just the
+                    // failures, not the bookings that already landed.
+                    _noShow.value = current.copy(submitting = false, error = failure, selectedIds = current.selectedIds - succeeded)
                 }
             }
         }
@@ -385,7 +393,9 @@ class GroupRosterViewModel
         }
 
         fun openAddAttendee() {
-            _navRequest.value = SchedulingRoutes.MANUAL_BOOKING
+            // Carry the roster's resolved owner so the manual booking lists this
+            // owner's event types and creates the attendee on this roster.
+            _navRequest.value = SchedulingRoutes.manualBooking(owner.routeKind, owner.ownerRouteId)
         }
 
         fun navRequestConsumed() {
@@ -403,10 +413,21 @@ class GroupRosterViewModel
             return start.isBefore(Instant.now())
         }
 
+        /**
+         * `BAD_STATE` from `POST /bookings/:id/no-show` means the booking already
+         * reached a terminal state (backend `markNoShow` only transitions
+         * confirmed/completed rows) — for the multi-select flow that reads as
+         * "already handled", not a retryable failure.
+         */
+        private fun isAlreadyTerminal(failure: NetworkResult.Failure): Boolean {
+            val decoded = errors.decode(failure.error)
+            return (decoded as? app.pantopus.android.data.scheduling.SchedulingError.Generic)?.code == CODE_BAD_STATE
+        }
+
         private fun noShowErrorMessage(failure: NetworkResult.Failure): String {
             val decoded = errors.decode(failure.error)
             val code = (decoded as? app.pantopus.android.data.scheduling.SchedulingError.Generic)?.code
-            return if (code == CODE_BAD_STATE || code == CODE_NOT_APPLICABLE_YET) {
+            return if (code == CODE_NOT_APPLICABLE_YET) {
                 "You can mark a no-show only after the booking's start time."
             } else {
                 "Couldn't update — try again."

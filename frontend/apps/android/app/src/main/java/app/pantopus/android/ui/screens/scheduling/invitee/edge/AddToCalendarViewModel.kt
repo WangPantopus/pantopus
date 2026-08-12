@@ -43,12 +43,11 @@ class AddToCalendarViewModel
             if (_ics.value is IcsState.Loading) return
             viewModelScope.launch {
                 _ics.value = IcsState.Loading
+                // The repository decodes the streaming body to text on IO, so the
+                // result is plain text here — no blocking reads on main.
                 _ics.value =
                     when (val result = repo.publicGetIcs(manageToken)) {
-                        is NetworkResult.Success ->
-                            runCatching { result.data.string() }
-                                .map { IcsState.Ready(it) as IcsState }
-                                .getOrElse { IcsState.Error("Couldn't prepare the calendar file.") }
+                        is NetworkResult.Success -> IcsState.Ready(result.data)
                         is NetworkResult.Failure -> IcsState.Error("Couldn't prepare the calendar file.")
                     }
             }

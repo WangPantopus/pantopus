@@ -51,9 +51,43 @@ sealed interface SchedulingOwner {
     val ownerId: String?
         get() = (this as? Business)?.businessUserId
 
+    /** Route-arg discriminator — pairs with [ownerRouteId]. See `SchedulingRoutes.ARG_OWNER_KIND`. */
+    val routeKind: String
+        get() =
+            when (this) {
+                is Personal -> "personal"
+                is Business -> OWNER_TYPE_BUSINESS
+                is Home -> OWNER_TYPE_HOME
+            }
+
+    /** Route-arg id — null for Personal, which needs no id. */
+    val ownerRouteId: String?
+        get() =
+            when (this) {
+                is Personal -> null
+                is Business -> businessUserId
+                is Home -> homeId
+            }
+
     companion object {
         const val SCHEDULING_BASE = "scheduling"
         const val OWNER_TYPE_BUSINESS = "business"
         const val OWNER_TYPE_HOME = "home"
+
+        /**
+         * Rebuild an owner from nav args. Falls back to [Personal] only when the kind is
+         * absent or genuinely personal — a Business/Home kind with a missing id yields
+         * Personal too, since acting on the wrong owner is worse than showing the default.
+         */
+        fun fromRoute(
+            kind: String?,
+            id: String?,
+        ): SchedulingOwner =
+            when {
+                kind.isNullOrBlank() -> Personal
+                kind == OWNER_TYPE_BUSINESS && !id.isNullOrBlank() -> Business(id)
+                kind == OWNER_TYPE_HOME && !id.isNullOrBlank() -> Home(id)
+                else -> Personal
+            }
     }
 }

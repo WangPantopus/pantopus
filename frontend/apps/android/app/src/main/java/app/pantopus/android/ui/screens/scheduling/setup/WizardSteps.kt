@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.screens.scheduling._shared.PantopusMiniToggle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -170,35 +169,36 @@ private fun DurationChip(
 }
 
 @Composable
-internal fun WizardTimezoneChip(
-    timezoneId: String,
-    pillar: SchedulingPillar,
-) {
+internal fun WizardTimezoneChip(timezoneId: String) {
+    // Design TimezoneRow uses fixed primary tokens, not the pillar accent
+    // (scheduling-setup-frames.jsx:286-304): primary50 fill, primary100 pill +
+    // AUTO-badge borders, primary700 glyphs/label, primary600 AUTO label —
+    // mirrors iOS WizardStepViews.timezoneRow.
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         SetupOverline("Timezone")
         Row(
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(Radii.pill))
-                    .background(pillar.accentBg)
-                    .border(1.dp, pillar.accent.copy(alpha = 0.25f), RoundedCornerShape(Radii.pill))
+                    .background(PantopusColors.primary50)
+                    .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.pill))
                     .padding(horizontal = Spacing.s3, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            PantopusIconImage(icon = PantopusIcon.Globe, contentDescription = null, size = 15.dp, tint = pillar.accent)
-            Text(timezoneId, color = pillar.accent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            PantopusIconImage(icon = PantopusIcon.Globe, contentDescription = null, size = 15.dp, tint = PantopusColors.primary700)
+            Text(timezoneId, color = PantopusColors.primary700, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Box(
                 modifier =
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurface)
-                        .border(1.dp, pillar.accent, RoundedCornerShape(Radii.pill))
+                        .border(1.dp, PantopusColors.primary100, RoundedCornerShape(Radii.pill))
                         .padding(horizontal = 7.dp, vertical = 2.dp),
             ) {
-                Text("AUTO", color = pillar.accent, fontWeight = FontWeight.Bold, fontSize = 9.5.sp)
+                Text("AUTO", color = PantopusColors.primary600, fontWeight = FontWeight.Bold, fontSize = 9.5.sp)
             }
-            PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = 14.dp, tint = pillar.accent)
+            PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = 14.dp, tint = PantopusColors.primary700)
         }
     }
 }
@@ -225,16 +225,12 @@ internal fun WizardHoursGrid(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Switch(
+                    // The design's 32×18 mini toggle (scheduling-setup-frames.jsx DayRow),
+                    // not the 52×32 Material 3 Switch — mirrors iOS SetupMiniToggle.
+                    PantopusMiniToggle(
                         checked = on,
                         onCheckedChange = { onToggleDay(weekday) },
-                        colors =
-                            SwitchDefaults.colors(
-                                checkedThumbColor = PantopusColors.appSurface,
-                                checkedTrackColor = pillar.accent,
-                                uncheckedThumbColor = PantopusColors.appSurface,
-                                uncheckedTrackColor = PantopusColors.appBorderStrong,
-                            ),
+                        accent = pillar.accent,
                         modifier = Modifier.semantics { contentDescription = label }.testTag("wizardDay_$weekday"),
                     )
                     Spacer(Modifier.width(Spacing.s3))
@@ -270,7 +266,10 @@ internal fun WizardHoursGrid(
                     }
                 }
                 if (index < DAY_LABELS.lastIndex) {
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+                    // Design DayRow separates with the standard `P.border` (#E5E7EB), not
+                    // the subtle hairline (scheduling-setup-frames.jsx:309-314; iOS uses
+                    // Theme.Color.appBorder).
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
                 }
             }
         }

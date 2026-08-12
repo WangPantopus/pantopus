@@ -156,7 +156,12 @@ fun WeeklyHoursEditorScreen(
                         )
                     }
                 }
-                A3SaveBar(label = "Save schedule", saving = form.saving, onSave = viewModel::save)
+                A3SaveBar(
+                    label = "Save schedule",
+                    saving = form.saving,
+                    enabled = form.isValid,
+                    onSave = viewModel::save,
+                )
             }
         }
     }

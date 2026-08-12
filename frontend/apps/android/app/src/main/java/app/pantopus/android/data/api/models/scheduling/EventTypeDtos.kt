@@ -180,6 +180,9 @@ data class UpdateEventTypeRequest(
     @Json(name = "allow_invitee_reschedule") val allowInviteeReschedule: Boolean? = null,
     @Json(name = "schedule_id") val scheduleId: String? = null,
     @Json(name = "is_active") val isActive: Boolean? = null,
+    // B1 FRAME 6 reorder mode — the list endpoint orders by sort_order
+    // (backend/routes/scheduling.js:247; PUT patch schema :372).
+    @Json(name = "sort_order") val sortOrder: Int? = null,
 )
 
 /** One assignee write entry for `PUT /event-types/:id/assignees`. */

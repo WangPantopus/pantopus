@@ -52,7 +52,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
 import app.pantopus.android.ui.screens.scheduling.resources.CounterRow
@@ -121,7 +120,7 @@ fun VisitSetupScreen(
                             onClick = {
                                 scope.launch {
                                     viewModel.save()?.let { id ->
-                                        onNavigate(SchedulingRoutes.visitDetail(id))
+                                        onNavigate(viewModel.detailRoute(id))
                                     }
                                 }
                             },

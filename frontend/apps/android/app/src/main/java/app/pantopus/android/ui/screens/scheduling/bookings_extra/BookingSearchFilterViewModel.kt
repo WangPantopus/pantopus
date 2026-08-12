@@ -21,6 +21,8 @@ import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -238,18 +240,29 @@ class BookingSearchFilterViewModel
             filters: BookingFilters,
             search: String,
         ): List<BookingDto>? {
-            val owner = resolveOwner(filters.scope) ?: return emptyList()
+            val owners = resolveOwners(filters.scope)
+            if (owners.isEmpty()) return emptyList()
             val (from, to) = dateBounds(filters)
-            val result =
-                repo.getBookings(
-                    owner = owner,
-                    status = filters.status?.queryValue,
-                    eventTypeId = filters.eventTypeId,
-                    from = from,
-                    to = to,
-                    query = search.ifBlank { null },
-                )
-            val bookings = (result as? NetworkResult.Success)?.data?.bookings ?: return null
+            val results =
+                coroutineScope {
+                    owners.map { owner ->
+                        async {
+                            repo.getBookings(
+                                owner = owner,
+                                status = filters.status?.queryValue,
+                                eventTypeId = filters.eventTypeId,
+                                from = from,
+                                to = to,
+                                query = search.ifBlank { null },
+                            )
+                        }
+                    }.map { it.await() }
+                }
+            // Any-success = data: a multi-owner fan-out shouldn't blank the whole
+            // search because one pillar's fetch failed. All-failed → error.
+            val successes = results.mapNotNull { (it as? NetworkResult.Success)?.data?.bookings }
+            if (successes.isEmpty()) return null
+            val bookings = successes.flatten()
             return if (filters.status == BookingStatusFilter.NoShow) {
                 bookings.filter { it.status == "no_show" }
             } else {
@@ -257,11 +270,22 @@ class BookingSearchFilterViewModel
             }
         }
 
-        private suspend fun resolveOwner(scope: BookingScopeFilter): SchedulingOwner? =
+        /**
+         * The owner contexts a scope spans. `All` fans out across every pillar the
+         * user actually has (Personal always; Home/Business only when resolvable) so
+         * the default search covers home + business bookings, not just personal.
+         */
+        private suspend fun resolveOwners(scope: BookingScopeFilter): List<SchedulingOwner> =
             when (scope) {
-                BookingScopeFilter.All, BookingScopeFilter.Personal -> SchedulingOwner.Personal
-                BookingScopeFilter.Home -> BookingsExtrasOwner.resolve(SchedulingPillar.Home, homes, auth)
-                BookingScopeFilter.Business -> BookingsExtrasOwner.resolve(SchedulingPillar.Business, homes, auth)
+                BookingScopeFilter.All ->
+                    listOfNotNull(
+                        SchedulingOwner.Personal,
+                        BookingsExtrasOwner.resolve(SchedulingPillar.Home, homes, auth),
+                        BookingsExtrasOwner.resolve(SchedulingPillar.Business, homes, auth),
+                    )
+                BookingScopeFilter.Personal -> listOf(SchedulingOwner.Personal)
+                BookingScopeFilter.Home -> listOfNotNull(BookingsExtrasOwner.resolve(SchedulingPillar.Home, homes, auth))
+                BookingScopeFilter.Business -> listOfNotNull(BookingsExtrasOwner.resolve(SchedulingPillar.Business, homes, auth))
             }
 
         private fun dateBounds(filters: BookingFilters): Pair<String?, String?> {

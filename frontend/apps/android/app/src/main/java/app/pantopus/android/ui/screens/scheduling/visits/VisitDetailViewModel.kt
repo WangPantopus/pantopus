@@ -17,9 +17,11 @@ import app.pantopus.android.ui.screens.scheduling.resources.VisitKind
 import app.pantopus.android.ui.screens.scheduling.resources.resolvePrimaryHomeId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -106,8 +108,18 @@ class VisitDetailViewModel
         private val _isMutating = MutableStateFlow(false)
         val isMutating: StateFlow<Boolean> = _isMutating.asStateFlow()
 
-        private var homeId: String? = null
+        private val _cancelled = Channel<Unit>(Channel.BUFFERED)
+
+        /** One-shot: emits once the cancel landed so the screen can dismiss. */
+        val cancelled = _cancelled.receiveAsFlow()
+
+        // Route homeId pins the navigated home; absent → inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var started = false
+
+        /** "Book again" hop into a fresh visit setup keeps the same home. */
+        fun bookAgainRoute(): String = SchedulingRoutes.visitSetup(homeId)
 
         fun start() {
             if (started) {
@@ -312,22 +324,26 @@ class VisitDetailViewModel
             _actionError.value = null
         }
 
-        /** Returns true on success so the screen can dismiss. */
-        suspend fun cancelVisit(): Boolean {
-            val hid = homeId ?: return false
-            if (_isMutating.value) return false
+        /**
+         * Cancel (delete) the visit. Runs in [viewModelScope] — not the screen's
+         * remembered composition scope — so dismissing the dialog/screen mid-flight
+         * can't cancel the DELETE. Emits on [cancelled] for the screen to dismiss.
+         */
+        fun cancelVisit() {
+            val hid = homeId ?: return
+            if (_isMutating.value) return
             _isMutating.value = true
             _showCancelConfirm.value = false
-            try {
-                return when (val result = homes.deleteHomeEvent(hid, eventId)) {
-                    is NetworkResult.Success -> true
-                    is NetworkResult.Failure -> {
-                        _actionError.value = result.error.message ?: "Couldn't cancel this visit."
-                        false
+            viewModelScope.launch {
+                try {
+                    when (val result = homes.deleteHomeEvent(hid, eventId)) {
+                        is NetworkResult.Success -> _cancelled.send(Unit)
+                        is NetworkResult.Failure ->
+                            _actionError.value = result.error.message ?: "Couldn't cancel this visit."
                     }
+                } finally {
+                    _isMutating.value = false
                 }
-            } finally {
-                _isMutating.value = false
             }
         }
 

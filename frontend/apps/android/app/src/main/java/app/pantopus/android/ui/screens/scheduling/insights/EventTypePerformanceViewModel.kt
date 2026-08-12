@@ -16,6 +16,7 @@ import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,16 +105,27 @@ class EventTypePerformanceViewModel
             }
         }
 
+        private var bookingsJob: Job? = null
+
         private fun loadBookings(id: String) {
             val type = eventTypes.firstOrNull { it.id == id } ?: return
             _state.value = PerfUiState.Loading
-            viewModelScope.launch {
-                val range = _filter.value.range()
-                val bookings =
-                    repo.getBookings(owner, eventTypeId = id, from = range.first, to = range.second)
-                        .dataOrNull()?.bookings.orEmpty()
-                _state.value = project(type, bookings)
-            }
+            // Cancel the in-flight fetch: rapid type switches must not let an
+            // older (slower) response land last and show type A's stats under
+            // type B's selection.
+            bookingsJob?.cancel()
+            bookingsJob =
+                viewModelScope.launch {
+                    val range = _filter.value.range()
+                    val bookings =
+                        repo.getBookings(owner, eventTypeId = id, from = range.first, to = range.second)
+                            .dataOrNull()?.bookings.orEmpty()
+                    // Guard the final assignment against a selection change that
+                    // happened while the fetch was in flight.
+                    if (_selectedId.value == id) {
+                        _state.value = project(type, bookings)
+                    }
+                }
         }
 
         private fun project(
@@ -168,7 +180,7 @@ class EventTypePerformanceViewModel
 
         fun editorRoute(): String = SchedulingRoutes.eventTypeEditor(_selectedId.value.orEmpty())
 
-        fun bookingPageRoute(): String = SchedulingRoutes.BOOKING_PAGE_MANAGE
+        fun bookingPageRoute(): String = SchedulingRoutes.bookingPageManage(owner.routeKind, owner.ownerRouteId)
 
         private fun SchedulingError.display(): String =
             when (this) {

@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.visits
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.homes.OccupantDto
@@ -55,7 +56,20 @@ class VisitSetupViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = VisitSetupViewModel(repo, homes, members, errors)
+    private fun vm(routeHomeId: String? = null) =
+        VisitSetupViewModel(
+            repo,
+            homes,
+            members,
+            errors,
+            SavedStateHandle(
+                buildMap {
+                    routeHomeId?.let {
+                        put(app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes.ARG_HOME_ID, it)
+                    }
+                },
+            ),
+        )
 
     @Test
     fun `invalid until a title and at least one host are chosen`() =

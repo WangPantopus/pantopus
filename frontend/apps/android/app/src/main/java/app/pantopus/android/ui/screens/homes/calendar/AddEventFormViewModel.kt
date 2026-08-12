@@ -168,6 +168,12 @@ data class AddEventUiState(
     val isEditing: Boolean = false,
     val isLoadingMembers: Boolean = true,
     val isSaving: Boolean = false,
+    /**
+     * True when editing but the source event could not be fetched — the
+     * form shows default values, so committing would overwrite the event
+     * with blanks. Blocks [isValid] until a reload succeeds.
+     */
+    val editingLoadFailed: Boolean = false,
     val toast: AddEventToast? = null,
     val commit: AddEventCommit? = null,
     val baseline: AddEventBaseline,
@@ -192,6 +198,7 @@ data class AddEventUiState(
 
     val isValid: Boolean
         get() {
+            if (editingLoadFailed) return false
             val title = fields[AddEventField.Title]?.value?.trim().orEmpty()
             if (title.isEmpty()) return false
             if (fields.values.any { it.error != null }) return false
@@ -234,7 +241,11 @@ class AddEventFormViewModel
         private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
-        private val zone: ZoneId = ZoneId.of("UTC"),
+        // Device-local zone: the picked wall-time is interpreted in the
+        // user's own timezone and converted to a true instant on the wire,
+        // matching iOS's SwiftUI DatePicker semantics (no timeZone override).
+        // Tests inject a fixed zone for determinism.
+        private val zone: ZoneId = ZoneId.systemDefault(),
     ) : ViewModel() {
         @Inject
         constructor(
@@ -242,7 +253,7 @@ class AddEventFormViewModel
             membersRepo: HomeMembersRepository,
             networkMonitor: NetworkMonitor,
             savedStateHandle: SavedStateHandle,
-        ) : this(repo, membersRepo, networkMonitor, savedStateHandle, Instant::now, ZoneId.of("UTC"))
+        ) : this(repo, membersRepo, networkMonitor, savedStateHandle, Instant::now, ZoneId.systemDefault())
 
         private val homeId: String =
             requireNotNull(savedStateHandle[ADD_EVENT_HOME_ID_KEY]) {
@@ -307,10 +318,18 @@ class AddEventFormViewModel
         private suspend fun fetchEditingSource(): CalendarEventDto? {
             val result = repo.getHomeEvent(homeId, editingEventId!!)
             return when (result) {
-                is NetworkResult.Success -> result.data.event
+                is NetworkResult.Success -> {
+                    _state.update { it.copy(editingLoadFailed = false) }
+                    result.data.event
+                }
                 is NetworkResult.Failure -> {
+                    // Block Save: the form still holds defaults, and a PUT from
+                    // here would overwrite the event with blanks.
                     _state.update {
-                        it.copy(toast = AddEventToast("Couldn't load this event.", isError = true))
+                        it.copy(
+                            editingLoadFailed = true,
+                            toast = AddEventToast("Couldn't load this event.", isError = true),
+                        )
                     }
                     null
                 }
@@ -495,6 +514,12 @@ class AddEventFormViewModel
         // MARK: - Submit
 
         fun submit() {
+            if (_state.value.editingLoadFailed) {
+                _state.update {
+                    it.copy(toast = AddEventToast("Couldn't load this event.", isError = true))
+                }
+                return
+            }
             val firstInvalid = validateAll()
             if (firstInvalid != null || _state.value.endError != null) {
                 _state.update {
@@ -658,21 +683,36 @@ class AddEventFormViewModel
                 }
             }
 
-            /** Midnight + nil end → all-day. Mirrors the iOS heuristic. */
+            private val UTC_ZONE: ZoneId = ZoneId.of("UTC")
+
+            /**
+             * Midnight **UTC** + nil end → all-day. The wire convention stores
+             * all-day events at 00:00Z, so the check is pinned to UTC no matter
+             * which zone the form edits in. Mirrors iOS `isAllDayHeuristic`
+             * (`utcCalendar()` components).
+             */
             internal fun isAllDayHeuristic(
                 start: ZonedDateTime,
                 end: ZonedDateTime?,
                 endIso: String?,
-            ): Boolean = start.hour == 0 && start.minute == 0 && start.second == 0 && end == null && endIso == null
+            ): Boolean {
+                val utc = start.withZoneSameInstant(UTC_ZONE)
+                return utc.hour == 0 && utc.minute == 0 && utc.second == 0 && end == null && endIso == null
+            }
 
-            /** ISO-8601 (UTC instant). Round-trips with the iOS shape. */
+            /**
+             * ISO-8601 (UTC instant). All-day events snap to the UTC
+             * start-of-day of the instant so the agenda's midnight-UTC
+             * heuristic recognises them — mirroring iOS `iso8601(from:allDay:)`
+             * (`utcCalendar().startOfDay`). Round-trips with the iOS shape.
+             */
             internal fun iso8601(
                 date: ZonedDateTime,
                 allDay: Boolean,
             ): String {
                 val stamp =
                     if (allDay) {
-                        date.toLocalDate().atStartOfDay(date.zone)
+                        date.withZoneSameInstant(UTC_ZONE).toLocalDate().atStartOfDay(UTC_ZONE)
                     } else {
                         date
                     }

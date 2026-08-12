@@ -11,6 +11,7 @@ import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,44 +128,53 @@ class BlockOffTimeViewModel
             _events.trySend(BlockOffEvent.OpenBooking(id))
         }
 
+        private var conflictJob: Job? = null
+
         private fun checkConflict() {
-            val current = _form.value
-            if (current.allDay) {
+            // One in-flight check at a time: rapid date/time edits cancel the
+            // stale check instead of letting an older response land last and
+            // pin a conflict computed for outdated form values.
+            conflictJob?.cancel()
+            if (_form.value.allDay) {
                 _form.update { it.copy(conflict = null) }
                 return
             }
-            viewModelScope.launch {
-                val dayStart = current.date.atStartOfDay(zone).toInstant()
-                val dayEnd = current.date.plusDays(1).atStartOfDay(zone).toInstant()
-                val result = repo.getBookings(SchedulingOwner.Personal, from = dayStart.toString(), to = dayEnd.toString())
-                if (result !is NetworkResult.Success) return@launch
-                val (startHour, startMin) = parseHourMinute(current.start)
-                val (endHour, endMin) = parseHourMinute(current.end)
-                val blockStart = current.date.atTime(startHour, startMin).atZone(zone).toInstant()
-                val blockEnd = current.date.atTime(endHour, endMin).atZone(zone).toInstant()
-                val overlap =
-                    result.data.bookings.firstOrNull { booking ->
-                        val status = booking.status
-                        val bStart = booking.startAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                        val bEnd = booking.endAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                        status != null && status in ACTIVE_STATUSES && bStart != null && bEnd != null &&
-                            bStart.isBefore(blockEnd) && bEnd.isAfter(blockStart)
-                    }
-                _form.update {
-                    if (overlap == null) {
-                        it.copy(conflict = null)
-                    } else {
-                        val time = overlap.startAt?.let { iso -> formatLocalTime(iso) }.orEmpty()
-                        it.copy(
-                            conflict =
-                                BlockConflict(
-                                    message = "This overlaps a confirmed $time booking. Blocking won't cancel it.",
-                                    bookingId = overlap.id,
-                                ),
-                        )
+            conflictJob =
+                viewModelScope.launch {
+                    // Read the form inside the coroutine so the surviving (latest)
+                    // check always evaluates the freshest values.
+                    val current = _form.value
+                    val dayStart = current.date.atStartOfDay(zone).toInstant()
+                    val dayEnd = current.date.plusDays(1).atStartOfDay(zone).toInstant()
+                    val result = repo.getBookings(SchedulingOwner.Personal, from = dayStart.toString(), to = dayEnd.toString())
+                    if (result !is NetworkResult.Success) return@launch
+                    val (startHour, startMin) = parseHourMinute(current.start)
+                    val (endHour, endMin) = parseHourMinute(current.end)
+                    val blockStart = current.date.atTime(startHour, startMin).atZone(zone).toInstant()
+                    val blockEnd = current.date.atTime(endHour, endMin).atZone(zone).toInstant()
+                    val overlap =
+                        result.data.bookings.firstOrNull { booking ->
+                            val status = booking.status
+                            val bStart = booking.startAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                            val bEnd = booking.endAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                            status != null && status in ACTIVE_STATUSES && bStart != null && bEnd != null &&
+                                bStart.isBefore(blockEnd) && bEnd.isAfter(blockStart)
+                        }
+                    _form.update {
+                        if (overlap == null) {
+                            it.copy(conflict = null)
+                        } else {
+                            val time = overlap.startAt?.let { iso -> formatLocalTime(iso) }.orEmpty()
+                            it.copy(
+                                conflict =
+                                    BlockConflict(
+                                        message = "This overlaps a confirmed $time booking. Blocking won't cancel it.",
+                                        bookingId = overlap.id,
+                                    ),
+                            )
+                        }
                     }
                 }
-            }
         }
 
         private fun formatLocalTime(iso: String): String {

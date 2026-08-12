@@ -14,13 +14,25 @@ import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalTime
+import java.util.Locale
 import javax.inject.Inject
+
+/** One-shot editor completion events — the screen collects these to dismiss. */
+sealed interface ResourceEditorEvent {
+    /** Save (create or update) landed on the server. */
+    data object Saved : ResourceEditorEvent
+
+    /** Delete landed on the server. */
+    data object Deleted : ResourceEditorEvent
+}
 
 /** F10 editor load lifecycle. */
 sealed interface ResourceEditorLoadState {
@@ -89,7 +101,14 @@ class ResourceEditorViewModel
         private val _isDeleting = MutableStateFlow(false)
         val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
 
-        private var homeId: String? = null
+        private val _events = Channel<ResourceEditorEvent>(Channel.BUFFERED)
+
+        /** One-shot completion events (save/delete landed) — collect and dismiss. */
+        val events = _events.receiveAsFlow()
+
+        // Route homeId pins the navigated home; absent → inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var started = false
 
         // ── Derived validation ───────────────────────────────────────────────
@@ -240,74 +259,81 @@ class ResourceEditorViewModel
             )
         }
 
-        /** Returns true on success so the screen can dismiss. */
-        suspend fun save(): Boolean {
-            if (!isValid || _isSaving.value) return false
-            val hid = homeId ?: return false
+        /**
+         * Persist the form. Runs in [viewModelScope] — not the screen's remembered
+         * composition scope — so a dismissal/recomposition mid-flight can't cancel
+         * the write. Emits [ResourceEditorEvent.Saved] for the screen to dismiss on.
+         */
+        fun save() {
+            if (!isValid || _isSaving.value) return
+            val hid = homeId ?: return
             _isSaving.value = true
-            try {
-                val f = _form.value
-                val owner = SchedulingOwner.Home(hid)
-                val result =
-                    if (resourceId != null) {
-                        repo.updateResource(
-                            owner,
-                            resourceId,
-                            UpdateResourceRequest(
-                                name = f.name.trim(),
-                                resourceType = f.kind.wire,
-                                whoCanBook = f.whoCanBook.wire,
-                                maxDurationMin = f.maxDurationHours * MINUTES_PER_HOUR,
-                                bufferMin = f.bufferMin,
-                                requiresApproval = f.requiresApproval,
-                                availableHours = availableHours().toJson(),
-                            ),
-                        )
-                    } else {
-                        repo.createResource(
-                            owner,
-                            CreateResourceRequest(
-                                name = f.name.trim(),
-                                resourceType = f.kind.wire,
-                                whoCanBook = f.whoCanBook.wire,
-                                maxDurationMin = f.maxDurationHours * MINUTES_PER_HOUR,
-                                bufferMin = f.bufferMin,
-                                requiresApproval = f.requiresApproval,
-                                availableHours = availableHours().toJson(),
-                                ownerType = owner.ownerType,
-                                ownerId = owner.ownerId,
-                            ),
-                        )
+            viewModelScope.launch {
+                try {
+                    val f = _form.value
+                    val owner = SchedulingOwner.Home(hid)
+                    val result =
+                        if (resourceId != null) {
+                            repo.updateResource(
+                                owner,
+                                resourceId,
+                                UpdateResourceRequest(
+                                    name = f.name.trim(),
+                                    resourceType = f.kind.wire,
+                                    whoCanBook = f.whoCanBook.wire,
+                                    maxDurationMin = f.maxDurationHours * MINUTES_PER_HOUR,
+                                    bufferMin = f.bufferMin,
+                                    requiresApproval = f.requiresApproval,
+                                    availableHours = availableHours().toJson(),
+                                ),
+                            )
+                        } else {
+                            repo.createResource(
+                                owner,
+                                CreateResourceRequest(
+                                    name = f.name.trim(),
+                                    resourceType = f.kind.wire,
+                                    whoCanBook = f.whoCanBook.wire,
+                                    maxDurationMin = f.maxDurationHours * MINUTES_PER_HOUR,
+                                    bufferMin = f.bufferMin,
+                                    requiresApproval = f.requiresApproval,
+                                    availableHours = availableHours().toJson(),
+                                    ownerType = owner.ownerType,
+                                    ownerId = owner.ownerId,
+                                ),
+                            )
+                        }
+                    when (result) {
+                        is NetworkResult.Success -> _events.send(ResourceEditorEvent.Saved)
+                        is NetworkResult.Failure ->
+                            _saveError.value = result.error.message ?: "Couldn't save this resource."
                     }
-                return when (result) {
-                    is NetworkResult.Success -> true
-                    is NetworkResult.Failure -> {
-                        _saveError.value = result.error.message ?: "Couldn't save this resource."
-                        false
-                    }
+                } finally {
+                    _isSaving.value = false
                 }
-            } finally {
-                _isSaving.value = false
             }
         }
 
-        /** Returns true on success so the screen can dismiss. */
-        suspend fun confirmDelete(): Boolean {
-            val id = resourceId ?: return false
-            val hid = homeId ?: return false
-            if (_isDeleting.value) return false
+        /**
+         * Delete the resource. Runs in [viewModelScope] (same rationale as [save])
+         * and emits [ResourceEditorEvent.Deleted] on success.
+         */
+        fun confirmDelete() {
+            val id = resourceId ?: return
+            val hid = homeId ?: return
+            if (_isDeleting.value) return
             _isDeleting.value = true
             _showDeleteConfirm.value = false
-            try {
-                return when (val result = repo.deleteResource(SchedulingOwner.Home(hid), id)) {
-                    is NetworkResult.Success -> true
-                    is NetworkResult.Failure -> {
-                        _saveError.value = result.error.message ?: "Couldn't delete this resource."
-                        false
+            viewModelScope.launch {
+                try {
+                    when (val result = repo.deleteResource(SchedulingOwner.Home(hid), id)) {
+                        is NetworkResult.Success -> _events.send(ResourceEditorEvent.Deleted)
+                        is NetworkResult.Failure ->
+                            _saveError.value = result.error.message ?: "Couldn't delete this resource."
                     }
+                } finally {
+                    _isDeleting.value = false
                 }
-            } finally {
-                _isDeleting.value = false
             }
         }
 
@@ -318,7 +344,8 @@ class ResourceEditorViewModel
             return LocalTime.of(hour, minute)
         }
 
-        private fun hhmm(time: LocalTime): String = "%02d:%02d".format(time.hour, time.minute)
+        /** Wire `"HH:MM"` — Locale.US-pinned so localized digits never reach the API. */
+        private fun hhmm(time: LocalTime): String = "%02d:%02d".format(Locale.US, time.hour, time.minute)
 
         private companion object {
             const val NEW_SENTINEL = "new"

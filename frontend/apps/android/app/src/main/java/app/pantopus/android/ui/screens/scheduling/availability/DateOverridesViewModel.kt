@@ -179,6 +179,10 @@ class DateOverridesViewModel
                     if (form.choice == OverrideChoice.Unavailable) {
                         OverrideItem(form.selectedDate.toString(), isUnavailable = true)
                     } else {
+                        // Inverted custom hours (start >= end) would 200-OK but zero the
+                        // day server-side — refuse to apply them (the hours sheet also
+                        // blocks confirming an inverted range).
+                        if (minutesOfDay(form.customStart) >= minutesOfDay(form.customEnd)) return@mutate form
                         OverrideItem(form.selectedDate.toString(), isUnavailable = false, start = form.customStart, end = form.customEnd)
                     }
                 form.copy(overrides = form.overrides.upsert(item))

@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.business
 
 import androidx.compose.runtime.Immutable
+import java.util.Locale
 
 /**
  * Self-contained weekday + time formatting for the A13 Business stream (G4
@@ -78,13 +79,17 @@ fun normalizeHhMm(time: String): String {
     return hhmm(hour, minute)
 }
 
-/** `"HH:MM"` for an hour/minute pair. */
+/**
+ * `"HH:MM"` for an hour/minute pair. Locale.ROOT-pinned: this is the WIRE
+ * format (working-hours PUT bodies validate against an ASCII `\d{2}:\d{2}`
+ * pattern server-side), so locale digit substitution must never leak in.
+ */
 fun hhmm(
     hour: Int,
     minute: Int,
-): String = "%02d:%02d".format(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
+): String = "%02d:%02d".format(Locale.ROOT, hour.coerceIn(0, 23), minute.coerceIn(0, 59))
 
-/** `"9:00 AM"` for a `"HH:MM"` 24-hour time. */
+/** `"9:00 AM"` for a `"HH:MM"` 24-hour time (Locale.US display digits). */
 fun formatTime12(time: String): String {
     val (hour, minute) = parseHhMm(time)
     val period = if (hour < 12) "AM" else "PM"
@@ -94,7 +99,7 @@ fun formatTime12(time: String): String {
             hour > 12 -> hour - 12
             else -> hour
         }
-    return "%d:%02d %s".format(h12, minute, period)
+    return "%d:%02d %s".format(Locale.US, h12, minute, period)
 }
 
 /** `"9:00 AM–5:00 PM"` for a start/end `"HH:MM"` pair (en-dash per the design). */

@@ -19,6 +19,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -89,9 +90,12 @@ class ResourceEditorViewModelTest {
             model.setName("EV charger")
             model.selectKind(ResourceKind.Charger)
 
-            val ok = model.save()
+            model.save()
+            advanceUntilIdle()
 
-            assertTrue(ok)
+            // The write ran in viewModelScope and the one-shot Saved event is
+            // buffered for the screen to dismiss on.
+            assertEquals(ResourceEditorEvent.Saved, model.events.first())
             coVerify {
                 repo.createResource(
                     SchedulingOwner.Home("home-1"),

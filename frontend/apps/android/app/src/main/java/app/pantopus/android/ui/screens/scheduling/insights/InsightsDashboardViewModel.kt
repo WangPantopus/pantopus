@@ -159,7 +159,7 @@ class InsightsDashboardViewModel
             return SchedulingRoutes.TEAM_PERFORMANCE
         }
 
-        fun bookingPageRoute(): String = SchedulingRoutes.BOOKING_PAGE_MANAGE
+        fun bookingPageRoute(): String = SchedulingRoutes.bookingPageManage(owner.routeKind, owner.ownerRouteId)
 
         private fun SchedulingError.display(): String =
             when (this) {

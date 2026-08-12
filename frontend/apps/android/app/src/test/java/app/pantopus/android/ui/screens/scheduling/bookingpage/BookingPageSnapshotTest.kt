@@ -84,7 +84,10 @@ class BookingPageSnapshotTest {
                         ShareTargetButton(PantopusIcon.Mail, "Email", Modifier.weight(1f)) {}
                     }
                     Box(modifier = Modifier.size(120.dp).background(PantopusColors.appSurface)) {
-                        QrCanvas(modifier = Modifier.fillMaxSize())
+                        // QrCanvas now encodes a real URL (the old decorative noise grid was
+                        // the fake-qr-code finding), so the snapshot pins a fixed link to
+                        // keep the rendered matrix deterministic.
+                        QrCanvas(url = "https://pantopus.com/book/maria-k", modifier = Modifier.fillMaxSize())
                     }
                     BLSavedToast("Link copied")
                 }

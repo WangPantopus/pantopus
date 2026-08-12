@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.bookingpage
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
 import app.pantopus.android.data.api.models.scheduling.BookingPageResponse
 import app.pantopus.android.data.api.models.scheduling.EventTypeDto
@@ -11,6 +12,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,13 +36,24 @@ class BookingPageManageViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repo: SchedulingRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
-    private val ownerRelay = BookingPageOwnerRelay()
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = BookingPageManageViewModel(repo, errors, ownerRelay)
+    private fun vm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = BookingPageManageViewModel(
+        repo,
+        errors,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
 
     private fun page(
         slug: String = "maria-k",
@@ -88,6 +101,17 @@ class BookingPageManageViewModelTest {
             vm.load()
             advanceUntilIdle()
             assertTrue(vm.state.value is BookingPageManageUiState.NeedsSetup)
+        }
+
+    @Test
+    fun `event-types failure yields Error not NeedsSetup`() =
+        runTest(dispatcher) {
+            coEvery { repo.getBookingPage(any()) } returns NetworkResult.Success(page(slug = "", isLive = false))
+            coEvery { repo.getEventTypes(any()) } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            val vm = vm()
+            vm.load()
+            advanceUntilIdle()
+            assertTrue(vm.state.value is BookingPageManageUiState.Error)
         }
 
     @Test
@@ -185,5 +209,24 @@ class BookingPageManageViewModelTest {
             vm.regenerateLink()
             advanceUntilIdle()
             coVerify { repo.resetSlug(SchedulingOwner.Personal) }
+        }
+
+    @Test
+    fun `route owner args scope loads and saves to the business owner`() =
+        runTest(dispatcher) {
+            coEvery { repo.getBookingPage(any()) } returns NetworkResult.Success(page())
+            coEvery { repo.getEventTypes(any()) } returns NetworkResult.Success(service())
+            coEvery { repo.updateBookingPage(any(), any()) } returns NetworkResult.Success(page())
+            val business = SchedulingOwner.Business("biz-1")
+            val vm = vm(ownerKind = "business", ownerId = "biz-1")
+            vm.load()
+            advanceUntilIdle()
+            coVerify { repo.getBookingPage(business) }
+            vm.setTitle("Studio")
+            vm.save()
+            advanceUntilIdle()
+            coVerify { repo.updateBookingPage(business, any()) }
+            // Onward hops keep the owner context.
+            assertEquals("scheduling/booking-page/preview?ownerKind=business&ownerId=biz-1", vm.previewRoute())
         }
 }

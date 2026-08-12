@@ -2,14 +2,17 @@
 
 package app.pantopus.android.ui.screens.scheduling.resources
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.BookingDto
 import app.pantopus.android.data.api.models.scheduling.ResourceDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,15 +34,13 @@ data class ResourceRowUi(
 sealed interface ResourceListUiState {
     data object Loading : ResourceListUiState
 
+    /**
+     * Loaded rows. Offline presentation (amber banner, 0.55 row dim,
+     * hidden FAB) is driven live by the screen from [ResourceListViewModel.isOnline],
+     * mirroring iOS's `NetworkMonitor.shared.isOnline`.
+     */
     data class Loaded(
         val rows: List<ResourceRowUi>,
-        /**
-         * True when the list was served from cache with no network — the
-         * screen renders the amber offline banner and dims all rows to 0.55.
-         * The VM leaves this `false` until a ConnectivityManager observer
-         * is wired; the field is ready so the screen can consume it.
-         */
-        val isOffline: Boolean = false,
     ) : ResourceListUiState
 
     data object Empty : ResourceListUiState
@@ -61,12 +62,25 @@ class ResourceListViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val homes: HomesRepository,
+        networkMonitor: NetworkMonitor,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val _state = MutableStateFlow<ResourceListUiState>(ResourceListUiState.Loading)
         val state: StateFlow<ResourceListUiState> = _state.asStateFlow()
 
-        private var homeId: String? = null
+        /** Live connectivity — drives the offline frame (banner + dim + FAB-hide). */
+        val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
+
+        // The route's homeId query arg pins the home the user navigated from
+        // (iOS parity); absent → resolvePrimaryHomeId inference on first fetch.
+        private var homeId: String? =
+            savedStateHandle.get<String>(SchedulingRoutes.ARG_HOME_ID)?.takeIf { it.isNotBlank() }
         private var started = false
+
+        /** Sibling-route builders — keep the resolved home across A12 hops. */
+        fun newEditorRoute(): String = SchedulingRoutes.resourceEditor("new", homeId)
+
+        fun detailRoute(resourceId: String): String = SchedulingRoutes.resourceDetail(resourceId, homeId)
 
         fun start() {
             if (started) {

@@ -6,7 +6,10 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateEventTypeRequest
+import app.pantopus.android.data.api.models.scheduling.RuleInput
+import app.pantopus.android.data.api.models.scheduling.RulesRequest
 import app.pantopus.android.data.api.models.scheduling.UpdateBookingPageRequest
+import app.pantopus.android.data.api.models.scheduling.UpdateScheduleRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
@@ -269,7 +272,29 @@ class FirstRunWizardViewModel
             val s = _state.value
             _state.value = s.copy(isSubmitting = true)
             viewModelScope.launch {
-                repo.updateBookingPage(owner, UpdateBookingPageRequest(timezone = s.timezoneId))
+                // Also publishes: pages insert with is_live=false, and the success step this
+                // advances to invites the user to share a link that 404s while unpublished.
+                repo.updateBookingPage(
+                    owner,
+                    UpdateBookingPageRequest(timezone = s.timezoneId, isLive = true, isPaused = false),
+                )
+                // Persist the hours grid to the default schedule. Without this the step is
+                // decorative: the server seeds Mon–Fri 09-17 in America/New_York, so any day
+                // the user toggled — and their real timezone — never reached availability.
+                val availability = repo.getAvailability()
+                if (availability is NetworkResult.Success) {
+                    val schedule =
+                        availability.data.schedules.firstOrNull { it.isDefault }
+                            ?: availability.data.schedules.firstOrNull()
+                    if (schedule != null) {
+                        repo.updateSchedule(schedule.id, UpdateScheduleRequest(timezone = s.timezoneId))
+                        val rules =
+                            s.hours.filterValues { it }.keys.sorted().map { weekday ->
+                                RuleInput(weekday = weekday, startTime = "09:00", endTime = "17:00")
+                            }
+                        repo.setRules(schedule.id, RulesRequest(rules = rules))
+                    }
+                }
                 _state.value = _state.value.copy(step = STEP_SUCCESS, isSubmitting = false)
             }
         }

@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.automations
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.scheduling.GetMessageTemplatesResponse
 import app.pantopus.android.data.api.models.scheduling.MessageTemplateDto
 import app.pantopus.android.data.api.models.scheduling.MessageTemplateResponse
@@ -9,6 +10,7 @@ import app.pantopus.android.data.api.models.scheduling.SchedulingOkResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -35,7 +37,26 @@ class TemplateLibraryViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = TemplateLibraryViewModel(repo, errors)
+    private fun vm(
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = TemplateLibraryViewModel(
+        repo,
+        errors,
+        SavedStateHandle(
+            buildMap {
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
+
+    @Test
+    fun `route owner args flow into the editor route builders`() {
+        val vm = vm(ownerKind = "home", ownerId = "home-3")
+        assertEquals("scheduling/templates/new?ownerKind=home&ownerId=home-3", vm.createNewRoute())
+        assertEquals("scheduling/templates/t9?ownerKind=home&ownerId=home-3", vm.templateRoute("t9"))
+    }
 
     private fun mine(name: String) = MessageTemplateDto(id = "t1", name = name, channel = "email", subject = "s", body = "Hello")
 

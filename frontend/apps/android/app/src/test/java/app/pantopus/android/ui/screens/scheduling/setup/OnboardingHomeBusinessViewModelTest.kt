@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.scheduling.setup
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
@@ -13,8 +14,10 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
+import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import com.squareup.moshi.Moshi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -29,6 +32,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -40,12 +45,30 @@ class OnboardingHomeBusinessViewModelTest {
     private val homes: HomesRepository = mockk()
     private val auth: AuthRepository = mockk(relaxed = true)
     private val errors = SchedulingErrorDecoder(Moshi.Builder().build())
+    private val flags = SchedulingFeatureFlags().apply { environment = "development" }
 
     @Before fun setup() = Dispatchers.setMain(dispatcher)
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = OnboardingHomeBusinessViewModel(repo, homes, auth, errors)
+    private fun vm(
+        flow: String? = null,
+        ownerKind: String? = null,
+        ownerId: String? = null,
+    ) = OnboardingHomeBusinessViewModel(
+        repo,
+        homes,
+        auth,
+        errors,
+        flags,
+        SavedStateHandle(
+            buildMap {
+                flow?.let { put(SchedulingRoutes.ARG_FLOW, it) }
+                ownerKind?.let { put(SchedulingRoutes.ARG_OWNER_KIND, it) }
+                ownerId?.let { put(SchedulingRoutes.ARG_OWNER_ID, it) }
+            },
+        ),
+    )
 
     private fun myHome(id: String) =
         MyHome(
@@ -69,6 +92,19 @@ class OnboardingHomeBusinessViewModelTest {
         assertEquals(OnboardingFlow.Business, vm.state.value.flow)
         assertEquals(4, vm.state.value.railSteps)
         assertEquals(1, vm.state.value.stepIndex)
+    }
+
+    @Test
+    fun `business flow arg renders the Business wizard`() {
+        val vm = vm(flow = SchedulingRoutes.FLOW_BUSINESS, ownerKind = "business", ownerId = "biz-1")
+        assertEquals(OnboardingFlow.Business, vm.state.value.flow)
+        assertEquals(4, vm.state.value.railSteps)
+    }
+
+    @Test
+    fun `business route owner alone implies the Business flow`() {
+        val vm = vm(ownerKind = "business", ownerId = "biz-1")
+        assertEquals(OnboardingFlow.Business, vm.state.value.flow)
     }
 
     @Test
@@ -97,5 +133,64 @@ class OnboardingHomeBusinessViewModelTest {
             coVerify { repo.createEventType(SchedulingOwner.Home("home-9"), any()) }
             assertEquals("collective", body.captured.assignmentMode)
             assertTrue(vm.state.value.isSuccess)
+        }
+
+    @Test
+    fun `home finish prefers the route owner over inference`() =
+        runTest(dispatcher) {
+            coEvery { repo.createEventType(any(), any()) } returns
+                NetworkResult.Success(EventTypeResponse(EventTypeDto(id = "e", name = "n", slug = "s", durations = listOf(30))))
+            coEvery { repo.updateBookingPage(any(), any()) } returns NetworkResult.Success(BookingPageResponse(BookingPageDto(id = "p")))
+
+            val vm = vm(flow = SchedulingRoutes.FLOW_HOME, ownerKind = "home", ownerId = "home-route")
+            vm.onPrimary()
+            vm.onPrimary()
+            advanceUntilIdle()
+            // myHomes() is never consulted when the route pins the home.
+            coVerify(exactly = 0) { homes.myHomes() }
+            coVerify { repo.createEventType(SchedulingOwner.Home("home-route"), any()) }
+        }
+
+    @Test
+    fun `paid flag off nulls priceCents and hides the price field state`() =
+        runTest(dispatcher) {
+            flags.environment = "production"
+            coEvery { repo.createEventType(any(), any()) } returns
+                NetworkResult.Success(EventTypeResponse(EventTypeDto(id = "e", name = "n", slug = "s", durations = listOf(30))))
+            coEvery { repo.updateBookingPage(any(), any()) } returns NetworkResult.Success(BookingPageResponse(BookingPageDto(id = "p")))
+            val body = slot<CreateEventTypeRequest>()
+            coEvery { repo.createEventType(SchedulingOwner.Business("biz-1"), capture(body)) } returns
+                NetworkResult.Success(EventTypeResponse(EventTypeDto(id = "e", name = "n", slug = "s", durations = listOf(30))))
+
+            val vm = vm(flow = SchedulingRoutes.FLOW_BUSINESS, ownerKind = "business", ownerId = "biz-1")
+            assertFalse(vm.state.value.paidEnabled)
+            // Jump past the slug step straight to finish: steps 2..4 then finish.
+            vm.onSecondary() // 1 -> 2 (Use defaults path skips the slug claim)
+            vm.onPrimary() // 2 -> 3
+            vm.onPrimary() // 3 -> 4
+            vm.onPrimary() // 4 -> finishSetup
+            advanceUntilIdle()
+            assertNull(body.captured.priceCents)
+            flags.environment = "development"
+        }
+
+    @Test
+    fun `paid flag on keeps the default price`() =
+        runTest(dispatcher) {
+            coEvery { repo.createEventType(any(), any()) } returns
+                NetworkResult.Success(EventTypeResponse(EventTypeDto(id = "e", name = "n", slug = "s", durations = listOf(30))))
+            coEvery { repo.updateBookingPage(any(), any()) } returns NetworkResult.Success(BookingPageResponse(BookingPageDto(id = "p")))
+            val body = slot<CreateEventTypeRequest>()
+            coEvery { repo.createEventType(SchedulingOwner.Business("biz-1"), capture(body)) } returns
+                NetworkResult.Success(EventTypeResponse(EventTypeDto(id = "e", name = "n", slug = "s", durations = listOf(30))))
+
+            val vm = vm(flow = SchedulingRoutes.FLOW_BUSINESS, ownerKind = "business", ownerId = "biz-1")
+            assertTrue(vm.state.value.paidEnabled)
+            vm.onSecondary()
+            vm.onPrimary()
+            vm.onPrimary()
+            vm.onPrimary()
+            advanceUntilIdle()
+            assertEquals(12_000, body.captured.priceCents)
         }
 }

@@ -91,6 +91,47 @@ class InvoiceDetailViewModelTest {
         }
 
     @Test
+    fun `loaded derives status, timeline and breakdown from the row`() =
+        runTest(dispatcher) {
+            coEvery { repo.getInvoice(any(), "abc123def") } returns
+                NetworkResult.Success(
+                    InvoiceResponse(
+                        invoice().copy(
+                            status = "paid",
+                            subtotalCents = 20000,
+                            feeCents = 2000,
+                            paidAt = "2026-06-06T09:00:00Z",
+                            dueDate = "2026-06-18T00:00:00Z",
+                        ),
+                    ),
+                )
+            val model = vm()
+            model.start()
+            advanceUntilIdle()
+            val loaded = model.state.value as InvoiceDetailUiState.Loaded
+            assertEquals("paid", loaded.invoiceStatus)
+            assertEquals("$200.00", loaded.subtotalLabel)
+            assertEquals("$20.00", loaded.feeLabel)
+            assertEquals(listOf("Created", "Sent", "Paid"), loaded.timelineEvents.map { it.label })
+            assertTrue(loaded.timelineEvents.all { it.isDone })
+        }
+
+    @Test
+    fun `unpaid invoice with a due date gets a pending Due event`() =
+        runTest(dispatcher) {
+            coEvery { repo.getInvoice(any(), "abc123def") } returns
+                NetworkResult.Success(
+                    InvoiceResponse(invoice().copy(status = "sent", dueDate = "2026-06-18T00:00:00Z")),
+                )
+            val model = vm()
+            model.start()
+            advanceUntilIdle()
+            val loaded = model.state.value as InvoiceDetailUiState.Loaded
+            assertEquals(listOf("Created", "Sent", "Due"), loaded.timelineEvents.map { it.label })
+            assertTrue(loaded.timelineEvents.last().isDone.not())
+        }
+
+    @Test
     fun `send posts the invoice and flashes the sent toast`() =
         runTest(dispatcher) {
             coEvery { repo.getInvoice(any(), any()) } returns NetworkResult.Success(InvoiceResponse(invoice()))

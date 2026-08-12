@@ -132,8 +132,11 @@ class BookingsInboxViewModel
                 }
         }
 
-        /** Empty-state CTA / FAB → the host's own booking page (A4) to share the link. */
-        fun shareRoute(): String = SchedulingRoutes.BOOKING_PAGE_MANAGE
+        /** Empty-state CTA / FAB → the booking page (A4) of the currently selected scope's owner. */
+        fun shareRoute(): String {
+            val owner = owners.firstOrNull { it.id == _scope.value }?.owner ?: SchedulingOwner.Personal
+            return SchedulingRoutes.bookingPageManage(owner.routeKind, owner.ownerRouteId)
+        }
 
         /** Open a row's detail, stashing its resolved owner for the arg-less detail route. */
         fun detailRoute(id: String): String {
@@ -326,16 +329,11 @@ class BookingsInboxViewModel
                 whenLabel = rowWhenLabel(startAt),
                 pillStatus = status.toPillStatus(),
                 showOwnerGlyph = true,
-                // hostDisplayName is not in the list DTO; use the userId prefix as a
-                // placeholder so AssignedChip at least shows something distinct from
-                // "Unassigned". Full name resolution deferred until the list endpoint
-                // exposes it.
-                assigneeName =
-                    if (ctx.pillar == SchedulingPillar.Business && !hostUserId.isNullOrBlank()) {
-                        hostUserId.take(8)
-                    } else {
-                        null
-                    },
+                // hostDisplayName is not in the list DTO. Keep this null (chip
+                // hidden) rather than leaking a raw userId prefix into the UI as
+                // if it were a name; wire it up once the list endpoint exposes a
+                // display name.
+                assigneeName = null,
                 unread = status == BookingStatus.Pending,
                 quickApprove = quickApprove && status == BookingStatus.Pending,
             )

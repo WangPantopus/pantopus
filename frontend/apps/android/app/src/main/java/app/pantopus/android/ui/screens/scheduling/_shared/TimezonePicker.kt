@@ -19,6 +19,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,7 +85,9 @@ fun TimezonePickerSheet(
         Header(accent = accent, onDone = onDismiss)
         SearchBox(query = query, onQueryChange = onQueryChange)
 
-        val filtered = options.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+        // Non-blank queries search the full IANA database (capped), so any city
+        // is findable; blank keeps the curated Common list.
+        val filtered = remember(query, options) { searchTimezoneOptions(query, options) }
         when {
             filtered.isEmpty() -> NoMatch(query)
             query.isNotBlank() -> {
@@ -314,21 +317,59 @@ private val DEFAULT_ZONE_IDS =
         "Europe/London", "Europe/Paris", "Asia/Tokyo", "Australia/Sydney", "UTC",
     )
 
+/** Search results are capped so a broad query ("a") doesn't render 400 rows. */
+private const val SEARCH_RESULT_CAP = 60
+
+/** Live option row for an IANA zone [id], or null when the id doesn't resolve. */
+fun timezoneOption(
+    id: String,
+    now: Instant = Instant.now(),
+): TimezoneOption? =
+    runCatching {
+        val zoned = ZonedDateTime.ofInstant(now, ZoneId.of(id))
+        val offsetId = zoned.offset.id.let { if (it == "Z") "GMT" else "GMT$it" }
+        TimezoneOption(
+            id = id,
+            name = id.substringAfterLast('/').replace('_', ' '),
+            offset = offsetId,
+            localTime = zoned.format(OFFSET_TIME_FORMAT),
+        )
+    }.getOrNull()
+
 /**
  * A curated set of common timezones with live offsets/local times, for callers
  * that don't supply their own. Snapshot tests should pass fixed options instead
  * (this reads the wall clock).
  */
-fun defaultTimezoneOptions(now: Instant = Instant.now()): List<TimezoneOption> =
-    DEFAULT_ZONE_IDS.mapNotNull { id ->
-        runCatching {
-            val zoned = ZonedDateTime.ofInstant(now, ZoneId.of(id))
-            val offsetId = zoned.offset.id.let { if (it == "Z") "GMT" else "GMT$it" }
-            TimezoneOption(
-                id = id,
-                name = id.substringAfterLast('/').replace('_', ' '),
-                offset = offsetId,
-                localTime = zoned.format(OFFSET_TIME_FORMAT),
-            )
-        }.getOrNull()
-    }
+fun defaultTimezoneOptions(now: Instant = Instant.now()): List<TimezoneOption> = DEFAULT_ZONE_IDS.mapNotNull { timezoneOption(it, now) }
+
+/**
+ * Search the FULL IANA zone database, not just the curated rows — "Karachi",
+ * "Kolkata", etc. must be findable even though they aren't in the Common list.
+ * Matching caller-supplied rows keep their friendlier names and lead the list;
+ * the rest of the database fills in behind (id or city-name match), capped at
+ * [SEARCH_RESULT_CAP]. Blank queries return [curated] unchanged.
+ */
+fun searchTimezoneOptions(
+    query: String,
+    curated: List<TimezoneOption>,
+    zoneIds: Collection<String> = ZoneId.getAvailableZoneIds(),
+    now: Instant = Instant.now(),
+): List<TimezoneOption> {
+    val q = query.trim()
+    if (q.isEmpty()) return curated
+    val curatedMatches = curated.filter { it.name.contains(q, ignoreCase = true) || it.id.contains(q, ignoreCase = true) }
+    val curatedIds = curatedMatches.map { it.id }.toSet()
+    val extra =
+        zoneIds.asSequence()
+            .filter { it !in curatedIds }
+            .filter { id ->
+                id.contains(q, ignoreCase = true) ||
+                    id.substringAfterLast('/').replace('_', ' ').contains(q, ignoreCase = true)
+            }
+            .sorted()
+            .mapNotNull { timezoneOption(it, now) }
+            .take((SEARCH_RESULT_CAP - curatedMatches.size).coerceAtLeast(0))
+            .toList()
+    return (curatedMatches + extra).take(SEARCH_RESULT_CAP)
+}

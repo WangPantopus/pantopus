@@ -186,7 +186,9 @@ class SlotPickerViewModel
          */
         private suspend fun loadSlots(month: YearMonth): List<SlotDto>? {
             val from = maxOf(month.atDay(1), LocalDate.now(zone())).toString()
-            val to = month.atEndOfMonth().toString()
+            // Exclusive end: a date-only `to` parses server-side as UTC midnight, so the
+            // last calendar day must be covered by sending the next day.
+            val to = month.atEndOfMonth().plusDays(1).toString()
             val oneOff = args.oneOffToken
             return if (oneOff != null) {
                 when (val r = repo.publicGetOneOff(oneOff, tzId, from, to)) {

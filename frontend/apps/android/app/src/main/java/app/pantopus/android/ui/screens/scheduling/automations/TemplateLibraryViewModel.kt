@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.automations
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateMessageTemplateRequest
@@ -38,8 +39,15 @@ class TemplateLibraryViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        // Owner comes from the route's ownerKind/ownerId args (threaded by the
+        // settings root); Personal when absent.
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
         val pillar: SchedulingPillar = owner.pillar()
 
         val starters: List<StarterTemplate> = StarterTemplate.all
@@ -55,6 +63,10 @@ class TemplateLibraryViewModel
 
         private val _actionError = MutableStateFlow<String?>(null)
         val actionError: StateFlow<String?> = _actionError.asStateFlow()
+
+        /** True while a pull-to-refresh refetch is in flight (drives the indicator). */
+        private val _isRefreshing = MutableStateFlow(false)
+        val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
         private val needle: String get() = _query.value.trim().lowercase()
 
@@ -87,10 +99,15 @@ class TemplateLibraryViewModel
                     is NetworkResult.Failure ->
                         _state.value = TemplateLibraryUiState.Error(errors.decode(result.error).loadMessage())
                 }
+                _isRefreshing.value = false
             }
         }
 
-        fun refresh() = load()
+        /** Refetch keeping Loaded content on screen (pull-to-refresh). */
+        fun refresh() {
+            if (_state.value is TemplateLibraryUiState.Loaded) _isRefreshing.value = true
+            load()
+        }
 
         fun setQuery(value: String) {
             _query.value = value
@@ -101,9 +118,9 @@ class TemplateLibraryViewModel
         }
 
         // Navigation route builders.
-        fun createNewRoute(): String = SchedulingRoutes.messageTemplateEditor("new")
+        fun createNewRoute(): String = SchedulingRoutes.messageTemplateEditor("new", owner.routeKind, owner.ownerRouteId)
 
-        fun templateRoute(id: String): String = SchedulingRoutes.messageTemplateEditor(id)
+        fun templateRoute(id: String): String = SchedulingRoutes.messageTemplateEditor(id, owner.routeKind, owner.ownerRouteId)
 
         // ── Mutations ──────────────────────────────────────────────────────────
 

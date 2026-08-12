@@ -13,14 +13,17 @@ import app.pantopus.android.data.api.models.scheduling.EventTypeDto
 import app.pantopus.android.data.api.models.scheduling.GetBookingsResponse
 import app.pantopus.android.data.api.models.scheduling.GetWaitlistResponse
 import app.pantopus.android.data.api.models.scheduling.WaitlistEntryDto
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
 import app.pantopus.android.data.scheduling.SchedulingRepository
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -94,5 +97,36 @@ class GroupRosterViewModelTest {
             advanceUntilIdle()
             coVerify { repo.markNoShow(any(), "b1") }
             coVerify { repo.markNoShow(any(), "b2") }
+        }
+
+    @Test
+    fun `a partial no-show failure keeps only the failed ids selected for retry`() =
+        runTest(dispatcher) {
+            coEvery { repo.markNoShow(any(), "b1") } returns NetworkResult.Success(BookingResponse(anchor.copy(status = "no_show")))
+            coEvery { repo.markNoShow(any(), "b2") } returns NetworkResult.Failure(NetworkError.Server(500, null))
+            every { errors.decode(any(), any()) } returns SchedulingError.Generic(code = null, message = "boom")
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            vm.openNoShow()
+            vm.confirmNoShow()
+            advanceUntilIdle()
+            val sheet = vm.noShow.value
+            assertEquals(setOf("b2"), sheet?.selectedIds)
+        }
+
+    @Test
+    fun `an already-terminal BAD_STATE counts as done, not a retry`() =
+        runTest(dispatcher) {
+            coEvery { repo.markNoShow(any(), "b1") } returns NetworkResult.Success(BookingResponse(anchor.copy(status = "no_show")))
+            coEvery { repo.markNoShow(any(), "b2") } returns NetworkResult.Failure(NetworkError.ClientError(409, "{}"))
+            every { errors.decode(any(), any()) } returns SchedulingError.Generic(code = "BAD_STATE", message = "terminal")
+            val vm = vm()
+            vm.start()
+            advanceUntilIdle()
+            vm.openNoShow()
+            vm.confirmNoShow()
+            advanceUntilIdle()
+            assertEquals(null, vm.noShow.value) // sheet dismissed — nothing left to retry
         }
 }

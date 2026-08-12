@@ -19,7 +19,9 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingsOwnerRelay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,9 +65,14 @@ class HomeCalendarViewModel
         private val membersRepo: HomeMembersRepository,
         private val authRepository: AuthRepository,
         private val networkMonitor: NetworkMonitor,
+        private val bookingsOwnerRelay: BookingsOwnerRelay,
         savedStateHandle: SavedStateHandle,
         private val clock: () -> Instant = Instant::now,
-        private val zone: ZoneId = ZoneId.of("UTC"),
+        // Device-local display zone — agenda rows and the month strip render
+        // the same wall time the event form composes instants from (iOS
+        // parity). Tests inject a fixed zone; the all-day heuristic stays
+        // pinned to UTC inside HomeAgendaBuilder.
+        private val zone: ZoneId = ZoneId.systemDefault(),
     ) : ViewModel() {
         @Inject
         constructor(
@@ -73,8 +80,18 @@ class HomeCalendarViewModel
             membersRepo: HomeMembersRepository,
             authRepository: AuthRepository,
             networkMonitor: NetworkMonitor,
+            bookingsOwnerRelay: BookingsOwnerRelay,
             savedStateHandle: SavedStateHandle,
-        ) : this(repo, membersRepo, authRepository, networkMonitor, savedStateHandle, Instant::now, ZoneId.of("UTC"))
+        ) : this(
+            repo,
+            membersRepo,
+            authRepository,
+            networkMonitor,
+            bookingsOwnerRelay,
+            savedStateHandle,
+            Instant::now,
+            ZoneId.systemDefault(),
+        )
 
         private val homeId: String =
             checkNotNull(savedStateHandle.get<String>(HOME_CALENDAR_HOME_ID_KEY)) {
@@ -140,7 +157,10 @@ class HomeCalendarViewModel
                     }
                     is NetworkResult.Failure -> {
                         events = emptyList()
-                        _monthStrip.value = null
+                        // Keep the last-built month strip so a refresh failure
+                        // after a successful load retains the chrome (design
+                        // FrameError keeps the strip; mirrors iOS, which never
+                        // clears `monthStrip` on error).
                         _state.value =
                             HomeCalendarUiState.Error(
                                 eventsResult.error.message ?: "Couldn't load your calendar.",
@@ -220,6 +240,11 @@ class HomeCalendarViewModel
 
         fun openAgendaItem(item: HomeAgendaItem) {
             if (item.isBooking && item.bookingId != null) {
+                // Booking-union rows belong to THIS home — stash the home owner
+                // for the arg-less detail route (iOS parity:
+                // `.bookingDetail(owner: .home(homeId), …)`), else the detail
+                // screen falls back to a stale relay value or Personal.
+                bookingsOwnerRelay.pending = SchedulingOwner.Home(homeId)
                 onNavigate(SchedulingRoutes.bookingDetail(item.bookingId))
             } else {
                 onOpenEvent(item.eventId ?: item.id)
@@ -234,8 +259,9 @@ class HomeCalendarViewModel
             when (action) {
                 HomeCreateAction.AddEvent -> onAddEvent()
                 HomeCreateAction.FindATime -> onNavigate(SchedulingRoutes.FIND_A_TIME)
-                HomeCreateAction.BookResource -> onNavigate(SchedulingRoutes.RESOURCE_LIST)
-                HomeCreateAction.ScheduleVisit -> onNavigate(SchedulingRoutes.VISIT_SETUP)
+                // Carry this calendar's home so F9/F13 act on it, not an inferred one.
+                HomeCreateAction.BookResource -> onNavigate(SchedulingRoutes.resourceList(homeId))
+                HomeCreateAction.ScheduleVisit -> onNavigate(SchedulingRoutes.visitSetup(homeId))
             }
         }
 

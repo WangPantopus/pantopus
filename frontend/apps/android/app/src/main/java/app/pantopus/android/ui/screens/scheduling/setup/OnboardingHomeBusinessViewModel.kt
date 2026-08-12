@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.setup
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.CreateEventTypeRequest
@@ -12,9 +13,12 @@ import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
+import app.pantopus.android.data.scheduling.SchedulingFeatureFlags
 import app.pantopus.android.data.scheduling.SchedulingOwner
 import app.pantopus.android.data.scheduling.SchedulingRepository
+import app.pantopus.android.ui.screens.scheduling._shared.MoneyAndFlag
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardModel
@@ -32,7 +36,6 @@ import javax.inject.Inject
 
 private const val SLUG_DEBOUNCE_MS = 450L
 private const val DEFAULT_DURATION = 30
-private const val CENTS_PER_DOLLAR = 100
 private const val MAX_SLUG_ATTEMPTS = 4
 
 enum class OnboardingFlow { Home, Business }
@@ -42,8 +45,9 @@ data class OnboardingUiState(
     val flow: OnboardingFlow = OnboardingFlow.Home,
     val stepIndex: Int = 1,
     val isSubmitting: Boolean = false,
-    // Home
-    val selectedMembers: Set<String> = setOf("you", "m2", "m3"),
+    // Home. Only the current user starts selected — adding other people to a shared
+    // booking rotation is an opt-in choice, and iOS seeds the same way.
+    val selectedMembers: Set<String> = setOf("you"),
     val combineMode: String = "collective",
     val roundRobinRule: String = "balanced",
     // Business
@@ -52,10 +56,15 @@ data class OnboardingUiState(
     val serviceType: String = "consultation",
     val duration: Int = DEFAULT_DURATION,
     val priceText: String = "120",
-    val seatedTeam: Set<String> = setOf("owner", "t2", "t3"),
+    // Owner-only start, matching iOS — seating teammates is an opt-in choice.
+    val seatedTeam: Set<String> = setOf("owner"),
     val confirmMode: String = "approve",
     val timezoneId: String = ZoneId.systemDefault().id,
     val submitError: String? = null,
+    /** The owner's real BookingPage slug, captured from the finishSetup page update. */
+    val pageSlug: String? = null,
+    /** Paid-scheduling gate — hides the Business price field and nulls priceCents when off (iOS parity). */
+    val paidEnabled: Boolean = true,
 ) {
     /** INPUT steps before success — Home: Members+Combine (2); Business: Link+Service+Team+Confirm (4). */
     val inputSteps: Int get() = if (flow == OnboardingFlow.Home) 2 else 4
@@ -68,16 +77,21 @@ data class OnboardingUiState(
     val shareLink: String
         get() =
             if (flow == OnboardingFlow.Home) {
-                "pantopus.com/book/family"
+                // The home's real page slug, captured at finishSetup. A hardcoded guess here
+                // ("family") produced a link that 404'd or opened a stranger's page.
+                "pantopus.com/book/${pageSlug.orEmpty().ifBlank { "…" }}"
             } else {
                 "pantopus.com/book/${slug.ifBlank { "your-link" }}"
             }
 }
 
 /**
- * A6 Onboarding for Home & Business. The arg-less route means the flow is
- * chosen in-screen (default Home); the owner is resolved only at
- * [finishSetup] from [HomesRepository]/[AuthRepository].
+ * A6 Onboarding for Home & Business. The route's `flow` arg (falling back to
+ * the route owner's pillar) picks which wizard renders — the hub's Business
+ * empty-state must land on the Business Link/Service/Team/Confirm wizard, not
+ * the Home one. The route's owner args pin [finishSetup]/slug claims to the
+ * owner the user launched from; absent args fall back to
+ * [HomesRepository]/[AuthRepository] resolution.
  */
 @HiltViewModel
 class OnboardingHomeBusinessViewModel
@@ -87,9 +101,27 @@ class OnboardingHomeBusinessViewModel
         private val homes: HomesRepository,
         private val auth: AuthRepository,
         private val errors: SchedulingErrorDecoder,
+        private val flags: SchedulingFeatureFlags,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel(),
         WizardModel {
-        private val _state = MutableStateFlow(OnboardingUiState())
+        /** The Home/Business owner the caller launched from; Personal when absent. */
+        private val routeOwner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
+
+        private val initialFlow: OnboardingFlow =
+            when {
+                savedStateHandle.get<String>(SchedulingRoutes.ARG_FLOW) == SchedulingRoutes.FLOW_BUSINESS -> OnboardingFlow.Business
+                savedStateHandle.get<String>(SchedulingRoutes.ARG_FLOW) == SchedulingRoutes.FLOW_HOME -> OnboardingFlow.Home
+                routeOwner is SchedulingOwner.Business -> OnboardingFlow.Business
+                else -> OnboardingFlow.Home
+            }
+
+        private val _state =
+            MutableStateFlow(OnboardingUiState(flow = initialFlow, paidEnabled = flags.paidSchedulingEnabled))
         val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
 
         private val _pendingShareUrl = MutableStateFlow<String?>(null)
@@ -167,7 +199,7 @@ class OnboardingHomeBusinessViewModel
 
         fun selectFlow(flow: OnboardingFlow) {
             if (flow == _state.value.flow) return
-            _state.value = OnboardingUiState(flow = flow)
+            _state.value = OnboardingUiState(flow = flow, paidEnabled = flags.paidSchedulingEnabled)
         }
 
         fun toggleMember(id: String) {
@@ -197,7 +229,7 @@ class OnboardingHomeBusinessViewModel
         }
 
         fun setPriceText(text: String) {
-            _state.value = _state.value.copy(priceText = text.filter { it.isDigit() })
+            _state.value = _state.value.copy(priceText = text.filter { it.isDigit() || it == '.' || it == ',' })
         }
 
         fun setConfirmMode(mode: String) {
@@ -295,9 +327,25 @@ class OnboardingHomeBusinessViewModel
                     _state.value = _state.value.copy(isSubmitting = false, submitError = ownerErrorMessage(s.flow))
                     return@launch
                 }
-                repo.updateBookingPage(owner, UpdateBookingPageRequest(timezone = s.timezoneId))
+                // Seed timezone and publish. Pages insert with is_live=false and the success
+                // frame tells the user their link is live — without this the link 404s until
+                // Booking Page Management is visited. Mirrors web + the iOS wizards.
+                val pageResult =
+                    repo.updateBookingPage(
+                        owner,
+                        UpdateBookingPageRequest(timezone = s.timezoneId, isLive = true, isPaused = false),
+                    )
+                // The response carries the page's REAL slug — the Home success screen's share
+                // link derives from it (a guessed slug 404s or opens someone else's page).
+                val pageSlug = (pageResult as? NetworkResult.Success)?.data?.page?.slug
                 if (createEventTypeWithRetry(owner, s)) {
-                    _state.value = _state.value.copy(stepIndex = s.inputSteps + 1, isSubmitting = false, submitError = null)
+                    _state.value =
+                        _state.value.copy(
+                            stepIndex = s.inputSteps + 1,
+                            isSubmitting = false,
+                            submitError = null,
+                            pageSlug = pageSlug,
+                        )
                 } else {
                     _state.value = _state.value.copy(isSubmitting = false, submitError = "Couldn't finish setup. Please try again.")
                 }
@@ -321,7 +369,10 @@ class OnboardingHomeBusinessViewModel
             return false
         }
 
-        private fun businessOwner(): SchedulingOwner = businessUserId()?.let { SchedulingOwner.Business(it) } ?: SchedulingOwner.Personal
+        private fun businessOwner(): SchedulingOwner =
+            (routeOwner as? SchedulingOwner.Business)
+                ?: businessUserId()?.let { SchedulingOwner.Business(it) }
+                ?: SchedulingOwner.Personal
 
         private fun businessUserId(): String? = (auth.state.value as? AuthRepository.State.SignedIn)?.user?.id?.takeIf { it.isNotBlank() }
 
@@ -351,22 +402,32 @@ class OnboardingHomeBusinessViewModel
                     locationMode = "in_person",
                     assignmentMode = "one_on_one",
                     requiresApproval = s.confirmMode == "approve",
-                    priceCents = s.priceText.toIntOrNull()?.times(CENTS_PER_DOLLAR),
+                    // iOS parity (SchedulingOnboardingModel): price only when the
+                    // paid-scheduling flag is on — production builds must create a
+                    // free service, never a silent price_cents=12000 default.
+                    priceCents = if (flags.paidSchedulingEnabled) MoneyAndFlag.parseCents(s.priceText) else null,
                 )
             }
 
-        /** Resolves the concrete owner; null when no household/business id can be resolved (then setup must not proceed). */
+        /**
+         * Resolves the concrete owner — the route owner when it matches the flow,
+         * else the legacy fallback; null when no household/business id can be
+         * resolved (then setup must not proceed).
+         */
         private suspend fun resolveOwner(flow: OnboardingFlow): SchedulingOwner? =
             when (flow) {
                 OnboardingFlow.Home ->
-                    (homes.myHomes() as? NetworkResult.Success)
-                        ?.data
-                        ?.homes
-                        ?.firstOrNull()
-                        ?.id
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let { SchedulingOwner.Home(it) }
-                OnboardingFlow.Business -> businessUserId()?.let { SchedulingOwner.Business(it) }
+                    (routeOwner as? SchedulingOwner.Home)
+                        ?: (homes.myHomes() as? NetworkResult.Success)
+                            ?.data
+                            ?.homes
+                            ?.firstOrNull()
+                            ?.id
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { SchedulingOwner.Home(it) }
+                OnboardingFlow.Business ->
+                    (routeOwner as? SchedulingOwner.Business)
+                        ?: businessUserId()?.let { SchedulingOwner.Business(it) }
             }
 
         fun shareConsumed() {

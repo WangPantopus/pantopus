@@ -403,9 +403,29 @@ private fun ConnectedRow(
     }
 }
 
-private fun syncedAgo(
-    @Suppress("UNUSED_PARAMETER") iso: String?,
-): String = "Synced just now"
+/**
+ * Relative sync label from the row's real `last_synced_at` — "Synced just now",
+ * "Synced 12 min ago", "Synced 3 hr ago", or "Synced Jun 4" once it's a day+
+ * old. Unparseable/absent timestamps render a bare "Synced".
+ */
+private fun syncedAgo(iso: String?): String {
+    val instant =
+        iso?.let {
+            runCatching { java.time.Instant.parse(it) }.getOrNull()
+                ?: runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull()
+        } ?: return "Synced"
+    val minutes = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()
+    return when {
+        minutes < 1 -> "Synced just now"
+        minutes < 60 -> "Synced $minutes min ago"
+        minutes < 24 * 60 -> "Synced ${minutes / 60} hr ago"
+        else ->
+            "Synced " +
+                java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.US)
+                    .withZone(java.time.ZoneId.systemDefault())
+                    .format(instant)
+    }
+}
 
 // ─── Re-auth needed row (warning banner) ─────────────────────────────────────
 

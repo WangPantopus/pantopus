@@ -244,8 +244,17 @@ private fun slotDateLabel(slot: SlotDto): String =
     parseLocal(slot.startLocal ?: slot.start)?.format(DATE_FORMAT) ?: (slot.startLocal ?: slot.start)
 
 private fun slotTimeRange(slot: SlotDto): String {
-    val start = parseLocal(slot.startLocal ?: slot.start)?.format(TIME_ONLY) ?: return slot.start
-    val end = slot.end?.let { parseLocal(it)?.format(TIME_ONLY) }
+    val startLocal = parseLocal(slot.startLocal ?: slot.start) ?: return slot.start
+    val start = startLocal.format(TIME_ONLY)
+    // `end` is a UTC instant with no local counterpart on the DTO — deriving it from
+    // the local start + the UTC duration keeps both ends in the viewer's zone.
+    val end =
+        slot.end?.let { endUtc ->
+            runCatching {
+                val duration = Duration.between(OffsetDateTime.parse(slot.start), OffsetDateTime.parse(endUtc))
+                startLocal.plus(duration).format(TIME_ONLY)
+            }.getOrNull()
+        }
     return if (end != null) "$start–$end" else start
 }
 

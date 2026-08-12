@@ -128,6 +128,12 @@ data class ConfirmFlowState(
     val holdSecondsLeft: Int = HOLD_SECONDS,
     val clientSecret: String? = null,
     val manageToken: String? = null,
+    /**
+     * The id of the booking `submit()` created — stashed even when the flow
+     * detours through [ConfirmStep.Payment] (where [confirmed] isn't built yet)
+     * so the post-payment [ConfirmedData] and its receipt/nav carry the real id.
+     */
+    val createdBookingId: String? = null,
     val confirmed: ConfirmedData? = null,
     /**
      * True when the entered email resolves to an existing account — surfaces the

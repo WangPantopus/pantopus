@@ -13,6 +13,8 @@ import app.pantopus.android.data.api.models.scheduling.EventTypeDto
 import app.pantopus.android.data.api.models.scheduling.UpdateBookingPageRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.businesses.BusinessTeamRepository
+import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.scheduling.SchedulingError
 import app.pantopus.android.data.scheduling.SchedulingErrorDecoder
@@ -34,7 +36,6 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 import javax.inject.Inject
 
@@ -51,6 +52,8 @@ class SchedulingHubViewModel
     constructor(
         private val repo: SchedulingRepository,
         private val homes: HomesRepository,
+        private val homeMembers: HomeMembersRepository,
+        private val businessTeam: BusinessTeamRepository,
         private val auth: AuthRepository,
         private val errors: SchedulingErrorDecoder,
     ) : ViewModel() {
@@ -72,10 +75,12 @@ class SchedulingHubViewModel
         private var started = false
         private var fetchJob: Job? = null
         private var pauseJob: Job? = null
+        private var summaryJob: Job? = null
 
         // Cached for actions that don't re-fetch the whole screen.
         private var page: BookingPageDto? = null
         private var canEdit: Boolean = true
+        private var eventTypes: List<EventTypeDto> = emptyList()
 
         fun start() {
             if (started) {
@@ -166,6 +171,7 @@ class SchedulingHubViewModel
                     val availabilityDef = async { if (isPersonal) repo.getAvailability().dataOrNull()?.rules.orEmpty() else emptyList() }
                     val calendarsDef =
                         async { if (isPersonal) repo.getConnectedCalendars().dataOrNull()?.calendars.orEmpty() else emptyList() }
+                    val memberNamesDef = async { resolveMemberNames() }
                     HubFetchData(
                         eventTypes = eventTypesDef.await(),
                         summaryResult = summaryDef.await(),
@@ -173,9 +179,11 @@ class SchedulingHubViewModel
                         pending = pendingDef.await(),
                         availability = availabilityDef.await(),
                         calendars = calendarsDef.await(),
+                        memberNames = memberNamesDef.await(),
                     )
                 }
             val eventTypes = data.eventTypes
+            this.eventTypes = eventTypes
             val summaryResult = data.summaryResult
             val upcoming = data.upcoming
             val pending = data.pending
@@ -206,12 +214,66 @@ class SchedulingHubViewModel
                     isComposed = !isPersonal,
                     summary = summaryUi,
                     summaryFailed = summaryFailed,
-                    agenda = buildAgenda(upcoming, pending, typesById, zone),
+                    agenda = buildAgenda(upcoming, pending, typesById, zone, data.memberNames),
                     manageRows = buildManageRows(isPersonal, eventTypes, availability, calendars, pending),
                 )
         }
 
+        /**
+         * Host attribution for composed hubs — resolves the owner's member roster
+         * (home occupants / business team) into a user-id → name map so agenda
+         * rows can render the design's `user` glyph + host first name
+         * (scheduling-hub-frames.jsx FrameHome `crossOwner`). Personal hubs skip
+         * the fetch; failures degrade to no attribution. Mirrors iOS
+         * `SchedulingHubModel.resolveMemberNames()`.
+         */
+        private suspend fun resolveMemberNames(): Map<String, String> =
+            when (val current = owner) {
+                is SchedulingOwner.Personal -> emptyMap()
+                is SchedulingOwner.Home ->
+                    homeMembers
+                        .listOccupants(current.homeId)
+                        .dataOrNull()
+                        ?.occupants
+                        .orEmpty()
+                        .filter { it.isActive }
+                        .mapNotNull { occupant -> (occupant.displayName ?: occupant.username)?.let { occupant.userId to it } }
+                        .toMap()
+                is SchedulingOwner.Business ->
+                    businessTeam
+                        .members(current.businessUserId)
+                        .dataOrNull()
+                        ?.members
+                        .orEmpty()
+                        .mapNotNull { member -> member.user?.let { user -> (user.name ?: user.username)?.let { user.id to it } } }
+                        .toMap()
+            }
+
         // ─── Actions ────────────────────────────────────────────────────────
+
+        /**
+         * Refetch just the summary after a summary-card Retry tap — the rest of
+         * the hub is already loaded, so no full-screen reload. The card's own
+         * shimmer covers the in-flight state (mirrors iOS `retrySummary()`).
+         */
+        fun retrySummary() {
+            val live = _state.value as? SchedulingHubUiState.Loaded ?: return
+            if (live.summary != null || live.summaryRetrying) return
+            _state.value = live.copy(summaryRetrying = true)
+            summaryJob?.cancel()
+            summaryJob =
+                viewModelScope.launch {
+                    val result = repo.getBookingsSummary(owner)
+                    val current = _state.value as? SchedulingHubUiState.Loaded ?: return@launch
+                    val summaryUi = (result as? NetworkResult.Success)?.data?.let { HubSummaryUi.from(it, eventTypes) }
+                    _state.value =
+                        current.copy(
+                            summary = summaryUi,
+                            summaryFailed = summaryUi == null,
+                            summaryRetrying = false,
+                        )
+                }
+        }
 
         fun setPaused(paused: Boolean) {
             if (!canEdit) return
@@ -300,6 +362,7 @@ class SchedulingHubViewModel
             pending: List<BookingDto>,
             typesById: Map<String, EventTypeDto>,
             zone: ZoneId,
+            memberNames: Map<String, String>,
         ): List<HubAgendaSection> {
             val merged = (upcoming + pending).associateBy { it.id }.values
             val rows =
@@ -323,25 +386,33 @@ class SchedulingHubViewModel
                 val date = zdt.toLocalDate()
                 val key: String
                 val header: String
+                val sub: String
                 when {
                     date.isBefore(today) -> {
                         key = "past"
                         header = "Earlier"
+                        sub = zdt.format(subFmt)
                     }
                     date == today -> {
                         key = "today"
                         header = "Today"
+                        sub = zdt.format(subFmt)
                     }
                     date == today.plusDays(1) -> {
                         key = "tomorrow"
                         header = "Tomorrow"
+                        sub = zdt.format(subFmt)
                     }
                     else -> {
+                        // Days past tomorrow render one "THU AUG 7"-style line: the header
+                        // carries the full short date (renderer uppercases) and the sub is
+                        // dropped — iOS `SchedulingHubModel.dayBucket` parity.
                         key = date.toString()
-                        header = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US).uppercase(Locale.US)
+                        header = zdt.format(subFmt)
+                        sub = ""
                     }
                 }
-                headers.getOrPut(key) { header to zdt.format(subFmt) }
+                headers.getOrPut(key) { header to sub }
                 val type = booking.eventTypeId?.let { typesById[it] }
                 grouped.getOrPut(key) { mutableListOf() }.add(
                     HubBookingRowUi(
@@ -349,11 +420,12 @@ class SchedulingHubViewModel
                         kind = locationKind(type?.locationMode),
                         title = type?.name ?: "Booking",
                         timeLabel = zdt.format(timeFmt),
-                        metaLabel = durationMeta(type),
+                        metaLabel = durationMeta(booking, type),
                         bookerName = booking.inviteeName ?: booking.inviteeEmail ?: "Invitee",
                         bookerInitials = initials(booking.inviteeName ?: booking.inviteeEmail ?: "?"),
                         bookerTone = toneFor(booking.id),
                         status = booking.status ?: "confirmed",
+                        hostName = hostNameFor(booking, memberNames),
                     ),
                 )
             }
@@ -363,10 +435,39 @@ class SchedulingHubViewModel
             }
         }
 
-        private fun durationMeta(type: EventTypeDto?): String {
-            val mins = type?.defaultDuration ?: type?.durations?.firstOrNull()
+        /**
+         * Cross-owner host attribution — first name of the booking's assigned
+         * member, composed (non-personal) hubs only. Null when unresolvable.
+         */
+        private fun hostNameFor(
+            booking: BookingDto,
+            memberNames: Map<String, String>,
+        ): String? {
+            if (owner is SchedulingOwner.Personal) return null
+            return booking.hostUserId?.let { memberNames[it] }?.let(::firstName)
+        }
+
+        private fun durationMeta(
+            booking: BookingDto,
+            type: EventTypeDto?,
+        ): String {
+            // Prefer THIS booking's real length (start→end): a booking may use a non-default
+            // duration, or a rescheduled/off-default one, and the event type's default_duration
+            // would mislabel it. Fall back to the type only when the row lacks both instants.
+            val mins = bookingDurationMinutes(booking) ?: type?.defaultDuration ?: type?.durations?.firstOrNull()
             val location = locationLabel(type?.locationMode)
             return listOfNotNull(mins?.let { "$it min" }, location.takeIf { it.isNotEmpty() }).joinToString(" · ")
+        }
+
+        private fun bookingDurationMinutes(booking: BookingDto): Int? {
+            val start = booking.startAt ?: return null
+            val end = booking.endAt ?: return null
+            return runCatching {
+                java.time.Duration.between(
+                    java.time.OffsetDateTime.parse(start),
+                    java.time.OffsetDateTime.parse(end),
+                ).toMinutes().toInt().takeIf { it > 0 }
+            }.getOrNull()
         }
 
         // ─── Manage rows ──────────────────────────────────────────────────────
@@ -386,7 +487,9 @@ class SchedulingHubViewModel
                     icon = PantopusIcon.LayoutGrid,
                     label = "Event types",
                     value = if (activeCount == 1) "1 active" else "$activeCount active",
-                    route = SchedulingRoutes.EVENT_TYPE_LIST,
+                    // Carry the hub's owner so the catalog opens scoped to the
+                    // pillar the user is looking at (not the Personal default).
+                    route = SchedulingRoutes.eventTypeList(owner.routeKind, owner.ownerRouteId),
                 )
             rows +=
                 if (isPersonal) {
@@ -432,17 +535,41 @@ class SchedulingHubViewModel
                         icon = PantopusIcon.Settings,
                         label = "Settings",
                         value = null,
-                        route = SchedulingRoutes.SETTINGS,
+                        // Carry the hub's owner so Settings acts on the page the user is
+                        // actually looking at — its danger zone resets the booking link.
+                        route = SchedulingRoutes.settings(owner.routeKind, owner.ownerRouteId),
                     )
             }
             return rows
         }
 
+        // Mirrors iOS SchedulingHubModel.summarizeRules: real day label + earliest–latest hours
+        // from the actual rules, not the hardcoded "Mon–Fri, 9–5" / "N days set" that ignored
+        // the host's configured times.
         private fun availabilitySummary(rules: List<AvailabilityRuleDto>): String? {
             if (rules.isEmpty()) return null
             val weekdays = rules.map { it.weekday }.toSet()
-            val isMonFri = weekdays == setOf(1, 2, 3, 4, 5)
-            return if (isMonFri) "Mon–Fri, 9–5" else "${weekdays.size} days set"
+            val monFri = setOf(1, 2, 3, 4, 5)
+            val dayLabel =
+                if (weekdays.containsAll(monFri) && weekdays.none { it == 0 || it == 6 }) {
+                    "Mon–Fri"
+                } else {
+                    val order = listOf(1, 2, 3, 4, 5, 6, 0)
+                    val names = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                    order.filter { it in weekdays }.joinToString(", ") { names[it] }.ifEmpty { "Custom" }
+                }
+            val earliest = rules.minByOrNull { it.startTime } ?: return dayLabel
+            val latest = rules.maxByOrNull { it.endTime } ?: return dayLabel
+            return "$dayLabel, ${shortTime(earliest.startTime)}–${shortTime(latest.endTime)}"
+        }
+
+        /** "09:00:00" → "9", "13:30" → "1:30" (12-hour, no meridiem — matches iOS shortTime). */
+        private fun shortTime(hms: String): String {
+            val parts = hms.split(":")
+            val h = parts.getOrNull(0)?.toIntOrNull() ?: return hms
+            val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            val hour12 = if (h % 12 == 0) 12 else h % 12
+            return if (m == 0) "$hour12" else "$hour12:${m.toString().padStart(2, '0')}"
         }
 
         private fun connectedCalendarsValue(calendars: List<ConnectedCalendarDto>): String {
@@ -455,12 +582,24 @@ class SchedulingHubViewModel
 
         fun setupRoute(): String = SchedulingRoutes.SETUP_WIZARD
 
-        fun onboardingRoute(): String = SchedulingRoutes.ONBOARDING
+        fun onboardingRoute(): String = SchedulingRoutes.onboarding(null)
 
         fun startSetupRoute(): String =
-            if (owner is SchedulingOwner.Personal) SchedulingRoutes.SETUP_WIZARD else SchedulingRoutes.ONBOARDING
+            when (val current = owner) {
+                is SchedulingOwner.Personal -> SchedulingRoutes.SETUP_WIZARD
+                is SchedulingOwner.Business ->
+                    SchedulingRoutes.onboarding(SchedulingRoutes.FLOW_BUSINESS, current.routeKind, current.ownerRouteId)
+                is SchedulingOwner.Home ->
+                    SchedulingRoutes.onboarding(SchedulingRoutes.FLOW_HOME, current.routeKind, current.ownerRouteId)
+            }
 
         fun bookingsRoute(): String = SchedulingRoutes.BOOKINGS_INBOX
+
+        /** Top-bar overflow → Settings, carrying the current owner (its danger zone is owner-scoped). */
+        fun settingsRoute(): String = SchedulingRoutes.settings(owner.routeKind, owner.ownerRouteId)
+
+        /** Summary card "See insights" → A15 insights dashboard (mirrors iOS `openInsights`). */
+        fun insightsRoute(): String = SchedulingRoutes.INSIGHTS_DASHBOARD
 
         private fun parseInstant(raw: String?): Instant? {
             if (raw.isNullOrBlank()) return null
@@ -497,6 +636,12 @@ private fun locationKind(mode: String?): HubBookingKind =
         else -> HubBookingKind.Consult
     }
 
+/**
+ * First token of a display name — the design's cross-owner chip labels hosts
+ * by first name only ("John", "Maria"). Mirrors iOS `SchedulingHubModel.firstName`.
+ */
+private fun firstName(name: String): String = name.trim().split(" ").firstOrNull { it.isNotBlank() } ?: name
+
 private fun initials(name: String): String {
     val parts = name.trim().split(" ", "@").filter { it.isNotBlank() }
     if (parts.isEmpty()) return "?"
@@ -517,4 +662,6 @@ private data class HubFetchData(
     val pending: List<BookingDto>,
     val availability: List<AvailabilityRuleDto>,
     val calendars: List<ConnectedCalendarDto>,
+    /** Member user-id → display name for cross-owner host attribution (empty on personal hubs). */
+    val memberNames: Map<String, String>,
 )

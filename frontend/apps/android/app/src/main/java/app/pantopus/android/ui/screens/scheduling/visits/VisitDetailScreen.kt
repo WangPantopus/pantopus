@@ -42,7 +42,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingLoadingSkeleton
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillStatus
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingStatusPill
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingTopBarLeading
@@ -80,7 +78,6 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
-import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -102,8 +99,9 @@ fun VisitDetailScreen(
     val isEditing by viewModel.isEditing.collectAsStateWithLifecycle()
     val showCancel by viewModel.showCancelConfirm.collectAsStateWithLifecycle()
     val actionError by viewModel.actionError.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { viewModel.start() }
+    // The cancel DELETE runs in viewModelScope; dismiss once it actually lands.
+    LaunchedEffect(Unit) { viewModel.cancelled.collect { onBack() } }
 
     val loaded = state as? VisitDetailUiState.Loaded
 
@@ -149,7 +147,7 @@ fun VisitDetailScreen(
                         loaded = s,
                         onCancel = viewModel::requestCancel,
                         onReschedule = viewModel::beginEdit,
-                        onBookAgain = { onNavigate(SchedulingRoutes.VISIT_SETUP) },
+                        onBookAgain = { onNavigate(viewModel.bookAgainRoute()) },
                     )
             }
         }
@@ -170,7 +168,7 @@ fun VisitDetailScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissCancel,
             confirmButton = {
-                TextButton(onClick = { scope.launch { if (viewModel.cancelVisit()) onBack() } }) {
+                TextButton(onClick = viewModel::cancelVisit) {
                     Text("Cancel visit", color = PantopusColors.error, fontWeight = FontWeight.Bold)
                 }
             },

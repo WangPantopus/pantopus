@@ -39,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +59,6 @@ import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Spacing
-import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -83,10 +81,14 @@ fun ResourceEditorScreen(
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val saveError by viewModel.saveError.collectAsStateWithLifecycle()
     val showDelete by viewModel.showDeleteConfirm.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     var nameTouched by remember { mutableStateOf(false) }
 
     LaunchedStart { viewModel.start() }
+    // Saves/deletes run in viewModelScope; this one-shot event flow is the
+    // dismiss signal once the write has actually landed.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.events.collect { onBack() }
+    }
 
     val canSave =
         loadState is ResourceEditorLoadState.Ready && viewModel.isValid && viewModel.isDirty
@@ -108,9 +110,7 @@ fun ResourceEditorScreen(
                             modifier = Modifier.padding(end = Spacing.s4).size(20.dp),
                         )
                     } else {
-                        TextButton(onClick = {
-                            scope.launch { if (viewModel.save()) onBack() }
-                        }, enabled = canSave) {
+                        TextButton(onClick = viewModel::save, enabled = canSave) {
                             Text(
                                 text = "Save",
                                 fontSize = 14.sp,
@@ -159,7 +159,7 @@ fun ResourceEditorScreen(
     if (showDelete) {
         ResourceDeleteDialog(
             resourceName = form.name.ifBlank { "resource" },
-            onDelete = { scope.launch { if (viewModel.confirmDelete()) onBack() } },
+            onDelete = viewModel::confirmDelete,
             onKeep = viewModel::dismissDelete,
         )
     }

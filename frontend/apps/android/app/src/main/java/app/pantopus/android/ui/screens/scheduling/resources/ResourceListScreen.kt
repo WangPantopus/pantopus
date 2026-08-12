@@ -21,6 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -32,29 +36,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.OfflineBannerHost
-import app.pantopus.android.ui.components.StatusChipVariant
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
-import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
-import app.pantopus.android.ui.screens.shared.list_of_rows.SectionStyle
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -84,16 +82,20 @@ private val RESOURCE_TEMPLATES =
 
 /**
  * F9 Bookable Home Resources · List. The view-model owns the data + status
- * projection; this screen maps it onto the ListOfRows shell (Home-green
+ * projection; this screen renders the design's bespoke frames (Home-green
  * identity) and owns navigation to the editor / detail.
  *
  * Bespoke states (rendered with a local Scaffold, not ListOfRows):
  *  - Empty  → explainer card + TEMPLATES overline + 5 tappable template rows
  *  - Error  → cloud-off in errorBg circle, "Couldn't load resources", "Retry"
+ *  - Loaded → the design `ResourceRow` (40dp Home tile · 13.5sp/700 name ·
+ *    sunken capsule type badge · 7dp dot + coloured status label) — the shared
+ *    ListOfRows row chrome can't express it, mirroring iOS `ResourceRow`.
+ *    Offline: amber banner + 0.55 row dim + hidden FAB, driven live from
+ *    the view-model's connectivity flow.
  *
  * Delegated to ListOfRows shell:
  *  - Loading → standard shimmer skeleton
- *  - Loaded  → list rows; offline amber banner + 0.55-alpha icon tints when offline
  */
 @Composable
 fun ResourceListScreen(
@@ -102,9 +104,11 @@ fun ResourceListScreen(
     viewModel: ResourceListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
+    val online by viewModel.isOnline.collectAsStateWithLifecycle()
+    val offline = !online
     LaunchedEffect(Unit) { viewModel.start() }
 
-    val openEditor = { onNavigate(SchedulingRoutes.resourceEditor("new")) }
+    val openEditor = { onNavigate(viewModel.newEditorRoute()) }
 
     when (val state = uiState) {
         ResourceListUiState.Loading -> {
@@ -121,17 +125,22 @@ fun ResourceListScreen(
 
         ResourceListUiState.Empty -> {
             // Bespoke empty frame: same top-bar chrome + explainer card + TEMPLATES.
+            // FAB hides offline, mirroring iOS `showsFAB`.
             ResourceScaffold(
                 onBack = onBack,
                 onAdd = openEditor,
                 fab =
-                    FabAction(
-                        icon = PantopusIcon.Plus,
-                        contentDescription = "Add a resource",
-                        variant = FabVariant.SecondaryCreate,
-                        tint = FabTint.Home,
-                        onClick = openEditor,
-                    ),
+                    if (!offline) {
+                        FabAction(
+                            icon = PantopusIcon.Plus,
+                            contentDescription = "Add a resource",
+                            variant = FabVariant.SecondaryCreate,
+                            tint = FabTint.Home,
+                            onClick = openEditor,
+                        )
+                    } else {
+                        null
+                    },
             ) { innerPadding ->
                 ResourceEmptyBody(
                     modifier = Modifier.padding(innerPadding),
@@ -141,13 +150,15 @@ fun ResourceListScreen(
         }
 
         is ResourceListUiState.Error -> {
-            // Bespoke error frame: cloud-off in errorBg circle, correct copy + Retry.
+            // Bespoke error frame: cloud-off in errorBg circle, the state's
+            // message (iOS parity — e.g. the no-home explainer), + Retry.
             ResourceScaffold(
                 onBack = onBack,
                 onAdd = openEditor,
                 fab = null,
             ) { innerPadding ->
                 ResourceErrorBody(
+                    message = state.message,
                     modifier = Modifier.padding(innerPadding),
                     onRetry = viewModel::refresh,
                 )
@@ -155,44 +166,35 @@ fun ResourceListScreen(
         }
 
         is ResourceListUiState.Loaded -> {
-            val loaded = state
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .testTag(RESOURCE_LIST_TAG),
-            ) {
-                ListOfRowsScreen(
-                    title = "Resources",
-                    state =
-                        loaded.toShellState(
-                            onOpenDetail = { onNavigate(SchedulingRoutes.resourceDetail(it)) },
-                            isOffline = loaded.isOffline,
-                        ),
-                    onRefresh = viewModel::refresh,
-                    onEndReached = {},
-                    onBack = onBack,
-                    topBarAction = resourceAddAction(openEditor),
-                    fab =
-                        if (!loaded.isOffline) {
-                            FabAction(
-                                icon = PantopusIcon.Plus,
-                                contentDescription = "Add a resource",
-                                variant = FabVariant.SecondaryCreate,
-                                tint = FabTint.Home,
-                                onClick = openEditor,
-                            )
-                        } else {
-                            null
-                        },
-                    // Offline amber banner rendered as a fixed strip above the list.
-                    customHeader =
-                        if (loaded.isOffline) {
-                            { OfflineBannerHost(isOffline = true) {} }
-                        } else {
-                            null
-                        },
-                )
+            // Bespoke loaded frame — design `ResourceRow`s (iOS parity).
+            ResourceScaffold(
+                onBack = onBack,
+                onAdd = openEditor,
+                fab =
+                    if (!offline) {
+                        FabAction(
+                            icon = PantopusIcon.Plus,
+                            contentDescription = "Add a resource",
+                            variant = FabVariant.SecondaryCreate,
+                            tint = FabTint.Home,
+                            onClick = openEditor,
+                        )
+                    } else {
+                        null
+                    },
+            ) { innerPadding ->
+                OfflineBannerHost(
+                    isOffline = offline,
+                    modifier = Modifier.padding(innerPadding),
+                ) {
+                    ResourceLoadedBody(
+                        rows = state.rows,
+                        dimmed = offline,
+                        isRefreshing = false,
+                        onRefresh = viewModel::refresh,
+                        onOpenDetail = { onNavigate(viewModel.detailRoute(it)) },
+                    )
+                }
             }
         }
     }
@@ -208,12 +210,13 @@ private fun resourceAddAction(onClick: () -> Unit) =
         label = "Add",
     )
 
-// ─── Reusable Scaffold for Empty/Error frames ──────────────────────────────
+// ─── Reusable Scaffold for the bespoke frames ──────────────────────────────
 
 /**
- * Minimal Scaffold for the bespoke Empty and Error frames. Provides the same
- * chrome structure as [ListOfRowsScreen] (CenterAlignedTopAppBar + optional FAB
- * + appBg container) without binding to a list-of-rows state machine.
+ * Minimal Scaffold for the bespoke Empty, Error, and Loaded frames. Provides
+ * the same chrome structure as [ListOfRowsScreen] (CenterAlignedTopAppBar +
+ * optional FAB + appBg container) without binding to a list-of-rows state
+ * machine.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -224,6 +227,7 @@ private fun ResourceScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
+        modifier = Modifier.testTag(RESOURCE_LIST_TAG),
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -245,7 +249,8 @@ private fun ResourceScaffold(
                     }
                 },
                 actions = {
-                    // Matches ListOfRowsScreen's TopBarActionButton text-label render.
+                    // Matches ListOfRowsScreen's TopBarActionButton text-label
+                    // render, tinted with the Home pillar accent (iOS parity).
                     Box(
                         modifier =
                             Modifier
@@ -256,7 +261,7 @@ private fun ResourceScaffold(
                             text = "Add",
                             style = PantopusTextStyle.body,
                             fontWeight = FontWeight.SemiBold,
-                            color = PantopusColors.primary600,
+                            color = PantopusColors.home,
                         )
                     }
                 },
@@ -421,11 +426,13 @@ private fun ResourceEmptyBody(
 
 /**
  * Bespoke error body (design: resources-list-frames.jsx FrameError).
- * 56dp errorBg circle + cloud-off icon, "Couldn't load resources",
- * "Check your connection and try again.", "Retry" pill with rotate-cw icon.
+ * 56dp errorBg circle + cloud-off icon, "Couldn't load resources", the
+ * state's message (iOS parity — surfaces the no-home explainer), "Retry"
+ * pill (Home green, mirroring iOS `HomePrimaryButton`) with rotate-cw icon.
  */
 @Composable
 private fun ResourceErrorBody(
+    message: String,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit,
 ) {
@@ -460,18 +467,19 @@ private fun ResourceErrorBody(
         )
         Spacer(Modifier.height(Spacing.s1))
         Text(
-            text = "Check your connection and try again.",
+            text = message.ifBlank { "Check your connection and try again." },
             style = PantopusTextStyle.small,
             color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(Spacing.s4))
-        // Retry pill: primary blue, leading rotate-cw icon, "Retry" label.
+        // Retry pill: Home green (pillar identity), leading rotate-cw icon.
         Row(
             modifier =
                 Modifier
                     .sizeIn(maxWidth = 160.dp)
                     .clip(RoundedCornerShape(Radii.pill))
-                    .background(PantopusColors.primary600)
+                    .background(PantopusColors.home)
                     .clickable(onClick = onRetry)
                     .padding(horizontal = Spacing.s4, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -493,56 +501,132 @@ private fun ResourceErrorBody(
     }
 }
 
-// ─── Loaded → shell state projection ──────────────────────────────────────
+// ─── Loaded frame (bespoke ResourceRow list) ───────────────────────────────
 
-private fun ResourceListUiState.Loaded.toShellState(
+/**
+ * Pull-to-refresh list of design `ResourceRow`s. Mirrors iOS's loaded frame
+ * (ScrollView + `.refreshable` + `ResourceRow(dim: isOffline)`).
+ */
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+private fun ResourceLoadedBody(
+    rows: List<ResourceRowUi>,
+    dimmed: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onOpenDetail: (String) -> Unit,
-    isOffline: Boolean,
-): ListOfRowsUiState =
-    ListOfRowsUiState.Loaded(
-        sections =
-            listOf(
-                RowSection(
-                    id = "resources",
-                    style = SectionStyle.Flat,
-                    rows =
-                        rows.map { row ->
-                            RowModel(
-                                id = row.id,
-                                title = row.name,
-                                template = RowTemplate.StatusChip,
-                                leading =
-                                    RowLeading.TypeIcon(
-                                        icon = row.kind.icon,
-                                        background =
-                                            if (isOffline) {
-                                                PantopusColors.homeBg.copy(alpha = 0.55f)
-                                            } else {
-                                                PantopusColors.homeBg
-                                            },
-                                        foreground =
-                                            if (isOffline) {
-                                                PantopusColors.home.copy(alpha = 0.55f)
-                                            } else {
-                                                PantopusColors.home
-                                            },
-                                    ),
-                                trailing =
-                                    RowTrailing.Status(
-                                        text = row.statusLabel,
-                                        variant = if (row.isFree) StatusChipVariant.Success else StatusChipVariant.Neutral,
-                                    ),
-                                chips =
-                                    listOf(
-                                        RowChip(
-                                            text = row.kind.label,
-                                            tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
-                                        ),
-                                    ),
-                                onTap = { onOpenDetail(row.id) },
-                            )
-                        },
+    modifier: Modifier = Modifier,
+) {
+    val pullState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
+    Box(modifier = modifier.fillMaxSize().pullRefresh(pullState)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = Spacing.s3,
+                    end = Spacing.s3,
+                    top = Spacing.s3,
+                    bottom = 92.dp,
                 ),
-            ),
-        hasMore = false,
-    )
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            items(rows, key = { it.id }) { row ->
+                ResourceLoadedRow(row = row, dimmed = dimmed, onTap = { onOpenDetail(row.id) })
+            }
+        }
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            contentColor = PantopusColors.home,
+        )
+    }
+}
+
+/**
+ * Design `ResourceRow` (resources-list-frames.jsx:8-22), mirroring iOS
+ * `ResourceRow`: 40dp Home tile (radius 11) · 13.5sp/700 name · sunken
+ * capsule type badge · trailing 7dp dot + coloured "Free now"/"Booked
+ * until …" label. Dimmed to 0.55 when offline.
+ */
+@Composable
+private fun ResourceLoadedRow(
+    row: ResourceRowUi,
+    dimmed: Boolean,
+    onTap: () -> Unit,
+) {
+    val rowLabel = "${row.name}, ${row.kind.label}, ${row.statusLabel}"
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(14.dp))
+                .clickable(onClick = onTap)
+                .padding(horizontal = 12.dp, vertical = 11.dp)
+                .alpha(if (dimmed) 0.55f else 1f)
+                .testTag("scheduling.resourceList.row.${row.id}")
+                .semantics { contentDescription = rowLabel },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(PantopusColors.homeBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = row.kind.icon,
+                contentDescription = null,
+                size = 20.dp,
+                tint = PantopusColors.home,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(
+                text = row.name,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+            )
+            Text(
+                text = row.kind.label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(horizontal = Spacing.s2, vertical = 2.dp),
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (row.isFree) PantopusColors.success else PantopusColors.appTextMuted),
+            )
+            Text(
+                text = row.statusLabel,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (row.isFree) PantopusColors.success else PantopusColors.appTextSecondary,
+                maxLines = 1,
+            )
+        }
+    }
+}

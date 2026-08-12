@@ -164,18 +164,19 @@ class MemberPollResponseViewModel
                             if (isEmpty()) append("Pick the times that work")
                         },
                 )
-            val myKey = (signedIn?.user?.displayName ?: signedIn?.user?.email)?.lowercase()
-            val myVotes =
-                data.votes
-                    .filter { v -> myKey != null && v.voterName?.lowercase() == myKey }
-                    .associate { it.optionId to VoteValue.fromWire(it.value as? String) }
+            // "Your votes" pre-selection is intentionally OFF: the public poll
+            // read carries no viewer-scoped vote key, and matching rows by
+            // display name / email string is wrong (name collisions surface a
+            // stranger's votes as yours, and the server is dropping voter_name
+            // from the public read). Re-enable once the API returns votes keyed
+            // to the requesting viewer.
             val options =
                 data.options.map { o ->
                     PollOptionUi(
                         id = o.id,
                         dayLabel = FindATimeFormat.zonedDay(o.startAt ?: "", zone),
                         timeLabel = FindATimeFormat.zonedTime(o.startAt ?: "", zone),
-                        vote = myVotes[o.id],
+                        vote = null,
                     )
                 }
             val open = data.poll.status.equals("open", ignoreCase = true)

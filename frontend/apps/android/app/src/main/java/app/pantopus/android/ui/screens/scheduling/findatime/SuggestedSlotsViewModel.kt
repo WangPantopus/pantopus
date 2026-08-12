@@ -163,7 +163,9 @@ class SuggestedSlotsViewModel
                 mode = FindMode.Collective,
                 durationMin = 30,
                 fromIso = FindATimeFormat.isoDate(from),
-                toIso = FindATimeFormat.isoDate(to),
+                // Exclusive end — see [FindATimeCriteria.toIso]: covers the whole
+                // last day, which a date-only inclusive bound would drop.
+                toIso = FindATimeFormat.isoDate(to.plusDays(1)),
                 windowLabel = FindATimeFormat.windowPhrase(from, to),
                 timezone = FindATimeFormat.deviceZoneId(),
             )
@@ -188,8 +190,13 @@ class SuggestedSlotsViewModel
                     lastSlots = rows
                     _state.value =
                         if (rows.isEmpty()) {
+                            // Record the verdict so F4's no-overlap frame (amber
+                            // banner + quick fixes) renders when the setup editor
+                            // opens; cleared again on any successful compute.
+                            session.noOverlapMessage = noOverlapCopy(required)
                             SuggestedSlotsUiState.Empty(header)
                         } else {
+                            session.noOverlapMessage = null
                             SuggestedSlotsUiState.Loaded(
                                 header = header,
                                 slots = rows,
@@ -200,6 +207,19 @@ class SuggestedSlotsViewModel
                 }
                 is NetworkResult.Failure ->
                     _state.value = SuggestedSlotsUiState.Error(errors.decode(result.error).let { friendly(it) })
+            }
+        }
+
+        /**
+         * Banner-body guidance for the F4 no-overlap frame (the banner title
+         * already states "No time works for all N"). Mirrors iOS `noOverlapCopy`.
+         */
+        private fun noOverlapCopy(required: List<FindMember>): String {
+            val name = required.firstOrNull()?.name
+            return if (name != null) {
+                "Try making $name optional, or widen the date window."
+            } else {
+                "Try making someone optional, or widen the date window."
             }
         }
 

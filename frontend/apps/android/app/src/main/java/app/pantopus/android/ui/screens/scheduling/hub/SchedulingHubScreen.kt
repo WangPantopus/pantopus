@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.scheduling.hub
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -89,7 +90,10 @@ fun SchedulingHubScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HubTopBar(canEdit = canEdit)
+            HubTopBar(
+                canEdit = canEdit,
+                onSettings = { onNavigate(viewModel.settingsRoute()) },
+            )
             HubPillBand(pillar = pillar, onSelect = viewModel::selectPillar)
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 Column(
@@ -123,6 +127,8 @@ fun SchedulingHubScreen(
                                 onToggle = { accepting -> viewModel.setPaused(!accepting) },
                                 onNavigate = onNavigate,
                                 onSeeAllBookings = { onNavigate(viewModel.bookingsRoute()) },
+                                onRetrySummary = viewModel::retrySummary,
+                                onInsights = { onNavigate(viewModel.insightsRoute()) },
                             )
                     }
                 }
@@ -140,7 +146,10 @@ fun SchedulingHubScreen(
 }
 
 @Composable
-private fun HubTopBar(canEdit: Boolean) {
+private fun HubTopBar(
+    canEdit: Boolean,
+    onSettings: () -> Unit,
+) {
     Column {
         Box(
             modifier =
@@ -169,12 +178,16 @@ private fun HubTopBar(canEdit: Boolean) {
                     Modifier
                         .align(Alignment.CenterEnd)
                         .size(36.dp)
+                        // The overflow glyph was purely decorative; the design's top-bar action
+                        // opens Settings (the manage list's Settings row goes to the same place).
+                        // Only interactive when the viewer can edit — view-only shows the info glyph.
+                        .then(if (canEdit) Modifier.clickable(onClick = onSettings) else Modifier)
                         .testTag(HubTags.TOP_BAR_TRAILING),
                 contentAlignment = Alignment.Center,
             ) {
                 PantopusIconImage(
                     icon = if (canEdit) PantopusIcon.MoreHorizontal else PantopusIcon.Info,
-                    contentDescription = if (canEdit) "More" else "View-only access",
+                    contentDescription = if (canEdit) "Settings" else "View-only access",
                     size = if (canEdit) 22.dp else 20.dp,
                     tint = PantopusColors.appText,
                 )
@@ -234,16 +247,27 @@ private fun HubLoadedBody(
     onToggle: (Boolean) -> Unit,
     onNavigate: (String) -> Unit,
     onSeeAllBookings: () -> Unit,
+    onRetrySummary: () -> Unit,
+    onInsights: () -> Unit,
 ) {
     Spacer(Modifier.height(Spacing.s4))
     if (!state.canEdit) {
         ViewOnlyBanner()
         Spacer(Modifier.height(Spacing.s3))
     }
-    // Design FrameDefault (scheduling-hub-frames.jsx) and iOS loadedBody render no
-    // analytics/summary card in the hub — booking-link card is the hero element.
-    // SummaryCard remains a standalone composable (snapshot-covered) for reuse on
-    // the insights surface, but is intentionally absent here.
+    // A5 summary card — embedded at the TOP of the loaded hub, above the
+    // booking-link card (summary-card-frames.jsx; mirrors iOS
+    // SchedulingHubScreen.summaryCard). Data / empty (share CTA) / error
+    // (retry) come from the already-fetched summary; the hub skeleton covers
+    // the initial loading frame and the card's own shimmer covers a
+    // summary-only retry.
+    SummaryCard(
+        content = summaryContent(state),
+        pillar = state.pillar,
+        onShare = onShare,
+        onRetry = onRetrySummary,
+        onInsights = onInsights,
+    )
     if (state.isComposed) {
         Spacer(Modifier.height(Spacing.s3))
         val lead = state.displayName.trim().firstOrNull()?.uppercase() ?: "Y"
@@ -300,6 +324,19 @@ private fun HubLoadedBody(
     HubManageGroup(rows = state.manageRows, readOnly = !state.canEdit, onNavigate = onNavigate)
     Spacer(Modifier.height(Spacing.s6))
 }
+
+/**
+ * Loaded-hub summary projection: retry-in-flight → the card's shimmer;
+ * fetch failure → error/Retry; zero data → the share-CTA empty variant;
+ * otherwise the stat cells (mirrors iOS `summaryContent`).
+ */
+private fun summaryContent(state: SchedulingHubUiState.Loaded): SummaryCardContent =
+    when {
+        state.summaryRetrying -> SummaryCardContent.Loading
+        state.summary == null -> SummaryCardContent.Error
+        state.summary.isEmpty -> SummaryCardContent.Empty
+        else -> SummaryCardContent.Data(state.summary)
+    }
 
 @Composable
 private fun ViewOnlyBanner() {

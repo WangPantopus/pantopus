@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.scheduling.settings
 
 import androidx.compose.runtime.Immutable
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.scheduling.BookingPageDto
@@ -16,6 +17,7 @@ import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling._shared.pillar
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,7 +58,14 @@ data class SettingsData(
     val justSavedRow: String? = null,
 )
 
-/** A3 Scheduling Settings Root ("Booking settings"). Personal default (arg-less route). */
+/**
+ * A3 Scheduling Settings Root ("Booking settings").
+ *
+ * Owner comes from the route (see `SchedulingRoutes.settings`), mirroring iOS's
+ * `SchedulingSettingsModel(owner:)`. It must not be hardcoded: this screen's danger zone
+ * resets the booking link, so a Personal default would destroy the personal page whenever
+ * the hub was scoped to a Home or Business.
+ */
 @HiltViewModel
 class SchedulingSettingsRootViewModel
     @Inject
@@ -64,8 +73,13 @@ class SchedulingSettingsRootViewModel
         private val repo: SchedulingRepository,
         private val errors: SchedulingErrorDecoder,
         private val featureFlags: SchedulingFeatureFlags,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val owner: SchedulingOwner = SchedulingOwner.Personal
+        private val owner: SchedulingOwner =
+            SchedulingOwner.fromRoute(
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_KIND],
+                savedStateHandle[SchedulingRoutes.ARG_OWNER_ID],
+            )
 
         private val _state = MutableStateFlow<SchedulingSettingsUiState>(SchedulingSettingsUiState.Loading)
         val state: StateFlow<SchedulingSettingsUiState> = _state.asStateFlow()
@@ -73,24 +87,31 @@ class SchedulingSettingsRootViewModel
         private val _toast = MutableStateFlow<String?>(null)
         val toast: StateFlow<String?> = _toast.asStateFlow()
 
+        private var fetchJob: Job? = null
+
         fun load() {
             _state.value = SchedulingSettingsUiState.Loading
-            viewModelScope.launch {
-                val pageResult = repo.getBookingPage(owner)
-                val page =
-                    when (pageResult) {
-                        is NetworkResult.Success -> pageResult.data.page
-                        is NetworkResult.Failure -> {
-                            _state.value = SchedulingSettingsUiState.Error(errors.decode(pageResult.error).settingsMessage())
-                            return@launch
+            fetchJob?.cancel()
+            fetchJob =
+                viewModelScope.launch {
+                    val pageResult = repo.getBookingPage(owner)
+                    val page =
+                        when (pageResult) {
+                            is NetworkResult.Success -> pageResult.data.page
+                            is NetworkResult.Failure -> {
+                                _state.value = SchedulingSettingsUiState.Error(errors.decode(pageResult.error).settingsMessage())
+                                return@launch
+                            }
                         }
-                    }
-                val paymentsDef = viewModelScope.async { repo.getPaymentsStatus(owner) }
-                val eventTypesDef = viewModelScope.async { repo.getEventTypes(owner) }
-                val payments = (paymentsDef.await() as? NetworkResult.Success)?.data
-                val eventTypeCount = (eventTypesDef.await() as? NetworkResult.Success)?.data?.eventTypes?.size ?: 0
-                _state.value = SchedulingSettingsUiState.Loaded(buildData(page, payments?.connected == true, eventTypeCount))
-            }
+                    // Bare async {} children of this launch — cancelling the fetch
+                    // (or a failure in either) cancels both, instead of orphaning
+                    // scope-rooted asyncs that outlive the launch.
+                    val paymentsDef = async { repo.getPaymentsStatus(owner) }
+                    val eventTypesDef = async { repo.getEventTypes(owner) }
+                    val payments = (paymentsDef.await() as? NetworkResult.Success)?.data
+                    val eventTypeCount = (eventTypesDef.await() as? NetworkResult.Success)?.data?.eventTypes?.size ?: 0
+                    _state.value = SchedulingSettingsUiState.Loaded(buildData(page, payments?.connected == true, eventTypeCount))
+                }
         }
 
         fun refresh() = load()
@@ -172,14 +193,16 @@ class SchedulingSettingsRootViewModel
             }
         }
 
-        // Navigation route helpers.
-        fun notificationsRoute() = SchedulingRoutes.NOTIFICATIONS
+        // Navigation route helpers. The automations rows carry this root's owner
+        // (iOS parity: `.defaultReminders(owner:)` etc.) — reminders persist onto
+        // the owner's BookingPage and workflows/templates mutate the owner's rows.
+        fun notificationsRoute() = SchedulingRoutes.notifications(owner.routeKind, owner.ownerRouteId)
 
-        fun remindersRoute() = SchedulingRoutes.REMINDERS_QUICK_SETUP
+        fun remindersRoute() = SchedulingRoutes.remindersQuickSetup(owner.routeKind, owner.ownerRouteId)
 
-        fun workflowsRoute() = SchedulingRoutes.WORKFLOWS_LIST
+        fun workflowsRoute() = SchedulingRoutes.workflowsList(owner.routeKind, owner.ownerRouteId)
 
-        fun templatesRoute() = SchedulingRoutes.TEMPLATE_LIBRARY
+        fun templatesRoute() = SchedulingRoutes.templateLibrary(owner.routeKind, owner.ownerRouteId)
 
         fun availabilityRoute() = SchedulingRoutes.AVAILABILITY_LIST
 

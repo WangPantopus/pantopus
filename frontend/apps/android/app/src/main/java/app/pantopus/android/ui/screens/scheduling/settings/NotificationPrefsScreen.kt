@@ -76,7 +76,13 @@ private fun NotifBody(
     // Presentational SMS-coming-soon tooltip toggle — mirrors iOS model.showSmsHint.
     var showSmsHint by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = Spacing.s6)) {
-        if (data.paused) NotifPauseBanner()
+        if (data.paused) {
+            NotifPauseBanner(
+                pausedForLabel = data.pausedForLabel,
+                resumesAtLabel = data.resumesAtLabel,
+                onResume = vm::resume,
+            )
+        }
         if (data.pushOff) NotifPushOffNotice(onOpenSettings = onOpenSettings)
         NotifOverline("Scheduling & bookings")
         NotifCategoryCard(
