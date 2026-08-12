@@ -227,8 +227,12 @@ export function formToWorkflowInput(form: WorkflowForm) {
 export function validateWorkflow(form: WorkflowForm): Record<string, string> {
   const errors: Record<string, string> = {};
   const name = form.name.trim();
-  // Name is optional — blank falls back to channel.actionSummary server-side.
-  if (name.length > 200)
+  // Name is REQUIRED: backend/routes/scheduling.js:1079 is
+  // `Joi.string().trim().min(1).max(200).required()`. A previous comment here claimed the
+  // server falls back to the action summary when it is blank — it does not, it 400s. Without
+  // this check the user gets an opaque request failure instead of inline field validation.
+  if (!name) errors.name = "Give this workflow a name.";
+  else if (name.length > 200)
     errors.name = "Keep the name under 200 characters.";
   if (!TRIGGERS.some((t) => t.id === form.trigger))
     errors.trigger = "Pick a trigger.";

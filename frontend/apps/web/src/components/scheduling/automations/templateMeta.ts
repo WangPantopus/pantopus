@@ -155,8 +155,12 @@ export function formToTemplateInput(form: TemplateForm) {
 export function validateTemplate(form: TemplateForm): Record<string, string> {
   const errors: Record<string, string> = {};
   const name = form.name.trim();
-  // Name is optional — blank falls back to the channel label server-side.
-  if (name.length > 200)
+  // Name is REQUIRED: backend/routes/scheduling.js:1123 is
+  // `Joi.string().trim().min(1).max(200).required()`. The server does not fall back to the
+  // channel label — it 400s — so accepting a blank name here turns an inline field error
+  // into an opaque save failure.
+  if (!name) errors.name = "Give this template a name.";
+  else if (name.length > 200)
     errors.name = "Keep the name under 200 characters.";
   const body = form.body.trim();
   if (!body) errors.body = "Add a message body.";

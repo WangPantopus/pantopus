@@ -16,7 +16,6 @@ import {
   Hourglass,
   MailCheck,
   Settings2,
-  TicketCheck,
   UserPlus,
 } from "lucide-react";
 import clsx from "clsx";
@@ -252,15 +251,16 @@ export default function ConfirmedView({ token }: { token: string }) {
   }
 
   const { booking, eventType, page, payment } = view;
-  const pillar = pillarForOwner(page?.owner_type ?? booking.owner_type);
+  // The public manage payload carries no owner / contact / payment-source
+  // fields on the booking (trimmed ManageBookingRow) — pillar comes from the
+  // page view, and the confirmation copy stays generic.
+  const pillar = pillarForOwner(page?.owner_type);
   const tk = pillarTokens(pillar);
   const hostName = page?.title || "your host";
   const eventName = eventType?.name || "Your booking";
   const tz = booking.invitee_timezone || page?.timezone || detectTimezone();
   const isPending = booking.status === "pending";
-  const sentTo = booking.invitee_email;
   const hasPayment = Boolean(payment && payment.amount_total > 0);
-  const usedCredit = Boolean(booking.package_credit_id);
   const managePath = buildBookingManagePath(token);
 
   return (
@@ -279,13 +279,7 @@ export default function ConfirmedView({ token }: { token: string }) {
               {confirmationMessage ||
                 (isPending
                   ? `${hostName} reviews each request before it's confirmed. We'll email you the moment it's set.`
-                  : sentTo
-                    ? "We sent the details to "
-                    : "Your booking is confirmed.")}
-              {!confirmationMessage && !isPending && sentTo && (
-                <b className="font-bold text-app-text">{sentTo}</b>
-              )}
-              {!confirmationMessage && !isPending && sentTo ? "." : ""}
+                  : "Your booking is confirmed.")}
             </p>
           </div>
         </div>
@@ -312,23 +306,8 @@ export default function ConfirmedView({ token }: { token: string }) {
           inviteeName={booking.invitee_name}
         />
 
-        {/* Receipt / credit */}
-        {usedCredit ? (
-          <div className="flex items-center gap-2.5 rounded-xl border border-app-success-light bg-app-success-bg px-3.5 py-3">
-            <TicketCheck
-              className="h-4 w-4 shrink-0 text-app-success"
-              aria-hidden
-            />
-            <div className="min-w-0">
-              <p className="text-[12px] font-bold text-app-success">
-                1 session credit used
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium text-app-success">
-                No charge today.
-              </p>
-            </div>
-          </div>
-        ) : hasPayment && payment ? (
+        {/* Receipt */}
+        {hasPayment && payment ? (
           <div className="rounded-xl border border-app-success-light bg-app-success-bg px-3.5 py-3">
             <div className="flex items-center gap-2">
               <MailCheck
@@ -344,11 +323,6 @@ export default function ConfirmedView({ token }: { token: string }) {
                 {formatCents(payment.amount_total, payment.currency)}
               </span>
             </div>
-            {sentTo && (
-              <p className="mt-2 text-[11px] font-medium text-app-text-strong">
-                Receipt emailed to {sentTo}
-              </p>
-            )}
           </div>
         ) : null}
 

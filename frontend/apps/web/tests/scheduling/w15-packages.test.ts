@@ -179,7 +179,11 @@ describe("credit display", () => {
   it("marks a depleted credit as used", () => {
     const p = creditProgress(credit({ remaining_sessions: 0 }));
     expect(p.state).toBe("used");
-    expect(creditCountLabel(p)).toBe("All used");
+    // The count keeps the "N of M left" shape when depleted — design
+    // mypackages-frames.jsx:52 renders "0 of 5 left" for state==='used'. The words
+    // "All used" belong to the separate uppercase pill beside it (frames line 54,
+    // rendered at MyPackages.tsx:188), not to this label.
+    expect(creditCountLabel(p)).toBe("0 of 5 left");
   });
 
   it("labels remaining sessions", () => {

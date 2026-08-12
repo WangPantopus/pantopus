@@ -234,10 +234,9 @@ export default function BookResource({
         },
         owner,
       );
-      // ResourceBooking.status (W0 type) omits 'pending', but the backend returns
-      // it when the resource requires approval — read the raw value.
-      const status = res.booking.status as string;
-      setSuccess(status === "pending" ? "pending" : "confirmed");
+      // bookResource returns a full Booking row; status is 'pending' when the
+      // resource requires approval.
+      setSuccess(res.booking.status === "pending" ? "pending" : "confirmed");
     } catch (err) {
       const decoded = decodeError(err);
       const sc = asSlotConflict(decoded);

@@ -19,6 +19,7 @@ import type {
   PublicSlotsResponse,
   PublicOneOff,
   PublicBookingInput,
+  PublicBookingSummary,
   CreatePublicBookingResult,
   BookingManageView,
   BookingSlot,
@@ -110,18 +111,20 @@ export function getIcsUrl(token: string): string {
   return `${PUBLIC}/booking/${encodeURIComponent(token)}/ics`;
 }
 
+/** Returns the trimmed {id, status, start_at, end_at} — never the full row. */
 export function rescheduleByToken(token: string, body: { start_at: string }) {
-  return post<{ booking: Booking }>(
+  return post<{ booking: PublicBookingSummary }>(
     `${PUBLIC}/booking/${encodeURIComponent(token)}/reschedule`,
     body,
   );
 }
 
+/** Returns only {id, status} — the cancel payload carries no times. */
 export function cancelByToken(
   token: string,
   body?: { reason?: string | null },
 ) {
-  return post<{ booking: Booking }>(
+  return post<{ booking: Pick<Booking, "id" | "status"> }>(
     `${PUBLIC}/booking/${encodeURIComponent(token)}/cancel`,
     body || {},
   );
@@ -135,15 +138,17 @@ export function unsubscribeByToken(token: string) {
   );
 }
 
+/** Returns the trimmed {id, status, start_at, end_at} — never the full row. */
 export function acceptReschedule(token: string) {
-  return post<{ booking: Booking }>(
+  return post<{ booking: PublicBookingSummary }>(
     `${PUBLIC}/booking/${encodeURIComponent(token)}/accept-reschedule`,
     {},
   );
 }
 
+/** Returns only {id, status} — the decline payload carries no times. */
 export function declineReschedule(token: string) {
-  return post<{ booking: Booking }>(
+  return post<{ booking: Pick<Booking, "id" | "status"> }>(
     `${PUBLIC}/booking/${encodeURIComponent(token)}/decline-reschedule`,
     {},
   );

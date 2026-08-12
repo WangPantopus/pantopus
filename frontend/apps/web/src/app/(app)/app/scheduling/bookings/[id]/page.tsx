@@ -175,7 +175,7 @@ export default function BookingDetailPage() {
         danger: true,
         onClick: () => openApprove("decline"),
       });
-    } else if ((s === "confirmed" || s === "rescheduled") && !elapsed) {
+    } else if (s === "confirmed" && !elapsed) {
       menuItems.push({
         label: "Reschedule",
         icon: CalendarClock,
@@ -195,7 +195,7 @@ export default function BookingDetailPage() {
         danger: true,
         onClick: () => openSheet("cancel"),
       });
-    } else if ((s === "confirmed" || s === "rescheduled") && elapsed) {
+    } else if (s === "confirmed" && elapsed) {
       menuItems.push({
         label: "Mark no-show",
         icon: UserX,
@@ -329,8 +329,7 @@ export default function BookingDetailPage() {
               </>
             )}
 
-            {(booking.status === "confirmed" ||
-              booking.status === "rescheduled") &&
+            {booking.status === "confirmed" &&
               !elapsed && (
                 <>
                   <DockButton
@@ -350,8 +349,7 @@ export default function BookingDetailPage() {
                 </>
               )}
 
-            {(booking.status === "confirmed" ||
-              booking.status === "rescheduled") &&
+            {booking.status === "confirmed" &&
               elapsed && (
                 <>
                   {messageHref && (

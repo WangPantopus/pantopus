@@ -88,15 +88,22 @@ export default function RescheduleReassignSheet({
       return;
     }
     let alive = true;
-    // Best-effort names for the reassign picker (team insights is the only
-    // names source); reassign still works by id if this is empty.
-    api.scheduling
-      .getTeamInsights(365, owner)
-      .then((res) => {
-        if (!alive) return;
-        setMembers(
-          (res.teamMembers ?? []).map((m) => ({ id: m.user_id, name: m.name })),
-        );
+    // Best-effort names for the reassign picker. The team-insights payload
+    // carries host ids only (no names), so the business members endpoint is
+    // the names source; reassign still works by id if this is empty.
+    const load = async (): Promise<Member[]> => {
+      if (owner.ownerType === "business" && owner.ownerId) {
+        const res = await api.businessIam.getTeamMembers(owner.ownerId);
+        return (res.members ?? []).map((m) => ({
+          id: m.user.id,
+          name: m.user.name || m.user.username,
+        }));
+      }
+      return [];
+    };
+    load()
+      .then((list) => {
+        if (alive) setMembers(list);
       })
       .catch(() => {
         if (alive) setMembers([]);

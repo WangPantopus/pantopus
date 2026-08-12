@@ -94,10 +94,27 @@ describe("validateIntake", () => {
         firstName: "Maya",
         lastName: "Chen",
         email: "maya@x.com",
+        // Phone is required — design intake-booking-frames.jsx:274 marks the field
+        // `required`. This test predates that rule and omitted it, so "complete" was
+        // asserting an incomplete form.
+        phone: "(415) 555-0142",
       },
       [],
     );
     expect(ok).toBe(true);
+  });
+
+  it("rejects a form with no phone number", () => {
+    const errors = validateIntake(
+      {
+        ...emptyIntake(),
+        firstName: "Maya",
+        lastName: "Chen",
+        email: "maya@x.com",
+      },
+      [],
+    );
+    expect(errors.phone).toBe("Enter your phone number");
   });
 
   it("enforces required questions and validates guest emails", () => {

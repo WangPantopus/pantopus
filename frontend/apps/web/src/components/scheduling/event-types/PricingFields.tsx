@@ -24,7 +24,7 @@ import {
   centsToDollars,
   dollarsToCents,
   type EventTypeFormValues,
-} from "./eventTypeForm";
+} from "./eventTypeFormModel";
 
 type PricingPatch = Partial<
   Pick<

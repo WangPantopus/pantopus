@@ -34,8 +34,12 @@ import clsx from "clsx";
 import { publicBooking } from "@pantopus/api";
 import type {
   BookingManageView,
-  CancellationPolicy as CancellationPolicyData,
+  CancellationPolicyValue,
 } from "@pantopus/types";
+import {
+  isNotesOnlyPolicy,
+  resolvePolicyValue,
+} from "@/components/scheduling/policyValue";
 import {
   buildBookingManagePath,
   buildBookingPagePath,
@@ -62,7 +66,12 @@ import {
 
 // ─── Policy sentence helper ──────────────────────────────────────────────────
 
-function plainPolicySentence(p: CancellationPolicyData): string {
+// Tolerates the string wire shape (iOS preset name / free text).
+function plainPolicySentence(value: CancellationPolicyValue): string {
+  const p = resolvePolicyValue(value);
+  if (!p) return "You can manage or cancel this booking anytime.";
+  // Free-text policy → the host's own words.
+  if (isNotesOnlyPolicy(p)) return String(p.notes);
   const min = p.cutoff_min;
   const cutoff =
     min == null
@@ -327,7 +336,9 @@ export default function ManageBookingPanel({ token }: { token: string }) {
   if (invalid || !view) return <ExpiredState hostEmail={null} />;
 
   const { booking, eventType, page, actions } = view;
-  const pillar = pillarForOwner(page?.owner_type ?? booking.owner_type);
+  // The public manage payload carries no owner fields on the booking — the
+  // page view is the only pillar source (personal fallback when hidden).
+  const pillar = pillarForOwner(page?.owner_type);
   const tk = pillarTokens(pillar);
   const hostName = page?.title || "your host";
   const eventName = eventType?.name || "Your booking";

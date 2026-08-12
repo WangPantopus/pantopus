@@ -16,7 +16,9 @@ import {
   ChevronRight,
   Clock,
   Flag,
+  Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 import type { AvailabilityOverride } from "@pantopus/types";
@@ -170,8 +172,11 @@ export default function DateOverrideEditor({
   });
   const [selected, setSelected] = useState<string | null>(null);
   const [choice, setChoice] = useState<"unavailable" | "custom">("unavailable");
-  const [customStart, setCustomStart] = useState("10:00");
-  const [customEnd, setCustomEnd] = useState("14:00");
+  // Design (AVAIL-08): custom hours are a LIST of blocks with a "+ Add a block" affordance —
+  // each block becomes its own override row for the date (the engine honors split windows).
+  const [customBlocks, setCustomBlocks] = useState<
+    Array<{ start: string; end: string }>
+  >([{ start: "10:00", end: "14:00" }]);
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [rangeOpen, setRangeOpen] = useState(false);
@@ -188,21 +193,29 @@ export default function DateOverrideEditor({
 
   const applyForSelected = () => {
     if (!selected) return;
-    const next: AvailabilityOverride =
+    const without = overrides.filter((o) => o.date !== selected);
+    const rows: AvailabilityOverride[] =
       choice === "unavailable"
-        ? {
-            date: selected,
-            is_unavailable: true,
-            start_time: null,
-            end_time: null,
-          }
-        : {
-            date: selected,
-            is_unavailable: false,
-            start_time: customStart,
-            end_time: customEnd,
-          };
-    onChange(upsert(overrides, next));
+        ? [
+            {
+              date: selected,
+              is_unavailable: true,
+              start_time: null,
+              end_time: null,
+            },
+          ]
+        : customBlocks
+            .filter((b) => b.start && b.end && b.start < b.end)
+            .map((b) => ({
+              date: selected,
+              is_unavailable: false,
+              start_time: b.start,
+              end_time: b.end,
+            }));
+    if (rows.length === 0) return;
+    onChange(
+      [...without, ...rows].sort((a, b) => a.date.localeCompare(b.date)),
+    );
     setSelected(null);
   };
 
@@ -263,13 +276,20 @@ export default function DateOverrideEditor({
         onCursor={setCursorISO}
         onSelect={(iso) => {
           setSelected(iso);
-          const existing = overrides.find((o) => o.date === iso);
-          if (existing && !existing.is_unavailable) {
+          const existing = overrides.filter(
+            (o) => o.date === iso && !o.is_unavailable,
+          );
+          if (existing.length > 0) {
             setChoice("custom");
-            setCustomStart(existing.start_time || "10:00");
-            setCustomEnd(existing.end_time || "14:00");
+            setCustomBlocks(
+              existing.map((o) => ({
+                start: o.start_time || "10:00",
+                end: o.end_time || "14:00",
+              })),
+            );
           } else {
             setChoice("unavailable");
+            setCustomBlocks([{ start: "10:00", end: "14:00" }]);
           }
         }}
       />
@@ -290,23 +310,71 @@ export default function DateOverrideEditor({
           {choice === "custom" ? (
             <div className="mt-3">
               <FieldLabel>Hours for this day</FieldLabel>
-              <div className="flex items-center gap-2 rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 shadow-sm">
-                <Clock className="h-3.5 w-3.5 text-app-personal" aria-hidden />
-                <input
-                  type="time"
-                  aria-label="Custom start time"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
-                />
-                <span className="text-app-text-muted">–</span>
-                <input
-                  type="time"
-                  aria-label="Custom end time"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
-                />
+              <div className="space-y-2">
+                {customBlocks.map((block, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 shadow-sm"
+                  >
+                    <Clock
+                      className="h-3.5 w-3.5 text-app-personal"
+                      aria-hidden
+                    />
+                    <input
+                      type="time"
+                      aria-label={`Block ${i + 1} start time`}
+                      value={block.start}
+                      onChange={(e) =>
+                        setCustomBlocks((bs) =>
+                          bs.map((b, j) =>
+                            j === i ? { ...b, start: e.target.value } : b,
+                          ),
+                        )
+                      }
+                      className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
+                    />
+                    <span className="text-app-text-muted">–</span>
+                    <input
+                      type="time"
+                      aria-label={`Block ${i + 1} end time`}
+                      value={block.end}
+                      onChange={(e) =>
+                        setCustomBlocks((bs) =>
+                          bs.map((b, j) =>
+                            j === i ? { ...b, end: e.target.value } : b,
+                          ),
+                        )
+                      }
+                      className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold tabular-nums text-app-text outline-none"
+                    />
+                    {customBlocks.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Remove block ${i + 1}`}
+                        onClick={() =>
+                          setCustomBlocks((bs) => bs.filter((_, j) => j !== i))
+                        }
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-app-text-muted hover:bg-app-hover"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {/* Design: "+ Add a block" affordance (AVAIL-08). */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCustomBlocks((bs) => [
+                      ...bs,
+                      { start: "16:00", end: "18:00" },
+                    ])
+                  }
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-app-border-strong py-1.5 text-[12px] font-semibold text-app-personal hover:bg-app-hover"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Add a block
+                </button>
               </div>
             </div>
           ) : (

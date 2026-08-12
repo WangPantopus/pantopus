@@ -1,13 +1,23 @@
-// Read-only renderer for a cancellation/refund policy object. Used in the
-// invitee confirm + manage surfaces (the "what the invitee sees" sentence).
-// The owner EDITOR (presets / custom fields) is a separate stream (W14).
+// Read-only renderer for a cancellation/refund policy. Used in the invitee
+// confirm + manage surfaces (the "what the invitee sees" sentence). The owner
+// EDITOR (presets / custom fields) is a separate stream (W14).
+//
+// The wire value (`cancellation_policy`, jsonb) is EITHER the structured
+// object or a plain string — an iOS preset ('flexible'|'moderate'|'strict')
+// or a free-text blurb. `resolvePolicyValue` normalizes all shapes so every
+// consumer tolerates both.
 
 import clsx from "clsx";
 import { Clock, RefreshCcw, Wallet } from "lucide-react";
 import type {
   CancellationPolicy as CancellationPolicyData,
+  CancellationPolicyValue,
   RefundPolicy,
 } from "@pantopus/types";
+import {
+  isNotesOnlyPolicy,
+  resolvePolicyValue,
+} from "@/components/scheduling/policyValue";
 
 const REFUND_LABEL: Record<RefundPolicy, string> = {
   full: "Full refund",
@@ -54,13 +64,28 @@ function plainSentence(policy: CancellationPolicyData): string {
 }
 
 export default function CancellationPolicy({
-  policy,
+  policy: value,
   className,
 }: {
-  policy?: CancellationPolicyData | null;
+  policy?: CancellationPolicyValue | null;
   className?: string;
 }) {
+  const policy = resolvePolicyValue(value);
   if (!policy) return null;
+
+  // Free-text policy → render the host's own words, nothing derived.
+  if (isNotesOnlyPolicy(policy)) {
+    return (
+      <div
+        className={clsx(
+          "rounded-xl border border-app-border bg-app-surface p-4",
+          className,
+        )}
+      >
+        <p className="text-sm text-app-text">{policy.notes}</p>
+      </div>
+    );
+  }
 
   const cutoff = formatWindow(policy.cutoff_min);
   const reschedule = formatWindow(policy.reschedule_cutoff_min);

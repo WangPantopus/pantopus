@@ -52,6 +52,14 @@ export interface CancellationPolicy {
   [key: string]: unknown;
 }
 
+/**
+ * `cancellation_policy` as stored on the wire (jsonb since migration 166):
+ * either the structured object above, or a plain string — the iOS presets
+ * 'flexible' | 'moderate' | 'strict', or a free-text blurb. Consumers must
+ * tolerate both shapes.
+ */
+export type CancellationPolicyValue = CancellationPolicy | string;
+
 export interface BookingPage {
   id: string;
   owner_type: SchedulingOwnerType;
@@ -66,7 +74,7 @@ export interface BookingPage {
   confirmation_message: string | null;
   timezone: string | null;
   reminder_minutes: number[];
-  cancellation_policy: CancellationPolicy | null;
+  cancellation_policy: CancellationPolicyValue | null;
   visibility: BookingPageVisibility;
   branding: Record<string, unknown> | null;
   created_at: string;
@@ -85,7 +93,7 @@ export interface BookingPageInput {
   is_live?: boolean;
   is_paused?: boolean;
   reminder_minutes?: number[];
-  cancellation_policy?: CancellationPolicy | null;
+  cancellation_policy?: CancellationPolicyValue | null;
   visibility?: BookingPageVisibility;
   branding?: Record<string, unknown>;
 }
@@ -242,6 +250,8 @@ export interface EventTypeInput {
   allow_invitee_reschedule?: boolean;
   schedule_id?: string | null;
   is_active?: boolean;
+  /** Catalog position (reorder mode persists PUT /event-types/:id {sort_order}). */
+  sort_order?: number;
 }
 
 // ─── Availability ───────────────────────────────────────────
@@ -323,22 +333,26 @@ export interface NotificationPreferences {
 
 // ─── Bookings ───────────────────────────────────────────────
 
+/**
+ * Matches the Postgres Booking.status enum (migration 159). There is NO
+ * 'rescheduled' status — a reschedule keeps the booking 'confirmed' and marks
+ * it via `previous_start_at != null`.
+ */
 export type BookingStatus =
   | "pending"
   | "confirmed"
   | "declined"
   | "cancelled"
   | "completed"
-  | "no_show"
-  | "rescheduled";
+  | "no_show";
 
-/** How a booking was created. */
-export type BookingSource =
-  | "public"
-  | "manual"
-  | "one_off"
-  | "recurring"
-  | "resource";
+/**
+ * How a booking was created — matches the DB check constraint
+ * Booking_created_via_chk (migration 160). Public-link bookings write
+ * 'public_link', resource + in-app host bookings 'in_app', recurring series
+ * 'manual', one-off links 'one_off'.
+ */
+export type BookingSource = "public_link" | "in_app" | "manual" | "one_off";
 
 export type RsvpStatus = "going" | "maybe" | "declined" | "pending";
 
@@ -397,14 +411,25 @@ export interface BookingDetail {
   eventType: Pick<EventType, "id" | "name" | "location_mode"> | null;
 }
 
-/** GET /bookings/summary — drives the A5 summary card. */
+/**
+ * GET /bookings/summary — drives the A5 summary card.
+ * Exact payload of bookingMetricsService.getSummary.
+ */
 export interface BookingsSummary {
+  /** Bookings created this calendar month (pending/confirmed/completed/no-show). */
+  bookingsThisMonth: number;
+  /** Same tally for the previous calendar month. */
+  bookingsLastMonth: number;
+  /** Month-over-month change, integer percent (100 when last month was 0 but this month isn't). */
+  deltaPct: number;
+  /** Confirmed bookings with a future start. */
   upcomingCount: number;
-  pendingCount: number;
-  totalThisMonth: number;
-  noShowRate: number;
-  nextBooking?: { start_at: string; invitee_name: string | null } | null;
-  [key: string]: unknown;
+  /** No-shows with start_at in this calendar month. */
+  noShowCount: number;
+  /** Daily created-booking counts for the trailing 30 days, oldest first. */
+  sparkline: Array<{ date: string; count: number }>;
+  /** Created-booking counts per event type over the same window, descending. */
+  byEventType: Array<{ event_type_id: string; count: number }>;
 }
 
 /** Body for POST /bookings (manual host create). */
@@ -488,7 +513,7 @@ export interface PublicPageView {
   timezone: string | null;
   branding: Record<string, unknown> | null;
   owner_type: SchedulingOwnerType;
-  cancellation_policy: CancellationPolicy | null;
+  cancellation_policy: CancellationPolicyValue | null;
 }
 
 /** GET /public/book/:slug response. */
@@ -530,9 +555,38 @@ export interface PublicBookingInput {
   answers?: Record<string, unknown>;
 }
 
+/**
+ * Trimmed booking returned by the PUBLIC endpoints — the backend hand-builds
+ * these payloads and never exposes the full Booking row to invitees (no
+ * owner/invitee-contact/payment fields).
+ */
+export type PublicBookingSummary = Pick<
+  Booking,
+  "id" | "status" | "start_at" | "end_at"
+> & {
+  /** POST /public/book/:slug/:eventTypeSlug only — true when status is 'pending'. */
+  requires_approval?: boolean;
+  /** Cancellation/refund terms frozen at booking time (null when none). */
+  policy_snapshot?: Record<string, unknown> | null;
+};
+
+/**
+ * Trimmed booking on GET /public/booking/:token (manage view) — everything in
+ * PublicBookingSummary plus the fields the manage screens render. This is the
+ * ONLY public payload carrying location + reschedule/cancel context.
+ */
+export type ManageBookingRow = PublicBookingSummary &
+  Pick<
+    Booking,
+    "invitee_name" | "invitee_timezone" | "previous_start_at" | "cancel_reason"
+  > & {
+    location_mode: EventTypeLocationMode | null;
+    location_detail: string | null;
+  };
+
 /** POST /public/book/... success body. Persist `manageToken`. */
 export interface CreatePublicBookingResult {
-  booking: Booking;
+  booking: PublicBookingSummary;
   eventType: PublicEventType;
   page?: { confirmation_message: string | null; timezone: string | null };
   manageToken: string;
@@ -559,12 +613,12 @@ export interface BookingPayment {
 
 /** GET /public/booking/:token response (manage view). */
 export interface BookingManageView {
-  booking: Booking;
+  booking: ManageBookingRow;
   actions: BookingManageActions;
   payment: BookingPayment | null;
   eventType: PublicEventType | null;
   page:
-    | (PublicPageView & { cancellation_policy: CancellationPolicy | null })
+    | (PublicPageView & { cancellation_policy: CancellationPolicyValue | null })
     | null;
 }
 
@@ -662,6 +716,11 @@ export interface Package {
   is_active: boolean;
   created_at: string;
   updated_at?: string;
+  /**
+   * Purchased-credit tally (the "· N sold" badge). Only present on
+   * GET /packages (list) — POST/PUT return the bare row without it.
+   */
+  sold_count?: number;
 }
 
 export interface PackageInput {
@@ -762,16 +821,10 @@ export interface ResourceInput {
   available_hours?: Record<string, unknown>;
 }
 
-export interface ResourceBooking {
-  id: string;
-  resource_id: string;
-  start_at: string;
-  end_at: string;
-  name: string | null;
-  booked_by: string;
-  status: "confirmed" | "cancelled";
-  created_at: string;
-}
+// NOTE: POST /resources/:rid/book returns a FULL Booking row (select('*') on
+// the Booking table, status 'pending' when the resource requires approval),
+// so there is no separate ResourceBooking type — the api layer types it as
+// `Booking & { resource_id: string | null }`.
 
 export interface ResourceBookingInput {
   start_at: string;
@@ -887,7 +940,8 @@ export interface PollVoteInput {
 
 // ─── Waitlist ───────────────────────────────────────────────
 
-export type WaitlistStatus = "waiting" | "promoted";
+/** Matches SchedulingWaitlist_status_chk (migration 165). */
+export type WaitlistStatus = "waiting" | "promoted" | "cancelled";
 
 export interface WaitlistEntry {
   id: string;
@@ -901,36 +955,44 @@ export interface WaitlistEntry {
 
 // ─── Insights ───────────────────────────────────────────────
 
+/**
+ * GET /insights/no-shows — exact payload of
+ * bookingMetricsService.getNoShowReport: settled-outcome tallies over the
+ * window plus the most recent no-show rows. Per-event-type / per-host
+ * breakdowns are NOT returned; compute them client-side from GET /bookings.
+ */
 export interface NoShowInsights {
-  noShowCount: number;
-  noShowRate: number;
-  byEventType: Array<{
-    event_type_id: string;
-    name: string;
-    count: number;
-    rate: number;
-  }>;
-  byHost: Array<{ user_id: string; name: string; count: number; rate: number }>;
-  recent: Array<{
-    booking_id: string;
-    invitee_name: string | null;
-    scheduled_at: string;
-    no_show_at: string;
-  }>;
+  window_days: number;
+  completed: number;
+  no_show: number;
+  cancelled: number;
+  /** Integer percent 0–100: no-shows ÷ (completed + no-shows). */
+  no_show_rate: number;
+  /** Up to 20 most recent no-show bookings, newest first. */
+  recent_no_shows: Array<
+    Pick<
+      Booking,
+      "id" | "start_at" | "status" | "invitee_name" | "event_type_id"
+    >
+  >;
 }
 
+/**
+ * GET /insights/team — exact payload of
+ * bookingMetricsService.getTeamPerformance: per-host status tallies for a
+ * business pool, sorted by total descending. No names, revenue or durations —
+ * resolve host display names elsewhere (e.g. the business members endpoint).
+ */
 export interface TeamInsights {
-  teamMembers: Array<{
-    user_id: string;
-    name: string;
-    bookingsCount: number;
-    revenue: number;
-    noShowRate: number;
-    avgDuration: number;
+  window_days: number;
+  hosts: Array<{
+    host_user_id: string;
+    total: number;
+    confirmed: number;
+    completed: number;
+    no_show: number;
+    cancelled: number;
   }>;
-  totalRevenue: number;
-  totalBookings: number;
-  avgBookingValue: number;
 }
 
 // ─── Home calendar union ────────────────────────────────────

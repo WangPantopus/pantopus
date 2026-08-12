@@ -9,9 +9,10 @@
 
 import type {
   BookingPage,
-  CancellationPolicy,
+  CancellationPolicyValue,
   NotificationPreferences,
 } from "@pantopus/types";
+import { resolvePolicyValue } from "@/components/scheduling/policyValue";
 
 export type ConfirmationMode = "auto" | "approve";
 
@@ -137,10 +138,14 @@ export function confirmationNote(mode: ConfirmationMode): string {
     : "Auto-confirm sends the booking straight to your calendar.";
 }
 
-/** Summarise the cancellation policy for the Policy chevron row. */
+/**
+ * Summarise the cancellation policy for the Policy chevron row. Tolerates the
+ * string wire shape (iOS preset name or free text) via resolvePolicyValue.
+ */
 export function cancellationLabel(
-  p: CancellationPolicy | null | undefined,
+  value: CancellationPolicyValue | null | undefined,
 ): string | null {
+  const p = resolvePolicyValue(value);
   if (!p) return null;
   const cutoff = typeof p.cutoff_min === "number" ? p.cutoff_min : null;
   const refund =

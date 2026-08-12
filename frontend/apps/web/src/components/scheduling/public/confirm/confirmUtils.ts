@@ -364,7 +364,7 @@ export function initialsFromName(value: string | null | undefined): string {
 /** True for booking statuses that have already concluded (read-only manage). */
 export function isPastBooking(status: string, endISO?: string | null): boolean {
   if (status === "completed" || status === "no_show") return true;
-  if (status !== "confirmed" && status !== "rescheduled") return false;
+  if (status !== "confirmed") return false;
   const end = endISO ? safeDate(endISO) : null;
   return end ? end.getTime() < Date.now() : false;
 }

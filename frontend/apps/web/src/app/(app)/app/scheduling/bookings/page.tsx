@@ -133,13 +133,17 @@ export default function BookingsInboxPage() {
       }
       setEventNames(map);
     });
+    // Pending badge: the wire summary carries no pendingCount — count the
+    // pending list directly (the same query the Pending tab renders).
     Promise.allSettled(
-      targets.map((t) => api.scheduling.getBookingsSummary(t.owner)),
+      targets.map((t) =>
+        api.scheduling.listBookings({ status: "pending" }, t.owner),
+      ),
     ).then((results) => {
       if (!alive) return;
       let n = 0;
       for (const r of results) {
-        if (r.status === "fulfilled") n += r.value.pendingCount ?? 0;
+        if (r.status === "fulfilled") n += (r.value.bookings ?? []).length;
       }
       setPendingCount(n);
     });

@@ -4,6 +4,9 @@
 // (duration · location · price), product-blue active toggle, and an overflow
 // menu (copy link, duplicate, share, hide/show, delete). Tokens-only chrome;
 // the accent dot uses the event type's own data color.
+// B1 FRAME 6 (`reorder`): a leading grip-vertical handle replaces the overflow
+// button, row interactions freeze, and the dragged row lifts (shadow + tilt)
+// while the rest dim to 0.55.
 
 import { useState } from "react";
 import clsx from "clsx";
@@ -12,6 +15,7 @@ import {
   EllipsisVertical,
   EyeOff,
   Eye,
+  GripVertical,
   Link2,
   Share2,
   Trash2,
@@ -28,7 +32,7 @@ const LOCATION_LABEL: Record<string, string> = {
   ask: "Ask invitee",
 };
 
-function metaLine(et: EventType, showPrice: boolean): string {
+export function metaLine(et: EventType, showPrice: boolean): string {
   const parts = [`${et.default_duration} min`];
   parts.push(LOCATION_LABEL[et.location_mode] ?? "Video");
   if (showPrice && et.price_cents > 0) {
@@ -57,6 +61,9 @@ export default function EventTypeCard({
   showPrice,
   busy,
   disabled,
+  reorder,
+  lifted,
+  dimmed,
   onOpen,
   onToggleActive,
   onCopyLink,
@@ -68,6 +75,12 @@ export default function EventTypeCard({
   showPrice: boolean;
   busy?: boolean;
   disabled?: boolean;
+  /** FRAME 6 reorder mode: leading grip, overflow hidden, toggle inert. */
+  reorder?: boolean;
+  /** The row currently being dragged (blue border, shadow, slight lift). */
+  lifted?: boolean;
+  /** Non-dragged rows dim to 55% while a drag is active. */
+  dimmed?: boolean;
   onOpen: () => void;
   onToggleActive: () => void;
   onCopyLink?: () => void;
@@ -110,11 +123,21 @@ export default function EventTypeCard({
   return (
     <div
       className={clsx(
-        "relative flex items-center gap-3 rounded-[14px] border border-app-border bg-app-surface p-3 shadow-sm transition",
+        "relative flex items-center gap-3 rounded-[14px] border bg-app-surface p-3 transition",
+        lifted
+          ? "z-10 -translate-y-0.5 scale-[1.012] border-primary-200 shadow-xl"
+          : "border-app-border shadow-sm",
         busy && "opacity-60",
-        !et.is_active && "opacity-90",
+        !et.is_active && !dimmed && "opacity-90",
+        dimmed && "opacity-[0.55]",
       )}
     >
+      {reorder && (
+        <GripVertical
+          className="h-4 w-4 shrink-0 cursor-grab text-app-text-muted"
+          aria-hidden
+        />
+      )}
       <span
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: et.color ?? "#0284c7" }}
@@ -124,7 +147,7 @@ export default function EventTypeCard({
       <button
         type="button"
         onClick={onOpen}
-        disabled={disabled}
+        disabled={disabled || reorder}
         className="min-w-0 flex-1 text-left disabled:cursor-not-allowed"
       >
         <span className="flex items-center gap-1.5">
@@ -145,12 +168,12 @@ export default function EventTypeCard({
 
       <Toggle
         on={et.is_active}
-        onChange={disabled ? undefined : onToggleActive}
-        disabled={disabled || busy}
+        onChange={disabled || reorder ? undefined : onToggleActive}
+        disabled={disabled || busy || reorder}
         label={`${et.is_active ? "Hide" : "Show"} ${et.name}`}
       />
 
-      {!disabled && (
+      {!disabled && !reorder && (
         <div className="relative">
           <button
             type="button"

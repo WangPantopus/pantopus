@@ -5,11 +5,22 @@
 // filter is client-side on is_active. Row actions: open, toggle active, copy
 // booking link, duplicate, share, delete (→ 409 HAS_UPCOMING_BOOKINGS offers
 // deactivate instead). All calls carry the SchedulingOwner context.
+// B1 FRAME 6: reorder mode — grip rows, HTML5 drag, PUT {sort_order} per
+// changed row. B1 FRAME 7: FORBIDDEN list → read-only catalog (lock banner,
+// disabled New / toggles / overflow), mirroring iOS/Android.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { ArrowRight, CalendarPlus, Clock, EyeOff, Plus } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarPlus,
+  Clock,
+  EyeOff,
+  Lock,
+  Move,
+  Plus,
+} from "lucide-react";
 import * as api from "@pantopus/api";
 import type { EventType } from "@pantopus/types";
 import { APP_WEB_URL, buildBookingEventPath } from "@pantopus/utils";
@@ -19,19 +30,22 @@ import { confirmStore } from "@/components/ui/confirm-store";
 import { ShimmerBlock } from "@/components/ui/Shimmer";
 import ErrorState from "@/components/ui/ErrorState";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
-import { pillarForOwner } from "@/components/scheduling/pillarTokens";
+import { PRIMARY_BLUE, pillarForOwner } from "@/components/scheduling/pillarTokens";
 import { decodeError } from "@/components/scheduling/decodeError";
-import EventTypeCard from "@/components/scheduling/event-types/EventTypeCard";
+import EventTypeCard, {
+  metaLine,
+} from "@/components/scheduling/event-types/EventTypeCard";
 import {
   PillarPill,
   SectionOverline,
+  Toggle,
 } from "@/components/scheduling/event-types/fields";
 import {
   eventTypeToForm,
   formToInput,
   slugify,
   suffixSlug,
-} from "@/components/scheduling/event-types/eventTypeForm";
+} from "@/components/scheduling/event-types/eventTypeFormModel";
 
 const NEW_PATH = "/app/scheduling/event-types/new";
 
@@ -47,10 +61,20 @@ export default function EventTypesPage() {
   const [filter, setFilter] = useState<"active" | "hidden">("active");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pageSlug, setPageSlug] = useState<string | null>(null);
+  // FRAME 7 — permission-gated read-only catalog (FORBIDDEN on list).
+  const [canEdit, setCanEdit] = useState(true);
+  // FRAME 6 — reorder mode.
+  const [reordering, setReordering] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const listRef = useRef<EventType[]>([]);
+  useEffect(() => {
+    listRef.current = eventTypes;
+  }, [eventTypes]);
 
   const load = useCallback(() => {
     let alive = true;
     setPhase("loading");
+    setCanEdit(true);
     api.scheduling
       .listEventTypes(owner)
       .then((res) => {
@@ -58,8 +82,21 @@ export default function EventTypesPage() {
         setEventTypes(res.eventTypes ?? []);
         setPhase("ready");
       })
-      .catch(() => {
-        if (alive) setPhase("error");
+      .catch((err) => {
+        if (!alive) return;
+        const d = decodeError(err);
+        // Same permission signal the automations surface uses: a FORBIDDEN
+        // list is the read-only state, not an error dead end.
+        if (
+          d.kind === "error" &&
+          (d.code === "FORBIDDEN" || d.code === "NOT_ALLOWED")
+        ) {
+          setCanEdit(false);
+          setEventTypes([]);
+          setPhase("ready");
+        } else {
+          setPhase("error");
+        }
       });
     // Best-effort: the booking-page slug lets us build per-event copy links.
     api.scheduling
@@ -70,6 +107,22 @@ export default function EventTypesPage() {
       .catch(() => {
         /* no page yet — copy link disabled */
       });
+    // FRAME 7 second tier: a home member with calendar.view but not calendar.edit can LIST
+    // the catalog (the 403 branch above never fires) yet every mutation would 403. Resolve
+    // the edit permission up front so the catalog renders read-only instead of erroring on
+    // first touch. Personal/business owners are edit-capable whenever the list loads.
+    if (owner.ownerType === "home" && owner.homeId) {
+      import("@pantopus/api")
+        .then(({ get }) => get(`/api/homes/${owner.homeId}/me`))
+        .then((me) => {
+          if (!alive) return;
+          const perms = (me as { permissions?: string[] })?.permissions ?? [];
+          if (!perms.includes("calendar.edit")) setCanEdit(false);
+        })
+        .catch(() => {
+          /* permission probe is best-effort; mutations still 403 server-side */
+        });
+    }
     return () => {
       alive = false;
     };
@@ -212,6 +265,54 @@ export default function EventTypesPage() {
     }
   };
 
+  // ── Reorder mode (FRAME 6) ────────────────────────────────────
+  // Live-preview: dragging a row over another moves it in local state; each
+  // completed drag persists every row whose position no longer matches its
+  // stored sort_order via PUT /event-types/:id {sort_order} (the list
+  // endpoint already orders by sort_order).
+  const moveDragged = (overId: string) => {
+    if (!dragId || dragId === overId) return;
+    setEventTypes((list) => {
+      const from = list.findIndex((x) => x.id === dragId);
+      const to = list.findIndex((x) => x.id === overId);
+      if (from < 0 || to < 0 || from === to) return list;
+      const next = [...list];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const persistOrder = async () => {
+    const list = listRef.current;
+    const changed = list
+      .map((et, index) => ({ et, index }))
+      .filter(({ et, index }) => et.sort_order !== index);
+    if (changed.length === 0) return;
+    // Optimistic: stamp positions locally, then persist only the changed rows.
+    setEventTypes((cur) => cur.map((et, i) => ({ ...et, sort_order: i })));
+    const results = await Promise.allSettled(
+      changed.map(({ et, index }) =>
+        api.scheduling.updateEventType(et.id, { sort_order: index }, owner),
+      ),
+    );
+    if (results.some((r) => r.status === "rejected")) {
+      toast.error("Couldn't save the new order.");
+      reload();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDragId(null);
+    void persistOrder();
+  };
+
+  const doneReordering = () => {
+    setDragId(null);
+    setReordering(false);
+    void persistOrder();
+  };
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <div>
@@ -230,15 +331,61 @@ export default function EventTypesPage() {
                 : "Things people can book with you."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push(NEW_PATH)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden />
-            New
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {canEdit && !reordering && phase === "ready" && shown.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setReordering(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm font-semibold text-primary-700 shadow-sm transition hover:bg-app-hover"
+              >
+                <Move className="h-4 w-4" strokeWidth={2.2} aria-hidden />
+                Reorder
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => router.push(NEW_PATH)}
+              disabled={!canEdit || reordering}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+              New
+            </button>
+          </div>
         </div>
+
+        {/* FRAME 6 — reorder hint bar */}
+        {reordering && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2">
+            <Move
+              className="h-[15px] w-[15px] shrink-0 text-primary-700"
+              aria-hidden
+            />
+            <span className="flex-1 text-[11.5px] font-semibold text-primary-700">
+              Drag to set the order people see
+            </span>
+            <button
+              type="button"
+              onClick={doneReordering}
+              className="text-xs font-bold text-primary-700"
+            >
+              Done
+            </button>
+          </div>
+        )}
+
+        {/* FRAME 7 — permission-gated read-only banner */}
+        {!canEdit && phase === "ready" && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface-sunken px-3 py-2.5">
+            <Lock
+              className="h-[15px] w-[15px] shrink-0 text-app-text-muted"
+              aria-hidden
+            />
+            <span className="text-[11.5px] font-medium text-app-text-secondary">
+              Only owners can edit this catalog.
+            </span>
+          </div>
+        )}
 
         {phase === "ready" && eventTypes.length > 0 && (
           <div className="mt-4 flex gap-1 rounded-[10px] bg-app-surface-sunken p-1">
@@ -302,18 +449,39 @@ export default function EventTypesPage() {
             {isBiz ? "Bookable services" : "Your event types"}
           </SectionOverline>
           {shown.map((et) => (
-            <EventTypeCard
+            <div
               key={et.id}
-              eventType={et}
-              showPrice={paid}
-              busy={busyId === et.id}
-              onOpen={() => router.push(`/app/scheduling/event-types/${et.id}`)}
-              onToggleActive={() => toggleActive(et)}
-              onCopyLink={() => copyLink(et)}
-              onDuplicate={() => duplicate(et)}
-              onShare={() => share(et)}
-              onDelete={() => remove(et)}
-            />
+              draggable={reordering}
+              onDragStart={reordering ? () => setDragId(et.id) : undefined}
+              onDragOver={
+                reordering
+                  ? (e) => {
+                      e.preventDefault();
+                      moveDragged(et.id);
+                    }
+                  : undefined
+              }
+              onDrop={reordering ? (e) => e.preventDefault() : undefined}
+              onDragEnd={reordering ? handleDragEnd : undefined}
+            >
+              <EventTypeCard
+                eventType={et}
+                showPrice={paid}
+                busy={busyId === et.id}
+                disabled={!canEdit}
+                reorder={reordering}
+                lifted={reordering && dragId === et.id}
+                dimmed={reordering && dragId !== null && dragId !== et.id}
+                onOpen={() =>
+                  router.push(`/app/scheduling/event-types/${et.id}`)
+                }
+                onToggleActive={() => toggleActive(et)}
+                onCopyLink={() => copyLink(et)}
+                onDuplicate={() => duplicate(et)}
+                onShare={() => share(et)}
+                onDelete={() => remove(et)}
+              />
+            </div>
           ))}
         </div>
       )}

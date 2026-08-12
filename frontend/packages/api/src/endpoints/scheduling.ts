@@ -54,7 +54,6 @@ import type {
   Invoice,
   Resource,
   ResourceInput,
-  ResourceBooking,
   ResourceBookingInput,
   Visit,
   VisitInput,
@@ -809,7 +808,9 @@ export function bookResource(
   data: ResourceBookingInput,
   owner?: SchedulingOwnerRef,
 ) {
-  return post<{ booking: ResourceBooking }>(
+  // The backend inserts a full Booking row (booker → invitee_*, status
+  // 'pending' when the resource requires approval) and returns select('*').
+  return post<{ booking: Booking & { resource_id: string | null } }>(
     `${ownerBase(owner)}/resources/${encodeURIComponent(rid)}/book`,
     { ...ownerParams(owner), ...data },
   );

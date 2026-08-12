@@ -32,7 +32,7 @@ import {
 } from "@stripe/react-stripe-js";
 import * as api from "@pantopus/api";
 import type {
-  CancellationPolicy as CancellationPolicyData,
+  CancellationPolicyValue,
   SchedulingOwnerRef,
 } from "@pantopus/types";
 import StripeProvider from "@/components/payments/StripeProvider";
@@ -58,7 +58,8 @@ export interface BuyPackageProps {
   ownerSubtitle: string | null;
   pillar: Pillar;
   eligibleLabel: string | null;
-  policy: CancellationPolicyData | null;
+  /** Wire value — object or string; the CancellationPolicy renderer tolerates both. */
+  policy: CancellationPolicyValue | null;
   returnPath: string;
 }
 

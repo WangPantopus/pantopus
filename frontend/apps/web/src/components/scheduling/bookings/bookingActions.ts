@@ -66,7 +66,6 @@ export function availableActions(
     case "pending":
       return ["approve", "decline", "message"];
     case "confirmed":
-    case "rescheduled":
       if (past) {
         // Elapsed but never closed out → let the host mark no-show or follow up.
         return ["message", "no_show", "nudge"];

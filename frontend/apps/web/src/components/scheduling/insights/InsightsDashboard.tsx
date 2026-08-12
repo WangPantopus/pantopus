@@ -121,11 +121,18 @@ export default function InsightsDashboard() {
     );
 
   const { summaryRange, byType, series, range } = view;
-  const noShowRate = data.noShow?.noShowRate ?? summaryRange.noShowRate;
-  const noShowCount = data.noShow?.noShowCount ?? summaryRange.noShow;
+  // no_show_rate is an integer percent on the wire — normalize to a fraction
+  // explicitly (formatRate would misread 1% as a 1.0 fraction = 100%).
+  const noShowRate =
+    typeof data.noShow?.no_show_rate === "number"
+      ? data.noShow.no_show_rate / 100
+      : summaryRange.noShowRate;
+  const noShowCount = data.noShow?.no_show ?? summaryRange.noShow;
 
   const upcomingCount = data.summary.upcomingCount ?? 0;
-  const liveTotal = upcomingCount + (data.summary.pendingCount ?? 0);
+  // Liveness check: the wire summary has no pendingCount — bookingsThisMonth
+  // (which includes pending) covers "activity exists even if the range is empty".
+  const liveTotal = upcomingCount + (data.summary.bookingsThisMonth ?? 0);
 
   if (summaryRange.total === 0 && liveTotal === 0) {
     return (
@@ -163,7 +170,7 @@ export default function InsightsDashboard() {
       {/* KPIs matching iOS/Android: This month · Upcoming · Completion · No-show */}
       <KpiGrid>
         <KpiTile
-          value={formatCount(data.summary.totalThisMonth)}
+          value={formatCount(data.summary.bookingsThisMonth)}
           label="This month"
           hint="bookings"
         />

@@ -61,7 +61,7 @@ import {
   suffixSlug,
   validateForm,
   type EventTypeFormValues,
-} from "./eventTypeForm";
+} from "./eventTypeFormModel";
 
 const LIST_PATH = "/app/scheduling/event-types";
 

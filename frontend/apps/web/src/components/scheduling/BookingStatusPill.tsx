@@ -5,7 +5,8 @@
 // Color semantics (design source of truth):
 //   confirmed → success green   pending  → info BLUE (not amber)
 //   completed → neutral/info     cancelled/no_show/declined → error red
-//   rescheduled → info blue      paused/secret/expired/unavailable → neutral
+//   paused/secret/expired/unavailable → neutral
+// (Reschedules stay 'confirmed' — previous_start_at marks them, not a status.)
 // Pending is INFO blue by design — it is an awaiting-action state, not a
 // warning. Amber is reserved for true warnings elsewhere.
 
@@ -13,7 +14,6 @@ import clsx from "clsx";
 import {
   AlertTriangle,
   Ban,
-  CalendarClock,
   Check,
   CircleSlash,
   Clock,
@@ -55,11 +55,6 @@ const CONFIG: Record<StatusPillValue, PillConfig> = {
     label: "Completed",
     cls: "bg-app-surface-sunken text-app-text-secondary",
     icon: Check,
-  },
-  rescheduled: {
-    label: "Rescheduled",
-    cls: "bg-app-info-bg text-app-info",
-    icon: CalendarClock,
   },
   declined: {
     label: "Declined",

@@ -5,7 +5,11 @@
 // (the exact sentence shown to invitees at checkout) — this file only builds
 // the policy object it consumes.
 
-import type { CancellationPolicy, RefundPolicy } from "@pantopus/types";
+import type {
+  CancellationPolicy,
+  CancellationPolicyValue,
+  RefundPolicy,
+} from "@pantopus/types";
 
 export type PresetKey = "flexible" | "moderate" | "strict" | "custom";
 
@@ -137,11 +141,29 @@ function matchesPreset(
   );
 }
 
-/** Re-derive the selected preset + custom fields from a stored policy. */
+/**
+ * Re-derive the selected preset + custom fields from a stored policy. The wire
+ * value may be a plain string (iOS preset name or free text) — tolerate both.
+ */
 export function fromCancellationPolicy(
-  policy: CancellationPolicy | null | undefined,
+  value: CancellationPolicyValue | null | undefined,
 ): { selected: PresetKey; custom: CustomPolicy } {
-  if (!policy) return { selected: "flexible", custom: DEFAULT_CUSTOM };
+  if (!value) return { selected: "flexible", custom: DEFAULT_CUSTOM };
+
+  let policy: CancellationPolicy;
+  if (typeof value === "string") {
+    const key = value.trim().toLowerCase();
+    if (key === "flexible" || key === "moderate" || key === "strict") {
+      policy = { ...PRESET_POLICY[key], preset: key };
+    } else if (key) {
+      // Free text → surface as custom so nothing is silently dropped.
+      policy = { preset: "custom", notes: value };
+    } else {
+      return { selected: "flexible", custom: DEFAULT_CUSTOM };
+    }
+  } else {
+    policy = value;
+  }
 
   // Explicit marker wins (set by toCancellationPolicy).
   const marker = policy.preset;

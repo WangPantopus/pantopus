@@ -1,21 +1,24 @@
 "use client";
 
-// W17 · H11 — No-Show & Cancellation Report. No-show analytics from
-// GET /bookings/insights/no-shows (rate, by event type, by host, recent),
-// alongside cancellation stats computed from GET /bookings over the range.
+// W17 · H11 — No-Show & Cancellation Report. Wire truth: GET /insights/no-shows
+// returns { window_days, completed, no_show, cancelled, no_show_rate (integer
+// percent), recent_no_shows } — settled-outcome tallies plus the most recent
+// no-show rows. Per-event-type breakdowns are computed CLIENT-SIDE from the
+// GET /bookings rows (joined with event-type names); the endpoint does not
+// return them. Cancellation stats also derive from the bookings range.
 // Read-only.
 
 import { useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarX2, PartyPopper, ShieldCheck } from "lucide-react";
 import * as api from "@pantopus/api";
-import type { Booking, NoShowInsights } from "@pantopus/types";
+import type { Booking, EventType, NoShowInsights } from "@pantopus/types";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
 import { pillarForOwner } from "@/components/scheduling/pillarTokens";
 import BookingStatusPill from "@/components/scheduling/BookingStatusPill";
 import { useReport } from "./useReport";
 import { useInsightsFilters } from "./useInsightsFilters";
-import { summarizeRange } from "./aggregate";
+import { aggregateByEventType, summarizeRange } from "./aggregate";
 import { bookingListParams, insightsDays } from "./filters";
 import {
   formatCount,
@@ -38,6 +41,7 @@ import {
 
 interface Data {
   bookings: Booking[];
+  eventTypes: EventType[];
   noShow: NoShowInsights;
 }
 
@@ -48,15 +52,26 @@ export default function NoShowReport() {
   const ownerKey = `${owner.ownerType}:${owner.ownerId ?? owner.homeId ?? ""}`;
 
   const { phase, data, reload } = useReport<Data>(async () => {
-    const [bookingsRes, noShow] = await Promise.all([
+    const [bookingsRes, etRes, noShow] = await Promise.all([
       api.scheduling.listBookings(bookingListParams(filters), owner),
+      api.scheduling.listEventTypes(owner),
       api.scheduling.getNoShowInsights(insightsDays(filters), owner),
     ]);
-    return { bookings: bookingsRes.bookings ?? [], noShow };
+    return {
+      bookings: bookingsRes.bookings ?? [],
+      eventTypes: etRes.eventTypes ?? [],
+      noShow,
+    };
   }, [query, ownerKey]);
 
   const summary = useMemo(
     () => (data ? summarizeRange(data.bookings) : null),
+    [data],
+  );
+
+  // Per-event-type breakdown is client-side (the endpoint doesn't return it).
+  const byType = useMemo(
+    () => (data ? aggregateByEventType(data.bookings, data.eventTypes) : []),
     [data],
   );
 
@@ -70,7 +85,7 @@ export default function NoShowReport() {
     );
 
   const { noShow } = data;
-  const noShowCount = noShow.noShowCount ?? summary.noShow;
+  const noShowCount = noShow.no_show ?? summary.noShow;
 
   if (summary.total === 0)
     return (
@@ -92,23 +107,26 @@ export default function NoShowReport() {
       />
     );
 
-  const byEventType: BarDatum[] = noShow.byEventType.map((r) => ({
-    key: r.event_type_id,
-    label: r.name || "Untitled event",
-    value: r.count,
-    display: formatCount(r.count),
-    caption: `${formatRate(r.rate)} no-show rate`,
-    tone: "error",
-  }));
+  // Client-side per-event-type bars from the bookings range (the wire payload
+  // carries only overall tallies). Per-host bars were dropped: the endpoint
+  // returns no host breakdown and the rows carry ids without names.
+  const byEventType: BarDatum[] = byType
+    .filter((t) => t.noShow > 0)
+    .map((t) => ({
+      key: t.eventTypeId,
+      label: t.name,
+      value: t.noShow,
+      display: formatCount(t.noShow),
+      caption: `${formatRate(t.noShowRate)} no-show rate`,
+      tone: "error",
+    }));
 
-  const byHost: BarDatum[] = noShow.byHost.map((r) => ({
-    key: r.user_id,
-    label: r.name || "Unknown",
-    value: r.count,
-    display: formatCount(r.count),
-    caption: `${formatRate(r.rate)} no-show rate`,
-    tone: "error",
-  }));
+  // no_show_rate is an integer percent on the wire — normalize to a fraction
+  // explicitly (formatRate/toFraction would misread 1% as 100%).
+  const noShowRateFraction =
+    typeof noShow.no_show_rate === "number"
+      ? noShow.no_show_rate / 100
+      : summary.noShowRate;
 
   return (
     <div className="space-y-4">
@@ -116,7 +134,7 @@ export default function NoShowReport() {
       <Card>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <DonutGauge
-            rate={noShow.noShowRate ?? summary.noShowRate}
+            rate={noShowRateFraction}
             tone="error"
             caption={`${formatCount(noShowCount)} no-shows of completed bookings`}
           />
@@ -155,17 +173,11 @@ export default function NoShowReport() {
         </Card>
       )}
 
-      {byHost.length > 0 && (
-        <Card title="No-shows by host" icon={CalendarX2}>
-          <BarList data={byHost} pillar={pillar} />
-        </Card>
-      )}
-
-      {noShow.recent.length > 0 && (
+      {(noShow.recent_no_shows ?? []).length > 0 && (
         <Card title="Recent no-shows">
           <ul className="divide-y divide-app-border-subtle">
-            {noShow.recent.map((r) => (
-              <li key={r.booking_id} className="flex items-center gap-3 py-2.5">
+            {noShow.recent_no_shows.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 py-2.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-app-error-bg text-[11px] font-bold text-app-error">
                   {initials(r.invitee_name)}
                 </span>
@@ -174,7 +186,7 @@ export default function NoShowReport() {
                     {r.invitee_name || "Guest"}
                   </span>
                   <span className="block truncate text-xs text-app-text-muted">
-                    {formatDateTimeShort(r.scheduled_at, filters.tz)}
+                    {formatDateTimeShort(r.start_at, filters.tz)}
                   </span>
                 </span>
                 <BookingStatusPill status="no_show" />

@@ -115,9 +115,25 @@ describe("WeeklyHoursGrid (B5)", () => {
       { weekday: 1, start_time: "09:00", end_time: "17:00" },
     ]).filter((d) => d.weekday === 1);
     render(<Harness initial={oneDay} />);
-    expect(screen.getAllByLabelText("Start time")).toHaveLength(1);
+    // Count the design's collapsed TimeRangeButton, not the raw <input>. The inputs only
+    // exist once a block is expanded — the design replaced always-visible native time
+    // inputs with a labelled time-range button, so asserting on "Start time" here made
+    // this test depend on a control the design deliberately removed.
+    const blocks = () => screen.getAllByLabelText(/^Time block:/);
+    expect(blocks()).toHaveLength(1);
     fireEvent.click(screen.getByText(/Add a block/));
-    expect(screen.getAllByLabelText("Start time")).toHaveLength(2);
+    expect(blocks()).toHaveLength(2);
+  });
+
+  it("reveals start and end inputs only after expanding a block", () => {
+    const oneDay: DayModel[] = rulesToDays([
+      { weekday: 1, start_time: "09:00", end_time: "17:00" },
+    ]).filter((d) => d.weekday === 1);
+    render(<Harness initial={oneDay} />);
+    expect(screen.queryByLabelText("Start time")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByLabelText(/^Time block:/)[0]);
+    expect(screen.getByLabelText("Start time")).toBeInTheDocument();
+    expect(screen.getByLabelText("End time")).toBeInTheDocument();
   });
 });
 
@@ -160,16 +176,26 @@ describe("BlockOffForm (B9)", () => {
   });
 });
 
-describe("BookingLimitsForm (B7 — thin surface)", () => {
-  it("is read-only and hands off to event types", () => {
+describe("BookingLimitsForm (B7)", () => {
+  // This surface used to be a read-only link-out to event types. The design specifies real
+  // StepperRows (booking-limits-frames.jsx), and the component was rebuilt to match, so the
+  // old "is read-only and hands off" assertions no longer describe the intended behaviour.
+  it("renders the designed limit steppers", () => {
     render(<BookingLimitsForm />);
-    expect(
-      screen.getByText(/Limits are set per event type/),
-    ).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /Manage on event types/ });
-    expect(link).toHaveAttribute("href", "/app/scheduling/event-types");
-    // No interactive steppers — just labelled default values.
-    expect(screen.getByText("Book up to")).toBeInTheDocument();
-    expect(screen.getByText("60 days")).toBeInTheDocument();
+    for (const label of [
+      "Minimum notice",
+      "Book up to",
+      "Max per day",
+      "Max per week",
+      "Per-person limit",
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  });
+
+  it("exposes working increment and decrement controls", () => {
+    render(<BookingLimitsForm />);
+    expect(screen.getAllByLabelText("Increase").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Decrease").length).toBeGreaterThan(0);
   });
 });

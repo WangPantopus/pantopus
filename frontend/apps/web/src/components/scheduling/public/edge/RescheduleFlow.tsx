@@ -106,11 +106,10 @@ export default function RescheduleFlow({ token }: { token: string }) {
     };
   }, [token, reloadKey]);
 
+  // The public manage payload carries no owner fields on the booking — the
+  // page view is the only pillar source (personal fallback when hidden).
   const pillar: Pillar = useMemo(
-    () =>
-      pillarForOwner(
-        view?.page?.owner_type ?? view?.booking.owner_type ?? null,
-      ),
+    () => pillarForOwner(view?.page?.owner_type ?? null),
     [view],
   );
 

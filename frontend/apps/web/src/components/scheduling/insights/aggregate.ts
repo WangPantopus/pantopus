@@ -55,7 +55,6 @@ export function summarizeRange(bookings: Booking[]): RangeSummary {
       case "declined":
         cancelled++;
         break;
-      // "rescheduled" rows are transitional — not counted as an outcome.
       default:
         break;
     }

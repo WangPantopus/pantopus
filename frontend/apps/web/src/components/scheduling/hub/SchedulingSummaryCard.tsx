@@ -1,12 +1,12 @@
 "use client";
 
-// A5 — Scheduling Summary Card. An at-a-glance "this month / this week" pulse,
-// powered by GET /bookings/summary. Self-contained (fetches its own data) and
-// reusable. States: loading · error+retry · empty (share CTA) · loaded.
-// Loaded state shows: period toggle · 4 stat cells (Bookings / delta / Upcoming
-// / No-shows) · sparkline · event-type breakdown chips. Fields not yet in the
-// API response (deltaPct, sparklineData, byEventType) render placeholder
-// structure per design ground rules.
+// A5 — Scheduling Summary Card. An at-a-glance "this month" pulse, powered by
+// GET /bookings/summary. Self-contained (fetches its own data) and reusable.
+// States: loading · error+retry · empty (share CTA) · loaded.
+// Wire shape: { bookingsThisMonth, bookingsLastMonth, deltaPct, upcomingCount,
+// noShowCount, sparkline:[{date,count}], byEventType:[{event_type_id,count}] }.
+// Loaded state shows: period pill · 4 stat cells (Bookings / delta / Upcoming /
+// No-shows) · 30-day sparkline · event-type breakdown chips · See insights.
 
 import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
@@ -14,13 +14,18 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarClock,
+  ChevronRight,
   CloudOff,
   RotateCcw,
   Share2,
 } from "lucide-react";
 import Link from "next/link";
 import * as api from "@pantopus/api";
-import type { BookingsSummary, SchedulingOwnerRef } from "@pantopus/types";
+import type {
+  BookingsSummary,
+  EventType,
+  SchedulingOwnerRef,
+} from "@pantopus/types";
 import {
   pillarTokens,
   type Pillar,
@@ -31,6 +36,8 @@ interface SummaryCardProps {
   pillar: Pillar;
   /** Called when the empty-state "Share booking link" CTA is pressed. */
   onShare?: () => void;
+  /** Resolves byEventType ids to names for the breakdown chips. */
+  eventTypes?: EventType[];
   insightsHref?: string;
   className?: string;
 }
@@ -84,13 +91,7 @@ function Divider() {
 }
 
 /** Flat sparkline SVG matching design (pillar accent polyline + faint fill). */
-function Sparkline({
-  data,
-  accent,
-}: {
-  data: number[];
-  accent: string;
-}) {
+function Sparkline({ data, accent }: { data: number[]; accent: string }) {
   const W = 296;
   const H = 40;
   const pad = 2;
@@ -158,6 +159,7 @@ export default function SchedulingSummaryCard({
   owner,
   pillar,
   onShare,
+  eventTypes,
   insightsHref = "/app/scheduling/insights",
   className,
 }: SummaryCardProps) {
@@ -165,8 +167,6 @@ export default function SchedulingSummaryCard({
   const [data, setData] = useState<BookingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  // Period toggle state: 'week' | 'month'
-  const [period, setPeriod] = useState<"week" | "month">("month");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -197,6 +197,7 @@ export default function SchedulingSummaryCard({
             </div>
           ))}
         </div>
+        <div className="mt-4 h-10 w-full animate-pulse rounded-lg bg-app-surface-sunken" />
       </Shell>
     );
   }
@@ -229,10 +230,31 @@ export default function SchedulingSummaryCard({
     );
   }
 
-  const total = num(data.totalThisMonth);
-  const upcoming = num(data.upcomingCount);
-  const pending = num(data.pendingCount);
-  const isEmpty = total === 0 && upcoming === 0 && pending === 0;
+  // Wire shape reads — narrowed defensively so partial payloads degrade to 0/[].
+  const raw = data as BookingsSummary & Record<string, unknown>;
+  const bookingsThisMonth = num(raw.bookingsThisMonth);
+  const upcoming = num(raw.upcomingCount);
+  const noShowCount = num(raw.noShowCount);
+  const deltaPct = typeof raw.deltaPct === "number" ? raw.deltaPct : null;
+  const sparkline: number[] = Array.isArray(raw.sparkline)
+    ? (raw.sparkline as Array<{ date?: string; count?: unknown }>).map((p) =>
+        num(p?.count),
+      )
+    : [];
+  const nameById = new Map((eventTypes ?? []).map((e) => [e.id, e.name]));
+  const byEventType = (
+    Array.isArray(raw.byEventType)
+      ? (raw.byEventType as Array<{ event_type_id?: string; count?: unknown }>)
+      : []
+  )
+    .map((b) => ({
+      name: b?.event_type_id ? nameById.get(b.event_type_id) : undefined,
+      count: num(b?.count),
+    }))
+    .filter((b): b is { name: string; count: number } => !!b.name)
+    .slice(0, 3);
+
+  const isEmpty = bookingsThisMonth === 0 && upcoming === 0;
 
   if (isEmpty) {
     return (
@@ -282,29 +304,15 @@ export default function SchedulingSummaryCard({
     );
   }
 
-  // Optional fields not yet in API contract — read via index signature
-  const raw = data as BookingsSummary & Record<string, unknown>;
-  const deltaPct = typeof raw.deltaPct === "number" ? raw.deltaPct : null;
-  const noShowCount =
-    typeof raw.noShowCount === "number" ? raw.noShowCount : null;
-  const sparklineData: number[] = Array.isArray(raw.sparklineData)
-    ? (raw.sparklineData as number[])
-    : [];
-  const byEventType: { name: string; count: number }[] = Array.isArray(
-    raw.byEventType,
-  )
-    ? (raw.byEventType as { name: string; count: number }[]).slice(0, 3)
-    : [];
-
-  // Delta direction
+  // Delta direction — deltaPct is vs last month, from the wire.
   const deltaDir: DeltaDir =
     deltaPct == null ? null : deltaPct >= 0 ? "up" : "down";
   const deltaLabel =
-    deltaPct == null ? null : `${deltaPct >= 0 ? "+" : ""}${deltaPct}%`;
+    deltaPct == null ? "—" : `${deltaPct >= 0 ? "+" : ""}${deltaPct}%`;
 
   return (
     <Shell className={className}>
-      {/* Card header: accent overline + period toggle */}
+      {/* Card header: accent overline + period pill (This month, static per mobile parity) */}
       <div className="mb-3.5 flex items-center justify-between">
         <p
           className={clsx(
@@ -314,55 +322,41 @@ export default function SchedulingSummaryCard({
         >
           This month
         </p>
-        {/* Period segmented toggle — design CardHeader showPeriod=true */}
         <div className="flex gap-[3px] rounded-full bg-app-surface-sunken p-[3px]">
-          {(["week", "month"] as const).map((p) => {
-            const on = period === p;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPeriod(p)}
-                className={clsx(
-                  "whitespace-nowrap rounded-full px-[11px] py-[5px] text-[11px] font-semibold",
-                  on
-                    ? clsx(tk.bg, "text-white")
-                    : "bg-transparent text-app-text-secondary",
-                )}
-              >
-                {p === "week" ? "This week" : "This month"}
-              </button>
-            );
-          })}
+          <span className="whitespace-nowrap rounded-full px-[11px] py-[5px] text-[11px] font-semibold text-app-text-secondary">
+            This week
+          </span>
+          <span
+            className={clsx(
+              "whitespace-nowrap rounded-full px-[11px] py-[5px] text-[11px] font-bold text-white",
+              tk.bg,
+            )}
+          >
+            This month
+          </span>
         </div>
       </div>
 
       {/* 4 stat cells: Bookings | delta vs last month | Upcoming | No-shows */}
       <div className="flex items-stretch gap-2.5">
-        <StatCell value={String(total)} label="Bookings" />
+        <StatCell value={String(bookingsThisMonth)} label="Bookings" />
         <Divider />
-        {/* delta cell — placeholder '—' when API field absent */}
         <StatCell
-          value={deltaLabel ?? "—"}
+          value={deltaLabel}
           label="vs last month"
           delta={deltaDir ?? undefined}
         />
         <Divider />
         <StatCell value={String(upcoming)} label="Upcoming" />
         <Divider />
-        {/* No-shows count (not rate%) per design */}
-        <StatCell
-          value={noShowCount != null ? String(noShowCount) : "—"}
-          label="No-shows"
-        />
+        <StatCell value={String(noShowCount)} label="No-shows" />
       </div>
 
-      {/* Sparkline — rendered when data available; placeholder baseline when absent */}
+      {/* 30-day sparkline — placeholder baseline when the wire has too few points */}
       <div className="mt-4">
-        {sparklineData.length >= 2 ? (
-          <Sparkline data={sparklineData} accent={tk.hex} />
+        {sparkline.length >= 2 ? (
+          <Sparkline data={sparkline} accent={tk.hex} />
         ) : (
-          /* Placeholder baseline matches sparkline height */
           <div
             className="h-10 w-full rounded bg-app-surface-sunken opacity-40"
             aria-hidden
@@ -400,7 +394,7 @@ export default function SchedulingSummaryCard({
           )}
         >
           See insights
-          <span aria-hidden>›</span>
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </div>
     </Shell>

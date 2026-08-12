@@ -36,6 +36,7 @@ import { toast } from "@/components/ui/toast-store";
 import { confirmStore } from "@/components/ui/confirm-store";
 import BookingLinkCard from "./BookingLinkCard";
 import AcceptingBookingsCard from "./AcceptingBookingsCard";
+import SchedulingSummaryCard from "./SchedulingSummaryCard";
 import AgendaSection from "./AgendaSection";
 import ManageRows, { type ManageItem } from "./ManageRows";
 import HubSkeleton from "./HubSkeleton";
@@ -251,6 +252,15 @@ export default function SchedulingHub() {
           />
         ) : (
           <>
+            {/* A5 summary card — sits atop the rest of the Hub per design */}
+            {owner && (
+              <SchedulingSummaryCard
+                owner={owner}
+                pillar={pillar}
+                eventTypes={eventTypes}
+                onShare={() => router.push(`${BASE}/booking-page`)}
+              />
+            )}
             <BookingLinkCard
               page={page}
               pillar={pillar}

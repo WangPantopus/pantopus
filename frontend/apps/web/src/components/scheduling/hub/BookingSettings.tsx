@@ -27,9 +27,10 @@ import {
 import * as api from "@pantopus/api";
 import type {
   BookingPage,
-  CancellationPolicy,
+  CancellationPolicyValue,
   SchedulingOwnerRef,
 } from "@pantopus/types";
+import { resolvePolicyValue } from "@/components/scheduling/policyValue";
 import { useSchedulingOwner } from "@/components/scheduling/SchedulingOwnerProvider";
 import { PillarThemeProvider } from "@/components/scheduling/PillarThemeProvider";
 import {
@@ -64,7 +65,11 @@ function isPillar(v: string | null): v is Pillar {
   return v === "personal" || v === "home" || v === "business";
 }
 
-function cancellationLabel(p: CancellationPolicy | null): string | null {
+// Tolerates the string wire shape (iOS preset name / free text).
+function cancellationLabel(
+  value: CancellationPolicyValue | null,
+): string | null {
+  const p = resolvePolicyValue(value);
   if (!p) return null;
   const cutoff = typeof p.cutoff_min === "number" ? p.cutoff_min : null;
   if (cutoff == null) return p.notes ? "Custom policy" : null;
