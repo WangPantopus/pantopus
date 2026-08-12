@@ -301,3 +301,38 @@ The agents' work left 4 real breakages that only the full gate surfaced:
    - EventTypeListScreen ContentBody: NestedBlockDepth 4/4 -> drag handler flattened by
      computing the swap `neighbour` up front (depth 3).
 Also ktlintFormat auto-fixed 34 style violations + 2 hand-fixes in my own onboarding edits.
+
+
+## Rev 14 (2026-08-12) — COMMITTED + PUSHED
+5 commits on feature/calendarly (72c9c592..b3018f89), pushed to origin:
+  71499c34 docs(calendarly): design frames + full audit record
+  d8874d6f fix(calendarly-backend): 8 blockers + 14 majors
+  cb119c4c fix(calendarly-web+types): wire contract + catalog screens
+  c6f8c270 fix(calendarly-android): owner threading, 7 blockers, design gaps
+  b3018f89 fix(calendarly-ios): 3 blockers, hub/editor majors, reorder mode
+Working tree CLEAN (0 files).
+
+FINAL GATES: backend Jest 213/213 (3236) | web Jest 43/43 (523) | web tsc 0 errors |
+Android compile+unit+ktlint+detekt BUILD SUCCESSFUL | iOS SwiftFormat 0/1732 + SwiftLint/
+icons/hex clean. iOS COMPILE still unverified — needs `xcodebuild -downloadPlatform iOS`.
+
+REMAINING (small, non-blocking):
+1. Android Paparazzi baselines for changed scheduling screens (./gradlew paparazziRecord;
+   arm64-local records pass CI's Linux verify per pantopus-paparazzi-apple-silicon memory).
+   NOT yet re-recorded — paparazziVerify was deliberately excluded from the gate runs.
+2. iOS compile/test once the platform is installed.
+3. Residual design-polish minors listed under "OPEN GAP" (rev 7b) — cosmetic only.
+
+
+## Rev 15 (2026-08-12) — Paparazzi baselines re-recorded (verified, minimal)
+paparazziVerify surfaced exactly 3 failures; each diff was inspected VISUALLY before
+re-recording (never blind-accepted):
+  · bookingpage share_targets_and_qr (1.96%) — old baseline was the fake noise grid with no
+    finder patterns / no quiet zone; new one is a real scannable QR. Proof of the fake-qr fix.
+  · hub hub_loaded_pieces (0.20%) — bulky M3 Switch -> the design's 32x18 mini toggle.
+  · eventtypes list_empty_templates (0.92%) — full-width CTA -> hugging CTA (ET-06).
+`paparazziRecord` rewrote 11 baselines, not 3. The extra 8 were sub-tolerance drift; 6 of them
+(homes.maintenance, mailbox CertifiedDetail x3, place.messaging x2) are screens this branch
+NEVER touched = arm64 re-render noise. Those 6 were REVERTED and paparazziVerify still passes
+(BUILD SUCCESSFUL), which confirms they were noise. Committed only the 5 scheduling baselines.
+Rule for future records here: revert any rewritten baseline on a screen you didn't change.
