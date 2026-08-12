@@ -8,11 +8,24 @@
 import SwiftUI
 
 extension EditProfileView {
+    /// A13.9 §① — avatar + "Change photo". The photo does not ride the
+    /// PATCH body; it has its own multipart route
+    /// (`POST /api/upload/profile-picture`), so the block sits above the
+    /// field groups rather than inside one.
+    var avatarSection: some View {
+        EditProfileAvatarBlock(
+            avatarURL: viewModel.avatarURL,
+            initial: viewModel.avatarInitial,
+            state: viewModel.avatarState,
+            onPicked: { data, filename, mimeType in
+                Task { await viewModel.uploadAvatar(data: data, filename: filename, mimeType: mimeType) }
+            },
+            onDismissError: { viewModel.dismissAvatarError() }
+        )
+        .padding(.bottom, Spacing.s2)
+    }
+
     var aboutSection: some View {
-        // Note: the design also calls for an avatar upload (tap to
-        // replace). `updateProfileSchema` exposes no avatar field, so
-        // the affordance is intentionally omitted until the backend
-        // accepts an avatar key on PATCH /api/users/profile.
         FormFieldGroup("About") {
             textField(.firstName, label: "First name")
             textField(.middleName, label: "Middle name (optional)")

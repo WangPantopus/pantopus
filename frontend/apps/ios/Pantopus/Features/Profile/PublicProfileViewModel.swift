@@ -2,9 +2,15 @@
 //  PublicProfileViewModel.swift
 //  Pantopus
 //
-//  Loads `GET /api/users/id/:id` and projects it onto the
-//  `StatsTabsBody` content model. Tab state lives in the VM so
-//  switching doesn't re-fetch.
+//  Loads the public profile and projects it onto the `StatsTabsBody`
+//  content model. Tab state lives in the VM so switching doesn't refetch.
+//
+//  T3 — the route param may be a UUID *or* a handle (`pantopus://u/mariak`,
+//  `https://pantopus.com/u/mariak`). We branch exactly like RN
+//  (`src/app/user/[id].tsx:27,53-58`): UUIDs go to `GET /api/users/id/:id`,
+//  handles to `GET /api/users/username/:username`. Both routes return the
+//  same body, and every follow-up call (relationship, follow, connect,
+//  block, posts) uses the *resolved* `profile.id`, never the raw param.
 //
 //  P6.5 — Persona vs Local chrome. The VM derives the profile kind
 //  from the loaded DTO's metadata so the screen can swap banner color,
@@ -229,7 +235,21 @@ public final class PublicProfileViewModel {
     /// Transient toast surface used for action feedback.
     public var toastMessage: String?
 
-    private let userId: String
+    /// T3 — plain follow graph (`/api/users/:id/follow`), distinct from the
+    /// persona privacy handshake. `true` once the viewer follows this user.
+    public private(set) var isFollowing: Bool = false
+    /// In-flight guard for the follow/unfollow toggle.
+    public private(set) var isFollowInFlight: Bool = false
+    /// `true` when a Follow affordance should render at all — someone else's
+    /// profile, viewed by a signed-in user. Mirrors RN, which hides the whole
+    /// action row on your own profile (`src/app/user/[id].tsx:522`).
+    public private(set) var canFollow: Bool = false
+
+    /// The raw route param — may be a UUID or a `@handle`.
+    private let routeIdentifier: String
+    /// The resolved `User.id`, known only after the profile loads. Every
+    /// user-scoped mutation must use this, never `routeIdentifier`.
+    private var resolvedUserId: String
     private let currentUserId: String?
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.PublicProfile")
@@ -239,7 +259,8 @@ public final class PublicProfileViewModel {
         currentUserId: String? = PublicProfileViewModel.signedInUserId(),
         client: APIClient = .shared
     ) {
-        self.userId = userId
+        self.routeIdentifier = userId
+        self.resolvedUserId = userId
         self.currentUserId = currentUserId
         self.client = client
     }
@@ -268,7 +289,7 @@ public final class PublicProfileViewModel {
     public func connect() async {
         guard connectState != .inFlight, connectState != .succeeded else { return }
         connectState = .inFlight
-        let body = ConnectionRequestBody(addresseeId: userId)
+        let body = ConnectionRequestBody(addresseeId: resolvedUserId)
         do {
             _ = try await client.request(
                 RelationshipsEndpoints.sendRequest(body: body),
@@ -288,15 +309,22 @@ public final class PublicProfileViewModel {
         }
     }
 
-    /// Persona follow — opens the privacy handshake wizard (Stripe
-    /// Checkout for paid tiers), mirroring BeaconProfile / RN follow.
+    /// Follow entry point behind every Follow affordance.
+    ///
+    /// A Beacon (persona with a resolvable handle) keeps the privacy
+    /// handshake wizard — that flow owns tier selection and Stripe
+    /// Checkout. Everyone else (ordinary neighbours, personas with no
+    /// Beacon bridge) now takes the plain `/api/users/:id/follow` path
+    /// instead of the old dead-end toast. Mirrors RN, whose profile screen
+    /// only ever calls `followUser`/`unfollowUser`
+    /// (`src/app/user/[id].tsx:184-199`).
     public func follow() {
-        guard canOpenHandshake else {
-            toastMessage = Self.handshakeUnavailableMessage
+        if canOpenHandshake {
+            handshakePreselectedTierRank = nil
+            showFollowHandshake = true
             return
         }
-        handshakePreselectedTierRank = nil
-        showFollowHandshake = true
+        Task { await toggleFollow() }
     }
 
     /// Unlock a tier-gated broadcast on a Persona profile.
@@ -339,7 +367,7 @@ public final class PublicProfileViewModel {
         blockState = .inFlight
         do {
             _ = try await client.request(
-                BlocksEndpoints.block(userId: userId),
+                BlocksEndpoints.block(userId: resolvedUserId),
                 as: EmptyResponse.self
             )
             blockState = .succeeded
@@ -358,10 +386,8 @@ public final class PublicProfileViewModel {
 
     private func fetch() async {
         do {
-            let profile = try await client.request(
-                PublicProfileEndpoints.profile(id: userId),
-                as: PublicProfile.self
-            )
+            let profile = try await client.request(profileEndpoint, as: PublicProfile.self)
+            resolvedUserId = profile.id
             let kind = derivedKind(from: profile)
             // A21.2 — the Local archetype renders a real neighbourhood post
             // feed, so pull the author's posts the way the RN `PostsTab`
@@ -371,12 +397,95 @@ public final class PublicProfileViewModel {
             // card would invent a visibility chip the API never sent.
             let posts = kind == .local ? await loadUserPosts(id: profile.id) : []
             state = .loaded(build(from: profile, kind: kind, posts: posts))
+            await loadRelationship(id: profile.id)
         } catch let error as APIError {
             logger.warning("Profile load failed: \(error)")
             state = .error(message: friendlyMessage(for: error))
         } catch {
             logger.warning("Profile load failed: \(error)")
             state = .error(message: "Something went wrong")
+        }
+    }
+
+    /// UUIDs resolve by id; handles resolve by username. Mirrors RN's
+    /// `fetchPublicProfileByIdentifier` (`src/app/user/[id].tsx:53-58`).
+    private var profileEndpoint: Endpoint {
+        let identifier = routeIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        if UserSocialEndpoints.isUUID(identifier) {
+            return PublicProfileEndpoints.profile(id: identifier)
+        }
+        return UserSocialEndpoints.profileByUsername(
+            UserSocialEndpoints.normalizeHandle(identifier)
+        )
+    }
+
+    /// `GET /api/users/:id/relationship` — seeds the Follow and Connect
+    /// poses. Requires auth, so a signed-out viewer just gets the resting
+    /// state (and no Follow affordance).
+    private func loadRelationship(id: String) async {
+        canFollow = currentUserId != nil && currentUserId != id
+        guard canFollow else {
+            isFollowing = false
+            return
+        }
+        do {
+            let relationship = try await client.request(
+                UserSocialEndpoints.relationship(userId: id),
+                as: UserRelationshipResponse.self
+            )
+            isFollowing = relationship.following ?? false
+            switch relationship.relationship ?? "none" {
+            case "pending_sent", "connected":
+                connectState = .succeeded
+            default:
+                break
+            }
+        } catch {
+            logger.debug("Relationship load failed: \(error)")
+        }
+    }
+
+    /// T3 — plain follow / unfollow for an ordinary neighbor.
+    /// `POST` / `DELETE /api/users/:id/follow`
+    /// (`backend/routes/users.js:3520` / `:3593`). Awaited, not optimistic,
+    /// so a rejected follow (blocked, curator account) can't leave the
+    /// button lying — same as RN's `handleFollow`
+    /// (`src/app/user/[id].tsx:184-199`).
+    public func toggleFollow() async {
+        guard canFollow, !isFollowInFlight else { return }
+        isFollowInFlight = true
+        defer { isFollowInFlight = false }
+        let wasFollowing = isFollowing
+        do {
+            let endpoint = wasFollowing
+                ? UserSocialEndpoints.unfollow(userId: resolvedUserId)
+                : UserSocialEndpoints.follow(userId: resolvedUserId)
+            let response = try await client.request(endpoint, as: UserFollowResponse.self)
+            isFollowing = response.following ?? !wasFollowing
+            toastMessage = isFollowing ? "Following" : "Unfollowed"
+        } catch let error as APIError {
+            logger.warning("Follow toggle failed: \(error)")
+            toastMessage = followFailureMessage(for: error, wasFollowing: wasFollowing)
+        } catch {
+            logger.warning("Follow toggle failed: \(error)")
+            toastMessage = wasFollowing ? "Couldn't unfollow." : "Couldn't follow."
+        }
+    }
+
+    private func followFailureMessage(for error: APIError, wasFollowing: Bool) -> String {
+        let fallback = wasFollowing ? "Couldn't unfollow." : "Couldn't follow."
+        switch error {
+        case .clientError:
+            // The backend sends readable copy here ("You are already
+            // following this user", "Cannot follow curator accounts") and
+            // `APIError.errorDescription` already unwraps `{error: …}`.
+            return error.errorDescription ?? fallback
+        case .forbidden:
+            return "You can't follow this profile."
+        case .transport:
+            return "Check your connection and try again."
+        default:
+            return fallback
         }
     }
 

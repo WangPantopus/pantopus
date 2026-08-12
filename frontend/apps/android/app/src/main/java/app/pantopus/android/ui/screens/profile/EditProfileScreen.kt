@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,6 +84,10 @@ fun EditProfileScreen(
     val email by viewModel.email.collectAsStateWithLifecycle()
     val emailVerified by viewModel.emailVerified.collectAsStateWithLifecycle()
     val shakeTrigger by viewModel.shakeTrigger.collectAsStateWithLifecycle()
+    val avatarUrl by viewModel.avatarUrl.collectAsStateWithLifecycle()
+    val avatarInitial by viewModel.avatarInitial.collectAsStateWithLifecycle()
+    val avatarState by viewModel.avatarState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         Analytics.track(AnalyticsEvent.ScreenEditProfileViewed)
@@ -133,6 +138,16 @@ fun EditProfileScreen(
                     onCommit = viewModel::save,
                     onDiscard = viewModel::discardChanges,
                     onUpdate = viewModel::update,
+                    avatarSlot = {
+                        EditProfileAvatarBlock(
+                            avatarUrl = avatarUrl,
+                            initial = avatarInitial,
+                            state = avatarState,
+                            onPicked = viewModel::uploadAvatar,
+                            onDismissError = viewModel::dismissAvatarError,
+                            scope = scope,
+                        )
+                    },
                 )
             is EditProfileUiState.Error ->
                 EmptyState(
@@ -189,6 +204,7 @@ internal fun EditProfileLoaded(
     onDiscard: () -> Unit,
     onUpdate: (EditProfileField, String) -> Unit,
     shakeTrigger: Int = 0,
+    avatarSlot: @Composable () -> Unit = {},
 ) {
     Box(
         modifier =
@@ -215,7 +231,13 @@ internal fun EditProfileLoaded(
                 )
             },
         ) {
-            EditProfileSections(fields = state.fields, email = state.email, emailVerified = state.emailVerified, onUpdate = onUpdate)
+            EditProfileSections(
+                fields = state.fields,
+                email = state.email,
+                emailVerified = state.emailVerified,
+                onUpdate = onUpdate,
+                avatarSlot = avatarSlot,
+            )
         }
     }
 }
@@ -226,12 +248,14 @@ private fun EditProfileSections(
     email: String,
     emailVerified: Boolean,
     onUpdate: (EditProfileField, String) -> Unit,
+    avatarSlot: @Composable () -> Unit = {},
 ) {
+    // A13.9 §① — avatar + "Change photo". The photo does not ride the
+    // PATCH body; it has its own multipart route
+    // (`POST /api/upload/profile-picture`), so the block sits above the
+    // field groups rather than inside one.
+    avatarSlot()
     FormFieldGroup("About") {
-        // Note: the design also calls for an avatar upload (tap to
-        // replace). `updateProfileSchema` exposes no avatar field,
-        // so the affordance is intentionally omitted until the
-        // backend accepts an avatar key on PATCH /api/users/profile.
         TextRow(
             field = EditProfileField.FirstName,
             label = "First name",

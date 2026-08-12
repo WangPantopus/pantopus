@@ -41,6 +41,8 @@ class ProfessionalProfileSnapshotTest {
                     mode = ProStickyMode.Saved,
                     dirtyCount = 0,
                     pendingCount = 0,
+                    isDisabling = false,
+                    onDisable = {},
                     onBack = {},
                     onDiscard = {},
                     onSaveSubmit = {},
@@ -66,6 +68,8 @@ class ProfessionalProfileSnapshotTest {
                     mode = ProStickyMode.PendingSave,
                     dirtyCount = content.dirtyCount,
                     pendingCount = content.pendingCount,
+                    isDisabling = false,
+                    onDisable = {},
                     onBack = {},
                     onDiscard = {},
                     onSaveSubmit = {},
@@ -77,6 +81,26 @@ class ProfessionalProfileSnapshotTest {
                     onRemoveCertification = {},
                     onAddPortfolioLink = {},
                     onVisibilityChange = { _, _ -> },
+                )
+            }
+        }
+    }
+
+    @Test fun professionalProfileCreateFrame() {
+        paparazzi.snapshot {
+            Frame {
+                ProfessionalEnableForm(
+                    draft = ProfessionalEnableDraft(),
+                    onBack = {},
+                    onEnable = {},
+                    onHeadlineChange = {},
+                    onBioChange = {},
+                    onToggleCategory = {},
+                    onCityChange = {},
+                    onStateChange = {},
+                    onRadiusChange = {},
+                    onHourlyRateChange = {},
+                    onPublicChange = {},
                 )
             }
         }

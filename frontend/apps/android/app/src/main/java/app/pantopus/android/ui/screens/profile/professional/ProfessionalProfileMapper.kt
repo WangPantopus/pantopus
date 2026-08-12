@@ -50,8 +50,28 @@ object ProfessionalProfileMapper {
             else -> ProVerificationStatus.Unverified
         }
 
-    /** `pet_care` → `Pet Care`. */
-    fun categoryLabel(key: String): String = key.split("_").joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+    /**
+     * Seed an enable draft from an existing (disabled) backend record so
+     * re-enabling keeps what the user already wrote.
+     */
+    fun draft(dto: ProfessionalProfileDto?): ProfessionalEnableDraft {
+        if (dto == null) return ProfessionalEnableDraft()
+        val rate = dto.pricingMeta?.hourlyRate
+        return ProfessionalEnableDraft(
+            headline = dto.headline.orEmpty(),
+            bio = dto.bio.orEmpty(),
+            categories = dto.categories ?: emptyList(),
+            city = dto.serviceArea?.city.orEmpty(),
+            state = dto.serviceArea?.state.orEmpty(),
+            radiusKm = dto.serviceArea?.radiusKm?.toInt()?.toString() ?: "50",
+            hourlyRate = rate?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "",
+            isPublic = dto.isPublic ?: true,
+            isReEnable = true,
+        )
+    }
+
+    /** `pet_care` → `Pet Care`, via the server's category catalogue. */
+    fun categoryLabel(key: String): String = ProfessionalCategory.label(key)
 
     fun categoryIcon(key: String): PantopusIcon =
         when (key) {

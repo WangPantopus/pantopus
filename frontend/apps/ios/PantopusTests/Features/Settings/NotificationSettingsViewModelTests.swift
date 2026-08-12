@@ -2,10 +2,11 @@
 //  NotificationSettingsViewModelTests.swift
 //  PantopusTests
 //
-//  P7.5 / A14.5 — the reshaped notification matrix. Covers the
-//  populated + paused frames, the channel-header / triad projection,
-//  the locked Emergency-push chip, optimistic chip + pause toggles, and
-//  the helper-line parity contract (mirrored on Android).
+//  A14.5 — notification & briefing preferences backed by
+//  `GET/PUT /api/hub/preferences`. Covers the four-card projection, the
+//  conditional time-chip rows, the wire names + `HH:mm` format the
+//  backend's Joi schema demands, the merged debounced patch, and the
+//  re-fetch rollback after a failed save. Mirrored on Android.
 //
 
 import XCTest
@@ -13,8 +14,71 @@ import XCTest
 
 @MainActor
 final class NotificationSettingsViewModelTests: XCTestCase {
-    private func loadedGroups(_ vm: NotificationSettingsViewModel) async -> [GroupedListGroup] {
-        await vm.load()
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
+
+    private typealias RowID = NotificationSettingsViewModel.RowID
+    private typealias GroupID = NotificationSettingsViewModel.GroupID
+
+    private func makeAPI() -> APIClient {
+        APIClient(
+            environment: .current,
+            session: SequencedURLProtocol.makeSession(),
+            retryPolicy: .none
+        )
+    }
+
+    /// A long debounce keeps the timer from firing on its own; tests
+    /// drain it with `flushPendingSaveNow()` so ordering is exact.
+    private func makeViewModel() -> NotificationSettingsViewModel {
+        NotificationSettingsViewModel(api: makeAPI(), saveDebounce: .seconds(60))
+    }
+
+    private static func prefsJSON(
+        dailyEnabled: Bool = true,
+        dailyTime: String = "07:30",
+        eveningEnabled: Bool = true,
+        eveningTime: String = "18:00",
+        weather: Bool = true,
+        aqi: Bool = true,
+        mail: Bool = true,
+        gigs: Bool = true,
+        homeReminders: Bool = true,
+        quietStart: String? = nil,
+        quietEnd: String? = nil,
+        locationMode: String = "primary_home",
+        timezone: String = "America/Los_Angeles"
+    ) -> String {
+        func quoted(_ value: String?) -> String { value.map { "\"\($0)\"" } ?? "null" }
+        return """
+        {"preferences":{
+          "user_id":"u_1",
+          "daily_briefing_enabled":\(dailyEnabled),
+          "daily_briefing_time_local":"\(dailyTime)",
+          "daily_briefing_timezone":"\(timezone)",
+          "evening_briefing_enabled":\(eveningEnabled),
+          "evening_briefing_time_local":"\(eveningTime)",
+          "weather_alerts_enabled":\(weather),
+          "aqi_alerts_enabled":\(aqi),
+          "mail_summary_enabled":\(mail),
+          "gig_updates_enabled":\(gigs),
+          "home_reminders_enabled":\(homeReminders),
+          "quiet_hours_start_local":\(quoted(quietStart)),
+          "quiet_hours_end_local":\(quoted(quietEnd)),
+          "location_mode":"\(locationMode)",
+          "custom_latitude":null,"custom_longitude":null,"custom_label":null
+        }}
+        """
+    }
+
+    private func loadedGroups(_ vm: NotificationSettingsViewModel) -> [GroupedListGroup] {
         guard case let .loaded(groups) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
             return []
@@ -26,172 +90,265 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         groups.flatMap(\.rows).first { $0.id == id }
     }
 
-    // MARK: - Populated frame
+    // MARK: - Loading
 
-    func testPopulatedProducesGlobalPlusFiveCategories() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
+    func testLoadProjectsFourCardsFromServerTruth() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.prefsJSON())]
+        let vm = makeViewModel()
+        await vm.load()
+
+        let groups = loadedGroups(vm)
         XCTAssertEqual(
             groups.map(\.id),
-            ["master", "tasks", "pulse", "marketplace", "homeMailbox", "accountSecurity"]
+            [GroupID.briefings, GroupID.alerts, GroupID.quietHours, GroupID.briefingLocation]
         )
-        XCTAssertNil(vm.banner)
-        XCTAssertFalse(vm.contentDimmed)
+        XCTAssertEqual(groups.map(\.overline), ["Briefings", "Alert preferences", "Quiet hours", "Briefing location"])
+        // The GET must go to the composed backend path.
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.first?.url?.path, "/api/hub/preferences")
+        XCTAssertEqual(SequencedURLProtocol.capturedRequests.first?.httpMethod, "GET")
     }
 
-    func testCategoryCardsCarryChannelHeaderAndTriadRows() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
-        let categories = groups.filter { $0.id != "master" }
-        XCTAssertEqual(categories.count, 5)
-        for category in categories {
-            XCTAssertTrue(category.showsChannelHeader, "\(category.id) should show the P/E/S header")
-            for row in category.rows {
-                guard case .channelTriad = row.control else {
-                    XCTFail("\(row.id) should be a channelTriad row")
-                    continue
-                }
-            }
-        }
+    func testAlertSwitchesMirrorServerValues() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(weather: false, aqi: true, mail: false, gigs: true, homeReminders: false))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        let groups = loadedGroups(vm)
+        XCTAssertEqual(row(groups, RowID.weatherAlerts)?.control, .toggle(isOn: false))
+        XCTAssertEqual(row(groups, RowID.aqiAlerts)?.control, .toggle(isOn: true))
+        XCTAssertEqual(row(groups, RowID.mailSummary)?.control, .toggle(isOn: false))
+        XCTAssertEqual(row(groups, RowID.gigUpdates)?.control, .toggle(isOn: true))
+        XCTAssertEqual(row(groups, RowID.homeReminders)?.control, .toggle(isOn: false))
     }
 
-    func testGlobalCardIsToggleAndChevron() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
-        let globalCard = groups.first { $0.id == "master" }
-        XCTAssertEqual(globalCard?.showsChannelHeader, false)
-        guard case .toggle(false)? = row(groups, NotificationSettingsViewModel.RowID.pauseAll)?.control else {
-            return XCTFail("Pause-all should be an off toggle in the populated frame")
-        }
-        guard case .chipStatus? = row(groups, NotificationSettingsViewModel.RowID.quietHours)?.control else {
-            return XCTFail("Quiet hours should be a chip + chevron row")
-        }
-    }
-
-    func testSeedPatternsMatchDesign() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
-        assertPattern(row(groups, "tasks.bids"), p: true, e: false, s: false)
-        assertPattern(row(groups, "tasks.messages"), p: true, e: true, s: false)
-        assertPattern(row(groups, "tasks.receipts"), p: false, e: true, s: false)
-        assertPattern(row(groups, "pulse.lostFound"), p: false, e: false, s: false)
-        assertPattern(row(groups, "marketplace.offers"), p: true, e: true, s: false)
-        assertPattern(row(groups, "account.billing"), p: false, e: true, s: false)
-    }
-
-    func testEmergencyKeepsPushLocked() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
-        guard case let .channelTriad(p, e, s, locked) = row(groups, NotificationSettingsViewModel.RowID.emergency)?.control else {
-            return XCTFail("Emergency should be a channelTriad row")
-        }
-        XCTAssertTrue(p)
-        XCTAssertTrue(e)
-        XCTAssertTrue(s)
-        XCTAssertEqual(locked, [.p], "Emergency push must be locked on")
-    }
-
-    // MARK: - Mutations (stubbed, local only)
-
-    func testToggleChannelFlipsLocalState() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        _ = await loadedGroups(vm)
-        await vm.toggleChannel("tasks.receipts", channel: .p, isOn: true)
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        assertPattern(row(groups, "tasks.receipts"), p: true, e: true, s: false)
-    }
-
-    func testLockedChannelCannotBeToggledOff() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        _ = await loadedGroups(vm)
-        await vm.toggleChannel(NotificationSettingsViewModel.RowID.emergency, channel: .p, isOn: false)
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        guard case let .channelTriad(p, _, _, locked) = row(groups, NotificationSettingsViewModel.RowID.emergency)?.control else {
-            return XCTFail("Emergency should be a channelTriad row")
-        }
-        XCTAssertTrue(p, "Locked push can't be turned off")
-        XCTAssertEqual(locked, [.p])
-    }
-
-    // MARK: - Paused frame
-
-    func testPauseAllSwapsGlobalForBannerAndDims() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        _ = await loadedGroups(vm)
-        await vm.toggleRow(NotificationSettingsViewModel.RowID.pauseAll, isOn: true)
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        XCTAssertFalse(groups.contains { $0.id == "master" }, "Master card is replaced by the banner")
-        XCTAssertEqual(groups.first?.id, "tasks")
-        XCTAssertTrue(vm.contentDimmed)
-        XCTAssertEqual(vm.banner?.title, "Paused for 2 hours")
-        XCTAssertEqual(vm.banner?.subtitle, "Resumes 11:42 AM · Emergency alerts still come through")
-        XCTAssertEqual(vm.banner?.actionLabel, "Resume")
-        XCTAssertEqual(vm.banner?.icon, .bellOff)
-    }
-
-    func testPausedVariantBootsPaused() async {
-        let vm = NotificationSettingsViewModel(variant: .paused)
-        let groups = await loadedGroups(vm)
-        XCTAssertTrue(vm.contentDimmed)
-        XCTAssertNotNil(vm.banner)
-        XCTAssertFalse(groups.contains { $0.id == "master" })
-        // The configured pattern is still readable underneath.
-        XCTAssertEqual(groups.map(\.id), ["tasks", "pulse", "marketplace", "homeMailbox", "accountSecurity"])
-    }
-
-    func testResumeRestoresGlobal() async {
-        let vm = NotificationSettingsViewModel(variant: .paused)
-        _ = await loadedGroups(vm)
-        await vm.tapBanner()
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        XCTAssertNil(vm.banner)
-        XCTAssertFalse(vm.contentDimmed)
-        XCTAssertEqual(groups.first?.id, "master")
-    }
-
-    // MARK: - Copy parity contract
-
-    func testFooterLegend() {
-        let vm = NotificationSettingsViewModel()
-        XCTAssertEqual(vm.footerCaption, "P · Push   E · Email   S · SMS")
-    }
-
-    func testHelperCopyMatchesDesign() async {
-        let vm = NotificationSettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
-        func helper(_ id: String) -> String? {
-            groups.first { $0.id == id }?.helper
-        }
+    func testTimeChipsOnlyRenderWhenTheBriefingIsOn() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(dailyEnabled: true, dailyTime: "08:30", eveningEnabled: false))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        let groups = loadedGroups(vm)
         XCTAssertEqual(
-            helper("master"),
-            "Pause all silences every channel except emergency alerts. Quiet hours just delays them."
+            row(groups, RowID.morningTime)?.control,
+            .chips(options: NotificationSettingsViewModel.morningTimeOptions, selected: "08:30")
+        )
+        XCTAssertNil(row(groups, RowID.eveningTime), "Evening chips hide while the evening briefing is off")
+    }
+
+    func testQuietHoursBoundsOnlyRenderWhenStartIsSet() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.prefsJSON(quietStart: nil, quietEnd: nil))]
+        let vm = makeViewModel()
+        await vm.load()
+        var groups = loadedGroups(vm)
+        XCTAssertEqual(row(groups, RowID.quietHours)?.control, .toggle(isOn: false))
+        XCTAssertNil(row(groups, RowID.quietHoursStart))
+
+        SequencedURLProtocol.sequence = [.status(200, body: Self.prefsJSON(quietStart: "23:00", quietEnd: "06:00"))]
+        await vm.refresh()
+        groups = loadedGroups(vm)
+        XCTAssertEqual(row(groups, RowID.quietHours)?.control, .toggle(isOn: true))
+        XCTAssertEqual(
+            row(groups, RowID.quietHoursStart)?.control,
+            .chips(options: NotificationSettingsViewModel.quietStartOptions, selected: "23:00")
         )
         XCTAssertEqual(
-            helper("tasks"),
-            "Push only for things that need a fast reply. Receipts go to email so they're searchable."
+            row(groups, RowID.quietHoursEnd)?.control,
+            .chips(options: NotificationSettingsViewModel.quietEndOptions, selected: "06:00")
         )
-        XCTAssertEqual(helper("pulse"), "Pulse is quiet by default. Mentions break through, browsing doesn't.")
-        XCTAssertNil(helper("marketplace"), "Marketplace card has no helper line in the design")
-        XCTAssertEqual(helper("homeMailbox"), "Emergency alerts can't be muted on push.")
-        XCTAssertEqual(helper("accountSecurity"), "Security alerts always come through. You can choose how.")
     }
 
-    // MARK: - Helpers
+    func testLocationRadiosReflectStoredMode() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.prefsJSON(locationMode: "device_location"))]
+        let vm = makeViewModel()
+        await vm.load()
+        let groups = loadedGroups(vm)
+        XCTAssertEqual(row(groups, RowID.locationPrimaryHome)?.control, .radio(isSelected: false))
+        XCTAssertEqual(row(groups, RowID.locationViewing)?.control, .radio(isSelected: false))
+        XCTAssertEqual(row(groups, RowID.locationDevice)?.control, .radio(isSelected: true))
+    }
 
-    private func assertPattern(
-        _ row: GroupedListRow?,
-        p expectedP: Bool,
-        e expectedE: Bool,
-        s expectedS: Bool,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case let .channelTriad(p, e, s, _) = row?.control else {
-            XCTFail("Expected channelTriad for \(row?.id ?? "nil")", file: file, line: line)
-            return
+    func testFooterCaptionNamesTheBriefingTimezone() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.prefsJSON(timezone: "America/New_York"))]
+        let vm = makeViewModel()
+        await vm.load()
+        XCTAssertEqual(vm.footerCaption, "Briefing times use America/New_York")
+    }
+
+    func testLoadFailureProducesErrorState() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{}")]
+        let vm = makeViewModel()
+        await vm.load()
+        guard case let .error(message) = vm.state else {
+            return XCTFail("Expected .error, got \(vm.state)")
         }
-        XCTAssertEqual(p, expectedP, "push for \(row?.id ?? "")", file: file, line: line)
-        XCTAssertEqual(e, expectedE, "email for \(row?.id ?? "")", file: file, line: line)
-        XCTAssertEqual(s, expectedS, "sms for \(row?.id ?? "")", file: file, line: line)
+        XCTAssertFalse(message.isEmpty)
+    }
+
+    // MARK: - Saving
+
+    func testToggleSendsTheBackendWireNameOnAPut() async throws {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(weather: true)),
+            .status(200, body: Self.prefsJSON(weather: false))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.toggleRow(RowID.weatherAlerts, isOn: false)
+        // Optimistic before the flush.
+        XCTAssertEqual(row(loadedGroups(vm), RowID.weatherAlerts)?.control, .toggle(isOn: false))
+        await vm.flushPendingSaveNow()
+
+        let put = try XCTUnwrap(SequencedURLProtocol.capturedRequests.last)
+        XCTAssertEqual(put.httpMethod, "PUT")
+        XCTAssertEqual(put.url?.path, "/api/hub/preferences")
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: XCTUnwrap(put.httpBodyData())) as? [String: Any]
+        )
+        XCTAssertEqual(body.count, 1)
+        XCTAssertEqual(body["weather_alerts_enabled"] as? Bool, false)
+        XCTAssertEqual(vm.toast?.text, "Saved")
+    }
+
+    func testTimeChipSendsRawHHMMNotALocaleString() async throws {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(dailyTime: "07:30")),
+            .status(200, body: Self.prefsJSON(dailyTime: "09:30"))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.selectChip(RowID.morningTime, value: "09:30")
+        await vm.flushPendingSaveNow()
+
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: XCTUnwrap(XCTUnwrap(SequencedURLProtocol.capturedRequests.last).httpBodyData())
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(body["daily_briefing_time_local"] as? String, "09:30")
+    }
+
+    func testQuietHoursToggleSeedsThenNullsBothBounds() async throws {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(quietStart: nil, quietEnd: nil)),
+            .status(200, body: Self.prefsJSON(quietStart: "22:00", quietEnd: "07:00")),
+            .status(200, body: Self.prefsJSON(quietStart: nil, quietEnd: nil))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+
+        await vm.toggleRow(RowID.quietHours, isOn: true)
+        await vm.flushPendingSaveNow()
+        var body = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: XCTUnwrap(XCTUnwrap(SequencedURLProtocol.capturedRequests.last).httpBodyData())
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(body["quiet_hours_start_local"] as? String, "22:00")
+        XCTAssertEqual(body["quiet_hours_end_local"] as? String, "07:00")
+
+        await vm.toggleRow(RowID.quietHours, isOn: false)
+        await vm.flushPendingSaveNow()
+        body = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: XCTUnwrap(XCTUnwrap(SequencedURLProtocol.capturedRequests.last).httpBodyData())
+            ) as? [String: Any]
+        )
+        // Explicit JSON null — the column is nullable and Joi allows it.
+        XCTAssertTrue(body["quiet_hours_start_local"] is NSNull)
+        XCTAssertTrue(body["quiet_hours_end_local"] is NSNull)
+    }
+
+    func testLocationRadioSendsTheModeEnum() async throws {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON()),
+            .status(200, body: Self.prefsJSON(locationMode: "viewing_location"))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.selectRadio(RowID.locationViewing)
+        await vm.flushPendingSaveNow()
+
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: XCTUnwrap(XCTUnwrap(SequencedURLProtocol.capturedRequests.last).httpBodyData())
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(body["location_mode"] as? String, "viewing_location")
+    }
+
+    func testDebounceMergesEveryPendingKeyIntoOnePut() async throws {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON()),
+            .status(200, body: Self.prefsJSON(aqi: false, gigs: false))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.toggleRow(RowID.aqiAlerts, isOn: false)
+        await vm.toggleRow(RowID.gigUpdates, isOn: false)
+        await vm.flushPendingSaveNow()
+
+        let writes = SequencedURLProtocol.capturedRequests.filter { $0.httpMethod == "PUT" }
+        XCTAssertEqual(writes.count, 1, "The debounce collapses the burst into one write")
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: XCTUnwrap(writes[0].httpBodyData())) as? [String: Any]
+        )
+        XCTAssertEqual(body["aqi_alerts_enabled"] as? Bool, false)
+        XCTAssertEqual(body["gig_updates_enabled"] as? Bool, false)
+    }
+
+    func testFailedSaveToastsAndRollsBackToServerTruth() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON(mail: true)),
+            .status(500, body: "{\"error\":\"nope\"}"),
+            .status(200, body: Self.prefsJSON(mail: true))
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.toggleRow(RowID.mailSummary, isOn: false)
+        XCTAssertEqual(row(loadedGroups(vm), RowID.mailSummary)?.control, .toggle(isOn: false))
+
+        await vm.flushPendingSaveNow()
+        XCTAssertEqual(vm.toast?.text, "Failed to save")
+        XCTAssertEqual(
+            row(loadedGroups(vm), RowID.mailSummary)?.control,
+            .toggle(isOn: true),
+            "The re-fetch restores the server value"
+        )
+    }
+
+    func testRefreshFailureKeepsContentAndToasts() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.prefsJSON()),
+            .status(500, body: "{}")
+        ]
+        let vm = makeViewModel()
+        await vm.load()
+        await vm.refresh()
+        XCTAssertEqual(vm.toast?.text, "Failed to load preferences")
+        XCTAssertFalse(loadedGroups(vm).isEmpty)
+    }
+}
+
+private extension URLRequest {
+    /// `URLProtocol`-stubbed sessions move the body onto
+    /// `httpBodyStream`; drain it so assertions don't flake.
+    func httpBodyData() -> Data? {
+        if let direct = httpBody { return direct }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }

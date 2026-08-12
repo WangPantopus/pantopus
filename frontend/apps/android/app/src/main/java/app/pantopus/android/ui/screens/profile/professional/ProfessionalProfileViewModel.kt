@@ -1,10 +1,15 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.profile.professional
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.professional.ProfessionalEnableRequest
+import app.pantopus.android.data.api.models.professional.ProfessionalPricingInput
+import app.pantopus.android.data.api.models.professional.ProfessionalProfileDto
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileUpdateRequest
+import app.pantopus.android.data.api.models.professional.ProfessionalServiceAreaInput
+import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.professional.ProfessionalRepository
@@ -53,8 +58,19 @@ class ProfessionalProfileViewModel
         private val _toast = MutableStateFlow<ProfessionalProfileToast?>(null)
         val toast: StateFlow<ProfessionalProfileToast?> = _toast.asStateFlow()
 
+        /** Drives the destructive "Disable professional mode?" confirm. */
+        private val _showsDisableConfirm = MutableStateFlow(false)
+        val showsDisableConfirm: StateFlow<Boolean> = _showsDisableConfirm.asStateFlow()
+
+        /** True while `DELETE /profile/me` is in flight. */
+        private val _isDisabling = MutableStateFlow(false)
+        val isDisabling: StateFlow<Boolean> = _isDisabling.asStateFlow()
+
         private var content: ProfessionalProfileContent? = null
         private var baseline: ProfessionalProfileContent? = null
+
+        /** Working copy for the enable (create / re-enable) form. */
+        private var draft: ProfessionalEnableDraft? = null
 
         fun load() {
             _state.value = ProfessionalProfileUiState.Loading
@@ -68,28 +84,165 @@ class ProfessionalProfileViewModel
                 recompute()
                 return
             }
-            viewModelScope.launch {
-                when (val result = repository.profileMe()) {
-                    is NetworkResult.Success -> {
-                        val verificationResult = repository.verificationStatus()
-                        val verification =
-                            if (verificationResult is NetworkResult.Success) verificationResult.data else null
-                        val mapped = ProfessionalProfileMapper.build(result.data.profile, verification)
-                        content = mapped
-                        baseline = mapped
-                        recompute()
+            viewModelScope.launch { fetchLive() }
+        }
+
+        private suspend fun fetchLive() {
+            when (val result = repository.profileMe()) {
+                is NetworkResult.Success -> {
+                    val profile = result.data.profile
+                    // `profile: null` (200) means professional mode was never
+                    // enabled; `is_active = false` means it was disabled. Both
+                    // are the create state, not an error — RN professional.tsx:100.
+                    if (profile == null || profile.isActive == false) {
+                        enterCreateMode(profile)
+                    } else {
+                        hydrate(profile)
                     }
-                    is NetworkResult.Failure -> {
+                }
+                is NetworkResult.Failure -> {
+                    // Older deployments 404 `profile/me` instead of returning
+                    // null — still the create state, not a failure.
+                    if (result.error is NetworkError.NotFound) {
+                        enterCreateMode(null)
+                    } else {
                         _state.value = ProfessionalProfileUiState.Error(result.error.displayMessage("Couldn't load this profile."))
                     }
                 }
             }
         }
 
+        /** Map an **active** backend record into the editor and render it. */
+        private suspend fun hydrate(profile: ProfessionalProfileDto) {
+            val verificationResult = repository.verificationStatus()
+            val verification =
+                if (verificationResult is NetworkResult.Success) verificationResult.data else null
+            val mapped = ProfessionalProfileMapper.build(profile, verification)
+            draft = null
+            content = mapped
+            baseline = mapped
+            recompute()
+        }
+
+        /**
+         * Switch to the "professional mode is off" form, seeded from a
+         * soft-disabled record when one exists.
+         */
+        private fun enterCreateMode(dto: ProfessionalProfileDto?) {
+            content = null
+            baseline = null
+            val seeded = ProfessionalProfileMapper.draft(dto)
+            draft = seeded
+            _state.value = ProfessionalProfileUiState.Create(seeded)
+        }
+
         fun refresh() = load()
 
         fun dismissToast() {
             _toast.value = null
+        }
+
+        // Enable / disable professional mode
+
+        fun updateDraftHeadline(value: String) = mutateDraft { it.copy(headline = value.take(HEADLINE_MAX)) }
+
+        fun updateDraftBio(value: String) = mutateDraft { it.copy(bio = value.take(BIO_MAX)) }
+
+        fun updateDraftCity(value: String) = mutateDraft { it.copy(city = value) }
+
+        fun updateDraftState(value: String) = mutateDraft { it.copy(state = value) }
+
+        fun updateDraftRadius(value: String) = mutateDraft { it.copy(radiusKm = value.filter(Char::isDigit).take(3)) }
+
+        fun updateDraftHourlyRate(value: String) =
+            mutateDraft { current ->
+                current.copy(hourlyRate = value.filter { char -> char.isDigit() || char == '.' })
+            }
+
+        fun setDraftPublic(isOn: Boolean) = mutateDraft { it.copy(isPublic = isOn) }
+
+        /** Add/remove a category, capped at the server's 5 (`professional.js:45`). */
+        fun toggleDraftCategory(key: String) =
+            mutateDraft { current ->
+                when {
+                    current.categories.contains(key) -> current.copy(categories = current.categories - key)
+                    current.canSelectMoreCategories -> current.copy(categories = current.categories + key)
+                    else -> current
+                }
+            }
+
+        /**
+         * Turn professional mode on. A never-created profile goes through
+         * `POST api/professional/profile`; a soft-disabled one is switched back
+         * on with `PATCH api/professional/profile/me { is_active: true }` — the
+         * same split as RN `professional.tsx:141`.
+         */
+        fun enable() {
+            val working = draft ?: return
+            if (working.isSubmitting) return
+            val submitting = working.copy(isSubmitting = true, errorMessage = null)
+            draft = submitting
+            _state.value = ProfessionalProfileUiState.Create(submitting)
+            viewModelScope.launch {
+                val result =
+                    if (submitting.isReEnable) {
+                        repository.updateProfileMe(updateRequest(submitting))
+                    } else {
+                        repository.createProfile(enableRequest(submitting))
+                    }
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val profile = result.data.profile
+                        if (profile != null) hydrate(profile) else fetchLive()
+                        _toast.value = ProfessionalProfileToast("Professional mode enabled")
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = result.error.displayMessage("Failed to enable professional mode")
+                        val failed = submitting.copy(isSubmitting = false, errorMessage = message)
+                        draft = failed
+                        _state.value = ProfessionalProfileUiState.Create(failed)
+                        _toast.value = ProfessionalProfileToast(message, isError = true)
+                    }
+                }
+            }
+        }
+
+        /** Open the destructive confirm — nothing is sent until it's accepted. */
+        fun requestDisable() {
+            _showsDisableConfirm.value = true
+        }
+
+        fun dismissDisableConfirm() {
+            _showsDisableConfirm.value = false
+        }
+
+        /**
+         * `DELETE api/professional/profile/me` — soft-disable. The row survives,
+         * so the screen drops back into the re-enable form.
+         */
+        fun disableConfirmed() {
+            if (_isDisabling.value) return
+            _showsDisableConfirm.value = false
+            _isDisabling.value = true
+            viewModelScope.launch {
+                when (val result = repository.disableProfile()) {
+                    is NetworkResult.Success -> {
+                        enterCreateMode(result.data.profile)
+                        _toast.value = ProfessionalProfileToast("Professional mode disabled")
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value = ProfessionalProfileToast("Could not disable", isError = true)
+                    }
+                }
+                _isDisabling.value = false
+            }
+        }
+
+        private fun mutateDraft(transform: (ProfessionalEnableDraft) -> ProfessionalEnableDraft) {
+            val working = draft ?: return
+            val updated = transform(working).copy(errorMessage = null)
+            draft = updated
+            _state.value = ProfessionalProfileUiState.Create(updated)
         }
 
         fun updateTitle(value: String) {
@@ -228,6 +381,60 @@ class ProfessionalProfileViewModel
             val working = content ?: return
             content = transform(working)
             recompute()
+        }
+
+        companion object {
+            private const val HEADLINE_MAX = 200
+            private const val BIO_MAX = 2000
+            private const val DEFAULT_RADIUS_KM = 50
+            private const val MIN_RADIUS_KM = 1
+            private const val MAX_RADIUS_KM = 500
+
+            /** Body for the first-time enable (`POST /profile`). */
+            fun enableRequest(draft: ProfessionalEnableDraft): ProfessionalEnableRequest =
+                ProfessionalEnableRequest(
+                    headline = draft.headline.trimOrNull(),
+                    bio = draft.bio.trimOrNull(),
+                    categories = draft.categories.ifEmpty { null },
+                    serviceArea = serviceArea(draft),
+                    pricingMeta = pricing(draft),
+                    isPublic = draft.isPublic,
+                )
+
+            /** Body for re-enabling a soft-disabled row (`PATCH /profile/me`). */
+            fun updateRequest(draft: ProfessionalEnableDraft): ProfessionalProfileUpdateRequest =
+                ProfessionalProfileUpdateRequest(
+                    headline = draft.headline.trimOrNull(),
+                    bio = draft.bio.trimOrNull(),
+                    isPublic = draft.isPublic,
+                    isActive = true,
+                    categories = draft.categories.ifEmpty { null },
+                    serviceArea = serviceArea(draft),
+                    pricingMeta = pricing(draft),
+                )
+
+            private fun serviceArea(draft: ProfessionalEnableDraft): ProfessionalServiceAreaInput? {
+                // Joi caps radius at 1…500 (`professional.js:50`) — a blank or
+                // out-of-range field would fail validation for the whole request.
+                val radius =
+                    (draft.radiusKm.toIntOrNull() ?: DEFAULT_RADIUS_KM)
+                        .coerceIn(MIN_RADIUS_KM, MAX_RADIUS_KM)
+                val area =
+                    ProfessionalServiceAreaInput(
+                        city = draft.city.trimOrNull(),
+                        state = draft.state.trimOrNull(),
+                        radiusKm = radius,
+                    )
+                return if (area.isEmpty) null else area
+            }
+
+            private fun pricing(draft: ProfessionalEnableDraft): ProfessionalPricingInput? {
+                val rate = draft.hourlyRate.toDoubleOrNull() ?: return null
+                if (rate <= 0.0) return null
+                return ProfessionalPricingInput(hourlyRate = rate, currency = "USD")
+            }
+
+            private fun String.trimOrNull(): String? = trim().ifEmpty { null }
         }
 
         private fun recompute() {

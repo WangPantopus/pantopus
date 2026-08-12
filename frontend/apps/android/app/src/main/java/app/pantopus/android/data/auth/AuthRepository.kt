@@ -475,6 +475,31 @@ class AuthRepository
             }
         }
 
+        /**
+         * Re-fetch `GET /api/users/profile` and re-publish the session user
+         * so a mutation made elsewhere (avatar upload, profile PATCH) shows
+         * up app-wide immediately. Mirrors RN's `AuthContext.refreshUser()`
+         * and iOS `AuthManager.refreshCurrentUser()`.
+         *
+         * Deliberately skips the [finishSignedIn] side effects — the socket
+         * is already connected and analytics already identified. A failure
+         * is swallowed: the caller surfaces its own error and a stale avatar
+         * beats dropping the session.
+         */
+        suspend fun refreshSessionUser(): UserDto? {
+            if (_state.value !is State.SignedIn) return null
+            return try {
+                val user = api.me().user.toSessionUser()
+                persistCachedUser(user)
+                _state.value = State.SignedIn(user)
+                user
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
         /** Clear local tokens and flip state to signed-out. */
         suspend fun signOut() {
             tokenStorage.clear()

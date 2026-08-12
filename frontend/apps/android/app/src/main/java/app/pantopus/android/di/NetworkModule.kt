@@ -6,6 +6,7 @@ import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequestJsonAdapter
 import app.pantopus.android.data.api.net.RetryInterceptor
 import app.pantopus.android.data.api.services.AIApi
+import app.pantopus.android.data.api.services.AccountDeletionApi
 import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
@@ -56,6 +57,7 @@ import app.pantopus.android.data.api.services.MailboxV2Api
 import app.pantopus.android.data.api.services.MailboxVaultApi
 import app.pantopus.android.data.api.services.MembershipApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
+import app.pantopus.android.data.api.services.NotificationPreferencesApi
 import app.pantopus.android.data.api.services.NotificationsApi
 import app.pantopus.android.data.api.services.OffersApi
 import app.pantopus.android.data.api.services.PaymentHistoryApi
@@ -78,6 +80,7 @@ import app.pantopus.android.data.api.services.TransactionReviewsApi
 import app.pantopus.android.data.api.services.UniversalSearchApi
 import app.pantopus.android.data.api.services.UploadApi
 import app.pantopus.android.data.api.services.UserReportsApi
+import app.pantopus.android.data.api.services.UserSocialApi
 import app.pantopus.android.data.api.services.UsersApi
 import app.pantopus.android.data.api.services.WalletApi
 import app.pantopus.android.data.auth.AuthInterceptor
@@ -121,6 +124,10 @@ object NetworkModule {
             // UploadEvidenceRequest one omits optional fields when
             // null instead of writing JSON `null`.
             .add(UploadEvidenceRequestJsonAdapter())
+            // T2 hub preferences: partial PUT body that must emit the
+            // changed keys only, plus explicit JSON null when quiet
+            // hours are cleared.
+            .add(app.pantopus.android.data.api.models.hub.NotificationPreferencesPatchJsonAdapter())
             .add(app.pantopus.android.data.api.models.businesses.BusinessServiceAreaJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
@@ -240,7 +247,14 @@ object NetworkModule {
     fun provideUsersApi(retrofit: Retrofit): UsersApi = retrofit.create(UsersApi::class.java)
 
     @Provides @Singleton
+    fun provideUserSocialApi(retrofit: Retrofit): UserSocialApi = retrofit.create(UserSocialApi::class.java)
+
+    @Provides @Singleton
     fun provideHubApi(retrofit: Retrofit): HubApi = retrofit.create(HubApi::class.java)
+
+    @Provides @Singleton
+    fun provideNotificationPreferencesApi(retrofit: Retrofit): NotificationPreferencesApi =
+        retrofit.create(NotificationPreferencesApi::class.java)
 
     @Provides @Singleton
     fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
@@ -432,6 +446,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun providePrivacyApi(retrofit: Retrofit): PrivacyApi = retrofit.create(PrivacyApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAccountDeletionApi(retrofit: Retrofit): AccountDeletionApi = retrofit.create(AccountDeletionApi::class.java)
 
     @Provides
     @Singleton

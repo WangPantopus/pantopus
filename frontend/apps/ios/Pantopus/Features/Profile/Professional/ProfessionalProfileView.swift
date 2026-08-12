@@ -2,10 +2,17 @@
 //  ProfessionalProfileView.swift
 //  Pantopus
 //
-//  A.5 (A13.11) — the Professional Profile editor (Business pillar). A
+//  A.5 (A13.11) — the Professional Profile screen (Business pillar). A
 //  pushed `FormShell` route with a back chevron, a verification-aware
 //  sticky bar, and five sections: Role · Skills · Certifications ·
 //  Portfolio · Visibility. Distinct from the Personal `EditProfile` (A13.9).
+//
+//  Three modes, mirroring RN `professional.tsx`:
+//  • **create** — professional mode is off (`profile: null` or
+//    `is_active: false`); rendered by `ProfessionalEnableFormView`.
+//  • **view/edit** — the editor below, with the destructive Disable row.
+//  • Disable is a confirmed `DELETE /api/professional/profile/me`, which
+//    drops the screen back into the re-enable form.
 //
 
 import SwiftUI
@@ -27,6 +34,8 @@ public struct ProfessionalProfileView: View {
             switch viewModel.state {
             case .loading:
                 ProfessionalProfileSkeleton()
+            case let .create(draft):
+                ProfessionalEnableFormView(draft: draft, viewModel: viewModel, onBack: onBack)
             case let .verified(content):
                 loaded(content, mode: .saved, dirtyCount: 0, pendingCount: content.pendingCount)
             case let .pending(content, dirtyCount, pendingCount):
@@ -57,6 +66,22 @@ public struct ProfessionalProfileView: View {
             }
         }
         .pantopusAnimation(.componentState, value: viewModel.toast)
+        .confirmationDialog(
+            "Disable professional mode?",
+            isPresented: Binding(
+                get: { viewModel.showsDisableConfirm },
+                set: { viewModel.showsDisableConfirm = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Disable", role: .destructive) {
+                Task { await viewModel.disableConfirmed() }
+            }
+            .accessibilityIdentifier("proDisableConfirmButton")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your profile will no longer be visible to the public.")
+        }
         .accessibilityIdentifier("professionalProfile")
     }
 
@@ -83,6 +108,7 @@ public struct ProfessionalProfileView: View {
                 certificationsSection(content)
                 portfolioSection(content)
                 visibilitySection(content)
+                disableSection()
             },
             stickyBottom: {
                 AnyView(
@@ -151,9 +177,9 @@ public struct ProfessionalProfileView: View {
     // MARK: - Sections
 
     private func roleSection(_ content: ProfessionalProfileContent) -> some View {
-        proSection("Role") {
+        ProSectionBlock("Role") {
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                proFieldLabel("Company", dirty: content.company.isDirty)
+                ProFieldLabelRow(text: "Company", dirty: content.company.isDirty)
                 CompanyField(company: content.company)
                 if let hint = content.company.hint {
                     HStack(alignment: .top, spacing: Spacing.s1) {
@@ -165,8 +191,8 @@ public struct ProfessionalProfileView: View {
                     }
                 }
             }
-            proTextField(
-                .init(
+            ProTextFieldRow(
+                spec: .init(
                     label: "Title",
                     required: true,
                     value: content.title.value,
@@ -175,8 +201,8 @@ public struct ProfessionalProfileView: View {
                     identifier: "proTitleField"
                 )
             ) { viewModel.updateTitle($0) }
-            proTextField(
-                .init(
+            ProTextFieldRow(
+                spec: .init(
                     label: "Years in role",
                     required: true,
                     value: content.yearsInRole.value,
@@ -190,8 +216,8 @@ public struct ProfessionalProfileView: View {
     }
 
     private func skillsSection(_ content: ProfessionalProfileContent) -> some View {
-        proSection("Skills") {
-            proFieldLabel("Specialties", dirty: content.skills.contains(where: \.isFresh))
+        ProSectionBlock("Skills") {
+            ProFieldLabelRow(text: "Specialties", dirty: content.skills.contains(where: \.isFresh))
             FilterSheetFlowLayout(spacing: Spacing.s1) {
                 ForEach(content.skills) { skill in
                     ProSkillChip(skill: skill) { viewModel.removeSkill(skill.id) }
@@ -214,7 +240,7 @@ public struct ProfessionalProfileView: View {
     }
 
     private func certificationsSection(_ content: ProfessionalProfileContent) -> some View {
-        proSection("Certifications") {
+        ProSectionBlock("Certifications") {
             ForEach(content.certifications) { cert in
                 CertCard(cert: cert) { viewModel.removeCertification(cert.id) }
             }
@@ -223,7 +249,7 @@ public struct ProfessionalProfileView: View {
     }
 
     private func portfolioSection(_ content: ProfessionalProfileContent) -> some View {
-        proSection("Portfolio") {
+        ProSectionBlock("Portfolio") {
             ForEach(content.portfolio) { link in
                 LinkCard(link: link)
             }
@@ -232,7 +258,7 @@ public struct ProfessionalProfileView: View {
     }
 
     private func visibilitySection(_ content: ProfessionalProfileContent) -> some View {
-        proSection("Visibility") {
+        ProSectionBlock("Visibility") {
             VStack(spacing: Spacing.s0) {
                 ForEach(Array(content.visibility.enumerated()), id: \.element.id) { index, row in
                     VisRow(row: row) { viewModel.setVisibility(row.id, isOn: $0) }
@@ -253,90 +279,49 @@ public struct ProfessionalProfileView: View {
         }
     }
 
-    // MARK: - Section / field helpers
-
-    private func proSection(
-        _ overline: String,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text(overline)
-                .pantopusTextStyle(.overline)
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .padding(.horizontal, Spacing.s4)
-                .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: Spacing.s3) {
-                content()
-            }
-            .padding(.horizontal, Spacing.s4)
-        }
-    }
-
-    private func proFieldLabel(
-        _ text: String,
-        required: Bool = false,
-        optional: Bool = false,
-        dirty: Bool = false
-    ) -> some View {
-        HStack(spacing: Spacing.s1) {
-            Text(text)
-                .pantopusTextStyle(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Theme.Color.appTextStrong)
-            if required {
-                Text("*")
-                    .pantopusTextStyle(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Theme.Color.business)
-            }
-            if optional {
-                Text("(optional)")
-                    .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            }
-            if dirty { FreshDot() }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            text + (required ? ", required" : "") + (optional ? ", optional" : "") + (dirty ? ", edited" : "")
-        )
-    }
-
-    private func proTextField(
-        _ spec: ProTextFieldSpec,
-        onChange: @escaping @MainActor @Sendable (String) -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.s1) {
-            proFieldLabel(spec.label, required: spec.required, optional: spec.optional, dirty: spec.dirty)
-            TextField(spec.placeholder, text: Binding(get: { spec.value }, set: onChange), axis: .vertical)
-                .font(Theme.Font.body)
-                .foregroundStyle(Theme.Color.appText)
-                .lineLimit(1...3)
-                .keyboardType(spec.keyboard)
-                .padding(.horizontal, Spacing.s3)
-                .padding(.vertical, Spacing.s2)
-                .frame(minHeight: 44)
+    /// RN's destructive "Disable" action (`professional.tsx:410`). Soft
+    /// disable — `DELETE /api/professional/profile/me` keeps the record so
+    /// the screen falls back to the re-enable form.
+    private func disableSection() -> some View {
+        ProSectionBlock("Professional mode") {
+            Button {
+                viewModel.requestDisable()
+            } label: {
+                HStack(spacing: Spacing.s3) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Disable professional mode")
+                            .pantopusTextStyle(.small)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.error)
+                        Text("Your profile will no longer be visible to the public.")
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: Spacing.s0)
+                    if viewModel.isDisabling {
+                        ProgressView()
+                    } else {
+                        Icon(.circleSlash, size: 18, color: Theme.Color.error)
+                    }
+                }
+                .padding(Spacing.s3)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .background(Theme.Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                        .stroke(Theme.Color.error.opacity(0.4), lineWidth: 1)
                 )
-                .accessibilityIdentifier(spec.identifier)
-                .accessibilityLabel(spec.label)
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isDisabling)
+            .accessibilityIdentifier("proDisableButton")
+            .accessibilityLabel("Disable professional mode")
+            .accessibilityHint("Your profile will no longer be visible to the public")
         }
     }
-}
-
-private struct ProTextFieldSpec {
-    let label: String
-    var required = false
-    var optional = false
-    let value: String
-    let dirty: Bool
-    let placeholder: String
-    let identifier: String
-    var keyboard: UIKeyboardType = .default
 }
 
 // MARK: - Loading skeleton

@@ -30,10 +30,16 @@ public final class ProfessionalProfileViewModel {
     public private(set) var state: ProfessionalProfileState = .loading
     /// Surfaced by the view after submit / discard; cleared on auto-dismiss.
     public var toast: ToastMessage?
+    /// Drives the destructive "Disable professional mode?" confirm.
+    public var showsDisableConfirm = false
+    /// True while `DELETE /profile/me` is in flight.
+    public private(set) var isDisabling = false
 
     /// Live working copy + the last-saved baseline used by Discard.
     private var content: ProfessionalProfileContent?
     private var baseline: ProfessionalProfileContent?
+    /// Working copy for the enable (create / re-enable) form.
+    private var draft: ProfessionalEnableDraft?
 
     private let api: APIClient
     private let mode: Mode
@@ -94,18 +100,21 @@ public final class ProfessionalProfileViewModel {
             let response: ProfessionalProfileResponse = try await api.request(
                 ProfessionalEndpoints.profileMe()
             )
-            let verification: ProfessionalVerificationStatusResponse? = try? await api.request(
-                ProfessionalEndpoints.verificationStatus()
-            )
-            let mapped = Self.makeContent(
-                from: response.profile,
-                verification: verification,
-                proName: currentProName()
-            )
-            content = mapped
-            baseline = mapped
-            recompute()
+            // `profile: null` (200) means professional mode has never been
+            // enabled; `is_active: false` means it was disabled. Both are the
+            // create state, not an error — RN `professional.tsx:100`.
+            guard let profile = response.profile, profile.isActive != false else {
+                enterCreateMode(from: response.profile)
+                return
+            }
+            await hydrate(profile)
         } catch {
+            // Older deployments 404 `profile/me` instead of returning null —
+            // still the create state, not a failure.
+            if let apiError = error as? APIError, case .notFound = apiError {
+                enterCreateMode(from: nil)
+                return
+            }
             state = .error(
                 message: (error as? APIError)?.errorDescription
                     ?? "We couldn't load your professional profile."
@@ -113,11 +122,188 @@ public final class ProfessionalProfileViewModel {
         }
     }
 
+    /// Map an **active** backend record into the editor and render it.
+    private func hydrate(_ profile: ProfessionalProfileDTO) async {
+        let verification: ProfessionalVerificationStatusResponse? = try? await api.request(
+            ProfessionalEndpoints.verificationStatus()
+        )
+        let mapped = Self.makeContent(
+            from: profile,
+            verification: verification,
+            proName: currentProName()
+        )
+        draft = nil
+        content = mapped
+        baseline = mapped
+        recompute()
+    }
+
+    /// Switch to the "professional mode is off" form, seeded from a
+    /// soft-disabled record when one exists.
+    private func enterCreateMode(from dto: ProfessionalProfileDTO?) {
+        content = nil
+        baseline = nil
+        let seeded = ProfessionalEnableDraft.from(dto)
+        draft = seeded
+        state = .create(seeded)
+    }
+
     private func currentProName() -> String {
         if case let .signedIn(user) = AuthManager.shared.state {
             return user.displayName ?? ""
         }
         return ""
+    }
+
+    // MARK: - Enable / disable professional mode
+
+    public func updateDraftHeadline(_ value: String) {
+        mutateDraft { $0.headline = String(value.prefix(200)) }
+    }
+
+    public func updateDraftBio(_ value: String) {
+        mutateDraft { $0.bio = String(value.prefix(2000)) }
+    }
+
+    public func updateDraftCity(_ value: String) {
+        mutateDraft { $0.city = value }
+    }
+
+    public func updateDraftState(_ value: String) {
+        mutateDraft { $0.state = value }
+    }
+
+    public func updateDraftRadius(_ value: String) {
+        mutateDraft { $0.radiusKm = String(value.filter(\.isNumber).prefix(3)) }
+    }
+
+    public func updateDraftHourlyRate(_ value: String) {
+        mutateDraft { $0.hourlyRate = value.filter { $0.isNumber || $0 == "." } }
+    }
+
+    public func setDraftPublic(_ isOn: Bool) {
+        mutateDraft { $0.isPublic = isOn }
+    }
+
+    /// Add/remove a category, capped at the server's 5 (`professional.js:45`).
+    public func toggleDraftCategory(_ key: String) {
+        mutateDraft { draft in
+            if let index = draft.categories.firstIndex(of: key) {
+                draft.categories.remove(at: index)
+            } else if draft.canSelectMoreCategories {
+                draft.categories.append(key)
+            }
+        }
+    }
+
+    /// Turn professional mode on. A never-created profile goes through
+    /// `POST /api/professional/profile`; a soft-disabled one is switched
+    /// back on with `PATCH /profile/me { is_active: true }` — same split as
+    /// RN `professional.tsx:141`.
+    public func enable() async {
+        guard var working = draft, !working.isSubmitting else { return }
+        working.isSubmitting = true
+        working.errorMessage = nil
+        draft = working
+        state = .create(working)
+
+        let endpoint = working.isReEnable
+            ? ProfessionalEndpoints.updateProfileMe(Self.updateRequest(from: working))
+            : ProfessionalEndpoints.createProfile(Self.enableRequest(from: working))
+        do {
+            let response: ProfessionalProfileResponse = try await api.request(endpoint)
+            if let profile = response.profile {
+                await hydrate(profile)
+            } else {
+                await fetchLive()
+            }
+            toast = ToastMessage(text: "Professional mode enabled", kind: .success)
+        } catch {
+            let message = (error as? APIError)?.errorDescription
+                ?? "Failed to enable professional mode"
+            working.isSubmitting = false
+            working.errorMessage = message
+            draft = working
+            state = .create(working)
+            toast = ToastMessage(text: message, kind: .error)
+        }
+    }
+
+    /// Open the destructive confirm — nothing is sent until it's accepted.
+    public func requestDisable() {
+        showsDisableConfirm = true
+    }
+
+    /// `DELETE /api/professional/profile/me` — soft-disable. The row
+    /// survives, so the screen drops back into the re-enable form.
+    public func disableConfirmed() async {
+        guard !isDisabling else { return }
+        isDisabling = true
+        defer { isDisabling = false }
+        do {
+            let response: ProfessionalProfileResponse = try await api.request(
+                ProfessionalEndpoints.disableProfile()
+            )
+            enterCreateMode(from: response.profile)
+            toast = ToastMessage(text: "Professional mode disabled", kind: .neutral)
+        } catch {
+            toast = ToastMessage(text: "Could not disable", kind: .error)
+        }
+    }
+
+    /// Body for the first-time enable (`POST /profile`).
+    static func enableRequest(from draft: ProfessionalEnableDraft) -> ProfessionalEnableRequest {
+        ProfessionalEnableRequest(
+            headline: trimmedOrNil(draft.headline),
+            bio: trimmedOrNil(draft.bio),
+            categories: draft.categories.isEmpty ? nil : draft.categories,
+            serviceArea: serviceArea(from: draft),
+            pricingMeta: pricing(from: draft),
+            isPublic: draft.isPublic
+        )
+    }
+
+    /// Body for re-enabling a soft-disabled row (`PATCH /profile/me`).
+    static func updateRequest(from draft: ProfessionalEnableDraft) -> ProfessionalProfileUpdateRequest {
+        ProfessionalProfileUpdateRequest(
+            headline: trimmedOrNil(draft.headline),
+            bio: trimmedOrNil(draft.bio),
+            isPublic: draft.isPublic,
+            isActive: true,
+            categories: draft.categories.isEmpty ? nil : draft.categories,
+            serviceArea: serviceArea(from: draft),
+            pricingMeta: pricing(from: draft)
+        )
+    }
+
+    private static func serviceArea(from draft: ProfessionalEnableDraft) -> ProfessionalServiceAreaInput? {
+        // Joi caps radius at 1…500 (`professional.js:50`) — a blank or
+        // out-of-range field would fail validation for the whole request.
+        let radius = min(max(Int(draft.radiusKm) ?? 50, 1), 500)
+        let area = ProfessionalServiceAreaInput(
+            city: trimmedOrNil(draft.city),
+            state: trimmedOrNil(draft.state),
+            radiusKm: radius
+        )
+        return area.isEmpty ? nil : area
+    }
+
+    private static func pricing(from draft: ProfessionalEnableDraft) -> ProfessionalPricingInput? {
+        guard let rate = Double(draft.hourlyRate), rate > 0 else { return nil }
+        return ProfessionalPricingInput(hourlyRate: rate, currency: "USD")
+    }
+
+    private static func trimmedOrNil(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func mutateDraft(_ transform: (inout ProfessionalEnableDraft) -> Void) {
+        guard var working = draft else { return }
+        transform(&working)
+        working.errorMessage = nil
+        draft = working
+        state = .create(working)
     }
 
     // MARK: - Field edits
@@ -291,11 +477,10 @@ public final class ProfessionalProfileViewModel {
         }
     }
 
-    /// `pet_care` → `Pet Care`.
+    /// `pet_care` → `Pet Care`, using the server's category catalogue so
+    /// special-cased labels (`hvac` → `HVAC`) read correctly.
     static func categoryLabel(_ key: String) -> String {
-        key.split(separator: "_")
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-            .joined(separator: " ")
+        ProfessionalCategory.label(for: key)
     }
 
     static func categoryIcon(_ key: String) -> PantopusIcon {

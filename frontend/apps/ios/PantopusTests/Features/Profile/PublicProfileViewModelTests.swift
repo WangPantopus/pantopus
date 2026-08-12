@@ -380,9 +380,82 @@ final class PublicProfileViewModelTests: XCTestCase {
         await vm.load()
         XCTAssertFalse(vm.showFollowHandshake)
         vm.follow()
+        // T3: with no attributable Beacon handle the handshake must stay
+        // shut — but the tap now falls through to the plain
+        // `/api/users/:id/follow` path instead of the old dead-end toast.
         XCTAssertFalse(vm.showFollowHandshake)
         XCTAssertEqual(vm.loadedPersonaHandle, "")
-        XCTAssertEqual(vm.toastMessage, PublicProfileViewModel.handshakeUnavailableMessage)
+        XCTAssertNil(vm.toastMessage)
+    }
+
+    // MARK: - T3 — username resolution + plain follow
+
+    /// A handle route (`pantopus://u/mariak`) must resolve through
+    /// `GET /api/users/username/:username`, not `/api/users/id/:id`.
+    func testHandleRouteResolvesThroughUsernameEndpoint() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let vm = PublicProfileViewModel(userId: "@mariak", client: makeAPI())
+        await vm.load()
+        guard case .loaded = vm.state else { return XCTFail("expected loaded") }
+        let paths = SequencedURLProtocol.capturedRequests.compactMap(\.url?.path)
+        XCTAssertEqual(paths.first, "/api/users/username/mariak")
+    }
+
+    func testUuidRouteStillResolvesThroughIdEndpoint() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let uuid = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+        let vm = PublicProfileViewModel(userId: uuid, client: makeAPI())
+        await vm.load()
+        let paths = SequencedURLProtocol.capturedRequests.compactMap(\.url?.path)
+        XCTAssertEqual(paths.first, "/api/users/id/\(uuid)")
+    }
+
+    /// Ordinary (non-Beacon) profile: Follow hits
+    /// `POST /api/users/:id/follow` and flips the button to "Following".
+    func testToggleFollowFollowsOrdinaryNeighbor() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(200, body: #"{"relationship":"none","following":false,"followed_by":false}"#),
+            .status(200, body: #"{"message":"You are now following alex","following":true}"#)
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "viewer", client: makeAPI())
+        await vm.load()
+        XCTAssertTrue(vm.canFollow)
+        XCTAssertFalse(vm.isFollowing)
+
+        await vm.toggleFollow()
+
+        XCTAssertTrue(vm.isFollowing)
+        XCTAssertFalse(vm.showFollowHandshake)
+        let follow = SequencedURLProtocol.capturedRequests.first { $0.url?.path == "/api/users/u1/follow" }
+        XCTAssertEqual(follow?.httpMethod, "POST")
+    }
+
+    /// Already following → the same control unfollows.
+    func testToggleFollowUnfollowsWhenAlreadyFollowing() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(200, body: #"{"relationship":"none","following":true,"followed_by":false}"#),
+            .status(200, body: #"{"message":"Unfollowed successfully","following":false}"#)
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "viewer", client: makeAPI())
+        await vm.load()
+        XCTAssertTrue(vm.isFollowing)
+
+        await vm.toggleFollow()
+
+        XCTAssertFalse(vm.isFollowing)
+        let unfollow = SequencedURLProtocol.capturedRequests.first { $0.httpMethod == "DELETE" }
+        XCTAssertEqual(unfollow?.url?.path, "/api/users/u1/follow")
+    }
+
+    func testOwnProfileHasNoFollowAffordance() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.profileWithReviews)]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "u1", client: makeAPI())
+        await vm.load()
+        XCTAssertFalse(vm.canFollow)
+        await vm.toggleFollow()
+        XCTAssertFalse(vm.isFollowing)
     }
 
     func testUnlockBroadcastWithoutBeaconHandleStaysClosed() async {

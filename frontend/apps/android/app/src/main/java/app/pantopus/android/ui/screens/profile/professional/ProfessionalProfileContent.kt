@@ -112,8 +112,53 @@ data class ProfessionalProfileContent(
             }
 }
 
+/**
+ * Working copy for the "professional mode is off" state — the fields
+ * `POST api/professional/profile` accepts (`professional.js:42`). Mirrors
+ * RN's create-mode form (`professional.tsx:123`) and the iOS
+ * `ProfessionalEnableDraft`.
+ */
+data class ProfessionalEnableDraft(
+    val headline: String = "",
+    val bio: String = "",
+    /** Selected backend category keys, capped at [ProfessionalCategory.SELECTION_LIMIT]. */
+    val categories: List<String> = emptyList(),
+    val city: String = "",
+    val state: String = "",
+    /** Digits only; blank falls back to 50 like RN. */
+    val radiusKm: String = "50",
+    /** Digits + one decimal separator; blank omits `pricing_meta`. */
+    val hourlyRate: String = "",
+    val isPublic: Boolean = true,
+    /**
+     * True when a soft-disabled row already exists, so the CTA re-enables it
+     * (`PATCH is_active = true`) instead of creating a new one.
+     */
+    val isReEnable: Boolean = false,
+    /** A create/re-enable request is in flight. */
+    val isSubmitting: Boolean = false,
+    /** Last failure from the enable call, shown inline above the CTA. */
+    val errorMessage: String? = null,
+) {
+    /** False once the 5-category cap is reached. */
+    val canSelectMoreCategories: Boolean
+        get() = categories.size < ProfessionalCategory.SELECTION_LIMIT
+
+    /** CTA label — "Enable" first time, "Re-enable" for a disabled record. */
+    val ctaLabel: String
+        get() = if (isReEnable) "Re-enable professional mode" else "Enable professional mode"
+}
+
 sealed interface ProfessionalProfileUiState {
     data object Loading : ProfessionalProfileUiState
+
+    /**
+     * Professional mode is **off** — either no record at all, or a
+     * soft-disabled one. Renders the enable form + CTA.
+     */
+    data class Create(
+        val draft: ProfessionalEnableDraft,
+    ) : ProfessionalProfileUiState
 
     data class Verified(
         val content: ProfessionalProfileContent,

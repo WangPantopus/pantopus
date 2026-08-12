@@ -14,6 +14,7 @@ import app.pantopus.android.data.blocks.BlocksRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
+import app.pantopus.android.data.social.UserSocialRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileReviewCard
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileStatCell
@@ -131,22 +132,41 @@ sealed interface PublicProfileActionState {
     data class Failed(val message: String) : PublicProfileActionState
 }
 
-/** Loads `GET /api/users/id/:id` and exposes a stable tab + toast surface. */
+/**
+ * Loads the public profile and exposes a stable tab + toast surface.
+ *
+ * T3 — the nav arg may be a UUID *or* a handle (`pantopus://u/mariak`,
+ * `https://pantopus.com/u/mariak`), because `DeepLinkRouter` maps
+ * `u/:handle` and `user/:handle` onto the same destination. We branch
+ * exactly like RN (`src/app/user/[id].tsx:27,53-58`): UUIDs resolve via
+ * `GET /api/users/id/:id`, handles via
+ * `GET /api/users/username/:username`. Both routes return the same body,
+ * and every follow-up call (relationship, follow, connect, block, posts)
+ * uses the *resolved* `profile.id`, never the raw nav arg.
+ */
 @HiltViewModel
 class PublicProfileViewModel
     @Inject
     constructor(
         private val repo: ProfileRepository,
+        private val social: UserSocialRepository,
         private val relationships: RelationshipsRepository,
         private val blocks: BlocksRepository,
         private val authRepository: AuthRepository,
         private val posts: PostsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val userId: String =
+        /** The raw nav arg — may be a UUID or a `@handle`. */
+        private val routeIdentifier: String =
             requireNotNull(savedStateHandle[PUBLIC_PROFILE_USER_ID_KEY]) {
                 "PublicProfileViewModel requires a '$PUBLIC_PROFILE_USER_ID_KEY' nav arg."
             }
+
+        /**
+         * The resolved `User.id`, known only once the profile loads. Every
+         * user-scoped mutation must use this, never [routeIdentifier].
+         */
+        private var userId: String = routeIdentifier
 
         private val _state = MutableStateFlow<PublicProfileUiState>(PublicProfileUiState.Loading)
         val state: StateFlow<PublicProfileUiState> = _state.asStateFlow()
@@ -178,6 +198,26 @@ class PublicProfileViewModel
 
         private val _showOverflow = MutableStateFlow(false)
         val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
+
+        /**
+         * T3 — plain follow graph (`api/users/:id/follow`), distinct from the
+         * persona privacy handshake. `true` once the viewer follows this user.
+         */
+        private val _isFollowing = MutableStateFlow(false)
+        val isFollowing: StateFlow<Boolean> = _isFollowing.asStateFlow()
+
+        /** In-flight guard for the follow/unfollow toggle. */
+        private val _isFollowInFlight = MutableStateFlow(false)
+        val isFollowInFlight: StateFlow<Boolean> = _isFollowInFlight.asStateFlow()
+
+        /**
+         * `true` when a Follow affordance should render at all — someone
+         * else's profile, viewed by a signed-in user. Mirrors RN, which hides
+         * the whole action row on your own profile
+         * (`src/app/user/[id].tsx:522`).
+         */
+        private val _canFollow = MutableStateFlow(false)
+        val canFollow: StateFlow<Boolean> = _canFollow.asStateFlow()
 
         fun load() {
             if (_state.value is PublicProfileUiState.Loaded) return
@@ -229,18 +269,67 @@ class PublicProfileViewModel
         }
 
         /**
-         * Persona follow — opens privacy handshake (Stripe Checkout for paid
-         * tiers). There is no in-flight/succeeded pose to track here: the
-         * handshake wizard owns the request and the resulting follow state,
-         * exactly as iOS `PublicProfileViewModel.follow()` does.
+         * Follow entry point behind every Follow affordance.
+         *
+         * A Beacon (persona with a resolvable handle) keeps the privacy
+         * handshake wizard — that flow owns tier selection and Stripe
+         * Checkout, so there is no in-flight pose to track for it. Everyone
+         * else (ordinary neighbours, personas with no Beacon bridge) now
+         * takes the plain `api/users/:id/follow` path instead of the old
+         * dead-end toast. Mirrors RN, whose profile screen only ever calls
+         * `followUser`/`unfollowUser` (`src/app/user/[id].tsx:184-199`), and
+         * iOS `PublicProfileViewModel.follow()`.
          */
         fun follow() {
-            if (!canOpenHandshake()) {
-                _toastMessage.value = HANDSHAKE_UNAVAILABLE_MESSAGE
+            if (canOpenHandshake()) {
+                _handshakePreselectedTierRank.value = null
+                _showFollowHandshake.value = true
                 return
             }
-            _handshakePreselectedTierRank.value = null
-            _showFollowHandshake.value = true
+            toggleFollow()
+        }
+
+        /**
+         * T3 — plain follow / unfollow for an ordinary neighbour.
+         * `POST` / `DELETE api/users/:id/follow`
+         * (`backend/routes/users.js:3520` / `:3593`). Awaited, not optimistic,
+         * so a rejected follow (blocked, curator account) can't leave the
+         * button lying.
+         */
+        fun toggleFollow() {
+            if (!_canFollow.value || _isFollowInFlight.value) return
+            _isFollowInFlight.value = true
+            val wasFollowing = _isFollowing.value
+            viewModelScope.launch {
+                val result = if (wasFollowing) social.unfollow(userId) else social.follow(userId)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isFollowing.value = result.data.following ?: !wasFollowing
+                        _toastMessage.value = if (_isFollowing.value) "Following" else "Unfollowed"
+                    }
+                    is NetworkResult.Failure -> {
+                        _toastMessage.value = followFailureMessage(result.error, wasFollowing)
+                    }
+                }
+                _isFollowInFlight.value = false
+            }
+        }
+
+        /**
+         * The backend sends readable copy on the 400/403 rejections
+         * ("You are already following this user", "Cannot follow curator
+         * accounts"); surface it rather than a generic failure.
+         */
+        private fun followFailureMessage(
+            error: NetworkError,
+            wasFollowing: Boolean,
+        ): String {
+            val fallback = if (wasFollowing) "Couldn't unfollow." else "Couldn't follow."
+            return when (error) {
+                is NetworkError.Transport -> "Check your connection and try again."
+                NetworkError.Forbidden -> "You can't follow this profile."
+                else -> error.message.ifBlank { fallback }
+            }
         }
 
         /** Unlock a tier-gated broadcast on a Persona profile. */
@@ -304,10 +393,51 @@ class PublicProfileViewModel
             }
         }
 
+        /**
+         * UUIDs resolve by id; handles resolve by username. Mirrors RN's
+         * `fetchPublicProfileByIdentifier` (`src/app/user/[id].tsx:53-58`).
+         */
+        private suspend fun loadProfile(): NetworkResult<PublicProfileDto> {
+            val identifier = routeIdentifier.trim()
+            return if (UserSocialRepository.isUuid(identifier)) {
+                repo.publicProfile(identifier)
+            } else {
+                social.publicProfileByUsername(identifier)
+            }
+        }
+
+        /**
+         * `GET api/users/:id/relationship` — seeds the Follow and Connect
+         * poses. Requires auth, so a signed-out viewer just gets the resting
+         * state (and no Follow affordance).
+         */
+        private suspend fun loadRelationship(profileId: String) {
+            val signedInId = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+            _canFollow.value = signedInId != null && signedInId != profileId
+            if (!_canFollow.value) {
+                _isFollowing.value = false
+                return
+            }
+            when (val result = social.relationship(profileId)) {
+                is NetworkResult.Success -> {
+                    _isFollowing.value = result.data.following == true
+                    when (result.data.relationship) {
+                        "pending_sent", "connected" ->
+                            _connectState.value = PublicProfileActionState.Succeeded
+                        else -> Unit
+                    }
+                }
+                // A failed relationship probe must not fail the profile —
+                // the buttons just stay in their resting pose.
+                is NetworkResult.Failure -> Unit
+            }
+        }
+
         private suspend fun fetch() {
-            when (val result = repo.publicProfile(userId)) {
+            when (val result = loadProfile()) {
                 is NetworkResult.Success -> {
                     val profile = result.data
+                    userId = profile.id
                     val kind = derivedKind(profile)
                     // A21.2 — the Local archetype renders a real neighbourhood
                     // post feed, so pull the author's posts the way the RN
@@ -319,6 +449,7 @@ class PublicProfileViewModel
                     val feed =
                         if (kind == PublicProfileKind.Local) loadUserPosts(profile.id) else emptyList()
                     _state.value = PublicProfileUiState.Loaded(build(profile, kind, feed))
+                    loadRelationship(profile.id)
                 }
                 is NetworkResult.Failure -> {
                     _state.value = PublicProfileUiState.Error(friendlyMessage(result.error))

@@ -1018,9 +1018,9 @@ public struct YouTabRoot: View {
         case .helpCenter:
             HelpCenterView { Task { @MainActor in pop() } }
         case .privacySettings:
-            GroupedListView(
-                dataSource: PrivacySettingsViewModel()
-            ) { Task { @MainActor in pop() } }
+            // `PrivacyView` (not a bare `GroupedListView`) — it hosts the
+            // account-delete confirm sheet the destructive row opens.
+            PrivacyView(viewModel: PrivacySettingsViewModel()) { Task { @MainActor in pop() } }
         case .legal:
             LegalIndexView(
                 onBack: { Task { @MainActor in pop() } },

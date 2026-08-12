@@ -21,6 +21,19 @@ public enum AppLockCapability: String, Sendable {
     }
 }
 
+/// Outcome of a one-shot re-auth gate in front of an irreversible action
+/// (account deletion today). Mirrors the RN `useSensitiveActionGuard`
+/// contract and the Android `AppLockManager.SensitiveActionOutcome`.
+public enum SensitiveActionOutcome: Sendable, Equatable {
+    /// Identity confirmed — or the device carries no credential to check
+    /// against, which RN also treats as a pass-through.
+    case verified
+    /// The user dismissed the system sheet. Callers stay put silently.
+    case cancelled
+    /// Verification could not be completed. Callers surface `message`.
+    case failed(message: String)
+}
+
 @Observable
 @MainActor
 public final class AppLockManager {
@@ -160,6 +173,34 @@ public final class AppLockManager {
         }
     }
 
+    /// One-shot device-credential check in front of an irreversible action.
+    ///
+    /// Independent of the app-lock *preference*: deleting an account is
+    /// gated whether or not the user opted into lock-on-resume, exactly
+    /// like RN's `useSensitiveActionGuard` (which reads the capability,
+    /// not the preference). When the device has no biometric and no
+    /// passcode there is nothing to check against, so the action is let
+    /// through rather than being made unreachable — RN's first branch.
+    public func verifySensitiveAction(reason: String) async -> SensitiveActionOutcome {
+        refreshCapability()
+        switch capability {
+        case .notAvailable, .notEnrolled, .passcodeNotSet:
+            return .verified
+        case .invalidContext:
+            return .failed(message: capability.statusText)
+        case .available:
+            break
+        }
+        lastError = nil
+        if await authenticate(reason: reason) { return .verified }
+        let message = lastError ?? "We couldn't verify your identity. Please try again."
+        return message == Self.cancelledMessage ? .cancelled : .failed(message: message)
+    }
+
+    /// The single string `message(for:)` produces for every user- /
+    /// system-initiated cancel, matched by `verifySensitiveAction`.
+    static let cancelledMessage = "Authentication was cancelled."
+
     public func clearTransientState() {
         isLocked = false
         isPrompting = false
@@ -259,7 +300,7 @@ public final class AppLockManager {
 
     private static func message(for error: LAError) -> String {
         switch error.code {
-        case .userCancel, .systemCancel, .appCancel: "Authentication was cancelled."
+        case .userCancel, .systemCancel, .appCancel: cancelledMessage
         case .authenticationFailed: "Authentication failed. Try again."
         case .biometryLockout: "Biometrics are locked. Use your device passcode."
         case .passcodeNotSet: "Set a device passcode to use app lock."

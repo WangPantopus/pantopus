@@ -1,17 +1,39 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.professional.ProfessionalEnableRequest
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileResponse
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileUpdateRequest
 import app.pantopus.android.data.api.models.professional.ProfessionalVerificationStatusResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
+import retrofit2.http.POST
 
 /** Professional-profile routes from `backend/routes/professional.js`. */
 interface ProfessionalApi {
     /** `GET /api/professional/profile/me` — route `professional.js:164`. */
     @GET("api/professional/profile/me")
     suspend fun profileMe(): ProfessionalProfileResponse
+
+    /**
+     * `POST /api/professional/profile` — route `professional.js:89`. Turns
+     * professional mode on: 201 for a brand-new record, 200 when it
+     * re-activates a soft-disabled one, 400 when an active profile already
+     * exists.
+     */
+    @POST("api/professional/profile")
+    suspend fun createProfile(
+        @Body body: ProfessionalEnableRequest,
+    ): ProfessionalProfileResponse
+
+    /**
+     * `DELETE /api/professional/profile/me` — route `professional.js:221`.
+     * Soft-disable: flips `is_active` + `is_public` to false and returns the
+     * updated row, so the record survives for a later re-enable.
+     */
+    @DELETE("api/professional/profile/me")
+    suspend fun disableProfile(): ProfessionalProfileResponse
 
     /** `PATCH /api/professional/profile/me` — route `professional.js:190`. */
     @PATCH("api/professional/profile/me")

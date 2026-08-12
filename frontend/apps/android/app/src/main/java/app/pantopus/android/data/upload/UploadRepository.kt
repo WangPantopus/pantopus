@@ -4,6 +4,7 @@ import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
 import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
+import app.pantopus.android.data.api.models.users.ProfilePictureUploadResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.UploadApi
@@ -64,6 +65,22 @@ class UploadRepository
                         )
                     }
                 uploadApi.uploadAIMedia(parts)
+            }
+
+        /**
+         * T3 — replace the signed-in user's avatar via
+         * `POST /api/upload/profile-picture`. Field name is `file`
+         * (singular), unlike the `files` multi-part routes above.
+         */
+        suspend fun uploadProfilePicture(file: UploadFile): NetworkResult<ProfilePictureUploadResponse> =
+            safeApiCall {
+                uploadApi.uploadProfilePicture(
+                    MultipartBody.Part.createFormData(
+                        name = "file",
+                        filename = file.filename,
+                        body = file.bytes.toRequestBody(file.mimeType.toMediaTypeOrNull()),
+                    ),
+                )
             }
 
         /** Snap & Sell — attach local photos to a just-created/edited listing. */

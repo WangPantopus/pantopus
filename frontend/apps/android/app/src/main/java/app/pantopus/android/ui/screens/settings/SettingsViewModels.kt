@@ -7,11 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.core.security.AppLockManager
+import app.pantopus.android.data.account.AccountDeletionRepository
+import app.pantopus.android.data.api.models.settings.PrivacySettingsUpdate
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.data.profile.ProfileRepository
-import app.pantopus.android.ui.components.ChannelGlyph
 import app.pantopus.android.ui.components.FuzzStop
 import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.components.ToastMessage
@@ -304,265 +305,6 @@ class SettingsIndexViewModel
         }
     }
 
-// MARK: - Notification preferences
-
-/**
- * P7.5 / A14.5 — Notification preferences. Reshaped from the old
- * channel-keyed toggle list into the design's three-channel matrix:
- * five category cards (Tasks · Pulse · Marketplace · Home & Mailbox ·
- * Account & security), each row carrying a [ChannelTriad] (Push /
- * Email / SMS). A Master card on top hosts the Pause-all toggle + a
- * Quiet-hours row; flipping Pause swaps the Master card for the amber
- * [PauseBanner] and dims the category cards to 0.5.
- *
- * Backend persistence is out of scope for P7.5 (mirrors A14.2 Home
- * security) — chips / toggles flip local state only. The helper lines
- * and channel patterns are the parity contract, mirrored word-for-word
- * in the iOS `NotificationSettingsViewModel`.
- */
-@HiltViewModel
-class NotificationSettingsViewModel
-    @Inject
-    constructor() : ViewModel() {
-        enum class Variant { Populated, Paused }
-
-        val title: String = "Notifications"
-
-        /** Mono legend pinned at the bottom of the scroll. */
-        val footerCaption: String = "P · Push   E · Email   S · SMS"
-
-        private var isPaused: Boolean = false
-        private val patterns: MutableMap<String, NotificationCatalog.Pattern> =
-            NotificationCatalog.seed().toMutableMap()
-
-        private val _state = MutableStateFlow<GroupedListUiState>(GroupedListUiState.Loading)
-        val state: StateFlow<GroupedListUiState> = _state.asStateFlow()
-
-        private val _banner = MutableStateFlow<GroupedListBanner?>(null)
-        val banner: StateFlow<GroupedListBanner?> = _banner.asStateFlow()
-
-        private val _dimmed = MutableStateFlow(false)
-        val dimmed: StateFlow<Boolean> = _dimmed.asStateFlow()
-
-        fun load() {
-            rebuild()
-        }
-
-        /** Test / preview seam: boot straight into a variant frame. */
-        fun setVariant(variant: Variant) {
-            isPaused = variant == Variant.Paused
-            patterns.clear()
-            patterns.putAll(NotificationCatalog.seed())
-            rebuild()
-        }
-
-        fun onToggle(
-            rowId: String,
-            isOn: Boolean,
-        ) {
-            if (rowId != NotificationCatalog.PAUSE_ALL) return
-            isPaused = isOn
-            rebuild()
-        }
-
-        fun onToggleChannel(
-            rowId: String,
-            channel: ChannelGlyph,
-            isOn: Boolean,
-        ) {
-            val pattern = patterns[rowId] ?: return
-            if (NotificationCatalog.lockedFor(rowId).contains(channel)) return
-            patterns[rowId] =
-                when (channel) {
-                    ChannelGlyph.P -> pattern.copy(p = isOn)
-                    ChannelGlyph.E -> pattern.copy(e = isOn)
-                    ChannelGlyph.S -> pattern.copy(s = isOn)
-                }
-            rebuild()
-        }
-
-        /** Resume — clears the pause; the configured pattern comes back. */
-        fun onTapBanner() {
-            isPaused = false
-            rebuild()
-        }
-
-        private fun rebuild() {
-            _banner.value = if (isPaused) pauseBanner() else null
-            _dimmed.value = isPaused
-            _state.value = GroupedListUiState.Loaded(groups())
-        }
-
-        private fun groups(): List<GroupedListGroup> =
-            buildList {
-                if (!isPaused) add(masterGroup())
-                NotificationCatalog.categories.forEach { add(categoryGroup(it)) }
-            }
-
-        private fun masterGroup(): GroupedListGroup =
-            GroupedListGroup(
-                id = "master",
-                overline = "Master",
-                helper = "Pause all silences every channel except emergency alerts. Quiet hours just delays them.",
-                rows =
-                    listOf(
-                        GroupedListRow(
-                            id = NotificationCatalog.PAUSE_ALL,
-                            label = "Pause all notifications",
-                            subtext = "Snooze everything but emergencies",
-                            control = RowControl.Toggle(isPaused),
-                        ),
-                        GroupedListRow(
-                            id = NotificationCatalog.QUIET_HOURS,
-                            label = "Quiet hours",
-                            subtext = "10:00 PM – 7:00 AM · Weekdays",
-                            control = RowControl.ChipStatus("On", RowControl.ChipTone.Neutral, includesChevron = true),
-                        ),
-                    ),
-            )
-
-        private fun categoryGroup(category: NotificationCatalog.Category): GroupedListGroup =
-            GroupedListGroup(
-                id = category.id,
-                overline = category.title,
-                helper = category.helper,
-                showsChannelHeader = true,
-                rows =
-                    category.rows.map { row ->
-                        val pattern = patterns[row.id] ?: row.seed
-                        GroupedListRow(
-                            id = row.id,
-                            label = row.label,
-                            subtext = row.sub,
-                            control =
-                                RowControl.ChannelTriad(
-                                    p = pattern.p,
-                                    e = pattern.e,
-                                    s = pattern.s,
-                                    locked = NotificationCatalog.lockedFor(row.id),
-                                ),
-                        )
-                    },
-            )
-
-        private fun pauseBanner(): GroupedListBanner =
-            GroupedListBanner(
-                icon = PantopusIcon.BellOff,
-                title = "Paused for 2 hours",
-                subtitle = "Resumes 11:42 AM · Emergency alerts still come through",
-                actionLabel = "Resume",
-            )
-    }
-
-/**
- * A14.5 notification catalog — the five category cards, their rows, seed
- * channel patterns, and locked channels. Top-level (mirror of the iOS
- * `NotificationSettingsViewModel` static data) so the view-model stays
- * lean. Copy + patterns here are the parity contract with iOS.
- */
-internal object NotificationCatalog {
-    const val PAUSE_ALL = "master.pauseAll"
-    const val QUIET_HOURS = "master.quietHours"
-    const val EMERGENCY = "home.emergency"
-
-    data class Pattern(
-        val p: Boolean,
-        val e: Boolean,
-        val s: Boolean,
-    )
-
-    data class RowSpec(
-        val id: String,
-        val label: String,
-        val sub: String?,
-        val seed: Pattern,
-    )
-
-    data class Category(
-        val id: String,
-        val title: String,
-        val helper: String?,
-        val rows: List<RowSpec>,
-    )
-
-    /** Channels that can't be muted — Emergency keeps push locked on. */
-    fun lockedFor(rowId: String): Set<ChannelGlyph> = if (rowId == EMERGENCY) setOf(ChannelGlyph.P) else emptySet()
-
-    fun seed(): Map<String, Pattern> = categories.flatMap { it.rows }.associate { it.id to it.seed }
-
-    private fun spec(
-        id: String,
-        label: String,
-        sub: String?,
-        p: Boolean,
-        e: Boolean,
-        s: Boolean,
-    ) = RowSpec(id, label, sub, Pattern(p, e, s))
-
-    val categories: List<Category> =
-        listOf(
-            Category(
-                id = "tasks",
-                title = "Tasks",
-                helper = "Push only for things that need a fast reply. Receipts go to email so they're searchable.",
-                rows =
-                    listOf(
-                        spec("tasks.bids", "Bids on my tasks", "Within 5 minutes of posting", p = true, e = false, s = false),
-                        spec("tasks.messages", "New messages", "From clients & taskers", p = true, e = true, s = false),
-                        spec("tasks.status", "Status updates", "Accepted, on the way, done", p = true, e = false, s = false),
-                        spec("tasks.receipts", "Payment receipts", null, p = false, e = true, s = false),
-                    ),
-            ),
-            Category(
-                id = "pulse",
-                title = "Pulse",
-                helper = "Pulse is quiet by default. Mentions break through, browsing doesn't.",
-                rows =
-                    listOf(
-                        spec("pulse.replies", "Replies to my posts", null, p = true, e = false, s = false),
-                        spec("pulse.mentions", "Mentions", "When a neighbor @s you", p = true, e = false, s = false),
-                        spec("pulse.lostFound", "Nearby Lost & Found", "Within 0.5 mi of your address", p = false, e = false, s = false),
-                        spec("pulse.digest", "Weekly digest", "Sundays, 8am", p = false, e = true, s = false),
-                    ),
-            ),
-            Category(
-                id = "marketplace",
-                title = "Marketplace",
-                helper = null,
-                rows =
-                    listOf(
-                        spec("marketplace.offers", "Offers on my listings", null, p = true, e = true, s = false),
-                        spec("marketplace.buyerMessages", "Buyer messages", null, p = true, e = false, s = false),
-                        spec("marketplace.priceDrops", "Price drops on saved items", null, p = false, e = true, s = false),
-                        spec("marketplace.expiring", "Listing expiring soon", "48h before auto-pause", p = false, e = true, s = false),
-                    ),
-            ),
-            Category(
-                id = "homeMailbox",
-                title = "Home & Mailbox",
-                helper = "Emergency alerts can't be muted on push.",
-                rows =
-                    listOf(
-                        spec("home.package", "Package arrived", "When carrier scans \"delivered\"", p = true, e = true, s = true),
-                        spec("home.member", "Member activity", "Check-ins, new passes, edits", p = true, e = false, s = false),
-                        spec("home.civic", "Civic notices", "Permits, service alerts", p = true, e = true, s = false),
-                        spec(EMERGENCY, "Emergency alerts", null, p = true, e = true, s = true),
-                    ),
-            ),
-            Category(
-                id = "accountSecurity",
-                title = "Account & security",
-                helper = "Security alerts always come through. You can choose how.",
-                rows =
-                    listOf(
-                        spec("account.signIn", "New sign-in", null, p = true, e = true, s = true),
-                        spec("account.verification", "Verification status", null, p = true, e = true, s = false),
-                        spec("account.billing", "Billing & receipts", null, p = false, e = true, s = false),
-                    ),
-            ),
-        )
-}
-
 // MARK: - Privacy
 
 /**
@@ -573,10 +315,21 @@ internal object NotificationCatalog {
  * leading-icon action rows + a detached destructive Delete row. A dark
  * `StealthBanner` rides above the first card in the stealth frame.
  *
- * Backend persistence is out of scope (mirrors A14.2 / A14.5) — the new
- * control set doesn't map onto the existing PrivacySettings fields, so
- * radios / toggles / fuzz flip local state only; data-export + delete
- * open placeholders. Copy is the parity contract, mirrored on iOS.
+ * Backend-backed controls (T1 parity):
+ *  · "Find me in search" radios + "Find me by real name" toggle read
+ *    `GET /api/privacy/settings` and optimistically PATCH the same route,
+ *    rolling back and toasting on failure — RN
+ *    `src/app/settings/privacy.tsx:151-191`.
+ *  · "Delete account" opens the confirm sheet, gates on a
+ *    device-credential re-auth, then `DELETE /api/users/account` and a
+ *    full sign-out — RN `src/app/settings.tsx:103-119`.
+ *
+ * The design's own control set (Profile visibility · Address on profile ·
+ * Map location fuzz · Activity) has no column in `UserPrivacySettings` —
+ * its four-way vocabularies don't map onto the three-way
+ * `profile_default_visibility` enum — so those cards stay local until the
+ * backend grows the fields. They are never presented as saved. Copy is
+ * the parity contract, mirrored on iOS.
  */
 @HiltViewModel
 class PrivacySettingsViewModel
@@ -584,6 +337,8 @@ class PrivacySettingsViewModel
     constructor(
         private val appLock: AppLockManager,
         private val authRepository: AuthRepository,
+        private val privacy: PrivacyRepository,
+        private val accountDeletion: AccountDeletionRepository,
     ) : ViewModel() {
         enum class Variant { Populated, Stealth }
 
@@ -598,6 +353,18 @@ class PrivacySettingsViewModel
         private var fuzz: FuzzStop = FuzzStop.HalfMile
         private val activity: MutableMap<String, Boolean> = PrivacyCatalog.seedActivity(stealth = false).toMutableMap()
 
+        // Search privacy (persisted) — `UserPrivacySettings`.
+        private var searchVisibility: String = "everyone"
+        private var findableByName: Boolean = false
+
+        /** `GET /api/privacy/settings` failed on the last load. RN keeps the
+         *  screen up and swaps the helper line rather than blanking it. */
+        private var searchPrivacyLoadFailed: Boolean = false
+
+        /** A PATCH is in flight — the radios/toggle ignore taps meanwhile,
+         *  matching RN's `privacySaving` guard. */
+        private var searchPrivacySaving: Boolean = false
+
         private val _state = MutableStateFlow<GroupedListUiState>(GroupedListUiState.Loading)
         val state: StateFlow<GroupedListUiState> = _state.asStateFlow()
 
@@ -607,10 +374,40 @@ class PrivacySettingsViewModel
         private val _toast = MutableStateFlow<ToastMessage?>(null)
         val toast: StateFlow<ToastMessage?> = _toast.asStateFlow()
 
+        private val _deleteSheetVisible = MutableStateFlow(false)
+        val deleteSheetVisible: StateFlow<Boolean> = _deleteSheetVisible.asStateFlow()
+
+        private val _deletingAccount = MutableStateFlow(false)
+        val deletingAccount: StateFlow<Boolean> = _deletingAccount.asStateFlow()
+
+        private val _deleteAccountError = MutableStateFlow<String?>(null)
+        val deleteAccountError: StateFlow<String?> = _deleteAccountError.asStateFlow()
+
+        /** Emitted once the account is gone and the session is cleared, so
+         *  the host can pop back to the auth root. */
+        private val _accountDeleted = MutableStateFlow(false)
+        val accountDeleted: StateFlow<Boolean> = _accountDeleted.asStateFlow()
+
         fun load() {
             configureAppLockForSignedInUser()
             appLock.refreshCapability()
-            rebuild()
+            viewModelScope.launch {
+                fetchSearchPrivacy()
+                rebuild()
+            }
+        }
+
+        /** `GET /api/privacy/settings` — `backend/routes/privacy.js:50`. A
+         *  failure never blanks the screen. */
+        private suspend fun fetchSearchPrivacy() {
+            when (val result = privacy.settings()) {
+                is NetworkResult.Success -> {
+                    searchVisibility = result.data.settings.searchVisibility ?: "everyone"
+                    findableByName = result.data.settings.findableByName ?: false
+                    searchPrivacyLoadFailed = false
+                }
+                is NetworkResult.Failure -> searchPrivacyLoadFailed = true
+            }
         }
 
         /** Test / preview seam: boot straight into a variant frame. */
@@ -626,6 +423,10 @@ class PrivacySettingsViewModel
 
         fun onRadio(rowId: String) {
             when {
+                rowId.startsWith(SEARCH_VISIBILITY_PREFIX) -> {
+                    setSearchVisibility(rowId.removePrefix(SEARCH_VISIBILITY_PREFIX))
+                    return
+                }
                 rowId.startsWith("visibility.") -> visibility = rowId.removePrefix("visibility.")
                 rowId.startsWith("address.") -> address = rowId.removePrefix("address.")
                 else -> return
@@ -638,6 +439,10 @@ class PrivacySettingsViewModel
             isOn: Boolean,
             hostActivity: FragmentActivity? = null,
         ) {
+            if (rowId == ROW_FINDABLE_BY_NAME) {
+                setFindableByName(isOn)
+                return
+            }
             if (rowId == "appLockToggle") {
                 viewModelScope.launch {
                     val activity = hostActivity
@@ -675,15 +480,152 @@ class PrivacySettingsViewModel
         }
 
         fun onTapRow(rowId: String) {
-            // Open Device Settings — mirrored from iOS UIApplication.openSettingsURLString.
-            // Download / What we collect / Delete are out-of-scope placeholders.
-            if (rowId == "appLockOpenSettings") {
-                // Handled in the screen (needs Context).
+            // "appLockOpenSettings" is handled in the screen (needs Context).
+            // Download your data / What we collect open dedicated GDPR flows
+            // tracked outside this package.
+            if (rowId == ROW_DELETE_ACCOUNT) {
+                _deleteAccountError.value = null
+                _deleteSheetVisible.value = true
             }
         }
 
         fun consumeToast() {
             _toast.value = null
+        }
+
+        // ---- Search privacy mutations (optimistic + rollback) ----
+
+        /**
+         * Optimistic `PATCH /api/privacy/settings { search_visibility }`.
+         * Mirrors RN `handleSearchVisibilityChange` — flip locally, adopt
+         * the server's echoed value on success, restore the previous value
+         * and toast on failure.
+         */
+        private fun setSearchVisibility(next: String) {
+            if (next == searchVisibility || searchPrivacySaving || searchPrivacyLoadFailed) {
+                rebuild()
+                return
+            }
+            val previous = searchVisibility
+            searchVisibility = next
+            searchPrivacySaving = true
+            rebuild()
+            viewModelScope.launch {
+                when (val result = privacy.updateSettings(PrivacySettingsUpdate(searchVisibility = next))) {
+                    is NetworkResult.Success -> {
+                        searchVisibility = result.data.settings.searchVisibility ?: next
+                        _toast.value = ToastMessage("Search privacy updated.", ToastKind.Success)
+                    }
+                    is NetworkResult.Failure -> {
+                        searchVisibility = previous
+                        _toast.value =
+                            ToastMessage(
+                                result.error.message.ifBlank { "Failed to update search privacy." },
+                                ToastKind.Error,
+                            )
+                    }
+                }
+                searchPrivacySaving = false
+                rebuild()
+            }
+        }
+
+        /**
+         * Optimistic `PATCH /api/privacy/settings { findable_by_name }`.
+         * Mirrors RN `handleFindableByNameChange`.
+         */
+        private fun setFindableByName(next: Boolean) {
+            if (searchPrivacySaving || searchPrivacyLoadFailed) {
+                rebuild()
+                return
+            }
+            val previous = findableByName
+            findableByName = next
+            searchPrivacySaving = true
+            rebuild()
+            viewModelScope.launch {
+                when (val result = privacy.updateSettings(PrivacySettingsUpdate(findableByName = next))) {
+                    is NetworkResult.Success -> {
+                        findableByName = result.data.settings.findableByName ?: next
+                        _toast.value = ToastMessage("Name search privacy updated.", ToastKind.Success)
+                    }
+                    is NetworkResult.Failure -> {
+                        findableByName = previous
+                        _toast.value =
+                            ToastMessage(
+                                result.error.message.ifBlank { "Failed to update name search privacy." },
+                                ToastKind.Error,
+                            )
+                    }
+                }
+                searchPrivacySaving = false
+                rebuild()
+            }
+        }
+
+        // ---- Account deletion ----
+
+        fun dismissDeleteSheet() {
+            if (_deletingAccount.value) return
+            _deleteAccountError.value = null
+            _deleteSheetVisible.value = false
+        }
+
+        /**
+         * The sheet's "Delete My Account" CTA.
+         *
+         * Order matches RN `settings.tsx:103-119`: re-auth **first**, then
+         * `DELETE /api/users/account` (`backend/routes/users.js:3945`), then
+         * a full sign-out so the host drops back to the auth root. The
+         * backend answers 409 when the account still has in-progress gigs
+         * or escrowed payments — that message is surfaced verbatim and
+         * nothing is deleted.
+         */
+        fun confirmDeleteAccount(hostActivity: FragmentActivity?) {
+            if (_deletingAccount.value) return
+            _deleteAccountError.value = null
+            viewModelScope.launch {
+                if (!verifyIdentityForDeletion(hostActivity)) return@launch
+
+                _deletingAccount.value = true
+                when (val result = accountDeletion.deleteAccount()) {
+                    is NetworkResult.Success -> {
+                        _deletingAccount.value = false
+                        _deleteSheetVisible.value = false
+                        authRepository.signOut()
+                        appLock.clearTransientState()
+                        _accountDeleted.value = true
+                    }
+                    is NetworkResult.Failure -> {
+                        _deletingAccount.value = false
+                        _deleteAccountError.value =
+                            result.error.message.ifBlank {
+                                "Failed to delete account. Please try again."
+                            }
+                    }
+                }
+            }
+        }
+
+        /**
+         * `true` when the DELETE may proceed. Sets [deleteAccountError]
+         * itself for the "couldn't verify" outcomes; a plain cancel is
+         * silent, exactly like RN's guard.
+         */
+        private suspend fun verifyIdentityForDeletion(hostActivity: FragmentActivity?): Boolean {
+            if (hostActivity == null) {
+                _deleteAccountError.value = "We couldn't verify your identity. Please try again."
+                return false
+            }
+            val outcome = appLock.verifySensitiveAction(hostActivity, "Approve account deletion")
+            return when (outcome) {
+                is AppLockManager.SensitiveActionOutcome.Verified -> true
+                is AppLockManager.SensitiveActionOutcome.Cancelled -> false
+                is AppLockManager.SensitiveActionOutcome.Failed -> {
+                    _deleteAccountError.value = outcome.message
+                    false
+                }
+            }
         }
 
         fun onSetFuzz(
@@ -719,12 +661,49 @@ class PrivacySettingsViewModel
         private fun groups(): List<GroupedListGroup> =
             listOf(
                 biometricSecurityGroup(),
+                searchPrivacyGroup(),
                 visibilityGroup(),
                 addressGroup(),
                 fuzzGroup(),
                 activityGroup(),
                 dataGroup(),
                 deleteGroup(),
+            )
+
+        /**
+         * The only backend-backed card on this screen —
+         * `UserPrivacySettings.search_visibility` + `.findable_by_name`.
+         * Radio labels + helper copy are RN's
+         * (`settings/privacy.tsx:20-33`, `:476-556`) word for word.
+         */
+        private fun searchPrivacyGroup(): GroupedListGroup =
+            GroupedListGroup(
+                id = PrivacyCatalog.SEARCH_PRIVACY,
+                overline = "Find me in search",
+                helper =
+                    if (searchPrivacyLoadFailed) {
+                        "Search privacy could not load. Pull to refresh before changing this setting."
+                    } else {
+                        PrivacyCatalog.searchVisibilityHelp[searchVisibility]
+                    },
+                rows =
+                    PrivacyCatalog.searchVisibilityOptions.map { option ->
+                        GroupedListRow(
+                            id = "$SEARCH_VISIBILITY_PREFIX${option.key}",
+                            label = option.label,
+                            control = RowControl.Radio(option.key == searchVisibility),
+                            testTag = "search-visibility-${option.key}",
+                        )
+                    } +
+                        GroupedListRow(
+                            id = ROW_FINDABLE_BY_NAME,
+                            label = "Find me by real name",
+                            subtext =
+                                "Let people search your account first, middle, or last name " +
+                                    "when your search visibility allows them.",
+                            control = RowControl.Toggle(findableByName),
+                            testTag = "findable-by-name-switch",
+                        ),
             )
 
         private fun biometricSecurityGroup(): GroupedListGroup {
@@ -872,15 +851,25 @@ class PrivacySettingsViewModel
                 rows =
                     listOf(
                         GroupedListRow(
-                            id = "deleteAccount",
+                            id = ROW_DELETE_ACCOUNT,
                             label = "Delete account",
-                            subtext = "Permanent. 30-day grace period.",
+                            // The design frame reads "Permanent. 30-day
+                            // grace period." — `users.js:3945` has no
+                            // grace window, it hard-deletes on the spot,
+                            // so the row can't promise one. Mirrored on
+                            // iOS; flagged for design review.
+                            subtext = "Permanent. This can't be undone.",
                             control = RowControl.Chevron,
                             destructive = true,
                         ),
                     ),
             )
     }
+
+/** `searchVisibility.<everyone|mutuals|nobody>` row-id prefix. */
+private const val SEARCH_VISIBILITY_PREFIX = "searchVisibility."
+private const val ROW_FINDABLE_BY_NAME = "findableByName"
+private const val ROW_DELETE_ACCOUNT = "deleteAccount"
 
 /**
  * A14.7 privacy catalog — the radio options, activity specs, and seeds.
@@ -890,12 +879,31 @@ class PrivacySettingsViewModel
 internal object PrivacyCatalog {
     const val FUZZ = "fuzz"
     const val BIOMETRIC_SECURITY = "biometricSecurity"
+    const val SEARCH_PRIVACY = "searchPrivacy"
 
     data class Option(
         val key: String,
         val label: String,
         val sub: String?,
     )
+
+    /** `search_visibility` enum values + RN's labels
+     *  (`settings/privacy.tsx:20-28`). Order is RN's. */
+    val searchVisibilityOptions: List<Option> =
+        listOf(
+            Option("everyone", "Everyone", null),
+            Option("mutuals", "Connections", null),
+            Option("nobody", "Hidden", null),
+        )
+
+    /** Helper line under the card — describes the *selected* option, as
+     *  RN does (`SEARCH_VISIBILITY_HELP`, `settings/privacy.tsx:30-33`). */
+    val searchVisibilityHelp: Map<String, String> =
+        mapOf(
+            "everyone" to "Your profile can appear when people search your handle or display name.",
+            "mutuals" to "Only connected people can find your profile in search.",
+            "nobody" to "Your profile is hidden from search and public discovery.",
+        )
 
     val visibilityOptions: List<Option> =
         listOf(

@@ -274,6 +274,38 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Replace the signed-in user's avatar via
+    /// `POST /api/upload/profile-picture` (`backend/routes/upload.js:236`).
+    /// Single file, field name `file`; the server resizes to 800×800 webp,
+    /// writes `User.profile_picture_url`, and echoes the new URL back.
+    /// Mirrors RN `api.upload.uploadProfilePicture`.
+    public func uploadProfilePicture(_ file: MultipartFile) async throws -> ProfilePictureUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/upload/profile-picture")
+        let body = Self.buildBody(boundary: boundary, file: file)
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(ProfilePictureUploadResponse.self, from: data)
+            } catch {
+                logger.error("Profile picture upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "That photo is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Profile picture must be an image.")
+        case 400..<500:
+            let message = String(data: data, encoding: .utf8)
+            throw APIError.clientError(status: http.statusCode, message: message)
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload images to `POST /api/upload/ai-media` for AI vision prompts.
     public func uploadAIMedia(files: [MultipartFile]) async throws -> AIMediaUploadResponse {
         guard !files.isEmpty else {

@@ -115,6 +115,7 @@ public struct EditProfileView: View {
             onClose: { dismiss() },
             onCommit: { Task { await viewModel.save() } },
             content: {
+                avatarSection
                 aboutSection
                 contactSection
                 addressSection

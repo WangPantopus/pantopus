@@ -7,12 +7,52 @@
 //  the stealth banner, optimistic radio / toggle / fuzz mutations, and
 //  the helper-line parity contract (mirrored on Android).
 //
+//  T1 adds the backend-backed surfaces: the search-privacy card wired to
+//  `GET/PATCH /api/privacy/settings`, and the delete-account gate in
+//  front of `DELETE /api/users/account`.
+//
 
 import XCTest
 @testable import Pantopus
 
 @MainActor
 final class PrivacyViewModelTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        SequencedURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        SequencedURLProtocol.reset()
+        super.tearDown()
+    }
+
+    /// `GET /api/privacy/settings` body the happy-path frames load from.
+    private func stubSettings(searchVisibility: String = "everyone", findableByName: Bool = false) {
+        SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
+            .status(200, body: settingsBody(searchVisibility, findableByName))
+        ]
+    }
+
+    private func settingsBody(_ visibility: String, _ findable: Bool) -> String {
+        """
+        {"settings":{"user_id":"u1","search_visibility":"\(visibility)",
+        "findable_by_name":\(findable ? "true" : "false")}}
+        """
+    }
+
+    private func makeViewModel(variant: PrivacySettingsViewModel.Variant = .populated) -> PrivacySettingsViewModel {
+        let client = APIClient(session: SequencedURLProtocol.makeSession(), retryPolicy: .none)
+        return PrivacySettingsViewModel(
+            variant: variant,
+            // A throwaway AuthManager over an in-memory keychain: the
+            // delete path signs out, and that must not touch the shared
+            // singleton other tests read.
+            auth: AuthManager(store: InMemorySecureStore(), apiClient: client),
+            api: client
+        )
+    }
+
     private func loadedGroups(_ vm: PrivacySettingsViewModel) async -> [GroupedListGroup] {
         await vm.load()
         guard case let .loaded(groups) = vm.state else {
@@ -26,6 +66,14 @@ final class PrivacyViewModelTests: XCTestCase {
         groups.first { $0.id == id }
     }
 
+    private func currentGroups(_ vm: PrivacySettingsViewModel) -> [GroupedListGroup] {
+        guard case let .loaded(groups) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return []
+        }
+        return groups
+    }
+
     private func selectedRadioId(_ group: GroupedListGroup?) -> String? {
         group?.rows.first { row in
             if case let .radio(isSelected) = row.control { return isSelected }
@@ -33,22 +81,31 @@ final class PrivacyViewModelTests: XCTestCase {
         }?.id
     }
 
+    private func toggleValue(_ group: GroupedListGroup?, _ rowId: String) -> Bool? {
+        guard case let .toggle(isOn) = group?.row(id: rowId)?.control else { return nil }
+        return isOn
+    }
+
     // MARK: - Defaults frame
 
-    func testPopulatedProducesSevenGroupsInDesignOrder() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
+    func testPopulatedProducesEightGroupsInDesignOrder() async {
+        stubSettings()
+        let vm = makeViewModel()
         let groups = await loadedGroups(vm)
         XCTAssertEqual(
             groups.map(\.id),
-            ["biometricSecurity", "visibility", "address", "fuzz", "activity", "data", "delete"]
+            [
+                "biometricSecurity", "searchPrivacy", "visibility",
+                "address", "fuzz", "activity", "data", "delete"
+            ]
         )
         XCTAssertNil(vm.banner)
         XCTAssertFalse(vm.contentDimmed)
     }
 
     func testVisibilityAndAddressAreFourOptionRadioCards() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
+        stubSettings()
+        let groups = await loadedGroups(makeViewModel())
         let visibility = group(groups, "visibility")
         let address = group(groups, "address")
         XCTAssertEqual(visibility?.rows.count, 4)
@@ -61,8 +118,8 @@ final class PrivacyViewModelTests: XCTestCase {
     }
 
     func testFuzzGroupDefaultsToHalfMile() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
+        stubSettings()
+        let groups = await loadedGroups(makeViewModel())
         let fuzz = group(groups, "fuzz")
         XCTAssertEqual(fuzz?.fuzz?.stop, .halfMile)
         XCTAssertEqual(fuzz?.fuzz?.leadIn, "How exact your task and listing pins appear on the map.")
@@ -70,8 +127,8 @@ final class PrivacyViewModelTests: XCTestCase {
     }
 
     func testActivityHasFourTogglesAllOn() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
+        stubSettings()
+        let groups = await loadedGroups(makeViewModel())
         let activity = group(groups, "activity")
         XCTAssertEqual(activity?.rows.map(\.id), ["online", "recent", "nearby", "ratings"])
         for row in activity?.rows ?? [] {
@@ -81,8 +138,8 @@ final class PrivacyViewModelTests: XCTestCase {
     }
 
     func testDataRowsCarryLeadingIconsAndDeleteIsDestructive() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
-        let groups = await loadedGroups(vm)
+        stubSettings()
+        let groups = await loadedGroups(makeViewModel())
         let data = group(groups, "data")
         XCTAssertEqual(data?.row(id: "downloadData")?.leadingIcon, .download)
         XCTAssertEqual(data?.row(id: "whatWeCollect")?.leadingIcon, .fileText)
@@ -91,40 +148,191 @@ final class PrivacyViewModelTests: XCTestCase {
         XCTAssertTrue(delete?.destructive ?? false)
     }
 
-    // MARK: - Mutations (stubbed, local only)
+    // MARK: - Mutations (local-only design cards)
 
     func testSelectRadioUpdatesSelection() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
+        stubSettings()
+        let vm = makeViewModel()
         _ = await loadedGroups(vm)
         await vm.selectRadio("visibility.connections")
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        XCTAssertEqual(selectedRadioId(group(groups, "visibility")), "visibility.connections")
+        XCTAssertEqual(selectedRadioId(group(currentGroups(vm), "visibility")), "visibility.connections")
     }
 
     func testToggleActivityFlipsLocalState() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
+        stubSettings()
+        let vm = makeViewModel()
         _ = await loadedGroups(vm)
         await vm.toggleRow("online", isOn: false)
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        if case let .toggle(isOn) = group(groups, "activity")?.row(id: "online")?.control {
-            XCTAssertFalse(isOn)
-        } else {
-            XCTFail("Expected toggle on online row")
-        }
+        XCTAssertEqual(toggleValue(group(currentGroups(vm), "activity"), "online"), false)
     }
 
     func testSetFuzzUpdatesStop() async {
-        let vm = PrivacySettingsViewModel(variant: .populated)
+        stubSettings()
+        let vm = makeViewModel()
         _ = await loadedGroups(vm)
         await vm.setFuzz(PrivacySettingsViewModel.Group.fuzz, stop: .exact)
-        guard case let .loaded(groups) = vm.state else { return XCTFail("Expected .loaded") }
-        XCTAssertEqual(group(groups, "fuzz")?.fuzz?.stop, .exact)
+        XCTAssertEqual(group(currentGroups(vm), "fuzz")?.fuzz?.stop, .exact)
+    }
+
+    // MARK: - Search privacy (GET / PATCH /api/privacy/settings)
+
+    func testSearchPrivacyCardReflectsLoadedSettings() async {
+        stubSettings(searchVisibility: "mutuals", findableByName: true)
+        let groups = await loadedGroups(makeViewModel())
+        let card = group(groups, "searchPrivacy")
+        XCTAssertEqual(
+            card?.rows.map(\.id),
+            [
+                "searchVisibility.everyone", "searchVisibility.mutuals",
+                "searchVisibility.nobody", "findableByName"
+            ]
+        )
+        XCTAssertEqual(selectedRadioId(card), "searchVisibility.mutuals")
+        XCTAssertEqual(toggleValue(card, "findableByName"), true)
+        XCTAssertEqual(card?.helper, "Only connected people can find your profile in search.")
+        XCTAssertEqual(
+            card?.row(id: "searchVisibility.everyone")?.accessibilityIdentifier,
+            "search-visibility-everyone"
+        )
+        XCTAssertEqual(
+            card?.row(id: "findableByName")?.accessibilityIdentifier,
+            "findable-by-name-switch"
+        )
+    }
+
+    func testSelectingSearchVisibilityPatchesAndAdoptsServerValue() async {
+        SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
+            .status(200, body: settingsBody("everyone", false)),
+            .status(200, body: "{\"message\":\"Privacy settings updated\","
+                + "\"settings\":{\"search_visibility\":\"nobody\",\"findable_by_name\":false}}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        await vm.selectRadio("searchVisibility.nobody")
+        XCTAssertEqual(selectedRadioId(group(currentGroups(vm), "searchPrivacy")), "searchVisibility.nobody")
+        XCTAssertEqual(vm.toast?.text, "Search privacy updated.")
+    }
+
+    func testFailedSearchVisibilityPatchRollsBack() async {
+        SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
+            .status(200, body: settingsBody("everyone", false)),
+            .status(500, body: "{\"error\":\"Failed to update privacy settings\"}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        await vm.selectRadio("searchVisibility.nobody")
+        XCTAssertEqual(selectedRadioId(group(currentGroups(vm), "searchPrivacy")), "searchVisibility.everyone")
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    func testFailedFindableByNamePatchRollsBack() async {
+        SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
+            .status(200, body: settingsBody("everyone", false)),
+            .status(500, body: "{\"error\":\"Failed to update privacy settings\"}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        await vm.toggleRow("findableByName", isOn: true)
+        XCTAssertEqual(toggleValue(group(currentGroups(vm), "searchPrivacy"), "findableByName"), false)
+        XCTAssertEqual(vm.toast?.kind, .error)
+    }
+
+    func testSearchPrivacyLoadFailureKeepsScreenAndSwapsHelper() async {
+        SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
+            .status(500, body: "{\"error\":\"Failed to load privacy settings\"}")
+        ]
+        let vm = makeViewModel()
+        let groups = await loadedGroups(vm)
+        XCTAssertEqual(groups.count, 8, "a failed settings fetch must not blank the screen")
+        XCTAssertEqual(
+            group(groups, "searchPrivacy")?.helper,
+            "Search privacy could not load. Pull to refresh before changing this setting."
+        )
+    }
+
+    // MARK: - Delete account (DELETE /api/users/account)
+
+    func testTappingDeleteRowOpensTheConfirmSheet() async {
+        stubSettings()
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        XCTAssertFalse(vm.isDeleteSheetPresented)
+        await vm.tapRow("deleteAccount")
+        XCTAssertTrue(vm.isDeleteSheetPresented)
+    }
+
+    func testCancelledReauthLeavesTheAccountAlone() async {
+        stubSettings()
+        SequencedURLProtocol.routeResponses["/api/users/account"] = [
+            .status(200, body: "{\"message\":\"Account deleted successfully\"}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        vm.sensitiveActionGate = { _ in .cancelled }
+        await vm.tapRow("deleteAccount")
+        await vm.confirmDeleteAccount()
+        XCTAssertTrue(vm.isDeleteSheetPresented, "sheet stays up when the user dismisses the OS prompt")
+        XCTAssertNil(vm.deleteAccountError)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.allSatisfy { $0.url?.path != "/api/users/account" },
+            "no DELETE may be sent without a verified identity"
+        )
+    }
+
+    func testFailedReauthSurfacesTheMessageAndSendsNothing() async {
+        stubSettings()
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        vm.sensitiveActionGate = { _ in .failed(message: "Device passcode not set") }
+        await vm.tapRow("deleteAccount")
+        await vm.confirmDeleteAccount()
+        XCTAssertEqual(vm.deleteAccountError, "Device passcode not set")
+        XCTAssertTrue(vm.isDeleteSheetPresented)
+        XCTAssertTrue(
+            SequencedURLProtocol.capturedRequests.allSatisfy { $0.url?.path != "/api/users/account" }
+        )
+    }
+
+    func testVerifiedDeleteSendsDeleteAndClosesTheSheet() async {
+        stubSettings()
+        SequencedURLProtocol.routeResponses["/api/users/account"] = [
+            .status(200, body: "{\"message\":\"Account deleted successfully\"}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        vm.sensitiveActionGate = { _ in .verified }
+        await vm.tapRow("deleteAccount")
+        await vm.confirmDeleteAccount()
+        XCTAssertFalse(vm.isDeleteSheetPresented)
+        XCTAssertNil(vm.deleteAccountError)
+        XCTAssertFalse(vm.isDeletingAccount)
+        let deleteRequest = SequencedURLProtocol.capturedRequests.first { $0.url?.path == "/api/users/account" }
+        XCTAssertEqual(deleteRequest?.httpMethod, "DELETE")
+    }
+
+    func testBlockingConflictSurfacesTheServerMessage() async {
+        stubSettings()
+        SequencedURLProtocol.routeResponses["/api/users/account"] = [
+            .status(409, body: "{\"error\":\"Cannot delete account while you have gigs in progress. "
+                + "Please complete or cancel them first.\",\"activeGigCount\":2}")
+        ]
+        let vm = makeViewModel()
+        _ = await loadedGroups(vm)
+        vm.sensitiveActionGate = { _ in .verified }
+        await vm.tapRow("deleteAccount")
+        await vm.confirmDeleteAccount()
+        XCTAssertEqual(
+            vm.deleteAccountError,
+            "Cannot delete account while you have gigs in progress. Please complete or cancel them first."
+        )
+        XCTAssertTrue(vm.isDeleteSheetPresented, "the sheet stays up so the 409 stays readable")
     }
 
     // MARK: - Stealth frame
 
     func testStealthShowsBannerAndStrictestControls() async {
-        let vm = PrivacySettingsViewModel(variant: .stealth)
+        stubSettings()
+        let vm = makeViewModel(variant: .stealth)
         let groups = await loadedGroups(vm)
         XCTAssertEqual(vm.banner?.title, "Stealth mode is on")
         XCTAssertEqual(vm.banner?.subtitle, "Your profile is hidden from search. Existing connections still see you.")
@@ -142,11 +350,12 @@ final class PrivacyViewModelTests: XCTestCase {
     // MARK: - Copy parity contract
 
     func testFooterDefault() {
-        XCTAssertEqual(PrivacySettingsViewModel(variant: .populated).footerCaption, "Last updated · Mar 12, 2024")
+        XCTAssertEqual(makeViewModel().footerCaption, "Last updated · Mar 12, 2024")
     }
 
     func testHelperCopyMatchesDesign() async {
-        let populated = await loadedGroups(PrivacySettingsViewModel(variant: .populated))
+        stubSettings()
+        let populated = await loadedGroups(makeViewModel())
         XCTAssertEqual(
             group(populated, "visibility")?.helper,
             "Verified neighbors can find you and start a conversation."
@@ -161,7 +370,8 @@ final class PrivacyViewModelTests: XCTestCase {
         )
         XCTAssertNil(group(populated, "activity")?.helper, "Activity card has no helper in the design")
 
-        let stealth = await loadedGroups(PrivacySettingsViewModel(variant: .stealth))
+        stubSettings()
+        let stealth = await loadedGroups(makeViewModel(variant: .stealth))
         XCTAssertEqual(
             group(stealth, "visibility")?.helper,
             "Hidden — your profile won't show in search or recommendations."

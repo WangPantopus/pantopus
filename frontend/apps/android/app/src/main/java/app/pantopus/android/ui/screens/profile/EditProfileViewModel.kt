@@ -10,8 +10,11 @@ import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.data.upload.UploadFile
+import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.screens.shared.form.FormAggregate
 import app.pantopus.android.ui.screens.shared.form.FormFieldState
 import app.pantopus.android.ui.screens.shared.form.FormValidator
@@ -80,6 +83,24 @@ data class EditProfileToast(
 )
 
 /**
+ * Avatar leg state. Separate from [EditProfileUiState] because the form
+ * stays fully usable while a photo uploads, and an upload failure must not
+ * blank the form. Mirrors iOS `EditProfileAvatarState`.
+ */
+sealed interface EditProfileAvatarState {
+    data object Idle : EditProfileAvatarState
+
+    data object Uploading : EditProfileAvatarState
+
+    /**
+     * Read *and* upload failures land here so the block renders a real
+     * error line instead of a silent no-op — a denied/revoked photo grant
+     * shows up as an unreadable `Uri`.
+     */
+    data class Failed(val message: String) : EditProfileAvatarState
+}
+
+/**
  * Backs `EditProfileScreen`. Fetches `GET /api/users/profile`
  * (`backend/routes/users.js:1962`) and submits
  * `PATCH /api/users/profile` (`backend/routes/users.js:2052`). The
@@ -87,18 +108,26 @@ data class EditProfileToast(
  * (`backend/routes/users.js:324-351`) and is mirrored 1:1 by
  * [EditProfileField].
  *
- * Note: the design also calls for an avatar upload, an editable email
- * when unverified, and boolean visibility toggles
- * (`profile_visibility_public` + `show_in_neighbor_discovery`). None
- * exist in `updateProfileSchema` today, so those affordances are
- * intentionally omitted on both platforms until the backend adds the
- * keys.
+ * The avatar is NOT part of `updateProfileSchema` — it has its own
+ * multipart route, `POST /api/upload/profile-picture`
+ * (`backend/routes/upload.js:236`), which writes `profile_picture_url`
+ * server-side. [uploadAvatar] drives that leg and then refreshes the
+ * session user so the new photo appears app-wide (RN
+ * `src/app/profile/edit.tsx:75-106`).
+ *
+ * Note: the design also calls for an editable email when unverified and
+ * boolean visibility toggles (`profile_visibility_public` +
+ * `show_in_neighbor_discovery`). Neither exists in `updateProfileSchema`
+ * today, so those affordances stay omitted on both platforms until the
+ * backend adds the keys.
  */
 @HiltViewModel
 class EditProfileViewModel
     @Inject
     constructor(
         private val repo: ProfileRepository,
+        private val uploads: UploadRepository,
+        private val authRepository: AuthRepository,
         private val networkMonitor: NetworkMonitor,
     ) : ViewModel() {
         private val _state = MutableStateFlow<EditProfileUiState>(EditProfileUiState.Loading)
@@ -131,6 +160,72 @@ class EditProfileViewModel
 
         private val _emailVerified = MutableStateFlow(false)
         val emailVerified: StateFlow<Boolean> = _emailVerified.asStateFlow()
+
+        /** Current avatar, replaced in place after a successful upload. */
+        private val _avatarUrl = MutableStateFlow<String?>(null)
+        val avatarUrl: StateFlow<String?> = _avatarUrl.asStateFlow()
+
+        /** Fallback glyph rendered when there is no avatar yet. */
+        private val _avatarInitial = MutableStateFlow("?")
+        val avatarInitial: StateFlow<String> = _avatarInitial.asStateFlow()
+
+        private val _avatarState = MutableStateFlow<EditProfileAvatarState>(EditProfileAvatarState.Idle)
+        val avatarState: StateFlow<EditProfileAvatarState> = _avatarState.asStateFlow()
+
+        /**
+         * Push a picked image to `POST /api/upload/profile-picture`, then
+         * refresh the session user so every avatar in the app flips at once.
+         *
+         * `bytes == null` means the picker handed back a `Uri` we couldn't
+         * open — a revoked/denied media grant or a Drive-backed file that
+         * won't materialise. That is surfaced as a real error state, never a
+         * silent no-op.
+         */
+        fun uploadAvatar(
+            bytes: ByteArray?,
+            filename: String,
+            mimeType: String,
+        ) {
+            if (_avatarState.value is EditProfileAvatarState.Uploading) return
+            if (bytes == null || bytes.isEmpty()) {
+                _avatarState.value =
+                    EditProfileAvatarState.Failed(
+                        "Couldn't read that photo. Check photo access for Pantopus and try again.",
+                    )
+                _toast.value = EditProfileToast("Couldn't read that photo.", isError = true)
+                return
+            }
+            if (!networkMonitor.isOnline.value) {
+                val message = "You're offline. Try again when you're back online."
+                _avatarState.value = EditProfileAvatarState.Failed(message)
+                _toast.value = EditProfileToast(message, isError = true)
+                return
+            }
+            _avatarState.value = EditProfileAvatarState.Uploading
+            val payload = UploadFile(filename = filename, mimeType = mimeType, bytes = bytes)
+            viewModelScope.launch {
+                when (val result = uploads.uploadProfilePicture(payload)) {
+                    is NetworkResult.Success -> {
+                        _avatarUrl.value = result.data.user?.profilePictureUrl ?: result.data.url
+                        _avatarState.value = EditProfileAvatarState.Idle
+                        _toast.value = EditProfileToast("Profile photo updated.", isError = false)
+                        authRepository.refreshSessionUser()
+                    }
+                    is NetworkResult.Failure -> {
+                        val message = result.error.message.ifBlank { "Couldn't upload that photo." }
+                        _avatarState.value = EditProfileAvatarState.Failed(message)
+                        _toast.value = EditProfileToast(message, isError = true)
+                    }
+                }
+            }
+        }
+
+        /** Clear a failed upload so the block returns to its resting pose. */
+        fun dismissAvatarError() {
+            if (_avatarState.value is EditProfileAvatarState.Failed) {
+                _avatarState.value = EditProfileAvatarState.Idle
+            }
+        }
 
         val aggregate: FormAggregate
             get() = FormAggregate.from(EditProfileField.entries.mapNotNull { _fields.value[it] })
@@ -261,6 +356,13 @@ class EditProfileViewModel
         private fun hydrate(profile: UserProfile) {
             _email.value = profile.email
             _emailVerified.value = profile.verified
+            // A just-uploaded avatar wins over the PATCH echo: `PATCH
+            // /api/users/profile` never touches `profile_picture_url`, so a
+            // stale row would otherwise flip the block back to initials.
+            if (_avatarUrl.value == null) {
+                _avatarUrl.value = profile.profilePictureUrl ?: profile.avatarUrl
+            }
+            _avatarInitial.value = displayInitial(profile.firstName, profile.name, profile.username)
             seed(EditProfileField.FirstName, profile.firstName)
             seed(EditProfileField.MiddleName, profile.middleName.orEmpty())
             seed(EditProfileField.LastName, profile.lastName)
@@ -338,6 +440,22 @@ class EditProfileViewModel
         }
 
         companion object {
+            /**
+             * First glyph of the best available display name — matches the RN
+             * `displayInitial` fallback on the avatar circle and the iOS
+             * `EditProfileViewModel.initial(...)` helper.
+             */
+            fun displayInitial(
+                firstName: String,
+                name: String,
+                username: String,
+            ): String =
+                listOf(firstName, name, username)
+                    .firstNotNullOfOrNull { it.trim().firstOrNull() }
+                    ?.uppercaseChar()
+                    ?.toString()
+                    ?: "?"
+
             /** Fields whose Joi declaration allows `''` / `null`. */
             private val ALLOWS_EMPTY: Set<EditProfileField> =
                 setOf(

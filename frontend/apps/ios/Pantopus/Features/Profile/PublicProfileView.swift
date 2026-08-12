@@ -193,6 +193,8 @@ public struct PublicProfileView: View {
             },
             body: {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
+                    followRow
+
                     LocalProfileTabStrip(
                         postCount: payload.posts.isEmpty ? nil : payload.posts.count,
                         selected: viewModel.selectedLocalTab
@@ -291,6 +293,39 @@ public struct PublicProfileView: View {
         )
     }
 
+    /// T3 — plain Follow / Following for an ordinary neighbor.
+    ///
+    /// The A21.2 Local header is spec'd at exactly two buttons (Connect +
+    /// Message), so the follow control lives here, directly beneath the
+    /// identity block — the same slot RN puts its action row in
+    /// (`src/app/user/[id].tsx:522-569`). Hidden on your own profile and
+    /// when signed out, matching RN.
+    @ViewBuilder private var followRow: some View {
+        if viewModel.canFollow {
+            Group {
+                if viewModel.isFollowing {
+                    GhostButton(
+                        title: "Following",
+                        isLoading: viewModel.isFollowInFlight,
+                        isEnabled: !viewModel.isFollowInFlight
+                    ) {
+                        await viewModel.toggleFollow()
+                    }
+                } else {
+                    PrimaryButton(
+                        title: "Follow",
+                        isLoading: viewModel.isFollowInFlight,
+                        isEnabled: !viewModel.isFollowInFlight
+                    ) {
+                        await viewModel.toggleFollow()
+                    }
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("publicProfileFollowButton")
+        }
+    }
+
     /// Kind-aware action buttons rendered top-right inside the
     /// `BeaconIdentityBlock` (replacing the former sticky footer).
     @ViewBuilder
@@ -308,8 +343,20 @@ public struct PublicProfileView: View {
                 BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {
                     viewModel.showOverflow = true
                 }
-                BeaconHeaderPrimaryButton(title: "Follow", icon: .plus) {
-                    viewModel.follow()
+                if viewModel.isFollowing {
+                    BeaconHeaderGhostButton(
+                        title: "Following",
+                        icon: .check,
+                        accessibilityLabel: "Following. Tap to unfollow"
+                    ) {
+                        viewModel.follow()
+                    }
+                    .accessibilityIdentifier("publicProfileFollowButton")
+                } else {
+                    BeaconHeaderPrimaryButton(title: "Follow", icon: .plus) {
+                        viewModel.follow()
+                    }
+                    .accessibilityIdentifier("publicProfileFollowButton")
                 }
             }
         case .local:

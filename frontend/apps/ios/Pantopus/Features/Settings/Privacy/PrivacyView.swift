@@ -26,6 +26,17 @@ public struct PrivacyView: View {
     public var body: some View {
         GroupedListView(dataSource: viewModel, onBack: onBack)
             .accessibilityIdentifier("privacySettings")
+            .sheet(isPresented: $viewModel.isDeleteSheetPresented) {
+                AccountDeleteSheet(
+                    isDeleting: viewModel.isDeletingAccount,
+                    errorMessage: viewModel.deleteAccountError,
+                    onCancel: { viewModel.dismissDeleteSheet() },
+                    onConfirm: { await viewModel.confirmDeleteAccount() }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(viewModel.isDeletingAccount)
+            }
             .overlay(alignment: .bottom) {
                 if let toast = viewModel.toast {
                     ToastView(message: toast)

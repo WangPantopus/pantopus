@@ -25,11 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +72,8 @@ fun ProfessionalProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val showsDisableConfirm by viewModel.showsDisableConfirm.collectAsStateWithLifecycle()
+    val isDisabling by viewModel.isDisabling.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -89,12 +93,28 @@ fun ProfessionalProfileScreen(
     ) {
         when (val current = state) {
             ProfessionalProfileUiState.Loading -> ProfessionalProfileSkeleton()
+            is ProfessionalProfileUiState.Create ->
+                ProfessionalEnableForm(
+                    draft = current.draft,
+                    onBack = onBack,
+                    onEnable = viewModel::enable,
+                    onHeadlineChange = viewModel::updateDraftHeadline,
+                    onBioChange = viewModel::updateDraftBio,
+                    onToggleCategory = viewModel::toggleDraftCategory,
+                    onCityChange = viewModel::updateDraftCity,
+                    onStateChange = viewModel::updateDraftState,
+                    onRadiusChange = viewModel::updateDraftRadius,
+                    onHourlyRateChange = viewModel::updateDraftHourlyRate,
+                    onPublicChange = viewModel::setDraftPublic,
+                )
             is ProfessionalProfileUiState.Verified ->
                 ProfessionalProfileLoaded(
                     content = current.content,
                     mode = ProStickyMode.Saved,
                     dirtyCount = 0,
                     pendingCount = current.content.pendingCount,
+                    isDisabling = isDisabling,
+                    onDisable = viewModel::requestDisable,
                     onBack = onBack,
                     onDiscard = viewModel::discard,
                     onSaveSubmit = viewModel::saveAndSubmit,
@@ -113,6 +133,8 @@ fun ProfessionalProfileScreen(
                     mode = ProStickyMode.PendingSave,
                     dirtyCount = current.dirtyCount,
                     pendingCount = current.pendingCount,
+                    isDisabling = isDisabling,
+                    onDisable = viewModel::requestDisable,
                     onBack = onBack,
                     onDiscard = viewModel::discard,
                     onSaveSubmit = viewModel::saveAndSubmit,
@@ -147,6 +169,23 @@ fun ProfessionalProfileScreen(
             )
         }
     }
+
+    if (showsDisableConfirm) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDisableConfirm,
+            title = { Text("Disable professional mode?") },
+            text = { Text("Your profile will no longer be visible to the public.") },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::disableConfirmed,
+                    modifier = Modifier.testTag("proDisableConfirmButton"),
+                ) { Text("Disable") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDisableConfirm) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 internal enum class ProStickyMode { Saved, PendingSave }
@@ -157,6 +196,8 @@ internal fun ProfessionalProfileLoaded(
     mode: ProStickyMode,
     dirtyCount: Int,
     pendingCount: Int,
+    isDisabling: Boolean,
+    onDisable: () -> Unit,
     onBack: () -> Unit,
     onDiscard: () -> Unit,
     onSaveSubmit: () -> Unit,
@@ -205,6 +246,67 @@ internal fun ProfessionalProfileLoaded(
         )
         PortfolioSection(content = content, onAddPortfolioLink = onAddPortfolioLink)
         VisibilitySection(content = content, onVisibilityChange = onVisibilityChange)
+        DisableSection(isDisabling = isDisabling, onDisable = onDisable)
+    }
+}
+
+/**
+ * RN's destructive "Disable" action (`professional.tsx:410`). Soft disable —
+ * `DELETE api/professional/profile/me` keeps the record, so the screen falls
+ * back to the re-enable form.
+ */
+@Composable
+private fun DisableSection(
+    isDisabling: Boolean,
+    onDisable: () -> Unit,
+) {
+    ProSection("Professional mode") {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.error.copy(alpha = 0.4f), RoundedCornerShape(Radii.lg))
+                    .clickable(enabled = !isDisabling, onClick = onDisable)
+                    .padding(Spacing.s3)
+                    .testTag("proDisableButton")
+                    .semantics {
+                        contentDescription = "Disable professional mode. Your profile will no longer be visible to the public"
+                        role = Role.Button
+                    },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Disable professional mode",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.error,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Your profile will no longer be visible to the public.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            if (isDisabling) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    color = PantopusColors.error,
+                    modifier = Modifier.size(18.dp),
+                )
+            } else {
+                PantopusIconImage(
+                    icon = PantopusIcon.CircleSlash,
+                    contentDescription = null,
+                    size = 18.dp,
+                    tint = PantopusColors.error,
+                )
+            }
+        }
     }
 }
 
@@ -398,7 +500,7 @@ private fun VisibilitySection(
 }
 
 @Composable
-private fun ProSection(
+internal fun ProSection(
     overline: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -421,7 +523,7 @@ private fun ProSection(
 }
 
 @Composable
-private fun ProFieldLabel(
+internal fun ProFieldLabel(
     text: String,
     required: Boolean = false,
     optional: Boolean = false,
@@ -445,7 +547,7 @@ private fun ProFieldLabel(
 }
 
 @Composable
-private fun ProTextInput(
+internal fun ProTextInput(
     label: String,
     value: String,
     placeholder: String,
@@ -858,7 +960,7 @@ private fun AddLinkRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun VisRow(
+internal fun VisRow(
     row: VisibilityRow,
     onToggle: (Boolean) -> Unit,
 ) {

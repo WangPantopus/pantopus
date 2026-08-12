@@ -4,6 +4,7 @@ import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
 import app.pantopus.android.data.api.models.posts.PostMediaUploadResponse
+import app.pantopus.android.data.api.models.users.ProfilePictureUploadResponse
 import okhttp3.MultipartBody
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -38,6 +39,18 @@ interface UploadApi {
     suspend fun uploadAIMedia(
         @Part files: @JvmSuppressWildcards List<MultipartBody.Part>,
     ): AIMediaUploadResponse
+
+    /**
+     * Replace the signed-in user's avatar. Single part named `file`; the
+     * server resizes to 800x800 webp, writes `User.profile_picture_url`,
+     * and echoes the new URL back.
+     * Route `backend/routes/upload.js:236`.
+     */
+    @Multipart
+    @POST("api/upload/profile-picture")
+    suspend fun uploadProfilePicture(
+        @Part file: MultipartBody.Part,
+    ): ProfilePictureUploadResponse
 
     /**
      * Attach photos to an existing listing (Snap & Sell post-create

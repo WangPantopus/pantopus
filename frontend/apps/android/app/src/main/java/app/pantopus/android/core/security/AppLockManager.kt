@@ -223,6 +223,62 @@ class AppLockManager
             }
         }
 
+        /**
+         * Outcome of a one-shot re-auth gate in front of an irreversible
+         * action (account deletion today). Mirrors the iOS
+         * `SensitiveActionOutcome` and RN's `useSensitiveActionGuard`.
+         */
+        sealed interface SensitiveActionOutcome {
+            /**
+             * Identity confirmed — or the device carries no credential to
+             * check against, which RN also treats as a pass-through.
+             */
+            data object Verified : SensitiveActionOutcome
+
+            /** The user dismissed the system sheet. Callers stay put silently. */
+            data object Cancelled : SensitiveActionOutcome
+
+            /** Verification could not be completed; callers surface [message]. */
+            data class Failed(
+                val message: String,
+            ) : SensitiveActionOutcome
+        }
+
+        /**
+         * One-shot device-credential check in front of an irreversible action.
+         *
+         * Independent of the app-lock *preference*: deleting an account is
+         * gated whether or not the user opted into lock-on-resume, exactly
+         * like RN's `useSensitiveActionGuard` (which reads the capability,
+         * not the preference). When the device has neither a biometric nor a
+         * device credential there is nothing to check against, so the action
+         * is let through rather than being made unreachable — RN's first
+         * branch.
+         */
+        suspend fun verifySensitiveAction(
+            activity: FragmentActivity,
+            reason: String,
+        ): SensitiveActionOutcome {
+            refreshCapability()
+            when (_capability.value) {
+                Capability.NotAvailable,
+                Capability.NotEnrolled,
+                Capability.PasscodeNotSet,
+                -> return SensitiveActionOutcome.Verified
+                Capability.InvalidContext ->
+                    return SensitiveActionOutcome.Failed(_capability.value.statusText)
+                Capability.Available -> Unit
+            }
+            _lastError.value = null
+            if (authenticate(activity, reason)) return SensitiveActionOutcome.Verified
+            val message = _lastError.value ?: DEFAULT_VERIFY_FAILURE
+            return if (message == CANCELLED_MESSAGE) {
+                SensitiveActionOutcome.Cancelled
+            } else {
+                SensitiveActionOutcome.Failed(message)
+            }
+        }
+
         fun clearTransientState() {
             _isLocked.value = false
             isPrompting = false
@@ -426,7 +482,7 @@ class AppLockManager
                 BiometricPrompt.ERROR_USER_CANCELED,
                 BiometricPrompt.ERROR_CANCELED,
                 BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-                -> "Authentication was cancelled."
+                -> CANCELLED_MESSAGE
                 BiometricPrompt.ERROR_LOCKOUT,
                 BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
                 -> "Biometrics are locked. Use your device passcode."
@@ -441,5 +497,14 @@ class AppLockManager
 
         companion object {
             private const val PREFS_FILE = "app_lock_prefs"
+
+            /**
+             * The single string [messageFor] produces for every user- /
+             * system-initiated cancel, matched by [verifySensitiveAction].
+             * Mirrors iOS `AppLockManager.cancelledMessage`.
+             */
+            const val CANCELLED_MESSAGE = "Authentication was cancelled."
+
+            private const val DEFAULT_VERIFY_FAILURE = "We couldn't verify your identity. Please try again."
         }
     }
