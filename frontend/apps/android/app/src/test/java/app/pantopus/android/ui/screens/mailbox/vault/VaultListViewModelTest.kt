@@ -6,15 +6,19 @@ import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderItemsResponse
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFoldersResponse
 import app.pantopus.android.data.api.models.mailbox.vault.VaultMailItemDto
+import app.pantopus.android.data.api.models.mailbox.vault.VaultSearchResponse
+import app.pantopus.android.data.api.models.mailbox.vault.VaultSearchResultDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -217,6 +221,10 @@ class VaultListViewModelTest {
                         total = 2,
                     ),
                 )
+            // The debounced server search fires once virtual time advances past
+            // the 300 ms debounce; stub it so the trailing call is answered.
+            coEvery { repo.search(any(), any(), any(), any()) } returns
+                NetworkResult.Success(VaultSearchResponse(results = emptyList(), total = 0, query = "Costco"))
             val vm = makeVm()
             vm.load()
             assertTrue(vm.state.value is ListOfRowsUiState.Loaded)
@@ -225,5 +233,94 @@ class VaultListViewModelTest {
             assertTrue("expected loaded after filter, was $state", state is ListOfRowsUiState.Loaded)
             val rows = (state as ListOfRowsUiState.Loaded).sections.first().rows
             assertEquals(listOf("m1"), rows.map { it.id })
+        }
+
+    // ─── Server-side search (RN `vault.tsx:65` performSearch) ──
+
+    @Test
+    fun `query past the threshold searches every drawer server-side`() =
+        runTest {
+            coEvery { repo.folders(any()) } returns
+                NetworkResult.Success(VaultFoldersResponse(folders = emptyList()))
+            coEvery { repo.search("Costco", null, any(), any()) } returns
+                NetworkResult.Success(
+                    VaultSearchResponse(
+                        results =
+                            listOf(
+                                VaultSearchResultDto(
+                                    id = "s1",
+                                    drawer = "business",
+                                    mailType = "receipt",
+                                    type = null,
+                                    subject = "Costco statement",
+                                    previewText = "Your July statement",
+                                    senderDisplay = "Costco Wholesale",
+                                    senderBusinessName = null,
+                                    createdAt = "2026-05-15T12:00:00Z",
+                                    vaultFolderId = null,
+                                    matchField = "sender",
+                                    matchExcerpt = "Costco Wholesale",
+                                ),
+                            ),
+                        total = 1,
+                        query = "Costco",
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+            vm.onQueryChange("Costco")
+            advanceUntilIdle()
+            val state = vm.state.value
+            assertTrue("expected loaded search results, was $state", state is ListOfRowsUiState.Loaded)
+            val section = (state as ListOfRowsUiState.Loaded).sections.first()
+            assertEquals("1 result · All drawers", section.header)
+            assertEquals(listOf("s1"), section.rows.map { it.id })
+            coVerify { repo.search("Costco", null, any(), any()) }
+        }
+
+    @Test
+    fun `empty server search renders the no-matches empty state`() =
+        runTest {
+            coEvery { repo.folders(any()) } returns
+                NetworkResult.Success(VaultFoldersResponse(folders = emptyList()))
+            coEvery { repo.search(any(), any(), any(), any()) } returns
+                NetworkResult.Success(VaultSearchResponse(results = emptyList(), total = 0, query = "zzz"))
+            val vm = makeVm()
+            vm.load()
+            vm.onQueryChange("zzz")
+            advanceUntilIdle()
+            val state = vm.state.value
+            assertTrue("expected empty, was $state", state is ListOfRowsUiState.Empty)
+            assertEquals("No matches found", (state as ListOfRowsUiState.Empty).headline)
+        }
+
+    @Test
+    fun `search failure renders the error state`() =
+        runTest {
+            coEvery { repo.folders(any()) } returns
+                NetworkResult.Success(VaultFoldersResponse(folders = emptyList()))
+            coEvery { repo.search(any(), any(), any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val vm = makeVm()
+            vm.load()
+            vm.onQueryChange("Costco")
+            advanceUntilIdle()
+            assertTrue(vm.state.value is ListOfRowsUiState.Error)
+        }
+
+    // ─── Drawer tabs ───────────────────────────────────────
+
+    @Test
+    fun `selecting a drawer tab refetches that drawer`() =
+        runTest {
+            coEvery { repo.folders(any()) } returns
+                NetworkResult.Success(VaultFoldersResponse(folders = emptyList()))
+            val vm = makeVm()
+            vm.load()
+            assertEquals("personal", vm.selectedDrawer.value)
+            vm.onSelectDrawer("business")
+            advanceUntilIdle()
+            assertEquals("business", vm.selectedDrawer.value)
+            coVerify { repo.folders("business") }
         }
 }

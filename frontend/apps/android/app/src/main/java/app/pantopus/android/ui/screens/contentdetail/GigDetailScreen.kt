@@ -79,6 +79,8 @@ fun GigDetailScreen(
     var showRescheduleSheet by remember { mutableStateOf(false) }
     // Poster's pre-start "Replace worker" confirm (`POST /reopen-bidding`).
     var showReplaceWorkerConfirm by remember { mutableStateOf(false) }
+    // Poster's "Close Gig" confirm on a still-open task (`DELETE /api/gigs/:id`).
+    var showCloseTaskConfirm by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deliverySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -195,6 +197,17 @@ fun GigDetailScreen(
                     ),
                 )
             }
+            // RN branches on status: an open gig is *closed* (deleted, no
+            // fee), anything live is *cancelled* (`gig/[id].tsx:412`).
+            if (viewModel.canCloseTask()) {
+                add(
+                    ContentDetailOverflowItem(
+                        label = "Close task",
+                        testTag = "gigDetail.close",
+                        onClick = { showCloseTaskConfirm = true },
+                    ),
+                )
+            }
             if (viewModel.canCancelTask()) {
                 add(
                     ContentDetailOverflowItem(
@@ -301,6 +314,35 @@ fun GigDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showReplaceWorkerConfirm = false }) { Text("Keep worker") }
+            },
+        )
+    }
+
+    // Poster closes a still-open task. RN copy verbatim
+    // (`gig/[id].tsx:414`); the row is deleted, so we pop back on success.
+    if (showCloseTaskConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCloseTaskConfirm = false },
+            title = { Text("Close Gig") },
+            text = {
+                Text(
+                    "Are you sure you want to close this gig? " +
+                        "It will be removed and this cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCloseTaskConfirm = false
+                        viewModel.closeGig { closed -> if (closed) onBack() }
+                    },
+                    modifier = Modifier.testTag("gigDetail.closeConfirm"),
+                ) {
+                    Text("Close Gig", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseTaskConfirm = false }) { Text("Keep Open") }
             },
         )
     }

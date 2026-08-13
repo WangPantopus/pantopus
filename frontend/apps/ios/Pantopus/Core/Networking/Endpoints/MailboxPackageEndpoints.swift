@@ -47,4 +47,50 @@ public enum MailboxPackageEndpoints {
             body: request
         )
     }
+
+    /// `POST /api/mailbox/v2/package/:mailId/share-eta` — route
+    /// `backend/routes/mailboxV2.js:727`. Drops a "package arriving soon"
+    /// notice into every other household member's Home drawer and returns
+    /// how many people were notified. Mirrors RN's
+    /// `handleShareEta` (`src/app/mailbox/package.tsx:40-48`).
+    public static func shareEta(mailId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/mailbox/v2/package/\(mailId)/share-eta")
+    }
+
+    /// `POST /api/mailbox/v2/event` — route
+    /// `backend/routes/mailboxV2.js:1007`. Client-side telemetry write;
+    /// the package screen uses it for `package_issue_reported`, matching
+    /// RN's `handleReportIssue` (`src/app/mailbox/package.tsx:60-64`).
+    /// The validator (`mailboxV2.js:34`) wants a `eventType` string and an
+    /// optional UUID `mailId`.
+    public static func logEvent(eventType: String, mailId: String?) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/mailbox/v2/event",
+            body: MailboxLogEventRequest(eventType: eventType, mailId: mailId)
+        )
+    }
+}
+
+/// Body for `POST /api/mailbox/v2/event`.
+public struct MailboxLogEventRequest: Encodable, Sendable {
+    public let eventType: String
+    public let mailId: String?
+
+    public init(eventType: String, mailId: String? = nil) {
+        self.eventType = eventType
+        self.mailId = mailId
+    }
+}
+
+/// `POST /api/mailbox/v2/package/:mailId/share-eta` —
+/// `{ message, notified }`.
+public struct SharePackageEtaResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let notified: Int?
+}
+
+/// `POST /api/mailbox/v2/event` — `{ logged }`.
+public struct MailboxLogEventResponse: Decodable, Sendable, Hashable {
+    public let logged: Bool?
 }

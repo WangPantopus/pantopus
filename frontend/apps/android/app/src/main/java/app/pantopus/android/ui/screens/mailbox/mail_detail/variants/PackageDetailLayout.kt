@@ -91,6 +91,12 @@ fun PackageDetailLayout(
     // this package; the flag mirrors RN's `?mode=pre|post`
     // (`src/app/mailbox/package.tsx:196-204`).
     onAskNeighbor: ((Boolean) -> Unit)? = null,
+    // A17.8 → "Share ETA with household" — RN's primary package-dashboard
+    // CTA (`src/app/mailbox/package.tsx:189-194`).
+    onShareEta: () -> Unit = {},
+    // A17.8 → "Report issue" — RN's tertiary CTA
+    // (`src/app/mailbox/package.tsx:212-214`).
+    onReportIssue: () -> Unit = {},
 ) {
     val isReceived =
         content.isAcknowledged || (packageDetail.deliveryPhoto?.isReceived == true)
@@ -104,6 +110,8 @@ fun PackageDetailLayout(
                     onSaveToVault = onSaveToVault,
                     onOpenUnboxing = onOpenUnboxing,
                     onAskNeighbor = onAskNeighbor,
+                    onShareEta = onShareEta,
+                    onReportIssue = onReportIssue,
                 ),
             aiElf = makeAIElf(packageDetail = packageDetail),
             attachments = makeAttachments(content = content),
@@ -140,6 +148,8 @@ private fun makeTopBar(
     onSaveToVault: () -> Unit,
     onOpenUnboxing: (() -> Unit)? = null,
     onAskNeighbor: ((Boolean) -> Unit)? = null,
+    onShareEta: () -> Unit = {},
+    onReportIssue: () -> Unit = {},
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = packageDetail.carrier,
@@ -175,11 +185,27 @@ private fun makeTopBar(
                         ) { onAskNeighbor(isPreDelivery) },
                     )
                 }
+                // RN's primary package-dashboard CTA — notifies every
+                // other resident that the package is on its way
+                // (`package.tsx:189-194`).
+                add(
+                    MailOverflowItem(
+                        "shareEta",
+                        PantopusIcon.Send,
+                        "Share ETA with household",
+                    ) { onShareEta() },
+                )
                 add(MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {})
                 add(MailOverflowItem("handoff", PantopusIcon.UserPlus, "Hand-off") {})
                 add(MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() })
                 add(MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {})
-                add(MailOverflowItem("report", PantopusIcon.AlertTriangle, "Report issue") {})
+                add(
+                    MailOverflowItem(
+                        "report",
+                        PantopusIcon.AlertTriangle,
+                        "Report issue",
+                    ) { onReportIssue() },
+                )
             },
     )
 

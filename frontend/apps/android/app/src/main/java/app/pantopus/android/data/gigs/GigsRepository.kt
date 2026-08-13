@@ -78,6 +78,12 @@ class GigsRepository
             maxPrice: Double? = null,
             scheduleType: String? = null,
             payType: String? = null,
+            // RN feed chips: distance (+ includeRemote=false), deadline
+            // window, and task archetype (`app/(tabs)/gigs.tsx:87`).
+            includeRemote: Boolean? = null,
+            deadline: String? = null,
+            maxDistanceMeters: Int? = null,
+            taskArchetype: String? = null,
         ): NetworkResult<GigsListResponse> =
             safeApiCall {
                 api.list(
@@ -86,10 +92,14 @@ class GigsRepository
                     latitude = latitude,
                     longitude = longitude,
                     radiusMiles = radiusMiles,
+                    includeRemote = includeRemote,
                     minPrice = minPrice,
                     maxPrice = maxPrice,
                     scheduleType = scheduleType,
                     payType = payType,
+                    deadline = deadline,
+                    maxDistanceMeters = maxDistanceMeters,
+                    taskArchetype = taskArchetype,
                     search = search,
                     limit = limit,
                     offset = offset,

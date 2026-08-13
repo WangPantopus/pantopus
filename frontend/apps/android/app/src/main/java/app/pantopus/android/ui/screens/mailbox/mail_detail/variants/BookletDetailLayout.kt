@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -54,6 +55,9 @@ import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import kotlin.math.ceil
 
+/** Dimmed opacity for a secondary tile whose action is in flight. */
+private const val DISABLED_TILE_ALPHA = 0.6f
+
 /**
  * T6.5c (P21) — Booklet (A17.2) variant layout. Mirrors iOS
  * `BookletDetailLayout`. Replaces the generic A17.1 body slot with
@@ -69,10 +73,23 @@ fun BookletDetailLayout(
     // T6.5e (P19.5) — Defaults to a no-op so existing call sites
     // compile unchanged.
     onSaveToVault: () -> Unit = {},
+    // A17.2 — fetches the rendered booklet PDF
+    // (`POST …/p2/booklet/:mailId/download`). RN reports the file size in
+    // the confirmation (`src/app/mailbox/booklet.tsx:43`).
+    onDownloadPdf: () -> Unit = {},
+    // `true` while the PDF fetch is in flight — the tile disables so a
+    // double-tap can't fire two downloads.
+    downloadInFlight: Boolean = false,
 ) {
     Box(modifier = Modifier.testTag("mailDetail_booklet")) {
         MailItemDetailShell(
-            topBar = makeTopBar(content = content, onBack = onBack, onSaveToVault = onSaveToVault),
+            topBar =
+                makeTopBar(
+                    content = content,
+                    onBack = onBack,
+                    onSaveToVault = onSaveToVault,
+                    onDownloadPdf = onDownloadPdf,
+                ),
             aiElf = makeAIElf(content = content, booklet = booklet),
             attachments = makeAttachments(content = content),
             hero = { HeroCard(content = content) },
@@ -85,7 +102,13 @@ fun BookletDetailLayout(
                 )
             },
             sender = { SenderCard(content = content, onOpenProfile = onOpenSenderProfile) },
-            actions = { ActionsRow() },
+            actions = {
+                ActionsRow(
+                    onSaveToVault = onSaveToVault,
+                    onDownloadPdf = onDownloadPdf,
+                    downloadInFlight = downloadInFlight,
+                )
+            },
         )
     }
 }
@@ -94,6 +117,7 @@ private fun makeTopBar(
     content: MailDetailContent,
     onBack: () -> Unit,
     onSaveToVault: () -> Unit,
+    onDownloadPdf: () -> Unit,
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = content.category.label,
@@ -104,7 +128,7 @@ private fun makeTopBar(
             listOf(
                 MailOverflowItem("share", PantopusIcon.Share, "Share") {},
                 MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
-                MailOverflowItem("download", PantopusIcon.Download, "Save PDF") {},
+                MailOverflowItem("download", PantopusIcon.Download, "Save PDF") { onDownloadPdf() },
                 MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
                 MailOverflowItem(
                     id = "delete",
@@ -389,7 +413,11 @@ private fun SenderCard(
 }
 
 @Composable
-private fun ActionsRow() {
+private fun ActionsRow(
+    onSaveToVault: () -> Unit,
+    onDownloadPdf: () -> Unit,
+    downloadInFlight: Boolean,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Row(
             modifier =
@@ -397,7 +425,7 @@ private fun ActionsRow() {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(PantopusColors.primary600)
-                    .clickable {}
+                    .clickable { onSaveToVault() }
                     .padding(vertical = 14.dp)
                     .testTag("mailDetail_booklet_saveToVault")
                     .semantics { contentDescription = "Save to Vault" },
@@ -423,7 +451,9 @@ private fun ActionsRow() {
             SecondaryTile(
                 icon = PantopusIcon.Download,
                 label = "PDF",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("mailDetail_booklet_downloadPdf"),
+                enabled = !downloadInFlight,
+                onClick = onDownloadPdf,
             )
             SecondaryTile(
                 icon = PantopusIcon.Archive,
@@ -439,6 +469,8 @@ private fun SecondaryTile(
     icon: PantopusIcon,
     label: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -446,7 +478,8 @@ private fun SecondaryTile(
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
-                .clickable {}
+                .clickable(enabled = enabled) { onClick() }
+                .alpha(if (enabled) 1f else DISABLED_TILE_ALPHA)
                 .padding(vertical = 10.dp)
                 .semantics { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,

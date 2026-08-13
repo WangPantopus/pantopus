@@ -6,6 +6,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.PackageSaveWarrantyReques
 import app.pantopus.android.data.api.models.mailbox.v2.PackageSaveWarrantyResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageUnboxingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.PackageUnboxingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.SharePackageEtaResponse
 import app.pantopus.android.data.api.models.mailbox.v2.UnboxingPackageResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
@@ -45,4 +46,8 @@ open class MailboxPackageRepository
             mailId: String,
             request: PackageGigRequest,
         ): NetworkResult<PackageGigResponse> = safeApiCall { api.createPackageGig(mailId, request) }
+
+        /** `POST api/mailbox/v2/package/:mailId/share-eta`. */
+        open suspend fun shareEta(mailId: String): NetworkResult<SharePackageEtaResponse> =
+            safeApiCall { api.shareEta(mailId) }
     }

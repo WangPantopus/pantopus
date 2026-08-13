@@ -37,6 +37,7 @@ public struct PulseComposeView: View {
         postId: String? = nil,
         businessAuthorId: String? = nil,
         managesDismiss: Bool = true,
+        taskShare: PulseTaskShare? = nil,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
@@ -46,7 +47,8 @@ public struct PulseComposeView: View {
             postingTarget: postingTarget,
             composePurpose: composePurpose,
             postId: postId,
-            businessAuthorId: businessAuthorId
+            businessAuthorId: businessAuthorId,
+            taskShare: taskShare
         ))
         self.managesDismiss = managesDismiss
         self.onCancel = onCancel

@@ -6,6 +6,7 @@ import app.pantopus.android.data.api.models.mailbox.v2.PackageSaveWarrantyReques
 import app.pantopus.android.data.api.models.mailbox.v2.PackageSaveWarrantyResponse
 import app.pantopus.android.data.api.models.mailbox.v2.PackageUnboxingRequest
 import app.pantopus.android.data.api.models.mailbox.v2.PackageUnboxingResponse
+import app.pantopus.android.data.api.models.mailbox.v2.SharePackageEtaResponse
 import app.pantopus.android.data.api.models.mailbox.v2.UnboxingPackageResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -64,4 +65,15 @@ interface MailboxPackageApi {
         @Path("mailId") mailId: String,
         @Body body: PackageGigRequest,
     ): PackageGigResponse
+
+    /**
+     * `POST api/mailbox/v2/package/:mailId/share-eta` — route
+     * `backend/routes/mailboxV2.js:727`. Drops a "package arriving soon"
+     * notice into every other resident's Home drawer and returns how many
+     * people were notified. Mirrors RN `src/app/mailbox/package.tsx:40-48`.
+     */
+    @POST("api/mailbox/v2/package/{mailId}/share-eta")
+    suspend fun shareEta(
+        @Path("mailId") mailId: String,
+    ): SharePackageEtaResponse
 }

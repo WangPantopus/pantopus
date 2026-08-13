@@ -36,6 +36,16 @@ struct CertifiedDetailLayout: View {
     /// certified notice. `nil` hides the affordance (e.g. snapshot
     /// fixtures), so existing call sites compile unchanged.
     var onOpenExtractedTask: (@MainActor () -> Void)?
+    /// A17.3 — fetches the legal delivery proof
+    /// (`GET …/p2/certified/:mailId/proof`). RN only offers this once the
+    /// item is acknowledged (`src/app/mailbox/certified.tsx:200`), which
+    /// matches the route's own 400 gate.
+    var onDownloadProof: @MainActor () -> Void = {}
+    /// `true` once the proof has been fetched — the tile flips to
+    /// "Saved" (RN's `✓ Saved`).
+    var proofSaved: Bool = false
+    /// `true` while the proof fetch is in flight.
+    var proofInFlight: Bool = false
     @State private var showsConfirmGate = false
     @State private var didAutoPresentConfirmGate = false
     @State private var showsTermsSheet = false
@@ -375,7 +385,42 @@ struct CertifiedDetailLayout: View {
             secondaryTile(icon: .calendar, label: "Calendar")
             secondaryTile(icon: .flag, label: "Dispute")
             secondaryTile(icon: .archive, label: "Archive")
+            // A17.3 — the legal delivery proof only exists after the
+            // acknowledgement is on file, so the tile appears with it.
+            if content.isAcknowledged {
+                proofTile
+            }
         }
+    }
+
+    /// "⬇ Proof" → "✓ Saved" (RN `certified.tsx:200-207`).
+    private var proofTile: some View {
+        Button(action: { onDownloadProof() }) {
+            HStack(spacing: Spacing.s2) {
+                Icon(
+                    proofSaved ? .badgeCheck : .download,
+                    size: 15,
+                    color: proofSaved ? Theme.Color.success : Theme.Color.primary600
+                )
+                Text(proofSaved ? "Saved" : "Proof")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(proofSaved ? Theme.Color.success : Theme.Color.appText)
+                Spacer(minLength: Spacing.s0)
+            }
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 11)
+            .background(proofSaved ? Theme.Color.successBg : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg)
+                    .stroke(proofSaved ? Theme.Color.successLight : Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+            .opacity(proofInFlight ? 0.6 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(proofInFlight || proofSaved)
+        .accessibilityLabel(proofSaved ? "Delivery proof saved" : "Download delivery proof")
+        .accessibilityIdentifier("mailDetail_certified_proof")
     }
 
     private func secondaryTile(icon: PantopusIcon, label: String) -> some View {

@@ -32,6 +32,8 @@ public enum GigsEndpoints {
         payType: String? = nil,
         scheduleType: String? = nil,
         deadline: String? = nil,
+        maxDistanceMeters: Int? = nil,
+        taskArchetype: String? = nil,
         search: String? = nil,
         limit: Int = 20,
         offset: Int = 0
@@ -51,6 +53,8 @@ public enum GigsEndpoints {
         if let payType { query["pay_type"] = payType }
         if let scheduleType { query["schedule_type"] = scheduleType }
         if let deadline { query["deadline"] = deadline }
+        if let maxDistanceMeters { query["max_distance"] = String(maxDistanceMeters) }
+        if let taskArchetype { query["task_archetype"] = taskArchetype }
         if let search, !search.isEmpty { query["search"] = search }
         return Endpoint(method: .get, path: "/api/gigs", query: query)
     }

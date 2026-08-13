@@ -181,7 +181,9 @@ public struct MailDetailView: View {
                 onBack: { onBack() },
                 onAcknowledge: { Task { await viewModel.acknowledge() } },
                 onOpenSenderProfile: onOpenSenderProfile,
-                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } }
+                onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
+                onDownloadPDF: { Task { await viewModel.downloadBookletPDF() } },
+                downloadInFlight: viewModel.bookletDownloadInFlight
             )
         } else {
             generic(content)
@@ -201,7 +203,10 @@ public struct MailDetailView: View {
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
                 onOpenExtractedTask: onOpenExtractedTask.map { open in
                     { @MainActor in open(mailId) }
-                }
+                },
+                onDownloadProof: { Task { await viewModel.downloadCertifiedProof() } },
+                proofSaved: viewModel.certifiedProofSaved,
+                proofInFlight: viewModel.certifiedProofInFlight
             )
         } else {
             generic(content)
@@ -288,7 +293,9 @@ public struct MailDetailView: View {
                 onOpenSenderProfile: onOpenSenderProfile,
                 onSaveToVault: { Task { await viewModel.openSaveToVaultPicker() } },
                 onOpenUnboxing: onOpenUnboxing,
-                onAskNeighbor: onAskNeighbor
+                onAskNeighbor: onAskNeighbor,
+                onShareEta: { Task { @MainActor in await viewModel.sharePackageEta() } },
+                onReportIssue: { Task { @MainActor in await viewModel.reportPackageIssue() } }
             )
         } else {
             generic(content)

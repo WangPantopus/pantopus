@@ -21,6 +21,8 @@ import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.mailbox.MailboxDocumentRepository
+import app.pantopus.android.data.mailbox.MailboxPackageRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -163,6 +165,8 @@ class MailDetailViewModel
         private val repo: MailboxRepository,
         private val vaultRepo: MailboxVaultRepository,
         private val gigsRepo: GigsRepository,
+        private val packageRepo: MailboxPackageRepository,
+        private val documentRepo: MailboxDocumentRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val mailId: String =
@@ -201,6 +205,13 @@ class MailDetailViewModel
         private val _recordsFileInFlight = MutableStateFlow(false)
         val recordsFileInFlight: StateFlow<Boolean> = _recordsFileInFlight.asStateFlow()
 
+        /**
+         * A17.8 — a package dashboard write (share ETA / report issue) is in
+         * flight; keeps the overflow entries from double-firing.
+         */
+        private val _packageActionInFlight = MutableStateFlow(false)
+        val packageActionInFlight: StateFlow<Boolean> = _packageActionInFlight.asStateFlow()
+
         /** T6.5e (P19.5) — Save-to-vault picker visibility. */
         private val _showsSaveToVaultPicker = MutableStateFlow(false)
         val showsSaveToVaultPicker: StateFlow<Boolean> = _showsSaveToVaultPicker.asStateFlow()
@@ -211,6 +222,22 @@ class MailDetailViewModel
 
         private val _saveToVaultInFlight = MutableStateFlow(false)
         val saveToVaultInFlight: StateFlow<Boolean> = _saveToVaultInFlight.asStateFlow()
+
+        /** A17.2 — booklet PDF download in flight; disables the "PDF" tile. */
+        private val _bookletDownloadInFlight = MutableStateFlow(false)
+        val bookletDownloadInFlight: StateFlow<Boolean> = _bookletDownloadInFlight.asStateFlow()
+
+        /** A17.3 — certified legal-proof fetch in flight. */
+        private val _certifiedProofInFlight = MutableStateFlow(false)
+        val certifiedProofInFlight: StateFlow<Boolean> = _certifiedProofInFlight.asStateFlow()
+
+        /**
+         * A17.3 — `true` once the legal delivery proof has been fetched, so
+         * the tile flips to "Saved" (RN's `✓ Saved`,
+         * `src/app/mailbox/certified.tsx:205`).
+         */
+        private val _certifiedProofSaved = MutableStateFlow(false)
+        val certifiedProofSaved: StateFlow<Boolean> = _certifiedProofSaved.asStateFlow()
 
         /**
          * A17.1 — per-category action currently POSTing to
@@ -412,6 +439,58 @@ class MailDetailViewModel
             }
         }
 
+        // MARK: - Package dashboard actions (A17.8)
+
+        /**
+         * A17.8 — "Share ETA with household". Drops a package-arriving
+         * notice into every other resident's Home drawer via
+         * `POST api/mailbox/v2/package/:mailId/share-eta`
+         * (`backend/routes/mailboxV2.js:727`) and toasts how many people
+         * were notified. Mirrors RN `src/app/mailbox/package.tsx:40-48`.
+         */
+        fun sharePackageEta() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            if (current.content.category != MailItemCategory.Package) return
+            if (_packageActionInFlight.value) return
+            _packageActionInFlight.value = true
+            viewModelScope.launch {
+                _toast.value =
+                    when (val result = packageRepo.shareEta(mailId)) {
+                        is NetworkResult.Success -> {
+                            val notified = result.data.notified ?: 0
+                            val noun = if (notified == 1) "member" else "members"
+                            "ETA shared with $notified household $noun"
+                        }
+                        is NetworkResult.Failure -> result.error.displayMessage("Failed to share")
+                    }
+                _packageActionInFlight.value = false
+            }
+        }
+
+        /**
+         * A17.8 — "Report issue". RN logs a `package_issue_reported` event
+         * against the mail item (`src/app/mailbox/package.tsx:60-64`); the
+         * native overflow entry used to be a no-op.
+         */
+        fun reportPackageIssue() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            if (current.content.category != MailItemCategory.Package) return
+            if (_packageActionInFlight.value) return
+            _packageActionInFlight.value = true
+            viewModelScope.launch {
+                _toast.value =
+                    when (
+                        val result =
+                            repo.logEvent(eventType = "package_issue_reported", mailId = mailId)
+                    ) {
+                        is NetworkResult.Success -> "Package issue has been reported"
+                        is NetworkResult.Failure ->
+                            result.error.displayMessage("Couldn't report this issue")
+                    }
+                _packageActionInFlight.value = false
+            }
+        }
+
         // MARK: - Save to vault (T6.5e / P19.5)
 
         /** Open the save-to-vault picker. Fetches folders on the first
@@ -439,6 +518,70 @@ class MailDetailViewModel
 
         fun dismissSaveToVaultPicker() {
             _showsSaveToVaultPicker.value = false
+        }
+
+        // ── Document artefacts (A17.2 booklet PDF / A17.3 proof) ─
+
+        /**
+         * A17.2 — `POST api/mailbox/v2/p2/booklet/:mailId/download`
+         * (`backend/routes/mailboxV2Phase2.js:447`). Mirrors RN's
+         * "Download Started · Downloading X.X MB" confirmation
+         * (`src/app/mailbox/booklet.tsx:43`). The backend answers 404 when
+         * the booklet has no rendered PDF, which surfaces as RN's
+         * "Download not available".
+         */
+        fun downloadBookletPdf() {
+            if (_bookletDownloadInFlight.value) return
+            _bookletDownloadInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    when (val result = documentRepo.bookletDownload(mailId)) {
+                        is NetworkResult.Success -> {
+                            val label = megabytesLabel(result.data.sizeBytes)
+                            _toast.value =
+                                if (label != null) "Download started · $label" else "Download started"
+                        }
+                        is NetworkResult.Failure -> _toast.value = "Download not available"
+                    }
+                } finally {
+                    _bookletDownloadInFlight.value = false
+                }
+            }
+        }
+
+        /**
+         * A17.3 — `GET api/mailbox/v2/p2/certified/:mailId/proof`
+         * (`backend/routes/mailboxV2Phase2.js:705`). The route rejects with
+         * 400 until the item is acknowledged, which is exactly when RN
+         * surfaces the button (`src/app/mailbox/certified.tsx:200`), so the
+         * failure copy matches RN's "Proof not available yet".
+         */
+        fun downloadCertifiedProof() {
+            if (_certifiedProofInFlight.value || _certifiedProofSaved.value) return
+            _certifiedProofInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    when (val result = documentRepo.certifiedProof(mailId)) {
+                        is NetworkResult.Success ->
+                            if (result.data.proof == null) {
+                                _toast.value = "Proof not available yet"
+                            } else {
+                                _certifiedProofSaved.value = true
+                                _toast.value = "Delivery proof saved"
+                            }
+                        is NetworkResult.Failure -> _toast.value = "Proof not available yet"
+                    }
+                } finally {
+                    _certifiedProofInFlight.value = false
+                }
+            }
+        }
+
+        /** "2.4 MB" — the label RN puts in its "Download Started" alert. */
+        private fun megabytesLabel(sizeBytes: Long?): String? {
+            if (sizeBytes == null || sizeBytes <= 0L) return null
+            val megabytes = sizeBytes.toDouble() / (1024 * 1024)
+            return String.format(Locale.US, "%.1f MB", megabytes)
         }
 
         // ── Ceremonial variant mutations (A17.5–A17.8) ───────────

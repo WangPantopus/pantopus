@@ -338,6 +338,10 @@ public final class PulseComposeViewModel {
     /// on `profile.edit` (owner / admin / editor).
     public let businessAuthorId: String?
 
+    /// Set when composing from a gig detail's "Share to feed": prefills
+    /// title + body and rides `refTaskId` on `POST /api/posts`.
+    public let taskShare: PulseTaskShare?
+
     init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
@@ -345,10 +349,12 @@ public final class PulseComposeViewModel {
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
         businessAuthorId: String? = nil,
+        taskShare: PulseTaskShare? = nil,
         api: APIClient = .shared,
         multipartUploader: MultipartUploader = .shared,
         locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
+        self.taskShare = taskShare
         self.businessAuthorId = businessAuthorId
         self.locationProvider = locationProvider
         activeIntent = composePurpose?.legacyIntent ?? intent
@@ -366,6 +372,19 @@ public final class PulseComposeViewModel {
         self.multipartUploader = multipartUploader
         for field in PulseComposeField.allCases {
             fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
+        }
+        // Task share — seed title + body as *current* values (not
+        // originals) so the form reads dirty and the CTA is live at once,
+        // matching RN's prefilled composer.
+        if let taskShare {
+            for (field, value) in [
+                (PulseComposeField.title, taskShare.title),
+                (PulseComposeField.body, taskShare.body)
+            ] where !value.isEmpty {
+                var snapshot = fields[field] ?? FormFieldState(id: field.rawValue, originalValue: "")
+                snapshot.value = value
+                fields[field] = snapshot
+            }
         }
         baselineIdentity = self.identity
         baselineVisibility = visibility
@@ -909,7 +928,11 @@ public final class PulseComposeViewModel {
                 purpose: purposeTag
             )
         }
-        return mergeTargetContext(into: base)
+        // "Share to feed" — carry the referenced task through so the post
+        // lands with `ref_task_id` and renders a "View task" ref card.
+        var request = mergeTargetContext(into: base)
+        request.refTaskId = taskShare?.taskId
+        return request
     }
 
     private func isoTimestamp(from date: Date) -> String {

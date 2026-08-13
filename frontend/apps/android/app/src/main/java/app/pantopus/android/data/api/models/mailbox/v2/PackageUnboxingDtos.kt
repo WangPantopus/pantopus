@@ -130,3 +130,14 @@ data class UnboxingPackageResponse(
     @Json(name = "package") val packageRow: UnboxingPackageDto,
     val sender: UnboxingPackageSender? = null,
 )
+
+/**
+ * Envelope for `POST api/mailbox/v2/package/:mailId/share-eta` — route
+ * `backend/routes/mailboxV2.js:727`. `notified` is the number of other
+ * household residents who received the arriving-soon notice.
+ */
+@JsonClass(generateAdapter = true)
+data class SharePackageEtaResponse(
+    val message: String? = null,
+    val notified: Int? = null,
+)

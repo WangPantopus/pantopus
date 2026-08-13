@@ -27,7 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,6 +50,7 @@ import app.pantopus.android.data.api.models.gigs.CancellationPreviewResponse
 import app.pantopus.android.data.api.models.gigs.GigBidDto
 import app.pantopus.android.data.api.models.gigs.GigChangeOrderDto
 import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
+import app.pantopus.android.data.api.models.gigs.GigFulfillmentStatus
 import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigReportReason
 import app.pantopus.android.ui.components.FutureDateTimePickerDialogs
@@ -59,6 +62,7 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -83,9 +87,13 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
     val payment by viewModel.payment.collectAsStateWithLifecycle()
     val changeOrders by viewModel.changeOrders.collectAsStateWithLifecycle()
     val changeOrderActionInFlight by viewModel.changeOrderActionInFlight.collectAsStateWithLifecycle()
+    val fulfillment by viewModel.fulfillment.collectAsStateWithLifecycle()
+    val fulfillmentActionInFlight by viewModel.fulfillmentActionInFlight.collectAsStateWithLifecycle()
 
     var counterTarget by remember { mutableStateOf<GigBidDto?>(null) }
     var rejectTarget by remember { mutableStateOf<GigBidDto?>(null) }
+    /** Bid whose pending counter-offer the poster is about to withdraw. */
+    var withdrawCounterTarget by remember { mutableStateOf<GigBidDto?>(null) }
     var noShowSheetVisible by remember { mutableStateOf(false) }
     var runningLateSheetVisible by remember { mutableStateOf(false) }
     var proposeChangeSheetVisible by remember { mutableStateOf(false) }
@@ -105,8 +113,63 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
             onAccept = { viewModel.acceptBidAsOwner(it.id) },
             onCounter = { counterTarget = it },
             onReject = { rejectTarget = it },
+            onWithdrawCounter = { withdrawCounterTarget = it },
         )
     }
+
+    // RN copy verbatim (`OffersPanel.tsx:178`).
+    withdrawCounterTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { withdrawCounterTarget = null },
+            title = { Text("Withdraw counter-offer?") },
+            text = { Text("The bid will revert to its original amount.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        withdrawCounterTarget = null
+                        viewModel.withdrawCounterAsOwner(target.id)
+                    },
+                    modifier = Modifier.testTag("gigDetail.withdrawCounterConfirm"),
+                ) {
+                    Text("Withdraw", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { withdrawCounterTarget = null }) { Text("Keep counter") }
+            },
+        )
+    }
+
+    // Urgent / starts-asap live stepper (RN `ActiveTaskPanel`).
+    fulfillment?.let { status ->
+        GigFulfillmentPanel(
+            status = status.status,
+            etaLabel =
+                status.helperEtaMinutes
+                    ?.takeIf { status.status == GigFulfillmentStatus.OnTheWay }
+                    ?.let { "ETA: ~$it min" },
+            nextAction = viewModel.nextFulfillmentAction(),
+            isBusy = fulfillmentActionInFlight,
+            onAdvance = { viewModel.advanceFulfillment(it) },
+        )
+    }
+
+    // "Remind worker" cooldown ticks locally so the button re-enables the
+    // moment the server's 15-minute window lapses (RN ticks every 15s).
+    val reminderCooldownEndsAt by viewModel.workerReminderCooldownEndsAt.collectAsStateWithLifecycle()
+    var reminderNowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(reminderCooldownEndsAt) {
+        val endsAt = reminderCooldownEndsAt ?: return@LaunchedEffect
+        while (System.currentTimeMillis() < endsAt) {
+            reminderNowMillis = System.currentTimeMillis()
+            delay(15_000L)
+        }
+        reminderNowMillis = System.currentTimeMillis()
+    }
+    val reminderCooldownLabel =
+        reminderCooldownEndsAt
+            ?.let { GigDetailViewModel.cooldownRemaining(it, reminderNowMillis) }
+            ?.let { "Sent · retry in $it" }
 
     activeTask?.let { panel ->
         GigActiveTaskPanel(
@@ -117,6 +180,9 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
             onConfirmCompletion = { viewModel.confirmCompletion() },
             onReportNoShow = { noShowSheetVisible = true },
             onCantMakeIt = { cantMakeItConfirmVisible = true },
+            canRemindWorker = viewModel.canRemindWorker(),
+            reminderCooldownLabel = reminderCooldownLabel,
+            onRemindWorker = { viewModel.remindWorker() },
         )
     }
 
@@ -252,6 +318,7 @@ private fun GigOwnerBidsPanel(
     onAccept: (GigBidDto) -> Unit,
     onCounter: (GigBidDto) -> Unit,
     onReject: (GigBidDto) -> Unit,
+    onWithdrawCounter: (GigBidDto) -> Unit,
 ) {
     Column(
         modifier =
@@ -291,6 +358,7 @@ private fun GigOwnerBidsPanel(
                     onAccept = { onAccept(bid) },
                     onCounter = { onCounter(bid) },
                     onReject = { onReject(bid) },
+                    onWithdrawCounter = { onWithdrawCounter(bid) },
                 )
             }
         }
@@ -304,6 +372,7 @@ private fun GigOwnerBidRow(
     onAccept: () -> Unit,
     onCounter: () -> Unit,
     onReject: () -> Unit,
+    onWithdrawCounter: () -> Unit,
 ) {
     val identity = bid.bidderIdentity()
     val name = identity?.resolvedDisplayName() ?: "Bidder"
@@ -364,18 +433,41 @@ private fun GigOwnerBidRow(
                     color = PantopusColors.appTextMuted,
                 )
             countered ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-                    PantopusIconImage(
-                        icon = PantopusIcon.ArrowsRepeat,
-                        contentDescription = null,
-                        size = 13.dp,
-                        tint = PantopusColors.warning,
-                    )
+                // RN keeps the poster in control while the bidder mulls it
+                // over: the counter can be pulled back and the bid reverts
+                // to its original amount (`OffersPanel.tsx:443`).
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.ArrowsRepeat,
+                            contentDescription = null,
+                            size = 13.dp,
+                            tint = PantopusColors.warning,
+                        )
+                        Text(
+                            text = "Countered ${formatBidAmount(bid.counterAmount ?: 0.0)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.warning,
+                        )
+                    }
                     Text(
-                        text = "Countered ${formatBidAmount(bid.counterAmount ?: 0.0)}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PantopusColors.warning,
+                        text = "Waiting for the bidder to respond to your counter.",
+                        fontSize = 11.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                    BidActionButton(
+                        label = "Withdraw counter",
+                        prominent = false,
+                        enabled = !busy,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("gigDetail.bid_${bid.id}.withdrawCounter"),
+                        onClick = onWithdrawCounter,
                     )
                 }
             else ->
@@ -628,6 +720,11 @@ private fun GigActiveTaskPanel(
     onConfirmCompletion: () -> Unit,
     onReportNoShow: () -> Unit,
     onCantMakeIt: () -> Unit,
+    /** Poster-only "Remind worker" nudge — assigned, pre-start. */
+    canRemindWorker: Boolean = false,
+    /** `"Sent · retry in 12m"` while the server's cooldown stands. */
+    reminderCooldownLabel: String? = null,
+    onRemindWorker: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -708,6 +805,21 @@ private fun GigActiveTaskPanel(
                     prominent = true,
                     modifier = Modifier.testTag("gigDetail.startTask"),
                     onClick = onStartTask,
+                )
+            }
+            if (canRemindWorker) {
+                ActivePanelButton(
+                    label = reminderCooldownLabel ?: "Remind worker",
+                    icon = PantopusIcon.Bell,
+                    prominent = reminderCooldownLabel == null,
+                    enabled = reminderCooldownLabel == null,
+                    modifier = Modifier.testTag("gigDetail.remindWorker"),
+                    onClick = onRemindWorker,
+                )
+                Text(
+                    text = "Nudges the worker to begin. You can send one every 15 minutes.",
+                    fontSize = 11.sp,
+                    color = PantopusColors.appTextSecondary,
                 )
             }
             if (panel.showConfirmCompletion) {
@@ -810,11 +922,13 @@ private fun ActivePanelButton(
     prominent: Boolean,
     modifier: Modifier = Modifier,
     destructive: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val background = if (prominent) PantopusColors.primary600 else PantopusColors.appSurfaceSunken
     val foreground =
         when {
+            !enabled -> PantopusColors.appTextMuted
             prominent -> PantopusColors.appTextInverse
             destructive -> PantopusColors.error
             else -> PantopusColors.appText
@@ -826,7 +940,7 @@ private fun ActivePanelButton(
                 .heightIn(min = 46.dp)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(background)
-                .clickable(onClick = onClick),
+                .clickable(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

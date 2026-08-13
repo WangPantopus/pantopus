@@ -25,6 +25,10 @@ public enum TasksRoute: Hashable {
     case chatConversation(InboxConversationDestination)
     case listingOffers(listingId: String, titleHint: String?)
     case editListing(listingId: String, jumpToStep: ListingComposeStep?)
+    /// Feed-scope quick links + Support Train rows (RN `gigs.tsx:433-441`).
+    case myTasks
+    case supportTrains
+    case supportTrainDetail(supportTrainId: String)
     case placeholder(label: String)
 }
 
@@ -61,7 +65,12 @@ public struct TasksTabRoot: View {
                     path.append(.tasksMap(categoryKey: category.rawValue))
                 },
                 onOpenSearch: { path.append(.gigSearch) },
-                onBack: nil
+                onBack: nil,
+                onOpenSupportTrain: { trainId in
+                    path.append(.supportTrainDetail(supportTrainId: trainId))
+                },
+                onOpenMyTasks: { path.append(.myTasks) },
+                onOpenMySupportTrains: { path.append(.supportTrains) }
             )
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: TasksRoute.self) { route in
@@ -129,7 +138,65 @@ public struct TasksTabRoot: View {
             listingOffersDestination(listingId: listingId, titleHint: titleHint)
         case let .editListing(listingId, jumpToStep):
             editListingDestination(listingId: listingId, jumpToStep: jumpToStep)
+        case .myTasks:
+            myTasksDestination()
+        case .supportTrains:
+            supportTrainsDestination()
+        case let .supportTrainDetail(supportTrainId):
+            supportTrainDetailDestination(supportTrainId: supportTrainId)
         }
+    }
+
+    /// "My Tasks" quick link under the feed-scope chips.
+    private func myTasksDestination() -> some View {
+        MyTasksView(
+            viewModel: MyTasksViewModel(
+                onOpenTask: { dto in Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) } },
+                onOpenBids: { dto in Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) } },
+                onEditTask: { dto in
+                    Task { @MainActor in
+                        path.append(.quickPostGig(category: GigsCategory.all.rawValue, editGigId: dto.id))
+                    }
+                },
+                onMessageWorker: { dto in Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) } },
+                onLeaveReview: { dto in Task { @MainActor in path.append(.gigDetail(gigId: dto.id)) } },
+                onPostTask: {
+                    Task { @MainActor in path.append(.composeGig(category: GigsCategory.all.rawValue)) }
+                },
+                onRepost: { _ in
+                    Task { @MainActor in path.append(.composeGig(category: GigsCategory.all.rawValue)) }
+                },
+                onRebook: { gig in
+                    Task { @MainActor in
+                        path.append(.composeGig(category: GigsCategory.from(backendKey: gig.category).rawValue))
+                    }
+                }
+            )
+        )
+    }
+
+    /// "My Support Trains" quick link under the feed-scope chips.
+    private func supportTrainsDestination() -> some View {
+        SupportTrainsView(
+            viewModel: SupportTrainsViewModel(
+                onOpenTrain: { trainId in
+                    Task { @MainActor in path.append(.supportTrainDetail(supportTrainId: trainId)) }
+                }
+            )
+        )
+    }
+
+    /// A Support Train row tapped in the merged Tasks feed.
+    private func supportTrainDetailDestination(supportTrainId: String) -> some View {
+        SupportTrainDetailView(
+            viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
+            onBack: pop,
+            onShare: {
+                systemSheet = .share(
+                    items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+                )
+            }
+        )
     }
 
     private func composeGigDestination(category: String) -> some View {

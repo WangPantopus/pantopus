@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.gigs.MyGigDto
+import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.screens.shared.activity_filter_sheet.ActivityFilterSheet
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
 
@@ -36,6 +37,7 @@ fun MyTasksScreen(
     onLeaveReview: (MyGigDto) -> Unit = {},
     onPostTask: () -> Unit = {},
     onRepost: (MyGigDto) -> Unit = {},
+    onRebook: (String) -> Unit = {},
     viewModel: MyTasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -73,6 +75,16 @@ fun MyTasksScreen(
             fab = fab,
             banner = banner,
             onBack = onBack,
+            // "Rebook a favorite helper" — collapses to nothing when the
+            // server has no rebookable tasks, so it costs a new poster no
+            // vertical space. Mirrors iOS MyTasksView's customHeader.
+            customHeader = {
+                RebookRail(
+                    onRebook = { gig ->
+                        onRebook(GigsCategory.fromBackendKey(gig.category).key)
+                    },
+                )
+            },
         )
     }
 

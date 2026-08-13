@@ -56,7 +56,10 @@ import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailDayApi
 import app.pantopus.android.data.api.services.MailboxApi
 import app.pantopus.android.data.api.services.MailboxCommunityApi
+import app.pantopus.android.data.api.services.MailboxDocumentApi
+import app.pantopus.android.data.api.services.MailboxKeepsakeApi
 import app.pantopus.android.data.api.services.MailboxPackageApi
+import app.pantopus.android.data.api.services.MailboxPartyApi
 import app.pantopus.android.data.api.services.MailboxRecordsApi
 import app.pantopus.android.data.api.services.MailboxTasksApi
 import app.pantopus.android.data.api.services.MailboxV2Api
@@ -386,7 +389,19 @@ object NetworkModule {
         retrofit.create(MailboxRecordsApi::class.java)
 
     @Provides @Singleton
+    fun provideMailboxKeepsakeApi(retrofit: Retrofit): MailboxKeepsakeApi =
+        retrofit.create(MailboxKeepsakeApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxPartyApi(retrofit: Retrofit): MailboxPartyApi =
+        retrofit.create(MailboxPartyApi::class.java)
+
+    @Provides @Singleton
     fun provideMailboxVaultApi(retrofit: Retrofit): MailboxVaultApi = retrofit.create(MailboxVaultApi::class.java)
+
+    @Provides @Singleton
+    fun provideMailboxDocumentApi(retrofit: Retrofit): MailboxDocumentApi =
+        retrofit.create(MailboxDocumentApi::class.java)
 
     @Provides @Singleton
     fun provideMailDayApi(retrofit: Retrofit): MailDayApi = retrofit.create(MailDayApi::class.java)
@@ -454,11 +469,28 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideGigExtrasApi(retrofit: Retrofit): app.pantopus.android.data.api.services.GigExtrasApi =
+        retrofit.create(app.pantopus.android.data.api.services.GigExtrasApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideGigSavedSearchesApi(retrofit: Retrofit): GigSavedSearchesApi = retrofit.create(GigSavedSearchesApi::class.java)
 
     @Provides
     @Singleton
     fun provideGigViewerBidApi(retrofit: Retrofit): GigViewerBidApi = retrofit.create(GigViewerBidApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGigsV2Api(retrofit: Retrofit): app.pantopus.android.data.api.services.GigsV2Api =
+        retrofit.create(app.pantopus.android.data.api.services.GigsV2Api::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGigOwnerActionsApi(
+        retrofit: Retrofit,
+    ): app.pantopus.android.data.api.services.GigOwnerActionsApi =
+        retrofit.create(app.pantopus.android.data.api.services.GigOwnerActionsApi::class.java)
 
     @Provides
     @Singleton

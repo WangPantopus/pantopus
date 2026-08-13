@@ -22,6 +22,11 @@ public struct GigsFeedView: View {
     private let onOpenMap: @MainActor (GigsCategory) -> Void
     private let onOpenSearch: @MainActor () -> Void
     private let onBack: (@MainActor () -> Void)?
+    /// Feed-scope extras — a merged Support Train row, and the two
+    /// quick links RN keeps under the scope chips.
+    private let onOpenSupportTrain: @MainActor (String) -> Void
+    private let onOpenMyTasks: (@MainActor () -> Void)?
+    private let onOpenMySupportTrains: (@MainActor () -> Void)?
 
     /// Two inits instead of a single `viewModel: GigsFeedViewModel =
     /// GigsFeedViewModel()` default: the Xcode 16.4 / Swift 6.1.2 compiler
@@ -36,7 +41,10 @@ public struct GigsFeedView: View {
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onOpenSupportTrain: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenMyTasks: (@MainActor () -> Void)? = nil,
+        onOpenMySupportTrains: (@MainActor () -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenGig = onOpenGig
@@ -44,6 +52,9 @@ public struct GigsFeedView: View {
         self.onOpenMap = onOpenMap
         self.onOpenSearch = onOpenSearch
         self.onBack = onBack
+        self.onOpenSupportTrain = onOpenSupportTrain
+        self.onOpenMyTasks = onOpenMyTasks
+        self.onOpenMySupportTrains = onOpenMySupportTrains
     }
 
     init(
@@ -51,7 +62,10 @@ public struct GigsFeedView: View {
         onCompose: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenMap: @escaping @MainActor (GigsCategory) -> Void = { _ in },
         onOpenSearch: @escaping @MainActor () -> Void = {},
-        onBack: (@MainActor () -> Void)? = nil
+        onBack: (@MainActor () -> Void)? = nil,
+        onOpenSupportTrain: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenMyTasks: (@MainActor () -> Void)? = nil,
+        onOpenMySupportTrains: (@MainActor () -> Void)? = nil
     ) {
         self.init(
             viewModel: GigsFeedViewModel(),
@@ -59,7 +73,10 @@ public struct GigsFeedView: View {
             onCompose: onCompose,
             onOpenMap: onOpenMap,
             onOpenSearch: onOpenSearch,
-            onBack: onBack
+            onBack: onBack,
+            onOpenSupportTrain: onOpenSupportTrain,
+            onOpenMyTasks: onOpenMyTasks,
+            onOpenMySupportTrains: onOpenMySupportTrains
         )
     }
 
@@ -68,6 +85,8 @@ public struct GigsFeedView: View {
             VStack(spacing: Spacing.s0) {
                 topBar
                 searchBar
+                scopeChipRow
+                quickLinksRow
                 categoryChipRow
                 sortFilterRow
                 if let suggestion = viewModel.radiusSuggestion {
@@ -323,6 +342,77 @@ public struct GigsFeedView: View {
         .accessibilityIdentifier("gigsSearchBar")
     }
 
+    // MARK: - Feed scope (All / Tasks / Support Trains)
+
+    /// RN's three scope chips above the category row (`gigs.tsx:398-421`).
+    private var scopeChipRow: some View {
+        HStack(spacing: Spacing.s2) {
+            ForEach(GigsFeedScope.allCases) { scope in
+                let active = viewModel.feedScope == scope
+                Button {
+                    Task { await viewModel.selectScope(scope) }
+                } label: {
+                    Text(scope.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 32)
+                        .background(active ? Theme.Color.primary600 : Theme.Color.appSurfaceSunken)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radii.pill, style: .continuous)
+                                .stroke(active ? Theme.Color.primary600 : Theme.Color.appBorder, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.pill, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(active ? "\(scope.label), selected" : scope.label)
+                .accessibilityIdentifier("gigsFeed.scope.\(scope.rawValue)")
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s2)
+        .accessibilityIdentifier("gigsFeed.scopeChips")
+    }
+
+    /// "My Tasks · My Support Trains" quick links (RN `gigs.tsx:433-441`).
+    @ViewBuilder private var quickLinksRow: some View {
+        if onOpenMyTasks != nil || onOpenMySupportTrains != nil {
+            HStack(spacing: Spacing.s2) {
+                if let onOpenMyTasks {
+                    Button(action: onOpenMyTasks) {
+                        Text("My Tasks")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.primary600)
+                            .frame(minHeight: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigsFeed.quickLink.myTasks")
+                }
+                if onOpenMyTasks != nil, onOpenMySupportTrains != nil {
+                    Text("·")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+                if let onOpenMySupportTrains {
+                    Button(action: onOpenMySupportTrains) {
+                        Text("My Support Trains")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.primary600)
+                            .frame(minHeight: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("gigsFeed.quickLink.mySupportTrains")
+                }
+                Spacer(minLength: Spacing.s0)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("gigsFeed.quickLinks")
+        }
+    }
+
     // MARK: - Category chip row
 
     private var categoryChipRow: some View {
@@ -377,7 +467,7 @@ public struct GigsFeedView: View {
         switch viewModel.state {
         case .loading: loadingFrame
         case let .empty(empty): emptyFrame(empty)
-        case let .loaded(rows): populatedFrame(rows)
+        case .loaded: populatedFrame(viewModel.feedRows)
         case let .browse(browse): browseFrame(browse)
         case let .error(message): errorFrame(message: message)
         }
@@ -418,10 +508,10 @@ public struct GigsFeedView: View {
                 .frame(width: 72, height: 72)
                 .background(Theme.Color.primary50)
                 .clipShape(Circle())
-            Text("No gigs nearby")
+            Text(viewModel.feedScope.emptyHeadline)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Text("Be the first to post one.")
+            Text(viewModel.feedScope.emptyBody)
                 .font(.system(size: 13.5))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
@@ -483,18 +573,29 @@ public struct GigsFeedView: View {
         return String(format: "%.1f mi", miles)
     }
 
-    private func populatedFrame(_ rows: [GigCardContent]) -> some View {
+    private func populatedFrame(_ rows: [GigsFeedRow]) -> some View {
         ScrollView {
             LazyVStack(spacing: Spacing.s2) {
                 ForEach(rows) { row in
-                    Button {
-                        onOpenGig(row.id)
-                    } label: {
-                        GigRow(content: row)
+                    switch row {
+                    case let .gig(content, _):
+                        Button {
+                            onOpenGig(content.id)
+                        } label: {
+                            GigRow(content: content)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { rowMenu(content) }
+                        .accessibilityIdentifier("gigsRow_\(content.id)")
+                    case let .supportTrain(content, _):
+                        Button {
+                            onOpenSupportTrain(content.id)
+                        } label: {
+                            SupportTrainFeedRow(content: content)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("gigsSupportTrainRow_\(content.id)")
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu { rowMenu(row) }
-                    .accessibilityIdentifier("gigsRow_\(row.id)")
                 }
                 if viewModel.hasMore {
                     loadMoreFooter
@@ -627,6 +728,57 @@ struct GigRow: View {
                 }
             }
             .padding(.top, 6)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+    }
+}
+
+/// One nearby Support Train row interleaved into the Tasks feed.
+/// Mirrors RN `components/gig-browse/SupportTrainRow.tsx`.
+struct SupportTrainFeedRow: View {
+    let content: SupportTrainRowContent
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            Icon(.heart, size: 22, strokeWidth: 2, color: Theme.Color.primary600)
+                .frame(width: 44, height: 44)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(content.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                HStack(spacing: Spacing.s2) {
+                    Text("SUPPORT TRAIN")
+                        .font(.system(size: 9, weight: .bold))
+                        .kerning(0.5)
+                        .foregroundStyle(Theme.Color.primary700)
+                        .padding(.horizontal, Spacing.s2)
+                        .padding(.vertical, 2)
+                        .background(Theme.Color.primary50)
+                        .clipShape(Capsule())
+                    if !content.metaLine.isEmpty {
+                        Text(content.metaLine)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                Text(content.subtitle)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: Spacing.s1)
+            Icon(.chevronRight, size: 16, strokeWidth: 2, color: Theme.Color.appTextMuted)
         }
         .padding(Spacing.s3)
         .frame(maxWidth: .infinity, alignment: .leading)

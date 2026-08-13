@@ -1983,7 +1983,12 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.tasksMap(categoryKey: category.rawValue)) }
                 },
                 onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
-                onBack: pop
+                onBack: pop,
+                onOpenSupportTrain: { trainId in
+                    Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
+                },
+                onOpenMyTasks: { Task { @MainActor in push(.myTasks) } },
+                onOpenMySupportTrains: { Task { @MainActor in push(.supportTrains) } }
             )
         case .gigSearch:
             GigSearchView(

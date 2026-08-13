@@ -94,6 +94,9 @@ fun MailDetailScreen(
     val partyRsvpInFlight by viewModel.partyRsvpInFlight.collectAsStateWithLifecycle()
     val recordsFileInFlight by viewModel.recordsFileInFlight.collectAsStateWithLifecycle()
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
+    val bookletDownloadInFlight by viewModel.bookletDownloadInFlight.collectAsStateWithLifecycle()
+    val certifiedProofInFlight by viewModel.certifiedProofInFlight.collectAsStateWithLifecycle()
+    val certifiedProofSaved by viewModel.certifiedProofSaved.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
     val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
     val categoryActionInFlight by viewModel.categoryActionInFlight.collectAsStateWithLifecycle()
@@ -182,6 +185,13 @@ fun MailDetailScreen(
                         onAskNeighbor?.let { open ->
                             { isPreDelivery: Boolean -> open(current.content.mailId, isPreDelivery) }
                         },
+                    onShareEta = viewModel::sharePackageEta,
+                    onReportIssue = viewModel::reportPackageIssue,
+                    onDownloadBookletPdf = viewModel::downloadBookletPdf,
+                    bookletDownloadInFlight = bookletDownloadInFlight,
+                    onDownloadCertifiedProof = viewModel::downloadCertifiedProof,
+                    certifiedProofSaved = certifiedProofSaved,
+                    certifiedProofInFlight = certifiedProofInFlight,
                 )
             is MailDetailUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -307,6 +317,13 @@ private fun LoadedLayout(
     onCreateTask: (() -> Unit)? = null,
     onOpenUnboxing: (() -> Unit)? = null,
     onAskNeighbor: ((Boolean) -> Unit)? = null,
+    onShareEta: () -> Unit = {},
+    onReportIssue: () -> Unit = {},
+    onDownloadBookletPdf: () -> Unit = {},
+    bookletDownloadInFlight: Boolean = false,
+    onDownloadCertifiedProof: () -> Unit = {},
+    certifiedProofSaved: Boolean = false,
+    certifiedProofInFlight: Boolean = false,
 ) {
     // Dispatch to ceremonial variant layouts when the projected content
     // carries decoded payloads. Every variant composes the shared
@@ -329,6 +346,8 @@ private fun LoadedLayout(
                 onBack = onBack,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
+                onDownloadPdf = onDownloadBookletPdf,
+                downloadInFlight = bookletDownloadInFlight,
             )
         content.category == MailItemCategory.Certified && certified != null ->
             CertifiedDetailLayout(
@@ -340,6 +359,9 @@ private fun LoadedLayout(
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
                 onOpenExtractedTask = onOpenExtractedTask,
+                onDownloadProof = onDownloadCertifiedProof,
+                proofSaved = certifiedProofSaved,
+                proofInFlight = certifiedProofInFlight,
             )
         content.category == MailItemCategory.Community && community != null ->
             CommunityDetailLayout(
@@ -392,6 +414,8 @@ private fun LoadedLayout(
                 onSaveToVault = onSaveToVault,
                 onOpenUnboxing = onOpenUnboxing,
                 onAskNeighbor = onAskNeighbor,
+                onShareEta = onShareEta,
+                onReportIssue = onReportIssue,
             )
         content.category == MailItemCategory.Party && party != null ->
             PartyDetailLayout(

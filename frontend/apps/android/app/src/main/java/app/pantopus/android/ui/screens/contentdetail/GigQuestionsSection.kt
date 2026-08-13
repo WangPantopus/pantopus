@@ -11,11 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +34,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.gigs.GigQuestionDto
 import app.pantopus.android.data.api.models.gigs.GigQuestionUser
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
+import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import java.time.Duration
@@ -45,8 +53,10 @@ fun GigQuestionsSection(
     val answerDraft by viewModel.answerDraftText.collectAsStateWithLifecycle()
     val questionSubmitting by viewModel.questionSubmitting.collectAsStateWithLifecycle()
     val answerSubmitting by viewModel.answerSubmitting.collectAsStateWithLifecycle()
+    val actionInFlight by viewModel.questionActionInFlight.collectAsStateWithLifecycle()
     val canAsk = viewModel.canAskQuestion()
     val viewerIsOwner = viewModel.viewerIsOwner()
+    var pendingDelete by remember { mutableStateOf<GigQuestionDto?>(null) }
 
     Column(
         modifier =
@@ -100,21 +110,61 @@ fun GigQuestionsSection(
                 )
             else ->
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                    questions.forEach { question ->
+                    viewModel.pinnedQuestions(questions).forEach { question ->
+                        PinnedQuestionCard(
+                            question = question,
+                            canUnpin = viewModel.canPinQuestion(question),
+                            actionsEnabled = actionInFlight == null,
+                            onTogglePin = { viewModel.toggleQuestionPin(question.id, onError) },
+                        )
+                    }
+                    viewModel.unpinnedQuestions(questions).forEach { question ->
                         QuestionRow(
                             question = question,
                             viewerIsOwner = viewerIsOwner,
                             answeringId = answeringId,
                             answerDraft = answerDraft,
                             answerSubmitting = answerSubmitting,
+                            canUpvote = viewModel.canUpvoteQuestion(),
+                            canPin = viewModel.canPinQuestion(question),
+                            canDelete = viewModel.canDeleteQuestion(question),
+                            actionsEnabled = actionInFlight == null,
                             onBeginAnswer = viewModel::beginAnswering,
                             onCancelAnswer = viewModel::cancelAnswering,
                             onAnswerDraftChange = viewModel::setAnswerDraftText,
                             onSubmitAnswer = { viewModel.submitAnswer(question.id, onError) },
+                            onUpvote = { viewModel.toggleQuestionUpvote(question.id, onError) },
+                            onTogglePin = { viewModel.toggleQuestionPin(question.id, onError) },
+                            onDelete = { pendingDelete = question },
                         )
                     }
                 }
         }
+    }
+
+    // Destructive confirm — names the question being removed, mirroring
+    // RN's `confirm({ title: 'Delete Question' })`.
+    pendingDelete?.let { target ->
+        val preview = target.question.trim().let { if (it.length > 60) it.take(60) + "…" else it }
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete question") },
+            text = { Text("“$preview” will be removed for everyone. This can't be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        viewModel.deleteQuestion(target.id, onError)
+                    },
+                    modifier = Modifier.testTag("gigQuestionsDeleteConfirm"),
+                ) {
+                    Text("Delete", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -219,6 +269,69 @@ private fun AskQuestionForm(
     }
 }
 
+/**
+ * Pinned answers get their own highlighted card above the thread —
+ * mirrors RN `QASection`'s `pinnedQuestions` block.
+ */
+@Composable
+private fun PinnedQuestionCard(
+    question: GigQuestionDto,
+    canUnpin: Boolean,
+    actionsEnabled: Boolean,
+    onTogglePin: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.personalBg)
+                .border(1.dp, PantopusColors.primary600, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("gigQuestionPinned.${question.id}"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Pin,
+                    contentDescription = null,
+                    size = 12.dp,
+                    tint = PantopusColors.primary600,
+                )
+                Text(
+                    text = "Pinned answer",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.primary600,
+                )
+            }
+            if (canUnpin) {
+                QuestionActionLink(
+                    label = "Unpin",
+                    tint = PantopusColors.primary600,
+                    enabled = actionsEnabled,
+                    testTag = "gigQuestion.${question.id}.unpin",
+                    onClick = onTogglePin,
+                )
+            }
+        }
+        Text(
+            text = "Q: ${question.question}",
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appText,
+        )
+        question.answer?.takeIf { it.isNotEmpty() }?.let { answer ->
+            Text(text = "A: $answer", fontSize = 13.5.sp, color = PantopusColors.appTextStrong)
+        }
+    }
+}
+
 @Composable
 private fun QuestionRow(
     question: GigQuestionDto,
@@ -226,12 +339,19 @@ private fun QuestionRow(
     answeringId: String?,
     answerDraft: String,
     answerSubmitting: Boolean,
+    canUpvote: Boolean,
+    canPin: Boolean,
+    canDelete: Boolean,
+    actionsEnabled: Boolean,
     onBeginAnswer: (String) -> Unit,
     onCancelAnswer: () -> Unit,
     onAnswerDraftChange: (String) -> Unit,
     onSubmitAnswer: () -> Unit,
+    onUpvote: () -> Unit,
+    onTogglePin: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -240,31 +360,101 @@ private fun QuestionRow(
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
                 .padding(Spacing.s3)
                 .testTag("gigQuestion.${question.id}"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Text(
-            text = question.question,
-            fontSize = 13.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appText,
-        )
-        QuestionMeta(question)
-        question.answer?.takeIf { it.isNotEmpty() }?.let { answer ->
-            AnswerBlock(question = question, answer = answer)
-        }
-        if (viewerIsOwner && !question.isAnswered) {
-            OwnerAnswerControls(
-                questionId = question.id,
-                answeringId = answeringId,
-                answerDraft = answerDraft,
-                answerSubmitting = answerSubmitting,
-                onBeginAnswer = onBeginAnswer,
-                onCancelAnswer = onCancelAnswer,
-                onAnswerDraftChange = onAnswerDraftChange,
-                onSubmitAnswer = onSubmitAnswer,
+        // Chevron + count column — tapping toggles the viewer's upvote.
+        Column(
+            modifier =
+                Modifier
+                    .width(28.dp)
+                    .clickable(enabled = canUpvote && actionsEnabled, onClick = onUpvote)
+                    .testTag("gigQuestion.${question.id}.upvote"),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.ChevronUp,
+                contentDescription = "Upvote question",
+                size = 18.dp,
+                tint = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = "${question.upvoteCount ?: 0}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
             )
         }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = question.question,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            QuestionMeta(question)
+            question.answer?.takeIf { it.isNotEmpty() }?.let { answer ->
+                AnswerBlock(question = question, answer = answer)
+            }
+            if (viewerIsOwner && !question.isAnswered) {
+                OwnerAnswerControls(
+                    questionId = question.id,
+                    answeringId = answeringId,
+                    answerDraft = answerDraft,
+                    answerSubmitting = answerSubmitting,
+                    onBeginAnswer = onBeginAnswer,
+                    onCancelAnswer = onCancelAnswer,
+                    onAnswerDraftChange = onAnswerDraftChange,
+                    onSubmitAnswer = onSubmitAnswer,
+                )
+            }
+            if (canPin || canDelete) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                    if (canPin) {
+                        QuestionActionLink(
+                            label = if (question.isPinned == true) "Unpin" else "Pin",
+                            tint = PantopusColors.primary600,
+                            enabled = actionsEnabled,
+                            testTag = "gigQuestion.${question.id}.pin",
+                            onClick = onTogglePin,
+                        )
+                    }
+                    if (canDelete) {
+                        QuestionActionLink(
+                            label = "Delete",
+                            tint = PantopusColors.error,
+                            enabled = actionsEnabled,
+                            testTag = "gigQuestion.${question.id}.delete",
+                            onClick = onDelete,
+                        )
+                    }
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun QuestionActionLink(
+    label: String,
+    tint: androidx.compose.ui.graphics.Color,
+    enabled: Boolean,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = label,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = if (enabled) tint else PantopusColors.appTextMuted,
+        modifier =
+            Modifier
+                .clickable(enabled = enabled, onClick = onClick)
+                .testTag(testTag),
+    )
 }
 
 @Composable

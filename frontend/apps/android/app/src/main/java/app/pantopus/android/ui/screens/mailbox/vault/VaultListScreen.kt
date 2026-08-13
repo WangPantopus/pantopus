@@ -30,6 +30,7 @@ fun VaultListScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val selectedDrawer by viewModel.selectedDrawer.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(
             onOpenItem = onOpenItem,
@@ -46,9 +47,12 @@ fun VaultListScreen(
         onRefresh = { viewModel.refresh() },
         onEndReached = {},
         onBack = onBack,
+        tabs = VaultListViewModel.DRAWER_TABS,
+        selectedTab = selectedDrawer,
+        onSelectTab = { viewModel.onSelectDrawer(it) },
         searchBar =
             SearchBarConfig(
-                placeholder = "Search vault",
+                placeholder = "Search sender, amount, date…",
                 text = query,
                 onChange = { viewModel.onQueryChange(it) },
             ),

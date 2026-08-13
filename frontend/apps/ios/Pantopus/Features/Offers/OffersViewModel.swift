@@ -229,9 +229,23 @@ public final class OffersViewModel: ListOfRowsDataSource {
 
     public private(set) var state: ListOfRowsState = .loading
 
+    // MARK: - Row actions (RN `offers.tsx`)
+
+    /// Bid awaiting the Accept confirm (payment-authorization copy).
+    public var acceptCandidate: BidDTO?
+    /// Bid awaiting the Reject confirm.
+    public var rejectCandidate: BidDTO?
+    /// Bid awaiting the Withdraw confirm.
+    public var withdrawCandidate: BidDTO?
+    /// Id of the bid whose mutation is in flight — the footer disables.
+    public private(set) var actionInFlight: String?
+    /// Transient toast surfaced by the screen.
+    public var toast: ToastMessage?
+
     // MARK: - Dependencies
 
     private let api: APIClient
+    private let checkout: CheckoutCoordinator
     private let onOpenOfferDetail: @MainActor (BidDTO) -> Void
     private let onBrowseListings: @MainActor () -> Void
     private let onPostTask: @MainActor () -> Void
@@ -245,12 +259,14 @@ public final class OffersViewModel: ListOfRowsDataSource {
 
     init(
         api: APIClient = .shared,
+        checkout: CheckoutCoordinator = CheckoutCoordinator(),
         onOpenOfferDetail: @escaping @MainActor (BidDTO) -> Void = { _ in },
         onBrowseListings: @escaping @MainActor () -> Void = {},
         onPostTask: @escaping @MainActor () -> Void = {},
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
+        self.checkout = checkout
         self.onOpenOfferDetail = onOpenOfferDetail
         self.onBrowseListings = onBrowseListings
         self.onPostTask = onPostTask
@@ -337,8 +353,27 @@ public final class OffersViewModel: ListOfRowsDataSource {
             state = .empty(isFiltered ? filteredEmptyContent() : emptyContent(for: selectedTab))
             return
         }
+        let inFlight = actionInFlight
         let rows = visible.map { dto in
-            Self.row(dto: dto, perspective: perspective, now: nowSnapshot) { [weak self] in
+            Self.row(
+                dto: dto,
+                perspective: perspective,
+                now: nowSnapshot,
+                footer: Self.footer(
+                    dto: dto,
+                    perspective: perspective,
+                    isBusy: inFlight != nil,
+                    onAccept: { [weak self] in
+                        Task { @MainActor in self?.acceptCandidate = dto }
+                    },
+                    onReject: { [weak self] in
+                        Task { @MainActor in self?.rejectCandidate = dto }
+                    },
+                    onWithdraw: { [weak self] in
+                        Task { @MainActor in self?.withdrawCandidate = dto }
+                    }
+                )
+            ) { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in self.onOpenOfferDetail(dto) }
             }
@@ -392,6 +427,149 @@ public final class OffersViewModel: ListOfRowsDataSource {
         }
     }
 
+    // MARK: - Mutations (RN `offers.tsx`)
+
+    /// Confirm copy for Accept. Paid offers authorize a hold first, so
+    /// the dialog quotes the exact amount (RN `handleAcceptBid`).
+    public static func acceptConfirmTitle(for dto: BidDTO) -> String {
+        (dto.bidAmount ?? 0) > 0 ? "Authorize payment method?" : "Accept offer"
+    }
+
+    public static func acceptConfirmMessage(for dto: BidDTO) -> String {
+        guard let amount = dto.bidAmount, amount > 0 else {
+            return "Accept this offer?"
+        }
+        return "Pantopus will place a temporary authorization hold of "
+            + formatUSD(amount)
+            + ". You are charged only after you confirm the task is completed. "
+            + "If canceled per policy, the hold is released (or only applicable fees apply)."
+    }
+
+    public static func acceptConfirmCTA(for dto: BidDTO) -> String {
+        (dto.bidAmount ?? 0) > 0 ? "Continue to Payment" : "Accept"
+    }
+
+    /// `$120.00` — the accept dialog quotes cents, unlike the row's
+    /// whole-dollar price stack.
+    public static func formatUSD(_ amount: Double) -> String {
+        String(format: "$%.2f", amount)
+    }
+
+    /// Poster accepts a received bid: `POST .../bids/:bidId/accept`;
+    /// paid gigs return PaymentSheet params → present → `finalize-accept`
+    /// (or `abort-accept` on cancel/decline). Mirrors the gig-detail flow.
+    public func confirmAccept() async {
+        guard let dto = acceptCandidate else { return }
+        acceptCandidate = nil
+        guard let gigId = dto.gigId ?? dto.gig?.id else {
+            toast = ToastMessage(text: "Gig not found for this offer.", kind: .error)
+            return
+        }
+        guard actionInFlight == nil else { return }
+        actionInFlight = dto.id
+        rebuild()
+        defer {
+            actionInFlight = nil
+            rebuild()
+        }
+        do {
+            let response: GigBidAcceptResponse = try await api.request(
+                GigsEndpoints.acceptBid(gigId: gigId, bidId: dto.id)
+            )
+            let requiresPayment = response.requiresPaymentSetup == true
+                || response.sheetParams.clientSecret != nil
+            if requiresPayment {
+                switch await checkout.present(response.sheetParams) {
+                case .paid:
+                    let _: GigBidAcceptResponse = try await api.request(
+                        GigsEndpoints.finalizeAcceptBid(gigId: gigId, bidId: dto.id)
+                    )
+                    toast = ToastMessage(text: "Offer accepted and payment authorized.", kind: .success)
+                case .canceled:
+                    _ = try? await api.request(
+                        GigsEndpoints.abortAcceptBid(gigId: gigId, bidId: dto.id),
+                        as: GigBidAcceptResponse.self
+                    )
+                    toast = ToastMessage(
+                        text: "Payment authorization is required before accepting this offer.",
+                        kind: .error
+                    )
+                case let .declined(message), let .failed(message):
+                    _ = try? await api.request(
+                        GigsEndpoints.abortAcceptBid(gigId: gigId, bidId: dto.id),
+                        as: GigBidAcceptResponse.self
+                    )
+                    toast = ToastMessage(text: message, kind: .error)
+                }
+            } else {
+                toast = ToastMessage(text: "Offer accepted.", kind: .success)
+            }
+            await fetchAll()
+        } catch {
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Couldn't accept this offer.",
+                kind: .error
+            )
+        }
+    }
+
+    /// Poster rejects a received bid — `POST .../bids/:bidId/reject`.
+    public func confirmReject() async {
+        guard let dto = rejectCandidate else { return }
+        rejectCandidate = nil
+        guard let gigId = dto.gigId ?? dto.gig?.id else {
+            toast = ToastMessage(text: "Gig not found for this offer.", kind: .error)
+            return
+        }
+        await mutate(bidId: dto.id, success: "Offer rejected.", failure: "Couldn't reject this offer.") {
+            _ = try await self.api.request(
+                GigsEndpoints.rejectBid(gigId: gigId, bidId: dto.id),
+                as: EmptyResponse.self
+            )
+        }
+    }
+
+    /// Bidder withdraws their own sent offer —
+    /// `DELETE /api/gigs/:gigId/bids/:bidId` with `reason=other`, exactly
+    /// as RN's `withdrawBid(gigId, bidId, 'other')`.
+    public func confirmWithdraw() async {
+        guard let dto = withdrawCandidate else { return }
+        withdrawCandidate = nil
+        guard let gigId = dto.gigId ?? dto.gig?.id else {
+            toast = ToastMessage(text: "Gig not found for this offer.", kind: .error)
+            return
+        }
+        await mutate(bidId: dto.id, success: "Offer withdrawn.", failure: "Couldn't withdraw this offer.") {
+            _ = try await self.api.request(
+                GigsEndpoints.withdrawBid(gigId: gigId, bidId: dto.id, reason: .other),
+                as: EmptyResponse.self
+            )
+        }
+    }
+
+    /// Shared in-flight / toast / refetch wrapper for the simple mutations.
+    private func mutate(
+        bidId: String,
+        success: String,
+        failure: String,
+        _ body: () async throws -> Void
+    ) async {
+        guard actionInFlight == nil else { return }
+        actionInFlight = bidId
+        rebuild()
+        defer {
+            actionInFlight = nil
+            rebuild()
+        }
+        do {
+            try await body()
+            toast = ToastMessage(text: success, kind: .success)
+            await fetchAll()
+        } catch {
+            toast = ToastMessage(text: (error as? APIError)?.errorDescription ?? failure, kind: .error)
+        }
+    }
+
     // MARK: - Pure projections (test surface)
 
     /// Pure projection from a `BidDTO` to a `RowModel`. Public so the
@@ -401,6 +579,7 @@ public final class OffersViewModel: ListOfRowsDataSource {
         dto: BidDTO,
         perspective: OfferPerspective,
         now: Date = Date(),
+        footer: RowFooter? = nil,
         onTap: @escaping @Sendable () -> Void
     ) -> RowModel {
         let status = derivedStatus(for: dto, now: now)
@@ -424,8 +603,55 @@ public final class OffersViewModel: ListOfRowsDataSource {
                     tint: .status(status.chipVariant)
                 )
             ],
-            metaTail: metaTail
+            metaTail: metaTail,
+            footer: footer
         )
+    }
+
+    /// In-card action footer. Mirrors RN `offers.tsx`: the Received tab
+    /// exposes Accept + Reject on a still-pending bid, the Sent tab
+    /// exposes Withdraw while the bid is `pending` or `countered`. Every
+    /// other lifecycle state renders footer-less (managed from detail).
+    public static func footer(
+        dto: BidDTO,
+        perspective: OfferPerspective,
+        isBusy: Bool,
+        onAccept: @escaping @Sendable () -> Void,
+        onReject: @escaping @Sendable () -> Void,
+        onWithdraw: @escaping @Sendable () -> Void
+    ) -> RowFooter? {
+        let status = (dto.status ?? "").lowercased()
+        switch perspective {
+        case .received:
+            guard status == "pending" else { return nil }
+            return RowFooter(actions: [
+                RowFooterAction(
+                    title: "Reject",
+                    icon: .x,
+                    variant: .destructive,
+                    identifier: "offers.\(dto.id).reject",
+                    handler: { if !isBusy { onReject() } }
+                ),
+                RowFooterAction(
+                    title: "Accept",
+                    icon: .check,
+                    variant: .primary,
+                    identifier: "offers.\(dto.id).accept",
+                    handler: { if !isBusy { onAccept() } }
+                )
+            ])
+        case .sent:
+            guard status == "pending" || status == "countered" else { return nil }
+            return RowFooter(actions: [
+                RowFooterAction(
+                    title: "Withdraw",
+                    icon: .x,
+                    variant: .destructive,
+                    identifier: "offers.\(dto.id).withdraw",
+                    handler: { if !isBusy { onWithdraw() } }
+                )
+            ])
+        }
     }
 
     /// Map a backend bid to one of the eight design statuses. Pure +

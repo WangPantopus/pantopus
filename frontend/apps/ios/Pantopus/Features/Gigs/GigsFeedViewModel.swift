@@ -28,6 +28,20 @@ public final class GigsFeedViewModel {
     /// Active category chip.
     public private(set) var activeCategory: GigsCategory = .all
 
+    /// Feed-scope segment (All / Tasks / Support Trains). Defaults to
+    /// `.tasks` so the sectioned browse surface stays the landing frame;
+    /// `.all` mixes nearby Support Trains into the flat list and
+    /// `.supportTrains` shows them alone (RN `gigs.tsx:126`).
+    public private(set) var feedScope: GigsFeedScope = .tasks
+
+    /// Nearby Support Trains for the `.all` / `.supportTrains` scopes,
+    /// from `GET /api/activities/support-trains/nearby`.
+    public private(set) var supportTrains: [SupportTrainRowContent] = []
+
+    /// Merged, newest-first render rows: gig cards plus (in the scopes
+    /// that include them) Support Train rows.
+    public private(set) var feedRows: [GigsFeedRow] = []
+
     /// Active sort option. Defaults to `newest`.
     public private(set) var activeSort: GigsSort = .newest
 
@@ -85,6 +99,7 @@ public final class GigsFeedViewModel {
     private let widgetStore: any WidgetSnapshotStoring
     private let isOnlineProvider: @MainActor () -> Bool
     private var loadedItems: [GigDTO] = []
+    private var loadedTrains: [GigsFeedNearbyTrainDTO] = []
     private var undoSnapshot: [GigDTO] = []
     private var isLoading = false
     /// X-dismissed for the session — suppresses the radius banner until
@@ -128,12 +143,30 @@ public final class GigsFeedViewModel {
         self.isOnlineProvider = isOnlineProvider
     }
 
-    /// True when the feed renders the sectioned browse surface: no
-    /// category chip, no structured filters, and no "See all" override.
+    /// True when the feed renders the sectioned browse surface: the
+    /// Tasks-only scope, no category chip, no structured filters, and no
+    /// "See all" override. RN gates the section feed the same way
+    /// (`gigs.tsx:292-298` — `feedTab === 'tasks' && !filtersActive`).
     /// (Search lives on its own screen, so "no search text" always holds
     /// here.)
     public var isBrowseMode: Bool {
-        activeCategory == .all && activeFilterCount == 0 && !flatListOverride
+        feedScope == .tasks && activeCategory == .all && activeFilterCount == 0 && !flatListOverride
+    }
+
+    /// Feed-scope chip tap. Re-selecting the active scope is a no-op.
+    public func selectScope(_ scope: GigsFeedScope) async {
+        guard scope != feedScope else { return }
+        feedScope = scope
+        if !scope.includesGigs {
+            loadedItems = []
+            hasMore = false
+            nextOffset = 0
+        }
+        if !scope.includesSupportTrains {
+            loadedTrains = []
+            supportTrains = []
+        }
+        await fetch()
     }
 
     /// First-time load. No-op once we have content.
@@ -311,11 +344,43 @@ public final class GigsFeedViewModel {
         case .loaded, .browse: break
         default: state = .loading
         }
+        await fetchNearbySupportTrains()
         if isBrowseMode, let coordinate = resolvedCoordinate() {
             await fetchBrowse(coordinate: coordinate)
-        } else {
+        } else if feedScope.includesGigs {
             await fetchFlat()
+        } else {
+            // Support-Trains-only scope: no gig request at all.
+            hasMore = false
+            nextOffset = 0
+            rebuildState()
         }
+    }
+
+    /// Nearby Support Trains for the scopes that show them. Best-effort:
+    /// a failure just leaves the train rows empty (RN swallows it too,
+    /// `gigs.tsx:234-238`).
+    private func fetchNearbySupportTrains() async {
+        guard feedScope.includesSupportTrains, let coordinate = resolvedCoordinate() else {
+            loadedTrains = []
+            supportTrains = []
+            return
+        }
+        let radiusMeters = radiusMiles * Self.metersPerMile
+        do {
+            let response: GigsFeedNearbyTrainsResponse = try await api.request(
+                SupportTrainsEndpoints.nearby(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    radiusMeters: radiusMeters,
+                    limit: Self.supportTrainsPageSize
+                )
+            )
+            loadedTrains = response.supportTrains
+        } catch {
+            loadedTrains = []
+        }
+        supportTrains = loadedTrains.map(Self.projectSupportTrain)
     }
 
     /// Injected fixed coordinate (tests / previews) or the device's
@@ -333,6 +398,7 @@ public final class GigsFeedViewModel {
         // section server-side, so there is nothing to page through.
         hasMore = false
         nextOffset = 0
+        feedRows = []
         do {
             let response: GigsBrowseResponse = try await api.request(
                 GigsEndpoints.browse(
@@ -368,10 +434,14 @@ public final class GigsFeedViewModel {
                     latitude: latitude,
                     longitude: longitude,
                     radiusMiles: radiusMiles,
+                    includeRemote: filters.serverIncludeRemote,
                     minPrice: filters.serverMinPrice,
                     maxPrice: filters.serverMaxPrice,
                     payType: filters.serverPayType,
                     scheduleType: filters.serverScheduleType,
+                    deadline: filters.serverDeadline,
+                    maxDistanceMeters: filters.serverMaxDistanceMeters,
+                    taskArchetype: filters.serverTaskArchetype,
                     limit: Self.pageSize,
                     offset: offset
                 )
@@ -427,7 +497,15 @@ public final class GigsFeedViewModel {
     private func rebuildState() -> Int {
         let now = Date()
         let visible = loadedItems.filter { filters.matchesClientSide($0, now: now) }
-        if visible.isEmpty {
+        var rows: [GigsFeedRow] = visible.map {
+            .gig(Self.project($0), sortKey: Self.epoch($0.createdAt))
+        }
+        rows += zip(loadedTrains, supportTrains).map { dto, content in
+            .supportTrain(content, sortKey: Self.epoch(dto.publishedAt))
+        }
+        rows.sort { $0.sortKey > $1.sortKey }
+        feedRows = rows
+        if rows.isEmpty {
             state = .empty(GigsFeedEmpty(radiusMiles: radiusMiles))
         } else {
             state = .loaded(visible.map(Self.project))
@@ -567,6 +645,49 @@ extension GigsFeedViewModel {
     /// Rows requested per `GET /api/gigs` page. Mirrors Android's
     /// `GigsFeedViewModel.PAGE_SIZE`.
     static let pageSize = 20
+
+    /// Nearby Support Trains requested per load. Mirrors RN's
+    /// `listNearbySupportTrains({ limit: 50 })` (`gigs.tsx:232`).
+    static let supportTrainsPageSize = 50
+
+    /// ISO-8601 timestamp → epoch seconds for the merged-row sort. Rows
+    /// without a parseable timestamp sink to the bottom.
+    static func epoch(_ timestamp: String?) -> Double {
+        guard let timestamp else { return 0 }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = parser.date(from: timestamp) ?? ISO8601DateFormatter().date(from: timestamp)
+        return date?.timeIntervalSince1970 ?? 0
+    }
+
+    /// Nearby-RPC row → render content. Mirrors RN
+    /// `components/gig-browse/SupportTrainRow.tsx`.
+    static func projectSupportTrain(_ dto: GigsFeedNearbyTrainDTO) -> SupportTrainRowContent {
+        let distance = dto.distanceMeters.flatMap(supportTrainDistanceLabel)
+        let age = ageLabel(timestamp: dto.publishedAt).map { "\($0) ago" }
+        let area: String? = switch (dto.city, dto.state) {
+        case let (city?, state?): "\(city), \(state)"
+        case let (city?, nil): city
+        case let (nil, state?): state
+        default: nil
+        }
+        let open = dto.openSlotsCount ?? 0
+        let slots = open > 0 ? "\(open) open slot\(open == 1 ? "" : "s")" : "View schedule"
+        return SupportTrainRowContent(
+            id: dto.supportTrainId,
+            title: (dto.title?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+                ?? "Support Train",
+            metaLine: [distance, age].compactMap { $0 }.joined(separator: " · "),
+            subtitle: area.map { "\($0) · \(slots)" } ?? slots
+        )
+    }
+
+    /// Metres → "820m" / "1.2mi" (RN `formatDistanceMeters`).
+    static func supportTrainDistanceLabel(_ meters: Double) -> String? {
+        guard meters.isFinite else { return nil }
+        if meters < 1609 { return "\(Int(meters.rounded()))m" }
+        return String(format: "%.1fmi", meters / 1609)
+    }
 
     /// `GigDTO` → render-only `GigCardContent`. Exposed (internal) so the
     /// Gig Search surface projects identical rows without duplicating the

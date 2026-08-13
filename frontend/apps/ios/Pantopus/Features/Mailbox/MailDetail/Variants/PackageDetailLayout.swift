@@ -30,6 +30,12 @@ struct PackageDetailLayout: View {
     /// this package. `isPreDelivery` mirrors RN's `?mode=pre|post`
     /// (`src/app/mailbox/package.tsx:196-204`).
     var onAskNeighbor: (@MainActor @Sendable (_ isPreDelivery: Bool) -> Void)?
+    /// A17.8 → "Share ETA with household" — RN's primary package-dashboard
+    /// CTA (`src/app/mailbox/package.tsx:189-194`).
+    var onShareEta: @MainActor () -> Void = {}
+    /// A17.8 → "Report issue" — RN's tertiary CTA
+    /// (`src/app/mailbox/package.tsx:212-214`).
+    var onReportIssue: @MainActor () -> Void = {}
 
     var body: some View {
         MailItemDetailShell(
@@ -95,14 +101,21 @@ struct PackageDetailLayout: View {
                 }
             )
         }
+        // RN's primary package-dashboard CTA — notifies every other
+        // resident that the package is on its way (`package.tsx:189-194`).
         items.append(contentsOf: [
+            MailOverflowItem(id: "shareEta", icon: .send, label: "Share ETA with household") { @Sendable in
+                Task { @MainActor in onShareEta() }
+            },
             MailOverflowItem(id: "openMap", icon: .map, label: "Track map") {},
             MailOverflowItem(id: "handoff", icon: .userPlus, label: "Hand-off") {},
             MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
                 Task { @MainActor in onSaveToVault() }
             },
             MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
-            MailOverflowItem(id: "report", icon: .alertTriangle, label: "Report issue") {}
+            MailOverflowItem(id: "report", icon: .alertTriangle, label: "Report issue") { @Sendable in
+                Task { @MainActor in onReportIssue() }
+            }
         ])
         return items
     }

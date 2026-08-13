@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -53,6 +54,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.PerforatedStamp
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.stamps.components.StampBookHero
@@ -82,10 +85,21 @@ fun StampsScreen(
     viewModel: StampsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val collection by viewModel.collection.collectAsStateWithLifecycle()
+    val themes by viewModel.themes.collectAsStateWithLifecycle()
+    val applyingThemeId by viewModel.applyingThemeId.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(onBack = onBack)
         viewModel.load()
+    }
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(2_200)
+            viewModel.consumeToast()
+        }
     }
     // Track the resolved screen view once (not the transient loading frame).
     LaunchedEffect(state.analyticsTag) {
@@ -94,25 +108,111 @@ fun StampsScreen(
         }
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PantopusColors.appBg)
-                .testTag("stamps"),
-    ) {
-        StampsNav(onBack = { viewModel.tapBack() })
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when (val current = state) {
-                is StampsUiState.Loading -> StampsLoadingBody()
-                is StampsUiState.Loaded ->
-                    StampsPopulatedBody(content = current.content, onBuyMore = { viewModel.buyMore() })
-                is StampsUiState.Empty ->
-                    StampsEmptyBody(content = current.content, onBuy = { viewModel.purchaseStarterBook() })
-                is StampsUiState.Error ->
-                    StampsErrorBody(message = current.message, onRetry = { viewModel.refresh() })
+    Box(modifier = Modifier.fillMaxSize().testTag("stamps")) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(PantopusColors.appBg),
+        ) {
+            StampsNav(onBack = { viewModel.tapBack() })
+            StampsModeHeader(
+                mode = mode,
+                progressLabel =
+                    (collection as? StampCollectionUiState.Loaded)
+                        ?.content
+                        ?.progressLabel
+                        ?.takeIf { mode == StampsViewMode.Stamps },
+                onToggle = { viewModel.toggleMode() },
+            )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (mode == StampsViewMode.Themes) {
+                    StampsThemesBody(
+                        state = themes,
+                        applyingThemeId = applyingThemeId,
+                        onApply = { id -> viewModel.applyTheme(id) },
+                        onRetry = { viewModel.fetchThemes() },
+                    )
+                } else {
+                    when (val current = state) {
+                        is StampsUiState.Loading -> StampsLoadingBody()
+                        is StampsUiState.Loaded ->
+                            StampsPopulatedBody(
+                                content = current.content,
+                                collection = collection,
+                                onBuyMore = { viewModel.buyMore() },
+                            )
+                        is StampsUiState.Empty ->
+                            StampsEmptyBody(content = current.content, onBuy = { viewModel.purchaseStarterBook() })
+                        is StampsUiState.Error ->
+                            StampsErrorBody(message = current.message, onRetry = { viewModel.refresh() })
+                    }
+                }
             }
         }
+        if (toast != null) {
+            Text(
+                text = toast.orEmpty(),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextInverse,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.s10)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appText.copy(alpha = 0.9f))
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("stamps_toast"),
+            )
+        }
+    }
+}
+
+// MARK: - Mode header
+
+/**
+ * Title + "N of M collected" subtitle + the Stamps ⇄ Themes toggle.
+ * Mirrors RN's header row (`src/app/mailbox/stamps.tsx:94-113`).
+ */
+@Composable
+private fun StampsModeHeader(
+    mode: StampsViewMode,
+    progressLabel: String?,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(PantopusColors.appBg)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = mode.title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            if (progressLabel != null) {
+                Text(text = progressLabel, fontSize = 11.sp, color = PantopusColors.appTextMuted)
+            }
+        }
+        Text(
+            text = mode.toggleLabel,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+            modifier =
+                Modifier
+                    .clip(CircleShape)
+                    .background(PantopusColors.appSurfaceSunken)
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = Spacing.s3, vertical = 6.dp)
+                    .testTag("stamps_modeToggle"),
+        )
     }
 }
 
@@ -205,6 +305,10 @@ private fun NavIcon(
 private fun StampsPopulatedBody(
     content: StampsContent,
     onBuyMore: () -> Unit,
+    // Live `GET api/mailbox/v2/p3/stamps` collection. `null` (the default)
+    // skips the section entirely, so the VM-free paparazzi frames keep
+    // rendering the pure wallet stack.
+    collection: StampCollectionUiState? = null,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -220,6 +324,9 @@ private fun StampsPopulatedBody(
             Padded { StampBookHero(book = content.book) }
             Padded { AIElfStripView(content = elfContent(content)) }
             Padded { StampSheet(book = content.book) }
+            if (collection != null) {
+                Padded { StampCollectionSection(state = collection) }
+            }
             WalletRail(stamps = content.wallet, summary = content.walletSummary)
             Padded { UsageHistoryCard(usage = content.usage, window = content.usageWindow) }
             Padded { StampsIssuerCard(issuer = content.issuer) }
@@ -707,6 +814,350 @@ private fun StampsErrorBody(
                     .testTag("stampsRetry"),
         ) {
             Text(text = "Try again", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+// MARK: - Collection section (GET /p3/stamps)
+
+/**
+ * The live stamp gallery: earned stamps followed by the LOCKED catalogue
+ * list. Ports RN `stamps.tsx:116-148`.
+ */
+@Composable
+private fun StampCollectionSection(state: StampCollectionUiState) {
+    StampCard(modifier = Modifier.testTag("stamps_collection")) {
+        StampSectionLabel(title = "Collection")
+        when (state) {
+            is StampCollectionUiState.Loading ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().testTag("stamps_collection_loading"),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    repeat(3) { Shimmer(width = 320.dp, height = 54.dp, cornerRadius = Radii.md) }
+                }
+
+            is StampCollectionUiState.Loaded ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().testTag("stamps_collection_loaded"),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+                ) {
+                    if (state.content.earned.isEmpty()) {
+                        Text(
+                            text = "Nothing collected yet — keep using your mailbox.",
+                            fontSize = 12.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                            state.content.earned.forEach { CollectedStampRow(stamp = it) }
+                        }
+                    }
+                    if (state.content.locked.isNotEmpty()) {
+                        Text(
+                            text = "LOCKED",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.7.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                            state.content.locked.forEach { CollectedStampRow(stamp = it) }
+                        }
+                    }
+                }
+
+            is StampCollectionUiState.Empty ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().testTag("stamps_collection_empty"),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Text(
+                        text = "No stamps to collect yet",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                    )
+                    Text(
+                        text = "Stamps unlock as you receive, file and act on mail.",
+                        fontSize = 12.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+
+            is StampCollectionUiState.Error ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().testTag("stamps_collection_error"),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Text(
+                        text = "Couldn't load your collection",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.appText,
+                    )
+                    Text(text = state.message, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
+                }
+        }
+    }
+}
+
+/**
+ * One earned / locked stamp row — rarity swatch, name, blurb and either
+ * the earned date or a lock glyph.
+ */
+@Composable
+private fun CollectedStampRow(stamp: CollectedStamp) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .alpha(if (stamp.isLocked) 0.55f else 1f)
+                .testTag("stamps_collection_row_${stamp.id}"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(stamp.rarity.accentBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = if (stamp.isLocked) PantopusIcon.Lock else PantopusIcon.Stamp,
+                contentDescription = null,
+                size = 16.dp,
+                tint = stamp.rarity.accent,
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stamp.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    text = stamp.rarity.label,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp,
+                    color = stamp.rarity.accent,
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .background(stamp.rarity.accentBg)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
+            stamp.detail?.let {
+                Text(text = it, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+            }
+            stamp.earnedLabel?.let {
+                Text(
+                    text = it,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextMuted,
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Themes body (GET /p3/themes)
+
+/**
+ * The "Seasonal Themes" half of the screen: an active-theme preview over
+ * the available-theme list. Tapping an unlocked row applies it. Ports RN
+ * `stamps.tsx:151-195`.
+ */
+@Composable
+private fun StampsThemesBody(
+    state: StampThemesUiState,
+    applyingThemeId: String?,
+    onApply: (String) -> Unit,
+    onRetry: () -> Unit,
+) {
+    when (state) {
+        is StampThemesUiState.Loading ->
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.s4)
+                        .padding(top = Spacing.s3)
+                        .testTag("stamps_themes_loading"),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                Shimmer(width = 360.dp, height = 140.dp, cornerRadius = Radii.xl)
+                repeat(4) { Shimmer(width = 360.dp, height = 64.dp, cornerRadius = Radii.lg) }
+            }
+
+        is StampThemesUiState.Loaded ->
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.s4)
+                        .padding(top = Spacing.s3, bottom = Spacing.s10)
+                        .testTag("stamps_themes_loaded"),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                state.content.activeTheme?.let { ActiveThemePreview(theme = it) }
+                Text(
+                    text = "AVAILABLE THEMES",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.7.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    state.content.themes.forEach { theme ->
+                        ThemeRow(
+                            theme = theme,
+                            isActive = theme.id == state.content.activeThemeId,
+                            isApplying = applyingThemeId == theme.id,
+                            isBusy = applyingThemeId != null,
+                            onTap = { onApply(theme.id) },
+                        )
+                    }
+                }
+            }
+
+        is StampThemesUiState.Empty ->
+            EmptyState(
+                icon = PantopusIcon.Palette,
+                headline = "No themes yet",
+                subcopy =
+                    "Seasonal mailbox themes unlock through the year and with stamp milestones.",
+                modifier = Modifier.testTag("stamps_themes_empty"),
+                ctaTitle = "Refresh",
+                onCta = onRetry,
+                tint = PantopusColors.magicBg,
+                accent = PantopusColors.magic,
+            )
+
+        is StampThemesUiState.Error ->
+            ErrorState(
+                headline = "Couldn't load themes",
+                message = state.message,
+                modifier = Modifier.testTag("stamps_themes_error"),
+                onRetry = onRetry,
+            )
+    }
+}
+
+/** Hero preview of the currently-applied theme. */
+@Composable
+private fun ActiveThemePreview(theme: MailboxTheme) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(theme.season.accentBg)
+                .testTag("stamps_themes_active"),
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.s5),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = theme.name,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(text = theme.season.label, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
+        }
+        Text(
+            text = "Active Theme",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextInverse,
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .clip(CircleShape)
+                    .background(PantopusColors.appText.copy(alpha = 0.3f))
+                    .padding(horizontal = 9.dp, vertical = 3.dp),
+        )
+    }
+}
+
+/** One row in "Available themes". Locked rows dim and don't respond. */
+@Composable
+private fun ThemeRow(
+    theme: MailboxTheme,
+    isActive: Boolean,
+    isApplying: Boolean,
+    isBusy: Boolean,
+    onTap: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .alpha(if (theme.isUnlocked) 1f else 0.5f)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(
+                    width = if (isActive) 2.dp else 1.dp,
+                    color = if (isActive) theme.season.accent else PantopusColors.appBorder,
+                    shape = RoundedCornerShape(Radii.lg),
+                )
+                .clickable(enabled = theme.isUnlocked && !isBusy, onClick = onTap)
+                .padding(13.dp)
+                .testTag("stamps_themes_row_${theme.id}"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(theme.season.accent),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = theme.name,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(text = theme.subtitle, fontSize = 11.sp, color = PantopusColors.appTextSecondary)
+        }
+        when {
+            isApplying ->
+                Shimmer(width = 18.dp, height = 18.dp, cornerRadius = Radii.pill)
+
+            isActive ->
+                PantopusIconImage(
+                    icon = PantopusIcon.CheckCircle,
+                    contentDescription = "Active theme",
+                    size = 18.dp,
+                    tint = theme.season.accent,
+                )
+
+            !theme.isUnlocked ->
+                PantopusIconImage(
+                    icon = PantopusIcon.Lock,
+                    contentDescription = "Locked",
+                    size = 16.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
         }
     }
 }

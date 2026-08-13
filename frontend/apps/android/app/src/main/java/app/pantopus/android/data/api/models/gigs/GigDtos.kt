@@ -75,6 +75,10 @@ data class GigDto(
     @Json(name = "worker_ack_status") val workerAckStatus: String? = null,
     // Phase 5b — ETA accompanying a `running_late` acknowledgement.
     @Json(name = "worker_ack_eta_minutes") val workerAckEtaMinutes: Int? = null,
+    // Timestamp of the poster's last "Remind worker" nudge. The backend
+    // enforces a 15-minute cooldown off this column
+    // (`backend/routes/gigs.js:5769`), mirrored on the detail button.
+    @Json(name = "last_worker_reminder_at") val lastWorkerReminderAt: String? = null,
     @Json(name = "engagement_mode") val engagementMode: String? = null,
     @Json(name = "schedule_type") val scheduleType: String? = null,
     @Json(name = "pay_type") val payType: String? = null,
@@ -105,10 +109,24 @@ data class GigDto(
     val location: GigCoordinate? = null,
     @Json(name = "exact_city") val exactCity: String? = null,
     @Json(name = "exact_state") val exactState: String? = null,
+    /** `flexible` / `standard` / `strict` — composer edit prefill (`gigs.js:642`). */
+    @Json(name = "cancellation_policy") val cancellationPolicy: String? = null,
+    /** Hours, `Joi.number().positive()`. Composer edit prefill. */
+    @Json(name = "estimated_duration") val estimatedDuration: Double? = null,
+    /** Errand / shopping line items (`Gig.items` jsonb). Composer edit prefill. */
+    val items: List<GigItemDto>? = null,
+    /**
+     * Sibling of [isUrgent] — the backend gates the live fulfillment
+     * routes on `is_urgent || starts_asap` (`gigs.js:8703`).
+     */
+    @Json(name = "starts_asap") val startsAsap: Boolean? = null,
     @Json(name = "creator") val creator: GigCreator? = null,
     @Json(name = "User") val legacyCreator: GigCreator? = null,
 ) {
     fun posterIdentity(): GigCreator? = creator ?: legacyCreator
+
+    /** The backend's own gate on `/status` + `/active-status`. */
+    fun usesLiveFulfillment(): Boolean = isUrgent == true || startsAsap == true
 }
 
 /** Nested `{ latitude, longitude }` on gig detail responses. */
@@ -376,6 +394,10 @@ data class CreateGigBody(
     @Json(name = "cancellation_policy") val cancellationPolicy: String? = null,
     @Json(name = "is_urgent") val isUrgent: Boolean? = null,
     val tags: List<String>? = null,
+    /** Hours (`Joi.number().positive()`, `gigs.js:433`). */
+    @Json(name = "estimated_duration") val estimatedDuration: Double? = null,
+    /** Errand / shopping line items (`gigs.js:487`). */
+    val items: List<GigItemDto>? = null,
     val location: CreateGigLocation,
 )
 

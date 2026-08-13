@@ -54,8 +54,10 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigTipViewModelTest {
     private val repo: GigsRepository = mockk()
+    private val extrasRepo: app.pantopus.android.data.gigs.GigExtrasRepository = mockk()
     private val reassignmentRepo: GigReassignmentRepository = mockk()
     private val viewerBidRepo: GigViewerBidRepository = mockk()
+    private val ownerActionsRepo: app.pantopus.android.data.gigs.GigOwnerActionsRepository = mockk()
     private val offersRepo: OffersRepository = mockk()
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
@@ -102,8 +104,10 @@ class GigTipViewModelTest {
         coEvery { repo.gigPayment("g1") } returns NetworkResult.Success(GigPaymentResponse())
         return GigDetailViewModel(
             repo,
+            extrasRepo,
             reassignmentRepo,
             viewerBidRepo,
+            ownerActionsRepo,
             offersRepo,
             authRepo,
             filesRepo,

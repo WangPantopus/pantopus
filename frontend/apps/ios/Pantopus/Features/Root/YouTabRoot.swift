@@ -90,6 +90,9 @@ public enum YouRoute: Hashable {
     /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
     /// Pushed when the Support Trains FAB / empty-state CTA fires.
     case startSupportTrain
+    /// A nearby Support Train tapped in the Tasks feed's merged
+    /// "All" / "Support Trains" scope.
+    case supportTrainDetail(supportTrainId: String)
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
@@ -1397,7 +1400,12 @@ public struct YouTabRoot: View {
                 onOpenSearch: {
                     Task { @MainActor in path.append(.gigSearch) }
                 },
-                onBack: { Task { @MainActor in pop() } }
+                onBack: { Task { @MainActor in pop() } },
+                onOpenSupportTrain: { trainId in
+                    Task { @MainActor in path.append(.supportTrainDetail(supportTrainId: trainId)) }
+                },
+                onOpenMyTasks: { Task { @MainActor in path.append(.myTasks) } },
+                onOpenMySupportTrains: { Task { @MainActor in path.append(.supportTrains) } }
             )
         case .gigSearch:
             GigSearchView(
@@ -1498,6 +1506,11 @@ public struct YouTabRoot: View {
                         Task { @MainActor in path.append(.searchSupportTrains) }
                     }
                 )
+            )
+        case let .supportTrainDetail(supportTrainId):
+            SupportTrainDetailView(
+                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
+                onBack: { Task { @MainActor in pop() } }
             )
         case .searchSupportTrains:
             SupportTrainsSearchView(

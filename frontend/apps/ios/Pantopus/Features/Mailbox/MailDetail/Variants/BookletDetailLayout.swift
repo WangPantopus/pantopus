@@ -30,6 +30,13 @@ struct BookletDetailLayout: View {
     /// T6.5e (P19.5) — Opens the host's Save-to-vault picker. Defaults
     /// to a no-op so existing call sites compile unchanged.
     var onSaveToVault: @MainActor () -> Void = {}
+    /// A17.2 — fetches the rendered booklet PDF
+    /// (`POST …/p2/booklet/:mailId/download`). RN reports the file size
+    /// in the confirmation (`src/app/mailbox/booklet.tsx:43`).
+    var onDownloadPDF: @MainActor () -> Void = {}
+    /// `true` while the PDF fetch is in flight — the tile disables so a
+    /// double-tap can't fire two downloads.
+    var downloadInFlight: Bool = false
 
     var body: some View {
         MailItemDetailShell(
@@ -46,7 +53,13 @@ struct BookletDetailLayout: View {
                 )
             },
             sender: { SenderCard(content: content, onOpenProfile: onOpenSenderProfile) },
-            actions: { ActionsRow() }
+            actions: {
+                ActionsRow(
+                    onSaveToVault: onSaveToVault,
+                    onDownloadPDF: onDownloadPDF,
+                    downloadInFlight: downloadInFlight
+                )
+            }
         )
         .accessibilityIdentifier("mailDetail_booklet")
     }
@@ -64,7 +77,9 @@ struct BookletDetailLayout: View {
                 MailOverflowItem(id: "saveToVault", icon: .bookmark, label: "Save to vault") { @Sendable in
                     Task { @MainActor in onSaveToVault() }
                 },
-                MailOverflowItem(id: "download", icon: .download, label: "Save PDF") {},
+                MailOverflowItem(id: "download", icon: .download, label: "Save PDF") { @Sendable in
+                    Task { @MainActor in onDownloadPDF() }
+                },
                 MailOverflowItem(id: "archive", icon: .archive, label: "Archive") {},
                 MailOverflowItem(id: "delete", icon: .trash2, label: "Delete", isDestructive: true) {}
             ]
@@ -134,9 +149,13 @@ struct BookletDetailLayout: View {
     // MARK: - Actions
 
     private struct ActionsRow: View {
+        let onSaveToVault: @MainActor () -> Void
+        let onDownloadPDF: @MainActor () -> Void
+        let downloadInFlight: Bool
+
         var body: some View {
             VStack(spacing: Spacing.s2) {
-                Button(action: {}) {
+                Button(action: { onSaveToVault() }) {
                     HStack(spacing: Spacing.s2) {
                         Icon(.archive, size: 16, color: Theme.Color.appTextInverse)
                         Text("Save to Vault")
@@ -151,15 +170,27 @@ struct BookletDetailLayout: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("mailDetail_booklet_saveToVault")
                 HStack(spacing: Spacing.s2) {
-                    secondary(icon: .share, label: "Share")
-                    secondary(icon: .download, label: "PDF")
-                    secondary(icon: .archive, label: "Archive")
+                    secondary(icon: .share, label: "Share", action: {})
+                    secondary(
+                        icon: .download,
+                        label: "PDF",
+                        identifier: "mailDetail_booklet_downloadPdf",
+                        isDisabled: downloadInFlight,
+                        action: onDownloadPDF
+                    )
+                    secondary(icon: .archive, label: "Archive", action: {})
                 }
             }
         }
 
-        private func secondary(icon: PantopusIcon, label: String) -> some View {
-            Button(action: {}) {
+        private func secondary(
+            icon: PantopusIcon,
+            label: String,
+            identifier: String? = nil,
+            isDisabled: Bool = false,
+            action: @escaping @MainActor () -> Void
+        ) -> some View {
+            Button(action: { action() }) {
                 VStack(spacing: Spacing.s1) {
                     Icon(icon, size: 17, color: Theme.Color.appTextStrong)
                     Text(label)
@@ -174,9 +205,12 @@ struct BookletDetailLayout: View {
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+                .opacity(isDisabled ? 0.6 : 1)
             }
             .buttonStyle(.plain)
+            .disabled(isDisabled)
             .accessibilityLabel(label)
+            .accessibilityIdentifier(identifier ?? "mailDetail_booklet_\(label.lowercased())")
         }
     }
 }

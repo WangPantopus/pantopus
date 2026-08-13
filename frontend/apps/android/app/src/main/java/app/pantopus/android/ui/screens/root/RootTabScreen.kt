@@ -2155,6 +2155,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                         onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
                         onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
+                        onOpenSupportTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                        onOpenMySupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     )
                 }
                 composable(PantopusRoute.Marketplace.path) {
@@ -3679,6 +3684,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
                         onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
                         onBack = { navController.popBackStack() },
+                        onOpenSupportTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                        onOpenMySupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     )
                 }
                 composable(ChildRoutes.GIG_SEARCH) {
@@ -3970,6 +3980,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                         onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                         onRepost = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                        onRebook = { categoryKey ->
+                            navController.navigate(ChildRoutes.composeGig(categoryKey))
+                        },
                     )
                 }
                 composable(ChildRoutes.COMPOSE_TASK) {
