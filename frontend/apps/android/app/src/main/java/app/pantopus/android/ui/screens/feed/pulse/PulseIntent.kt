@@ -6,10 +6,15 @@ import androidx.compose.runtime.Immutable
 import app.pantopus.android.ui.theme.PantopusIcon
 
 /**
- * Six-way classification for Pulse posts. Drives the chip-row filter,
+ * Ten-way classification for Pulse posts. Drives the chip-row filter,
  * the per-card colored chip, the reaction-verb set, and the compose
  * FAB's pre-fill. `All` is a chip-row-only sentinel; real posts always
- * resolve to one of the other five.
+ * resolve to one of the other nine.
+ *
+ * The chip set mirrors RN's `PLACE_POST_TYPES`
+ * (`src/constants/feed.ts:18-28`) 1:1 — `Alert` / `Deal` /
+ * `NeighborhoodWin` / `VisitorGuide` were previously collapsed into
+ * `Announce`, which made those four lanes unreachable from the filter row.
  */
 enum class PulseIntent(
     val key: String,
@@ -21,7 +26,11 @@ enum class PulseIntent(
     Recommend(key = "recommend", label = "Recommend", cardChipLabel = "Rec"),
     Event(key = "event", label = "Event", cardChipLabel = "Event"),
     Lost(key = "lost", label = "Lost & Found", cardChipLabel = "Lost"),
+    Alert(key = "alert", label = "Alerts", cardChipLabel = "Alert"),
+    Deal(key = "deal", label = "Deals", cardChipLabel = "Deal"),
     Announce(key = "announce", label = "Announce", cardChipLabel = "Announce"),
+    NeighborhoodWin(key = "neighborhoodWin", label = "Wins", cardChipLabel = "Win"),
+    VisitorGuide(key = "visitorGuide", label = "Guide", cardChipLabel = "Guide"),
     ;
 
     /** Backend `post_type` filter for `/api/posts/feed`. `All` is `null`. */
@@ -33,7 +42,11 @@ enum class PulseIntent(
                 Recommend -> "recommendation"
                 Event -> "event"
                 Lost -> "lost_found"
+                Alert -> "alert"
+                Deal -> "deal"
                 Announce -> "local_update"
+                NeighborhoodWin -> "neighborhood_win"
+                VisitorGuide -> "visitor_guide"
             }
 
     /** Icon used inside the per-card intent chip. */
@@ -45,7 +58,11 @@ enum class PulseIntent(
                 Recommend -> PantopusIcon.ThumbsUp
                 Event -> PantopusIcon.Calendar
                 Lost -> PantopusIcon.Search
+                Alert -> PantopusIcon.AlertTriangle
+                Deal -> PantopusIcon.Tag
                 Announce -> PantopusIcon.Megaphone
+                NeighborhoodWin -> PantopusIcon.PartyPopper
+                VisitorGuide -> PantopusIcon.Compass
             }
 
     companion object {
@@ -62,7 +79,11 @@ enum class PulseIntent(
                 "recommendation", "recommend" -> Recommend
                 "event" -> Event
                 "lost_found" -> Lost
-                "local_update", "announcement", "heads_up", "neighborhood_win", "alert" -> Announce
+                "alert", "safety_alert" -> Alert
+                "deal" -> Deal
+                "neighborhood_win" -> NeighborhoodWin
+                "visitor_guide" -> VisitorGuide
+                "local_update", "announcement", "heads_up" -> Announce
                 else -> Announce
             }
     }
@@ -120,7 +141,17 @@ fun PulseIntent.reactionTemplate(
                 PulseReaction(PulseReaction.Kind.Seen, PantopusIcon.Eye, "seen", helpfulCount, true),
                 PulseReaction(PulseReaction.Kind.Shared, PantopusIcon.Share, "shared", secondaryCount, false),
             )
-        PulseIntent.Announce, PulseIntent.All ->
+        PulseIntent.NeighborhoodWin ->
+            listOf(
+                PulseReaction(PulseReaction.Kind.Helpful, PantopusIcon.Heart, "", helpfulCount, true),
+                PulseReaction(PulseReaction.Kind.Seen, PantopusIcon.Eye, "seen", secondaryCount, false),
+            )
+        PulseIntent.Deal, PulseIntent.VisitorGuide ->
+            listOf(
+                PulseReaction(PulseReaction.Kind.Helpful, PantopusIcon.Lightbulb, "helpful", helpfulCount, true),
+                PulseReaction(PulseReaction.Kind.Shared, PantopusIcon.Share, "shared", secondaryCount, false),
+            )
+        PulseIntent.Announce, PulseIntent.Alert, PulseIntent.All ->
             // A03: announce cards lead with the "seen" eye verb.
             listOf(
                 PulseReaction(PulseReaction.Kind.Seen, PantopusIcon.Eye, "seen", helpfulCount, true),

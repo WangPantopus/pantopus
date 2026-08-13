@@ -55,6 +55,19 @@ struct HubView: View {
                     onMenuTap: { onNavigate(.openMenu) }
                 )
                 HubActionStrip(chips: content.actionChips) { onNavigate(.action($0)) }
+                if let density = content.neighborDensity {
+                    HubNeighborDensitySection(content: density) {
+                        Task { await viewModel.dismissDensityMilestone() }
+                    }
+                }
+                // Rendered unconditionally: the empty set is the design's
+                // "All caught up" pill, not a hidden section (RN
+                // `HubActionStrip.tsx:33-38`).
+                HubStatusStrip(
+                    items: content.statusItems,
+                    onTap: { onNavigate(.statusItem($0)) },
+                    onDismiss: { viewModel.dismissStatusItem(id: $0) }
+                )
                 if let banner = content.setupBanner {
                     HubSetupBanner(
                         content: banner,
@@ -150,6 +163,9 @@ enum HubNavigationIntent {
     case openMenu
     case openProfile
     case action(ActionChipContent.Kind)
+    /// Tap on a server-driven "Needs attention" pill. The host resolves
+    /// `item.route` the same way it resolves a jump-back-in route.
+    case statusItem(StatusStripItem)
     case startVerification
     case pillar(PillarTile.Pillar)
     case openDiscovery(DiscoveryCardContent)

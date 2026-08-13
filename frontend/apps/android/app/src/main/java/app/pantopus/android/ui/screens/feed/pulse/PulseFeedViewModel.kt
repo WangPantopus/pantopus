@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.feed.FeedMuteEntityType
 import app.pantopus.android.data.api.models.feed.FeedPost
+import app.pantopus.android.data.api.models.sports.ActiveSportsEventDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
@@ -20,7 +21,9 @@ import app.pantopus.android.data.feed.FeedActionsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
+import app.pantopus.android.data.sports.SportsRepository
 import app.pantopus.android.ui.screens.feed.FeedEmptyContent
+import app.pantopus.android.ui.screens.feed.FeedRadiusSuggestion
 import app.pantopus.android.ui.screens.feed.FeedSurface
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
 import app.pantopus.android.ui.screens.shared.media.buildPostMediaItems
@@ -73,12 +76,93 @@ class PulseFeedViewModel
         private val authRepo: AuthRepository,
         private val locationProvider: LocationProvider,
         private val postsRefresh: PulsePostsRefreshNotifier,
+        /** `GET /api/sports/active-events` — backs the Sports lane. */
+        private val sportsRepo: SportsRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseFeedUiState>(PulseFeedUiState.Loading)
         val state: StateFlow<PulseFeedUiState> = _state.asStateFlow()
 
         private val _activeIntent = MutableStateFlow(PulseIntent.All)
         val activeIntent: StateFlow<PulseIntent> = _activeIntent.asStateFlow()
+
+        // Topic lane (Nearby only).
+
+        /**
+         * Active topic lane. Non-null swaps the post-type chip row for the
+         * topic's own mode chips — RN `useFeedFiltering.ts:45-50`.
+         */
+        private val _activeTopic = MutableStateFlow<PulseTopic?>(null)
+        val activeTopic: StateFlow<PulseTopic?> = _activeTopic.asStateFlow()
+
+        /** Mode chip inside the Sports lane. */
+        private val _sportsMode = MutableStateFlow(PulseSportsMode.ForYou)
+        val sportsMode: StateFlow<PulseSportsMode> = _sportsMode.asStateFlow()
+
+        /**
+         * Event the `event` mode chip is scoped to. Defaults to the
+         * primary active event when the user hasn't picked one.
+         */
+        private var eventKey: String? = null
+
+        /** Currently-active major sports events, highest priority first. */
+        private val _activeSportsEvents = MutableStateFlow<List<ActiveSportsEventDto>>(emptyList())
+        val activeSportsEvents: StateFlow<List<ActiveSportsEventDto>> = _activeSportsEvents.asStateFlow()
+
+        /**
+         * Highest-priority active event — labels the `event` chip and backs
+         * the active-event module.
+         */
+        private val _primarySportsEvent = MutableStateFlow<ActiveSportsEventDto?>(null)
+        val primarySportsEvent: StateFlow<ActiveSportsEventDto?> = _primarySportsEvent.asStateFlow()
+
+        /** Topics offered on this surface. Topic lanes are Nearby-only. */
+        val availableTopics: List<PulseTopic>
+            get() = if (_surface.value == FeedSurface.Pulse) PulseTopic.entries.toList() else emptyList()
+
+        /** True while the Sports lane is showing. */
+        val isInSportsLane: Boolean
+            get() = _surface.value == FeedSurface.Pulse && _activeTopic.value == PulseTopic.Sports
+
+        /**
+         * Mode chips for the active lane — the `event` chip is relabelled
+         * with the primary event's short label and hidden when nothing is
+         * live (RN `FeedScreen.tsx:117-127`).
+         */
+        fun sportsModeChips(): List<Pair<PulseSportsMode, String>> {
+            if (!isInSportsLane) return emptyList()
+            val primaryLabel = _primarySportsEvent.value?.chipLabel
+            return PulseSportsMode.entries.mapNotNull { mode ->
+                when {
+                    mode != PulseSportsMode.Event -> mode to mode.label
+                    primaryLabel != null -> mode to primaryLabel
+                    else -> null
+                }
+            }
+        }
+
+        // Radius suggestion.
+
+        private val _viewingRadiusMiles = MutableStateFlow(100.0)
+
+        /**
+         * Radius of the viewer's active viewing location. Set by the
+         * context bar so the suggestion ladder lines up with the server.
+         */
+        val viewingRadiusMiles: StateFlow<Double> = _viewingRadiusMiles.asStateFlow()
+
+        private val _radiusSuggestion = MutableStateFlow<FeedRadiusSuggestion?>(null)
+
+        /**
+         * Proposed radius change when the lane came back nearly empty (or
+         * overwhelmingly full). `null` hides the banner.
+         */
+        val radiusSuggestion: StateFlow<FeedRadiusSuggestion?> = _radiusSuggestion.asStateFlow()
+
+        /**
+         * Session-scoped dismissal, re-armed whenever the radius changes —
+         * RN `useRadiusSuggestion.ts:117-122`.
+         */
+        private var radiusSuggestionDismissed = false
 
         /** True while a pull-to-refresh refetch is in flight (drives the spinner). */
         private val _isRefreshing = MutableStateFlow(false)
@@ -195,6 +279,9 @@ class PulseFeedViewModel
             _surface.value = next
             _showsSurfaceToggle.value = next in FeedSurface.toggleSurfaces
             _activeIntent.value = PulseIntent.All
+            // Leaving Nearby clears the topic lane — topics are
+            // Nearby-only (RN `useFeedFiltering.ts:24-27`).
+            if (next != FeedSurface.Pulse) _activeTopic.value = null
             loadedPosts = emptyList()
             overrides = emptyMap()
             removedPostIds = emptySet()
@@ -207,6 +294,93 @@ class PulseFeedViewModel
             _activeIntent.value = intent
             fetch()
         }
+
+        /**
+         * Topic-chip tap. Passing `null` (or re-tapping the active chip)
+         * exits the lane. Entering or leaving resets the post-type filter
+         * and the sports mode — RN `useFeedFiltering.ts:29-42`.
+         */
+        fun selectTopic(topic: PulseTopic?) {
+            if (_activeTopic.value == topic) return
+            _activeTopic.value = topic
+            _activeIntent.value = PulseIntent.All
+            _sportsMode.value = PulseSportsMode.ForYou
+            eventKey = null
+            if (topic == PulseTopic.Sports && _activeSportsEvents.value.isEmpty()) {
+                loadActiveSportsEvents { fetch() }
+            } else {
+                fetch()
+            }
+        }
+
+        /** Sports mode-chip tap. */
+        fun selectSportsMode(mode: PulseSportsMode) {
+            if (_sportsMode.value == mode) return
+            _sportsMode.value = mode
+            fetch()
+        }
+
+        /**
+         * "See threads" on the active-event module — pins the lane to that
+         * event and switches to the `event` mode.
+         */
+        fun selectSportsEvent(key: String) {
+            eventKey = key
+            _sportsMode.value = PulseSportsMode.Event
+            fetch()
+        }
+
+        /**
+         * Read `GET /api/sports/active-events`. Optional: a failure just
+         * hides the event chip and the module.
+         */
+        fun loadActiveSportsEvents(then: () -> Unit = {}) {
+            viewModelScope.launch {
+                val data = (sportsRepo.activeEvents() as? NetworkResult.Success)?.data
+                _activeSportsEvents.value = data?.events.orEmpty()
+                _primarySportsEvent.value = data?.primaryEvent ?: data?.events?.firstOrNull()
+                then()
+            }
+        }
+
+        /**
+         * Sync the viewing radius from the context bar. A manual change
+         * re-arms the suggestion banner.
+         */
+        fun setViewingRadiusMiles(miles: Double) {
+            if (_viewingRadiusMiles.value == miles) return
+            _viewingRadiusMiles.value = miles
+            radiusSuggestionDismissed = false
+            recomputeRadiusSuggestion()
+        }
+
+        /** Dismiss the radius-suggestion banner for this radius. */
+        fun dismissRadiusSuggestion() {
+            radiusSuggestionDismissed = true
+            _radiusSuggestion.value = null
+        }
+
+        private fun recomputeRadiusSuggestion() {
+            if (_surface.value != FeedSurface.Pulse || radiusSuggestionDismissed) {
+                _radiusSuggestion.value = null
+                return
+            }
+            _radiusSuggestion.value =
+                FeedRadiusSuggestion.compute(
+                    currentRadius = _viewingRadiusMiles.value,
+                    itemCount = loadedPosts.size,
+                )
+        }
+
+        /**
+         * `topic` param — Place-only, and only while a lane is active
+         * (`backend/routes/posts.js:1481-1484` rejects it elsewhere).
+         */
+        private fun topicQueryValue(): String? =
+            if (_surface.value == FeedSurface.Pulse) _activeTopic.value?.key else null
+
+        /** `eventKey` param — the user's pick, else the primary event. */
+        private fun resolvedEventKey(): String? = eventKey ?: _primarySportsEvent.value?.eventKey
 
         /** Update the search query — filters the loaded pages client-side. */
         fun setSearchText(text: String) {
@@ -541,9 +715,12 @@ class PulseFeedViewModel
                                 surface = _surface.value.backendSurface,
                                 latitude = lat,
                                 longitude = lng,
-                                postType = _activeIntent.value.postType,
+                                postType = if (isInSportsLane) null else _activeIntent.value.postType,
                                 cursorCreatedAt = cursorCreatedAt,
                                 cursorId = cursorId,
+                                topic = topicQueryValue(),
+                                sportsMode = if (isInSportsLane) _sportsMode.value.key else null,
+                                eventKey = if (isInSportsLane) resolvedEventKey() else null,
                             )
                     ) {
                         is NetworkResult.Success -> {
@@ -614,7 +791,10 @@ class PulseFeedViewModel
                                 surface = _surface.value.backendSurface,
                                 latitude = lat,
                                 longitude = lng,
-                                postType = _activeIntent.value.postType,
+                                postType = if (isInSportsLane) null else _activeIntent.value.postType,
+                                topic = topicQueryValue(),
+                                sportsMode = if (isInSportsLane) _sportsMode.value.key else null,
+                                eventKey = if (isInSportsLane) resolvedEventKey() else null,
                             )
                     ) {
                         is NetworkResult.Success -> {
@@ -622,6 +802,7 @@ class PulseFeedViewModel
                             scopeLabel = response.posts.firstOrNull()?.locationName ?: scopeLabel
                             loadedPosts = response.posts
                             applyPagination(response.pagination)
+                            recomputeRadiusSuggestion()
                             _state.value =
                                 if (response.posts.isEmpty()) {
                                     PulseFeedUiState.Empty(

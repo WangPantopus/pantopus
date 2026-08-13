@@ -48,6 +48,10 @@ public struct BusinessOwnerView: View {
     private let onOpenPayments: @MainActor () -> Void
     private let onOpenInvoices: @MainActor () -> Void
     private let onOpenLegal: @MainActor () -> Void
+    /// Business-inbox row taps — opens a chat room (`roomId`, counterpart
+    /// name, counterpart handle) or a matched neighborhood post.
+    private let onOpenChatRoom: @MainActor (String, String, String) -> Void
+    private let onOpenPost: @MainActor (String) -> Void
 
     public init(
         businessId: String,
@@ -60,6 +64,8 @@ public struct BusinessOwnerView: View {
         onOpenPayments: @escaping @MainActor () -> Void = {},
         onOpenInvoices: @escaping @MainActor () -> Void = {},
         onOpenLegal: @escaping @MainActor () -> Void = {},
+        onOpenChatRoom: @escaping @MainActor (String, String, String) -> Void = { _, _, _ in },
+        onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         content: BusinessOwnerContent? = nil
     ) {
         _viewModel = State(initialValue: BusinessOwnerViewModel(businessId: businessId, content: content))
@@ -73,11 +79,14 @@ public struct BusinessOwnerView: View {
         self.onOpenPayments = onOpenPayments
         self.onOpenInvoices = onOpenInvoices
         self.onOpenLegal = onOpenLegal
+        self.onOpenChatRoom = onOpenChatRoom
+        self.onOpenPost = onOpenPost
     }
 
     public var body: some View {
         content
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+            .overlay(alignment: .bottom) { toastOverlay }
             .accessibilityIdentifier("businessOwner")
             .task { await viewModel.load() }
             .sheet(isPresented: $showsComposer) {
@@ -114,10 +123,13 @@ public struct BusinessOwnerView: View {
                         onOpenLegal: onOpenLegal,
                         onPreview: { mode = .preview },
                         onManageCatalog: { mode = .catalog },
+                        onOpenInbox: { mode = .inbox },
                         onComposePost: { showsComposer = true },
                         onSubmitReply: { reviewId, text in
                             viewModel.submitReply(reviewId: reviewId, text: text)
-                        }
+                        },
+                        onClaimFounding: { Task { await viewModel.claimFoundingOffer() } },
+                        onDismissFounding: { viewModel.dismissFoundingBanner() }
                     )
                     .transition(.opacity)
                 case .preview:
@@ -130,6 +142,14 @@ public struct BusinessOwnerView: View {
                         mode = .owner
                         Task { await viewModel.refresh() }
                     }
+                    .transition(.opacity)
+                case .inbox:
+                    BusinessInboxView(
+                        businessId: payload.businessId,
+                        onBack: { mode = .owner },
+                        onOpenRoom: onOpenChatRoom,
+                        onOpenPost: onOpenPost
+                    )
                     .transition(.opacity)
                 }
             }
@@ -150,6 +170,29 @@ public struct BusinessOwnerView: View {
             ) { Task { await viewModel.refresh() } }
         }
     }
+
+    /// Founding-claim confirmation / error copy. RN raises an `Alert`;
+    /// native uses the same transient toast idiom as the rest of the app.
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            Text(toast)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s3)
+                .background(Theme.Color.appText)
+                .clipShape(Capsule())
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, 140)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    viewModel.toast = nil
+                }
+                .accessibilityIdentifier("businessOwner.toast")
+        }
+    }
 }
 
 /// Which frame the owner dashboard is showing.
@@ -158,6 +201,9 @@ enum OwnerViewMode: Hashable {
     case preview
     /// C2 — the catalog manager (services / products CRUD + reorder).
     case catalog
+    /// The business-side inbox — rooms addressed to the business identity
+    /// plus neighborhood posts matched to it.
+    case inbox
 }
 
 // MARK: - Owner / edit frame
@@ -179,10 +225,15 @@ struct OwnerEditFrame: View {
     let onPreview: @MainActor () -> Void
     /// C2 — opens the catalog manager frame ("Manage" / "Add a service").
     var onManageCatalog: @MainActor () -> Void = {}
+    /// Opens the business inbox frame (Messages + Mentions).
+    var onOpenInbox: @MainActor () -> Void = {}
     /// C2 — opens the "Post as this business" composer. Only reachable
     /// when `content.canPostAsBusiness`.
     var onComposePost: @MainActor () -> Void = {}
     let onSubmitReply: @MainActor (String, String) -> Void
+    /// Founding-business offer banner actions.
+    var onClaimFounding: @MainActor () -> Void = {}
+    var onDismissFounding: @MainActor () -> Void = {}
 
     private var profile: BusinessProfileContent {
         content.publicProfile
@@ -239,6 +290,14 @@ struct OwnerEditFrame: View {
 
     private func scrollBody(in profile: BusinessProfileContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
+            if let offer = content.foundingOffer {
+                FoundingOfferBanner(
+                    offer: offer,
+                    onClaim: onClaimFounding,
+                    onDismiss: onDismissFounding
+                )
+                .padding(.top, 14)
+            }
             InsightTiles(insights: content.insights, onOpenInsights: onOpenInsights)
                 .padding(.top, 14)
             ProfileStrengthCard(strength: content.profileStrength) { _ in onEditPage() }
@@ -272,6 +331,15 @@ struct OwnerEditFrame: View {
 
             OwnerSectionHeader(title: "Pages", actionLabel: "Manage", actionIcon: .fileText, onAction: onOpenPages)
             PagesSummaryRow(onOpen: onOpenPages)
+
+            OwnerSectionHeader(title: "Inbox", actionLabel: "Open", actionIcon: .inbox, onAction: onOpenInbox)
+            OwnerNavRow(
+                icon: .inbox,
+                title: "Messages & mentions",
+                subtitle: "Conversations with this business and posts that mention it",
+                identifier: "businessOwner.inboxRow",
+                onOpen: onOpenInbox
+            )
 
             OwnerSectionHeader(title: "Money & legal")
             VStack(spacing: Spacing.s2) {

@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.api.models.feed.FeedPostCreator
 import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.sports.ActiveSportsEventsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
@@ -15,6 +16,7 @@ import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
+import app.pantopus.android.data.sports.SportsRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -48,6 +50,13 @@ class PulseFeedViewModelTest {
             override suspend fun requestCurrent(timeoutMillis: Long): UserCoordinate? = null
         }
     private val postsRefresh = PulsePostsRefreshNotifier()
+
+    // Sports lane — only queried once the Sports topic is selected.
+    private val sportsRepo: SportsRepository =
+        mockk {
+            coEvery { activeEvents() } returns
+                NetworkResult.Success(ActiveSportsEventsResponse(primaryEvent = null, events = emptyList()))
+        }
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -110,7 +119,7 @@ class PulseFeedViewModelTest {
         )
 
     private fun makeVm(): PulseFeedViewModel =
-        PulseFeedViewModel(repo, feedActions, authRepo, locationProvider, postsRefresh)
+        PulseFeedViewModel(repo, feedActions, authRepo, locationProvider, postsRefresh, sportsRepo)
 
     @Test fun load_with_posts_transitions_loaded() =
         runTest {

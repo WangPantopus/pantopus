@@ -38,6 +38,7 @@ public struct PulseComposeView: View {
         businessAuthorId: String? = nil,
         managesDismiss: Bool = true,
         taskShare: PulseTaskShare? = nil,
+        prefillBody: String? = nil,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
@@ -48,7 +49,8 @@ public struct PulseComposeView: View {
             composePurpose: composePurpose,
             postId: postId,
             businessAuthorId: businessAuthorId,
-            taskShare: taskShare
+            taskShare: taskShare,
+            prefillBody: prefillBody
         ))
         self.managesDismiss = managesDismiss
         self.onCancel = onCancel
@@ -174,7 +176,9 @@ public struct PulseComposeView: View {
             onSelectDealExpires: { viewModel.dealExpiresAt = $0 },
             onUpdateField: { viewModel.update($0, to: $1) },
             onPickPhotos: { showsPhotosPicker = true },
-            onRemovePhoto: { viewModel.remove(photo: $0) }
+            onRemovePhoto: { viewModel.remove(photo: $0) },
+            onBodyEditingEnded: { Task { await viewModel.runPrecheck() } },
+            onDismissPrecheckNudge: { viewModel.precheckNudge = nil }
         )
     }
 
@@ -212,6 +216,9 @@ public extension PulseComposeViewModel {
             recommendRating: recommendRating,
             dealExpiresAt: dealExpiresAt,
             eligibilityWarning: eligibilityWarning,
+            precheckNudge: precheckNudge,
+            precheckCooldown: precheckCooldown,
+            isVisitorPost: isVisitorPost,
             fields: fields,
             photos: photos,
             isIntentLocked: isIntentLocked,

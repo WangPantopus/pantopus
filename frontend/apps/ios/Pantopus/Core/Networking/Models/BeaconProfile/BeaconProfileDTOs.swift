@@ -134,6 +134,11 @@ public struct BeaconPostDTO: Decodable, Sendable, Hashable, Identifiable {
     public let locked: Bool?
     public let teaser: String?
     public let mediaUrls: [String]?
+    /// Set on Post rows published through a broadcast channel
+    /// (`backend/routes/broadcastChannels.js:554`). Non-nil is what makes a
+    /// row eligible for a read receipt — RN gates on the same field
+    /// (`src/app/persona/[personaHandle]/index.tsx:66`).
+    public let broadcastChannelId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, body, content, visibility, locked, teaser
@@ -144,6 +149,7 @@ public struct BeaconPostDTO: Decodable, Sendable, Hashable, Identifiable {
         case deliveredCount = "delivered_count"
         case readCount = "read_count"
         case mediaUrls = "media_urls"
+        case broadcastChannelId = "broadcast_channel_id"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -161,5 +167,6 @@ public struct BeaconPostDTO: Decodable, Sendable, Hashable, Identifiable {
         locked = try c.decodeIfPresent(Bool.self, forKey: .locked)
         teaser = try c.decodeIfPresent(String.self, forKey: .teaser)
         mediaUrls = try c.decodeIfPresent([String].self, forKey: .mediaUrls)
+        broadcastChannelId = try c.decodeIfPresent(String.self, forKey: .broadcastChannelId)
     }
 }

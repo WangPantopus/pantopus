@@ -1,5 +1,7 @@
 package app.pantopus.android.data.following
 
+import app.pantopus.android.data.api.models.following.FollowNotificationLevelBody
+import app.pantopus.android.data.api.models.following.FollowPreferencesResponse
 import app.pantopus.android.data.api.models.following.FollowingActionEcho
 import app.pantopus.android.data.api.models.following.FollowingListResponse
 import app.pantopus.android.data.api.models.following.FollowingMuteBody
@@ -31,4 +33,13 @@ class FollowingRepository
         ): NetworkResult<FollowingMuteResponse> = safeApiCall { api.mute(personaId, FollowingMuteBody(days = days)) }
 
         suspend fun unfollow(personaId: String): NetworkResult<FollowingActionEcho> = safeApiCall { api.unfollow(personaId) }
+
+        /** `PATCH …/follow/preferences` — All / Highlights / Off. */
+        suspend fun updateNotificationLevel(
+            personaId: String,
+            level: String,
+        ): NetworkResult<FollowPreferencesResponse> =
+            safeApiCall {
+                api.updateNotificationLevel(personaId, FollowNotificationLevelBody(notificationLevel = level))
+            }
     }

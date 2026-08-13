@@ -126,6 +126,19 @@ final class DeepLinkRouter {
         case viewAs
         /// `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room.
         case waitingRoom(id: String)
+        /// `pantopus://hub-today?deliveryId=&kind=morning|evening` — the Hub
+        /// "Today" briefing opened from a Morning/Evening Briefing push. The
+        /// notification's metadata carries `briefing_delivery_id` +
+        /// `briefing_kind`; with an id the screen resolves that stored
+        /// delivery rather than only the live `/api/hub/today` snapshot.
+        /// Mirrors RN `resolveNotificationRoute`'s `/hub-today?…` target
+        /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`).
+        case hubToday(briefingDeliveryId: String?, kind: String?)
+        /// `pantopus://profile?tab=receipt` — the profile tab with the Monthly
+        /// Receipt card auto-expanded, the target RN resolves for a
+        /// `monthly_receipt` notification
+        /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:29`).
+        case monthlyReceipt
         case unknown(URL)
     }
 
@@ -257,6 +270,36 @@ final class DeepLinkRouter {
         }
     }
 
+    /// Morning/Evening Briefing and Monthly Receipt pushes ship no `link` —
+    /// the briefing carries `{ type, route: "/hub/today", briefingKind,
+    /// briefingDeliveryId }` (`backend/routes/internalBriefing.js:239`), and
+    /// the receipt push is typed only. Compose the same paths RN's
+    /// `resolveNotificationRoute` produces
+    /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`)
+    /// so the tap resolves the specific stored briefing / expands the card.
+    ///
+    /// `nonisolated` + `[AnyHashable: Any]` in, `String?` out — the caller
+    /// (`AppDelegate`) never smuggles the non-Sendable payload across actors.
+    nonisolated static func pushFallbackPath(userInfo: [AnyHashable: Any]) -> String? {
+        let type = (userInfo["type"] as? String ?? "").lowercased()
+        if type == "monthly_receipt" { return "/profile?tab=receipt" }
+        let briefingTypes: Set<String> = ["daily_briefing", "morning_briefing", "evening_briefing"]
+        guard briefingTypes.contains(type) else { return nil }
+        let rawKind = type == "evening_briefing"
+            ? "evening"
+            : ((userInfo["briefingKind"] as? String)
+                ?? (userInfo["briefing_kind"] as? String)
+                ?? "").lowercased()
+        let kind = rawKind == "evening" ? "evening" : "morning"
+        let deliveryId = (userInfo["briefingDeliveryId"] as? String)
+            ?? (userInfo["briefing_delivery_id"] as? String)
+        guard let deliveryId, !deliveryId.isEmpty else { return "/hub-today?kind=\(kind)" }
+        let encoded = deliveryId.addingPercentEncoding(
+            withAllowedCharacters: .urlQueryAllowed
+        ) ?? deliveryId
+        return "/hub-today?kind=\(kind)&deliveryId=\(encoded)"
+    }
+
     static func normalizeIncoming(_ path: String) -> String {
         if path.hasPrefix("pantopus://") || path.hasPrefix("http") {
             return path
@@ -375,6 +418,19 @@ final class DeepLinkRouter {
             // RN `/join/:code` → register-with-invite. Root presents the same
             // token-accept surface it uses for `.invite`.
             if let code = segments.dropFirst().first, !code.isEmpty { return .joinInvite(code: code) }
+            return .unknown(url)
+        case "hub-today", "hub_today", "today":
+            // `?deliveryId=` + `?kind=` ride the Morning/Evening Briefing push.
+            return .hubToday(
+                briefingDeliveryId: queryValue("deliveryId", in: comps)
+                    ?? queryValue("briefing_delivery_id", in: comps),
+                kind: queryValue("kind", in: comps)
+                    ?? queryValue("briefing_kind", in: comps)
+            )
+        case "profile":
+            // Only `?tab=receipt` is deep-linkable today (the monthly-receipt
+            // push). A bare `pantopus://profile` falls through to `.unknown`.
+            if tabQuery?.lowercased() == "receipt" { return .monthlyReceipt }
             return .unknown(url)
         case "connections":
             return .connections

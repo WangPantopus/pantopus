@@ -1,6 +1,7 @@
 package app.pantopus.android.data.upload
 
 import app.pantopus.android.data.api.models.audience.PersonaMediaUploadResponse
+import app.pantopus.android.data.api.models.businesses.BusinessMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
@@ -115,6 +116,30 @@ class UploadRepository
             safeApiCall {
                 uploadApi.uploadPersonaMedia(
                     personaId = personaId,
+                    type = type,
+                    file =
+                        MultipartBody.Part.createFormData(
+                            name = "file",
+                            filename = file.filename,
+                            body = file.bytes.toRequestBody(file.mimeType.toMediaTypeOrNull()),
+                        ),
+                )
+            }
+
+        /**
+         * Business logo / banner. Single part named `file` (singular) and a
+         * `type` query param — `logo` or `banner`. The server writes the URL
+         * onto the business profile itself, so no follow-up PATCH is needed.
+         * Route `backend/routes/upload.js:1679`.
+         */
+        suspend fun uploadBusinessMedia(
+            businessId: String,
+            type: String,
+            file: UploadFile,
+        ): NetworkResult<BusinessMediaUploadResponse> =
+            safeApiCall {
+                uploadApi.uploadBusinessMedia(
+                    businessId = businessId,
                     type = type,
                     file =
                         MultipartBody.Part.createFormData(

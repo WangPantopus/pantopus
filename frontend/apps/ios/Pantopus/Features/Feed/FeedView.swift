@@ -35,10 +35,16 @@ public struct FeedView: View {
     /// Map-mode engine. Lazily activated the first time the Map segment
     /// is selected (`FeedMapView.task`).
     @State private var mapViewModel: FeedMapViewModel
+    /// Viewing-location switcher above the Nearby feed — RN
+    /// `FeedScreen.tsx:151-155`.
+    @State private var contextBarViewModel: FeedContextBarViewModel
     /// List / Map segment — mirrors RN `FeedHeader.tsx:35-52`.
     @State private var viewMode: FeedViewMode = .list
     @State private var isSearchVisible = false
     @State private var showsIntentPicker = false
+    /// Sports starter tapped in the empty state — presents the compose
+    /// flow with the prompt already in the body.
+    @State private var sportsStarter: PulseSportsStarter?
     /// Non-nil while the system share sheet is up for one post.
     @State private var shareTarget: FeedShareTarget?
     @FocusState private var searchFieldFocused: Bool
@@ -59,6 +65,11 @@ public struct FeedView: View {
         let resolved = viewModel ?? PulseFeedViewModel()
         _viewModel = State(initialValue: resolved)
         _mapViewModel = State(initialValue: mapViewModel ?? FeedMapViewModel(surface: resolved.surface))
+        // No retain cycle: the feed view-model never references the
+        // context bar back.
+        _contextBarViewModel = State(initialValue: FeedContextBarViewModel {
+            Task { await resolved.refresh() }
+        })
         self.onOpenPost = onOpenPost
         self.onCompose = onCompose
         self.onEmptyCTA = onEmptyCTA
@@ -75,13 +86,39 @@ public struct FeedView: View {
                 if isSearchVisible {
                     searchField
                 }
-                FeedChipRow(
-                    chips: PulseIntent.allCases.map { FeedChipItem(id: $0.rawValue, label: $0.label) },
-                    activeId: viewModel.activeIntent.rawValue,
-                    skeleton: isInitialLoading
-                ) { id in
-                    let intent = PulseIntent(rawValue: id) ?? .all
-                    selectIntent(intent)
+                if viewModel.surface == .pulse {
+                    FeedContextBar(viewModel: contextBarViewModel)
+                }
+                if !viewModel.availableTopics.isEmpty {
+                    PulseTopicChipRow(
+                        topics: viewModel.availableTopics,
+                        activeTopic: viewModel.activeTopic
+                    ) { topic in
+                        Task { await viewModel.selectTopic(topic) }
+                    }
+                }
+                chipRow
+                if viewModel.isInSportsLane, let event = viewModel.primarySportsEvent {
+                    PulseSportsEventModule(
+                        event: event,
+                        onSeeThreads: {
+                            Task { await viewModel.selectSportsEvent(eventKey: event.eventKey) }
+                        },
+                        onStartThread: { onCompose(viewModel.activeIntent) }
+                    )
+                }
+                if viewModel.surface == .pulse, let suggestion = viewModel.radiusSuggestion {
+                    FeedRadiusSuggestionBanner(
+                        suggestion: suggestion,
+                        onApply: {
+                            Task {
+                                if await contextBarViewModel.applyRadius(suggestion.suggestedRadius) {
+                                    viewModel.viewingRadiusMiles = suggestion.suggestedRadius
+                                }
+                            }
+                        },
+                        onDismiss: { viewModel.dismissRadiusSuggestion() }
+                    )
                 }
                 if viewMode == .map {
                     FeedMapView(
@@ -103,6 +140,11 @@ public struct FeedView: View {
         }
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
+        .task {
+            guard viewModel.surface == .pulse else { return }
+            await contextBarViewModel.load()
+            viewModel.viewingRadiusMiles = contextBarViewModel.radiusMiles
+        }
         .onReceive(NotificationCenter.default.publisher(for: .pulsePostsDidChange)) { _ in
             Task { await viewModel.refresh() }
         }
@@ -123,7 +165,51 @@ public struct FeedView: View {
             overflowRow: overflowRow
         ))
         .overlay(alignment: .bottom) { toastOverlay }
+        .fullScreenCover(item: $sportsStarter) { starter in
+            PulseComposeFlowView(
+                prefillFeedIntent: .ask,
+                prefillBody: starter.placeholder,
+                onCancel: { sportsStarter = nil },
+                onPosted: { _ in
+                    sportsStarter = nil
+                    Task { await viewModel.refresh() }
+                }
+            )
+        }
         .accessibilityIdentifier("pulseFeed")
+    }
+
+    /// Open the composer pre-filled from a Sports starter prompt.
+    @MainActor
+    private func onComposeStarter(_ starter: PulseSportsStarter) {
+        sportsStarter = starter
+    }
+
+    /// Filter chips. Inside a topic lane the post-type row is replaced by
+    /// the lane's own mode chips — RN `FeedScreen.tsx:129`.
+    @ViewBuilder private var chipRow: some View {
+        if viewModel.isInSportsLane {
+            let chips = viewModel.sportsModeChips
+            if !chips.isEmpty {
+                FeedChipRow(
+                    chips: chips.map { FeedChipItem(id: $0.mode.rawValue, label: $0.label) },
+                    activeId: viewModel.sportsMode.rawValue,
+                    skeleton: isInitialLoading
+                ) { id in
+                    let mode = PulseSportsMode(rawValue: id) ?? .forYou
+                    Task { await viewModel.selectSportsMode(mode) }
+                }
+            }
+        } else {
+            FeedChipRow(
+                chips: PulseIntent.allCases.map { FeedChipItem(id: $0.rawValue, label: $0.label) },
+                activeId: viewModel.activeIntent.rawValue,
+                skeleton: isInitialLoading
+            ) { id in
+                let intent = PulseIntent(rawValue: id) ?? .all
+                selectIntent(intent)
+            }
+        }
     }
 
     /// The row whose overflow menu is open, if any.
@@ -420,6 +506,14 @@ public struct FeedView: View {
                         .stroke(Theme.Color.appBorder, lineWidth: 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .padding(.top, Spacing.s4)
+            }
+            // Sports lane starter prompts — tapping one opens the
+            // composer pre-filled (RN `FeedEmptyState` starters).
+            if viewModel.isInSportsLane {
+                PulseSportsStarterRow { starter in
+                    onComposeStarter(starter)
+                }
                 .padding(.top, Spacing.s4)
             }
             Spacer()

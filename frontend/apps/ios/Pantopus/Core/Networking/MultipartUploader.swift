@@ -352,6 +352,55 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Upload a business logo or banner via
+    /// `POST /api/upload/business-media/:businessId?type=logo|banner`
+    /// (`backend/routes/upload.js:1679`). Single file, field name `file`,
+    /// images only — the route resizes (800×800 for logos, 1600×900 for
+    /// banners), writes `BusinessProfile.logo_file_id` / `banner_file_id`
+    /// plus the mirrored `User.profile_picture_url` / `cover_photo_url`,
+    /// and echoes the new URL. Requires the `profile.edit` permission on
+    /// the business (403 otherwise).
+    /// Mirrors RN `api.upload.uploadBusinessMedia`
+    /// (`packages/api/src/endpoints/upload.ts:498`).
+    public func uploadBusinessMedia(
+        businessId: String,
+        kind: BusinessMediaKind,
+        file: MultipartFile
+    ) async throws -> BusinessMediaUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        var components = URLComponents(
+            url: environment.apiBaseURL.appendingPathComponent("/api/upload/business-media/\(businessId)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "type", value: kind.rawValue)]
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        // The route reads `type` from the query string or the form body —
+        // send both so a proxy that strips the query still resolves the slot.
+        let body = Self.buildBody(boundary: boundary, file: file, fields: ["type": kind.rawValue])
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(BusinessMediaUploadResponse.self, from: data)
+            } catch {
+                logger.error("Business media upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 403:
+            throw APIError.clientError(status: 403, message: "You do not have permission to edit this business profile.")
+        case 413:
+            throw APIError.clientError(status: 413, message: "That image is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Business media must be an image.")
+        case 400..<500:
+            throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload images to `POST /api/upload/ai-media` for AI vision prompts.
     public func uploadAIMedia(files: [MultipartFile]) async throws -> AIMediaUploadResponse {
         guard !files.isEmpty else {

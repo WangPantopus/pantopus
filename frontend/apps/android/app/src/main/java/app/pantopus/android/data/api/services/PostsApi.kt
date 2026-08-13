@@ -45,6 +45,12 @@ interface PostsApi {
         @Query("limit") limit: Int = 20,
         @Query("cursorCreatedAt") cursorCreatedAt: String? = null,
         @Query("cursorId") cursorId: String? = null,
+        // Topic lane params — validated at
+        // `backend/routes/posts.js:1478-1489`. `topic` is Place-only and
+        // `sportsMode` must be one of for_you|local|event|watch.
+        @Query("topic") topic: String? = null,
+        @Query("sportsMode") sportsMode: String? = null,
+        @Query("eventKey") eventKey: String? = null,
     ): FeedResponse
 
     /**

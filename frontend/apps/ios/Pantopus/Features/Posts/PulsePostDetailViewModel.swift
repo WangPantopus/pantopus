@@ -116,6 +116,12 @@ public final class PulsePostDetailViewModel {
     /// Set after a successful author delete so the view can pop back.
     public private(set) var didDeletePost: Bool = false
 
+    /// "Nearby Providers" — organically matched local businesses for this
+    /// post's `service_category`. Empty when the post has no category, is
+    /// older than the 30-day window, or nothing matched; the card is hidden
+    /// in all three cases, exactly like RN.
+    public private(set) var nearbyProviders: [NearbyProviderRow] = []
+
     /// Viewer's bookmark state (`POST /:id/save` toggle).
     public private(set) var isSaved: Bool = false
 
@@ -416,6 +422,45 @@ public final class PulsePostDetailViewModel {
             logger.warning("Post detail load failed: \(error)")
             state = .error(message: "Something went wrong")
         }
+    }
+
+    /// `GET /api/posts/:id/matched-businesses?cached=true`
+    /// (`backend/routes/posts.js:2550`). Best-effort — a failure just hides
+    /// the card rather than failing the post. Kicked from its own `.task`
+    /// so the card never blocks (or fails) the post itself.
+    public func loadNearbyProviders() async {
+        await fetchNearbyProviders()
+    }
+
+    private func fetchNearbyProviders() async {
+        do {
+            let response = try await client.request(
+                MatchedBusinessesEndpoints.matchedBusinesses(postId: postId),
+                as: MatchedBusinessesResponse.self
+            )
+            nearbyProviders = response.businesses.compactMap(Self.providerRow(from:))
+        } catch {
+            logger.warning("Matched businesses load failed: \(error)")
+            nearbyProviders = []
+        }
+    }
+
+    /// Rows need a username to route to `/business/:username`; a payload
+    /// without one is dropped rather than rendered as a dead tap target.
+    static func providerRow(from dto: MatchedBusinessDTO) -> NearbyProviderRow? {
+        guard let username = dto.username, !username.isEmpty else { return nil }
+        return NearbyProviderRow(
+            id: dto.businessUserId,
+            username: username,
+            name: dto.name?.isEmpty == false ? (dto.name ?? username) : username,
+            avatarURL: dto.profilePictureUrl.flatMap(URL.init(string:)),
+            category: dto.categories?.first,
+            ratingLabel: NearbyProviderFormat.ratingLabel(dto.averageRating),
+            reviewCountLabel: (dto.reviewCount ?? 0) > 0 ? "\(dto.reviewCount ?? 0)" : nil,
+            distanceLabel: NearbyProviderFormat.distanceLabel(dto.distanceMiles),
+            neighborLabel: NearbyProviderFormat.neighborLabel(dto.neighborCount),
+            isNew: dto.isNewBusiness ?? false
+        )
     }
 
     private func rebuildContent(from post: PostDetailDTO) -> PulsePostDetailContent {

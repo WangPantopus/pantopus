@@ -51,6 +51,17 @@ data class FirstRunContent(
 data class PopulatedContent(
     val topBar: TopBarContent,
     val actionChips: List<ActionChipContent>,
+    /**
+     * Server-driven "Needs attention" strip — `GET /api/hub`'s
+     * `statusItems[]` (`backend/routes/hub.js:24`). Mirrors RN
+     * `src/components/hub/HubActionStrip.tsx`.
+     */
+    val statusItems: List<StatusStripItem> = emptyList(),
+    /**
+     * Neighbor-density pill + milestone banner. `null` when the viewer
+     * has no home or the backend omits the block.
+     */
+    val neighborDensity: NeighborDensityContent? = null,
     val setupBanner: SetupBannerContent?,
     val today: TodaySummary?,
     val pillars: List<PillarTile>,
@@ -58,6 +69,68 @@ data class PopulatedContent(
     val jumpBackIn: List<JumpBackItem>,
     val activity: List<ActivityEntry>,
 )
+
+/**
+ * One pill in the hub's "Needs attention" strip, projected from
+ * `GET /api/hub`'s `statusItems[]`. The backend owns the copy, the
+ * severity and the tap route; the client only owns the dismissal.
+ */
+@Immutable
+data class StatusStripItem(
+    val id: String,
+    val title: String,
+    val subtitle: String?,
+    val severity: Severity,
+    val icon: PantopusIcon,
+    /** Canonical web route the host maps to a native destination. */
+    val route: String,
+) {
+    /** Server severity, drives the pill tint. */
+    enum class Severity {
+        Critical,
+        Warning,
+        Info,
+        ;
+
+        companion object {
+            fun fromRaw(raw: String): Severity =
+                when (raw.lowercase()) {
+                    "critical" -> Critical
+                    "warning" -> Warning
+                    else -> Info
+                }
+        }
+    }
+}
+
+/**
+ * Neighbor-density pill + optional milestone banner — `GET /api/hub`'s
+ * `neighborDensity` block. Mirrors RN
+ * `src/components/hub/NeighborDensity.tsx`.
+ */
+@Immutable
+data class NeighborDensityContent(
+    /** Verified neighbors inside [radiusMiles]. */
+    val count: Int,
+    val radiusMiles: Double,
+    /** Server-authored celebration copy; `null` hides the banner. */
+    val milestone: String?,
+    /**
+     * Home the dismissal is recorded against. `null` disables the
+     * dismiss call (the banner still hides locally).
+     */
+    val homeId: String?,
+) {
+    /** "12 verified neighbors within 1 mi". */
+    val pillText: String
+        get() {
+            val noun = if (count == 1) "neighbor" else "neighbors"
+            return "$count verified $noun within ${formatRadius(radiusMiles)}"
+        }
+
+    private fun formatRadius(miles: Double): String =
+        if (miles == Math.floor(miles)) "${miles.toInt()} mi" else String.format("%.1f mi", miles)
+}
 
 /** Setup-step row. */
 @Immutable
@@ -242,6 +315,14 @@ sealed interface HubNavigationIntent {
 
     data class DiscoveryTapped(
         val item: DiscoveryCardContent,
+    ) : HubNavigationIntent
+
+    /**
+     * Tap on a server-driven "Needs attention" pill. The host resolves
+     * `item.route` the same way it resolves a jump-back-in route.
+     */
+    data class StatusItemTapped(
+        val item: StatusStripItem,
     ) : HubNavigationIntent
 
     /** Hub Discovery rail "See all" CTA — pushes the typed Discover hub

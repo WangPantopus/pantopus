@@ -329,7 +329,13 @@ public enum HubRoute: Hashable {
     case placeholder(label: String)
     /// A10.3 — Full "Today" briefing (weather, air, daylight, signals).
     /// Pushed when the Hub's Today card is tapped.
-    case todayDetail
+    ///
+    /// `briefingDeliveryId` / `briefingKind` are non-nil only when the screen
+    /// was opened from a Morning/Evening Briefing push, whose metadata carries
+    /// `briefing_delivery_id` + `briefing_kind`. With an id the screen resolves
+    /// that stored delivery (`GET /api/hub/briefings/:id`) instead of showing
+    /// only the live `/api/hub/today` snapshot.
+    case todayDetail(briefingDeliveryId: String?, briefingKind: String?)
     /// A.4 — Property details for a home.
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
@@ -805,6 +811,11 @@ public struct HubTabRoot: View {
         case .discoverHub:
             path.append(.discoverHub)
             _ = router.consume()
+        case let .hubToday(briefingDeliveryId, kind):
+            // Morning/Evening Briefing push → the stored delivery, not just
+            // the live `/api/hub/today` snapshot.
+            path.append(.todayDetail(briefingDeliveryId: briefingDeliveryId, briefingKind: kind))
+            _ = router.consume()
         case .wallet:
             path.append(.wallet)
             _ = router.consume()
@@ -933,9 +944,24 @@ public struct HubTabRoot: View {
                 } else {
                     path.append(Self.route(forJumpBackIn: item))
                 }
+            case let .statusItem(item):
+                // `statusItems[].route` uses the same canonical web paths
+                // as `jumpBackIn[].route`, so they share one resolver.
+                if item.route.hasPrefix("/app/chat") {
+                    rootTabs.selected = .messages
+                } else {
+                    path.append(Self.route(
+                        forJumpBackIn: JumpBackItem(
+                            id: item.id,
+                            title: item.title,
+                            icon: item.icon,
+                            route: item.route
+                        )
+                    ))
+                }
             // `openToday` taps the weather/today card → full Today briefing
             // (A10.3 — weather, air, daylight, and neighbourhood signals).
-            case .openToday: path.append(.todayDetail)
+            case .openToday: path.append(.todayDetail(briefingDeliveryId: nil, briefingKind: nil))
             case .openRecentActivity: path.append(.recentActivity)
             }
         }
@@ -1847,6 +1873,10 @@ public struct HubTabRoot: View {
                 },
                 onEdit: { id in
                     Task { @MainActor in push(.editPost(postId: id)) }
+                },
+                onOpenBusiness: { username in
+                    // "Nearby Providers" row → `/business/:username`.
+                    Task { @MainActor in push(.businessProfile(businessId: username)) }
                 }
             )
         case .mailboxVault:
@@ -2525,8 +2555,12 @@ public struct HubTabRoot: View {
             NotYetAvailableView(tabName: label, icon: .info)
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
-        case .todayDetail:
+        case let .todayDetail(briefingDeliveryId, briefingKind):
             TodayDetailView(
+                viewModel: TodayDetailViewModel(
+                    briefingDeliveryId: briefingDeliveryId,
+                    requestedKind: briefingKind
+                ),
                 onBack: pop,
                 onShare: {
                     systemSheet = .share(items: ["Today's Pantopus briefing — \(InviteLinks.downloadURLString)"])
@@ -2788,7 +2822,19 @@ public struct HubTabRoot: View {
                 onOpenPages: { Task { @MainActor in push(.businessPages(businessId: businessId)) } },
                 onOpenPayments: { Task { @MainActor in push(.businessPaymentsOwner(businessId: businessId)) } },
                 onOpenInvoices: { Task { @MainActor in push(.businessInvoicesOwner(businessId: businessId)) } },
-                onOpenLegal: { Task { @MainActor in push(.businessLegal(businessId: businessId)) } }
+                onOpenLegal: { Task { @MainActor in push(.businessLegal(businessId: businessId)) } },
+                onOpenChatRoom: { roomId, name, _ in
+                    Task { @MainActor in
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .room(id: roomId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
+                onOpenPost: { postId in Task { @MainActor in push(.pulsePost(postId: postId)) } }
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)

@@ -52,6 +52,7 @@ fun FollowingActionSheet(
     onMarkSeen: () -> Unit,
     onMute: (Int) -> Unit,
     onUnfollow: () -> Unit,
+    onNotificationLevel: (FollowingNotificationLevel) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -68,6 +69,7 @@ fun FollowingActionSheet(
                         onMarkSeen = onMarkSeen,
                         onMuteStep = { step = SheetStep.Mute },
                         onUnfollow = onUnfollow,
+                        onNotificationLevel = onNotificationLevel,
                     )
                 SheetStep.Mute ->
                     MuteStep(
@@ -93,9 +95,15 @@ private fun ActionsStep(
     onMarkSeen: () -> Unit,
     onMuteStep: () -> Unit,
     onUnfollow: () -> Unit,
+    onNotificationLevel: (FollowingNotificationLevel) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag("followingActionSheet")) {
         ContextHeader(target)
+        SheetDivider()
+        NotificationLevelPicker(
+            selected = target.notificationLevel,
+            onSelect = onNotificationLevel,
+        )
         SheetDivider()
         SheetActionRow(
             icon = PantopusIcon.CheckCheck,
@@ -261,6 +269,69 @@ private fun StepperButton(
         contentAlignment = Alignment.Center,
     ) {
         Text(symbol, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)
+    }
+}
+
+@Composable
+private fun NotificationLevelPicker(
+    selected: FollowingNotificationLevel,
+    onSelect: (FollowingNotificationLevel) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("followingNotifyPicker"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "Notifications",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp,
+            color = PantopusColors.appTextMuted,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            FollowingNotificationLevel.entries.forEach { level ->
+                val active = level == selected
+                Row(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(
+                                if (active) PantopusColors.appSurface else androidx.compose.ui.graphics.Color.Transparent,
+                            ).clickable { onSelect(level) }
+                            .padding(vertical = 7.dp)
+                            .testTag("followingNotify.${level.wire}"),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PantopusIconImage(
+                        icon = level.icon,
+                        contentDescription = null,
+                        size = 13.dp,
+                        tint = if (active) PantopusColors.primary600 else PantopusColors.appTextSecondary,
+                    )
+                    Text(
+                        text = level.label,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (active) PantopusColors.appText else PantopusColors.appTextSecondary,
+                        modifier = Modifier.padding(start = Spacing.s1),
+                    )
+                }
+            }
+        }
     }
 }
 

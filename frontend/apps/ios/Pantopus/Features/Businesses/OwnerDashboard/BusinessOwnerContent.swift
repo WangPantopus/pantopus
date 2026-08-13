@@ -114,6 +114,24 @@ public struct OwnerReviewItem: Sendable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Founding offer
+
+/// First-50 "Founding Business" offer banner. Present only when the offer
+/// is still active, this business has not already claimed a slot, and the
+/// owner has not dismissed the banner — the same three-way gate RN applies
+/// (`src/app/businesses/[id]/index.tsx:108-119`).
+public struct OwnerFoundingOffer: Sendable, Hashable {
+    /// `slots_remaining` from `GET /api/businesses/founding-offer/status`.
+    public let slotsRemaining: Int
+    /// True while `POST …/founding-offer/claim` is in flight.
+    public let isClaiming: Bool
+
+    public init(slotsRemaining: Int, isClaiming: Bool = false) {
+        self.slotsRemaining = slotsRemaining
+        self.isClaiming = isClaiming
+    }
+}
+
 // MARK: - Top-level payload
 
 /// Top-level content for the owner dashboard. `publicProfile` is the exact
@@ -139,6 +157,8 @@ public struct BusinessOwnerContent: Sendable, Hashable {
     /// /api/businesses/:businessId/posts` requires `profile.edit`, so a
     /// staff / viewer seat never sees the affordance.
     public let canPostAsBusiness: Bool
+    /// Founding-business offer banner; `nil` renders nothing.
+    public let foundingOffer: OwnerFoundingOffer?
 
     public init(
         businessId: String,
@@ -149,8 +169,10 @@ public struct BusinessOwnerContent: Sendable, Hashable {
         reviewsToReplyLabel: String?,
         reviews: [OwnerReviewItem],
         publicProfile: BusinessProfileContent,
-        canPostAsBusiness: Bool = false
+        canPostAsBusiness: Bool = false,
+        foundingOffer: OwnerFoundingOffer? = nil
     ) {
+        self.foundingOffer = foundingOffer
         self.businessId = businessId
         self.isLive = isLive
         self.editedMeta = editedMeta
@@ -190,7 +212,25 @@ public struct BusinessOwnerContent: Sendable, Hashable {
             reviewsToReplyLabel: recomputeReplyLabel(after: updated),
             reviews: updated,
             publicProfile: publicProfile,
-            canPostAsBusiness: canPostAsBusiness
+            canPostAsBusiness: canPostAsBusiness,
+            foundingOffer: foundingOffer
+        )
+    }
+
+    /// Returns a copy with a different founding-offer banner state — used
+    /// for the dismiss (`nil`) and the in-flight claim spinner.
+    public func withFoundingOffer(_ offer: OwnerFoundingOffer?) -> BusinessOwnerContent {
+        BusinessOwnerContent(
+            businessId: businessId,
+            isLive: isLive,
+            editedMeta: editedMeta,
+            insights: insights,
+            profileStrength: profileStrength,
+            reviewsToReplyLabel: reviewsToReplyLabel,
+            reviews: reviews,
+            publicProfile: publicProfile,
+            canPostAsBusiness: canPostAsBusiness,
+            foundingOffer: offer
         )
     }
 

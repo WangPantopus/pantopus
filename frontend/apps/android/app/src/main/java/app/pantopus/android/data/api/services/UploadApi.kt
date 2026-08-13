@@ -1,6 +1,7 @@
 package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.audience.PersonaMediaUploadResponse
+import app.pantopus.android.data.api.models.businesses.BusinessMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.AIMediaUploadResponse
 import app.pantopus.android.data.api.models.chats.ChatMediaUploadResponse
 import app.pantopus.android.data.api.models.listings.ListingMediaUploadResponse
@@ -79,4 +80,21 @@ interface UploadApi {
         @Query("type") type: String,
         @Part file: MultipartBody.Part,
     ): PersonaMediaUploadResponse
+
+    /**
+     * Upload a business logo or banner. Single part named `file`, images
+     * only; `type` is `logo` or `banner`. The server resizes (800x800 for
+     * logos, 1600x900 for banners), writes `logo_file_id` /
+     * `banner_file_id` on the business profile plus the mirrored
+     * `User.profile_picture_url` / `cover_photo_url`, and echoes the new
+     * URL. Requires the `profile.edit` permission on the business.
+     * Route `backend/routes/upload.js:1679`.
+     */
+    @Multipart
+    @POST("api/upload/business-media/{businessId}")
+    suspend fun uploadBusinessMedia(
+        @Path("businessId") businessId: String,
+        @Query("type") type: String,
+        @Part file: MultipartBody.Part,
+    ): BusinessMediaUploadResponse
 }

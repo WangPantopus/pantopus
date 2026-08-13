@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +75,8 @@ import app.pantopus.android.ui.screens.business_profile.components.CategoryRow
 import app.pantopus.android.ui.screens.business_profile.components.EmptyBlock
 import app.pantopus.android.ui.screens.business_profile.components.HoursTable
 import app.pantopus.android.ui.screens.businesses.catalog.BusinessCatalogScreen
+import app.pantopus.android.ui.screens.businesses.inbox.BusinessInboxScreen
+import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.FoundingOfferBanner
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.InsightTiles
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerComposeFab
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerHeaderBanner
@@ -90,6 +93,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.delay
 
 /**
  * A10.7 — the single-business owner dashboard, the owner-facing twin of
@@ -118,9 +122,14 @@ fun BusinessOwnerScreen(
     onOpenPayments: () -> Unit = {},
     onOpenInvoices: () -> Unit = {},
     onOpenLegal: () -> Unit = {},
+    /** Business-inbox row taps — opens a chat room (`roomId`, counterpart
+     *  name, counterpart handle) or a matched neighborhood post. */
+    onOpenChatRoom: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenPost: (String) -> Unit = {},
     viewModel: BusinessOwnerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
     var mode by remember { mutableStateOf(OwnerViewMode.Owner) }
     /** C2 — bumped per composer open so each post starts from a blank draft. */
     var composeSession by remember { mutableIntStateOf(0) }
@@ -169,11 +178,14 @@ fun BusinessOwnerScreen(
                                 onOpenLegal = onOpenLegal,
                                 onPreview = { mode = OwnerViewMode.Preview },
                                 onManageCatalog = { mode = OwnerViewMode.Catalog },
+                                onOpenInbox = { mode = OwnerViewMode.Inbox },
                                 onComposePost = {
                                     composeSession += 1
                                     mode = OwnerViewMode.Compose
                                 },
                                 onSubmitReply = { id, text -> viewModel.submitReply(id, text) },
+                                onClaimFounding = viewModel::claimFoundingOffer,
+                                onDismissFounding = viewModel::dismissFoundingBanner,
                             )
                         OwnerViewMode.Preview ->
                             OwnerPreviewFrame(
@@ -186,6 +198,12 @@ fun BusinessOwnerScreen(
                                     mode = OwnerViewMode.Owner
                                     viewModel.refresh()
                                 },
+                            )
+                        OwnerViewMode.Inbox ->
+                            BusinessInboxScreen(
+                                onBack = { mode = OwnerViewMode.Owner },
+                                onOpenRoom = onOpenChatRoom,
+                                onOpenPost = onOpenPost,
                             )
                         OwnerViewMode.Compose ->
                             // C2 — reuse the shared Pulse composer, pointed at
@@ -204,6 +222,40 @@ fun BusinessOwnerScreen(
                     }
                 }
         }
+
+        // Founding-claim confirmation / error copy. RN raises an `Alert`;
+        // native uses the same transient toast idiom as the rest of the app.
+        OwnerToastOverlay(message = toast, onDismiss = viewModel::consumeToast)
+    }
+}
+
+@Composable
+private fun BoxScope.OwnerToastOverlay(
+    message: String?,
+    onDismiss: () -> Unit,
+) {
+    if (message == null) return
+    LaunchedEffect(message) {
+        delay(3_000)
+        onDismiss()
+    }
+    Box(
+        modifier =
+            Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 140.dp, start = Spacing.s4, end = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appText)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("businessOwner.toast"),
+    ) {
+        Text(
+            text = message,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextInverse,
+        )
     }
 }
 
@@ -217,6 +269,10 @@ enum class OwnerViewMode {
 
     /** C2 — "Post as this business" (role-gated). */
     Compose,
+
+    /** The business-side inbox — rooms addressed to the business identity
+     *  plus neighborhood posts matched to it. */
+    Inbox,
 }
 
 // MARK: - Owner / edit frame
@@ -239,8 +295,13 @@ internal fun OwnerEditFrame(
     onOpenLegal: () -> Unit = {},
     /** C2 — opens the catalog manager frame ("Manage" / "Add a service"). */
     onManageCatalog: () -> Unit = {},
+    /** Opens the business inbox frame (Messages + Mentions). */
+    onOpenInbox: () -> Unit = {},
     /** C2 — opens the "Post as this business" composer. */
     onComposePost: () -> Unit = {},
+    /** Founding-business offer banner actions. */
+    onClaimFounding: () -> Unit = {},
+    onDismissFounding: () -> Unit = {},
 ) {
     val profile = content.publicProfile
     Box(modifier = Modifier.fillMaxSize().testTag("businessOwner.edit")) {
@@ -276,7 +337,10 @@ internal fun OwnerEditFrame(
                         onOpenInvoices = onOpenInvoices,
                         onOpenLegal = onOpenLegal,
                         onManageCatalog = onManageCatalog,
+                        onOpenInbox = onOpenInbox,
                         onSubmitReply = onSubmitReply,
+                        onClaimFounding = onClaimFounding,
+                        onDismissFounding = onDismissFounding,
                     )
                 }
             }
@@ -319,8 +383,19 @@ private fun OwnerSections(
     onOpenInvoices: () -> Unit,
     onOpenLegal: () -> Unit,
     onManageCatalog: () -> Unit,
+    onOpenInbox: () -> Unit,
     onSubmitReply: (String, String) -> Unit,
+    onClaimFounding: () -> Unit,
+    onDismissFounding: () -> Unit,
 ) {
+    content.foundingOffer?.let { offer ->
+        FoundingOfferBanner(
+            offer = offer,
+            onClaim = onClaimFounding,
+            onDismiss = onDismissFounding,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+    }
     InsightTiles(
         insights = content.insights,
         onOpenInsights = onOpenInsights,
@@ -411,6 +486,20 @@ private fun OwnerSections(
         subtitle = "Build menus, about pages and more with content blocks",
         testTagValue = "businessOwner.pagesRow",
         onOpen = onOpenPages,
+    )
+
+    OwnerSectionHeader(
+        title = "Inbox",
+        actionLabel = "Open",
+        actionIcon = PantopusIcon.Inbox,
+        onAction = onOpenInbox,
+    )
+    OwnerNavRow(
+        icon = PantopusIcon.Inbox,
+        title = "Messages & mentions",
+        subtitle = "Conversations with this business and posts that mention it",
+        testTagValue = "businessOwner.inboxRow",
+        onOpen = onOpenInbox,
     )
 
     OwnerSectionHeader(title = "Money & legal")

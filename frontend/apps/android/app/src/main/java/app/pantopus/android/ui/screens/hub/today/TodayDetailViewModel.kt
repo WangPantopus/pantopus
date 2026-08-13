@@ -2,8 +2,10 @@
 
 package app.pantopus.android.ui.screens.hub.today
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.hub.BriefingDeliveryDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.hub.HubRepository
@@ -29,11 +31,28 @@ class TodayDetailViewModel
     @Inject
     constructor(
         private val repository: HubRepository,
+        savedStateHandle: SavedStateHandle = SavedStateHandle(),
     ) : ViewModel() {
         private var fixture: TodayDetailContent? = null
 
+        /** `DailyBriefingDelivery.id` carried by the push notification. */
+        private val briefingDeliveryId: String? =
+            savedStateHandle.get<String>(BRIEFING_DELIVERY_ID_KEY)?.takeIf { it.isNotEmpty() }
+
+        /** `morning` | `evening` from the notification type / metadata. */
+        private val requestedKind: String? =
+            savedStateHandle.get<String>(BRIEFING_KIND_KEY)?.takeIf { it.isNotEmpty() }
+
         private val _state = MutableStateFlow<TodayDetailUiState>(TodayDetailUiState.Loading)
         val state: StateFlow<TodayDetailUiState> = _state.asStateFlow()
+
+        /**
+         * Header title — "Morning Briefing" / "Evening Briefing" once a stored
+         * delivery (or the deep link's kind) resolves; "Today" otherwise.
+         * Mirrors RN `hub-today.tsx`'s `headerTitle`.
+         */
+        private val _headerTitle = MutableStateFlow(titleForKind(requestedKind))
+        val headerTitle: StateFlow<String> = _headerTitle.asStateFlow()
 
         fun load() {
             val seed = fixture
@@ -44,14 +63,19 @@ class TodayDetailViewModel
             }
             _state.value = TodayDetailUiState.Loading
             viewModelScope.launch {
+                // Resolve the stored briefing first when the push carried one,
+                // so a briefing that outlives the live Today window still opens.
+                val briefing = fetchBriefing()
+                (briefing?.briefingKind ?: requestedKind)?.let { _headerTitle.value = titleForKind(it) }
                 when (val result = repository.todayDetail()) {
                     is NetworkResult.Success -> {
                         val payload = result.data
+                        val hasStoredSummary = !briefing?.summaryText.isNullOrEmpty()
                         _state.value =
-                            if (!payload.isRenderable) {
+                            if (!payload.isRenderable && !hasStoredSummary) {
                                 TodayDetailUiState.Error("Today's briefing isn't available right now.")
                             } else {
-                                val content = TodayDetailMapper.fromPayload(payload)
+                                val content = TodayDetailMapper.fromPayload(payload, briefing)
                                 if (content.isAlert) {
                                     TodayDetailUiState.Alert(content)
                                 } else {
@@ -60,10 +84,26 @@ class TodayDetailViewModel
                             }
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = TodayDetailUiState.Error(result.error.displayMessage("Couldn't load Today."))
+                        // A stored briefing is enough to render on its own — RN
+                        // falls back the same way.
+                        _state.value =
+                            if (!briefing?.summaryText.isNullOrEmpty()) {
+                                TodayDetailUiState.Populated(TodayDetailMapper.fromPayload(null, briefing))
+                            } else {
+                                TodayDetailUiState.Error(result.error.displayMessage("Couldn't load Today."))
+                            }
                     }
                 }
             }
+        }
+
+        /**
+         * `GET /api/hub/briefings/:id`. A missing / expired delivery degrades to
+         * the live Today payload rather than failing the screen.
+         */
+        private suspend fun fetchBriefing(): BriefingDeliveryDto? {
+            val id = briefingDeliveryId ?: return null
+            return (repository.briefingDelivery(id) as? NetworkResult.Success)?.data?.briefing
         }
 
         fun refresh() = load()
@@ -71,5 +111,17 @@ class TodayDetailViewModel
         /** Test/preview seam — swap the stub fixture before calling [load]. */
         fun setFixture(content: TodayDetailContent) {
             this.fixture = content
+        }
+
+        companion object {
+            const val BRIEFING_DELIVERY_ID_KEY = "briefingDeliveryId"
+            const val BRIEFING_KIND_KEY = "briefingKind"
+
+            fun titleForKind(kind: String?): String =
+                when (kind?.lowercase()) {
+                    "evening" -> "Evening Briefing"
+                    "morning" -> "Morning Briefing"
+                    else -> "Today"
+                }
         }
     }

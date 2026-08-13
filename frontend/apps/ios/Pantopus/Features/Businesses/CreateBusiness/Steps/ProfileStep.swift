@@ -2,24 +2,30 @@
 //  ProfileStep.swift
 //  Pantopus
 //
-//  Create Business step 3 — Location Form + Hours. Both sections may be
-//  skipped. Composed with Wizard + Form tokens (no design frames).
+//  Create Business step 3 — Location Form + Hours + Logo. All three
+//  sections may be skipped. Composed with Wizard + Form tokens (no design
+//  frames). The logo lives here rather than in its own step because
+//  A12.10's designed frame 1 fixes the readout at "1 of 4"; RN carries it
+//  as a separate step (`src/app/businesses/new.tsx:27`).
 //
 
+import PhotosUI
 import SwiftUI
 
 struct ProfileStep: View {
     @Bindable var viewModel: CreateBusinessWizardViewModel
+    @State private var logoSelection: PhotosPickerItem?
 
     var body: some View {
         BusinessIdentityChip()
         HeadlineBlock(
-            "Location & hours",
-            subtitle: "Add a primary address and weekly hours, or skip for now."
+            "Location, hours & logo",
+            subtitle: "Add a primary address, weekly hours and a logo, or skip for now."
         )
 
         locationSection
         hoursSection
+        logoSection
 
         if let submitError = viewModel.submitError, viewModel.currentStep == .profile {
             Text(submitError)
@@ -27,6 +33,104 @@ struct ProfileStep: View {
                 .foregroundStyle(Theme.Color.error)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("createBusinessSubmitError")
+        }
+    }
+
+    // MARK: - Logo
+
+    @ViewBuilder
+    private var logoSection: some View {
+        if viewModel.logoSkipped {
+            skippedCard(
+                icon: .image,
+                label: "Logo skipped",
+                subcopy: "You can add a logo later from the dashboard.",
+                actionLabel: "Add a logo",
+                action: viewModel.unskipLogo
+            )
+        } else {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text("Logo")
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appText)
+                HStack(spacing: Spacing.s4) {
+                    PhotosPicker(selection: $logoSelection, matching: .images) {
+                        Group {
+                            if let data = viewModel.logoPick?.data, let image = UIImage(data: data) {
+                                Image(uiImage: image).resizable().scaledToFill()
+                            } else {
+                                VStack(spacing: Spacing.s1) {
+                                    Icon(.image, size: 20, color: Theme.Color.appTextMuted)
+                                    Text("Tap to select")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Theme.Color.appTextSecondary)
+                                }
+                            }
+                        }
+                        .frame(width: 96, height: 96)
+                        .background(Theme.Color.appSurfaceSunken)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Choose a business logo")
+                    .accessibilityIdentifier("createBusiness_logoPicker")
+
+                    VStack(alignment: .leading, spacing: Spacing.s2) {
+                        Text("Square works best — we crop to 800×800.")
+                            .pantopusTextStyle(.caption)
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                        if viewModel.logoPick != nil {
+                            Button {
+                                logoSelection = nil
+                                viewModel.clearLogoPick()
+                            } label: {
+                                Text("Remove")
+                                    .pantopusTextStyle(.body)
+                                    .foregroundStyle(Theme.Color.error)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("createBusiness_logoRemove")
+                        }
+                    }
+                    Spacer(minLength: Spacing.s0)
+                }
+                Button {
+                    logoSelection = nil
+                    viewModel.skipLogo()
+                } label: {
+                    Text("Skip logo for now")
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("createBusiness_skipLogo")
+            }
+            .onChange(of: logoSelection) { _, item in
+                loadLogo(item)
+            }
+        }
+    }
+
+    private func loadLogo(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            let mime = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+            let ext = mime == "image/png" ? "png" : "jpg"
+            await MainActor.run {
+                viewModel.setLogoPick(
+                    CreateBusinessLogoPick(
+                        data: data,
+                        // Randomised name — the picker's `IMG_xxxx` never
+                        // reaches S3 / access logs.
+                        fileName: "business-logo-\(UUID().uuidString.prefix(8)).\(ext)",
+                        mimeType: mime
+                    )
+                )
+            }
         }
     }
 

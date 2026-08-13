@@ -35,12 +35,115 @@ public enum HubState: Sendable {
     public struct PopulatedContent: Sendable {
         public let topBar: TopBarContent
         public let actionChips: [ActionChipContent]
+        /// Server-driven "Needs attention" strip — `GET /api/hub`'s
+        /// `statusItems[]` (`backend/routes/hub.js:24`). Mirrors RN
+        /// `src/components/hub/HubActionStrip.tsx`.
+        public let statusItems: [StatusStripItem]
+        /// Neighbor-density pill + milestone banner. `nil` when the
+        /// viewer has no home or the backend omits the block.
+        public let neighborDensity: NeighborDensityContent?
         public let setupBanner: SetupBannerContent?
         public let today: TodaySummary?
         public let pillars: [PillarTile]
         public let discovery: [DiscoveryCardContent]
         public let jumpBackIn: [JumpBackItem]
         public let activity: [ActivityEntry]
+
+        public init(
+            topBar: TopBarContent,
+            actionChips: [ActionChipContent],
+            statusItems: [StatusStripItem] = [],
+            neighborDensity: NeighborDensityContent? = nil,
+            setupBanner: SetupBannerContent?,
+            today: TodaySummary?,
+            pillars: [PillarTile],
+            discovery: [DiscoveryCardContent],
+            jumpBackIn: [JumpBackItem],
+            activity: [ActivityEntry]
+        ) {
+            self.topBar = topBar
+            self.actionChips = actionChips
+            self.statusItems = statusItems
+            self.neighborDensity = neighborDensity
+            self.setupBanner = setupBanner
+            self.today = today
+            self.pillars = pillars
+            self.discovery = discovery
+            self.jumpBackIn = jumpBackIn
+            self.activity = activity
+        }
+    }
+}
+
+/// One pill in the hub's "Needs attention" strip. Projected from
+/// `GET /api/hub`'s `statusItems[]` — the backend owns the copy, the
+/// severity, and the tap route; the client only owns the dismissal.
+public struct StatusStripItem: Identifiable, Sendable, Hashable {
+    /// Server severity, drives the pill tint.
+    public enum Severity: String, Sendable, Hashable {
+        case critical, warning, info
+
+        public init(raw: String) {
+            self = Severity(rawValue: raw.lowercased()) ?? .info
+        }
+    }
+
+    public let id: String
+    public let title: String
+    public let subtitle: String?
+    public let severity: Severity
+    public let icon: PantopusIcon
+    /// Canonical web route the host maps to a native destination.
+    public let route: String
+
+    public init(
+        id: String,
+        title: String,
+        subtitle: String?,
+        severity: Severity,
+        icon: PantopusIcon,
+        route: String
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.severity = severity
+        self.icon = icon
+        self.route = route
+    }
+}
+
+/// Neighbor-density pill + optional milestone banner —
+/// `GET /api/hub`'s `neighborDensity` block. Mirrors RN
+/// `src/components/hub/NeighborDensity.tsx`.
+public struct NeighborDensityContent: Sendable, Hashable {
+    /// Verified neighbors inside `radiusMiles`.
+    public let count: Int
+    public let radiusMiles: Double
+    /// Server-authored celebration copy; `nil` hides the banner.
+    public let milestone: String?
+    /// Home the dismissal is recorded against. `nil` disables the
+    /// dismiss call (the banner still hides locally).
+    public let homeId: String?
+
+    public init(count: Int, radiusMiles: Double, milestone: String?, homeId: String?) {
+        self.count = count
+        self.radiusMiles = radiusMiles
+        self.milestone = milestone
+        self.homeId = homeId
+    }
+
+    /// Pill copy — "👥 12 verified neighbors within 1 mi" in RN; the
+    /// native pill renders the glyph separately.
+    public var pillText: String {
+        let noun = count == 1 ? "neighbor" : "neighbors"
+        return "\(count) verified \(noun) within \(Self.formatRadius(radiusMiles))"
+    }
+
+    /// `1` → "1 mi", `1.5` → "1.5 mi".
+    static func formatRadius(_ miles: Double) -> String {
+        if miles == miles.rounded() { return "\(Int(miles)) mi" }
+        return String(format: "%.1f mi", miles)
     }
 }
 

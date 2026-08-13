@@ -30,7 +30,11 @@ class CreateBusinessWizardViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm(): CreateBusinessWizardViewModel = CreateBusinessWizardViewModel(businessesRepository = mockk(relaxed = true))
+    private fun makeVm(): CreateBusinessWizardViewModel =
+        CreateBusinessWizardViewModel(
+            businessesRepository = mockk(relaxed = true),
+            uploadRepository = mockk(relaxed = true),
+        )
 
     @Test
     fun initial_state_is_pick_category_with_home_default() {
@@ -111,6 +115,45 @@ class CreateBusinessWizardViewModelTest {
         vm.onPrimary() // blocked without fields
         assertEquals(CreateBusinessStep.LegalInfo, vm.state.value.currentStep)
         assertNotNull(vm.state.value.submitError)
+    }
+
+    /**
+     * A12.10 parity: Save-as-draft is a confirm-step-only ghost, so the
+     * earlier steps must not render it.
+     */
+    @Test
+    fun save_as_draft_ghost_is_confirm_step_only() {
+        val vm = makeVm()
+        assertNull(vm.chrome.secondaryCta)
+        vm.onPrimary() // → legal info
+        assertNull(vm.chrome.secondaryCta)
+        // Secondary taps outside the confirm step are inert.
+        vm.onSecondary()
+        assertEquals(CreateBusinessStep.LegalInfo, vm.state.value.currentStep)
+        assertNull(vm.pendingEvent.value)
+    }
+
+    @Test
+    fun logo_pick_is_held_until_create_and_can_be_skipped() {
+        val vm = makeVm()
+        assertNull(vm.state.value.logoPick)
+
+        vm.setLogoPick(
+            CreateBusinessLogoPick(
+                bytes = byteArrayOf(1),
+                fileName = "business-logo-abc.jpg",
+                mimeType = "image/jpeg",
+            ),
+        )
+        assertEquals("business-logo-abc.jpg", vm.state.value.logoPick?.fileName)
+        assertFalse(vm.state.value.logoSkipped)
+
+        vm.skipLogo()
+        assertNull(vm.state.value.logoPick)
+        assertTrue(vm.state.value.logoSkipped)
+
+        vm.unskipLogo()
+        assertFalse(vm.state.value.logoSkipped)
     }
 
     @Test

@@ -143,6 +143,23 @@ public extension BusinessCategory {
     }
 }
 
+/// A logo picked in the wizard, held in memory until create-full returns a
+/// business id (`POST /api/upload/business-media/:businessId` needs one).
+/// The filename is randomised at pick time so the photo library's
+/// `IMG_xxxx` name never reaches S3 — same firewall RN applies in
+/// `src/utils/mediaFirewall.ts`.
+public struct CreateBusinessLogoPick: Sendable, Equatable {
+    public let data: Data
+    public let fileName: String
+    public let mimeType: String
+
+    public init(data: Data, fileName: String, mimeType: String) {
+        self.data = data
+        self.fileName = fileName
+        self.mimeType = mimeType
+    }
+}
+
 /// Live username-availability state for the basic-info step.
 public enum UsernameCheckStatus: Sendable, Equatable {
     case idle

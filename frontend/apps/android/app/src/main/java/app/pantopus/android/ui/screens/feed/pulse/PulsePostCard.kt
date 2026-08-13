@@ -582,7 +582,11 @@ private fun PulseIntent.tintColors(): Pair<Color, Color> =
         PulseIntent.Recommend -> PantopusColors.success to PantopusColors.successLight
         PulseIntent.Event -> PantopusColors.magic to PantopusColors.magicBg
         PulseIntent.Lost -> PantopusColors.rose to PantopusColors.roseBg
+        PulseIntent.Alert -> PantopusColors.error to PantopusColors.errorBg
+        PulseIntent.Deal -> PantopusColors.success to PantopusColors.successBg
         PulseIntent.Announce -> PantopusColors.slate to PantopusColors.slateBg
+        PulseIntent.NeighborhoodWin -> PantopusColors.warning to PantopusColors.warningBg
+        PulseIntent.VisitorGuide -> PantopusColors.info to PantopusColors.infoBg
     }
 
 private fun buildA11yLabel(content: PulsePostCardContent): String {

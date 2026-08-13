@@ -16,6 +16,7 @@ import app.pantopus.android.data.api.models.beacon.BeaconViewerDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.beacon.BeaconProfileRepository
+import app.pantopus.android.data.broadcast.BroadcastReadRepository
 import app.pantopus.android.ui.screens.profile.PublicProfilePost
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -36,6 +37,10 @@ import org.junit.Test
 class BeaconProfileViewModelTest {
     private val repo: BeaconProfileRepository = mockk()
 
+    /** Read receipts are fire-and-forget; relaxed so cases that don't assert
+     *  on them never need a stub. */
+    private val broadcastReads: BroadcastReadRepository = mockk(relaxed = true)
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
     }
@@ -44,9 +49,10 @@ class BeaconProfileViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun ownerVm() = BeaconProfileViewModel(repo, SavedStateHandle())
+    private fun ownerVm() = BeaconProfileViewModel(repo, broadcastReads, SavedStateHandle())
 
-    private fun visitorVm(handle: String = "mariak") = BeaconProfileViewModel(repo, SavedStateHandle(mapOf(BEACON_HANDLE_KEY to handle)))
+    private fun visitorVm(handle: String = "mariak") =
+        BeaconProfileViewModel(repo, broadcastReads, SavedStateHandle(mapOf(BEACON_HANDLE_KEY to handle)))
 
     private fun persona(
         viewer: BeaconViewerDto? = null,

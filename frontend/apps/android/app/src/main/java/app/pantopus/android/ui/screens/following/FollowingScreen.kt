@@ -1,10 +1,12 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.following
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,6 +76,9 @@ fun FollowingScreen(
     val sort by viewModel.selectedSort.collectAsStateWithLifecycle()
     val actionTarget by viewModel.actionTarget.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val isSelecting by viewModel.isSelecting.collectAsStateWithLifecycle()
+    val selectedRowIds by viewModel.selectedRowIds.collectAsStateWithLifecycle()
+    val pendingBulk by viewModel.pendingBulkUnfollow.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(toast) {
@@ -89,7 +96,15 @@ fun FollowingScreen(
                 .testTag(FOLLOWING_TAG),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            FollowingTopBar(state = state, onBack = onBack)
+            if (isSelecting) {
+                FollowingSelectionTopBar(
+                    selectedCount = selectedRowIds.size,
+                    onCancel = viewModel::exitSelection,
+                    onUnfollow = viewModel::requestBulkUnfollow,
+                )
+            } else {
+                FollowingTopBar(state = state, onBack = onBack)
+            }
             when (val s = state) {
                 is FollowingUiState.Loading -> {
                     FollowingSortControl(sort, viewModel::selectSort)
@@ -97,7 +112,16 @@ fun FollowingScreen(
                 }
                 is FollowingUiState.Loaded -> {
                     FollowingSortControl(sort, viewModel::selectSort)
-                    FollowingLoadedList(s, onOpenPersona, viewModel::openActions)
+                    FollowingLoadedList(
+                        state = s,
+                        isSelecting = isSelecting,
+                        selectedRowIds = selectedRowIds,
+                        onOpenPersona = onOpenPersona,
+                        onToggleSelect = viewModel::toggleSelection,
+                        onLongPress = viewModel::beginSelection,
+                        onBell = viewModel::cycleNotificationLevel,
+                        onOverflow = viewModel::openActions,
+                    )
                 }
                 is FollowingUiState.Empty -> FollowingEmpty(onDiscover)
                 is FollowingUiState.Error -> FollowingError(s.message, viewModel::refresh)
@@ -112,8 +136,88 @@ fun FollowingScreen(
             onMarkSeen = { viewModel.markSeen(target) },
             onMute = { days -> viewModel.mute(target, days) },
             onUnfollow = { viewModel.unfollow(target) },
+            onNotificationLevel = { level -> viewModel.setNotificationLevel(target, level) },
             onDismiss = { viewModel.closeActions() },
         )
+    }
+
+    pendingBulk?.let { request ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelBulkUnfollow,
+            title = { Text(request.title, fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+            text = { Text(request.message, fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmBulkUnfollow(request) },
+                    modifier = Modifier.testTag("followingBulkUnfollow.confirm"),
+                ) {
+                    Text("Unfollow", color = PantopusColors.error, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelBulkUnfollow) {
+                    Text("Cancel", color = PantopusColors.appTextSecondary)
+                }
+            },
+            containerColor = PantopusColors.appSurface,
+            titleContentColor = PantopusColors.appText,
+            textContentColor = PantopusColors.appTextSecondary,
+            modifier = Modifier.testTag("followingBulkUnfollowDialog"),
+        )
+    }
+}
+
+/**
+ * Multi-select chrome: Cancel · "N selected" · Unfollow. Mirrors RN
+ * `renderHeader`'s select branch
+ * (`pantopus/frontend/apps/mobile/src/app/beacons/following.tsx:280`).
+ */
+@Composable
+private fun FollowingSelectionTopBar(
+    selectedCount: Int,
+    onCancel: () -> Unit,
+    onUnfollow: () -> Unit,
+) {
+    Column {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .background(PantopusColors.appSurfaceMuted)
+                    .padding(horizontal = Spacing.s4)
+                    .testTag("followingSelectBar"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Cancel",
+                fontSize = 15.sp,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onCancel)
+                        .testTag("followingSelect.cancel"),
+            )
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "$selectedCount selected",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PantopusColors.appText,
+                )
+            }
+            Text(
+                text = "Unfollow",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selectedCount == 0) PantopusColors.appTextMuted else PantopusColors.error,
+                modifier =
+                    Modifier
+                        .clickable(enabled = selectedCount > 0, onClick = onUnfollow)
+                        .testTag("followingSelect.unfollow"),
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
     }
 }
 
@@ -235,7 +339,12 @@ private fun FollowingSortControl(
 @Composable
 private fun FollowingLoadedList(
     state: FollowingUiState.Loaded,
+    isSelecting: Boolean,
+    selectedRowIds: Set<String>,
     onOpenPersona: (String) -> Unit,
+    onToggleSelect: (FollowingRow) -> Unit,
+    onLongPress: (FollowingRow) -> Unit,
+    onBell: (FollowingRow) -> Unit,
     onOverflow: (FollowingRow) -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -244,7 +353,16 @@ private fun FollowingLoadedList(
                 FollowingSectionHeader(section)
             }
             item(key = "group-${section.kind.name}") {
-                FollowingRowGroup(section.rows, onOpenPersona, onOverflow)
+                FollowingRowGroup(
+                    rows = section.rows,
+                    isSelecting = isSelecting,
+                    selectedRowIds = selectedRowIds,
+                    onOpenPersona = onOpenPersona,
+                    onToggleSelect = onToggleSelect,
+                    onLongPress = onLongPress,
+                    onBell = onBell,
+                    onOverflow = onOverflow,
+                )
             }
         }
         item { Spacer(Modifier.height(Spacing.s5)) }
@@ -278,7 +396,12 @@ private fun FollowingSectionHeader(section: FollowingSection) {
 @Composable
 private fun FollowingRowGroup(
     rows: List<FollowingRow>,
+    isSelecting: Boolean,
+    selectedRowIds: Set<String>,
     onOpenPersona: (String) -> Unit,
+    onToggleSelect: (FollowingRow) -> Unit,
+    onLongPress: (FollowingRow) -> Unit,
+    onBell: (FollowingRow) -> Unit,
     onOverflow: (FollowingRow) -> Unit,
 ) {
     Column(
@@ -300,7 +423,16 @@ private fun FollowingRowGroup(
                         .background(PantopusColors.appBorderSubtle),
                 )
             }
-            FollowingRowItem(row, onOpenPersona, onOverflow)
+            FollowingRowItem(
+                row = row,
+                isSelecting = isSelecting,
+                isSelected = row.id in selectedRowIds,
+                onOpenPersona = onOpenPersona,
+                onToggleSelect = onToggleSelect,
+                onLongPress = onLongPress,
+                onBell = onBell,
+                onOverflow = onOverflow,
+            )
         }
     }
 }
@@ -308,44 +440,108 @@ private fun FollowingRowGroup(
 @Composable
 private fun FollowingRowItem(
     row: FollowingRow,
+    isSelecting: Boolean,
+    isSelected: Boolean,
     onOpenPersona: (String) -> Unit,
+    onToggleSelect: (FollowingRow) -> Unit,
+    onLongPress: (FollowingRow) -> Unit,
+    onBell: (FollowingRow) -> Unit,
     onOverflow: (FollowingRow) -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .alpha(if (row.isMuted) 0.62f else 1f)
+                .background(if (isSelected) PantopusColors.primary50 else Color.Transparent)
+                .alpha(if (row.isMuted || row.isPaused) 0.62f else 1f)
                 .padding(start = 14.dp, end = Spacing.s3, top = 11.dp, bottom = 11.dp)
                 .testTag("followingRow.${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (isSelecting) {
+            PantopusIconImage(
+                icon = if (isSelected) PantopusIcon.CheckCircle else PantopusIcon.Circle,
+                contentDescription = if (isSelected) "Selected" else "Not selected",
+                size = 22.dp,
+                tint = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorderStrong,
+                modifier = Modifier.testTag("followingRow.selectTick"),
+            )
+            Spacer(Modifier.width(Spacing.s2))
+        }
         Row(
-            modifier = Modifier.weight(1f).clickable { onOpenPersona(row.handle) },
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .combinedClickable(
+                        onClick = { if (isSelecting) onToggleSelect(row) else onOpenPersona(row.handle) },
+                        onLongClick = { onLongPress(row) },
+                    ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             FollowingAvatar(row.initials, row.tone.color, row.avatarUrl, row.verified, 44.dp)
             FollowingRowText(row, modifier = Modifier.weight(1f))
         }
-        FollowingTrailing(row.trailing)
-        Spacer(Modifier.width(Spacing.s1))
-        Box(
-            modifier =
-                Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .clickable { onOverflow(row) }
-                    .testTag("followingRow.overflow"),
-            contentAlignment = Alignment.Center,
-        ) {
-            PantopusIconImage(
-                icon = PantopusIcon.MoreHorizontal,
-                contentDescription = "More",
-                size = 18.dp,
-                tint = PantopusColors.appTextMuted,
-            )
+        if (!isSelecting) {
+            FollowingTrailing(row.trailing)
+            Spacer(Modifier.width(Spacing.s1))
+            FollowingBellButton(row = row, onBell = onBell)
+            Spacer(Modifier.width(Spacing.s1))
+            Box(
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .clickable { onOverflow(row) }
+                        .testTag("followingRow.overflow"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.MoreHorizontal,
+                    contentDescription = "More",
+                    size = 18.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
         }
+    }
+}
+
+/** Inline All / Highlights / Off bell. Tapping cycles the level. */
+@Composable
+private fun FollowingBellButton(
+    row: FollowingRow,
+    onBell: (FollowingRow) -> Unit,
+) {
+    val tint =
+        if (row.isPaused || row.notificationLevel == FollowingNotificationLevel.Off) {
+            PantopusColors.appTextMuted
+        } else {
+            PantopusColors.primary600
+        }
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.sm))
+                .background(PantopusColors.appSurfaceSunken)
+                .clickable(enabled = !row.isPaused) { onBell(row) }
+                .padding(horizontal = Spacing.s2, vertical = 6.dp)
+                .testTag("followingRow.bell"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = row.notificationLevel.icon,
+            contentDescription = "Notifications: ${row.notificationLevel.label}",
+            size = 14.dp,
+            tint = tint,
+        )
+        Text(
+            text = row.notificationLevel.label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (row.isPaused) PantopusColors.appTextMuted else PantopusColors.appTextStrong,
+        )
     }
 }
 
@@ -458,13 +654,10 @@ private fun FollowingTrailing(trailing: FollowingRowTrailing) {
                 size = 16.dp,
                 tint = PantopusColors.appTextMuted,
             )
-        is FollowingRowTrailing.Chevron ->
-            PantopusIconImage(
-                icon = PantopusIcon.ChevronRight,
-                contentDescription = null,
-                size = 18.dp,
-                tint = PantopusColors.appBorderStrong,
-            )
+        // The inline notification bell now owns the trailing rail, so the
+        // pure-affordance chevron is dropped to keep the row from stacking
+        // three trailing controls.
+        is FollowingRowTrailing.Chevron -> Unit
     }
 }
 

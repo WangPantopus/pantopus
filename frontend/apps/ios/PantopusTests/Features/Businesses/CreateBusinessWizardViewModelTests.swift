@@ -152,6 +152,36 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
         XCTAssertTrue(vm.whatYouGetItems.isEmpty, "Other categories don't have a payload yet.")
     }
 
+    /// A12.10 parity: Save-as-draft is a confirm-step-only ghost, so the
+    /// earlier steps must not render it.
+    func testSaveAsDraftGhostIsConfirmStepOnly() {
+        let vm = makeVM()
+        XCTAssertNil(vm.chrome.secondaryCTA, "Step 1 must not offer Save as draft.")
+        vm.primaryTapped() // → legalInfo
+        XCTAssertNil(vm.chrome.secondaryCTA, "Step 2 must not offer Save as draft.")
+        // Secondary taps outside the confirm step are inert.
+        vm.secondaryTapped()
+        XCTAssertEqual(vm.currentStep, .legalInfo)
+        XCTAssertNil(vm.pendingEvent)
+    }
+
+    func testLogoPickIsHeldUntilCreateAndCanBeSkipped() {
+        let vm = makeVM()
+        XCTAssertNil(vm.logoPick)
+        vm.setLogoPick(
+            CreateBusinessLogoPick(data: Data([0x1]), fileName: "business-logo-abc.jpg", mimeType: "image/jpeg")
+        )
+        XCTAssertEqual(vm.logoPick?.fileName, "business-logo-abc.jpg")
+        XCTAssertFalse(vm.logoSkipped)
+
+        vm.skipLogo()
+        XCTAssertNil(vm.logoPick, "Skipping clears the staged image so it is never uploaded.")
+        XCTAssertTrue(vm.logoSkipped)
+
+        vm.unskipLogo()
+        XCTAssertFalse(vm.logoSkipped)
+    }
+
     func testChromeIdentityAccentIsBusinessViolet() {
         // Smoke-check the WizardIdentity threading by verifying the
         // chrome wires up the violet identity at the call site. We can't

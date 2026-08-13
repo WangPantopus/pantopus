@@ -3,10 +3,14 @@
 package app.pantopus.android.ui.screens.creator_audience
 
 import app.pantopus.android.data.api.models.audience.AudienceCountsDto
+import app.pantopus.android.data.api.models.audience.AudienceFollowerDto
+import app.pantopus.android.data.api.models.audience.AudienceFollowerUpdateResponse
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
+import app.pantopus.android.data.api.models.audience.AudiencePaginationDto
 import app.pantopus.android.data.api.models.audience.FanDto
 import app.pantopus.android.data.api.models.audience.FanTierBadgeDto
+import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
@@ -72,7 +76,7 @@ class YourAudienceViewModelTest {
 
     @Test
     fun load_populated_projectsPendingAndTierGroups() {
-        coEvery { repository.audienceMembers(any(), any()) } returns NetworkResult.Success(populated)
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returns NetworkResult.Success(populated)
         val vm = YourAudienceViewModel(repository)
         vm.load()
 
@@ -89,7 +93,7 @@ class YourAudienceViewModelTest {
 
     @Test
     fun countsAndDerivations() {
-        coEvery { repository.audienceMembers(any(), any()) } returns NetworkResult.Success(populated)
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returns NetworkResult.Success(populated)
         val vm = YourAudienceViewModel(repository)
         vm.load()
 
@@ -109,7 +113,7 @@ class YourAudienceViewModelTest {
                 items = emptyList(),
                 counts = AudienceCountsDto(totalActive = 0, pending = 0, byTier = mapOf("1" to 0)),
             )
-        coEvery { repository.audienceMembers(any(), any()) } returns NetworkResult.Success(body)
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returns NetworkResult.Success(body)
         val vm = YourAudienceViewModel(repository)
         vm.load()
 
@@ -119,12 +123,89 @@ class YourAudienceViewModelTest {
 
     @Test
     fun load_failure_transitionsToError() {
-        coEvery { repository.audienceMembers(any(), any()) } returns
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returns
             NetworkResult.Failure(NetworkError.Server(500, null))
         val vm = YourAudienceViewModel(repository)
         vm.load()
 
         assertTrue(vm.state.value is YourAudienceUiState.Error)
+    }
+
+    @Test
+    fun cycleSort_advancesAndToasts() {
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returns
+            NetworkResult.Success(populated)
+        val vm = YourAudienceViewModel(repository)
+        vm.load()
+        assertEquals(AudienceSort.Recent, vm.sort.value)
+
+        vm.cycleSort()
+
+        assertEquals(AudienceSort.Tenure, vm.sort.value)
+        assertEquals("Sort: Longest-tenured first", vm.toast.value)
+    }
+
+    @Test
+    fun loadMore_appendsSecondPage() {
+        val page1 =
+            AudienceListResponse(
+                persona = PersonaSummaryDto(id = "p1"),
+                items = listOf(fan("m1", "a", "A", 4, false, "active", "2025-01")),
+                counts = AudienceCountsDto(totalActive = 2, pending = 0, byTier = mapOf("4" to 2)),
+                pagination = AudiencePaginationDto(nextOffset = 1, hasMore = true),
+            )
+        val page2 =
+            AudienceListResponse(
+                persona = PersonaSummaryDto(id = "p1"),
+                items = listOf(fan("m2", "b", "B", 4, false, "active", "2025-02")),
+                counts = AudienceCountsDto(totalActive = 2, pending = 0, byTier = mapOf("4" to 2)),
+                pagination = AudiencePaginationDto(nextOffset = null, hasMore = false),
+            )
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returnsMany
+            listOf(NetworkResult.Success(page1), NetworkResult.Success(page2))
+
+        val vm = YourAudienceViewModel(repository)
+        vm.load()
+        assertTrue(vm.hasMore)
+
+        vm.loadMore()
+
+        val loaded = (vm.state.value as YourAudienceUiState.Loaded).loaded
+        assertEquals(listOf("m1", "m2"), loaded.tierGroups.first().members.map { it.membershipId })
+        assertTrue(!vm.hasMore)
+    }
+
+    @Test
+    fun block_commitsFollowerStatusAndReFetches() {
+        val withPersona =
+            AudienceListResponse(
+                persona = PersonaSummaryDto(id = "p1"),
+                items = listOf(fan("m2", "priyanair", "Priya Nair", 4, true, "active", "2025-01")),
+                counts = AudienceCountsDto(totalActive = 1, pending = 0, byTier = mapOf("4" to 1)),
+            )
+        val afterBlock =
+            AudienceListResponse(
+                persona = PersonaSummaryDto(id = "p1"),
+                items = emptyList(),
+                counts = AudienceCountsDto(totalActive = 0, pending = 0, byTier = mapOf("4" to 0)),
+            )
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returnsMany
+            listOf(NetworkResult.Success(withPersona), NetworkResult.Success(afterBlock))
+        coEvery { repository.updateFollowerStatus("p1", "m2", "blocked") } returns
+            NetworkResult.Success(AudienceFollowerUpdateResponse(AudienceFollowerDto(id = "m2", status = "blocked")))
+
+        val vm = YourAudienceViewModel(repository)
+        vm.load()
+        val member = (vm.state.value as YourAudienceUiState.Loaded).loaded.tierGroups.first().members.first()
+
+        vm.requestBlock(member)
+        assertEquals("m2", vm.blockTarget.value?.membershipId)
+
+        vm.confirmBlock(member)
+
+        assertEquals(null, vm.blockTarget.value)
+        assertEquals("Blocked Priya Nair.", vm.toast.value)
+        assertTrue(vm.state.value is YourAudienceUiState.Empty)
     }
 
     @Test
@@ -137,7 +218,7 @@ class YourAudienceViewModelTest {
                     ),
                 counts = AudienceCountsDto(totalActive = 4, pending = 0, byTier = mapOf("3" to 3, "4" to 2)),
             )
-        coEvery { repository.audienceMembers(any(), any()) } returnsMany
+        coEvery { repository.audienceMembers(any(), any(), any(), any(), any()) } returnsMany
             listOf(NetworkResult.Success(populated), NetworkResult.Success(afterApprove))
         coEvery { repository.audienceMemberAction("m1", "approve") } returns
             NetworkResult.Success(AudienceMemberActionResponse("m1", "active"))

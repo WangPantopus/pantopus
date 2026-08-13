@@ -1,5 +1,7 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.following.FollowNotificationLevelBody
+import app.pantopus.android.data.api.models.following.FollowPreferencesResponse
 import app.pantopus.android.data.api.models.following.FollowingActionEcho
 import app.pantopus.android.data.api.models.following.FollowingListResponse
 import app.pantopus.android.data.api.models.following.FollowingMuteBody
@@ -59,4 +61,15 @@ interface FollowingApi {
     suspend fun unfollow(
         @Path("personaId") personaId: String,
     ): FollowingActionEcho
+
+    /**
+     * `PATCH /api/personas/:id/follow/preferences` — per-Beacon notification
+     * level (`all | highlights | none`). Route
+     * `backend/routes/personas.js:1743`.
+     */
+    @PATCH("api/personas/{personaId}/follow/preferences")
+    suspend fun updateNotificationLevel(
+        @Path("personaId") personaId: String,
+        @Body body: FollowNotificationLevelBody,
+    ): FollowPreferencesResponse
 }

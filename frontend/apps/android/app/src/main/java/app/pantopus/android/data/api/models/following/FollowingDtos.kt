@@ -1,5 +1,6 @@
 package app.pantopus.android.data.api.models.following
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
@@ -90,6 +91,25 @@ data class FollowingSeenResponse(
 @JsonClass(generateAdapter = true)
 data class FollowingMuteResponse(
     val mutedUntil: String? = null,
+)
+
+/**
+ * `PATCH /api/personas/:id/follow/preferences` body. The validator requires
+ * `notification_level` to be one of `all | highlights | none`
+ * (`notificationPreferenceSchema`, `backend/routes/personas.js:88`).
+ */
+@JsonClass(generateAdapter = true)
+data class FollowNotificationLevelBody(
+    @Json(name = "notification_level") val notificationLevel: String,
+)
+
+/** `PATCH /api/personas/:id/follow/preferences` echo. */
+@JsonClass(generateAdapter = true)
+data class FollowPreferencesResponse(
+    val following: Boolean? = null,
+    val status: String? = null,
+    val relationshipType: String? = null,
+    val notificationLevel: String? = null,
 )
 
 /** `DELETE /api/personas/:id/follow` echo (`{ message }`). */

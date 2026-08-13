@@ -66,6 +66,11 @@ import app.pantopus.android.ui.screens.feed.pulse.PulseFeedViewModel
 import app.pantopus.android.ui.screens.feed.pulse.PulseIntent
 import app.pantopus.android.ui.screens.feed.pulse.PulsePostCard
 import app.pantopus.android.ui.screens.feed.pulse.PulsePostCardContent
+import app.pantopus.android.ui.screens.feed.pulse.PulseSportsEventModule
+import app.pantopus.android.ui.screens.feed.pulse.PulseSportsMode
+import app.pantopus.android.ui.screens.feed.pulse.PulseSportsStarter
+import app.pantopus.android.ui.screens.feed.pulse.PulseSportsStarterRow
+import app.pantopus.android.ui.screens.feed.pulse.PulseTopicChipRow
 import app.pantopus.android.ui.screens.shared.feed.FeedChipItem
 import app.pantopus.android.ui.screens.shared.feed.FeedChipRow
 import app.pantopus.android.ui.screens.shared.feed.FeedComposeFAB
@@ -90,7 +95,11 @@ fun FeedScreen(
     onCompose: (PulseIntent) -> Unit = {},
     onEmptyCta: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    /** Sports-lane starter tapped in the empty state — opens the composer
+     *  with the prompt already in the body. */
+    onComposeStarter: ((PulseSportsStarter) -> Unit)? = null,
     viewModel: PulseFeedViewModel = hiltViewModel(),
+    contextBarViewModel: FeedContextBarViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +118,14 @@ fun FeedScreen(
     val deletingPostId by viewModel.deletingPostId.collectAsStateWithLifecycle()
     val mutingPostId by viewModel.mutingPostId.collectAsStateWithLifecycle()
     val showsPreferences by viewModel.showsPreferences.collectAsStateWithLifecycle()
+    val activeTopic by viewModel.activeTopic.collectAsStateWithLifecycle()
+    val sportsMode by viewModel.sportsMode.collectAsStateWithLifecycle()
+    val primarySportsEvent by viewModel.primarySportsEvent.collectAsStateWithLifecycle()
+    val radiusSuggestion by viewModel.radiusSuggestion.collectAsStateWithLifecycle()
+    val contextLabel by contextBarViewModel.locationLabel.collectAsStateWithLifecycle()
+    val contextRadius by contextBarViewModel.radiusMiles.collectAsStateWithLifecycle()
+    val switcherState by contextBarViewModel.sheetState.collectAsStateWithLifecycle()
+    val switcherOpen by contextBarViewModel.isSheetOpen.collectAsStateWithLifecycle()
     var showsSearch by remember { mutableStateOf(false) }
     var showsIntentPicker by remember { mutableStateOf(false) }
     // List / Map segment — mirrors RN `FeedHeader.tsx:35-52`.
@@ -118,7 +135,14 @@ fun FeedScreen(
         viewModel.configureSurface(surface)
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenPulseFeedViewed(intent = activeIntent.key))
+        if (surface == FeedSurface.Pulse) {
+            contextBarViewModel.onChange = { viewModel.refresh() }
+            contextBarViewModel.load()
+        }
     }
+
+    // Keep the suggestion ladder aligned with the server-side radius.
+    LaunchedEffect(contextRadius) { viewModel.setViewingRadiusMiles(contextRadius) }
 
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -191,12 +215,60 @@ fun FeedScreen(
                             .testTag("pulseSearchField"),
                 )
             }
-            FeedChipRow(
-                chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
-                activeId = activeIntent.key,
-                onSelect = { id -> viewModel.selectIntent(PulseIntent.fromKey(id)) },
-                skeleton = state is PulseFeedUiState.Loading,
+            if (activeSurface == FeedSurface.Pulse) {
+                FeedContextBar(
+                    label = contextLabel,
+                    radiusMiles = contextRadius,
+                    onOpen = { contextBarViewModel.openSwitcher() },
+                )
+            }
+            PulseTopicChipRow(
+                topics = viewModel.availableTopics,
+                activeTopic = activeTopic,
+                onSelect = { viewModel.selectTopic(it) },
             )
+            // Inside a topic lane the post-type row is replaced by the
+            // lane's own mode chips — RN `FeedScreen.tsx:129`.
+            if (viewModel.isInSportsLane) {
+                val modeChips = viewModel.sportsModeChips()
+                if (modeChips.isNotEmpty()) {
+                    FeedChipRow(
+                        chips = modeChips.map { FeedChipItem(id = it.first.key, label = it.second) },
+                        activeId = sportsMode.key,
+                        onSelect = { id -> viewModel.selectSportsMode(PulseSportsMode.fromKey(id)) },
+                        skeleton = state is PulseFeedUiState.Loading,
+                    )
+                }
+            } else {
+                FeedChipRow(
+                    chips = PulseIntent.entries.map { FeedChipItem(id = it.key, label = it.label) },
+                    activeId = activeIntent.key,
+                    onSelect = { id -> viewModel.selectIntent(PulseIntent.fromKey(id)) },
+                    skeleton = state is PulseFeedUiState.Loading,
+                )
+            }
+            if (viewModel.isInSportsLane) {
+                primarySportsEvent?.let { event ->
+                    PulseSportsEventModule(
+                        event = event,
+                        onSeeThreads = { viewModel.selectSportsEvent(event.eventKey) },
+                        onStartThread = { onCompose(activeIntent) },
+                    )
+                }
+            }
+            if (activeSurface == FeedSurface.Pulse) {
+                radiusSuggestion?.let { suggestion ->
+                    FeedRadiusSuggestionBanner(
+                        suggestion = suggestion,
+                        onApply = {
+                            contextBarViewModel.applyRadius(suggestion.suggestedRadius) { applied ->
+                                if (applied) viewModel.setViewingRadiusMiles(suggestion.suggestedRadius)
+                            }
+                        },
+                        onDismiss = { viewModel.dismissRadiusSuggestion() },
+                    )
+                }
+            }
             if (viewMode == FeedViewMode.Map && surface.supportsMapMode) {
                 FeedMapSection(
                     query = FeedMapQuery(surface = activeSurface, postType = activeIntent.postType),
@@ -206,7 +278,18 @@ fun FeedScreen(
                 when (val s = state) {
                     is PulseFeedUiState.Loading -> LoadingFrame()
                     is PulseFeedUiState.Empty ->
-                        FeedEmptyState(content = s.content) { onEmptyCta?.invoke() ?: onCompose(activeIntent) }
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                FeedEmptyState(content = s.content) {
+                                    onEmptyCta?.invoke() ?: onCompose(activeIntent)
+                                }
+                            }
+                            // Sports lane starter prompts — tapping one
+                            // opens the composer pre-filled.
+                            if (viewModel.isInSportsLane && onComposeStarter != null) {
+                                PulseSportsStarterRow(onSelect = onComposeStarter)
+                            }
+                        }
                     is PulseFeedUiState.Loaded ->
                         PopulatedFrame(
                             state = s,
@@ -270,6 +353,15 @@ fun FeedScreen(
                 dismissButton = {
                     TextButton(onClick = { showsIntentPicker = false }) { Text("Cancel") }
                 },
+            )
+        }
+        if (switcherOpen) {
+            FeedLocationSwitcherSheet(
+                state = switcherState,
+                activeLabel = contextLabel,
+                onSelect = { contextBarViewModel.select(it) },
+                onRetry = { contextBarViewModel.openSwitcher() },
+                onDismiss = { contextBarViewModel.closeSwitcher() },
             )
         }
         FeedComposeFAB(

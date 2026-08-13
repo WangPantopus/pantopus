@@ -30,20 +30,91 @@ public struct FollowingView: View {
         .accessibilityIdentifier("followingScreen")
         .task { await viewModel.load() }
         .sheet(item: $bindable.actionTarget) { target in
+            // Read the live target back off the VM so the notification
+            // picker re-renders after `setNotificationLevel` lands.
             FollowingActionSheet(
-                target: target,
+                target: viewModel.actionTarget ?? target,
                 onMarkSeen: { Task { await viewModel.markSeen(target) } },
                 onMute: { days in Task { await viewModel.mute(target, days: days) } },
                 onUnfollow: { Task { await viewModel.unfollow(target) } },
+                onNotificationLevel: { level in
+                    Task { await viewModel.setNotificationLevel(target, level: level) }
+                },
                 onCancel: { viewModel.closeActions() }
             )
+        }
+        .confirmationDialog(
+            bindable.pendingBulkUnfollow?.title ?? "Unfollow Beacons?",
+            isPresented: Binding(
+                get: { bindable.pendingBulkUnfollow != nil },
+                set: { if !$0 { viewModel.cancelBulkUnfollow() } }
+            ),
+            titleVisibility: .visible,
+            presenting: bindable.pendingBulkUnfollow
+        ) { request in
+            Button("Unfollow", role: .destructive) {
+                Task { await viewModel.confirmBulkUnfollow(request) }
+            }
+            .accessibilityIdentifier("followingBulkUnfollow.confirm")
+            Button("Cancel", role: .cancel) { viewModel.cancelBulkUnfollow() }
+        } message: { request in
+            Text(request.message)
         }
         .overlay(alignment: .bottom) { toastOverlay }
     }
 
     // MARK: - Top bar
 
-    private var topBar: some View {
+    @ViewBuilder private var topBar: some View {
+        if viewModel.isSelecting {
+            selectionTopBar
+        } else {
+            defaultTopBar
+        }
+    }
+
+    /// Multi-select chrome: Cancel · "N selected" · Unfollow.
+    /// Mirrors RN `renderHeader`'s select branch
+    /// (`pantopus/frontend/apps/mobile/src/app/beacons/following.tsx:280`).
+    private var selectionTopBar: some View {
+        HStack {
+            Button { viewModel.exitSelection() } label: {
+                Text("Cancel")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.Color.primary600)
+                    .frame(height: 40)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("followingSelect.cancel")
+            Spacer()
+            Text("\(viewModel.selectedRowIDs.count) selected")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Spacer()
+            Button { viewModel.requestBulkUnfollow() } label: {
+                Text("Unfollow")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(
+                        viewModel.selectedRowIDs.isEmpty
+                            ? Theme.Color.appTextMuted
+                            : Theme.Color.error
+                    )
+                    .frame(height: 40)
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.selectedRowIDs.isEmpty)
+            .accessibilityIdentifier("followingSelect.unfollow")
+        }
+        .frame(height: 54)
+        .padding(.horizontal, Spacing.s4)
+        .background(Theme.Color.appSurfaceMuted)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+        }
+        .accessibilityIdentifier("followingSelectBar")
+    }
+
+    private var defaultTopBar: some View {
         ZStack {
             HStack {
                 Button { viewModel.back() } label: {
@@ -186,7 +257,17 @@ public struct FollowingView: View {
                 }
                 FollowingRowView(
                     row: row,
-                    onTap: { viewModel.openPersona(handle: row.handle) },
+                    isSelecting: viewModel.isSelecting,
+                    isSelected: viewModel.isSelected(row),
+                    onTap: {
+                        if viewModel.isSelecting {
+                            viewModel.toggleSelection(row)
+                        } else {
+                            viewModel.openPersona(handle: row.handle)
+                        }
+                    },
+                    onLongPress: { viewModel.beginSelection(row) },
+                    onBell: { Task { await viewModel.cycleNotificationLevel(row) } },
                     onOverflow: { viewModel.openActions(for: row) }
                 )
             }
@@ -305,11 +386,18 @@ public struct FollowingView: View {
 
 struct FollowingRowView: View {
     let row: FollowingRow
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
     let onTap: @MainActor () -> Void
+    var onLongPress: @MainActor () -> Void = {}
+    var onBell: @MainActor () -> Void = {}
     let onOverflow: @MainActor () -> Void
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
+            if isSelecting {
+                selectionTick
+            }
             Button(action: onTap) {
                 HStack(spacing: Spacing.s3) {
                     FollowingAvatar(
@@ -325,16 +413,69 @@ struct FollowingRowView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.35).onEnded { _ in onLongPress() }
+            )
 
-            trailingAccessory
-            overflowButton
+            if !isSelecting {
+                trailingAccessory
+                bellButton
+                overflowButton
+            }
         }
         .padding(.leading, 14)
         .padding(.trailing, Spacing.s3)
         .padding(.vertical, 11)
-        .opacity(row.isMuted ? 0.62 : 1)
+        .opacity(row.isMuted || row.isPaused ? 0.62 : 1)
+        .background(isSelected ? Theme.Color.primary50 : Color.clear)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("followingRow.\(row.id)")
+    }
+
+    private var selectionTick: some View {
+        Icon(
+            isSelected ? .checkCircle : .circle,
+            size: 22,
+            color: isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong
+        )
+        .accessibilityLabel(isSelected ? "Selected" : "Not selected")
+        .accessibilityIdentifier("followingRow.selectTick")
+    }
+
+    /// Inline All / Highlights / Off bell. Tapping cycles the level.
+    private var bellButton: some View {
+        Button(action: onBell) {
+            HStack(spacing: Spacing.s1) {
+                Icon(
+                    row.notificationLevel.icon,
+                    size: 14,
+                    color: bellTint
+                )
+                Text(row.notificationLevel.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        row.isPaused ? Theme.Color.appTextMuted : Theme.Color.appTextStrong
+                    )
+            }
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                    .fill(Theme.Color.appSurfaceSunken)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(row.isPaused)
+        .accessibilityLabel("Notifications: \(row.notificationLevel.label)")
+        .accessibilityIdentifier("followingRow.bell")
+    }
+
+    private var bellTint: Color {
+        if row.isPaused || row.notificationLevel == .none {
+            return Theme.Color.appTextMuted
+        }
+        return Theme.Color.primary600
     }
 
     private var textColumn: some View {
@@ -386,7 +527,10 @@ struct FollowingRowView: View {
         case .muted:
             Icon(.bellOff, size: 16, color: Theme.Color.appTextMuted)
         case .chevron:
-            Icon(.chevronRight, size: 18, color: Theme.Color.appBorderStrong)
+            // The inline notification bell now owns the trailing rail, so
+            // the pure-affordance chevron is dropped to keep the row from
+            // stacking three trailing controls.
+            EmptyView()
         }
     }
 

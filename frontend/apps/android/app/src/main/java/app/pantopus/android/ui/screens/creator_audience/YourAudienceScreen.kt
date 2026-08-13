@@ -23,9 +23,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +54,9 @@ import kotlinx.coroutines.delay
 private const val AVATAR_SIZE = 44
 private const val DIVIDER_INSET = 68
 
+/** Pixels from the bottom of the scroll extent that count as "end reached". */
+private const val END_REACHED_SLOP = 240
+
 @Composable
 fun YourAudienceScreen(
     onBack: () -> Unit = {},
@@ -62,7 +67,11 @@ fun YourAudienceScreen(
     val counts by viewModel.counts.collectAsStateWithLifecycle()
     val tierNames by viewModel.tierNames.collectAsStateWithLifecycle()
     val overflowTarget by viewModel.overflowTarget.collectAsStateWithLifecycle()
+    val blockTarget by viewModel.blockTarget.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val pendingUndo by viewModel.pendingUndo.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -73,7 +82,12 @@ fun YourAudienceScreen(
                 .background(PantopusColors.appBg)
                 .testTag("audienceScreen"),
     ) {
-        TopBar(countLine = audienceCountLine(counts), onBack = onBack)
+        TopBar(
+            countLine = audienceCountLine(counts),
+            sortLabel = sort.label,
+            onBack = onBack,
+            onCycleSort = viewModel::cycleSort,
+        )
 
         if (state is YourAudienceUiState.Loaded) {
             FilterChips(
@@ -94,13 +108,18 @@ fun YourAudienceScreen(
                         loaded = current.loaded,
                         filter = filter,
                         pendingCount = counts.pending,
+                        isLoadingMore = isLoadingMore,
                         onApprove = viewModel::approve,
                         onDecline = viewModel::decline,
                         onOverflow = viewModel::openOverflow,
+                        onEndReached = viewModel::loadMore,
                     )
             }
 
-            ToastOverlay(message = toast, onDismiss = viewModel::consumeToast)
+            UndoToastOverlay(pending = pendingUndo, onUndo = viewModel::undoPendingAction)
+            if (pendingUndo == null) {
+                ToastOverlay(message = toast, onDismiss = viewModel::consumeToast)
+            }
         }
     }
 
@@ -110,9 +129,31 @@ fun YourAudienceScreen(
                 member = member,
                 onMessage = { viewModel.message(member) },
                 onChangeTier = { viewModel.changeTier(member) },
+                onMute = { viewModel.mute(member) },
+                onUnmute = { viewModel.unmute(member) },
                 onRemove = { viewModel.remove(member) },
+                onBlock = { viewModel.requestBlock(member) },
             )
         }
+    }
+
+    blockTarget?.let { member ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBlock,
+            title = { Text("Block follower?") },
+            text = { Text(viewModel.blockConfirmationMessage(member)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmBlock(member) },
+                    modifier = Modifier.testTag("audienceBlockConfirm"),
+                ) {
+                    Text("Block", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissBlock) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -121,7 +162,9 @@ fun YourAudienceScreen(
 @Composable
 private fun TopBar(
     countLine: String,
+    sortLabel: String,
     onBack: () -> Unit,
+    onCycleSort: () -> Unit,
 ) {
     Column {
         Box(
@@ -145,6 +188,25 @@ private fun TopBar(
                     icon = PantopusIcon.ChevronLeft,
                     contentDescription = "Back",
                     size = 24.dp,
+                    strokeWidth = 2.2f,
+                    tint = PantopusColors.appText,
+                )
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = Spacing.s1)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onCycleSort)
+                        .testTag("audienceSortButton"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ArrowDownUp,
+                    contentDescription = "Sort: $sortLabel",
+                    size = 20.dp,
                     strokeWidth = 2.2f,
                     tint = PantopusColors.appText,
                 )
@@ -281,15 +343,26 @@ private fun LoadedContent(
     loaded: AudienceLoaded,
     filter: AudienceFilter,
     pendingCount: Int,
+    isLoadingMore: Boolean,
     onApprove: (AudienceMember) -> Unit,
     onDecline: (AudienceMember) -> Unit,
     onOverflow: (AudienceMember) -> Unit,
+    onEndReached: () -> Unit,
 ) {
+    val scrollState = rememberScrollState()
+    // Mirrors RN's `onEndReached` — the view-model no-ops unless the server
+    // reported another page. The list is a plain scrolling Column (tier
+    // sections, not a flat lazy list), so the trigger keys off scroll extent.
+    LaunchedEffect(scrollState.value, scrollState.maxValue) {
+        if (scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue - END_REACHED_SLOP) {
+            onEndReached()
+        }
+    }
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(top = Spacing.s2, bottom = Spacing.s6),
     ) {
         if (filter.showsPendingSection) {
@@ -330,6 +403,33 @@ private fun LoadedContent(
                 }
             }
         }
+
+        if (isLoadingMore) {
+            LoadMoreFooter()
+        }
+    }
+}
+
+/** Next-page indicator. RN renders the same footer under its
+ *  `onEndReached` loader (`src/app/audience/members.tsx:320-326`). */
+@Composable
+private fun LoadMoreFooter() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.s4)
+                .testTag("audienceLoadingMore"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Shimmer(width = 90.dp, height = 12.dp)
+        Text(
+            text = "Loading more…",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextMuted,
+        )
     }
 }
 
@@ -882,12 +982,16 @@ private fun OverflowSheetContent(
     member: AudienceMember,
     onMessage: () -> Unit,
     onChangeTier: () -> Unit,
+    onMute: () -> Unit,
+    onUnmute: () -> Unit,
     onRemove: () -> Unit,
+    onBlock: () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(Spacing.s4)
                 .padding(bottom = Spacing.s6)
                 .testTag("audienceOverflowSheet"),
@@ -910,12 +1014,41 @@ private fun OverflowSheetContent(
             testTag = "audienceOverflow.changeTier",
             onClick = onChangeTier,
         )
+        // Reversible action first, so Remove/Block are harder to fat-finger —
+        // mirrors RN's AudienceMemberSheet ordering.
+        if (member.isMuted) {
+            OverflowAction(
+                icon = PantopusIcon.Bell,
+                label = "Unmute",
+                subtitle = "Restore their access to your updates",
+                tint = PantopusColors.appText,
+                testTag = "audienceOverflow.unmute",
+                onClick = onUnmute,
+            )
+        } else {
+            OverflowAction(
+                icon = PantopusIcon.BellOff,
+                label = "Mute this member",
+                subtitle = "They won't receive your broadcasts. Reversible.",
+                tint = PantopusColors.appText,
+                testTag = "audienceOverflow.mute",
+                onClick = onMute,
+            )
+        }
         OverflowAction(
             icon = PantopusIcon.UserMinus,
             label = "Remove",
             tint = PantopusColors.error,
             testTag = "audienceOverflow.remove",
             onClick = onRemove,
+        )
+        OverflowAction(
+            icon = PantopusIcon.Ban,
+            label = "Block",
+            subtitle = "They lose access to follower-only updates.",
+            tint = PantopusColors.error,
+            testTag = "audienceOverflow.block",
+            onClick = onBlock,
         )
     }
 }
@@ -927,6 +1060,7 @@ private fun OverflowAction(
     tint: Color,
     testTag: String,
     onClick: () -> Unit,
+    subtitle: String? = null,
 ) {
     Row(
         modifier =
@@ -941,7 +1075,12 @@ private fun OverflowAction(
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PantopusIconImage(icon = icon, contentDescription = null, size = 18.dp, strokeWidth = 2f, tint = tint)
-        Text(text = label, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = tint)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = label, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = tint)
+            if (subtitle != null) {
+                Text(text = subtitle, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
+            }
+        }
     }
 }
 
@@ -968,6 +1107,45 @@ private fun BoxScope.ToastOverlay(
                 .testTag("audienceToast"),
     ) {
         Text(text = message, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PantopusColors.appTextInverse)
+    }
+}
+
+/**
+ * Destructive-action undo toast. The row is already gone; tapping the toast
+ * puts it back and cancels the pending `PATCH`. The view-model owns the
+ * 5-second window, so this overlay simply mirrors it.
+ */
+@Composable
+private fun BoxScope.UndoToastOverlay(
+    pending: PendingAudienceUndo?,
+    onUndo: () -> Unit,
+) {
+    if (pending == null) return
+    Row(
+        modifier =
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Spacing.s8)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appText)
+                .clickable(onClick = onUndo)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("audienceUndoToast"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Undo2,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.appTextInverse,
+        )
+        Text(
+            text = pending.message,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextInverse,
+        )
     }
 }
 

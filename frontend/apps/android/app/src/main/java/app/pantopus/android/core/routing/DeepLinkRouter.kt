@@ -224,6 +224,28 @@ object DeepLinkRouter {
         /** `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room. */
         data class WaitingRoom(val homeId: String) : Destination
 
+        /**
+         * `pantopus://hub-today?deliveryId=&kind=morning|evening` — the Hub
+         * "Today" briefing opened from a Morning/Evening Briefing push. The
+         * notification's metadata carries `briefing_delivery_id` +
+         * `briefing_kind`; with an id the screen resolves that stored delivery
+         * rather than only the live `/api/hub/today` snapshot. Mirrors RN
+         * `resolveNotificationRoute`'s `/hub-today?…` target
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`).
+         */
+        data class HubToday(
+            val briefingDeliveryId: String?,
+            val kind: String?,
+        ) : Destination
+
+        /**
+         * `pantopus://profile?tab=receipt` — the profile tab with the Monthly
+         * Receipt card auto-expanded, the target RN resolves for a
+         * `monthly_receipt` notification
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:29`).
+         */
+        data object MonthlyReceipt : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
@@ -393,6 +415,20 @@ object DeepLinkRouter {
             "feed" -> Destination.Feed
             "home" -> Destination.Home
             "notifications" -> Destination.Notifications
+            "hub-today", "hub_today", "today" ->
+                // `?deliveryId=` + `?kind=` ride the Morning/Evening Briefing push.
+                Destination.HubToday(
+                    briefingDeliveryId =
+                        Paths.queryParam(queryPart, "deliveryId")
+                            ?: Paths.queryParam(queryPart, "briefing_delivery_id"),
+                    kind =
+                        Paths.queryParam(queryPart, "kind")
+                            ?: Paths.queryParam(queryPart, "briefing_kind"),
+                )
+            "profile" ->
+                // Only `?tab=receipt` is deep-linkable today (the monthly-receipt
+                // push). A bare `pantopus://profile` falls through to Unknown.
+                if (tabQuery?.lowercase() == "receipt") Destination.MonthlyReceipt else Destination.Unknown(raw)
             "connections" -> Destination.Connections
             "beacons", "beacon-updates", "beacon_updates" -> Destination.Beacons
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub

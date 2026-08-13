@@ -551,3 +551,18 @@ data class UpdateBusinessLocationRequest(
 data class BusinessLocationUpdateResponse(
     val location: BusinessLocationDto? = null,
 )
+
+// Business media upload (A12.10 Create Business — logo)
+
+/**
+ * `POST /api/upload/business-media/:businessId?type=logo|banner` response
+ * (`backend/routes/upload.js:1797`). The server has already written the URL
+ * onto the business profile, so callers only need the echoed `url` to
+ * render the freshly-uploaded image.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessMediaUploadResponse(
+    val message: String? = null,
+    val url: String,
+    val key: String? = null,
+)

@@ -58,6 +58,73 @@ public final class PulseFeedViewModel {
     /// FAB's pre-fill.
     public private(set) var activeIntent: PulseIntent = .all
 
+    // MARK: - Topic lane (Nearby only)
+
+    /// Active topic lane. Non-nil swaps the post-type chip row for the
+    /// topic's own mode chips — RN `useFeedFiltering.ts:45-50`.
+    public private(set) var activeTopic: PulseTopic?
+
+    /// Mode chip inside the Sports lane.
+    public private(set) var sportsMode: PulseSportsMode = .forYou
+
+    /// Event the `event` mode chip is scoped to. Defaults to the primary
+    /// active event when the user hasn't picked one.
+    public private(set) var eventKey: String?
+
+    /// Currently-active major sports events, highest priority first.
+    public private(set) var activeSportsEvents: [ActiveSportsEventDTO] = []
+
+    /// Highest-priority active event — labels the `event` chip and backs
+    /// the active-event module.
+    public private(set) var primarySportsEvent: ActiveSportsEventDTO?
+
+    /// Topics offered on this surface. Topic lanes are Nearby-only.
+    public var availableTopics: [PulseTopic] {
+        surface == .pulse ? PulseTopic.allCases : []
+    }
+
+    /// True while the Sports lane is showing.
+    public var isInSportsLane: Bool {
+        surface == .pulse && activeTopic == .sports
+    }
+
+    /// Mode chips for the active lane — the `event` chip is relabelled
+    /// with the primary event's short label and hidden when nothing is
+    /// live (RN `FeedScreen.tsx:117-127`).
+    public var sportsModeChips: [(mode: PulseSportsMode, label: String)] {
+        guard isInSportsLane else { return [] }
+        let primaryLabel = primarySportsEvent?.chipLabel
+        return PulseSportsMode.allCases.compactMap { mode in
+            if mode == .event {
+                guard let primaryLabel else { return nil }
+                return (mode, primaryLabel)
+            }
+            return (mode, mode.label)
+        }
+    }
+
+    // MARK: - Radius suggestion
+
+    /// Radius of the viewer's active viewing location. Set by the
+    /// context bar so the suggestion ladder lines up with the server.
+    public var viewingRadiusMiles: Double = 100 {
+        didSet {
+            guard viewingRadiusMiles != oldValue else { return }
+            // A manual radius change re-arms the banner (RN
+            // `useRadiusSuggestion.ts:117-122`).
+            radiusSuggestionDismissed = false
+            recomputeRadiusSuggestion()
+        }
+    }
+
+    /// Proposed radius change when the lane came back nearly empty (or
+    /// overwhelmingly full). `nil` hides the banner.
+    public private(set) var radiusSuggestion: FeedRadiusSuggestion?
+
+    /// Session-scoped dismissal, re-armed whenever the radius changes —
+    /// RN `useRadiusSuggestion.ts:117-122`.
+    private var radiusSuggestionDismissed = false
+
     /// Locality name surfaced on the empty state. Set from the loaded
     /// first post or a backend hint.
     public private(set) var scopeLabel: String?
@@ -155,6 +222,9 @@ public final class PulseFeedViewModel {
         guard next != surface else { return }
         surface = next
         activeIntent = .all
+        // Leaving Nearby clears the topic lane — topics are Nearby-only
+        // (RN `useFeedFiltering.ts:24-27`).
+        if next != .pulse { activeTopic = nil }
         loadedItems = []
         overrides = [:]
         removedPostIds = []
@@ -167,6 +237,65 @@ public final class PulseFeedViewModel {
         guard intent != activeIntent else { return }
         activeIntent = intent
         await fetch()
+    }
+
+    /// Topic-chip tap. Passing `nil` (or re-tapping the active chip)
+    /// exits the lane. Entering or leaving resets the post-type filter
+    /// and the sports mode — RN `useFeedFiltering.ts:29-42`.
+    public func selectTopic(_ topic: PulseTopic?) async {
+        guard topic != activeTopic else { return }
+        activeTopic = topic
+        activeIntent = .all
+        sportsMode = .forYou
+        eventKey = nil
+        if topic == .sports, activeSportsEvents.isEmpty {
+            await loadActiveSportsEvents()
+        }
+        await fetch()
+    }
+
+    /// Sports mode-chip tap.
+    public func selectSportsMode(_ mode: PulseSportsMode) async {
+        guard mode != sportsMode else { return }
+        sportsMode = mode
+        await fetch()
+    }
+
+    /// "See threads" on the active-event module — pins the lane to that
+    /// event and switches to the `event` mode.
+    public func selectSportsEvent(eventKey key: String) async {
+        eventKey = key
+        sportsMode = .event
+        await fetch()
+    }
+
+    /// Read `GET /api/sports/active-events`. Optional: a failure just
+    /// hides the event chip and the module.
+    public func loadActiveSportsEvents() async {
+        let response: ActiveSportsEventsResponse? = try? await api.request(
+            SportsEndpoints.activeEvents()
+        )
+        activeSportsEvents = response?.events ?? []
+        primarySportsEvent = response?.primaryEvent ?? activeSportsEvents.first
+    }
+
+    /// Dismiss the radius-suggestion banner for this radius.
+    public func dismissRadiusSuggestion() {
+        radiusSuggestionDismissed = true
+        radiusSuggestion = nil
+    }
+
+    /// Recompute the banner from the last page size. Called after every
+    /// fetch and whenever the viewing radius changes.
+    private func recomputeRadiusSuggestion() {
+        guard surface == .pulse, !radiusSuggestionDismissed else {
+            radiusSuggestion = nil
+            return
+        }
+        radiusSuggestion = FeedRadiusSuggestion.compute(
+            currentRadius: viewingRadiusMiles,
+            itemCount: loadedItems.count
+        )
     }
 
     /// Infinite scroll — call from the last visible row's `onAppear`.
@@ -425,13 +554,17 @@ public final class PulseFeedViewModel {
                     surface: surface.backendSurface,
                     latitude: coords.latitude,
                     longitude: coords.longitude,
-                    postType: activeIntent.postType,
-                    limit: 20
+                    postType: isInSportsLane ? nil : activeIntent.postType,
+                    limit: 20,
+                    topic: topicQueryValue,
+                    sportsMode: isInSportsLane ? sportsMode.rawValue : nil,
+                    eventKey: isInSportsLane ? resolvedEventKey : nil
                 )
             )
             loadedItems = response.posts
             applyPagination(response.pagination)
             scopeLabel = response.posts.first?.locationName ?? scopeLabel
+            recomputeRadiusSuggestion()
             rebuildLoadedState()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load posts."
@@ -451,10 +584,13 @@ public final class PulseFeedViewModel {
                     surface: surface.backendSurface,
                     latitude: coords.latitude,
                     longitude: coords.longitude,
-                    postType: activeIntent.postType,
+                    postType: isInSportsLane ? nil : activeIntent.postType,
                     limit: 20,
                     cursorCreatedAt: cursorCreatedAt,
-                    cursorId: cursorId
+                    cursorId: cursorId,
+                    topic: topicQueryValue,
+                    sportsMode: isInSportsLane ? sportsMode.rawValue : nil,
+                    eventKey: isInSportsLane ? resolvedEventKey : nil
                 )
             )
             // Seeded/system cards can repeat across pages — dedupe by id.
@@ -466,6 +602,18 @@ public final class PulseFeedViewModel {
             // Leave the loaded rows alone; the next scroll retries.
             hasMore = true
         }
+    }
+
+    /// `topic` param — Place-only, and only while a lane is active
+    /// (`backend/routes/posts.js:1481-1484` rejects it elsewhere).
+    private var topicQueryValue: String? {
+        guard surface == .pulse, let activeTopic else { return nil }
+        return activeTopic.queryValue
+    }
+
+    /// `eventKey` param — the user's pick, else the primary active event.
+    private var resolvedEventKey: String? {
+        eventKey ?? primarySportsEvent?.eventKey
     }
 
     private func applyPagination(_ pagination: FeedPagination?) {

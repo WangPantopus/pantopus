@@ -24,6 +24,8 @@ public struct PulseComposeFlowView: View {
     /// drops the Connections card and the purpose is fixed to Local
     /// Update, matching RN (`gig/[id].tsx:540-542,1474-1481`).
     private let taskShare: PulseTaskShare?
+    /// Sports-lane starter prompt text seeded into the draft body.
+    private let prefillBody: String?
     private let onCancel: @MainActor () -> Void
     private let onPosted: @MainActor (String?) -> Void
 
@@ -31,12 +33,14 @@ public struct PulseComposeFlowView: View {
         prefillFeedIntent: PulseIntent? = nil,
         editingPostId: String? = nil,
         taskShare: PulseTaskShare? = nil,
+        prefillBody: String? = nil,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
         self.prefillFeedIntent = prefillFeedIntent
         self.editingPostId = editingPostId
         self.taskShare = taskShare
+        self.prefillBody = prefillBody
         self.onCancel = onCancel
         self.onPosted = onPosted
         if editingPostId != nil {
@@ -85,6 +89,7 @@ public struct PulseComposeFlowView: View {
             postId: editingPostId,
             managesDismiss: false,
             taskShare: taskShare,
+            prefillBody: prefillBody,
             onCancel: onCancel,
             onPosted: onPosted
         )

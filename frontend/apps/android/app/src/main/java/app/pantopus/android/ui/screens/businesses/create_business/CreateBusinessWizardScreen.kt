@@ -104,6 +104,10 @@ fun CreateBusinessWizardScreen(
                             onSkipHours = viewModel::skipHours,
                             onUnskipHours = viewModel::unskipHours,
                             onToggleDayClosed = viewModel::toggleDayClosed,
+                            onLogoPicked = viewModel::setLogoPick,
+                            onClearLogo = viewModel::clearLogoPick,
+                            onSkipLogo = viewModel::skipLogo,
+                            onUnskipLogo = viewModel::unskipLogo,
                         ),
                 )
             CreateBusinessStep.Confirm -> ConfirmStep(state = state)

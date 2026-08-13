@@ -22,6 +22,16 @@ public enum HubEndpoints {
         Endpoint(method: .get, path: "/api/hub/today")
     }
 
+    /// `GET /api/hub/briefings/:id` — a stored Morning/Evening Briefing
+    /// delivery, scoped to the signed-in user. The push notification for
+    /// `morning_briefing` / `evening_briefing` carries the delivery id in
+    /// `metadata.briefing_delivery_id`; opening it must resolve *that*
+    /// briefing rather than refetching the live `/api/hub/today` snapshot.
+    /// Route `backend/routes/hub.js:612`.
+    public static func briefingDelivery(id: String) -> Endpoint {
+        Endpoint(method: .get, path: "/api/hub/briefings/\(id)")
+    }
+
     /// `GET /api/hub/discovery` — route `backend/routes/hub.js:757`.
     ///
     /// T5.4.1 chip-strip filters (`since` / `verified` / `freeOrWanted`)

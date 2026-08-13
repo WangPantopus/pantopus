@@ -68,10 +68,12 @@ fun TodayDetailScreen(
     viewModel: TodayDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val headerTitle by viewModel.headerTitle.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
     TodayDetailScreenContent(
         state = state,
+        headerTitle = headerTitle,
         onBack = onBack,
         onShare = onShare,
         onMore = onMore,
@@ -83,6 +85,7 @@ fun TodayDetailScreen(
 @Composable
 internal fun TodayDetailScreenContent(
     state: TodayDetailUiState,
+    headerTitle: String = "Today",
     onBack: () -> Unit = {},
     onShare: () -> Unit = {},
     onMore: () -> Unit = {},
@@ -96,7 +99,13 @@ internal fun TodayDetailScreenContent(
                 .background(PantopusColors.appBg)
                 .testTag("todayDetail"),
     ) {
-        TodayTopBar(dateLabel = state.dateLabel, onBack = onBack, onShare = onShare, onMore = onMore)
+        TodayTopBar(
+            title = headerTitle,
+            dateLabel = state.dateLabel,
+            onBack = onBack,
+            onShare = onShare,
+            onMore = onMore,
+        )
         when (val current = state) {
             TodayDetailUiState.Loading -> LoadingBody()
             is TodayDetailUiState.Populated -> TodayBriefing(current.content, onShare, onManage)
@@ -126,6 +135,7 @@ private val TodayDetailUiState.dateLabel: String?
 
 @Composable
 private fun TodayTopBar(
+    title: String,
     dateLabel: String?,
     onBack: () -> Unit,
     onShare: () -> Unit,
@@ -141,9 +151,10 @@ private fun TodayTopBar(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Today",
+                text = title,
                 style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
                 color = PantopusColors.appText,
+                modifier = Modifier.testTag("todayHeaderTitle"),
             )
             if (dateLabel != null) {
                 Text(text = dateLabel, style = PantopusTextStyle.caption, color = PantopusColors.appTextMuted)

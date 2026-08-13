@@ -54,16 +54,26 @@ final class CreateBusinessWizardViewModel: WizardModel {
     private(set) var hoursSkipped: Bool = false
     private(set) var hours: [BusinessHoursDay] = BusinessHoursDay.defaultWeek()
 
+    // Logo (step 3, uploaded after create — the route needs a business id).
+    private(set) var logoPick: CreateBusinessLogoPick?
+    private(set) var logoSkipped: Bool = false
+    /// Set when create succeeded but the logo upload didn't. RN swallows the
+    /// same failure ("Non-critical — user can upload from dashboard"); we
+    /// surface it as a banner instead of silently dropping the image.
+    private(set) var logoUploadWarning: String?
+
     var pendingEvent: CreateBusinessOutboundEvent?
 
     // MARK: - Init
 
     private let api: APIClient
+    private let uploader: MultipartUploader
     private let logger = Logger(label: "app.pantopus.ios.CreateBusinessWizard")
     private var usernameCheckTask: Task<Void, Never>?
 
-    init(api: APIClient = .shared) {
+    init(api: APIClient = .shared, uploader: MultipartUploader = .shared) {
         self.api = api
+        self.uploader = uploader
     }
 
     // MARK: - WizardModel
@@ -81,7 +91,12 @@ final class CreateBusinessWizardViewModel: WizardModel {
             leading: currentStep == .pickCategory ? .close : .back,
             primaryCTALabel: primaryLabel,
             primaryCTAEnabled: primaryEnabled,
-            secondaryCTA: nil,
+            secondaryCTA: currentStep == .confirm
+                ? WizardSecondaryCTA(
+                    label: "Save as draft",
+                    identifier: "createBusiness_saveDraft"
+                )
+                : nil,
             isSubmitting: isSubmittingCustom || isCreating,
             dirty: isDirty,
             showsProgressBar: true
@@ -125,12 +140,16 @@ final class CreateBusinessWizardViewModel: WizardModel {
             guard validateLocation() else { return }
             transition(to: .confirm)
         case .confirm:
-            Task { await createBusiness() }
+            Task { await createBusiness(publish: true) }
         }
     }
 
+    /// Confirm step's ghost CTA — creates the business but leaves it
+    /// unpublished, matching RN's "Save as Draft"
+    /// (`src/app/businesses/new.tsx:273-320`).
     func secondaryTapped() {
-        // No secondary CTA.
+        guard currentStep == .confirm else { return }
+        Task { await createBusiness(publish: false) }
     }
 
     // MARK: - Selection
@@ -228,6 +247,31 @@ final class CreateBusinessWizardViewModel: WizardModel {
         hoursSkipped = false
     }
 
+    // MARK: - Logo
+
+    /// Stash a picked logo. It can only be uploaded once the business
+    /// exists (the route is keyed by business id), so it rides along until
+    /// create-full returns — same ordering as RN
+    /// (`src/app/businesses/new.tsx:223-230`).
+    func setLogoPick(_ pick: CreateBusinessLogoPick) {
+        logoPick = pick
+        logoSkipped = false
+        logoUploadWarning = nil
+    }
+
+    func clearLogoPick() {
+        logoPick = nil
+    }
+
+    func skipLogo() {
+        logoSkipped = true
+        logoPick = nil
+    }
+
+    func unskipLogo() {
+        logoSkipped = false
+    }
+
     func toggleDayClosed(_ dayOfWeek: Int) {
         guard let index = hours.firstIndex(where: { $0.dayOfWeek == dayOfWeek }) else { return }
         var day = hours[index]
@@ -283,7 +327,10 @@ final class CreateBusinessWizardViewModel: WizardModel {
         case .legalInfo: "Next"
         case .profile:
             locationSkipped ? "Skip" : "Next"
-        case .confirm: "Confirm"
+        // RN's review step publishes ("Publish"), with Save as Draft as the
+        // ghost — native previously created an unpublished business and
+        // called it "Confirm", so nothing ever went live.
+        case .confirm: "Publish"
         }
     }
 
@@ -377,7 +424,7 @@ final class CreateBusinessWizardViewModel: WizardModel {
         return true
     }
 
-    private func createBusiness() async {
+    private func createBusiness(publish: Bool) async {
         guard !isCreating else { return }
         guard validateBasicInfo() else { return }
         guard let category = selectedCategoryId else {
@@ -387,6 +434,7 @@ final class CreateBusinessWizardViewModel: WizardModel {
 
         isCreating = true
         submitError = nil
+        logoUploadWarning = nil
 
         let locationPayload: CreateBusinessLocationPayload? = hasLocation
             ? CreateBusinessLocationPayload(
@@ -425,7 +473,12 @@ final class CreateBusinessWizardViewModel: WizardModel {
             let response: CreateBusinessFullResponse = try await api.request(
                 BusinessesEndpoints.createBusinessFull(body)
             )
-            pendingEvent = .openBusinessDashboard(businessId: response.business.id)
+            let businessId = response.business.id
+            await uploadLogoIfNeeded(businessId: businessId)
+            if publish {
+                await publishCreatedBusiness(businessId: businessId)
+            }
+            pendingEvent = .openBusinessDashboard(businessId: businessId)
         } catch {
             submitError = Self.createErrorMessage(from: error)
             logger.error("create-full failed", metadata: [
@@ -433,6 +486,47 @@ final class CreateBusinessWizardViewModel: WizardModel {
             ])
         }
         isCreating = false
+    }
+
+    /// Push the picked logo once the business id exists. RN treats a failed
+    /// logo upload as non-critical (the business is already created), so we
+    /// keep the navigation and surface a warning instead of an error.
+    private func uploadLogoIfNeeded(businessId: String) async {
+        guard !logoSkipped, let pick = logoPick else { return }
+        do {
+            _ = try await uploader.uploadBusinessMedia(
+                businessId: businessId,
+                kind: .logo,
+                file: MultipartFile(
+                    fieldName: "file",
+                    filename: pick.fileName,
+                    mimeType: pick.mimeType,
+                    data: pick.data
+                )
+            )
+            logoPick = nil
+        } catch {
+            logoUploadWarning = "Your business was created, but the logo didn't upload. Add it from the dashboard."
+            logger.error("business logo upload failed", metadata: [
+                "error": .string(String(describing: error))
+            ])
+        }
+    }
+
+    /// Flip the freshly-created profile live. RN does the same immediately
+    /// after create (`src/app/businesses/new.tsx:244-251`) and treats a
+    /// failure as "still created as draft".
+    private func publishCreatedBusiness(businessId: String) async {
+        do {
+            _ = try await api.request(
+                BusinessesEndpoints.publishBusiness(businessId: businessId),
+                as: BusinessMutationMessageResponse.self
+            )
+        } catch {
+            logger.error("publish after create failed", metadata: [
+                "error": .string(String(describing: error))
+            ])
+        }
     }
 
     private func usernameUnavailableMessage(_ reason: String?) -> String {

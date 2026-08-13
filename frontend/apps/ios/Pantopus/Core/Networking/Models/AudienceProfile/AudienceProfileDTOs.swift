@@ -58,6 +58,16 @@ public struct AudienceListResponse: Decodable, Sendable {
     public let persona: PersonaSummaryDTO?
     public let items: [FanDTO]
     public let counts: AudienceCountsDTO
+    /// Offset cursor echoed by the handler
+    /// (`backend/routes/personas.js:735-741`). Absent on the
+    /// no-persona short-circuit, so it stays optional.
+    public let pagination: AudiencePaginationDTO?
+}
+
+/// `{ nextOffset, hasMore }` — `nextOffset` is `null` on the last page.
+public struct AudiencePaginationDTO: Decodable, Sendable, Hashable {
+    public let nextOffset: Int?
+    public let hasMore: Bool?
 }
 
 public struct AudienceCountsDTO: Decodable, Sendable, Hashable {
@@ -125,6 +135,23 @@ public struct FanTierBadgeDTO: Decodable, Sendable, Hashable {
 public struct AudienceMemberActionResponse: Decodable, Sendable, Hashable {
     public let membershipId: String?
     public let status: String?
+}
+
+// MARK: - PATCH /api/personas/:id/followers/:followId
+
+/// `{ follower: … }` echoed after an owner-side follower status change
+/// (`serializePersonaFollowForOwner`, `backend/routes/personas.js:225`).
+/// Only the new status is read — the block flow re-fetches the list for
+/// authoritative counts.
+public struct AudienceFollowerUpdateResponse: Decodable, Sendable, Hashable {
+    public let follower: AudienceFollowerDTO?
+}
+
+public struct AudienceFollowerDTO: Decodable, Sendable, Hashable {
+    public let id: String?
+    public let status: String?
+    public let relationshipType: String?
+    public let notificationLevel: String?
 }
 
 // MARK: - GET /api/personas/:handle/posts

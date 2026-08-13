@@ -944,8 +944,17 @@ private object ChildRoutes {
      *  · payout routing). Distinct from `pantopus://wallet` (earnings-in). */
     const val SETTINGS_PAYMENTS = "settings/payments"
 
-    /** Profile / account hub — reached from the Hub avatar (no longer a bottom tab). */
-    const val PROFILE = "profile"
+    /**
+     * Profile / account hub — reached from the Hub avatar (no longer a bottom
+     * tab). `?tab=receipt` is the `monthly_receipt` push target and opens with
+     * the Monthly Receipt card expanded (RN `/(tabs)/profile?tab=receipt`).
+     */
+    const val PROFILE = "profile?tab={tab}"
+
+    /** Nav arg key for [PROFILE]'s `?tab=`. */
+    const val PROFILE_TAB_KEY = "tab"
+
+    fun profile(tab: String? = null): String = "profile?tab=${Uri.encode(tab.orEmpty())}"
 
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
@@ -1239,7 +1248,11 @@ private object ChildRoutes {
 
     /** Compose post target — placeholder until the compose flow ships. */
     const val COMPOSE_INTENT_KEY = "intent"
-    const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
+
+    /** Optional Sports-lane starter prompt seeded into the draft body. */
+    const val COMPOSE_BODY_KEY = "prefillBody"
+    const val COMPOSE_POST =
+        "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}&$COMPOSE_BODY_KEY={$COMPOSE_BODY_KEY}"
 
     /** P3.5 — Edit an existing Pulse post. Re-uses the compose flow. */
     const val EDIT_POST_POST_ID_KEY = "postId"
@@ -1313,7 +1326,12 @@ private object ChildRoutes {
     fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 
     /** Build the compose-post path with the pre-fill intent encoded. */
-    fun composePost(intent: String): String = "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+    fun composePost(
+        intent: String,
+        prefillBody: String = "",
+    ): String =
+        "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}" +
+            "&$COMPOSE_BODY_KEY=${java.net.URLEncoder.encode(prefillBody, "UTF-8")}"
 
     /** Build the edit-post path. The VM reads `postId` via SavedStateHandle. */
     fun editPost(postId: String): String = "feed/edit/${java.net.URLEncoder.encode(postId, "UTF-8")}"
@@ -1471,8 +1489,24 @@ private object ChildRoutes {
     // the NavHost below; when an A.x screen ships, swap that one composable
     // body for the real screen (the route + builder here are already correct).
 
-    /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
-    const val TODAY_DETAIL = "hub/today/detail"
+    /**
+     * A10.3 — Full "Today" briefing (weather, air, daylight, signals).
+     *
+     * `briefingDeliveryId` / `briefingKind` are non-empty only when opened
+     * from a Morning/Evening Briefing push, whose metadata carries
+     * `briefing_delivery_id` + `briefing_kind`. With an id the screen resolves
+     * that stored delivery (`GET /api/hub/briefings/:id`) instead of showing
+     * only the live `/api/hub/today` snapshot.
+     */
+    const val TODAY_DETAIL =
+        "hub/today/detail?briefingDeliveryId={briefingDeliveryId}&briefingKind={briefingKind}"
+
+    fun todayDetail(
+        briefingDeliveryId: String? = null,
+        briefingKind: String? = null,
+    ): String =
+        "hub/today/detail?briefingDeliveryId=${Uri.encode(briefingDeliveryId.orEmpty())}" +
+            "&briefingKind=${Uri.encode(briefingKind.orEmpty())}"
 
     /** A10.10 — Wallet (earnings-side surface). Reached from the
      *  Settings → "Payments & payouts" row and the
@@ -2014,6 +2048,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.waitingRoom(pending.homeId))
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.HubToday -> {
+                // Morning/Evening Briefing push → the stored delivery, not just
+                // the live `/api/hub/today` snapshot.
+                navController.navigate(
+                    ChildRoutes.todayDetail(pending.briefingDeliveryId, pending.kind),
+                )
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.MonthlyReceipt -> {
+                // `monthly_receipt` push → profile with the receipt expanded.
+                navController.navigate(ChildRoutes.profile(tab = "receipt"))
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.ResetPassword,
             is DeepLinkRouter.Destination.VerifyEmail,
             is DeepLinkRouter.Destination.Unknown,
@@ -2096,7 +2143,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 HubNavigationIntent.OpenMenu ->
                                     navDrawerScope.launch { navDrawerState.open() }
                                 HubNavigationIntent.OpenProfile ->
-                                    navController.navigate(ChildRoutes.PROFILE)
+                                    navController.navigate(ChildRoutes.profile())
                                 HubNavigationIntent.StartVerification ->
                                     navController.navigate(ChildRoutes.ADD_HOME)
                                 is HubNavigationIntent.ActionTapped ->
@@ -2135,8 +2182,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     } else {
                                         navController.navigate(routeForJumpBackIn(intent.item))
                                     }
+                                // `statusItems[].route` uses the same canonical web
+                                // paths as `jumpBackIn[].route`, so they share one
+                                // resolver.
+                                is HubNavigationIntent.StatusItemTapped ->
+                                    if (intent.item.route.startsWith("/app/chat")) {
+                                        navController.navigateToRootTab(PantopusRoute.Messages)
+                                    } else {
+                                        navController.navigate(
+                                            routeForJumpBackIn(
+                                                JumpBackItem(
+                                                    id = intent.item.id,
+                                                    title = intent.item.title,
+                                                    icon = intent.item.icon,
+                                                    route = intent.item.route,
+                                                ),
+                                            ),
+                                        )
+                                    }
                                 HubNavigationIntent.OpenToday ->
-                                    navController.navigate(ChildRoutes.TODAY_DETAIL)
+                                    navController.navigate(ChildRoutes.todayDetail())
                                 HubNavigationIntent.OpenRecentActivity ->
                                     navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                             }
@@ -2147,6 +2212,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     FeedScreen(
                         onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                         onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                        onComposeStarter = { starter ->
+                            navController.navigate(
+                                ChildRoutes.composePost(PulseIntent.Ask.key, starter.placeholder),
+                            )
+                        },
                     )
                 }
                 composable(PantopusRoute.Tasks.path) {
@@ -2177,8 +2247,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
                     )
                 }
-                composable(ChildRoutes.PROFILE) {
+                composable(
+                    ChildRoutes.PROFILE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PROFILE_TAB_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) { profileEntry ->
                     YouScreen(
+                        expandMonthlyReceipt =
+                            profileEntry.arguments
+                                ?.getString(ChildRoutes.PROFILE_TAB_KEY)
+                                ?.lowercase() == "receipt",
                         onOpenPublicProfile = { userId ->
                             navController.navigate(ChildRoutes.publicProfile(userId))
                         },
@@ -3324,6 +3407,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onEdit = { postId ->
                             navController.navigate(ChildRoutes.editPost(postId))
                         },
+                        onOpenBusiness = { username ->
+                            // "Nearby Providers" row → `/business/:username`.
+                            navController.navigate(ChildRoutes.businessProfile(username))
+                        },
                     )
                 }
                 composable(
@@ -3552,6 +3639,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                         onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
                         onBack = { navController.popBackStack() },
+                        onComposeStarter = { starter ->
+                            navController.navigate(
+                                ChildRoutes.composePost(PulseIntent.Ask.key, starter.placeholder),
+                            )
+                        },
                     )
                 }
                 composable(ChildRoutes.BEACONS_FEED) {
@@ -3798,6 +3890,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navArgument(ChildRoutes.COMPOSE_INTENT_KEY) {
                                 type = NavType.StringType
                                 defaultValue = PulseIntent.All.key
+                            },
+                            navArgument(ChildRoutes.COMPOSE_BODY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
                             },
                         ),
                 ) { entry ->
@@ -4471,7 +4567,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 // ---- Wave A bootstrap placeholders. Swap each body for the real
                 // screen when the matching A.x screen ships. ----
-                composable(ChildRoutes.TODAY_DETAIL) {
+                composable(
+                    ChildRoutes.TODAY_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument("briefingDeliveryId") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument("briefingKind") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
                     TodayDetailScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.WALLET) {
@@ -4802,6 +4911,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.businessInvoicesOwner(businessId))
                         },
                         onOpenLegal = { navController.navigate(ChildRoutes.businessLegal(businessId)) },
+                        onOpenChatRoom = { roomId, name, _ ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = false,
+                                ),
+                            )
+                        },
+                        onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                     )
                 }
                 composable(

@@ -1,6 +1,7 @@
 package app.pantopus.android.ui.screens.hub
 
 import android.content.SharedPreferences
+import app.pantopus.android.data.api.models.gigs.RebookableGigsResponse
 import app.pantopus.android.data.api.models.hub.DiscoveryItem
 import app.pantopus.android.data.api.models.hub.HubAvailability
 import app.pantopus.android.data.api.models.hub.HubCards
@@ -16,6 +17,7 @@ import app.pantopus.android.data.api.models.hub.HubUser
 import app.pantopus.android.data.api.models.notifications.NotificationUnreadCountResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigExtrasRepository
 import app.pantopus.android.data.hub.HubRepository
 import app.pantopus.android.data.notifications.NotificationsRepository
 import io.mockk.coEvery
@@ -46,10 +48,15 @@ class HubViewModelTest {
     // S5 — the Hub reads `byContext.audience` for the Beacon megaphone.
     private val notificationsRepo: NotificationsRepository = mockk()
 
+    // "Jump back in" prepends up to two rebookable-helper cards.
+    private val gigExtrasRepo: GigExtrasRepository = mockk()
+
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         coEvery { notificationsRepo.unreadCount() } returns
             NetworkResult.Success(NotificationUnreadCountResponse(count = 0, byContext = null))
+        coEvery { gigExtrasRepo.rebookable() } returns
+            NetworkResult.Success(RebookableGigsResponse(rebookable = emptyList()))
     }
 
     @After fun tearDown() {
@@ -129,7 +136,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs, notificationsRepo)
+            val vm = HubViewModel(repo, prefs, notificationsRepo, gigExtrasRepo)
             assertTrue(vm.state.value is HubUiState.Skeleton)
             vm.load()
             val populated = vm.state.value as HubUiState.Populated
@@ -146,7 +153,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs, notificationsRepo)
+            val vm = HubViewModel(repo, prefs, notificationsRepo, gigExtrasRepo)
             vm.load()
             val first = vm.state.value as HubUiState.FirstRun
             assertEquals(0.2f, first.content.profileCompleteness, 0.001f)
@@ -164,7 +171,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs, notificationsRepo)
+            val vm = HubViewModel(repo, prefs, notificationsRepo, gigExtrasRepo)
             vm.load()
             assertTrue(vm.state.value is HubUiState.Error)
             vm.refresh()
@@ -179,7 +186,7 @@ class HubViewModelTest {
             coEvery { repo.discovery(any(), any()) } returns
                 NetworkResult.Success(HubDiscoveryResponse(items = emptyList()))
 
-            val vm = HubViewModel(repo, prefs, notificationsRepo)
+            val vm = HubViewModel(repo, prefs, notificationsRepo, gigExtrasRepo)
             vm.load()
             val firstContent = (vm.state.value as HubUiState.Populated).content
             assertNotNull(firstContent.setupBanner)
@@ -211,7 +218,7 @@ class HubViewModelTest {
                             ),
                     ),
                 )
-            val vm = HubViewModel(repo, prefs, notificationsRepo)
+            val vm = HubViewModel(repo, prefs, notificationsRepo, gigExtrasRepo)
             vm.load()
             val populated = vm.state.value as HubUiState.Populated
             assertEquals(1, populated.content.discovery.size)

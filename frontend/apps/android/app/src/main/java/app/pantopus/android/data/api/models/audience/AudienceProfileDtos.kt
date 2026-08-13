@@ -45,6 +45,17 @@ data class AudienceListResponse(
     val persona: PersonaSummaryDto? = null,
     val items: List<FanDto> = emptyList(),
     val counts: AudienceCountsDto = AudienceCountsDto(),
+    /** Offset cursor echoed by the handler
+     *  (`backend/routes/personas.js:735-741`). Absent on the no-persona
+     *  short-circuit, so it stays nullable. */
+    val pagination: AudiencePaginationDto? = null,
+)
+
+/** `{ nextOffset, hasMore }` — `nextOffset` is null on the last page. */
+@JsonClass(generateAdapter = true)
+data class AudiencePaginationDto(
+    val nextOffset: Int? = null,
+    val hasMore: Boolean? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -95,6 +106,31 @@ data class AudienceMemberActionBody(
 data class AudienceMemberActionResponse(
     val membershipId: String? = null,
     val status: String? = null,
+)
+
+// PATCH /api/personas/:id/followers/:followId
+
+/** Body for the owner-side follower status change. Only `status` is sent;
+ *  the schema also accepts `relationship_type` / `notification_level` but
+ *  the block flow never changes those. */
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerStatusBody(
+    val status: String,
+)
+
+/** `{ follower: … }` echoed after the change
+ *  (`serializePersonaFollowForOwner`, `backend/routes/personas.js:225`). */
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerUpdateResponse(
+    val follower: AudienceFollowerDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerDto(
+    val id: String? = null,
+    val status: String? = null,
+    val relationshipType: String? = null,
+    val notificationLevel: String? = null,
 )
 
 // GET /api/personas/:handle/posts

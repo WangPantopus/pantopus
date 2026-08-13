@@ -435,11 +435,18 @@ public struct YouTabRoot: View {
         return ""
     }
 
-    public init() {}
+    /// True when opened from the `monthly_receipt` push — the Monthly
+    /// Receipt card renders expanded (RN `/(tabs)/profile?tab=receipt`).
+    private let expandMonthlyReceipt: Bool
+
+    public init(expandMonthlyReceipt: Bool = false) {
+        self.expandMonthlyReceipt = expandMonthlyReceipt
+    }
 
     public var body: some View {
         NavigationStack(path: navigationPathBinding) {
             MeView(
+                expandMonthlyReceipt: expandMonthlyReceipt,
                 onAction: { tile in handleAction(tile) },
                 onSection: { row in handleSection(row) },
                 onLogOut: { showsSignOutConfirm = true }
@@ -1354,6 +1361,10 @@ public struct YouTabRoot: View {
                 },
                 onEdit: { id in
                     Task { @MainActor in path.append(.editPost(postId: id)) }
+                },
+                onOpenBusiness: { username in
+                    // "Nearby Providers" row → `/business/:username`.
+                    Task { @MainActor in path.append(.businessProfile(businessId: username)) }
                 }
             )
         case .myBids:
@@ -2539,6 +2550,20 @@ public struct YouTabRoot: View {
                 },
                 onOpenLegal: {
                     Task { @MainActor in path.append(.businessLegal(businessId: businessId)) }
+                },
+                onOpenChatRoom: { roomId, name, _ in
+                    Task { @MainActor in
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .room(id: roomId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
+                onOpenPost: { postId in
+                    Task { @MainActor in path.append(.pulsePost(postId: postId)) }
                 }
             )
         case let .businessTeam(businessId):

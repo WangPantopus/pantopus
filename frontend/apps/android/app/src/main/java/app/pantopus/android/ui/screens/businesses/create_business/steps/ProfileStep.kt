@@ -1,7 +1,13 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.businesses.create_business.steps
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,9 +25,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.businesses.create_business.BusinessHoursDay
+import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessLogoPick
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessUiState
 import app.pantopus.android.ui.screens.shared.wizard.blocks.FormFieldsBlock
 import app.pantopus.android.ui.screens.shared.wizard.blocks.HeadlineBlock
@@ -39,10 +53,16 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Create Business step 3 — Location Form + Hours. Both sections may be
- * skipped. Composed with Wizard + Form tokens (no design frames).
+ * Create Business step 3 — Location Form + Hours + Logo. All three sections
+ * may be skipped. Composed with Wizard + Form tokens (no design frames).
+ * The logo lives here rather than in its own step because A12.10's designed
+ * frame 1 fixes the readout at "1 of 4"; RN carries it as a separate step
+ * (`src/app/businesses/new.tsx:27`).
  */
 @Composable
 fun ProfileStep(
@@ -50,14 +70,16 @@ fun ProfileStep(
     callbacks: ProfileStepCallbacks,
 ) {
     BusinessIdentityChip()
-    HeadlineBlock("Location & hours")
-    SubcopyBlock("Add a primary address and weekly hours, or skip for now.")
+    HeadlineBlock("Location, hours & logo")
+    SubcopyBlock("Add a primary address, weekly hours and a logo, or skip for now.")
 
     LocationSection(state = state, callbacks = callbacks)
 
     if (!state.locationSkipped) {
         HoursSection(state = state, callbacks = callbacks)
     }
+
+    LogoSection(state = state, callbacks = callbacks)
 
     state.submitError?.let { error ->
         Text(
@@ -71,6 +93,154 @@ fun ProfileStep(
         )
     }
 }
+
+@Composable
+private fun LogoSection(
+    state: CreateBusinessUiState,
+    callbacks: ProfileStepCallbacks,
+) {
+    if (state.logoSkipped) {
+        SkippedCard(
+            icon = PantopusIcon.Image,
+            label = "Logo skipped",
+            subcopy = "You can add a logo later from the dashboard.",
+            actionLabel = "Add a logo",
+            onAction = callbacks.onUnskipLogo,
+        )
+        return
+    }
+    val pickLogo = rememberLogoPicker(onPicked = callbacks.onLogoPicked)
+    val preview: ImageBitmap? =
+        remember(state.logoPick) {
+            state.logoPick?.bytes?.let { bytes ->
+                runCatching {
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                }.getOrNull()
+            }
+        }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Text(
+            text = "Logo",
+            style = PantopusTextStyle.body.copy(fontWeight = FontWeight.SemiBold),
+            color = PantopusColors.appText,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s4),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(Spacing.s16 + Spacing.s8)
+                        .clip(CircleShape)
+                        .background(PantopusColors.appSurfaceSunken)
+                        .border(1.dp, PantopusColors.appBorder, CircleShape)
+                        .clickable(onClick = pickLogo)
+                        .testTag("createBusiness_logoPicker"),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (preview != null) {
+                    Image(
+                        bitmap = preview,
+                        contentDescription = "Selected business logo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Image,
+                            contentDescription = null,
+                            size = Spacing.s5,
+                            tint = PantopusColors.appTextMuted,
+                        )
+                        Text(
+                            text = "Tap to select",
+                            style = PantopusTextStyle.caption,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                Text(
+                    text = "Square works best — we crop to 800×800.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+                if (state.logoPick != null) {
+                    Text(
+                        text = "Remove",
+                        style = PantopusTextStyle.body,
+                        color = PantopusColors.error,
+                        modifier =
+                            Modifier
+                                .clickable(onClick = callbacks.onClearLogo)
+                                .testTag("createBusiness_logoRemove"),
+                    )
+                }
+            }
+        }
+        Text(
+            text = "Skip logo for now",
+            style = PantopusTextStyle.body,
+            color = PantopusColors.appTextSecondary,
+            textAlign = TextAlign.Center,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = callbacks.onSkipLogo)
+                    .testTag("createBusiness_skipLogo")
+                    .padding(vertical = Spacing.s2),
+        )
+    }
+}
+
+/**
+ * Photo-picker launcher for the logo. Reads the bytes off the main thread
+ * and hands back a [CreateBusinessLogoPick] with a randomised filename so
+ * the picker's `IMG_xxxx` never reaches S3.
+ */
+@Composable
+private fun rememberLogoPicker(onPicked: (CreateBusinessLogoPick) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            scope.launch {
+                val bytes =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        }.getOrNull()
+                    } ?: return@launch
+                onPicked(
+                    CreateBusinessLogoPick(
+                        bytes = bytes,
+                        fileName = "business-logo-${System.currentTimeMillis()}.${extensionFor(mimeType)}",
+                        mimeType = mimeType,
+                    ),
+                )
+            }
+        }
+    return { launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+}
+
+private fun extensionFor(mimeType: String): String =
+    when (mimeType.lowercase()) {
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        "image/heic", "image/heif" -> "heic"
+        else -> "jpg"
+    }
 
 @Composable
 private fun LocationSection(

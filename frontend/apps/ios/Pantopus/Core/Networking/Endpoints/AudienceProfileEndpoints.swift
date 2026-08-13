@@ -17,17 +17,46 @@ public enum AudienceProfileEndpoints {
     public static let me = Endpoint(method: .get, path: "/api/personas/me")
 
     /// `GET /api/personas/me/audience` — fan list + counts by tier.
+    /// `sort` ∈ `recent / tenure / tier / alpha` (anything else falls back
+    /// to `recent`); `limit` is clamped server-side to 1…200 and `offset`
+    /// drives the `pagination.nextOffset` cursor echoed in the response.
     /// Route `backend/routes/personas.js:649`.
     public static func audience(
         sort: String? = nil,
         status: String? = nil,
-        tierRank: Int? = nil
+        tierRank: Int? = nil,
+        limit: Int? = nil,
+        offset: Int? = nil
     ) -> Endpoint {
         var query: [String: String] = [:]
         if let sort { query["sort"] = sort }
         if let status { query["status"] = status }
         if let tierRank { query["tier_rank"] = String(tierRank) }
+        if let limit { query["limit"] = String(limit) }
+        if let offset, offset > 0 { query["offset"] = String(offset) }
         return Endpoint(method: .get, path: "/api/personas/me/audience", query: query)
+    }
+
+    /// `PATCH /api/personas/:id/followers/:followId` — the owner-side
+    /// follower record update. `followId` is the **membership id**: the
+    /// handler looks the row up in `PersonaMembership` by `id`
+    /// (`backend/routes/personas.js:964-969`), so an id taken from
+    /// `/me/audience` resolves here unchanged. `status` ∈
+    /// `pending / active / muted / blocked / removed`
+    /// (`ownerFollowerUpdateSchema`, `backend/routes/personas.js:108`).
+    /// This is the only route that can set `blocked` — the
+    /// `/me/audience/:membershipId` action verb list has no block action.
+    /// Route `backend/routes/personas.js:960`.
+    public static func followerStatus(
+        personaId: String,
+        followId: String,
+        status: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .patch,
+            path: "/api/personas/\(personaId)/followers/\(followId)",
+            body: AudienceFollowerStatusBody(status: status)
+        )
     }
 
     /// `PATCH /api/personas/me/audience/:membershipId` — owner-side action
@@ -149,5 +178,16 @@ public struct AudienceMemberActionBody: Encodable, Sendable {
 
     public init(action: String) {
         self.action = action
+    }
+}
+
+/// Body for `PATCH /api/personas/:id/followers/:followId`. Only `status`
+/// is sent; the schema also accepts `relationship_type` /
+/// `notification_level` but the block flow never changes those.
+public struct AudienceFollowerStatusBody: Encodable, Sendable {
+    public let status: String
+
+    public init(status: String) {
+        self.status = status
     }
 }

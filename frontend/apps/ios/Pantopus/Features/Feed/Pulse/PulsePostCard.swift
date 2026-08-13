@@ -496,7 +496,11 @@ public struct PulseIntentChip: View {
         case .recommend: Theme.Color.success
         case .event: Theme.Color.magic
         case .lost: Theme.Color.rose
+        case .alert: Theme.Color.error
+        case .deal: Theme.Color.success
         case .announce: Theme.Color.slate
+        case .neighborhoodWin: Theme.Color.warning
+        case .visitorGuide: Theme.Color.info
         }
     }
 
@@ -507,7 +511,11 @@ public struct PulseIntentChip: View {
         case .recommend: Theme.Color.successLight
         case .event: Theme.Color.magicBg
         case .lost: Theme.Color.roseBg
+        case .alert: Theme.Color.errorBg
+        case .deal: Theme.Color.successBg
         case .announce: Theme.Color.slateBg
+        case .neighborhoodWin: Theme.Color.warningBg
+        case .visitorGuide: Theme.Color.infoBg
         }
     }
 }

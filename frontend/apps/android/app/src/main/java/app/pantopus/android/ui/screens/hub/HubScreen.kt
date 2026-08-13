@@ -35,10 +35,12 @@ import app.pantopus.android.ui.screens.hub.sections.HubDiscoveryRail
 import app.pantopus.android.ui.screens.hub.sections.HubFirstRunHero
 import app.pantopus.android.ui.screens.hub.sections.HubFloatingProgress
 import app.pantopus.android.ui.screens.hub.sections.HubJumpBackIn
+import app.pantopus.android.ui.screens.hub.sections.HubNeighborDensitySection
 import app.pantopus.android.ui.screens.hub.sections.HubPillarGrid
 import app.pantopus.android.ui.screens.hub.sections.HubRecentActivity
 import app.pantopus.android.ui.screens.hub.sections.HubSetupBanner
 import app.pantopus.android.ui.screens.hub.sections.HubSkeleton
+import app.pantopus.android.ui.screens.hub.sections.HubStatusStrip
 import app.pantopus.android.ui.screens.hub.sections.HubTodayCard
 import app.pantopus.android.ui.screens.hub.sections.HubTopBar
 import app.pantopus.android.ui.theme.PantopusColors
@@ -95,6 +97,8 @@ fun HubScreen(
                     content = current.content,
                     onIntent = onIntent,
                     onDismissBanner = viewModel::dismissSetupBanner,
+                    onDismissStatusItem = viewModel::dismissStatusItem,
+                    onDismissMilestone = viewModel::dismissDensityMilestone,
                     discoveryFilter = discoveryFilter,
                     discoveryLoading = discoveryLoading,
                     onDiscoveryFilterChange = viewModel::selectDiscoveryFilter,
@@ -115,6 +119,8 @@ private fun PopulatedLayout(
     content: PopulatedContent,
     onIntent: (HubNavigationIntent) -> Unit,
     onDismissBanner: () -> Unit,
+    onDismissStatusItem: (String) -> Unit,
+    onDismissMilestone: () -> Unit,
     discoveryFilter: HubDiscoveryFilter,
     discoveryLoading: Boolean,
     onDiscoveryFilterChange: (HubDiscoveryFilter) -> Unit,
@@ -139,6 +145,21 @@ private fun PopulatedLayout(
         }
         item(key = "actionStrip") {
             HubActionStrip(chips = content.actionChips) { onIntent(HubNavigationIntent.ActionTapped(it)) }
+        }
+        content.neighborDensity?.let { density ->
+            item(key = "neighborDensity") {
+                HubNeighborDensitySection(content = density, onDismissMilestone = onDismissMilestone)
+            }
+        }
+        // Rendered unconditionally: the empty set is the design's
+        // "All caught up" pill, not a hidden section (RN
+        // `HubActionStrip.tsx:33-38`).
+        item(key = "statusStrip") {
+            HubStatusStrip(
+                items = content.statusItems,
+                onTap = { onIntent(HubNavigationIntent.StatusItemTapped(it)) },
+                onDismiss = onDismissStatusItem,
+            )
         }
         content.setupBanner?.let { banner ->
             item(key = "setupBanner") {
@@ -310,6 +331,8 @@ private fun HubScreenPopulatedPreview() {
         content = sampleContent(),
         onIntent = {},
         onDismissBanner = {},
+        onDismissStatusItem = {},
+        onDismissMilestone = {},
         discoveryFilter = HubDiscoveryFilter.Gigs,
         discoveryLoading = false,
         onDiscoveryFilterChange = {},
