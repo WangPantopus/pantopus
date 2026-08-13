@@ -4,7 +4,55 @@
 > Android implementations. Generated 2026-08-06. **Separate axis from the design audit** — this asks
 > only: *what can a user do in RN that they cannot do natively?*
 
-## Headline
+---
+
+## STATUS — all 64 high-severity findings closed (2026-08-11)
+
+Branch `claude/rn-parity-high-severity-fixes`. Every high finding below was implemented on **both**
+platforms, in six waves, each compile-gated before the next started:
+
+| Wave | Cluster | Findings | Commit |
+|---|---|---|---|
+| 1 | homes-a + homes-b | 16 | `81d4f6d0` |
+| 2 | mailbox | 10 | `ebbb1c07` |
+| 3 | gigs + money | 10 | `8fcb7ae0` |
+| 4 | tabs-social | 10 | `d59be020` |
+| 5 | auth-settings | 7 | `27a6a0e3` |
+| 6 | creator-biz | 11 | `c44bb907` |
+
+**Verification performed:** iOS `make build` and Android `:app:compileDebugKotlin` green after every
+wave; SwiftLint clean; `verifyPantopusIcons` clean; full Android unit suite green (3264 tests); all 33
+new Android routes confirmed to have both a `composable(...)` registration *and* a production
+navigation call site; every endpoint the findings required confirmed present on both platforms.
+
+**Bugs found in existing code while doing this** (not in the original audit):
+
+- Every Support Train endpoint targeted `/api/support-trains/*`, which does not exist — the router
+  mounts at `/api/activities/support-trains` (`backend/app.js:404`). All nine pre-existing helpers were
+  hitting 404s on both platforms.
+- The privacy DTOs carried fields absent from the route's Joi schema, and that validator runs
+  `allowUnknown: false` — every `PATCH /api/privacy/settings` would have 400'd.
+- `CeremonialMailOpen` read `stationeryTheme` from the wrong level of `object_payload`, so theme / ink /
+  voice always fell back to defaults.
+- Two Support Train DTOs decoded a capitalised Supabase alias instead of the lowercase `user` object the
+  handlers actually return.
+
+**Known caveats, stated plainly:**
+
+- `verifyPantopusTokens` is red, but it was already red on `master` (406 distinct violations there). This
+  branch adds ~24 more, all `size = N.dp` on `PantopusIconImage`, matching the pervasive codebase idiom —
+  there is no icon-size token to use instead. Not fixed, to avoid making new code inconsistent with old.
+- Waves 3 and 5 lost their adversarial audit agents to session limits, and the final adversarial review
+  wave failed outright for the same reason. The mechanical verification above was run by hand instead;
+  a full per-finding adversarial re-verify has **not** been done.
+- `BusinessInvoicesEndpoints.receivedInvoices` (the paged list) is declared on both platforms with no UI
+  caller yet — symmetric across platforms, and groundwork for a received-invoices list.
+
+The medium (73) and low (13) findings below are **not** addressed by this branch.
+
+---
+
+## Headline (original audit, 2026-08-06)
 
 **142 RN routes reviewed. 38 fully migrated. 150 gaps (64 high / 73 medium / 13 low).**
 

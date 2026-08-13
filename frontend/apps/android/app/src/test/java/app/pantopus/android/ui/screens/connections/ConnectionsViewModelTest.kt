@@ -151,9 +151,16 @@ class ConnectionsViewModelTest {
     @Test
     fun both_fetches_failing_transitions_to_error() =
         runTest {
+            // Error is reserved for "nothing loaded at all". Since the Sent
+            // and Blocked tabs landed, that means all four fetches must fail —
+            // any one succeeding still gives the user a usable screen.
             coEvery { repo.list(any(), any(), any()) } returns
                 NetworkResult.Failure(NetworkError.Server(500, null))
             coEvery { repo.pendingRequests() } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            coEvery { connectionsRepo.sentRequests() } returns
+                NetworkResult.Failure(NetworkError.Server(500, null))
+            coEvery { connectionsRepo.blocked() } returns
                 NetworkResult.Failure(NetworkError.Server(500, null))
             val vm = ConnectionsViewModel(repo, connectionsRepo)
             vm.load()

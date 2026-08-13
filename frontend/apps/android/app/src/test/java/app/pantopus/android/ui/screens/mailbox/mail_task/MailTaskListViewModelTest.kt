@@ -160,6 +160,11 @@ class MailTaskListViewModelTest {
 
     @Test
     fun `toggle moves the row between buckets optimistically`() {
+        // Stub the PATCH explicitly: a `relaxed` mock's return value does not
+        // read as NetworkResult.Success, so the view model treats it as a
+        // failure and rolls the optimistic move straight back.
+        coEvery { repository.updateP3Task(any(), any()) } returns
+            NetworkResult.Success(P3TaskResponse(task = task("t-1", "completed")))
         val model = vm()
         model.load()
         val row = (model.state.value as MailTaskListUiState.Loaded).active.first()

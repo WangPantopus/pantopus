@@ -217,9 +217,15 @@ class ClaimOwnershipWizardViewModelTest {
             vm.picked(ClaimEvidenceSlot.Ownership, pickedFile("deed.pdf"))
             vm.onPrimary()
             assertEquals(ClaimOwnershipStep.Upload, vm.state.value.currentStep)
-            assertEquals(
-                "We're already working on a claim for this home.",
-                vm.state.value.submitError,
+            // A null claim id on the opaque-handshake path means a duplicate
+            // already exists — the same user-visible outcome as a 409. It now
+            // raises the blocked prompt (which offers "Search homes", matching
+            // RN's `claim-owner/evidence.tsx:194-212`) rather than a bare
+            // error string, so `submitError` stays null.
+            assertNull(vm.state.value.submitError)
+            assertTrue(
+                vm.state.value.blockedByOtherClaimPrompt
+                    ?.contains("verification is already in progress") == true,
             )
         }
 
