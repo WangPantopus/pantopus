@@ -62,6 +62,12 @@ data class PaymentMethod(
     val label: String,
     val subtext: String? = null,
     val chip: PaymentMethodChip? = null,
+    /**
+     * Last four digits of the card / bank account, when the server sent them.
+     * Only used to name the method in the destructive remove confirmation,
+     * mirroring RN's "…ending in 4421" alert (`PaymentMethodsTab.tsx:48-69`).
+     */
+    val last4: String? = null,
 )
 
 /** Brand badge variants for `PaymentMethodRow`. */

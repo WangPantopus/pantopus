@@ -180,12 +180,14 @@ public final class PulseFeedViewModel {
     private var nextCursorId: String?
     /// Optimistic per-post state layered over `loadedItems`.
     private var overrides: [String: PulsePostOverride] = [:]
-    /// Posts removed client-side (hidden / deleted / dismissed).
+    /// Posts removed client-side by *this* surface (deleted / dismissed).
+    /// Hides live in `moderation` instead — they are app-wide.
     private var removedPostIds: Set<String> = []
-    /// Muted authors + topics — removes their rows from the visible list
-    /// straight away, exactly as RN does.
-    private var mutedUserIds: Set<String> = []
-    private var mutedBusinessIds: Set<String> = []
+    /// App-wide mute / hide layer shared by every feed surface, mirroring
+    /// RN's `PantopusProvider` (`mutedEntities` + `hiddenPostIds`).
+    private let moderation: FeedModerationStore
+    /// Muted topics stay local: `POST /api/posts/mute/topic` is scoped to a
+    /// surface, so a topic muted on Nearby is not muted on Beacons.
     private var mutedPostTypes: Set<String> = []
 
     init(
@@ -194,7 +196,8 @@ public final class PulseFeedViewModel {
         latitude: Double? = nil,
         longitude: Double? = nil,
         viewerId: String? = nil,
-        locationProvider: any LocationProviding = DeviceLocationProvider.shared
+        locationProvider: any LocationProviding = DeviceLocationProvider.shared,
+        moderation: FeedModerationStore = .shared
     ) {
         self.api = api
         self.surface = surface
@@ -202,6 +205,7 @@ public final class PulseFeedViewModel {
         self.longitude = longitude
         self.locationProvider = locationProvider
         self.explicitViewerId = viewerId
+        self.moderation = moderation
     }
 
     /// First-time load. Refetches when still empty so a location fix can
@@ -399,9 +403,10 @@ public final class PulseFeedViewModel {
     }
 
     /// `POST /api/posts/hide/:id` — drops the row immediately, restores it
-    /// if the call fails.
+    /// if the call fails. The hide is recorded app-wide (RN's
+    /// `addHiddenPost`), so the post stays gone on every other surface too.
     public func hidePost(postId: String) async {
-        removedPostIds.insert(postId)
+        moderation.addHiddenPost(postId)
         rebuildLoadedState()
         do {
             _ = try await api.request(
@@ -410,7 +415,7 @@ public final class PulseFeedViewModel {
             )
             toastMessage = "Post hidden from your feed."
         } catch {
-            removedPostIds.remove(postId)
+            moderation.removeHiddenPost(postId)
             toastMessage = "Couldn't hide that post."
             rebuildLoadedState()
         }
@@ -469,7 +474,9 @@ public final class PulseFeedViewModel {
         let entityType: FeedMuteEntityType = item.businessAuthorId != nil ? .business : .user
         guard let entityId = item.businessAuthorId ?? item.userId else { return }
         let name = item.creator?.displayName ?? "this author"
-        if entityType == .business { mutedBusinessIds.insert(entityId) } else { mutedUserIds.insert(entityId) }
+        // App-wide: RN's `addMute` lives on the provider, so the author is
+        // filtered on every surface, not just this one.
+        moderation.addMute(entityType: entityType, entityId: entityId)
         rebuildLoadedState()
         do {
             _ = try await api.request(
@@ -478,11 +485,7 @@ public final class PulseFeedViewModel {
             )
             toastMessage = "Muted \(name)."
         } catch {
-            if entityType == .business {
-                mutedBusinessIds.remove(entityId)
-            } else {
-                mutedUserIds.remove(entityId)
-            }
+            moderation.removeMute(entityType: entityType, entityId: entityId)
             toastMessage = "Couldn't mute \(name)."
             rebuildLoadedState()
         }
@@ -647,8 +650,11 @@ public final class PulseFeedViewModel {
 
     private func isVisible(_ post: FeedPostDTO) -> Bool {
         if removedPostIds.contains(post.id) { return false }
-        if let businessId = post.businessAuthorId, mutedBusinessIds.contains(businessId) { return false }
-        if let userId = post.userId, mutedUserIds.contains(userId) { return false }
+        guard moderation.isVisible(
+            postId: post.id,
+            userId: post.userId,
+            businessAuthorId: post.businessAuthorId
+        ) else { return false }
         if let postType = post.postType, mutedPostTypes.contains(postType) { return false }
         return true
     }

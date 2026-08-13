@@ -88,6 +88,25 @@ public struct PublicProfileView: View {
         .sheet(isPresented: $showReportSheet) {
             reportSheet
         }
+        // RN gates the same `DELETE /api/relationships/:id` behind a
+        // "Disconnect · Remove this connection?" alert
+        // (`src/app/connections.tsx:69-77`), so tapping "Connected" here
+        // confirms before it removes the edge.
+        .confirmationDialog(
+            disconnectTitle,
+            isPresented: Binding(
+                get: { viewModel.showDisconnectConfirm },
+                set: { viewModel.showDisconnectConfirm = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                Task { await viewModel.disconnect() }
+            }
+            Button("Cancel", role: .cancel) { viewModel.cancelDisconnect() }
+        } message: {
+            Text("Remove this connection?")
+        }
         .sheet(
             isPresented: Binding(
                 get: { viewModel.showFollowHandshake },
@@ -113,6 +132,14 @@ public struct PublicProfileView: View {
         )
         .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
+    }
+
+    /// Names the neighbor being disconnected, per the destructive-confirm
+    /// rule. Falls back to the generic title before the profile resolves.
+    private var disconnectTitle: String {
+        guard case let .loaded(payload) = viewModel.state else { return "Disconnect" }
+        let name = payload.header.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Disconnect" : "Disconnect from \(name)"
     }
 
     @ViewBuilder private var reportSheet: some View {
@@ -326,6 +353,15 @@ public struct PublicProfileView: View {
         }
     }
 
+    /// Glyph paired with the Connect control's current label.
+    private var connectIcon: PantopusIcon {
+        switch viewModel.connection {
+        case .connected: .check
+        case .pendingSent: .clock
+        default: .userPlus
+        }
+    }
+
     /// Kind-aware action buttons rendered top-right inside the
     /// `BeaconIdentityBlock` (replacing the former sticky footer).
     @ViewBuilder
@@ -360,12 +396,21 @@ public struct PublicProfileView: View {
                 }
             }
         case .local:
-            BeaconHeaderGhostButton(
-                title: viewModel.connectState == .succeeded ? "Requested" : "Connect",
-                icon: .userPlus,
-                accessibilityLabel: viewModel.connectState == .succeeded ? "Requested" : "Connect"
-            ) {
-                Task { await viewModel.connect() }
+            // The Connect control reads the real edge from
+            // `GET /api/users/:id/relationship`: Connect → Requested →
+            // Accept → Connected, and disappears once the viewer has
+            // blocked this neighbor (RN `src/app/user/[id].tsx:391-398,523`).
+            if viewModel.showsConnectAction {
+                BeaconHeaderGhostButton(
+                    title: viewModel.connectLabel,
+                    icon: connectIcon,
+                    accessibilityLabel: viewModel.connection.accessibilityLabel
+                ) {
+                    Task { await viewModel.connect() }
+                }
+                .disabled(!viewModel.isConnectEnabled)
+                .opacity(viewModel.isConnectEnabled ? 1 : 0.7)
+                .accessibilityIdentifier("publicProfileConnectCta")
             }
             BeaconHeaderPrimaryButton(title: "Message", icon: .messageSquare) {
                 onOpenMessages(payload.profile)

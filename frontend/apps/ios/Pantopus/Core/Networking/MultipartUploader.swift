@@ -306,6 +306,47 @@ public final class MultipartUploader: @unchecked Sendable {
         }
     }
 
+    /// Add one portfolio item via `POST /api/files/portfolio`
+    /// (`backend/routes/files.js:362`). Single file, field name `file`;
+    /// `category` / `title` / `description` ride alongside as form fields
+    /// and land in `File.file_context` + `File.metadata`. Mirrors RN's
+    /// `api.files.uploadPortfolio`
+    /// (`packages/api/src/endpoints/files.ts:29`).
+    public func uploadPortfolio(
+        file: MultipartFile,
+        title: String,
+        description: String?,
+        category: String?
+    ) async throws -> PortfolioUploadResponse {
+        var fields: [String: String] = ["title": title]
+        if let description, !description.isEmpty { fields["description"] = description }
+        if let category, !category.isEmpty { fields["category"] = category }
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/files/portfolio")
+        let body = Self.buildBody(boundary: boundary, file: file, fields: fields)
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(PortfolioUploadResponse.self, from: data)
+            } catch {
+                logger.error("Portfolio upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "That file is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "That file type isn't supported.")
+        case 400..<500:
+            let message = String(data: data, encoding: .utf8)
+            throw APIError.clientError(status: http.statusCode, message: message)
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     /// Upload a Beacon avatar or banner via
     /// `POST /api/upload/persona-media/:personaId?type=avatar|banner`
     /// (`backend/routes/upload.js:312`). Single file, field name `file`,

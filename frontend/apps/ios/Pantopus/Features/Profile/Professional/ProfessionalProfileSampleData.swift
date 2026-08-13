@@ -45,7 +45,13 @@ public enum ProfessionalProfileSampleData {
             skills: publishedSkills,
             certifications: publishedCertifications,
             portfolio: publishedPortfolio,
-            visibility: publishedVisibility
+            visibility: publishedVisibility,
+            categories: ["carpentry", "plumber", "electrician"],
+            serviceCity: FormFieldState(id: "serviceCity", originalValue: "Elm Park"),
+            serviceState: FormFieldState(id: "serviceState", originalValue: "NY"),
+            serviceRadiusKm: FormFieldState(id: "serviceRadiusKm", originalValue: "25"),
+            hourlyRate: FormFieldState(id: "hourlyRate", originalValue: "85"),
+            verification: ProVerificationSummary(status: .verified, tier: 2)
         )
     }
 

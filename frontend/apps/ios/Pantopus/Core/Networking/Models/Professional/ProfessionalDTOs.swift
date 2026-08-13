@@ -79,6 +79,32 @@ public struct ProfessionalVerificationStatusResponse: Decodable, Sendable, Hasha
     }
 }
 
+// MARK: - POST /api/professional/verification/start
+
+/// Body for `POST /api/professional/verification/start`
+/// (`professional.js:310`). `tier` must be 1 or 2 — anything else is a 400
+/// (`professional.js:315`). RN sends tier 1 from the profile CTA
+/// (`professional.tsx:390`).
+public struct ProfessionalVerificationStartRequest: Encodable, Sendable, Hashable {
+    public let tier: Int
+
+    public init(tier: Int = 1) {
+        self.tier = tier
+    }
+}
+
+/// `{ message, verification_status }` — the row's new status after the
+/// start call (`professional.js:358`).
+public struct ProfessionalVerificationStartResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let verificationStatus: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case verificationStatus = "verification_status"
+    }
+}
+
 // MARK: - Shared request sub-objects
 
 /// `service_area` object accepted by both the create and update schemas

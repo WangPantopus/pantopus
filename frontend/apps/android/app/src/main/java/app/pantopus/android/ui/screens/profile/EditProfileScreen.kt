@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -377,13 +378,66 @@ private fun EditProfileSections(
         )
     }
     FormFieldGroup("Visibility") {
-        // Note: the design splits visibility into a
-        // `profile_visibility_public` boolean and a
-        // `show_in_neighbor_discovery` toggle. The schema only
-        // exposes the 3-way `profileVisibility` enum today, so we
-        // render the segmented picker and omit the toggle until
-        // the backend adds it.
+        // Note: the design also calls for a `show_in_neighbor_discovery`
+        // toggle. That key isn't in `updateProfileSchema` today, so it
+        // stays omitted; the 3-way `profileVisibility` enum and the two
+        // contact-visibility booleans below are the schema's full set
+        // (`backend/routes/users.js:797-800`).
         VisibilityPicker(fields = fields, onUpdate = onUpdate)
+        ContactVisibilityToggle(
+            field = EditProfileField.ShowEmail,
+            label = "Show Email on Profile",
+            subtitle = "Neighbors viewing your profile can see your email address.",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+        ContactVisibilityToggle(
+            field = EditProfileField.ShowPhone,
+            label = "Show Phone on Profile",
+            subtitle = "Neighbors viewing your profile can see your phone number.",
+            fields = fields,
+            onUpdate = onUpdate,
+        )
+    }
+}
+
+/**
+ * Boolean row backed by a `"true"` / `"false"` [FormFieldState], so it flows
+ * through the same dirty / discard / PATCH machinery as every other field.
+ * Mirrors RN `settings.tsx:236` and the iOS `contactVisibilityToggle`.
+ */
+@Composable
+private fun ContactVisibilityToggle(
+    field: EditProfileField,
+    label: String,
+    subtitle: String,
+    fields: Map<EditProfileField, FormFieldState>,
+    onUpdate: (EditProfileField, String) -> Unit,
+) {
+    val snapshot = fields[field]
+    val isOn = snapshot?.value == "true"
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .semantics { contentDescription = "$label, ${if (isOn) "on" else "off"}" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            DirtyFieldLabel(label = label, dirty = snapshot?.isDirty == true)
+            Text(
+                text = subtitle,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Switch(
+            checked = isOn,
+            onCheckedChange = { onUpdate(field, if (it) "true" else "false") },
+            modifier = Modifier.testTag("field_${field.key}"),
+        )
     }
 }
 

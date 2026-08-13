@@ -21,6 +21,30 @@ public enum AppLockCapability: String, Sendable {
     }
 }
 
+/// Per-user answer to the one-time "turn on app lock?" offer made after an
+/// interactive sign-in. Persisted so the offer is made exactly once per
+/// account, never on every launch. Mirrors RN's
+/// `AppLockSetupPromptState` (`src/lib/biometrics.ts:10`) and the Android
+/// `AppLockManager.SetupPromptState`.
+public enum AppLockSetupPromptState: String, Sendable {
+    /// Never answered — the prompt is still owed.
+    case pending
+    /// The user said "Not Now" (or the attempt failed) — never ask again.
+    case declined
+    /// App lock is on; nothing left to offer.
+    case enabled
+}
+
+/// Which surface asked to enable app lock. Only the post-login offer
+/// records a `declined` answer when the user backs out — turning the
+/// preference on from Settings and cancelling the biometric sheet must not
+/// burn the one-time prompt. Mirrors RN's `enableAppLock(source)`
+/// (`src/contexts/AppLockContext.tsx:118`).
+public enum AppLockEnableSource: Sendable {
+    case settings
+    case postLoginPrompt
+}
+
 /// Outcome of a one-shot re-auth gate in front of an irreversible action
 /// (account deletion today). Mirrors the RN `useSensitiveActionGuard`
 /// contract and the Android `AppLockManager.SensitiveActionOutcome`.
@@ -46,6 +70,12 @@ public final class AppLockManager {
     public private(set) var preferenceEnabled = false
     public private(set) var lastError: String?
 
+    /// Per-user answer to the one-time post-login "turn on app lock?" offer.
+    /// `nil` while signed out. Hydrated by `configure(userID:)` from the same
+    /// per-user `UserDefaults` namespace as the preference itself. Mirrors
+    /// RN's `AppLockContext.setupPromptState`.
+    public private(set) var setupPromptState: AppLockSetupPromptState?
+
     /// Immediate-on-resume today; persisted as a number so 1/15 minute choices
     /// can be added without migrating the per-user preference format.
     public var lockAfterMs: Int {
@@ -56,6 +86,16 @@ public final class AppLockManager {
     private let defaults: UserDefaults
     private var userID: String?
     private var attemptedCurrentLock = false
+
+    /// RN's `SENSITIVE_AUTH_GRACE_MS` (`contexts/AppLockContext.tsx:32`) —
+    /// a screen guard that ran a successful check within this window lets
+    /// the next money surface straight through.
+    public static let sensitiveAuthGrace: TimeInterval = 5 * 60
+
+    /// In-memory (never persisted, exactly like RN's `useRef`) timestamp of
+    /// the last *successful* sensitive-action check. Feeds
+    /// `isWithinSensitiveGracePeriod(_:)`.
+    private var lastSensitiveAuthAt: Date?
 
     /// Set by `appDidEnterBackground()`, consumed by `appDidBecomeActive()`.
     /// Mirrors Android's `onStop` → `onStart` pairing so a foreground pass
@@ -81,14 +121,38 @@ public final class AppLockManager {
         guard let userID else {
             preferenceEnabled = false
             isLocked = false
+            setupPromptState = nil
             return
         }
         preferenceEnabled = defaults.bool(forKey: key("enabled", userID))
+        setupPromptState = AppLockSetupPromptState(
+            rawValue: defaults.string(forKey: key("setupPrompt", userID)) ?? ""
+        ) ?? .pending
         refreshCapability()
         autoDisableForUnavailableCapability()
+        // RN's "sync setup prompt state with preferences" effect
+        // (`AppLockContext.tsx:395`): a user who already turned the lock on
+        // is never offered it again.
+        if preferenceEnabled, setupPromptState == .pending {
+            persistSetupPromptState(.enabled)
+        }
         if preferenceEnabled {
             isLocked = true
         }
+    }
+
+    /// Record the user's answer to the one-time post-login offer.
+    /// No-op while signed out (there is no per-user namespace to write to).
+    private func persistSetupPromptState(_ next: AppLockSetupPromptState) {
+        guard let userID else { return }
+        defaults.set(next.rawValue, forKey: key("setupPrompt", userID))
+        setupPromptState = next
+    }
+
+    /// "Not Now" on the post-login offer — burn the prompt for this user.
+    /// Mirrors RN `AppLockContext.dismissSetupPrompt`.
+    public func dismissSetupPrompt() {
+        persistSetupPromptState(.declined)
     }
 
     /// The app left the foreground.
@@ -137,7 +201,12 @@ public final class AppLockManager {
         }
     }
 
-    public func setEnabled(_ enabled: Bool) async -> Bool {
+    /// - Parameter source: `.postLoginPrompt` records a `declined` answer on
+    ///   every non-success path so the one-time offer is never repeated —
+    ///   RN's `enableAppLock('post_login_prompt')`
+    ///   (`AppLockContext.tsx:118-198`). `.settings` (the default) leaves the
+    ///   prompt state untouched on failure.
+    public func setEnabled(_ enabled: Bool, source: AppLockEnableSource = .settings) async -> Bool {
         guard let userID else { return false }
         if !enabled {
             defaults.set(false, forKey: key("enabled", userID))
@@ -150,15 +219,21 @@ public final class AppLockManager {
         refreshCapability()
         guard capability == .available else {
             autoDisableForUnavailableCapability()
+            if source == .postLoginPrompt { persistSetupPromptState(.declined) }
             return false
         }
         let succeeded = await authenticate(reason: "Turn on app lock for Pantopus")
-        guard succeeded else { return false }
+        guard succeeded else {
+            if source == .postLoginPrompt { persistSetupPromptState(.declined) }
+            return false
+        }
         defaults.set(true, forKey: key("enabled", userID))
         defaults.set(0, forKey: key("lockAfterMs", userID))
         preferenceEnabled = true
         isLocked = false
         recordUnlock()
+        // Turning the lock on — from anywhere — resolves the one-time offer.
+        persistSetupPromptState(.enabled)
         return true
     }
 
@@ -192,9 +267,21 @@ public final class AppLockManager {
             break
         }
         lastError = nil
-        if await authenticate(reason: reason) { return .verified }
+        if await authenticate(reason: reason) {
+            lastSensitiveAuthAt = Date()
+            return .verified
+        }
         let message = lastError ?? "We couldn't verify your identity. Please try again."
         return message == Self.cancelledMessage ? .cancelled : .failed(message: message)
+    }
+
+    /// `true` when a successful sensitive-action check happened inside the
+    /// grace window. Mirrors RN `AppLockContext.isWithinGracePeriod`.
+    public func isWithinSensitiveGracePeriod(
+        _ grace: TimeInterval = AppLockManager.sensitiveAuthGrace
+    ) -> Bool {
+        guard let lastSensitiveAuthAt else { return false }
+        return Date().timeIntervalSince(lastSensitiveAuthAt) < grace
     }
 
     /// The single string `message(for:)` produces for every user- /
@@ -210,6 +297,8 @@ public final class AppLockManager {
         lastError = nil
         userID = nil
         preferenceEnabled = false
+        lastSensitiveAuthAt = nil
+        setupPromptState = nil
     }
 
     public func refreshCapability() {

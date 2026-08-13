@@ -89,15 +89,61 @@ extension EditProfileView {
     }
 
     var visibilitySection: some View {
-        // Note: the design splits visibility into a
-        // `profile_visibility_public` boolean and a
-        // `show_in_neighbor_discovery` toggle. The schema only has the
-        // 3-way `profileVisibility` enum today (public / registered /
-        // private) and no neighbor-discovery key, so we render the
-        // enum picker and omit the toggle until the backend adds it.
+        // Note: the design also calls for a `show_in_neighbor_discovery`
+        // toggle. That key isn't in `updateProfileSchema` today, so it
+        // stays omitted; the 3-way `profileVisibility` enum and the two
+        // contact-visibility booleans below are the schema's full set
+        // (`backend/routes/users.js:797-800`).
         FormFieldGroup("Visibility") {
             visibilityPicker
+            contactVisibilityToggle(
+                .showEmail,
+                label: "Show Email on Profile",
+                subtitle: "Neighbors viewing your profile can see your email address."
+            )
+            contactVisibilityToggle(
+                .showPhone,
+                label: "Show Phone on Profile",
+                subtitle: "Neighbors viewing your profile can see your phone number."
+            )
         }
+    }
+
+    /// Boolean row backed by a `"true"` / `"false"` `FormFieldState`, so it
+    /// flows through the same dirty / discard / PATCH machinery as every
+    /// other field. Mirrors RN `settings.tsx:236`.
+    @ViewBuilder
+    func contactVisibilityToggle(
+        _ key: EditProfileField,
+        label: String,
+        subtitle: String
+    ) -> some View {
+        let snapshot = viewModel.fields[key] ?? FormFieldState(id: key.rawValue, originalValue: "false")
+        let isOn = snapshot.value == "true"
+        HStack(spacing: Spacing.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                EditProfileFieldLabel(label, dirty: snapshot.isDirty)
+                Text(subtitle)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer(minLength: Spacing.s0)
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { isOn },
+                    set: { viewModel.update(key, to: $0 ? "true" : "false") }
+                )
+            )
+            .labelsHidden()
+            .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("field_\(key.rawValue)")
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(label), \(isOn ? "on" : "off")")
     }
 
     @ViewBuilder

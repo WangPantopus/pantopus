@@ -72,6 +72,31 @@ data class VisibilityRow(
         get() = isOn != originalOn
 }
 
+/**
+ * The professional record's verification leg — `verification_tier` +
+ * `verification_status` (`professional.js:372`). [canStart] gates the
+ * "Start verification" CTA exactly like RN (`professional.tsx:385`, which
+ * shows it only when nothing has been submitted).
+ */
+data class ProVerificationSummary(
+    val status: ProVerificationStatus,
+    val tier: Int? = null,
+    /** True while `POST /verification/start` is in flight. */
+    val isStarting: Boolean = false,
+) {
+    /** One-line status copy — mirrors RN `professional.tsx:378`. */
+    val summary: String
+        get() =
+            when (status) {
+                ProVerificationStatus.Verified -> tier?.let { "Tier $it verified" } ?: "Verified"
+                ProVerificationStatus.Pending -> "Pending"
+                else -> "Not verified"
+            }
+
+    val canStart: Boolean
+        get() = status != ProVerificationStatus.Verified && status != ProVerificationStatus.Pending
+}
+
 data class ProfessionalProfileContent(
     val proName: String,
     val strength: Int,
@@ -82,13 +107,45 @@ data class ProfessionalProfileContent(
     val certifications: List<Certification>,
     val portfolio: List<PortfolioLink>,
     val visibility: List<VisibilityRow>,
+    /**
+     * Selected backend category keys — written to `categories[]` on
+     * `PATCH api/professional/profile/me`. Capped at
+     * [ProfessionalCategory.SELECTION_LIMIT].
+     */
+    val categories: List<String> = emptyList(),
+    /** Last-saved category baseline, used for dirty tracking. */
+    val originalCategories: List<String> = categories,
+    /** `service_area.city` / `.state` / `.radius_km`. */
+    val serviceCity: FormFieldState = FormFieldState(id = "serviceCity"),
+    val serviceState: FormFieldState = FormFieldState(id = "serviceState"),
+    val serviceRadiusKm: FormFieldState = FormFieldState(id = "serviceRadiusKm"),
+    /** `pricing_meta.hourly_rate` (currency is always USD, like RN). */
+    val hourlyRate: FormFieldState = FormFieldState(id = "hourlyRate"),
+    /** Verification tier + status, and whether a start call is in flight. */
+    val verification: ProVerificationSummary = ProVerificationSummary(ProVerificationStatus.Unverified),
 ) {
+    /** True when the category selection differs from the last-saved set. */
+    val categoriesAreDirty: Boolean
+        get() = categories != originalCategories
+
+    /**
+     * False once the server's 5-category cap is reached
+     * (`professional.js:45`) — unselected chips go disabled.
+     */
+    val canSelectMoreCategories: Boolean
+        get() = categories.size < ProfessionalCategory.SELECTION_LIMIT
+
     val dirtyCount: Int
         get() =
             listOf(
                 title.isDirty,
                 yearsInRole.isDirty,
                 company.isDirty,
+                categoriesAreDirty,
+                serviceCity.isDirty,
+                serviceState.isDirty,
+                serviceRadiusKm.isDirty,
+                hourlyRate.isDirty,
             ).count { it } +
                 skills.count { it.isFresh } +
                 certifications.count { it.isFresh } +

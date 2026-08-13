@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.feed.FeedActionsRepository
+import app.pantopus.android.data.feed.FeedModerationStore
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.posts.PostsRepository
@@ -118,8 +119,18 @@ class PulseFeedViewModelTest {
                 ),
         )
 
+    // A fresh moderation store per VM keeps mute/hide cases isolated — the
+    // production instance is a process singleton shared by every surface.
     private fun makeVm(): PulseFeedViewModel =
-        PulseFeedViewModel(repo, feedActions, authRepo, locationProvider, postsRefresh, sportsRepo)
+        PulseFeedViewModel(
+            repo,
+            feedActions,
+            authRepo,
+            locationProvider,
+            postsRefresh,
+            sportsRepo,
+            FeedModerationStore(),
+        )
 
     @Test fun load_with_posts_transitions_loaded() =
         runTest {

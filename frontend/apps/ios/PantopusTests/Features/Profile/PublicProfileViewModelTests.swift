@@ -475,4 +475,66 @@ final class PublicProfileViewModelTests: XCTestCase {
         vm.follow()
         XCTAssertFalse(vm.showFollowHandshake)
     }
+
+    // MARK: - Relationship-aware connect control
+
+    /// `GET /api/users/:id/relationship` values → RN's `getConnectLabel`
+    /// (`src/app/user/[id].tsx:391-398`).
+    func testConnectionLabels() {
+        XCTAssertEqual(ProfileConnection(apiValue: "none").label, "Connect")
+        XCTAssertEqual(ProfileConnection(apiValue: "pending_sent").label, "Requested")
+        XCTAssertEqual(ProfileConnection(apiValue: "pending_received").label, "Accept")
+        XCTAssertEqual(ProfileConnection(apiValue: "connected").label, "Connected")
+        XCTAssertEqual(ProfileConnection(apiValue: "blocked").label, "Connect")
+    }
+
+    /// Anything the server doesn't send (or nil) falls back to `.none`,
+    /// matching RN's `rel.relationship || 'none'`.
+    func testUnknownRelationshipFallsBackToNone() {
+        XCTAssertEqual(ProfileConnection(apiValue: nil), .none)
+        XCTAssertEqual(ProfileConnection(apiValue: ""), .none)
+        XCTAssertEqual(ProfileConnection(apiValue: "who-knows"), .none)
+    }
+
+    /// Only an outstanding outbound request makes the control inert.
+    func testOnlyPendingSentIsInert() {
+        XCTAssertFalse(ProfileConnection.pendingSent.isActionable)
+        for connection in ProfileConnection.allCases where connection != .pendingSent {
+            XCTAssertTrue(connection.isActionable, "\(connection) should be tappable")
+        }
+    }
+
+    /// A blocked edge drops the Connect affordance entirely, and so does a
+    /// signed-out viewer / your own profile (both leave `canFollow` false).
+    func testBlockHidesConnectAction() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            // relationship probe
+            .status(200, body: "{\"relationship\":\"none\",\"following\":false,\"followed_by\":false}"),
+            .status(200, body: "{\"message\":\"blocked\"}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "viewer", client: makeAPI())
+        await vm.load()
+        XCTAssertTrue(vm.showsConnectAction)
+        await vm.block()
+        XCTAssertEqual(vm.connection, .blocked)
+        XCTAssertFalse(vm.showsConnectAction)
+    }
+
+    /// Tapping Connect on an already-connected edge must confirm before it
+    /// deletes the relationship.
+    func testConnectOnConnectedEdgeRaisesDisconnectConfirm() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.profileWithReviews),
+            .status(200, body: "{\"relationship\":\"connected\",\"following\":false,\"followed_by\":false}")
+        ]
+        let vm = PublicProfileViewModel(userId: "u1", currentUserId: "viewer", client: makeAPI())
+        await vm.load()
+        XCTAssertEqual(vm.connection, .connected)
+        XCTAssertEqual(vm.connectLabel, "Connected")
+        await vm.connect()
+        XCTAssertTrue(vm.showDisconnectConfirm)
+        vm.cancelDisconnect()
+        XCTAssertFalse(vm.showDisconnectConfirm)
+    }
 }

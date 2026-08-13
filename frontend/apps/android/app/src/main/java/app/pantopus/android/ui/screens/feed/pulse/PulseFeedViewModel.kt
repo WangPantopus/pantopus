@@ -18,6 +18,7 @@ import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.feed.FeedActionsRepository
+import app.pantopus.android.data.feed.FeedModerationStore
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
@@ -78,6 +79,11 @@ class PulseFeedViewModel
         private val postsRefresh: PulsePostsRefreshNotifier,
         /** `GET /api/sports/active-events` — backs the Sports lane. */
         private val sportsRepo: SportsRepository,
+        /**
+         * App-wide mute / hide layer shared by every feed surface, mirroring
+         * RN's `PantopusProvider` (`mutedEntities` + `hiddenPostIds`).
+         */
+        private val moderation: FeedModerationStore,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseFeedUiState>(PulseFeedUiState.Loading)
         val state: StateFlow<PulseFeedUiState> = _state.asStateFlow()
@@ -228,12 +234,16 @@ class PulseFeedViewModel
         /** Optimistic per-post state layered over [loadedPosts]. */
         private var overrides: Map<String, PulsePostOverride> = emptyMap()
 
-        /** Posts removed client-side (hidden / deleted / dismissed). */
+        /**
+         * Posts removed client-side by *this* surface (deleted / dismissed).
+         * Hides live in [moderation] instead — they are app-wide.
+         */
         private var removedPostIds: Set<String> = emptySet()
 
-        /** Muted authors + topics — their rows leave the list immediately. */
-        private var mutedUserIds: Set<String> = emptySet()
-        private var mutedBusinessIds: Set<String> = emptySet()
+        /**
+         * Muted topics stay local: `POST /api/posts/mute/topic` is scoped to
+         * a surface, so a topic muted on Nearby is not muted on Beacons.
+         */
         private var mutedPostTypes: Set<String> = emptySet()
 
         /** Signed-in user id — gates delete / mark-solved / report per RN. */
@@ -552,13 +562,15 @@ class PulseFeedViewModel
          * it if the call fails.
          */
         fun hidePost(postId: String) {
-            removedPostIds = removedPostIds + postId
+            // The hide is recorded app-wide (RN's `addHiddenPost`), so the
+            // post stays gone on every other surface too.
+            moderation.addHiddenPost(postId)
             rebuildLoadedState()
             viewModelScope.launch {
                 when (feedActions.hidePost(postId)) {
                     is NetworkResult.Success -> _toastMessage.value = "Post hidden from your feed."
                     is NetworkResult.Failure -> {
-                        removedPostIds = removedPostIds - postId
+                        moderation.removeHiddenPost(postId)
                         _toastMessage.value = "Couldn't hide that post."
                         rebuildLoadedState()
                     }
@@ -620,21 +632,15 @@ class PulseFeedViewModel
             val entityType = if (businessId != null) FeedMuteEntityType.Business else FeedMuteEntityType.User
             val entityId = businessId ?: post.userId ?: return
             val name = post.creator?.displayName() ?: "this author"
-            if (entityType == FeedMuteEntityType.Business) {
-                mutedBusinessIds = mutedBusinessIds + entityId
-            } else {
-                mutedUserIds = mutedUserIds + entityId
-            }
+            // App-wide: RN's `addMute` lives on the provider, so the author is
+            // filtered on every surface, not just this one.
+            moderation.addMute(entityType, entityId)
             rebuildLoadedState()
             viewModelScope.launch {
                 when (feedActions.mute(entityType, entityId)) {
                     is NetworkResult.Success -> _toastMessage.value = "Muted $name."
                     is NetworkResult.Failure -> {
-                        if (entityType == FeedMuteEntityType.Business) {
-                            mutedBusinessIds = mutedBusinessIds - entityId
-                        } else {
-                            mutedUserIds = mutedUserIds - entityId
-                        }
+                        moderation.removeMute(entityType, entityId)
                         _toastMessage.value = "Couldn't mute $name."
                         rebuildLoadedState()
                     }
@@ -746,8 +752,11 @@ class PulseFeedViewModel
         private fun visiblePosts(): List<FeedPost> =
             loadedPosts.filter { post ->
                 post.id !in removedPostIds &&
-                    (post.businessAuthorId == null || post.businessAuthorId !in mutedBusinessIds) &&
-                    (post.userId == null || post.userId !in mutedUserIds) &&
+                    moderation.isVisible(
+                        postId = post.id,
+                        userId = post.userId,
+                        businessAuthorId = post.businessAuthorId,
+                    ) &&
                     (post.postType == null || post.postType !in mutedPostTypes)
             }
 

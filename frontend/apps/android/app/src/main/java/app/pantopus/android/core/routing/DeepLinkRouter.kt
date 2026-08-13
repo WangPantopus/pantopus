@@ -38,7 +38,7 @@ object DeepLinkRouter {
         /** OAuth callback / Unknown — never stash, never park as content. */
         Discard,
 
-        /** Reset / verify — auth stack owns these; never persist. */
+        /** Reset / verify / join-invite — auth stack owns these; never persist. */
         AuthOwned,
 
         /** Content. When signed out, persist for post-login replay. */
@@ -354,6 +354,16 @@ object DeepLinkRouter {
         when (destination) {
             is Destination.Unknown -> RoutingKind.Discard
             is Destination.ResetPassword, is Destination.VerifyEmail -> RoutingKind.AuthOwned
+            // RN sends a signed-out `/join/:code` straight to the register
+            // form with the code pre-filled — it never parks the link for
+            // post-login replay, because the code only matters while the
+            // account is still being created
+            // (`pantopus/frontend/apps/mobile/src/app/_layout.tsx:76`,
+            // `src/app/join/[code].tsx:20`). Auth-owned keeps it in memory so
+            // [app.pantopus.android.ui.screens.auth.AuthNavHost] can push
+            // Sign-up with the code, while a signed-in viewer still gets the
+            // token-accept surface from `RootTabScreen`.
+            is Destination.JoinInvite -> RoutingKind.AuthOwned
             else -> RoutingKind.Content
         }
 

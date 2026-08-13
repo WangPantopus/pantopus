@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.connections.ConnectionsRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
@@ -133,6 +134,62 @@ sealed interface PublicProfileActionState {
 }
 
 /**
+ * The viewer↔profile connection edge, as reported by
+ * `GET api/users/:id/relationship`
+ * (`backend/routes/users.js:3685` → `visibilityPolicy.getRelationshipStatus`,
+ * `backend/utils/visibilityPolicy.js:37`). Drives the Connect control's
+ * label and what tapping it does — RN's `connectionState`
+ * (`pantopus/frontend/apps/mobile/src/app/user/[id].tsx:80,203-221,392`).
+ * Mirrors iOS `ProfileConnection`.
+ */
+enum class ProfileConnection(
+    val apiValue: String,
+) {
+    None("none"),
+    PendingSent("pending_sent"),
+    PendingReceived("pending_received"),
+    Connected("connected"),
+    Blocked("blocked"),
+    ;
+
+    /** Connect-button copy. Mirrors RN `getConnectLabel`. */
+    val label: String
+        get() =
+            when (this) {
+                Connected -> "Connected"
+                PendingSent -> "Requested"
+                PendingReceived -> "Accept"
+                None, Blocked -> "Connect"
+            }
+
+    /**
+     * RN disables the button only while a request is outstanding
+     * (`disabled={actionLoading || connectionState === 'pending_sent'}`).
+     */
+    val isActionable: Boolean
+        get() = this != PendingSent
+
+    /** TalkBack copy — mirrored as the iOS `accessibilityLabel`. */
+    val accessibilityLabel: String
+        get() =
+            when (this) {
+                Connected -> "Connected. Tap to remove this connection"
+                PendingSent -> "Connection requested"
+                PendingReceived -> "Accept connection request"
+                None, Blocked -> "Connect"
+            }
+
+    companion object {
+        /**
+         * Decode the server's string, defaulting anything unrecognised to
+         * [None] — the same fallback RN applies (`rel.relationship || 'none'`).
+         */
+        fun fromApi(value: String?): ProfileConnection =
+            entries.firstOrNull { it.apiValue == value?.lowercase() } ?: None
+    }
+}
+
+/**
  * Loads the public profile and exposes a stable tab + toast surface.
  *
  * T3 — the nav arg may be a UUID *or* a handle (`pantopus://u/mariak`,
@@ -151,6 +208,8 @@ class PublicProfileViewModel
         private val repo: ProfileRepository,
         private val social: UserSocialRepository,
         private val relationships: RelationshipsRepository,
+        /** Owns the disconnect half of `/api/relationships` (S5 split). */
+        private val connections: ConnectionsRepository,
         private val blocks: BlocksRepository,
         private val authRepository: AuthRepository,
         private val posts: PostsRepository,
@@ -191,6 +250,24 @@ class PublicProfileViewModel
         private val _connectState =
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
         val connectState: StateFlow<PublicProfileActionState> = _connectState.asStateFlow()
+
+        /**
+         * The existing connection edge, seeded by
+         * `GET api/users/:id/relationship` on load and kept current after
+         * every connect / accept / disconnect. Without it the Connect
+         * control is one-way; with it the button reads Connect / Requested /
+         * Accept / Connected exactly like RN.
+         */
+        private val _connection = MutableStateFlow(ProfileConnection.None)
+        val connection: StateFlow<ProfileConnection> = _connection.asStateFlow()
+
+        /**
+         * Drives the "Remove connection?" confirm. RN's Connections centre
+         * gates the same `DELETE /api/relationships/:id` behind an alert
+         * (`src/app/connections.tsx:69-77`).
+         */
+        private val _showDisconnectConfirm = MutableStateFlow(false)
+        val showDisconnectConfirm: StateFlow<Boolean> = _showDisconnectConfirm.asStateFlow()
 
         private val _blockState =
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
@@ -355,14 +432,49 @@ class PublicProfileViewModel
                 !content.personaHandle.isNullOrBlank()
         }
 
+        // MARK: - Connect control (relationship-aware)
+
+        /**
+         * The control is hidden entirely on your own profile, for a
+         * signed-out viewer, and once the edge is `blocked` — RN drops the
+         * whole action row in those cases (`src/app/user/[id].tsx:522-523`).
+         */
+        fun showsConnectAction(): Boolean = _canFollow.value && _connection.value != ProfileConnection.Blocked
+
+        /** Tapping is a no-op while a request is outstanding or in flight. */
+        fun isConnectEnabled(): Boolean =
+            _connection.value.isActionable && _connectState.value !is PublicProfileActionState.InFlight
+
+        /**
+         * The Connect affordance. What it does depends on the edge the
+         * server reported, mirroring RN's `handleConnect`
+         * (`src/app/user/[id].tsx:201-224`):
+         *
+         *  - `none` → `POST api/relationships/requests`
+         *  - `pending_received` → resolve the inbound row, then
+         *    `POST api/relationships/:id/accept`
+         *  - `connected` → raise the disconnect confirm, which then calls
+         *    `DELETE api/relationships/:id`
+         *  - `pending_sent` / `blocked` → inert
+         */
         fun connect() {
             if (_connectState.value is PublicProfileActionState.InFlight) return
-            if (_connectState.value is PublicProfileActionState.Succeeded) return
+            when (_connection.value) {
+                ProfileConnection.None -> sendConnectionRequest()
+                ProfileConnection.PendingReceived -> acceptConnectionRequest()
+                ProfileConnection.Connected -> _showDisconnectConfirm.value = true
+                ProfileConnection.PendingSent, ProfileConnection.Blocked -> Unit
+            }
+        }
+
+        /** `POST api/relationships/requests` (relationships.js:67). */
+        private fun sendConnectionRequest() {
             _connectState.value = PublicProfileActionState.InFlight
             viewModelScope.launch {
                 when (val result = relationships.sendRequest(userId)) {
                     is NetworkResult.Success -> {
                         _connectState.value = PublicProfileActionState.Succeeded
+                        _connection.value = ProfileConnection.PendingSent
                         _toastMessage.value = "Connection request sent"
                     }
                     is NetworkResult.Failure -> {
@@ -374,6 +486,85 @@ class PublicProfileViewModel
             }
         }
 
+        /**
+         * Accept the inbound request. The relationship id isn't on the
+         * profile payload, so resolve it from
+         * `GET api/relationships/requests/pending` (relationships.js:669)
+         * first — exactly what RN does before calling accept.
+         */
+        private fun acceptConnectionRequest() {
+            _connectState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val pending = relationships.pendingRequests()) {
+                    is NetworkResult.Failure -> failConnect(pending.error)
+                    is NetworkResult.Success -> {
+                        val match = pending.data.requests.firstOrNull { it.requester?.id == userId }
+                        if (match == null) {
+                            _connectState.value = PublicProfileActionState.Idle
+                            // The row moved (withdrawn / already handled) —
+                            // re-read the edge rather than leave the button lying.
+                            loadRelationship(userId)
+                            _toastMessage.value = "That request is no longer pending."
+                            return@launch
+                        }
+                        when (val accepted = relationships.accept(match.id)) {
+                            is NetworkResult.Success -> {
+                                _connectState.value = PublicProfileActionState.Succeeded
+                                _connection.value = ProfileConnection.Connected
+                                _toastMessage.value = "Connected"
+                            }
+                            is NetworkResult.Failure -> failConnect(accepted.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Confirmed disconnect. Resolves the accepted row from
+         * `GET api/relationships?status=accepted` (relationships.js:622) and
+         * deletes it (`DELETE api/relationships/:id`, relationships.js:578).
+         */
+        fun disconnect() {
+            _showDisconnectConfirm.value = false
+            if (_connection.value != ProfileConnection.Connected) return
+            if (_connectState.value is PublicProfileActionState.InFlight) return
+            _connectState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val list = relationships.list(status = "accepted")) {
+                    is NetworkResult.Failure -> failConnect(list.error)
+                    is NetworkResult.Success -> {
+                        val match = list.data.relationships.firstOrNull { it.otherUser?.id == userId }
+                        if (match == null) {
+                            _connectState.value = PublicProfileActionState.Idle
+                            loadRelationship(userId)
+                            _toastMessage.value = "You're not connected to this neighbor."
+                            return@launch
+                        }
+                        when (val removed = connections.disconnect(match.id)) {
+                            is NetworkResult.Success -> {
+                                _connectState.value = PublicProfileActionState.Idle
+                                _connection.value = ProfileConnection.None
+                                _toastMessage.value = "Connection removed"
+                            }
+                            is NetworkResult.Failure -> failConnect(removed.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Dismiss the confirm without disconnecting. */
+        fun cancelDisconnect() {
+            _showDisconnectConfirm.value = false
+        }
+
+        private fun failConnect(error: NetworkError) {
+            val message = friendlyMessage(error)
+            _connectState.value = PublicProfileActionState.Failed(message)
+            _toastMessage.value = message
+        }
+
         /** Block this user via `POST /api/users/:userId/block`. */
         fun block() {
             if (_blockState.value is PublicProfileActionState.InFlight) return
@@ -382,6 +573,10 @@ class PublicProfileViewModel
                 when (val result = blocks.block(userId)) {
                     is NetworkResult.Success -> {
                         _blockState.value = PublicProfileActionState.Succeeded
+                        // RN flips `connectionState` to 'blocked' on the same
+                        // success, which drops the Connect / Follow row
+                        // (`src/app/user/[id].tsx:322`).
+                        _connection.value = ProfileConnection.Blocked
                         _toastMessage.value = "User blocked"
                     }
                     is NetworkResult.Failure -> {
@@ -421,11 +616,17 @@ class PublicProfileViewModel
             when (val result = social.relationship(profileId)) {
                 is NetworkResult.Success -> {
                     _isFollowing.value = result.data.following == true
-                    when (result.data.relationship) {
-                        "pending_sent", "connected" ->
-                            _connectState.value = PublicProfileActionState.Succeeded
-                        else -> Unit
-                    }
+                    val connection = ProfileConnection.fromApi(result.data.relationship)
+                    _connection.value = connection
+                    _connectState.value =
+                        when (connection) {
+                            ProfileConnection.PendingSent, ProfileConnection.Connected ->
+                                PublicProfileActionState.Succeeded
+                            ProfileConnection.None,
+                            ProfileConnection.PendingReceived,
+                            ProfileConnection.Blocked,
+                            -> PublicProfileActionState.Idle
+                        }
                 }
                 // A failed relationship probe must not fail the profile —
                 // the buttons just stay in their resting pose.

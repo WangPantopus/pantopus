@@ -55,6 +55,11 @@ public enum EditProfileField: String, CaseIterable, Sendable {
 
     /// Visibility
     case profileVisibility
+    /// Contact visibility — `"true"` / `"false"` strings so the whole form
+    /// stays on one `FormFieldState` machinery. Mapped to the booleans
+    /// `showEmail` / `showPhone` on PATCH (`backend/routes/users.js:2076`).
+    case showEmail
+    case showPhone
 }
 
 /// Observed state for the Edit Profile screen.
@@ -312,6 +317,14 @@ final class EditProfileViewModel {
         seed(.instagram, profile.socialLinks?.instagram ?? "")
         seed(.facebook, profile.socialLinks?.facebook ?? "")
         seed(.profileVisibility, profile.profileVisibility ?? "public")
+        seed(.showEmail, Self.boolString(profile.showEmail))
+        seed(.showPhone, Self.boolString(profile.showPhone))
+    }
+
+    /// Bridge between the string-valued form machinery and the two boolean
+    /// contact-visibility keys.
+    static func boolString(_ value: Bool?) -> String {
+        (value ?? false) ? "true" : "false"
     }
 
     /// First glyph of the best available display name — matches the RN
@@ -368,6 +381,14 @@ final class EditProfileViewModel {
             ["public", "registered", "private"].contains(value)
                 ? nil
                 : "Pick a visibility option."
+        },
+        // Boolean-backed toggles — the only invalid state is an unseeded
+        // field, which the loader never produces.
+        .showEmail: FormValidator { value in
+            ["true", "false"].contains(value) ? nil : "Pick an option."
+        },
+        .showPhone: FormValidator { value in
+            ["true", "false"].contains(value) ? nil : "Pick an option."
         }
     ]
 
@@ -413,6 +434,8 @@ final class EditProfileViewModel {
             case .instagram: update.instagram = trimmed
             case .facebook: update.facebook = trimmed
             case .profileVisibility: update.profileVisibility = trimmed
+            case .showEmail: update.showEmail = trimmed == "true"
+            case .showPhone: update.showPhone = trimmed == "true"
             }
         }
         return update

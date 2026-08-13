@@ -26,10 +26,12 @@ object ProfessionalProfileMapper {
             listOfNotNull(dto?.serviceArea?.city, dto?.serviceArea?.state)
                 .filter { it.isNotEmpty() }
                 .joinToString(", ")
+        val categories = dto?.categories ?: emptyList()
         val skills =
-            (dto?.categories ?: emptyList()).map {
+            categories.map {
                 ProSkill(id = it, label = categoryLabel(it), icon = categoryIcon(it))
             }
+        val rate = dto?.pricingMeta?.hourlyRate
         return ProfessionalProfileContent(
             proName = proName,
             strength = strength(dto),
@@ -40,8 +42,27 @@ object ProfessionalProfileMapper {
             certifications = emptyList(),
             portfolio = emptyList(),
             visibility = visibilityRows(dto?.isPublic ?: false, dto?.isActive ?: false),
+            categories = categories,
+            serviceCity = seeded("serviceCity", dto?.serviceArea?.city.orEmpty()),
+            serviceState = seeded("serviceState", dto?.serviceArea?.state.orEmpty()),
+            serviceRadiusKm = seeded("serviceRadiusKm", dto?.serviceArea?.radiusKm?.toInt()?.toString() ?: ""),
+            hourlyRate =
+                seeded(
+                    "hourlyRate",
+                    rate?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "",
+                ),
+            verification =
+                ProVerificationSummary(
+                    status = status,
+                    tier = dto?.verificationTier ?: verification?.tier,
+                ),
         )
     }
+
+    private fun seeded(
+        id: String,
+        value: String,
+    ): FormFieldState = FormFieldState(id = id, value = value, originalValue = value)
 
     fun verificationStatus(raw: String?): ProVerificationStatus =
         when (raw) {

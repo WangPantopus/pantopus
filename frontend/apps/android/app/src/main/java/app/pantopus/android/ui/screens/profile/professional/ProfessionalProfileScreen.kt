@@ -126,6 +126,12 @@ fun ProfessionalProfileScreen(
                     onRemoveCertification = viewModel::removeCertification,
                     onAddPortfolioLink = viewModel::addPortfolioLink,
                     onVisibilityChange = viewModel::setVisibility,
+                    onToggleCategory = viewModel::toggleCategory,
+                    onServiceCityChange = viewModel::updateServiceCity,
+                    onServiceStateChange = viewModel::updateServiceState,
+                    onServiceRadiusChange = viewModel::updateServiceRadius,
+                    onHourlyRateChange = viewModel::updateHourlyRate,
+                    onStartVerification = { viewModel.startVerification() },
                 )
             is ProfessionalProfileUiState.Pending ->
                 ProfessionalProfileLoaded(
@@ -146,6 +152,12 @@ fun ProfessionalProfileScreen(
                     onRemoveCertification = viewModel::removeCertification,
                     onAddPortfolioLink = viewModel::addPortfolioLink,
                     onVisibilityChange = viewModel::setVisibility,
+                    onToggleCategory = viewModel::toggleCategory,
+                    onServiceCityChange = viewModel::updateServiceCity,
+                    onServiceStateChange = viewModel::updateServiceState,
+                    onServiceRadiusChange = viewModel::updateServiceRadius,
+                    onHourlyRateChange = viewModel::updateHourlyRate,
+                    onStartVerification = { viewModel.startVerification() },
                 )
             is ProfessionalProfileUiState.Error ->
                 EmptyState(
@@ -209,6 +221,12 @@ internal fun ProfessionalProfileLoaded(
     onRemoveCertification: (String) -> Unit,
     onAddPortfolioLink: () -> Unit,
     onVisibilityChange: (String, Boolean) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onServiceCityChange: (String) -> Unit,
+    onServiceStateChange: (String) -> Unit,
+    onServiceRadiusChange: (String) -> Unit,
+    onHourlyRateChange: (String) -> Unit,
+    onStartVerification: () -> Unit,
 ) {
     FormShell(
         title = "Professional profile",
@@ -239,12 +257,21 @@ internal fun ProfessionalProfileLoaded(
             onAddSkill = onAddSkill,
             onRemoveSkill = onRemoveSkill,
         )
+        CategoriesSection(content = content, onToggleCategory = onToggleCategory)
+        ServiceAreaSection(
+            content = content,
+            onServiceCityChange = onServiceCityChange,
+            onServiceStateChange = onServiceStateChange,
+            onServiceRadiusChange = onServiceRadiusChange,
+            onHourlyRateChange = onHourlyRateChange,
+        )
         CertificationsSection(
             content = content,
             onAddCertification = onAddCertification,
             onRemoveCertification = onRemoveCertification,
         )
         PortfolioSection(content = content, onAddPortfolioLink = onAddPortfolioLink)
+        VerificationSection(content = content, onStartVerification = onStartVerification)
         VisibilitySection(content = content, onVisibilityChange = onVisibilityChange)
         DisableSection(isDisabling = isDisabling, onDisable = onDisable)
     }
@@ -443,6 +470,184 @@ private fun SkillsSection(
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,
         )
+    }
+}
+
+/**
+ * `categories[]` on `PATCH api/professional/profile/me`
+ * (`professional.js:190`). Server enum + 5-item cap (`professional.js:45`);
+ * mirrors RN's chip picker (`professional.tsx:494`).
+ */
+@Composable
+private fun CategoriesSection(
+    content: ProfessionalProfileContent,
+    onToggleCategory: (String) -> Unit,
+) {
+    ProSection("Categories") {
+        ProFieldLabel(
+            text = "Up to ${ProfessionalCategory.SELECTION_LIMIT}",
+            dirty = content.categoriesAreDirty,
+        )
+        FlowRow(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(Spacing.s2)
+                    .testTag("proEditCategoryPicker"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            ProfessionalCategory.all.forEach { category ->
+                val isOn = content.categories.contains(category.key)
+                ProCategoryChip(
+                    label = category.label,
+                    isOn = isOn,
+                    isDisabled = !isOn && !content.canSelectMoreCategories,
+                    testTag = "proEditCategoryChip_${category.key}",
+                    onClick = { onToggleCategory(category.key) },
+                )
+            }
+        }
+        Text(
+            text = "Used to rank you in search and on the pro map.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+/**
+ * `service_area.city/state/radius_km` + `pricing_meta.hourly_rate`
+ * (`professional.js:47` and `:54`) — RN's editor writes the same four values
+ * (`professional.tsx:123`).
+ */
+@Composable
+private fun ServiceAreaSection(
+    content: ProfessionalProfileContent,
+    onServiceCityChange: (String) -> Unit,
+    onServiceStateChange: (String) -> Unit,
+    onServiceRadiusChange: (String) -> Unit,
+    onHourlyRateChange: (String) -> Unit,
+) {
+    ProSection("Service area & pricing") {
+        ProTextInput(
+            label = "City",
+            optional = true,
+            value = content.serviceCity.value,
+            placeholder = "City",
+            testTag = "proServiceCityField",
+            onValueChange = onServiceCityChange,
+        )
+        ProTextInput(
+            label = "State",
+            optional = true,
+            value = content.serviceState.value,
+            placeholder = "State",
+            testTag = "proServiceStateField",
+            onValueChange = onServiceStateChange,
+        )
+        ProTextInput(
+            label = "Radius (km)",
+            optional = true,
+            value = content.serviceRadiusKm.value,
+            placeholder = "50",
+            keyboardType = KeyboardType.Number,
+            testTag = "proServiceRadiusField",
+            onValueChange = onServiceRadiusChange,
+        )
+        ProTextInput(
+            label = "Hourly rate (USD)",
+            optional = true,
+            value = content.hourlyRate.value,
+            placeholder = "0",
+            keyboardType = KeyboardType.Decimal,
+            testTag = "proHourlyRateField",
+            onValueChange = onHourlyRateChange,
+        )
+    }
+}
+
+/**
+ * Verification status + RN's "Start verification" CTA
+ * (`professional.tsx:377-400`) — `POST api/professional/verification/start`
+ * (`professional.js:310`).
+ */
+@Composable
+private fun VerificationSection(
+    content: ProfessionalProfileContent,
+    onStartVerification: () -> Unit,
+) {
+    val tone = content.verification.status.tone
+    ProSection("Verification") {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                modifier =
+                    Modifier
+                        .testTag("proVerificationStatus")
+                        .semantics { contentDescription = content.verification.summary },
+            ) {
+                PantopusIconImage(
+                    icon = tone.icon,
+                    contentDescription = null,
+                    size = 16.dp,
+                    tint = tone.foreground,
+                )
+                Text(
+                    text = content.verification.summary,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (content.verification.canStart) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.business)
+                            .clickable(
+                                enabled = !content.verification.isStarting,
+                                onClick = onStartVerification,
+                            ).testTag("proStartVerificationButton")
+                            .semantics {
+                                contentDescription = "Start verification"
+                                role = Role.Button
+                            },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (content.verification.isStarting) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            color = PantopusColors.appTextInverse,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    } else {
+                        Text(
+                            text = "Start verification",
+                            style = PantopusTextStyle.small,
+                            color = PantopusColors.appTextInverse,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

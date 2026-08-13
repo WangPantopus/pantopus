@@ -9,6 +9,7 @@
 
 package app.pantopus.android.ui.screens.auth.sign_up
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.auth.AccountType
@@ -85,6 +86,7 @@ class SignUpViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         data class UiState(
             val email: String = "",
@@ -183,7 +185,20 @@ class SignUpViewModel
                 }
         }
 
-        private val _uiState = MutableStateFlow(UiState())
+        /**
+         * Referral code carried in from a `pantopus://join/:code` deep link
+         * (`AuthRoutes.signUp`). Seeds the optional Invite code field so it
+         * rides the register call as `invite_code`, exactly like RN's
+         * `/(auth)/register?invite_code=CODE`
+         * (`pantopus/frontend/apps/mobile/src/app/(auth)/register.tsx:129`).
+         */
+        private val seededInviteCode: String =
+            savedStateHandle.get<String>(INVITE_CODE_KEY).orEmpty().trim()
+
+        /** True when the screen was reached from a `join/:code` link. */
+        val arrivedByInvite: Boolean = seededInviteCode.isNotEmpty()
+
+        private val _uiState = MutableStateFlow(UiState(inviteCode = seededInviteCode))
         val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
         private val _browserAuth = Channel<OAuthBrowserCommand>(Channel.BUFFERED)
@@ -430,6 +445,15 @@ class SignUpViewModel
         }
 
         companion object {
+            /**
+             * `SavedStateHandle` key for the optional `invite_code` query arg
+             * on [app.pantopus.android.ui.screens.auth.AuthRoutes.SIGN_UP_PATTERN].
+             */
+            const val INVITE_CODE_KEY = "invite_code"
+
+            /** Copy shown when the form was opened from a `join/:code` link. */
+            const val INVITED_MESSAGE = "You've been invited to join Pantopus!"
+
             /**
              * Blocked because the OAuth callback can only ever produce a
              * Personal account: `backend/routes/users.js`

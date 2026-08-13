@@ -290,7 +290,7 @@ private fun EnableError(message: String) {
  * 5-category cap is reached — mirroring RN `professional.tsx:494`.
  */
 @Composable
-private fun ProCategoryChip(
+internal fun ProCategoryChip(
     label: String,
     isOn: Boolean,
     isDisabled: Boolean,

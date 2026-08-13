@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -162,6 +163,11 @@ internal fun PaymentsScreenContent(
     actions: PaymentsScreenActions,
 ) {
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
+    // Removing a card detaches it from the Stripe customer and cannot be
+    // undone, so the DELETE is gated behind a destructive confirmation naming
+    // the card — mirroring RN's Alert (`PaymentMethodsTab.tsx:48-69`) and the
+    // iOS `confirmationDialog`.
+    var pendingRemoval by remember { mutableStateOf<PaymentMethod?>(null) }
 
     Column(
         modifier =
@@ -193,10 +199,83 @@ internal fun PaymentsScreenContent(
         MethodActionSheet(
             method = method,
             onSetDefault = actions.onSetDefault,
-            onRemove = actions.onRemove,
+            onRemove = { pendingRemoval = method },
             onDismiss = { selectedMethod = null },
         )
     }
+
+    pendingRemoval?.let { method ->
+        RemoveMethodDialog(
+            method = method,
+            onConfirm = {
+                actions.onRemove(method.id)
+                pendingRemoval = null
+            },
+            onDismiss = { pendingRemoval = null },
+        )
+    }
+}
+
+/**
+ * Destructive confirmation before `DELETE api/payments/methods/{id}`. Copy
+ * mirrors RN's Alert — "Remove Card" / "Are you sure you want to remove the
+ * card ending in 4421?" (`PaymentMethodsTab.tsx:50-53`).
+ */
+@Composable
+private fun RemoveMethodDialog(
+    method: PaymentMethod,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val subject =
+        method.last4?.takeIf { it.isNotEmpty() }?.let { "the card ending in $it" }
+            ?: method.label
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = PantopusColors.appSurface,
+        title = {
+            Text(
+                text = "Remove card",
+                color = PantopusColors.appText,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Text(
+                text = "Are you sure you want to remove $subject?",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 14.sp,
+            )
+        },
+        confirmButton = {
+            Text(
+                text = "Remove",
+                color = PantopusColors.error,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onConfirm)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveConfirm"),
+            )
+        },
+        dismissButton = {
+            Text(
+                text = "Cancel",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveCancel"),
+            )
+        },
+        modifier = Modifier.testTag("paymentsRemoveConfirmDialog"),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -204,7 +283,7 @@ internal fun PaymentsScreenContent(
 private fun MethodActionSheet(
     method: PaymentMethod,
     onSetDefault: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -243,7 +322,9 @@ private fun MethodActionSheet(
                 color = PantopusColors.error,
                 testTag = "paymentsRow_${method.id}_remove",
                 onClick = {
-                    onRemove(method.id)
+                    // Hands off to the destructive confirmation — the DELETE
+                    // only fires once the user confirms.
+                    onRemove()
                     onDismiss()
                 },
             )

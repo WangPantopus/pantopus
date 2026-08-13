@@ -3,6 +3,8 @@ package app.pantopus.android.data.api.services
 import app.pantopus.android.data.api.models.professional.ProfessionalEnableRequest
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileResponse
 import app.pantopus.android.data.api.models.professional.ProfessionalProfileUpdateRequest
+import app.pantopus.android.data.api.models.professional.ProfessionalVerificationStartRequest
+import app.pantopus.android.data.api.models.professional.ProfessionalVerificationStartResponse
 import app.pantopus.android.data.api.models.professional.ProfessionalVerificationStatusResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -44,4 +46,17 @@ interface ProfessionalApi {
     /** `GET /api/professional/verification/status` — route `professional.js:372`. */
     @GET("api/professional/verification/status")
     suspend fun verificationStatus(): ProfessionalVerificationStatusResponse
+
+    /**
+     * `POST /api/professional/verification/start` — route
+     * `professional.js:310`. Moves `verification_status` to `pending` for
+     * admin review. Tier must be 1 or 2 (`professional.js:315`); 400 when a
+     * review is already running or the tier is already verified, 404 when
+     * professional mode is off. Mirrors RN's "Start verification" CTA
+     * (`professional.tsx:386`).
+     */
+    @POST("api/professional/verification/start")
+    suspend fun startVerification(
+        @Body body: ProfessionalVerificationStartRequest,
+    ): ProfessionalVerificationStartResponse
 }

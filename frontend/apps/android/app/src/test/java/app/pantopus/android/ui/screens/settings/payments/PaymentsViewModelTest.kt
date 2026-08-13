@@ -13,6 +13,7 @@ import app.pantopus.android.data.api.models.payments.PaymentMethodDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.connect.ConnectRepository
 import app.pantopus.android.data.payments.PaymentHistoryRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import io.mockk.coEvery
@@ -41,15 +42,20 @@ import org.junit.Test
 class PaymentsViewModelTest {
     private lateinit var repository: PaymentsRepository
     private lateinit var historyRepository: PaymentHistoryRepository
+    private lateinit var connectRepository: ConnectRepository
 
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         repository = mockk(relaxed = true)
         historyRepository = mockk(relaxed = true)
+        connectRepository = mockk(relaxed = true)
         // Every live load reads the history feed right after the methods list.
         coEvery { historyRepository.history(any(), any()) } returns
             NetworkResult.Success(PaymentHistoryResponse(transactions = emptyList(), total = 0))
+        // No connected account by default → the not-connected Payouts scaffold.
+        coEvery { connectRepository.accountStatus() } returns
+            NetworkResult.Failure(NetworkError.NotFound)
     }
 
     @After
@@ -57,7 +63,7 @@ class PaymentsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() = PaymentsViewModel(repository, historyRepository)
+    private fun vm() = PaymentsViewModel(repository, historyRepository, connectRepository)
 
     private fun cardDto(
         id: String,

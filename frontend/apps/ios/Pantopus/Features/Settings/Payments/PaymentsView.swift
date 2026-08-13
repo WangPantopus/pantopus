@@ -32,6 +32,18 @@ public struct PaymentsView: View {
     }
 
     public var body: some View {
+        // Money surface — RN wraps this route in `SensitiveScreenGuard`
+        // (`app/settings/payments.tsx:31`), so the device credential is
+        // checked before any card / payout detail is composed.
+        SensitiveScreenGuard(
+            reason: "Verify to access Payments & Payouts",
+            onRejected: onBack
+        ) {
+            guardedBody
+        }
+    }
+
+    private var guardedBody: some View {
         VStack(spacing: Spacing.s0) {
             SettingsTopBar(title: "Payments", onBack: onBack)
                 .accessibilityIdentifier("paymentsTopBar")
@@ -102,6 +114,9 @@ private extension PaymentsView {
                 }
                 methodsSection(loaded.methods)
                 payoutsSection(loaded.payouts)
+                if let earnings = loaded.earnings {
+                    earningsSection(earnings)
+                }
                 activitySection(loaded.activity)
                 if loaded.canCloseAccount {
                     destructiveCard
@@ -202,6 +217,68 @@ private extension PaymentsView {
                     .accessibilityIdentifier("paymentsHelper_payouts")
             }
         }
+    }
+
+    /// "Earnings & Spending" — the two lifetime totals from
+    /// `GET /api/payments/earnings` + `/spending`, mirroring RN
+    /// `components/payments/PayoutsTab.tsx:251`.
+    private func earningsSection(_ earnings: PaymentsEarnings) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            sectionOverline("Earnings & spending", id: "earnings")
+            card(id: "earnings") {
+                HStack(spacing: Spacing.s3) {
+                    earningsTile(
+                        label: "Total earned",
+                        value: earnings.totalEarned,
+                        tint: Theme.Color.success,
+                        identifier: "paymentsTotalEarned"
+                    )
+                    earningsTile(
+                        label: "Total spent",
+                        value: earnings.totalSpent,
+                        tint: Theme.Color.primary600,
+                        identifier: "paymentsTotalSpent"
+                    )
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s4)
+                Text(earnings.caption)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, Spacing.s3)
+                    .padding(.bottom, Spacing.s4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("paymentsEarningsCaption")
+            }
+        }
+    }
+
+    private func earningsTile(
+        label: String,
+        value: String,
+        tint: Color,
+        identifier: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text(label.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .kerning(0.8)
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.system(size: 20, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.Color.appText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.s3)
+        .background(tint.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(tint.opacity(0.25), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier(identifier)
     }
 
     private func activitySection(_ activity: PaymentsActivity) -> some View {

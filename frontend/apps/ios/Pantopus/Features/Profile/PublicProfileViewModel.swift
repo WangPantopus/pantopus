@@ -198,6 +198,53 @@ public enum PublicProfileActionState: Sendable, Equatable {
     case failed(message: String)
 }
 
+/// The viewer↔profile connection edge, as reported by
+/// `GET /api/users/:id/relationship`
+/// (`backend/routes/users.js:3685` → `visibilityPolicy.getRelationshipStatus`,
+/// `backend/utils/visibilityPolicy.js:37`). Drives the Connect control's
+/// label and what tapping it does — RN's `connectionState`
+/// (`pantopus/frontend/apps/mobile/src/app/user/[id].tsx:80,203-221,392`).
+public enum ProfileConnection: String, Sendable, Equatable, Hashable, CaseIterable {
+    case none
+    case pendingSent = "pending_sent"
+    case pendingReceived = "pending_received"
+    case connected
+    case blocked
+
+    /// Decode the server's string, defaulting anything unrecognised to
+    /// `.none` — same fallback RN applies (`rel.relationship || 'none'`).
+    public init(apiValue: String?) {
+        self = ProfileConnection(rawValue: (apiValue ?? "").lowercased()) ?? .none
+    }
+
+    /// Connect-button copy. Mirrors RN `getConnectLabel`
+    /// (`src/app/user/[id].tsx:391-398`).
+    public var label: String {
+        switch self {
+        case .connected: "Connected"
+        case .pendingSent: "Requested"
+        case .pendingReceived: "Accept"
+        case .none, .blocked: "Connect"
+        }
+    }
+
+    /// RN disables the button only while a request is outstanding
+    /// (`disabled={actionLoading || connectionState === 'pending_sent'}`).
+    public var isActionable: Bool {
+        self != .pendingSent
+    }
+
+    /// VoiceOver copy — mirrored as the Android `contentDescription`.
+    public var accessibilityLabel: String {
+        switch self {
+        case .connected: "Connected. Tap to remove this connection"
+        case .pendingSent: "Connection requested"
+        case .pendingReceived: "Accept connection request"
+        case .none, .blocked: "Connect"
+        }
+    }
+}
+
 /// View-model for the public profile screen.
 @MainActor
 @Observable
@@ -220,6 +267,18 @@ public final class PublicProfileViewModel {
     /// Connect button state — toggles between `idle` → `inFlight` →
     /// `succeeded` after a successful `POST /api/relationships/requests`.
     public private(set) var connectState: PublicProfileActionState = .idle
+
+    /// The existing connection edge, seeded by
+    /// `GET /api/users/:id/relationship` on load and kept current after
+    /// every connect / accept / disconnect. Without it the Connect control
+    /// is one-way; with it the button reads Connect / Requested / Accept /
+    /// Connected exactly like RN.
+    public private(set) var connection: ProfileConnection = .none
+
+    /// Drives the "Remove connection?" confirm. RN's Connections centre
+    /// gates the same `DELETE /api/relationships/:id` behind an alert
+    /// (`src/app/connections.tsx:69-77`).
+    public var showDisconnectConfirm: Bool = false
 
     /// Block action state — surfaces toast on success or failure of
     /// `POST /api/users/:userId/block`.
@@ -284,10 +343,51 @@ public final class PublicProfileViewModel {
         await fetch()
     }
 
-    /// Send a connection request. Wraps
-    /// `POST /api/relationships/requests` (relationships.js:67).
+    // MARK: - Connect control (relationship-aware)
+
+    /// Copy on the Connect affordance for the current edge.
+    public var connectLabel: String {
+        connection.label
+    }
+
+    /// The control is hidden entirely on your own profile, for a signed-out
+    /// viewer, and once the edge is `blocked` — RN drops the whole action
+    /// row in those cases (`src/app/user/[id].tsx:522-523`).
+    public var showsConnectAction: Bool {
+        canFollow && connection != .blocked
+    }
+
+    /// Tapping is a no-op while a request is outstanding or in flight.
+    public var isConnectEnabled: Bool {
+        connection.isActionable && connectState != .inFlight
+    }
+
+    /// The Connect affordance. What it does depends on the edge the server
+    /// reported, mirroring RN's `handleConnect`
+    /// (`src/app/user/[id].tsx:201-224`):
+    ///
+    /// - `none` → `POST /api/relationships/requests`
+    /// - `pending_received` → resolve the inbound row, then
+    ///   `POST /api/relationships/:id/accept`
+    /// - `connected` → raise the disconnect confirm (RN's Connections
+    ///   centre alert), which then calls `DELETE /api/relationships/:id`
+    /// - `pending_sent` / `blocked` → inert
     public func connect() async {
-        guard connectState != .inFlight, connectState != .succeeded else { return }
+        guard connectState != .inFlight else { return }
+        switch connection {
+        case .none:
+            await sendConnectionRequest()
+        case .pendingReceived:
+            await acceptConnectionRequest()
+        case .connected:
+            showDisconnectConfirm = true
+        case .pendingSent, .blocked:
+            return
+        }
+    }
+
+    /// `POST /api/relationships/requests` (relationships.js:67).
+    private func sendConnectionRequest() async {
         connectState = .inFlight
         let body = ConnectionRequestBody(addresseeId: resolvedUserId)
         do {
@@ -296,6 +396,7 @@ public final class PublicProfileViewModel {
                 as: ConnectionRequestResponse.self
             )
             connectState = .succeeded
+            connection = .pendingSent
             toastMessage = "Connection request sent"
         } catch let error as APIError {
             let message = friendlyMessage(for: error)
@@ -307,6 +408,86 @@ public final class PublicProfileViewModel {
             toastMessage = "Couldn't send the request"
             logger.warning("Connect failed: \(error)")
         }
+    }
+
+    /// Accept the inbound request. The relationship id isn't on the
+    /// profile payload, so resolve it from
+    /// `GET /api/relationships/requests/pending` (relationships.js:669)
+    /// first — exactly what RN does before calling accept.
+    private func acceptConnectionRequest() async {
+        connectState = .inFlight
+        do {
+            let pending = try await client.request(
+                RelationshipsEndpoints.pending,
+                as: PendingRequestsResponse.self
+            )
+            guard let match = pending.requests.first(where: { $0.requester?.id == resolvedUserId }) else {
+                connectState = .idle
+                // The row moved (withdrawn / already handled) — re-read the
+                // edge rather than leaving the button lying.
+                await loadRelationship(id: resolvedUserId)
+                toastMessage = "That request is no longer pending."
+                return
+            }
+            _ = try await client.request(
+                RelationshipsEndpoints.accept(id: match.id),
+                as: RelationshipActionEcho.self
+            )
+            connectState = .succeeded
+            connection = .connected
+            toastMessage = "Connected"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            connectState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Accept failed: \(error)")
+        } catch {
+            connectState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't accept that request"
+            logger.warning("Accept failed: \(error)")
+        }
+    }
+
+    /// Confirmed disconnect. Resolves the accepted row from
+    /// `GET /api/relationships?status=accepted` (relationships.js:622) and
+    /// deletes it (`DELETE /api/relationships/:id`, relationships.js:578).
+    public func disconnect() async {
+        showDisconnectConfirm = false
+        guard connection == .connected, connectState != .inFlight else { return }
+        connectState = .inFlight
+        do {
+            let list = try await client.request(
+                RelationshipsEndpoints.list(status: "accepted"),
+                as: RelationshipsListResponse.self
+            )
+            guard let match = list.relationships.first(where: { $0.otherUser?.id == resolvedUserId }) else {
+                connectState = .idle
+                await loadRelationship(id: resolvedUserId)
+                toastMessage = "You're not connected to this neighbor."
+                return
+            }
+            _ = try await client.request(
+                ConnectionsEndpoints.disconnect(id: match.id),
+                as: RelationshipActionEcho.self
+            )
+            connectState = .idle
+            connection = .none
+            toastMessage = "Connection removed"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            connectState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Disconnect failed: \(error)")
+        } catch {
+            connectState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't remove that connection"
+            logger.warning("Disconnect failed: \(error)")
+        }
+    }
+
+    /// Dismiss the confirm without disconnecting.
+    public func cancelDisconnect() {
+        showDisconnectConfirm = false
     }
 
     /// Follow entry point behind every Follow affordance.
@@ -371,6 +552,10 @@ public final class PublicProfileViewModel {
                 as: EmptyResponse.self
             )
             blockState = .succeeded
+            // RN flips `connectionState` to 'blocked' on the same success,
+            // which is what drops the Connect / Follow row
+            // (`src/app/user/[id].tsx:322`).
+            connection = .blocked
             toastMessage = "User blocked"
         } catch let error as APIError {
             let message = friendlyMessage(for: error)
@@ -434,11 +619,12 @@ public final class PublicProfileViewModel {
                 as: UserRelationshipResponse.self
             )
             isFollowing = relationship.following ?? false
-            switch relationship.relationship ?? "none" {
-            case "pending_sent", "connected":
+            connection = ProfileConnection(apiValue: relationship.relationship)
+            switch connection {
+            case .pendingSent, .connected:
                 connectState = .succeeded
-            default:
-                break
+            case .none, .pendingReceived, .blocked:
+                connectState = .idle
             }
         } catch {
             logger.debug("Relationship load failed: \(error)")

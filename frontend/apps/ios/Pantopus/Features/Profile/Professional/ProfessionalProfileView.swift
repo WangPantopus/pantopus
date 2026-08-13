@@ -105,8 +105,11 @@ public struct ProfessionalProfileView: View {
                 pillarHeader(content)
                 roleSection(content)
                 skillsSection(content)
+                categoriesSection(content)
+                serviceAreaSection(content)
                 certificationsSection(content)
                 portfolioSection(content)
+                verificationSection(content)
                 visibilitySection(content)
                 disableSection()
             },
@@ -236,6 +239,143 @@ public struct ProfessionalProfileView: View {
                 .pantopusTextStyle(.caption)
                 .italic()
                 .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+    }
+
+    /// `categories[]` on `PATCH /api/professional/profile/me`
+    /// (`professional.js:190`). Server enum + 5-item cap
+    /// (`professional.js:45`); mirrors RN's chip picker
+    /// (`professional.tsx:494`).
+    private func categoriesSection(_ content: ProfessionalProfileContent) -> some View {
+        ProSectionBlock("Categories") {
+            ProFieldLabelRow(
+                text: "Up to \(ProfessionalCategory.selectionLimit)",
+                dirty: content.categoriesAreDirty
+            )
+            FilterSheetFlowLayout(spacing: Spacing.s1) {
+                ForEach(ProfessionalCategory.all) { category in
+                    let isOn = content.categories.contains(category.key)
+                    ProCategoryChip(
+                        label: category.label,
+                        isOn: isOn,
+                        isDisabled: !isOn && !content.canSelectMoreCategories,
+                        identifier: "proEditCategoryChip_\(category.key)"
+                    ) { viewModel.toggleCategory(category.key) }
+                }
+            }
+            .padding(Spacing.s2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .accessibilityIdentifier("proEditCategoryPicker")
+            Text("Used to rank you in search and on the pro map.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+    }
+
+    /// `service_area.city/state/radius_km` + `pricing_meta.hourly_rate`
+    /// (`professional.js:47` / `:54`) — RN's editor writes the same four
+    /// values (`professional.tsx:123`).
+    private func serviceAreaSection(_ content: ProfessionalProfileContent) -> some View {
+        ProSectionBlock("Service area & pricing") {
+            ProTextFieldRow(
+                spec: .init(
+                    label: "City",
+                    optional: true,
+                    value: content.serviceCity.value,
+                    dirty: content.serviceCity.isDirty,
+                    placeholder: "City",
+                    identifier: "proServiceCityField"
+                )
+            ) { viewModel.updateServiceCity($0) }
+            ProTextFieldRow(
+                spec: .init(
+                    label: "State",
+                    optional: true,
+                    value: content.serviceState.value,
+                    dirty: content.serviceState.isDirty,
+                    placeholder: "State",
+                    identifier: "proServiceStateField"
+                )
+            ) { viewModel.updateServiceState($0) }
+            ProTextFieldRow(
+                spec: .init(
+                    label: "Radius (km)",
+                    optional: true,
+                    value: content.serviceRadiusKm.value,
+                    dirty: content.serviceRadiusKm.isDirty,
+                    placeholder: "50",
+                    identifier: "proServiceRadiusField",
+                    keyboard: .numberPad
+                )
+            ) { viewModel.updateServiceRadius($0) }
+            ProTextFieldRow(
+                spec: .init(
+                    label: "Hourly rate (USD)",
+                    optional: true,
+                    value: content.hourlyRate.value,
+                    dirty: content.hourlyRate.isDirty,
+                    placeholder: "0",
+                    identifier: "proHourlyRateField",
+                    keyboard: .decimalPad
+                )
+            ) { viewModel.updateHourlyRate($0) }
+        }
+    }
+
+    /// Verification status + RN's "Start verification" CTA
+    /// (`professional.tsx:377-400`) — `POST /api/professional/
+    /// verification/start` (`professional.js:310`).
+    private func verificationSection(_ content: ProfessionalProfileContent) -> some View {
+        ProSectionBlock("Verification") {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                HStack(spacing: Spacing.s2) {
+                    Icon(content.verification.status.icon, size: 16, color: content.verification.status.foreground)
+                    Text(content.verification.summary)
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer(minLength: Spacing.s0)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("proVerificationStatus")
+                if content.verification.canStart {
+                    Button {
+                        Task { await viewModel.startVerification() }
+                    } label: {
+                        Group {
+                            if content.verification.isStarting {
+                                ProgressView().tint(Theme.Color.appTextInverse)
+                            } else {
+                                Text("Start verification")
+                                    .pantopusTextStyle(.small)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Theme.Color.appTextInverse)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Theme.Color.business)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(content.verification.isStarting)
+                    .accessibilityIdentifier("proStartVerificationButton")
+                    .accessibilityLabel("Start verification")
+                }
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
         }
     }
 

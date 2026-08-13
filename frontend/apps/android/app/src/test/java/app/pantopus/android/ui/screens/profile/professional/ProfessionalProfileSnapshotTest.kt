@@ -54,6 +54,12 @@ class ProfessionalProfileSnapshotTest {
                     onRemoveCertification = {},
                     onAddPortfolioLink = {},
                     onVisibilityChange = { _, _ -> },
+                    onToggleCategory = {},
+                    onServiceCityChange = {},
+                    onServiceStateChange = {},
+                    onServiceRadiusChange = {},
+                    onHourlyRateChange = {},
+                    onStartVerification = {},
                 )
             }
         }
@@ -81,6 +87,12 @@ class ProfessionalProfileSnapshotTest {
                     onRemoveCertification = {},
                     onAddPortfolioLink = {},
                     onVisibilityChange = { _, _ -> },
+                    onToggleCategory = {},
+                    onServiceCityChange = {},
+                    onServiceStateChange = {},
+                    onServiceRadiusChange = {},
+                    onHourlyRateChange = {},
+                    onStartVerification = {},
                 )
             }
         }

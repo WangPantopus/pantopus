@@ -4,8 +4,10 @@ package app.pantopus.android.ui.screens.settings.payments
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.connect.ConnectAccountDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.connect.ConnectRepository
 import app.pantopus.android.data.payments.PaymentHistoryRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,6 +46,7 @@ class PaymentsViewModel
     constructor(
         private val repository: PaymentsRepository,
         private val historyRepository: PaymentHistoryRepository,
+        private val connectRepository: ConnectRepository,
     ) : ViewModel() {
         private companion object {
             /** Matches the server's default page size for `GET api/payments/history`. */
@@ -87,6 +90,7 @@ class PaymentsViewModel
                                 PaymentsMapper.liveFrame(
                                     methods = result.data.paymentMethods.map(PaymentsMapper::toUiMethod),
                                     activity = fetchActivity(),
+                                    connectAccount = fetchConnectAccount(),
                                 ),
                             )
                     is NetworkResult.Failure ->
@@ -109,6 +113,14 @@ class PaymentsViewModel
                         body = "Pull down to refresh and try again.",
                     )
             }
+
+        /**
+         * `GET api/payments/connect/account` → the Payouts card. A 404 (the
+         * seller has never connected) or any transport error degrades to null,
+         * which renders the honest not-connected scaffold.
+         */
+        private suspend fun fetchConnectAccount(): ConnectAccountDto? =
+            (connectRepository.accountStatus() as? NetworkResult.Success)?.data?.account
 
         fun refresh() {
             load()

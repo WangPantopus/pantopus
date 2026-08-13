@@ -18,22 +18,27 @@ struct PayoutAccountCard: View {
     var onAction: () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .center, spacing: Spacing.s3) {
-            iconTile
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.headline)
-                    .font(.system(size: 12.5, weight: .bold))
-                    .tracking(-0.1)
-                    .foregroundStyle(Theme.Color.appText)
-                Text(account.bodyText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(
-                        account.warn ? WalletPalette.amberDeep : Theme.Color.appTextSecondary
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            HStack(alignment: .center, spacing: Spacing.s3) {
+                iconTile
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.headline)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(account.bodyText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(
+                            account.warn ? WalletPalette.amberDeep : Theme.Color.appTextSecondary
+                        )
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Spacing.s2)
+                action
             }
-            Spacer(minLength: Spacing.s2)
-            action
+            if !account.capabilities.isEmpty {
+                capabilityGrid
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, Spacing.s3)
@@ -46,6 +51,34 @@ struct PayoutAccountCard: View {
         .pantopusShadow(.sm)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("walletPayoutAccount")
+    }
+
+    /// RN `PayoutsTab`'s `detailsGrid` — one tile per Stripe capability so the
+    /// account status reads as detail, not a single boolean.
+    private var capabilityGrid: some View {
+        HStack(spacing: Spacing.s2) {
+            ForEach(account.capabilities) { capability in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(capability.label)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                    Text(capability.enabled ? "Enabled" : "Disabled")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(
+                            capability.enabled ? Theme.Color.success : Theme.Color.appTextSecondary
+                        )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("walletPayoutCapability_\(capability.id)")
+            }
+        }
     }
 
     private var iconTile: some View {
@@ -95,7 +128,11 @@ struct PayoutAccountCard: View {
                 headline: "Stripe account connected",
                 bodyText: "Payouts enabled · Card payments enabled",
                 actionLabel: "Open Stripe Dashboard",
-                warn: false
+                warn: false,
+                capabilities: [
+                    WalletPayoutCapability(key: "cardPayments", label: "Card payments", enabled: true),
+                    WalletPayoutCapability(key: "payouts", label: "Payouts", enabled: true)
+                ]
             )
         )
         PayoutAccountCard(

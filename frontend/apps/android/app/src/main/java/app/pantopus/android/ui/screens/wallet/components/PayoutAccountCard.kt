@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.screens.wallet.WalletPayoutAccount
+import app.pantopus.android.ui.screens.wallet.WalletPayoutCapability
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -54,7 +55,7 @@ fun PayoutAccountCard(
     val borderColor = if (account.warn) PantopusColors.warningLight else PantopusColors.appBorder
     val shape = RoundedCornerShape(14.dp)
 
-    Row(
+    Column(
         modifier =
             modifier
                 .fillMaxWidth()
@@ -64,34 +65,87 @@ fun PayoutAccountCard(
                 .border(BorderStroke(1.dp, borderColor), shape)
                 .padding(horizontal = 14.dp, vertical = Spacing.s3)
                 .testTag("walletPayoutAccount"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        IconTile(warn = account.warn)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Text(
-                text = account.headline,
-                color = PantopusColors.appText,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.1).sp,
-            )
-            Text(
-                text = account.bodyText,
-                color =
-                    if (account.warn) {
-                        WalletPalette.amberDeep
-                    } else {
-                        PantopusColors.appTextSecondary
-                    },
-                fontSize = 11.sp,
-            )
+            IconTile(warn = account.warn)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = account.headline,
+                    color = PantopusColors.appText,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.1).sp,
+                )
+                Text(
+                    text = account.bodyText,
+                    color =
+                        if (account.warn) {
+                            WalletPalette.amberDeep
+                        } else {
+                            PantopusColors.appTextSecondary
+                        },
+                    fontSize = 11.sp,
+                )
+            }
+            Spacer(Modifier.width(Spacing.s2))
+            AccountActionButton(account = account, onClick = onAction)
         }
-        Spacer(Modifier.width(Spacing.s2))
-        AccountActionButton(account = account, onClick = onAction)
+        if (account.capabilities.isNotEmpty()) {
+            CapabilityGrid(capabilities = account.capabilities)
+        }
+    }
+}
+
+/**
+ * RN `PayoutsTab`'s `detailsGrid` — one tile per Stripe capability so the
+ * account status reads as detail, not a single boolean. Mirrors iOS
+ * `PayoutAccountCard.capabilityGrid`.
+ */
+@Composable
+private fun CapabilityGrid(capabilities: List<WalletPayoutCapability>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        capabilities.forEach { capability ->
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(horizontal = 10.dp, vertical = Spacing.s2)
+                        .testTag("walletPayoutCapability_${capability.key}"),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = capability.label.uppercase(),
+                    color = PantopusColors.appTextMuted,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                )
+                Text(
+                    text = if (capability.enabled) "Enabled" else "Disabled",
+                    color =
+                        if (capability.enabled) {
+                            PantopusColors.success
+                        } else {
+                            PantopusColors.appTextSecondary
+                        },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 

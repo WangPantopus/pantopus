@@ -52,6 +52,20 @@ data class ProfessionalVerificationStatusResponse(
     @Json(name = "completed_at") val completedAt: String? = null,
 )
 
+// POST /api/professional/verification/start — backend/routes/professional.js:310
+// `tier` must be 1 or 2 (`professional.js:315`); RN sends 1 from the profile
+// CTA (`professional.tsx:390`). Response is `{ message, verification_status }`.
+@JsonClass(generateAdapter = true)
+data class ProfessionalVerificationStartRequest(
+    val tier: Int = 1,
+)
+
+@JsonClass(generateAdapter = true)
+data class ProfessionalVerificationStartResponse(
+    val message: String? = null,
+    @Json(name = "verification_status") val verificationStatus: String? = null,
+)
+
 // Shared request sub-objects — `service_area` (radius 1…500) and
 // `pricing_meta`, accepted by both the create and update schemas
 // (backend/routes/professional.js:47 and :54).

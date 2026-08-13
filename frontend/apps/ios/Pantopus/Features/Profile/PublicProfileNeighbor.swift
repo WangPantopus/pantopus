@@ -256,6 +256,9 @@ struct NeighborProfileLayout: View {
     let content: NeighborProfileContent
     @Binding var selectedTab: NeighborProfileTab
     let connectState: PublicProfileActionState
+    /// Existing viewer↔profile edge from `GET /api/users/:id/relationship`.
+    /// Drives the Connect button's label + whether it renders at all.
+    var connection: ProfileConnection = .none
     let onBack: @MainActor () -> Void
     let onMessage: @MainActor () -> Void
     let onConnect: @MainActor () -> Void
@@ -292,6 +295,7 @@ struct NeighborProfileLayout: View {
             NeighborActionBar(
                 primaryLabel: content.primaryCtaLabel,
                 connectState: connectState,
+                connection: connection,
                 onMessage: onMessage,
                 onConnect: onConnect
             )
@@ -932,31 +936,32 @@ struct NeighborReportBlockRow: View {
 struct NeighborActionBar: View {
     let primaryLabel: String
     let connectState: PublicProfileActionState
+    /// Existing viewer↔profile edge. `blocked` hides the Connect button
+    /// entirely (RN drops the whole action row), `pending_sent` renders it
+    /// inert, and the rest each get their own label.
+    var connection: ProfileConnection = .none
     let onMessage: @MainActor () -> Void
     let onConnect: @MainActor () -> Void
 
+    /// Tapping is inert while a request is outstanding or in flight —
+    /// RN's `disabled={actionLoading || connectionState === 'pending_sent'}`.
+    private var isConnectDisabled: Bool {
+        connectState == .inFlight || !connection.isActionable
+    }
+
+    private var connectIcon: PantopusIcon {
+        switch connection {
+        case .connected: .check
+        case .pendingSent: .clock
+        default: .userPlus
+        }
+    }
+
     var body: some View {
         HStack(spacing: Spacing.s2) {
-            Button(action: onConnect) {
-                HStack(spacing: Spacing.s1) {
-                    Icon(connectState == .succeeded ? .check : .userPlus, size: 16, color: Theme.Color.appText)
-                    Text(connectState == .succeeded ? "Requested" : "Connect")
-                        .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Theme.Color.appSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                        .stroke(Theme.Color.appBorder, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            if connection != .blocked {
+                connectButton
             }
-            .buttonStyle(.plain)
-            .disabled(connectState == .inFlight)
-            .opacity(connectState == .inFlight ? 0.7 : 1)
-            .accessibilityIdentifier("publicProfileConnectCta")
-            .accessibilityLabel(connectState == .succeeded ? "Connection requested" : "Connect")
 
             Button(action: onMessage) {
                 HStack(spacing: Spacing.s1) {
@@ -982,6 +987,29 @@ struct NeighborActionBar: View {
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
         }
+    }
+
+    private var connectButton: some View {
+        Button(action: onConnect) {
+            HStack(spacing: Spacing.s1) {
+                Icon(connectIcon, size: 16, color: Theme.Color.appText)
+                Text(connection.label)
+                    .font(.system(size: PantopusTextStyle.small.size, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(isConnectDisabled)
+        .opacity(isConnectDisabled ? 0.7 : 1)
+        .accessibilityIdentifier("publicProfileConnectCta")
+        .accessibilityLabel(connection.accessibilityLabel)
     }
 }
 

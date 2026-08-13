@@ -1,5 +1,6 @@
 package app.pantopus.android.ui.screens.auth
 
+import android.net.Uri
 import app.pantopus.android.data.auth.AuthError
 
 /**
@@ -10,7 +11,16 @@ import app.pantopus.android.data.auth.AuthError
 sealed class AuthRoute {
     data object Login : AuthRoute()
 
-    data object SignUp : AuthRoute()
+    /**
+     * Create account. [inviteCode] is non-null only when the screen was
+     * reached from a `pantopus://join/:code` deep link — it pre-fills the
+     * optional Invite code field and rides the register call as
+     * `invite_code`, mirroring RN's `/(auth)/register?invite_code=CODE`
+     * (`pantopus/frontend/apps/mobile/src/app/(auth)/register.tsx:25,129`).
+     */
+    data class SignUp(
+        val inviteCode: String? = null,
+    ) : AuthRoute()
 
     data object ForgotPassword : AuthRoute()
 
@@ -37,9 +47,27 @@ sealed class AuthRoute {
 /** Flat string-route table that the NavHost composables register against. */
 object AuthRoutes {
     const val LOGIN = "auth/login"
-    const val SIGN_UP = "auth/sign_up"
     const val FORGOT_PASSWORD = "auth/forgot_password"
     const val AUTH_ERROR = "auth/error"
+
+    /**
+     * A19 legal document reached from a signed-out consent sentence
+     * (login OAuth line, sign-up Terms checkbox). RN pushes
+     * `/legal/terms` / `/legal/privacy` from the same taps
+     * (`src/app/(auth)/register.tsx:327,334`).
+     */
+    const val LEGAL_PATTERN = "auth/legal/{document}"
+
+    /** Key for the `{document}` path arg on [LEGAL_PATTERN]. */
+    const val LEGAL_DOCUMENT_KEY = "document"
+
+    fun legal(document: String): String = "auth/legal/$document"
+
+    /**
+     * Create account. `{invite_code}` is an optional query arg carried in
+     * from a `pantopus://join/:code` deep link; blank means "typed here".
+     */
+    const val SIGN_UP_PATTERN = "auth/sign_up?invite_code={invite_code}"
 
     /** Reset password takes a `{token}` path argument. */
     const val RESET_PASSWORD_PATTERN = "auth/reset_password/{token}"
@@ -58,6 +86,11 @@ object AuthRoutes {
     const val VERIFY_EMAIL_LANDING_PATTERN = "auth/verify_email_landing?email={email}&token={token}"
 
     fun resetPassword(token: String): String = "auth/reset_password/$token"
+
+    fun signUp(inviteCode: String? = null): String {
+        val codeArg = Uri.encode(inviteCode?.takeIf { it.isNotEmpty() }.orEmpty())
+        return "auth/sign_up?invite_code=$codeArg"
+    }
 
     fun verifyEmail(
         email: String? = null,

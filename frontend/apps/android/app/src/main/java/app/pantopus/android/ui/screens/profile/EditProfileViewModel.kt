@@ -65,6 +65,14 @@ enum class EditProfileField(val key: String) {
 
     // Visibility
     ProfileVisibility("profileVisibility"),
+
+    /**
+     * Contact visibility — `"true"` / `"false"` strings so the whole form
+     * stays on one [FormFieldState] machinery. Mapped to the booleans
+     * `showEmail` / `showPhone` on PATCH (`backend/routes/users.js:2076`).
+     */
+    ShowEmail("showEmail"),
+    ShowPhone("showPhone"),
 }
 
 /** Render states for the Edit Profile screen. */
@@ -380,6 +388,8 @@ class EditProfileViewModel
             seed(EditProfileField.Instagram, profile.socialLinks?.instagram.orEmpty())
             seed(EditProfileField.Facebook, profile.socialLinks?.facebook.orEmpty())
             seed(EditProfileField.ProfileVisibility, profile.profileVisibility ?: "public")
+            seed(EditProfileField.ShowEmail, boolString(profile.showEmail))
+            seed(EditProfileField.ShowPhone, boolString(profile.showPhone))
         }
 
         private fun seed(
@@ -418,6 +428,12 @@ class EditProfileViewModel
                 if (text.isEmpty() && field !in ALLOWS_EMPTY) return null
                 return text
             }
+            /** Boolean-backed field → `true` only when it was actually toggled. */
+            fun boolean(field: EditProfileField): Boolean? {
+                val snapshot = map[field] ?: return null
+                if (!snapshot.isDirty) return null
+                return snapshot.value == "true"
+            }
             return ProfileUpdateRequest(
                 firstName = trimmed(EditProfileField.FirstName),
                 middleName = trimmed(EditProfileField.MiddleName),
@@ -431,6 +447,8 @@ class EditProfileViewModel
                 bio = trimmed(EditProfileField.Bio),
                 tagline = trimmed(EditProfileField.Tagline),
                 profileVisibility = trimmed(EditProfileField.ProfileVisibility),
+                showEmail = boolean(EditProfileField.ShowEmail),
+                showPhone = boolean(EditProfileField.ShowPhone),
                 website = trimmed(EditProfileField.Website),
                 linkedin = trimmed(EditProfileField.Linkedin),
                 twitter = trimmed(EditProfileField.Twitter),
@@ -500,8 +518,23 @@ class EditProfileViewModel
                         FormValidator { value ->
                             if (value in VISIBILITY_OPTIONS) null else "Pick a visibility option."
                         },
+                    // Boolean-backed toggles — the only invalid state is an
+                    // unseeded field, which the loader never produces.
+                    EditProfileField.ShowEmail to
+                        FormValidator { value -> if (value in BOOL_OPTIONS) null else "Pick an option." },
+                    EditProfileField.ShowPhone to
+                        FormValidator { value -> if (value in BOOL_OPTIONS) null else "Pick an option." },
                 )
 
             internal val VISIBILITY_OPTIONS: List<String> = listOf("public", "registered", "private")
+
+            private val BOOL_OPTIONS: List<String> = listOf("true", "false")
+
+            /**
+             * Bridge between the string-valued form machinery and the two
+             * boolean contact-visibility keys. Mirrors the iOS
+             * `EditProfileViewModel.boolString(_:)`.
+             */
+            fun boolString(value: Boolean?): String = if (value == true) "true" else "false"
         }
     }

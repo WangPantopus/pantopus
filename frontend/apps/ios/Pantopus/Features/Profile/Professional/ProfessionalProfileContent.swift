@@ -225,6 +225,39 @@ public struct ProVisibilityRow: Sendable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Verification
+
+/// The professional record's verification leg —
+/// `verification_tier` + `verification_status` (`professional.js:372`).
+/// `canStart` gates the "Start verification" CTA exactly like RN
+/// (`professional.tsx:385`, which shows it only for status `none`).
+public struct ProVerificationSummary: Sendable, Hashable {
+    public var status: ProVerificationStatus
+    public var tier: Int?
+    /// True while `POST /verification/start` is in flight.
+    public var isStarting: Bool
+
+    public init(status: ProVerificationStatus, tier: Int? = nil, isStarting: Bool = false) {
+        self.status = status
+        self.tier = tier
+        self.isStarting = isStarting
+    }
+
+    /// One-line status copy — mirrors RN `professional.tsx:378`.
+    public var summary: String {
+        switch status {
+        case .verified: tier.map { "Tier \($0) verified" } ?? "Verified"
+        case .pending: "Pending"
+        default: "Not verified"
+        }
+    }
+
+    /// RN only offers the CTA when nothing has been submitted yet.
+    public var canStart: Bool {
+        status != .verified && status != .pending
+    }
+}
+
 // MARK: - Aggregate content
 
 /// The full editable Professional-profile payload.
@@ -240,6 +273,19 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
     public var certifications: [Certification]
     public var portfolio: [PortfolioLink]
     public var visibility: [ProVisibilityRow]
+    /// Selected backend category keys — written to `categories[]` on
+    /// `PATCH /profile/me`. Capped at `ProfessionalCategory.selectionLimit`.
+    public var categories: [String]
+    /// Last-saved category baseline, used for dirty tracking.
+    public var originalCategories: [String]
+    /// `service_area.city` / `.state` / `.radius_km`.
+    public var serviceCity: FormFieldState
+    public var serviceState: FormFieldState
+    public var serviceRadiusKm: FormFieldState
+    /// `pricing_meta.hourly_rate` (currency is always USD, like RN).
+    public var hourlyRate: FormFieldState
+    /// Verification tier + status, and whether a start call is in flight.
+    public var verification: ProVerificationSummary
 
     public init(
         proName: String,
@@ -250,7 +296,13 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         skills: [ProSkill],
         certifications: [Certification],
         portfolio: [PortfolioLink],
-        visibility: [ProVisibilityRow]
+        visibility: [ProVisibilityRow],
+        categories: [String] = [],
+        serviceCity: FormFieldState = FormFieldState(id: "serviceCity", originalValue: ""),
+        serviceState: FormFieldState = FormFieldState(id: "serviceState", originalValue: ""),
+        serviceRadiusKm: FormFieldState = FormFieldState(id: "serviceRadiusKm", originalValue: ""),
+        hourlyRate: FormFieldState = FormFieldState(id: "hourlyRate", originalValue: ""),
+        verification: ProVerificationSummary = ProVerificationSummary(status: .unverified)
     ) {
         self.proName = proName
         self.strength = strength
@@ -261,6 +313,24 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         self.certifications = certifications
         self.portfolio = portfolio
         self.visibility = visibility
+        self.categories = categories
+        originalCategories = categories
+        self.serviceCity = serviceCity
+        self.serviceState = serviceState
+        self.serviceRadiusKm = serviceRadiusKm
+        self.hourlyRate = hourlyRate
+        self.verification = verification
+    }
+
+    /// True when the category selection differs from the last-saved set.
+    public var categoriesAreDirty: Bool {
+        categories != originalCategories
+    }
+
+    /// False once the server's 5-category cap is reached
+    /// (`professional.js:45`) — unselected chips go disabled.
+    public var canSelectMoreCategories: Bool {
+        categories.count < ProfessionalCategory.selectionLimit
     }
 
     /// Number of unsaved edits made this session — drives the "N edits"
@@ -274,6 +344,11 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         count += certifications.filter(\.isFresh).count
         count += portfolio.filter(\.isFresh).count
         count += visibility.filter(\.isDirty).count
+        if categoriesAreDirty { count += 1 }
+        if serviceCity.isDirty { count += 1 }
+        if serviceState.isDirty { count += 1 }
+        if serviceRadiusKm.isDirty { count += 1 }
+        if hourlyRate.isDirty { count += 1 }
         return count
     }
 

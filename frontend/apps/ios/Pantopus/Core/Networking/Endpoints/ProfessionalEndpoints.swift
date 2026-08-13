@@ -46,6 +46,16 @@ public enum ProfessionalEndpoints {
         Endpoint(method: .get, path: "/api/professional/verification/status")
     }
 
+    /// `POST /api/professional/verification/start` — route
+    /// `professional.js:310`. Moves `verification_status` to `pending` for
+    /// admin review. Tier must be 1 or 2 (`professional.js:315`); 400 when a
+    /// review is already in progress or the tier is already verified, 404
+    /// when professional mode is off. Mirrors RN's "Start verification" CTA
+    /// (`pantopus/frontend/apps/mobile/src/app/professional.tsx:386`).
+    public static func startVerification(_ body: ProfessionalVerificationStartRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/api/professional/verification/start", body: body)
+    }
+
     /// `GET /api/professional/:username` — route `professional.js:403`. The
     /// public-facing professional profile (user + portfolio + skills +
     /// review stats). Used by the public view, not the self editor.

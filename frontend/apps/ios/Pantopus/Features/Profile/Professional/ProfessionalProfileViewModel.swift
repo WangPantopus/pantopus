@@ -328,8 +328,60 @@ public final class ProfessionalProfileViewModel {
         }
     }
 
+    /// Add/remove a backend category on an **active** profile, capped at
+    /// the server's 5 (`professional.js:45`). The Skills chips are the
+    /// rendered projection of `categories`, so both move together.
+    public func toggleCategory(_ key: String) {
+        mutate { content in
+            if let index = content.categories.firstIndex(of: key) {
+                content.categories.remove(at: index)
+                content.skills.removeAll { $0.id == key }
+            } else if content.canSelectMoreCategories {
+                content.categories.append(key)
+                content.skills.append(
+                    ProSkill(
+                        id: key,
+                        label: Self.categoryLabel(key),
+                        icon: Self.categoryIcon(key)
+                    )
+                )
+            }
+        }
+    }
+
+    public func updateServiceCity(_ value: String) {
+        mutate { $0.serviceCity.value = value
+            $0.serviceCity.touched = true
+        }
+    }
+
+    public func updateServiceState(_ value: String) {
+        mutate { $0.serviceState.value = value
+            $0.serviceState.touched = true
+        }
+    }
+
+    public func updateServiceRadius(_ value: String) {
+        let digitsOnly = String(value.filter(\.isNumber).prefix(3))
+        mutate { $0.serviceRadiusKm.value = digitsOnly
+            $0.serviceRadiusKm.touched = true
+        }
+    }
+
+    public func updateHourlyRate(_ value: String) {
+        let filtered = value.filter { $0.isNumber || $0 == "." }
+        mutate { $0.hourlyRate.value = filtered
+            $0.hourlyRate.touched = true
+        }
+    }
+
     public func removeSkill(_ id: String) {
-        mutate { $0.skills.removeAll { $0.id == id } }
+        mutate {
+            $0.skills.removeAll { $0.id == id }
+            // Live skill ids are backend category keys — keep the two in
+            // sync so the PATCH drops the category too.
+            $0.categories.removeAll { $0 == id }
+        }
     }
 
     public func removeCertification(_ id: String) {
@@ -398,6 +450,11 @@ public final class ProfessionalProfileViewModel {
         let pending = working.pendingCount
         working.title.commit()
         working.yearsInRole.commit()
+        working.serviceCity.commit()
+        working.serviceState.commit()
+        working.serviceRadiusKm.commit()
+        working.hourlyRate.commit()
+        working.originalCategories = working.categories
         working.company.isDirty = false
         for index in working.skills.indices {
             working.skills[index].isFresh = false
@@ -423,18 +480,76 @@ public final class ProfessionalProfileViewModel {
         )
     }
 
-    /// Best-effort write of the safe, unambiguous fields.
+    /// Write the editable backend fields with `PATCH /profile/me`
+    /// (`professional.js:190`) — headline, public/active flags, and the
+    /// three RN also writes: `categories[]`, `service_area.city/state/
+    /// radius_km` and `pricing_meta.hourly_rate/currency`
+    /// (`professional.tsx:123`).
     private func persist(_ content: ProfessionalProfileContent) {
-        let request = ProfessionalProfileUpdateRequest(
+        let request = Self.updateRequest(from: content)
+        let api = api
+        // Inherits this type's `@MainActor` isolation, so the toast
+        // assignment below is already on the main actor.
+        Task {
+            do {
+                _ = try await api.request(
+                    ProfessionalEndpoints.updateProfileMe(request),
+                    as: ProfessionalProfileResponse.self
+                )
+            } catch {
+                toast = ToastMessage(
+                    text: (error as? APIError)?.errorDescription ?? "Couldn't save your profile.",
+                    kind: .error
+                )
+            }
+        }
+    }
+
+    /// Body for the active-profile save. Empty text fields are omitted
+    /// rather than sent blank — Joi rejects an out-of-range radius and an
+    /// empty `service_area` object outright (`professional.js:67`).
+    static func updateRequest(from content: ProfessionalProfileContent) -> ProfessionalProfileUpdateRequest {
+        let radius = min(max(Int(content.serviceRadiusKm.value) ?? 50, 1), 500)
+        let area = ProfessionalServiceAreaInput(
+            city: trimmedOrNil(content.serviceCity.value),
+            state: trimmedOrNil(content.serviceState.value),
+            radiusKm: radius
+        )
+        let rate = Double(content.hourlyRate.value)
+        return ProfessionalProfileUpdateRequest(
             headline: content.title.value,
             isPublic: content.visibility.first { $0.id == "publicProfile" }?.isOn,
-            isActive: content.visibility.first { $0.id == "activeForHire" }?.isOn
+            isActive: content.visibility.first { $0.id == "activeForHire" }?.isOn,
+            categories: content.categories,
+            serviceArea: area.isEmpty ? nil : area,
+            pricingMeta: (rate ?? 0) > 0 ? ProfessionalPricingInput(hourlyRate: rate, currency: "USD") : nil
         )
-        let api = api
-        Task {
-            _ = try? await api.request(
-                ProfessionalEndpoints.updateProfileMe(request),
-                as: ProfessionalProfileResponse.self
+    }
+
+    // MARK: - Verification
+
+    /// `POST /api/professional/verification/start` (`professional.js:310`)
+    /// — RN's "Start verification" CTA (`professional.tsx:386`), which
+    /// sends tier 1 and reloads the profile on success.
+    public func startVerification(tier: Int = 1) async {
+        guard case .live = mode else { return }
+        guard var working = content, !working.verification.isStarting else { return }
+        working.verification.isStarting = true
+        content = working
+        recompute()
+        do {
+            let response: ProfessionalVerificationStartResponse = try await api.request(
+                ProfessionalEndpoints.startVerification(ProfessionalVerificationStartRequest(tier: tier))
+            )
+            toast = ToastMessage(text: response.message ?? "Verification started", kind: .success)
+            await load()
+        } catch {
+            working.verification.isStarting = false
+            content = working
+            recompute()
+            toast = ToastMessage(
+                text: (error as? APIError)?.errorDescription ?? "Failed to start verification",
+                kind: .error
             )
         }
     }
@@ -453,9 +568,11 @@ public final class ProfessionalProfileViewModel {
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
-        let skills = (dto?.categories ?? []).map {
+        let categories = dto?.categories ?? []
+        let skills = categories.map {
             ProSkill(id: $0, label: categoryLabel($0), icon: categoryIcon($0))
         }
+        let rate = dto?.pricingMeta?.hourlyRate
         return ProfessionalProfileContent(
             proName: proName,
             strength: strength(for: dto),
@@ -465,7 +582,22 @@ public final class ProfessionalProfileViewModel {
             skills: skills,
             certifications: [],
             portfolio: [],
-            visibility: visibilityRows(isPublic: dto?.isPublic ?? false, isActive: dto?.isActive ?? false)
+            visibility: visibilityRows(isPublic: dto?.isPublic ?? false, isActive: dto?.isActive ?? false),
+            categories: categories,
+            serviceCity: FormFieldState(id: "serviceCity", originalValue: dto?.serviceArea?.city ?? ""),
+            serviceState: FormFieldState(id: "serviceState", originalValue: dto?.serviceArea?.state ?? ""),
+            serviceRadiusKm: FormFieldState(
+                id: "serviceRadiusKm",
+                originalValue: dto?.serviceArea?.radiusKm.map { String(Int($0)) } ?? ""
+            ),
+            hourlyRate: FormFieldState(
+                id: "hourlyRate",
+                originalValue: rate.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? ""
+            ),
+            verification: ProVerificationSummary(
+                status: status,
+                tier: dto?.verificationTier ?? verification?.tier
+            )
         )
     }
 

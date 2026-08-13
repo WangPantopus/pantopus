@@ -146,7 +146,8 @@ final class DeepLinkRouter {
     private enum RoutingKind {
         /// OAuth callback / `.unknown` — never stash, never park as content.
         case discard
-        /// `reset-password` / `verify-email` — auth stack owns these; never persist.
+        /// `reset-password` / `verify-email` / `join/:code` — the auth stack
+        /// owns these; never persist.
         case authOwned
         /// Content destinations. When signed out, persist for post-login replay.
         case content
@@ -264,6 +265,16 @@ final class DeepLinkRouter {
         case .unknown:
             return .discard
         case .resetPassword, .verifyEmail:
+            return .authOwned
+        case .joinInvite:
+            // RN sends a signed-out `/join/:code` straight to the register
+            // form with the code pre-filled — it never parks the link for
+            // post-login replay, because the code is only meaningful while
+            // the account is still being created
+            // (`pantopus/frontend/apps/mobile/src/app/_layout.tsx:76`,
+            // `src/app/join/[code].tsx:20`). Classifying it auth-owned keeps
+            // it in memory so `LoginView` can push Sign-up with the code,
+            // while a signed-in viewer still gets the token-accept sheet.
             return .authOwned
         default:
             return .content

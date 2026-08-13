@@ -38,6 +38,10 @@ public struct PaymentsLoaded: Sendable, Hashable {
     public let canCloseAccount: Bool
     /// Monospaced footer caption rendered below the destructive card.
     public let footerCaption: String
+    /// Lifetime TOTAL EARNED / TOTAL SPENT tiles
+    /// (`GET /api/payments/earnings` + `/spending`). `nil` when neither
+    /// figure could be read — the card is hidden rather than showing "$0".
+    public let earnings: PaymentsEarnings?
 
     public init(
         balance: PaymentsBalance?,
@@ -45,7 +49,8 @@ public struct PaymentsLoaded: Sendable, Hashable {
         payouts: PaymentsPayouts,
         activity: PaymentsActivity,
         canCloseAccount: Bool,
-        footerCaption: String
+        footerCaption: String,
+        earnings: PaymentsEarnings? = nil
     ) {
         self.balance = balance
         self.methods = methods
@@ -53,6 +58,26 @@ public struct PaymentsLoaded: Sendable, Hashable {
         self.activity = activity
         self.canCloseAccount = canCloseAccount
         self.footerCaption = footerCaption
+        self.earnings = earnings
+    }
+}
+
+/// "Earnings & Spending" card — the two lifetime totals RN renders at the
+/// bottom of the Payouts tab (`components/payments/PayoutsTab.tsx:251`).
+/// Values are pre-formatted from the server's integer cents; an unreadable
+/// figure stays as the em-dash RN uses rather than a misleading "$0.00".
+public struct PaymentsEarnings: Sendable, Hashable {
+    /// `"$1,284.50"` or `"—"` when `GET /api/payments/earnings` failed.
+    public let totalEarned: String
+    /// `"$318.00"` or `"—"` when `GET /api/payments/spending` failed.
+    public let totalSpent: String
+    /// Caption clarifying that earned includes funds still in review.
+    public let caption: String
+
+    public init(totalEarned: String, totalSpent: String, caption: String) {
+        self.totalEarned = totalEarned
+        self.totalSpent = totalSpent
+        self.caption = caption
     }
 }
 

@@ -106,6 +106,29 @@ data class WalletPayoutAccount(
      * and the action resumes hosted onboarding instead of the dashboard.
      */
     val warn: Boolean,
+    /**
+     * Per-capability tiles rendered under the row once the account is
+     * connected — "Card payments" (`charges_enabled`) and "Payouts"
+     * (`payouts_enabled`), each Enabled/Disabled. Empty while the account is
+     * still verifying, which keeps the verifying frame identical to RN's.
+     * Mirrors iOS `WalletPayoutAccount.capabilities`.
+     */
+    val capabilities: List<WalletPayoutCapability> = emptyList(),
+)
+
+/**
+ * One Connect capability tile — "CARD PAYMENTS · Enabled" / "PAYOUTS ·
+ * Disabled". Mirrors RN `PayoutsTab`'s `detailsGrid`, which renders
+ * `charges_enabled` and `payouts_enabled` as separate tiles instead of
+ * collapsing the account to a single boolean.
+ */
+data class WalletPayoutCapability(
+    /** Stable key for the test tag — `cardPayments` / `payouts`. */
+    val key: String,
+    /** Tile overline, rendered uppercased — "Card payments" / "Payouts". */
+    val label: String,
+    /** Server-reported flag; the tile renders "Enabled" / "Disabled". */
+    val enabled: Boolean,
 )
 
 /**
@@ -116,6 +139,26 @@ data class WalletPayoutAccount(
 data class WalletTaxDocs(
     val ready: Boolean,
     val bodyText: String,
+)
+
+/**
+ * Escrow breakdown behind the hero's single "Pending" figure, projected
+ * from `GET api/wallet/pending-release`. RN renders the same two lines
+ * (`WalletTab.tsx:161-173`); collapsing them to `total_pending_cents` hides
+ * *why* money is held — funds still inside the cooling-off review window
+ * read very differently from funds already queued for transfer. Both
+ * strings are pre-formatted (`"$140.00"`); the counts come straight from
+ * the same payload. Mirrors iOS `WalletPendingBreakdown`.
+ */
+data class WalletPendingBreakdown(
+    /** `in_review_cents` — still inside the cooling-off window. */
+    val inReview: String,
+    /** `releasing_soon_cents` — past cooling-off, awaiting the transfer job. */
+    val releasingSoon: String,
+    /** `in_review_count`. */
+    val inReviewCount: Int = 0,
+    /** `releasing_soon_count`. */
+    val releasingSoonCount: Int = 0,
 )
 
 /**
@@ -140,6 +183,13 @@ data class WalletContent(
     val available: String,
     val pending: String,
     val pendingMeta: String,
+    /**
+     * Split of [pending] into "In review" / "Releasing soon". `null` when
+     * nothing is in escrow (or the supplementary call failed) — the section
+     * is hidden rather than showing two `$0.00` lines, matching RN's
+     * `total_pending_cents > 0` gate.
+     */
+    val pendingBreakdown: WalletPendingBreakdown? = null,
     val monthValue: String,
     val monthMeta: String,
     val activity: List<WalletActivityItem>,
@@ -170,8 +220,45 @@ data class WalletContent(
      * the live path sets it from `GET /connect/account`.
      */
     val payoutsEnabled: Boolean = true,
+    /**
+     * Lifetime credited earnings (`Wallet.lifetime_received`), pre-formatted as
+     * `"$4,120.00"`. RN surfaces this as "Total Earned" beside the balance
+     * (`WalletTab.tsx:152`). `null` when the payload omitted the column — the
+     * section hides rather than claiming `$0.00`.
+     */
+    val lifetimeEarned: String? = null,
+    /**
+     * Lifetime withdrawals (`Wallet.lifetime_withdrawals`), pre-formatted.
+     * RN's "Withdrawn" figure (`WalletTab.tsx:157`).
+     */
+    val lifetimeWithdrawn: String? = null,
+    /**
+     * The server's `Wallet.frozen` flag (`GET api/wallet`). A frozen wallet is
+     * rejected by `POST api/wallet/withdraw` with 403, so the CTA is locked
+     * rather than left tappable — RN's `canWithdraw` includes `!frozen`
+     * (`components/payments/WalletTab.tsx:121`).
+     */
+    val frozen: Boolean = false,
+    /**
+     * `false` when the available balance is zero — RN's `balance > 0` leg of
+     * `canWithdraw`, which renders the disabled "No funds to withdraw" CTA.
+     */
+    val hasBalance: Boolean = true,
 ) {
     val isOnHold: Boolean get() = holdState != null
+
+    /**
+     * `true` when the server sent at least one lifetime total — drives the
+     * "Lifetime" section's visibility.
+     */
+    val hasLifetimeTotals: Boolean get() = lifetimeEarned != null || lifetimeWithdrawn != null
+
+    /**
+     * RN `canWithdraw = hasWallet && !wallet.frozen && balance > 0`, plus the
+     * native payouts-enabled gate (the server also requires a verified Connect
+     * account) and the designed hold frame. Mirrors iOS `WalletContent`.
+     */
+    val canWithdraw: Boolean get() = payoutsEnabled && !frozen && hasBalance && !isOnHold
 }
 
 /**

@@ -21,6 +21,7 @@ import app.pantopus.android.data.api.models.auth.VerifyEmailRequest
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.feed.FeedModerationStore
 import app.pantopus.android.data.observability.Observability
 import app.pantopus.android.data.realtime.SocketManager
 import com.squareup.moshi.Moshi
@@ -111,6 +112,12 @@ class AuthRepository
         private val tokenStorage: TokenStorage,
         private val observability: Observability,
         private val socketManager: SocketManager,
+        /**
+         * Session-scoped client-side mute / hide layer — dropped on sign-out
+         * so one account's mutes never filter the next account's feed (RN
+         * drops the provider state the same way).
+         */
+        private val feedModeration: FeedModerationStore,
     ) {
         /**
          * Outcome of a token refresh. The distinction matters: only
@@ -144,6 +151,17 @@ class AuthRepository
 
         private val _state = MutableStateFlow<State>(State.Unknown)
         val state: StateFlow<State> = _state.asStateFlow()
+
+        /**
+         * When the user last signed in *interactively* (email/password or
+         * OAuth) — never stamped by a silent token restore. The post-login
+         * app-lock offer keys off this so it is made once per real sign-in and
+         * never on a cold launch into an existing session. Mirrors RN
+         * `AuthContext.lastInteractiveSignInAt` (`AuthContext.tsx:28`) and iOS
+         * `AuthManager.lastInteractiveSignInAt`.
+         */
+        private val _lastInteractiveSignInAt = MutableStateFlow<Long?>(null)
+        val lastInteractiveSignInAt: StateFlow<Long?> = _lastInteractiveSignInAt.asStateFlow()
 
         private val userAdapter = Moshi.Builder().build().adapter(UserDto::class.java)
 
@@ -300,6 +318,10 @@ class AuthRepository
                 userId = response.user.id,
             )
             persistCachedUser(user)
+            // Every interactive entry point (email/password + both OAuth
+            // exchanges) funnels through here; `restore()` deliberately
+            // does not.
+            _lastInteractiveSignInAt.value = System.currentTimeMillis()
             finishSignedIn(user, access)
             observability.track("auth.signed_in")
             return user
@@ -510,6 +532,8 @@ class AuthRepository
             // Workstream 1.4 — never resume a prior user's deferred destination.
             PendingDeepLinkStore.clear()
             DeepLinkRouter.clearPending()
+            feedModeration.clear()
+            _lastInteractiveSignInAt.value = null
             _state.value = State.SignedOut
         }
     }

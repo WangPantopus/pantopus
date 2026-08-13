@@ -369,16 +369,18 @@ fun BeaconHeaderGhostButton(
     actionLabel: String,
     onClick: () -> Unit,
     title: String? = null,
+    enabled: Boolean = true,
 ) {
     if (title == null) {
         Box(
             modifier =
                 Modifier
                     .size(36.dp)
+                    .alpha(if (enabled) 1f else DISABLED_ALPHA)
                     .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                    .clickable(onClick = onClick)
+                    .clickable(enabled = enabled, onClick = onClick)
                     .semantics { contentDescription = actionLabel },
             contentAlignment = Alignment.Center,
         ) {
