@@ -21,9 +21,10 @@ platforms, in six waves, each compile-gated before the next started:
 | 6 | creator-biz | 11 | `c44bb907` |
 
 **Verification performed:** iOS `make build` and Android `:app:compileDebugKotlin` green after every
-wave; SwiftLint clean; `verifyPantopusIcons` clean; full Android unit suite green (3264 tests); all 33
-new Android routes confirmed to have both a `composable(...)` registration *and* a production
-navigation call site; every endpoint the findings required confirmed present on both platforms.
+wave; SwiftLint clean; `verifyPantopusIcons` clean; **both unit suites green — iOS 3139 tests, Android
+3264 tests, zero failures**; all 33 new Android routes confirmed to have both a `composable(...)`
+registration *and* a production navigation call site; every endpoint the findings required confirmed
+present on both platforms.
 
 **Bugs found in existing code while doing this** (not in the original audit):
 
@@ -36,6 +37,9 @@ navigation call site; every endpoint the findings required confirmed present on 
   voice always fell back to defaults.
 - Two Support Train DTOs decoded a capitalised Supabase alias instead of the lowercase `user` object the
   handlers actually return.
+- The **iOS test target was not compiling** — a test used `httpBodyData()` without declaring the
+  `fileprivate` copy each test file carries — so the entire iOS unit suite had been silently not
+  running. Fixed; it now runs and passes.
 
 **Known caveats, stated plainly:**
 
