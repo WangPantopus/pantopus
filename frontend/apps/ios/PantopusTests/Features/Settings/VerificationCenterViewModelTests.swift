@@ -54,7 +54,10 @@ final class VerificationCenterViewModelTests: XCTestCase {
         } else {
             XCTFail("Expected chipStatus on email row")
         }
-        XCTAssertEqual(groups.map(\.id), ["email", "phone", "home", "photoid"])
+        // The "Phone" and "Home address" groups were display-only "Coming soon"
+        // placeholders and were removed in 76db2882 (WS5.2) on both platforms;
+        // this assertion was never updated to match.
+        XCTAssertEqual(groups.map(\.id), ["email", "photoid"])
     }
 
     func testLoadUnverifiedShowsResendRow() async {

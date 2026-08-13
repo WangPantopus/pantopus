@@ -40,7 +40,13 @@ final class HomeSettingsViewModelTests: XCTestCase {
             uniqueKeysWithValues: groups.map { ($0.id, $0.rows.map(\.id)) }
         )
         XCTAssertEqual(rowsByGroup["homeIdentity"], ["address", "propertyDetails", "photos", "documents"])
-        XCTAssertEqual(rowsByGroup["access"], ["accessCodes", "trustedNeighbors", "privacy"])
+        // `ownershipSecurity` is the per-home security-policy row (privacy mask
+        // level / owner claim policy / member attach policy) added alongside the
+        // existing client-side privacy toggles.
+        XCTAssertEqual(
+            rowsByGroup["access"],
+            ["accessCodes", "trustedNeighbors", "privacy", "ownershipSecurity"]
+        )
         XCTAssertEqual(rowsByGroup["members"], ["people", "inviteLink"])
         XCTAssertEqual(rowsByGroup["notifications"], ["homeNotifications"])
         XCTAssertEqual(rowsByGroup["windDown"], ["leaveHome"])

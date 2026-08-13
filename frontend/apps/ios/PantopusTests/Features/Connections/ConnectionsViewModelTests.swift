@@ -160,10 +160,15 @@ final class ConnectionsViewModelTests: XCTestCase {
         XCTAssertEqual(sections.first?.rows.count, 2)
     }
 
-    func testBothFetchesFailingTransitionsToError() async {
+    func testAllFetchesFailingTransitionsToError() async {
+        // Error is reserved for "nothing loaded at all". Since the Sent and
+        // Blocked tabs landed that means all four fetches, not two — any one
+        // succeeding still leaves the user a usable screen.
         stubConnections(
             accepted: .status(500, body: "{}"),
-            pending: .status(500, body: "{}")
+            pending: .status(500, body: "{}"),
+            sent: .status(500, body: "{}"),
+            blocked: .status(500, body: "{}")
         )
         let vm = makeVM()
         await vm.load()
