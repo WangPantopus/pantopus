@@ -35,6 +35,15 @@ enum PollsTab: String, CaseIterable {
     case closed
 }
 
+/// One-shot event the view turns into a confirm sheet. The VM never
+/// presents UI itself — same contract as `MyHomesListEvent`.
+enum PollsListEvent: Equatable {
+    /// "Close" tapped on an active poll card.
+    case confirmClose(pollId: String, title: String)
+    /// "Delete" tapped on an active poll card.
+    case confirmDelete(pollId: String, title: String)
+}
+
 private struct PollsTabCounts {
     let active: Int?
     let closed: Int?
@@ -136,6 +145,17 @@ final class PollsListViewModel: ListOfRowsDataSource {
 
     private(set) var state: ListOfRowsState = .loading
 
+    /// Set when a card's Close / Delete footer button fires. The view
+    /// drains it into a `confirmationDialog` and clears it.
+    var pendingEvent: PollsListEvent?
+
+    /// Surfaced by the view as an alert when a close / delete fails.
+    var actionError: String?
+
+    /// Poll id whose mutation is in flight — the footer buttons for that
+    /// row stay rendered but the VM ignores repeat taps.
+    private var mutatingPollId: String?
+
     private var polls: [PollDTO]?
 
     private let homeId: String
@@ -196,6 +216,57 @@ final class PollsListViewModel: ListOfRowsDataSource {
         }
     }
 
+    // MARK: - Close / delete
+
+    /// "Close" tapped — hand the confirm to the view. RN raises the same
+    /// prompt from the active poll card (`src/app/homes/[id]/polls.tsx:75-83`).
+    func requestClose(pollId: String) {
+        guard let poll = polls?.first(where: { $0.id == pollId }) else { return }
+        pendingEvent = .confirmClose(pollId: pollId, title: poll.title)
+    }
+
+    /// "Delete" tapped — hand the confirm to the view
+    /// (`src/app/homes/[id]/polls.tsx:85-93`).
+    func requestDelete(pollId: String) {
+        guard let poll = polls?.first(where: { $0.id == pollId }) else { return }
+        pendingEvent = .confirmDelete(pollId: pollId, title: poll.title)
+    }
+
+    /// Close a poll to further votes — `PUT /api/homes/:id/polls/:pollId`
+    /// with `status: "closed"` (route `backend/routes/home.js:7381`,
+    /// `updatePollSchema` accepts `open / closed / canceled`).
+    func closePoll(pollId: String) async {
+        await mutate(pollId: pollId, status: "closed", failureCopy: "Couldn't close that poll. Try again.")
+    }
+
+    /// Retire a poll — same route with `status: "canceled"`, the schema's
+    /// removal value. The backend exposes no DELETE for polls, so this is
+    /// the strongest retire the API offers; a canceled poll drops out of
+    /// the Active tab exactly like a closed one.
+    func deletePoll(pollId: String) async {
+        await mutate(pollId: pollId, status: "canceled", failureCopy: "Couldn't delete that poll. Try again.")
+    }
+
+    private func mutate(pollId: String, status: String, failureCopy: String) async {
+        guard mutatingPollId == nil else { return }
+        mutatingPollId = pollId
+        defer { mutatingPollId = nil }
+        do {
+            let _: EmptyResponse = try await api.request(
+                HomesEndpoints.updatePoll(
+                    homeId: homeId,
+                    pollId: pollId,
+                    request: UpdatePollRequest(status: status)
+                )
+            )
+            // RN re-fetches after the mutation rather than patching
+            // locally, so the vote counts stay server-authoritative.
+            await fetch()
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? failureCopy
+        }
+    }
+
     private func rebuildState() {
         guard let polls else { return }
         let nowDate = now()
@@ -246,8 +317,34 @@ final class PollsListViewModel: ListOfRowsDataSource {
             onTap: { [onOpenPoll] in onOpenPoll(pollId) },
             chips: chips,
             timeMeta: projection.timeMeta,
-            highlight: projection.chipStatus == .closed ? .muted : nil
+            highlight: projection.chipStatus == .closed ? .muted : nil,
+            footer: footer(for: projection, pollId: pollId)
         )
+    }
+
+    /// RN renders a Close + Delete action strip under every **active**
+    /// poll card (`src/app/homes/[id]/polls.tsx:198-209`); closed polls
+    /// carry no actions. Rendered here as the shell's `RowFooter`.
+    private func footer(for projection: PollRowProjection, pollId: String) -> RowFooter? {
+        guard projection.chipStatus != .closed else { return nil }
+        return RowFooter(actions: [
+            RowFooterAction(
+                title: "Close",
+                icon: .lock,
+                variant: .ghost,
+                identifier: "polls.row_\(pollId).close"
+            ) { [weak self] in
+                Task { @MainActor [weak self] in self?.requestClose(pollId: pollId) }
+            },
+            RowFooterAction(
+                title: "Delete",
+                icon: .trash,
+                variant: .destructive,
+                identifier: "polls.row_\(pollId).delete"
+            ) { [weak self] in
+                Task { @MainActor [weak self] in self?.requestDelete(pollId: pollId) }
+            }
+        ])
     }
 
     /// Pure mapping from a poll + clock to display strings. Exposed

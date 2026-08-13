@@ -573,6 +573,17 @@ public struct HubTabRoot: View {
             path.append(.claimOwnership(homeId: id))
         case let .cancelClaim(id):
             path.append(.cancelClaim(homeId: id))
+        // Verification Center action cards.
+        case let .verifyPostcard(id):
+            path.append(.postcardVerification(homeId: id))
+        case let .uploadProof(id):
+            path.append(.verifyResidency(homeId: id))
+        case let .landlordVerification(id):
+            path.append(.verifyLandlord(homeId: id))
+        case let .leaveHome(id):
+            path.append(.leaveHome(homeId: id))
+        case .requestHelp:
+            path.append(.helpCenter)
         }
     }
 
@@ -1155,6 +1166,18 @@ public struct HubTabRoot: View {
                     // H1 — "Hire" on a seasonal-checklist item opens the
                     // gig composer pre-filtered to the item's category.
                     Task { @MainActor in push(.composeGig(category: categoryKey)) }
+                },
+                onAddTask: { id in
+                    Task { @MainActor in push(.addHouseholdTask(homeId: id)) }
+                },
+                onTrackBill: { id in
+                    Task { @MainActor in push(.addBill(homeId: id)) }
+                },
+                onTrackPackage: { id in
+                    Task { @MainActor in push(.logPackage(homeId: id)) }
+                },
+                onSendMail: { _ in
+                    Task { @MainActor in push(.ceremonialMail) }
                 }
             )
         case let .homeMaintenance(homeId):

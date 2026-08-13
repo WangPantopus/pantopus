@@ -33,7 +33,7 @@ public struct WaitingRoomView: View {
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             WaitingRoomTopBar(
-                title: viewModel.content.title,
+                title: topBarTitle,
                 onBack: onBack
             ) {
                 viewModel.openNotifications()
@@ -41,6 +41,15 @@ public struct WaitingRoomView: View {
             switch viewModel.phase {
             case .loading:
                 WaitingRoomLoadingFrame()
+            case let .verification(content):
+                // RN's Verification Center — served on the same route
+                // when the caller has no claim in review but their
+                // occupancy still isn't verified.
+                HomeVerificationFrame(
+                    content: content,
+                    onAction: { viewModel.handleVerificationAction($0) },
+                    onDone: onBack
+                )
             case let .notice(notice):
                 WaitingRoomNoticeFrame(notice: notice) {
                     if notice.isRetry {
@@ -75,6 +84,15 @@ public struct WaitingRoomView: View {
     }
 
     // MARK: - Body slots
+
+    /// The Verification Center frame retitles the bar; every other phase
+    /// keeps the claim room's "Waiting for approval".
+    private var topBarTitle: String {
+        if case .verification = viewModel.phase {
+            return HomeVerificationContent.screenTitle
+        }
+        return viewModel.content.title
+    }
 
     @ViewBuilder
     private var loadedFrame: some View {

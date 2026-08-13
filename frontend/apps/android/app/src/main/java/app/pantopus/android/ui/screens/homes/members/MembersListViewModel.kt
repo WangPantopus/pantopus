@@ -6,13 +6,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeAccessDto
+import app.pantopus.android.data.api.models.homes.HomeAuditEntryDto
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestDto
 import app.pantopus.android.data.api.models.homes.InvitationDto
 import app.pantopus.android.data.api.models.homes.InviteMemberRequest
 import app.pantopus.android.data.api.models.homes.OccupantDto
 import app.pantopus.android.data.api.models.homes.PendingInviteDto
+import app.pantopus.android.data.api.models.homes.actionLabel
+import app.pantopus.android.data.api.models.homes.actorDisplayName
 import app.pantopus.android.data.api.models.homes.requestedIdentityLabel
 import app.pantopus.android.data.api.models.homes.requesterDisplayName
+import app.pantopus.android.data.api.models.homes.targetLabel
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
@@ -62,6 +66,13 @@ object MembersTab {
      * them (`GET /api/homes/:id/me` → `is_owner` or `members.manage`).
      */
     const val REQUESTS = "requests"
+
+    /**
+     * Who did what to the household — `GET /api/homes/:id/audit-log`
+     * (`backend/routes/homeIam.js:602`). Same `members.manage` gate as
+     * the Requests queue.
+     */
+    const val AUDIT = "audit"
 }
 
 /**
@@ -142,6 +153,7 @@ class MembersListViewModel
         private var occupants: List<OccupantDto> = emptyList()
         private var pendingInvites: List<PendingInviteDto> = emptyList()
         private var accessRequests: List<HouseholdAccessRequestDto> = emptyList()
+        private var auditEntries: List<HomeAuditEntryDto> = emptyList()
         private var access: HomeAccessDto? = null
         private var loadedOnce = false
         private var busyRequestId: String? = null
@@ -174,7 +186,8 @@ class MembersListViewModel
         val fab: FabAction?
             get() =
                 when (_selectedTab.value) {
-                    MembersTab.REQUESTS -> null
+                    // Review / read-only queues carry no create affordance.
+                    MembersTab.REQUESTS, MembersTab.AUDIT -> null
                     MembersTab.GUESTS ->
                         FabAction(
                             icon = PantopusIcon.UserPlus,
@@ -396,8 +409,11 @@ class MembersListViewModel
                     occupants = result.data.occupants.filter { it.isActive }
                     pendingInvites = result.data.pendingInvites
                     fetchAccessRequests()
+                    fetchAuditLog()
                     loadedOnce = true
-                    if (_selectedTab.value == MembersTab.REQUESTS && !canManageMembers) {
+                    if (_selectedTab.value in setOf(MembersTab.REQUESTS, MembersTab.AUDIT) &&
+                        !canManageMembers
+                    ) {
                         _selectedTab.value = MembersTab.MEMBERS
                     }
                     applyState()
@@ -425,6 +441,24 @@ class MembersListViewModel
                 }
         }
 
+        /**
+         * `GET /api/homes/:id/audit-log` — route
+         * `backend/routes/homeIam.js:602`. 403s for viewers without
+         * `members.manage`, so it is best-effort and never fails the
+         * whole screen.
+         */
+        private suspend fun fetchAuditLog() {
+            if (!canManageMembers) {
+                auditEntries = emptyList()
+                return
+            }
+            auditEntries =
+                when (val result = adminRepo.auditLog(homeId)) {
+                    is NetworkResult.Success -> result.data.entries
+                    is NetworkResult.Failure -> emptyList()
+                }
+        }
+
         // ─── Buckets ──────────────────────────────────────────────
 
         private fun membersBucket(): List<OccupantDto> = occupants.filter { MemberRole.parse(it.role) !in MemberRole.guestRoles }
@@ -444,6 +478,13 @@ class MembersListViewModel
                             count = accessRequests.size,
                         ),
                     )
+                    add(
+                        ListOfRowsTab(
+                            id = MembersTab.AUDIT,
+                            label = "Audit Log",
+                            count = auditEntries.size,
+                        ),
+                    )
                 }
             }
 
@@ -458,6 +499,7 @@ class MembersListViewModel
                     MembersTab.GUESTS -> guestsBucket().map { rowForOccupant(it, now, zone) }
                     MembersTab.PENDING -> pendingInvites.map { rowForPending(it, now, zone) }
                     MembersTab.REQUESTS -> accessRequests.map { rowForRequest(it, now, zone) }
+                    MembersTab.AUDIT -> auditEntries.map { rowForAudit(it, now, zone) }
                     else -> membersBucket().map { rowForOccupant(it, now, zone) }
                 }
             if (rows.isEmpty()) {
@@ -493,6 +535,15 @@ class MembersListViewModel
                         icon = PantopusIcon.Mailbox,
                         headline = "No pending requests",
                         subcopy = "When someone asks to join from the claim flow, their request appears here.",
+                    )
+                // Read-only history — no CTA. Copy mirrors RN's empty
+                // state (`src/app/homes/[id]/members/index.tsx:385`).
+                MembersTab.AUDIT ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.FileText,
+                        headline = "No audit log entries",
+                        subcopy =
+                            "Role changes, removals, guest passes, and ownership actions on this home show up here.",
                     )
                 else ->
                     ListOfRowsUiState.Empty(
@@ -730,6 +781,36 @@ class MembersListViewModel
                                 foreground = PantopusColors.home,
                             ),
                     ),
+            )
+        }
+
+        /**
+         * Audit-log row — action verb as the title, `actor → target` as
+         * the subtitle, and the timestamp as the trailing meta.
+         * Read-only: no tap target, no trailing control. Mirrors RN's
+         * audit card (`src/app/homes/[id]/members/index.tsx:387-399`).
+         */
+        internal fun rowForAudit(
+            entry: HomeAuditEntryDto,
+            now: Instant,
+            zone: ZoneId,
+        ): RowModel {
+            val actor = entry.actorDisplayName()
+            val target = entry.targetLabel()
+            return RowModel(
+                id = entry.id,
+                title = entry.actionLabel(),
+                subtitle = if (target != null) "$actor → $target" else actor,
+                template = RowTemplate.StatusChip,
+                leading =
+                    RowLeading.TypeIcon(
+                        icon = PantopusIcon.FileText,
+                        background = PantopusColors.homeBg,
+                        foreground = PantopusColors.home,
+                    ),
+                trailing = RowTrailing.None,
+                subtitleIcon = PantopusIcon.User,
+                timeMeta = relativeText(entry.createdAt, now = now, zone = zone),
             )
         }
 

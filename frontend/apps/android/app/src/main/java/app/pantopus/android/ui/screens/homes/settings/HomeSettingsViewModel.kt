@@ -1,15 +1,19 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.settings
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.homes.HomeAccessDto
 import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.OccupantsResponse
+import app.pantopus.android.data.api.models.homes.UpdateHomeRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomeMembersRepository
+import app.pantopus.android.data.homes.HomeSettingsRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListRow
@@ -19,6 +23,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -52,9 +57,33 @@ enum class HomeSettingsRoute {
 }
 
 /**
+ * Inline rename state for the identity card — RN's nickname editor
+ * (`src/app/homes/[id]/settings/index.tsx:89-108`).
+ */
+data class HomeRenameState(
+    /**
+     * True when the viewer may rename this home. Mirrors RN's `canEdit`
+     * (`settings/index.tsx:47`); the backend enforces the same `home.edit`
+     * gate on `PATCH /api/homes/:id` (`home.js:3110`).
+     */
+    val canEdit: Boolean = false,
+    /** True when the card renders the field instead of the name. */
+    val isRenaming: Boolean = false,
+    val draft: String = "",
+    val isSaving: Boolean = false,
+    val error: String? = null,
+) {
+    companion object {
+        /** `updateHomeSchema`'s `name: Joi.string().max(120)`. */
+        const val NAME_MAX_LENGTH: Int = 120
+    }
+}
+
+/**
  * P5.1 / A14.1 / Block 2A — per-home Settings index. A NAVIGATION index
- * (chevron rows routing to Address / Photos / People / … sub-screens),
- * not a settings form — there is no settings `PATCH`.
+ * (chevron rows routing to Address / Photos / People / … sub-screens)
+ * plus one mutation: the inline rename on the identity card, which
+ * PATCHes `/api/homes/:id`.
  *
  * Wiring: fetches the real home (`GET /:id`) so the identity card shows
  * `home.name` + a verification chip derived from the claim state, and
@@ -69,6 +98,8 @@ class HomeSettingsViewModel
     constructor(
         private val homesRepository: HomesRepository,
         private val homeMembersRepository: HomeMembersRepository,
+        private val homeAdminRepository: HomeAdminRepository,
+        private val homeSettingsRepository: HomeSettingsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         val title: String = "Home settings"
@@ -90,6 +121,9 @@ class HomeSettingsViewModel
 
         private val _navigation = MutableStateFlow<HomeSettingsRoute?>(null)
         val navigation: StateFlow<HomeSettingsRoute?> = _navigation.asStateFlow()
+
+        private val _rename = MutableStateFlow(HomeRenameState())
+        val rename: StateFlow<HomeRenameState> = _rename.asStateFlow()
 
         private var frame: HomeSettingsSampleData.Frame = HomeSettingsSampleData.Frame.Populated
         private var subtexts = RowSubtexts()
@@ -126,16 +160,81 @@ class HomeSettingsViewModel
                 }
         }
 
+        // MARK: - Inline rename
+
+        /** Swap the identity card's name for the field. */
+        fun beginRenaming() {
+            _rename.update { current ->
+                if (!current.canEdit || current.isSaving) {
+                    current
+                } else {
+                    current.copy(isRenaming = true, draft = _identity.value.homeName, error = null)
+                }
+            }
+        }
+
+        /** Field binding. */
+        fun updateRenameDraft(value: String) {
+            _rename.update { it.copy(draft = value, error = null) }
+        }
+
+        /** Discard the draft — RN's close button (`settings/index.tsx:103`). */
+        fun cancelRenaming() {
+            _rename.update {
+                it.copy(isRenaming = false, draft = _identity.value.homeName, error = null)
+            }
+        }
+
+        /**
+         * `PATCH /api/homes/:id` with the trimmed draft, then re-read the
+         * home so every derived caption follows the new name.
+         */
+        fun saveRenaming() {
+            val current = _rename.value
+            if (!current.canEdit || current.isSaving) return
+            val trimmed = current.draft.trim()
+            if (trimmed.isEmpty()) {
+                _rename.update { it.copy(error = "Enter a name for this home.") }
+                return
+            }
+            if (trimmed.length > HomeRenameState.NAME_MAX_LENGTH) {
+                _rename.update {
+                    it.copy(error = "Keep the name under ${HomeRenameState.NAME_MAX_LENGTH} characters.")
+                }
+                return
+            }
+            _rename.update { it.copy(isSaving = true, error = null) }
+            viewModelScope.launch {
+                when (val result = homeSettingsRepository.updateHome(homeId, UpdateHomeRequest(name = trimmed))) {
+                    is NetworkResult.Success -> {
+                        _rename.update { it.copy(isSaving = false, isRenaming = false, error = null) }
+                        reload()
+                    }
+                    is NetworkResult.Failure -> {
+                        _rename.update {
+                            it.copy(
+                                isSaving = false,
+                                error = result.error.displayMessage("Couldn't rename this home. Try again."),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         private fun reload() {
             _state.value = GroupedListUiState.Loading
             viewModelScope.launch {
                 when (val result = homesRepository.detail(homeId)) {
                     is NetworkResult.Success -> {
-                        // Member counts are best-effort — a roster failure
-                        // still lets the identity card + navigation render.
+                        // Member counts + viewer access are best-effort — a
+                        // failure on either still lets the identity card +
+                        // navigation render.
                         val occupants =
                             (homeMembersRepository.listOccupants(homeId) as? NetworkResult.Success)?.data
-                        apply(result.data.home, occupants)
+                        val access =
+                            (homeAdminRepository.myAccess(homeId) as? NetworkResult.Success)?.data
+                        apply(result.data.home, occupants, access)
                         loadedOnce = true
                         _state.value = GroupedListUiState.Loaded(groups())
                     }
@@ -149,6 +248,7 @@ class HomeSettingsViewModel
         private fun apply(
             detail: HomeDetail,
             occupants: OccupantsResponse?,
+            access: HomeAccessDto?,
         ) {
             val isPending = detail.isPendingOwner || detail.pendingClaimId != null
             frame = if (isPending) HomeSettingsSampleData.Frame.Pending else HomeSettingsSampleData.Frame.Populated
@@ -170,6 +270,27 @@ class HomeSettingsViewModel
                     propertyDetails = humanizedHomeType(detail.homeType),
                     people = peopleSubtext(occupants),
                 )
+            _rename.update { current ->
+                current.copy(
+                    canEdit = canEdit(detail, access),
+                    draft = if (current.isRenaming) current.draft else homeName,
+                )
+            }
+        }
+
+        /**
+         * RN's `canEdit` (`settings/index.tsx:47`): owner, an explicit
+         * `home.edit` permission, or an owner/admin base role. `GET /:id/me`
+         * is best-effort, so fall back to the detail payload's `isOwner`.
+         */
+        private fun canEdit(
+            detail: HomeDetail,
+            access: HomeAccessDto?,
+        ): Boolean {
+            access ?: return detail.isOwner
+            if (access.isOwner || detail.isOwner) return true
+            if (access.permissions.contains("home.edit")) return true
+            return access.roleBase == "owner" || access.roleBase == "admin"
         }
 
         private fun addressLine(detail: HomeDetail): String? {

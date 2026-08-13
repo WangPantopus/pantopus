@@ -93,6 +93,16 @@ fun HomeDashboardScreen(
      *  the item's `gig_category` so the host can open the gig composer
      *  pre-filtered (RN routes to `/gig-v2/new?initialText=…`). */
     onHireHelp: ((String) -> Unit)? = null,
+    /** FAB → "Add Task" — the household-task create form for this home.
+     *  Mirrors RN `homes/[id]/index.tsx:155`. */
+    onAddTask: ((String) -> Unit)? = null,
+    /** FAB → "Track Bill" (RN `homes/[id]/index.tsx:156`). */
+    onTrackBill: ((String) -> Unit)? = null,
+    /** FAB → "Track Package" (RN `homes/[id]/index.tsx:157`). */
+    onTrackPackage: ((String) -> Unit)? = null,
+    /** FAB → "Send Mail" — opens the mail composer
+     *  (RN `homes/[id]/index.tsx:160`). */
+    onSendMail: ((String) -> Unit)? = null,
     viewModel: HomeDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -112,6 +122,12 @@ fun HomeDashboardScreen(
 
     fun actionLabel(actionId: String): String =
         when (actionId) {
+            "add_task" -> "Add Task"
+            "track_bill" -> "Track Bill"
+            "track_package" -> "Track Package"
+            "add_pet" -> "Add Pet"
+            "create_poll" -> "Create Poll"
+            "send_mail" -> "Send Mail"
             "log_package" -> "Log a package"
             "view_packages" -> "Packages"
             "add_mail" -> "Add mail"
@@ -134,8 +150,28 @@ fun HomeDashboardScreen(
         onOpenPlaceholder?.invoke(actionLabel(actionId))
     }
 
+    /**
+     * Prefer the dedicated create route, fall back to the feature's list
+     * route, and only then to the host's placeholder screen.
+     */
+    fun routeFab(
+        actionId: String,
+        primary: ((String) -> Unit)?,
+        fallback: ((String) -> Unit)?,
+    ) {
+        val homeId = viewModel.currentHomeId() ?: return
+        val target = primary ?: fallback
+        if (target != null) target(homeId) else openPlaceholder(actionId)
+    }
+
     fun handleFab(actionId: String) {
         when (actionId) {
+            "add_task" -> routeFab(actionId, onAddTask, onOpenTasks)
+            "track_bill" -> routeFab(actionId, onTrackBill, onOpenBills)
+            "track_package" -> routeFab(actionId, onTrackPackage, onOpenPackages)
+            "add_pet" -> routeFab(actionId, onOpenPets, null)
+            "create_poll" -> routeFab(actionId, onOpenPolls, null)
+            "send_mail" -> routeFab(actionId, onSendMail, null)
             "add_member" -> {
                 viewModel.currentHomeId()?.let { homeId ->
                     // Prefer the dedicated Members screen when its host
@@ -208,6 +244,24 @@ fun HomeDashboardScreen(
         }
     }
 
+    /**
+     * Security-banner CTA routing. Mirrors RN's
+     * `HomeStatusBanner.tsx:53` (claim window → invite co-owner) and
+     * `:60` / `:66` (review / dispute → the home's security surface).
+     */
+    fun handleSecurityAction(action: HomeSecurityBannerAction) {
+        val homeId = viewModel.currentHomeId() ?: return
+        when (action) {
+            HomeSecurityBannerAction.InviteCoOwner ->
+                onInviteOwner?.invoke(homeId)
+                    ?: onOpenMembers?.invoke(homeId)
+                    ?: openPlaceholder("add_member")
+            HomeSecurityBannerAction.OpenSecuritySettings ->
+                onOpenSettings?.invoke(homeId) ?: openPlaceholder("home_security")
+            HomeSecurityBannerAction.NoAction -> Unit
+        }
+    }
+
     // H1 — health ring + seasonal checklist + property value + bill
     // trends. Each card owns its loading / loaded / empty / error surface
     // so one failing read can't blank the Overview.
@@ -263,6 +317,7 @@ fun HomeDashboardScreen(
                                 viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
                             }
                         },
+                    onSecurityAction = ::handleSecurityAction,
                 )
             is HomeDashboardUiState.Empty ->
                 DashboardLayout(
@@ -290,6 +345,7 @@ fun HomeDashboardScreen(
                                 viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
                             }
                         },
+                    onSecurityAction = ::handleSecurityAction,
                 )
             is HomeDashboardUiState.NeedsAttention ->
                 DashboardLayout(
@@ -318,6 +374,7 @@ fun HomeDashboardScreen(
                                 viewModel.currentHomeId()?.let { homeId -> handler(homeId) }
                             }
                         },
+                    onSecurityAction = ::handleSecurityAction,
                 )
             is HomeDashboardUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -396,6 +453,8 @@ private fun DashboardLayout(
     onViewClaims: () -> Unit,
     onOpenPropertyDetails: () -> Unit,
     onOpenSettings: (() -> Unit)? = null,
+    /** Security-state banner CTA. No-op in preview/snapshot hosts. */
+    onSecurityAction: (HomeSecurityBannerAction) -> Unit = {},
     /** H1 — Home Intelligence stack slot (health ring, seasonal checklist,
      *  property value, bill trends). Empty in preview/snapshot hosts. */
     intelligence: @Composable () -> Unit = {},
@@ -412,12 +471,18 @@ private fun DashboardLayout(
                 )
             },
         cta = {
+            // Six one-tap creates, matching RN's `homeFabActions`
+            // (`src/app/homes/[id]/index.tsx:154-161`). Every entry
+            // routes to a real create surface — no placeholders.
             FabCreateCTA(
                 actions =
                     listOf(
-                        FabSheetAction("log_package", "Log a package", PantopusIcon.ShoppingBag),
-                        FabSheetAction("add_member", "Invite owner", PantopusIcon.UserPlus),
-                        FabSheetAction("add_mail", "Add mail", PantopusIcon.Mailbox),
+                        FabSheetAction("add_task", "Add Task", PantopusIcon.ListChecks),
+                        FabSheetAction("track_bill", "Track Bill", PantopusIcon.CreditCard),
+                        FabSheetAction("track_package", "Track Package", PantopusIcon.Package),
+                        FabSheetAction("add_pet", "Add Pet", PantopusIcon.PawPrint),
+                        FabSheetAction("create_poll", "Create Poll", PantopusIcon.BarChart3),
+                        FabSheetAction("send_mail", "Send Mail", PantopusIcon.Mail),
                     ),
                 onSelect = onFabAction,
             )
@@ -427,6 +492,12 @@ private fun DashboardLayout(
         },
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                content.securityBanner?.let { banner ->
+                    HomeSecurityStatusBanner(
+                        content = banner,
+                        onCta = { onSecurityAction(banner.action) },
+                    )
+                }
                 content.attentionSummary?.let { summary ->
                     NeedsAttentionBanner(summary = summary, onJump = onQuickAction)
                 }
@@ -456,6 +527,80 @@ private fun DashboardLayout(
             }
         },
     )
+}
+
+/**
+ * Home security-state banner — `claim_window` / `review_required` /
+ * `disputed` / `frozen`. Rendered at the very top of the dashboard,
+ * above the attention / claim banners, mirroring RN's `HomeStatusBanner`
+ * (`src/components/HomeStatusBanner.tsx`) which sits directly under the
+ * header at `src/app/homes/[id]/index.tsx:211`.
+ */
+@Composable
+private fun HomeSecurityStatusBanner(
+    content: HomeSecurityBannerContent,
+    onCta: () -> Unit,
+) {
+    // Severity ramp per state — the same one RN encodes in
+    // STATUS_BANNER (`src/constants/ownershipCopy.ts`), in tokens.
+    val tint: Color =
+        when (content.state) {
+            "review_required" -> PantopusColors.primary600
+            "frozen" -> PantopusColors.error
+            else -> PantopusColors.warning
+        }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, tint.copy(alpha = 0.4f), RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s4)
+                .testTag("homeDashboard_securityBanner"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            PantopusIconImage(
+                icon = content.icon,
+                contentDescription = null,
+                size = Radii.xl2,
+                tint = tint,
+            )
+            Text(
+                text = content.title,
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.Bold,
+                color = tint,
+            )
+        }
+        Text(
+            text = content.body,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        content.ctaLabel?.let { label ->
+            Box(
+                modifier =
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .background(tint.copy(alpha = 0.12f))
+                        .clickable(onClick = onCta)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("homeDashboard_securityBannerCTA"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.SemiBold,
+                    color = tint,
+                )
+            }
+        }
+    }
 }
 
 @Composable

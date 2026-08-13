@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
 import app.pantopus.android.data.api.models.homes.NormalizedAddressDto
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
@@ -49,6 +50,12 @@ class AddHomeWizardViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // A12.2 — the Confirm step runs the property-suggestions lookup
+        // right after check-address clears. Stub it explicitly: a relaxed
+        // mock would hand back a proxy that is neither `Success` nor
+        // `Failure`, which the sealed `when` can't match.
+        coEvery { repo.propertySuggestions(any()) } returns
+            NetworkResult.Success(PropertySuggestionsResponse())
     }
 
     @After

@@ -6,6 +6,9 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import app.pantopus.android.data.api.models.homes.ChangeMemberRoleResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessDto
+import app.pantopus.android.data.api.models.homes.HomeAuditActorDto
+import app.pantopus.android.data.api.models.homes.HomeAuditEntryDto
+import app.pantopus.android.data.api.models.homes.HomeAuditLogResponse
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestActionResponse
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestDto
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequesterDto
@@ -73,6 +76,7 @@ class MembersListViewModelTest {
         every { auth.state } returns MutableStateFlow(AuthRepository.State.SignedOut)
         stubOwnerAccess()
         stubRequests()
+        stubAuditLog()
     }
 
     @After
@@ -106,6 +110,12 @@ class MembersListViewModelTest {
     private fun stubRequests(rows: List<HouseholdAccessRequestDto> = emptyList()) {
         coEvery { adminRepo.householdAccessRequests("home_1", any()) } returns
             NetworkResult.Success(HouseholdAccessRequestsResponse(requests = rows))
+    }
+
+    /** `GET /:id/audit-log` — empty unless a test stubs rows. */
+    private fun stubAuditLog(rows: List<HomeAuditEntryDto> = emptyList()) {
+        coEvery { adminRepo.auditLog("home_1", any(), any()) } returns
+            NetworkResult.Success(HomeAuditLogResponse(entries = rows))
     }
 
     private fun accessRequest(
@@ -333,7 +343,13 @@ class MembersListViewModelTest {
             vm.load()
             assertTrue(vm.canManageMembers)
             assertEquals(
-                listOf(MembersTab.MEMBERS, MembersTab.GUESTS, MembersTab.PENDING, MembersTab.REQUESTS),
+                listOf(
+                    MembersTab.MEMBERS,
+                    MembersTab.GUESTS,
+                    MembersTab.PENDING,
+                    MembersTab.REQUESTS,
+                    MembersTab.AUDIT,
+                ),
                 vm.tabs.value.map { it.id },
             )
             vm.selectTab(MembersTab.REQUESTS)
@@ -649,6 +665,59 @@ class MembersListViewModelTest {
             val vm = makeVm()
             vm.load()
             vm.selectTab(MembersTab.REQUESTS)
+            assertNull(vm.fab)
+        }
+
+    // ─── Audit Log tab ────────────────────────────────────────────
+
+    @Test
+    fun audit_tab_hidden_for_viewers_who_cannot_manage() =
+        runTest {
+            stubMemberAccess()
+            coEvery { repo.listOccupants("home_1") } returns NetworkResult.Success(populated())
+            val vm = makeVm()
+            vm.load()
+            assertEquals(false, vm.tabs.value.any { it.id == MembersTab.AUDIT })
+        }
+
+    @Test
+    fun audit_tab_renders_action_actor_and_target() =
+        runTest {
+            stubAuditLog(
+                listOf(
+                    HomeAuditEntryDto(
+                        id = "log_1",
+                        homeId = "home_1",
+                        actorUserId = "u_owner",
+                        action = "MEMBER_ROLE_CHANGED",
+                        targetType = "HomeOccupancy",
+                        targetId = "occ_1",
+                        createdAt = "2026-05-14T12:00:00Z",
+                        actor = HomeAuditActorDto(id = "u_owner", username = "ada", name = "Ada Lovelace"),
+                    ),
+                ),
+            )
+            coEvery { repo.listOccupants("home_1") } returns NetworkResult.Success(populated())
+            val vm = makeVm()
+            vm.load()
+            vm.selectTab(MembersTab.AUDIT)
+            val loaded = vm.state.value as ListOfRowsUiState.Loaded
+            val row = loaded.sections.first().rows.first()
+            assertEquals("log_1", row.id)
+            assertEquals("Member role changed", row.title)
+            assertEquals("Ada Lovelace → Home occupancy", row.subtitle)
+            assertEquals(RowTrailing.None, row.trailing)
+        }
+
+    @Test
+    fun audit_tab_empty_state_when_log_is_empty() =
+        runTest {
+            coEvery { repo.listOccupants("home_1") } returns NetworkResult.Success(populated())
+            val vm = makeVm()
+            vm.load()
+            vm.selectTab(MembersTab.AUDIT)
+            val empty = vm.state.value as ListOfRowsUiState.Empty
+            assertEquals("No audit log entries", empty.headline)
             assertNull(vm.fab)
         }
 

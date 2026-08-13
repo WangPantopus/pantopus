@@ -88,6 +88,18 @@ public struct ClaimOwnershipWizardView: View {
         } message: {
             Text(viewModel.blockedByOtherClaimPrompt ?? "")
         }
+        .alert(
+            viewModel.routingWarning?.title ?? "",
+            isPresented: Binding(
+                get: { viewModel.routingWarning != nil },
+                set: { if !$0 { viewModel.acknowledgeRoutingWarning() } }
+            )
+        ) {
+            Button("Continue") { viewModel.acknowledgeRoutingWarning() }
+                .accessibilityIdentifier("claimOwnership_routingWarningContinue")
+        } message: {
+            Text(viewModel.routingWarning?.message ?? "")
+        }
         .accessibilityIdentifier("claimOwnershipWizard")
     }
 
@@ -104,7 +116,7 @@ public struct ClaimOwnershipWizardView: View {
         case .upload:
             ClaimUploadStep(viewModel: viewModel)
         case .success:
-            ClaimSuccessStep()
+            ClaimSuccessStep(outcomeNote: viewModel.submissionOutcomeNote)
         }
     }
 

@@ -51,6 +51,13 @@ class HomeCalendarViewModelTest {
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // The calendar also plots task / bill / package due dates
+        // alongside events. They are best-effort side-reads, so the
+        // default here is "unavailable" and each test only stubs the
+        // events feed it asserts on.
+        coEvery { repo.getHomeTasks(any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
+        coEvery { repo.getHomeBills(any(), any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
+        coEvery { repo.getHomePackages(any(), any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
     }
 
     @After fun tearDown() {

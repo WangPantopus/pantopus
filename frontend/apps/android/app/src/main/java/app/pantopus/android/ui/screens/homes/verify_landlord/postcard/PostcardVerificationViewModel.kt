@@ -117,9 +117,17 @@ data class PostcardVerificationUiState(
      */
     val isCodeInputUnlocked: Boolean get() = !isSubmitting
 
-    /** Whether the screen renders the "enter your code" frame. */
+    /**
+     * Whether the screen renders the "enter your code" frame rather than
+     * the waiting-for-delivery / request-a-code frame.
+     *
+     * [needsNewCode] wins: once the backend says the pending code is gone
+     * (404 / 410 expired / 429 too many attempts) RN drops the user back
+     * on the request step (`verify-postcard.tsx:79-82`), so typing into a
+     * dead code field is never the foreground affordance.
+     */
     val showsCodeEntryFrame: Boolean
-        get() = hasCodeInHand || stage == PostcardDeliveryStage.Delivered
+        get() = !needsNewCode && (hasCodeInHand || stage == PostcardDeliveryStage.Delivered)
 
     val primaryCtaEnabled: Boolean
         get() = codeInput.length == CODE_LENGTH && !isSubmitting
@@ -203,7 +211,9 @@ open class PostcardVerificationViewModel
          * the code-entry frame without waiting on the delivery timeline.
          */
         fun markHasCode() {
-            _state.update { it.copy(hasCodeInHand = true, notice = null) }
+            // RN's request step routes straight to `enter` — the user says
+            // they're holding a card, so stop insisting on a new one.
+            _state.update { it.copy(hasCodeInHand = true, needsNewCode = false, notice = null) }
         }
 
         /**
@@ -263,6 +273,10 @@ open class PostcardVerificationViewModel
                         it.copy(
                             isRequestingCode = false,
                             needsNewCode = false,
+                            // RN's `handleRequestCode` drops the user on the
+                            // enter-code step once the mailer accepts the
+                            // request (`verify-postcard.tsx:45`).
+                            hasCodeInHand = true,
                             submitState = VerifyLandlordSubmitState.Idle,
                             codeExpiresOn = formatExpiry(result.data.postcard.expiresAt),
                             notice = PostcardNotice(text = result.data.message, isError = false),

@@ -79,6 +79,28 @@ public struct AddHomeWizardView: View {
                 AddressClaimedModal(viewModel: viewModel)
             }
         }
+        // A12.2 Setup — the Wi-Fi QR scanner takes the whole screen so
+        // the viewfinder matches RN's full-screen `QrScannerModal`.
+        .fullScreenCover(isPresented: Binding(
+            get: { viewModel.scannerTargetItemID != nil },
+            set: { if !$0 { viewModel.closeWifiQRScanner() } }
+        )) {
+            WifiQRScannerSheet(
+                onScanned: { viewModel.applyScannedWifi($0) },
+                onClose: { viewModel.closeWifiQRScanner() }
+            )
+        }
+        .alert(
+            "Home created",
+            isPresented: Binding(
+                get: { viewModel.accessSecretWarning != nil },
+                set: { if !$0 { viewModel.acknowledgeAccessSecretWarning() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { viewModel.acknowledgeAccessSecretWarning() }
+        } message: {
+            Text(viewModel.accessSecretWarning ?? "")
+        }
         .accessibilityIdentifier("addHomeWizard")
     }
 
@@ -277,6 +299,14 @@ private struct AddHomeConfirmStep: View {
             PrimaryHomeToggle(isPrimary: viewModel.form.isPrimary) {
                 viewModel.setPrimaryHome($0)
             }
+            // A12.2 Details — nickname / type / beds / baths / sizes /
+            // year / description, pre-filled from public records. Hidden
+            // on the join-an-existing-home path, which RN skips too
+            // (`useHomeForm.ts:619-623, :700-705`).
+            if !viewModel.isClaimingExistingHome {
+                Divider().background(Theme.Color.appBorderSubtle)
+                AddHomeDetailsSection(viewModel: viewModel)
+            }
         }
     }
 }
@@ -296,6 +326,15 @@ private struct RoleStep: View {
                 }
             }
         }
+        // A12.2 Setup — RN's Setup step is role picker + "Networks &
+        // codes" in one screen (`SetupStep.tsx:33-174`), and the block is
+        // hidden when joining an existing home (`SetupStep.tsx:66`).
+        if viewModel.showsAccessSetup {
+            Divider()
+                .background(Theme.Color.appBorderSubtle)
+                .padding(.vertical, Spacing.s2)
+            AddHomeAccessSetupSection(viewModel: viewModel)
+        }
     }
 }
 
@@ -307,7 +346,15 @@ private struct ReviewStep: View {
     var body: some View {
         HeadlineBlock("Review and submit")
         SubcopyBlock("Make sure everything below looks right before submitting.")
-        ReviewSummaryBlock([
+        ReviewSummaryBlock(summaryRows)
+    }
+
+    /// Address / role / primary, plus everything the Details and Setup
+    /// blocks collected — the review step previously showed only the
+    /// first three, so nothing the user typed on those blocks was
+    /// verifiable before submit.
+    private var summaryRows: [ReviewSummaryRow] {
+        var rows: [ReviewSummaryRow] = [
             ReviewSummaryRow(
                 label: "Address",
                 value: composedAddress(viewModel.form.address)
@@ -320,7 +367,41 @@ private struct ReviewStep: View {
                 label: "Primary",
                 value: viewModel.form.isPrimary ? "Yes" : "No"
             )
-        ])
+        ]
+        guard !viewModel.isClaimingExistingHome else { return rows }
+        let details = viewModel.form.details
+        let nickname = details.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !nickname.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Nickname", value: nickname))
+        }
+        rows.append(ReviewSummaryRow(label: "Home type", value: details.homeType.label))
+        if let size = bedBathSummary(details) {
+            rows.append(ReviewSummaryRow(label: "Size", value: size))
+        }
+        if !details.sqFt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Home size", value: "\(details.sqFt) sq ft"))
+        }
+        if !details.lotSqFt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Lot size", value: "\(details.lotSqFt) sq ft"))
+        }
+        if !details.yearBuilt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Year built", value: details.yearBuilt))
+        }
+        let secretCount = viewModel.accessItems.filter(\.isComplete).count
+        if secretCount > 0 {
+            rows.append(ReviewSummaryRow(
+                label: "Networks & codes",
+                value: secretCount == 1 ? "1 entry" : "\(secretCount) entries"
+            ))
+        }
+        return rows
+    }
+
+    private func bedBathSummary(_ details: AddHomeDetailsFields) -> String? {
+        var parts: [String] = []
+        if !details.bedrooms.isEmpty { parts.append("\(details.bedrooms) bd") }
+        if !details.bathrooms.isEmpty { parts.append("\(details.bathrooms) ba") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func composedAddress(_ fields: AddHomeAddressFields) -> String {

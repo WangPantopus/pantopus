@@ -44,6 +44,9 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
     public let permissions: [String]
     public let canManageHome: Bool
     public let canManageAccess: Bool
+    public let canManageFinance: Bool
+    public let canManageTasks: Bool
+    public let canViewSensitive: Bool
 
     public init(
         hasAccess: Bool,
@@ -51,7 +54,10 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
         roleBase: String? = nil,
         permissions: [String] = [],
         canManageHome: Bool = false,
-        canManageAccess: Bool = false
+        canManageAccess: Bool = false,
+        canManageFinance: Bool = false,
+        canManageTasks: Bool = false,
+        canViewSensitive: Bool = false
     ) {
         self.hasAccess = hasAccess
         self.isOwner = isOwner
@@ -59,6 +65,9 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
         self.permissions = permissions
         self.canManageHome = canManageHome
         self.canManageAccess = canManageAccess
+        self.canManageFinance = canManageFinance
+        self.canManageTasks = canManageTasks
+        self.canViewSensitive = canViewSensitive
     }
 
     public init(from decoder: any Decoder) throws {
@@ -69,6 +78,9 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
         permissions = try container.decodeIfPresent([String].self, forKey: .permissions) ?? []
         canManageHome = try container.decodeIfPresent(Bool.self, forKey: .canManageHome) ?? false
         canManageAccess = try container.decodeIfPresent(Bool.self, forKey: .canManageAccess) ?? false
+        canManageFinance = try container.decodeIfPresent(Bool.self, forKey: .canManageFinance) ?? false
+        canManageTasks = try container.decodeIfPresent(Bool.self, forKey: .canManageTasks) ?? false
+        canViewSensitive = try container.decodeIfPresent(Bool.self, forKey: .canViewSensitive) ?? false
     }
 
     /// Mirrors `canReviewHouseholdAccessRequests`
@@ -78,6 +90,18 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
         isOwner || permissions.contains("members.manage")
     }
 
+    /// RN's `can(perm)` helper (`src/app/homes/[id]/index.tsx:122`):
+    /// owners and admins see everything; a viewer whose record carries no
+    /// `permissions[]` at all falls through to "allow" so a partial
+    /// payload can't blank the dashboard; otherwise the IAM string list
+    /// decides. Permission vocabulary is the `home_permission` enum
+    /// (`backend/database/schema.sql:227-251`).
+    public func can(_ permission: String) -> Bool {
+        if isOwner || roleBase == "owner" || roleBase == "admin" { return true }
+        if permissions.isEmpty { return true }
+        return permissions.contains(permission)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case hasAccess
         case isOwner = "is_owner"
@@ -85,6 +109,126 @@ public struct HomeAccessDTO: Decodable, Sendable, Hashable {
         case permissions
         case canManageHome = "can_manage_home"
         case canManageAccess = "can_manage_access"
+        case canManageFinance = "can_manage_finance"
+        case canManageTasks = "can_manage_tasks"
+        case canViewSensitive = "can_view_sensitive"
+    }
+}
+
+// MARK: - GET /api/homes/:id/audit-log
+
+/// Joined actor `User` on a `HomeAuditLog` row — route
+/// `backend/routes/homeIam.js:602` selects
+/// `actor:actor_user_id (id, username, name, profile_picture_url)`.
+public struct HomeAuditActorDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let username: String?
+    public let name: String?
+    public let profilePictureUrl: String?
+
+    public init(
+        id: String,
+        username: String? = nil,
+        name: String? = nil,
+        profilePictureUrl: String? = nil
+    ) {
+        self.id = id
+        self.username = username
+        self.name = name
+        self.profilePictureUrl = profilePictureUrl
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case name
+        case profilePictureUrl = "profile_picture_url"
+    }
+}
+
+/// One `HomeAuditLog` row. The handler `select('*')`s the table, so the
+/// action verb, the target it was applied to, and the timestamp are all
+/// present; `metadata` is free-form jsonb we deliberately don't model.
+public struct HomeAuditEntryDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let homeId: String?
+    public let actorUserId: String?
+    /// Screaming-snake verb, e.g. `OWNERSHIP_CLAIM_SUBMITTED`.
+    public let action: String
+    /// Table name the action targeted, e.g. `HomeOccupancy`.
+    public let targetType: String?
+    public let targetId: String?
+    public let createdAt: String?
+    public let actor: HomeAuditActorDTO?
+
+    public init(
+        id: String,
+        homeId: String? = nil,
+        actorUserId: String? = nil,
+        action: String,
+        targetType: String? = nil,
+        targetId: String? = nil,
+        createdAt: String? = nil,
+        actor: HomeAuditActorDTO? = nil
+    ) {
+        self.id = id
+        self.homeId = homeId
+        self.actorUserId = actorUserId
+        self.action = action
+        self.targetType = targetType
+        self.targetId = targetId
+        self.createdAt = createdAt
+        self.actor = actor
+    }
+
+    /// RN falls back to "System" when the row has no resolvable actor
+    /// (`src/app/homes/[id]/members/index.tsx:393`).
+    public var actorDisplayName: String {
+        if let name = actor?.name, !name.isEmpty { return name }
+        if let username = actor?.username, !username.isEmpty { return "@\(username)" }
+        return "System"
+    }
+
+    /// `OWNERSHIP_CLAIM_SUBMITTED` → "Ownership claim submitted".
+    public var actionLabel: String {
+        let spaced = action
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+            .lowercased()
+            .trimmingCharacters(in: .whitespaces)
+        guard let first = spaced.first else { return action }
+        return first.uppercased() + spaced.dropFirst()
+    }
+
+    /// `HomeOccupancy` → "Home occupancy". `nil` when the row carries no
+    /// target, so the row never renders a dangling arrow.
+    public var targetLabel: String? {
+        guard let targetType, !targetType.isEmpty else { return nil }
+        let spaced = targetType
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+        guard let first = spaced.first else { return nil }
+        return first.uppercased() + spaced.dropFirst().lowercased()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case homeId = "home_id"
+        case actorUserId = "actor_user_id"
+        case action
+        case targetType = "target_type"
+        case targetId = "target_id"
+        case createdAt = "created_at"
+        case actor
+    }
+}
+
+/// `{ entries }` envelope — route `backend/routes/homeIam.js:602`.
+public struct HomeAuditLogResponse: Decodable, Sendable, Hashable {
+    public let entries: [HomeAuditEntryDTO]
+
+    public init(entries: [HomeAuditEntryDTO]) {
+        self.entries = entries
     }
 }
 

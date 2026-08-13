@@ -39,9 +39,11 @@ import app.pantopus.android.data.api.services.HomeDiscoveryApi
 import app.pantopus.android.data.api.services.HomeGuestPassesApi
 import app.pantopus.android.data.api.services.HomeIssuesApi
 import app.pantopus.android.data.api.services.HomeMembersApi
+import app.pantopus.android.data.api.services.HomeOwnershipClaimApi
 import app.pantopus.android.data.api.services.HomeOwnershipSecurityApi
 import app.pantopus.android.data.api.services.HomePetsApi
 import app.pantopus.android.data.api.services.HomePrivacyApi
+import app.pantopus.android.data.api.services.HomeSettingsApi
 import app.pantopus.android.data.api.services.HomeTasksApi
 import app.pantopus.android.data.api.services.HomeVerificationApi
 import app.pantopus.android.data.api.services.HomesApi
@@ -332,6 +334,10 @@ object NetworkModule {
     fun provideHomeAdminApi(retrofit: Retrofit): HomeAdminApi = retrofit.create(HomeAdminApi::class.java)
 
     @Provides @Singleton
+    fun provideHomeOwnershipClaimApi(retrofit: Retrofit): HomeOwnershipClaimApi =
+        retrofit.create(HomeOwnershipClaimApi::class.java)
+
+    @Provides @Singleton
     fun provideHomeGuestPassesApi(retrofit: Retrofit): HomeGuestPassesApi = retrofit.create(HomeGuestPassesApi::class.java)
 
     @Provides @Singleton
@@ -339,6 +345,10 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideHomePrivacyApi(retrofit: Retrofit): HomePrivacyApi = retrofit.create(HomePrivacyApi::class.java)
+
+    /** A14.1 per-home settings mutations (inline rename). */
+    @Provides @Singleton
+    fun provideHomeSettingsApi(retrofit: Retrofit): HomeSettingsApi = retrofit.create(HomeSettingsApi::class.java)
 
     /** A12.1 Find-or-Add-Home discovery + join-an-existing-home routes. */
     @Provides @Singleton

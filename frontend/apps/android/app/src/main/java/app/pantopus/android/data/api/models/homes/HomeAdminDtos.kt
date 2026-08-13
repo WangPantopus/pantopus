@@ -37,6 +37,9 @@ data class HomeAccessDto(
     val permissions: List<String> = emptyList(),
     @Json(name = "can_manage_home") val canManageHome: Boolean = false,
     @Json(name = "can_manage_access") val canManageAccess: Boolean = false,
+    @Json(name = "can_manage_finance") val canManageFinance: Boolean = false,
+    @Json(name = "can_manage_tasks") val canManageTasks: Boolean = false,
+    @Json(name = "can_view_sensitive") val canViewSensitive: Boolean = false,
 ) {
     /**
      * Mirrors `canReviewHouseholdAccessRequests` (`home.js:219`) and the
@@ -44,7 +47,99 @@ data class HomeAccessDto(
      */
     val canManageMembers: Boolean
         get() = isOwner || permissions.contains("members.manage")
+
+    /**
+     * RN's `can(perm)` helper (`src/app/homes/[id]/index.tsx:122`):
+     * owners and admins see everything; a viewer whose record carries no
+     * `permissions[]` at all falls through to "allow" so a partial
+     * payload can't blank the dashboard; otherwise the IAM string list
+     * decides. Permission vocabulary is the `home_permission` enum
+     * (`backend/database/schema.sql:227-251`).
+     */
+    fun can(permission: String): Boolean {
+        if (isOwner || roleBase == "owner" || roleBase == "admin") return true
+        if (permissions.isEmpty()) return true
+        return permissions.contains(permission)
+    }
 }
+
+/**
+ * Joined actor `User` on a `HomeAuditLog` row — the handler selects
+ * `actor:actor_user_id (id, username, name, profile_picture_url)`.
+ */
+@JsonClass(generateAdapter = true)
+data class HomeAuditActorDto(
+    val id: String,
+    val username: String? = null,
+    val name: String? = null,
+    @Json(name = "profile_picture_url") val profilePictureUrl: String? = null,
+)
+
+/**
+ * One `HomeAuditLog` row from `GET /:id/audit-log`. The handler
+ * `select('*')`s the table, so the action verb, the target it was
+ * applied to, and the timestamp are all present; `metadata` is
+ * free-form jsonb we deliberately don't model.
+ */
+@JsonClass(generateAdapter = true)
+data class HomeAuditEntryDto(
+    val id: String,
+    @Json(name = "home_id") val homeId: String? = null,
+    @Json(name = "actor_user_id") val actorUserId: String? = null,
+    /** Screaming-snake verb, e.g. `OWNERSHIP_CLAIM_SUBMITTED`. */
+    val action: String,
+    /** Table name the action targeted, e.g. `HomeOccupancy`. */
+    @Json(name = "target_type") val targetType: String? = null,
+    @Json(name = "target_id") val targetId: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    val actor: HomeAuditActorDto? = null,
+)
+
+/**
+ * RN falls back to "System" when the row has no resolvable actor
+ * (`src/app/homes/[id]/members/index.tsx:393`).
+ */
+fun HomeAuditEntryDto.actorDisplayName(): String {
+    val who = actor ?: return "System"
+    if (!who.name.isNullOrEmpty()) return who.name
+    if (!who.username.isNullOrEmpty()) return "@${who.username}"
+    return "System"
+}
+
+/** `OWNERSHIP_CLAIM_SUBMITTED` → "Ownership claim submitted". */
+fun HomeAuditEntryDto.actionLabel(): String {
+    val spaced =
+        action
+            .replace('_', ' ')
+            .replace('.', ' ')
+            .lowercase()
+            .trim()
+    if (spaced.isEmpty()) return action
+    return spaced.replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * `HomeOccupancy` → "Home occupancy". Null when the row carries no
+ * target, so the row never renders a dangling arrow.
+ */
+fun HomeAuditEntryDto.targetLabel(): String? {
+    val raw = targetType
+    if (raw.isNullOrEmpty()) return null
+    val spaced =
+        Regex("([a-z0-9])([A-Z])")
+            .replace(raw) { "${it.groupValues[1]} ${it.groupValues[2]}" }
+            .replace('_', ' ')
+            .lowercase()
+            .trim()
+    if (spaced.isEmpty()) return null
+    return spaced.replaceFirstChar { it.uppercase() }
+}
+
+/** `{ entries }` envelope from `GET /:id/audit-log`. */
+@JsonClass(generateAdapter = true)
+data class HomeAuditLogResponse(
+    val entries: List<HomeAuditEntryDto> = emptyList(),
+)
 
 /**
  * Body for `POST /:id/members/:userId/role`. The handler accepts

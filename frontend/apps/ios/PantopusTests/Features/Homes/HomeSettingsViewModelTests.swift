@@ -109,6 +109,16 @@ final class HomeSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(receivedRoute, .security)
     }
 
+    func testRenameIsGatedOnEditPermission() async {
+        // The sample-frame seam never resolves `GET /:id/me`, so the
+        // viewer has no `home.edit` and the inline editor stays closed.
+        let vm = HomeSettingsViewModel(homeId: "home-1", frame: .populated)
+        await vm.load()
+        XCTAssertFalse(vm.canEditHome)
+        vm.beginRenaming()
+        XCTAssertFalse(vm.isRenaming)
+    }
+
     func testFrameInferenceFollowsHomeIdPrefix() {
         XCTAssertEqual(HomeSettingsSampleData.frame(forHomeId: "home-abc"), .populated)
         XCTAssertEqual(HomeSettingsSampleData.frame(forHomeId: "pending-xyz"), .pending)

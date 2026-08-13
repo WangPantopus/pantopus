@@ -279,10 +279,16 @@ final class UITestStubProtocol: URLProtocol {
     }}
     """
 
-    /// ATTOM property suggestions envelope — matches `JSONValue` with one
-    /// candidate. Tests can override via `UI_TESTS_HOMES_SUGGEST_BODY`.
+    /// ATTOM property-suggestions envelope from
+    /// `backend/services/ai/propertySuggestionsService.js:261-267`. Feeds
+    /// the Add-Home wizard's Details fields. Tests can override via
+    /// `UI_TESTS_HOMES_SUGGEST_BODY`.
     static let defaultPropertySuggestionsJSON = """
-    {"results":[{"address":"412 Elm St","city":"Portland","state":"OR","zipCode":"97214"}]}
+    {"suggestions":{"home_type":"house","bedrooms":3,"bathrooms":2,
+      "sq_ft":1480,"lot_sq_ft":5200,"year_built":1974,"description":null},
+     "field_sources":{"home_type":"attom","bedrooms":"attom"},
+     "tiers_used":["attom"],"llm_enabled":false,
+     "attom_property_detail":{"source":"attom"}}
     """
 
     /// `CheckAddressResponse` — `HOME_NOT_FOUND` so the wizard's verdict

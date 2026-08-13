@@ -114,6 +114,16 @@ data class HomeDetail(
     val isOccupant: Boolean = false,
     val owners: List<HomeOwnershipRef> = emptyList(),
     @Json(name = "can_delete_home") val canDeleteHome: Boolean = false,
+    /**
+     * `Home.security_state` — the lifecycle guard rail
+     * (`normal | claim_window | review_required | disputed | frozen |
+     * frozen_silent`). The handler `select('*')`s the Home row
+     * (`backend/routes/home.js:2902`), so this and `claim_window_ends_at`
+     * ride along on every detail read. Drives the dashboard status
+     * banner.
+     */
+    @Json(name = "security_state") val securityState: String? = null,
+    @Json(name = "claim_window_ends_at") val claimWindowEndsAt: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -207,6 +217,23 @@ data class CreateHomeRequest(
     val visibility: String? = null,
     val name: String? = null,
     val description: String? = null,
+    /** `bedrooms` — `createHomeSchema` (`backend/routes/home.js:94`). */
+    val bedrooms: Int? = null,
+    /** `bathrooms` — accepts halves (`backend/routes/home.js:95`). */
+    val bathrooms: Double? = null,
+    /** `sq_ft` — `backend/routes/home.js:96`. */
+    @Json(name = "sq_ft") val sqFt: Int? = null,
+    /** `lot_sq_ft` — `backend/routes/home.js:98`. */
+    @Json(name = "lot_sq_ft") val lotSqFt: Int? = null,
+    /** `year_built` — `backend/routes/home.js:99`. */
+    @Json(name = "year_built") val yearBuilt: Int? = null,
+    /** `is_owner` — `backend/routes/home.js:101`. */
+    @Json(name = "is_owner") val isOwner: Boolean? = null,
+    /**
+     * `role` — one of `owner | renter | household | property_manager |
+     * guest` (`backend/routes/home.js:102`).
+     */
+    val role: String? = null,
     @Json(name = "attom_property_detail") val attomPropertyDetail: JsonValue? = null,
 )
 
@@ -232,8 +259,61 @@ data class PropertySuggestionsRequest(
     val state: String,
     @Json(name = "zip_code") val zipCode: String,
     @Json(name = "address_id") val addressId: String? = null,
-    val classification: String? = null,
+    /**
+     * Optional Places / parcel hints forwarded from address validation —
+     * `propertySuggestionsSchema` (`backend/routes/home.js:528-532`).
+     */
+    val classification: PropertySuggestionsClassification? = null,
 )
+
+/** Places / parcel classification hints (`backend/routes/home.js:528-532`). */
+@JsonClass(generateAdapter = true)
+data class PropertySuggestionsClassification(
+    @Json(name = "google_place_types") val googlePlaceTypes: List<String>? = null,
+    @Json(name = "parcel_type") val parcelType: String? = null,
+    @Json(name = "building_type") val buildingType: String? = null,
+)
+
+/**
+ * The merged property fields the tiered lookup resolved. Every field is
+ * nullable — the service returns explicit nulls for anything ATTOM,
+ * heuristics, or the LLM couldn't fill
+ * (`backend/services/ai/propertySuggestionsService.js:144-152`).
+ */
+@JsonClass(generateAdapter = true)
+data class PropertySuggestionsFields(
+    @Json(name = "home_type") val homeType: String? = null,
+    val bedrooms: Int? = null,
+    val bathrooms: Double? = null,
+    @Json(name = "sq_ft") val sqFt: Int? = null,
+    @Json(name = "lot_sq_ft") val lotSqFt: Int? = null,
+    @Json(name = "year_built") val yearBuilt: Int? = null,
+    val description: String? = null,
+)
+
+/**
+ * `POST /api/homes/property-suggestions` response envelope —
+ * `backend/services/ai/propertySuggestionsService.js:261-267`. The
+ * `attom_property_detail` bundle is provider-defined, so it stays an
+ * untyped [JsonValue] that we hand straight back to `POST /api/homes`.
+ */
+@JsonClass(generateAdapter = true)
+data class PropertySuggestionsResponse(
+    val suggestions: PropertySuggestionsFields? = null,
+    /** Per-field provenance (`attom` / `heuristic` / `llm`). */
+    @Json(name = "field_sources") val fieldSources: Map<String, String>? = null,
+    @Json(name = "tiers_used") val tiersUsed: List<String>? = null,
+    @Json(name = "llm_enabled") val llmEnabled: Boolean? = null,
+    @Json(name = "attom_property_detail") val attomPropertyDetail: JsonValue? = null,
+) {
+    /**
+     * True when ATTOM actually returned a public record for the address —
+     * drives the "Public records (ATTOM)" card. RN keys off the same
+     * field (`DetailsStep.tsx:53`).
+     */
+    val hasAttomRecord: Boolean
+        get() = !attomPropertyDetail.isNullOrEmpty()
+}
 
 /**
  * `POST /api/homes/check-address` request. Route:

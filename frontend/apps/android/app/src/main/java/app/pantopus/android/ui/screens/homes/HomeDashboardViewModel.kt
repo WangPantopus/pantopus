@@ -13,13 +13,16 @@ import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistCarry
 import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistDto
 import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistItemDto
 import app.pantopus.android.data.api.models.homedashboard.SeasonalChecklistProgressDto
+import app.pantopus.android.data.api.models.homes.HomeAccessDto
 import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.HomePublicProfile
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomeDashboardRepository
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.ui.screens.homes.settings.ownership_security.HomeOwnershipSecurityViewModel
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsTab
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroStat
 import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTile
@@ -58,7 +61,40 @@ data class HomeDashboardContent(
     val tabs: List<GridTabsTab>,
     val overview: HomeDashboardOverviewContent,
     val attentionSummary: HomeDashboardAttentionSummary? = null,
+    /**
+     * Non-null when the home is in a non-normal security state and the
+     * banner must render above the tabs. See [HomeSecurityBannerContent].
+     */
+    val securityBanner: HomeSecurityBannerContent? = null,
 )
+
+/**
+ * Projection of the home's `security_state` guard rail onto the
+ * dashboard banner. Mirrors RN `src/components/HomeStatusBanner.tsx`
+ * (copy from `src/constants/ownershipCopy.ts`), which renders nothing
+ * for `normal` / `frozen_silent`.
+ *
+ * Parity contract — mirrored in iOS `HomeSecurityBannerContent`.
+ */
+data class HomeSecurityBannerContent(
+    /** Raw `home_security_state` value the banner was derived from. */
+    val state: String,
+    val icon: PantopusIcon,
+    val title: String,
+    val body: String,
+    val ctaLabel: String?,
+    val action: HomeSecurityBannerAction,
+)
+
+/**
+ * Which action the security banner's CTA performs, or [NoAction] when
+ * the state has no destination we can route to.
+ */
+enum class HomeSecurityBannerAction {
+    InviteCoOwner,
+    OpenSecuritySettings,
+    NoAction,
+}
 
 data class HomeDashboardOverviewContent(
     val upcoming: List<HomeDashboardTimelineItem>,
@@ -178,6 +214,7 @@ class HomeDashboardViewModel
     constructor(
         private val repo: HomesRepository,
         private val intelligenceRepo: HomeDashboardRepository,
+        private val adminRepo: HomeAdminRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val homeId: String =
@@ -228,6 +265,14 @@ class HomeDashboardViewModel
         private var detailData: HomeDetail? = null
         private var publicData: HomePublicProfile? = null
         private var dashboardData: HomeDashboardResponse? = null
+
+        /**
+         * The viewer's own per-home access record. Gates the quick-action
+         * tiles + tab strip exactly as RN gates its dashboard cards.
+         * Best-effort: a 403 / offline read leaves this null and the
+         * surface renders ungated rather than blank.
+         */
+        private var accessData: HomeAccessDto? = null
 
         private val _selectedTab = MutableStateFlow("overview")
 
@@ -290,14 +335,27 @@ class HomeDashboardViewModel
                 trends.await()
             }
 
-        /** Home detail (identity / ownership) + the dashboard aggregate. */
+        /**
+         * Home detail (identity / ownership) + the dashboard aggregate +
+         * the viewer's access record (`GET /api/homes/:id/me`, route
+         * `backend/routes/homeIam.js:51`). The access read is
+         * best-effort: a 403 there means "no access record", which must
+         * not fail the dashboard.
+         */
         private suspend fun fetchCore() =
             coroutineScope {
                 val detailDeferred = async { repo.detail(homeId) }
                 val dashboardDeferred = async { intelligenceRepo.dashboard(homeId) }
+                val accessDeferred = async { adminRepo.myAccess(homeId) }
                 val detailResult = detailDeferred.await()
                 val dashboardResult = dashboardDeferred.await()
+                val accessResult = accessDeferred.await()
                 dashboardData = if (dashboardResult is NetworkResult.Success) dashboardResult.data else null
+                // The 403 body decodes into the same shape with
+                // hasAccess=false; treat that as "unknown" so the surface
+                // stays ungated.
+                accessData =
+                    (accessResult as? NetworkResult.Success)?.data?.takeIf { it.hasAccess }
 
                 when (detailResult) {
                     is NetworkResult.Success -> {
@@ -488,6 +546,11 @@ class HomeDashboardViewModel
                                 // Banner gate: I'm the verified owner only when
                                 // isOwner is true and no claim is still in flight.
                                 isVerifiedOwner = detail.isOwner && !detail.isPendingOwner,
+                                securityBanner =
+                                    securityBanner(
+                                        state = detail.securityState,
+                                        claimWindowEndsAt = detail.claimWindowEndsAt,
+                                    ),
                             ),
                         )
                 publicProfile != null ->
@@ -499,6 +562,8 @@ class HomeDashboardViewModel
                                 // Public-profile path is hit when the user is NOT
                                 // a verified owner; detail returned 403/404 first.
                                 isVerifiedOwner = false,
+                                // The public preview carries no security_state.
+                                securityBanner = null,
                             ),
                         )
             }
@@ -508,6 +573,7 @@ class HomeDashboardViewModel
             address: String,
             verified: Boolean,
             isVerifiedOwner: Boolean,
+            securityBanner: HomeSecurityBannerContent?,
         ): HomeDashboardContent {
             val counts = dashboardData?.counts
             return HomeDashboardContent(
@@ -515,14 +581,83 @@ class HomeDashboardViewModel
                 verified = verified,
                 isVerifiedOwner = isVerifiedOwner,
                 stats = HomeDashboardProjection.stats(counts),
-                quickActions = HomeDashboardProjection.quickActions(counts),
-                tabs = HomeDashboardProjection.tabs,
+                quickActions = HomeDashboardProjection.quickActions(counts, accessData),
+                tabs = HomeDashboardProjection.gatedTabs(accessData),
                 overview =
                     HomeDashboardProjection.overview(
                         dashboard = dashboardData,
                         health = _healthScore.value.valueOrNull(),
                     ),
                 attentionSummary = null,
+                securityBanner = securityBanner,
             )
+        }
+
+        companion object {
+            /**
+             * Pure projection of `Home.security_state` onto the dashboard
+             * banner. Copy is lifted verbatim from RN's
+             * `ownershipCopy.ts` (`CLAIM_WINDOW` / `REVIEW_REQUIRED` /
+             * `DISPUTE` / `FROZEN`) and the render gate matches
+             * `HomeStatusBanner.tsx:33` — `normal` and `frozen_silent`
+             * render nothing.
+             *
+             * Parity contract — mirrored in iOS
+             * `HomeDashboardViewModel.securityBanner(state:claimWindowEndsAt:)`.
+             */
+            fun securityBanner(
+                state: String?,
+                claimWindowEndsAt: String?,
+            ): HomeSecurityBannerContent? =
+                when (state) {
+                    "claim_window" -> {
+                        val date = HomeOwnershipSecurityViewModel.formattedDate(claimWindowEndsAt)
+                        HomeSecurityBannerContent(
+                            state = state,
+                            icon = PantopusIcon.Clock,
+                            title = "Claim Window Active",
+                            body =
+                                if (date != null) {
+                                    "Co-owners can verify ownership until $date."
+                                } else {
+                                    "Co-owners can verify ownership while the window is open."
+                                },
+                            ctaLabel = "Invite Co-Owner",
+                            action = HomeSecurityBannerAction.InviteCoOwner,
+                        )
+                    }
+                    "review_required" ->
+                        HomeSecurityBannerContent(
+                            state = state,
+                            icon = PantopusIcon.Shield,
+                            title = "Review Required",
+                            body = "New owner claims require manual review.",
+                            ctaLabel = "Learn Why",
+                            action = HomeSecurityBannerAction.OpenSecuritySettings,
+                        )
+                    "disputed" ->
+                        HomeSecurityBannerContent(
+                            state = state,
+                            icon = PantopusIcon.AlertTriangle,
+                            title = "Verification dispute active",
+                            body = "Some sensitive actions are temporarily restricted.",
+                            ctaLabel = "View Details",
+                            action = HomeSecurityBannerAction.OpenSecuritySettings,
+                        )
+                    "frozen" ->
+                        // RN renders a "Contact support" label with no
+                        // handler (`HomeStatusBanner.tsx:68-72`); we ship
+                        // the copy without a dead button rather than a
+                        // control that does nothing.
+                        HomeSecurityBannerContent(
+                            state = state,
+                            icon = PantopusIcon.Lock,
+                            title = "Home protections enabled",
+                            body = "Some actions require support.",
+                            ctaLabel = null,
+                            action = HomeSecurityBannerAction.NoAction,
+                        )
+                    else -> null
+                }
         }
     }

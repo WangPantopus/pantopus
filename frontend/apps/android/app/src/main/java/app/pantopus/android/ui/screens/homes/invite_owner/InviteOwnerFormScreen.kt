@@ -21,6 +21,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -104,6 +106,7 @@ fun InviteOwnerFormScreen(
             onGrantChange = viewModel::updateGrantPercent,
             onSnapToAvailable = viewModel::snapGrantToAvailablePool,
             onRebalance = viewModel::rebalanceShares,
+            onFastTrackChange = viewModel::updateFastTrack,
         )
 
         state.toast?.let { toast ->
@@ -137,6 +140,7 @@ internal fun InviteOwnerFormScreenContent(
     onGrantChange: (Int) -> Unit,
     onSnapToAvailable: () -> Unit,
     onRebalance: () -> Unit,
+    onFastTrackChange: (Boolean) -> Unit = {},
 ) {
     when (val phase = state.phase) {
         InviteOwnerPhase.Loading -> InviteOwnerLoadingForm(onClose = onClose)
@@ -152,6 +156,7 @@ internal fun InviteOwnerFormScreenContent(
                 onGrantChange = onGrantChange,
                 onSnapToAvailable = onSnapToAvailable,
                 onRebalance = onRebalance,
+                onFastTrackChange = onFastTrackChange,
             )
     }
 }
@@ -166,6 +171,7 @@ internal fun InviteOwnerLoadedForm(
     onGrantChange: (Int) -> Unit,
     onSnapToAvailable: () -> Unit,
     onRebalance: () -> Unit,
+    onFastTrackChange: (Boolean) -> Unit = {},
 ) {
     FormShell(
         title = "Invite owner",
@@ -182,6 +188,7 @@ internal fun InviteOwnerLoadedForm(
             onGrantChange = onGrantChange,
             onSnapToAvailable = onSnapToAvailable,
             onRebalance = onRebalance,
+            onFastTrackChange = onFastTrackChange,
         )
     }
 }
@@ -193,6 +200,7 @@ private fun InviteOwnerFormContent(
     onGrantChange: (Int) -> Unit,
     onSnapToAvailable: () -> Unit,
     onRebalance: () -> Unit,
+    onFastTrackChange: (Boolean) -> Unit,
 ) {
     HomeContextStrip(context = state.homeContext)
 
@@ -252,6 +260,10 @@ private fun InviteOwnerFormContent(
                 onRebalance = onRebalance,
             )
         }
+    }
+
+    FormFieldGroup(title = "Verification") {
+        FastTrackToggleRow(isOn = state.fastTrack, onCheckedChange = onFastTrackChange)
     }
 
     FormFieldGroup(title = "Role") {
@@ -381,6 +393,53 @@ private fun FieldFor(
         isRequired = isRequired,
         fieldTestTag = testTag,
     )
+}
+
+/**
+ * RN's fast-track switch (`src/app/homes/[id]/owners/invite.tsx:98-110`),
+ * copy from `constants/ownershipCopy.ts` `CO_OWNER_INVITE`. Defaults ON
+ * and sends `fast_track` so the backend files the claim as a vouch.
+ */
+@Composable
+private fun FastTrackToggleRow(
+    isOn: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("inviteOwnerFastTrackToggle"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Fast track (vouch)",
+                style = PantopusTextStyle.body,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Still requires verification",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Switch(
+            checked = isOn,
+            onCheckedChange = onCheckedChange,
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = PantopusColors.appSurface,
+                    checkedTrackColor = PantopusColors.primary600,
+                ),
+        )
+    }
 }
 
 @Composable

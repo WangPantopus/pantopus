@@ -2,8 +2,10 @@
 //  ClaimDocumentTypePicker.swift
 //  Pantopus
 //
-//  "Select document type" card list used by the residency variant of the
-//  evidence step. Mirrors RN's `docCard` list
+//  "Select document type" card list used by both evidence variants —
+//  five ownership documents (deed / closing disclosure / property tax
+//  statement / title-escrow attestation / title record match) or three
+//  residency documents. Mirrors RN's `docCard` list
 //  (`src/app/homes/[id]/claim-owner/evidence.tsx:299-338`): icon disc,
 //  label + description, check glyph on the selected row.
 //

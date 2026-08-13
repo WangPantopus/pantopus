@@ -117,7 +117,7 @@ fun ClaimOwnershipWizardScreen(
                     onSelectMethod = viewModel::selectStartMethod,
                 )
             ClaimOwnershipStep.Upload -> UploadStep(state, viewModel)
-            ClaimOwnershipStep.Success -> SuccessStep()
+            ClaimOwnershipStep.Success -> SuccessStep(outcomeNote = state.submissionOutcomeNote)
         }
     }
 
@@ -150,6 +150,19 @@ fun ClaimOwnershipWizardScreen(
             dismissLabel = "OK",
             onDismiss = viewModel::dismissBlockedByOtherClaim,
             testTag = "claimOwnershipBlockedByOtherClaim",
+        )
+    }
+    // Backend `routing_classification` acknowledgement — single
+    // "Continue" action, matching RN's blocking alert
+    // (`claim-owner/evidence.tsx:223-241`).
+    state.routingWarning?.let { warning ->
+        ClaimAlertDialog(
+            title = warning.title,
+            message = warning.message,
+            confirmLabel = "Continue",
+            onConfirm = viewModel::acknowledgeRoutingWarning,
+            onDismiss = viewModel::acknowledgeRoutingWarning,
+            testTag = "claimOwnershipRoutingWarning",
         )
     }
 }
@@ -687,12 +700,17 @@ internal fun UploadStepContent(
         }
         if (documentOptions.isEmpty() || selectedDocumentType != null) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                val heading =
+                    if (documentOptions.isEmpty()) "Documents" else "2. Upload your document"
                 Text(
+                    // Multi-slot variants (owner: ID + ownership proof)
+                    // keep the attached-count readout; the single-slot
+                    // residency variant matches RN's plain heading.
                     text =
-                        if (documentOptions.isEmpty()) {
-                            "Documents · $attached of ${slots.size} attached"
+                        if (slots.size > 1) {
+                            "$heading · $attached of ${slots.size} attached"
                         } else {
-                            "2. Upload your document"
+                            heading
                         },
                     style = PantopusTextStyle.overline,
                     color = PantopusColors.appTextSecondary,
@@ -751,11 +769,31 @@ private fun InfoBanner(text: String) {
 // MARK: - Step 3
 
 @Composable
-private fun SuccessStep() {
+private fun SuccessStep(outcomeNote: String? = null) {
     // Route through the shared T3.6 Status / Waiting body so the
     // claim-submitted state shares its hero, timeline, action cards,
     // and explainer bullets with every other "submitted" surface.
     StatusWaitingBody(content = StatusWaitingContent.claimSubmitted())
+    // Extra line describing what the submission actually did — a
+    // parallel claim, or a challenge that opened against the current
+    // verified household. Derived from the backend's
+    // `routing_classification` (RN passes the same signal into its
+    // `submitted` screen as `?parallel=1` / `?challenge=1`).
+    outcomeNote?.let { note ->
+        Text(
+            text = note,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.s3)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceMuted)
+                    .padding(Spacing.s3)
+                    .testTag("claimOwnershipOutcomeNote"),
+        )
+    }
 }
 
 // MARK: - Helpers

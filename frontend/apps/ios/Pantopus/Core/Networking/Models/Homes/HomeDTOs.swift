@@ -133,6 +133,12 @@ public struct HomeDetail: Decodable, Sendable, Hashable {
     public let isOccupant: Bool
     public let owners: [HomeOwnershipRef]
     public let canDeleteHome: Bool
+    /// `Home.security_state` — the lifecycle guard rail. The handler
+    /// `select('*')`s the Home row (`backend/routes/home.js:2902`), so
+    /// this and `claim_window_ends_at` ride along on every detail read.
+    /// Drives the dashboard status banner.
+    public let securityState: HomeSecurityState
+    public let claimWindowEndsAt: String?
 
     public init(from decoder: any Decoder) throws {
         base = try HomeDTO(from: decoder)
@@ -146,12 +152,19 @@ public struct HomeDetail: Decodable, Sendable, Hashable {
         isOccupant = try c.decodeIfPresent(Bool.self, forKey: .isOccupant) ?? false
         owners = try c.decodeIfPresent([HomeOwnershipRef].self, forKey: .owners) ?? []
         canDeleteHome = try c.decodeIfPresent(Bool.self, forKey: .canDeleteHome) ?? false
+        // Decoded through its raw string so a future backend enum value
+        // degrades to `.normal` instead of failing the whole home read.
+        let rawSecurityState = try c.decodeIfPresent(String.self, forKey: .securityState)
+        securityState = rawSecurityState.flatMap(HomeSecurityState.init(rawValue:)) ?? .normal
+        claimWindowEndsAt = try c.decodeIfPresent(String.self, forKey: .claimWindowEndsAt)
     }
 
     private enum FlatKeys: String, CodingKey {
         case owner, occupants, location
         case isOwner, isPendingOwner, pendingClaimId, isOccupant, owners
         case canDeleteHome = "can_delete_home"
+        case securityState = "security_state"
+        case claimWindowEndsAt = "claim_window_ends_at"
     }
 }
 
@@ -277,6 +290,21 @@ public struct CreateHomeRequest: Encodable, Sendable {
     public let visibility: String?
     public let name: String?
     public let description: String?
+    /// `bedrooms` — `createHomeSchema` (`backend/routes/home.js:94`).
+    public let bedrooms: Int?
+    /// `bathrooms` — accepts halves (`backend/routes/home.js:95`).
+    public let bathrooms: Double?
+    /// `sq_ft` — `backend/routes/home.js:96`.
+    public let sqFt: Int?
+    /// `lot_sq_ft` — `backend/routes/home.js:98`.
+    public let lotSqFt: Int?
+    /// `year_built` — `backend/routes/home.js:99`.
+    public let yearBuilt: Int?
+    /// `is_owner` — `backend/routes/home.js:101`.
+    public let isOwner: Bool?
+    /// `role` — one of `owner | renter | household | property_manager |
+    /// guest` (`backend/routes/home.js:102`).
+    public let role: String?
     public let attomPropertyDetail: JSONEncodable?
 
     public init(
@@ -291,6 +319,13 @@ public struct CreateHomeRequest: Encodable, Sendable {
         visibility: String? = nil,
         name: String? = nil,
         description: String? = nil,
+        bedrooms: Int? = nil,
+        bathrooms: Double? = nil,
+        sqFt: Int? = nil,
+        lotSqFt: Int? = nil,
+        yearBuilt: Int? = nil,
+        isOwner: Bool? = nil,
+        role: String? = nil,
         attomPropertyDetail: JSONEncodable? = nil
     ) {
         self.address = address
@@ -304,6 +339,13 @@ public struct CreateHomeRequest: Encodable, Sendable {
         self.visibility = visibility
         self.name = name
         self.description = description
+        self.bedrooms = bedrooms
+        self.bathrooms = bathrooms
+        self.sqFt = sqFt
+        self.lotSqFt = lotSqFt
+        self.yearBuilt = yearBuilt
+        self.isOwner = isOwner
+        self.role = role
         self.attomPropertyDetail = attomPropertyDetail
     }
 
@@ -315,6 +357,12 @@ public struct CreateHomeRequest: Encodable, Sendable {
         case latitude, longitude
         case homeType = "home_type"
         case visibility, name, description
+        case bedrooms, bathrooms
+        case sqFt = "sq_ft"
+        case lotSqFt = "lot_sq_ft"
+        case yearBuilt = "year_built"
+        case isOwner = "is_owner"
+        case role
         case attomPropertyDetail = "attom_property_detail"
     }
 }
@@ -344,7 +392,9 @@ public struct PropertySuggestionsRequest: Encodable, Sendable {
     public let state: String
     public let zipCode: String
     public let addressId: String?
-    public let classification: String?
+    /// Optional Places/parcel hints forwarded from address validation —
+    /// `propertySuggestionsSchema` (`backend/routes/home.js:528-532`).
+    public let classification: PropertySuggestionsClassification?
 
     public init(
         address: String,
@@ -353,7 +403,7 @@ public struct PropertySuggestionsRequest: Encodable, Sendable {
         state: String,
         zipCode: String,
         addressId: String? = nil,
-        classification: String? = nil
+        classification: PropertySuggestionsClassification? = nil
     ) {
         self.address = address
         self.unitNumber = unitNumber
@@ -374,10 +424,114 @@ public struct PropertySuggestionsRequest: Encodable, Sendable {
     }
 }
 
-/// ATTOM property-suggestions payload. The upstream schema is
-/// provider-defined; expose the raw JSON envelope rather than invent a
-/// shape. Route: `backend/routes/home.js:540`.
-public typealias PropertySuggestionsResponse = JSONValue
+/// Places / parcel classification hints on the property-suggestions
+/// request — `backend/routes/home.js:528-532`.
+public struct PropertySuggestionsClassification: Encodable, Sendable, Hashable {
+    public let googlePlaceTypes: [String]?
+    public let parcelType: String?
+    public let buildingType: String?
+
+    public init(
+        googlePlaceTypes: [String]? = nil,
+        parcelType: String? = nil,
+        buildingType: String? = nil
+    ) {
+        self.googlePlaceTypes = googlePlaceTypes
+        self.parcelType = parcelType
+        self.buildingType = buildingType
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case googlePlaceTypes = "google_place_types"
+        case parcelType = "parcel_type"
+        case buildingType = "building_type"
+    }
+}
+
+/// The merged property fields the tiered lookup resolved. Every field is
+/// optional — the service returns explicit `null`s for anything ATTOM /
+/// heuristics / the LLM couldn't fill
+/// (`backend/services/ai/propertySuggestionsService.js:144-152`).
+public struct PropertySuggestionsFields: Decodable, Sendable, Hashable {
+    public let homeType: String?
+    public let bedrooms: Int?
+    public let bathrooms: Double?
+    public let sqFt: Int?
+    public let lotSqFt: Int?
+    public let yearBuilt: Int?
+    public let description: String?
+
+    public init(
+        homeType: String? = nil,
+        bedrooms: Int? = nil,
+        bathrooms: Double? = nil,
+        sqFt: Int? = nil,
+        lotSqFt: Int? = nil,
+        yearBuilt: Int? = nil,
+        description: String? = nil
+    ) {
+        self.homeType = homeType
+        self.bedrooms = bedrooms
+        self.bathrooms = bathrooms
+        self.sqFt = sqFt
+        self.lotSqFt = lotSqFt
+        self.yearBuilt = yearBuilt
+        self.description = description
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case homeType = "home_type"
+        case bedrooms, bathrooms
+        case sqFt = "sq_ft"
+        case lotSqFt = "lot_sq_ft"
+        case yearBuilt = "year_built"
+        case description
+    }
+}
+
+/// `POST /api/homes/property-suggestions` response envelope —
+/// `backend/services/ai/propertySuggestionsService.js:261-267`. The
+/// `attom_property_detail` bundle is provider-defined, so it stays a raw
+/// `JSONValue` that we hand straight back to `POST /api/homes`.
+public struct PropertySuggestionsResponse: Decodable, Sendable, Hashable {
+    public let suggestions: PropertySuggestionsFields?
+    /// Per-field provenance (`attom` / `heuristic` / `llm`).
+    public let fieldSources: [String: String]?
+    public let tiersUsed: [String]?
+    public let llmEnabled: Bool?
+    public let attomPropertyDetail: JSONValue?
+
+    public init(
+        suggestions: PropertySuggestionsFields? = nil,
+        fieldSources: [String: String]? = nil,
+        tiersUsed: [String]? = nil,
+        llmEnabled: Bool? = nil,
+        attomPropertyDetail: JSONValue? = nil
+    ) {
+        self.suggestions = suggestions
+        self.fieldSources = fieldSources
+        self.tiersUsed = tiersUsed
+        self.llmEnabled = llmEnabled
+        self.attomPropertyDetail = attomPropertyDetail
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case suggestions
+        case fieldSources = "field_sources"
+        case tiersUsed = "tiers_used"
+        case llmEnabled = "llm_enabled"
+        case attomPropertyDetail = "attom_property_detail"
+    }
+
+    /// True when ATTOM actually returned a public record for the address —
+    /// drives the "Public records (ATTOM)" card. RN keys off the same
+    /// field (`DetailsStep.tsx:53`).
+    public var hasAttomRecord: Bool {
+        guard let attomPropertyDetail else { return false }
+        if case .null = attomPropertyDetail { return false }
+        return true
+    }
+}
 
 /// `POST /api/homes/check-address` request. Route:
 /// `backend/routes/home.js:555`.

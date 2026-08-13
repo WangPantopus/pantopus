@@ -4,6 +4,8 @@ import app.pantopus.android.data.api.models.homes.ChangeMemberRoleRequest
 import app.pantopus.android.data.api.models.homes.ChangeMemberRoleResponse
 import app.pantopus.android.data.api.models.homes.DeleteHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessDto
+import app.pantopus.android.data.api.models.homes.HomeAuditLogResponse
+import app.pantopus.android.data.api.models.homes.HomeVerificationAccessDto
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestActionResponse
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestsResponse
 import retrofit2.http.Body
@@ -46,6 +48,34 @@ interface HomeAdminApi {
     suspend fun myAccess(
         @Path("id") homeId: String,
     ): HomeAccessDto
+
+    /**
+     * `GET /api/homes/:id/me` — same route
+     * (`backend/routes/homeIam.js:51`), decoded into the
+     * verification-facing slice the Verification Center branches on:
+     * `verification_status`, the challenge window, and the pending
+     * postcard's expiry.
+     */
+    @GET("api/homes/{id}/me")
+    suspend fun myVerificationAccess(
+        @Path("id") homeId: String,
+    ): HomeVerificationAccessDto
+
+    /**
+     * `GET /api/homes/:id/audit-log` — route
+     * `backend/routes/homeIam.js:602`.
+     *
+     * Who did what to the household, newest first. Requires
+     * `members.manage` (403 otherwise), joins the actor `User` row, and
+     * responds `{ entries }`. `limit` / `offset` default to 50 / 0
+     * server-side; we send them so the page size is stable.
+     */
+    @GET("api/homes/{id}/audit-log")
+    suspend fun auditLog(
+        @Path("id") homeId: String,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): HomeAuditLogResponse
 
     /**
      * `POST /api/homes/:id/members/:userId/role` — route

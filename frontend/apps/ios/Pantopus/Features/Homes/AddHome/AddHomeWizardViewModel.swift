@@ -6,6 +6,12 @@
 //  step 1 search-first with deterministic address fixtures, and exposes
 //  the small `WizardChrome` shape the shared `WizardShell` consumes.
 //
+//  Step 2 (Confirm) also owns the A12.2 Details block — the
+//  `property-suggestions` lookup plus the eight editable property fields
+//  — and step 3 (Role) owns the Setup block's access secrets, mirroring
+//  RN's three-step `useHomeForm` (Location → Details → Setup).
+//
+// swiftlint:disable type_body_length file_length
 
 import Foundation
 import Observation
@@ -70,6 +76,21 @@ final class AddHomeWizardViewModel: WizardModel {
     /// Candidate id selected from nearby results or autocomplete.
     private(set) var selectedHomeID: String?
 
+    /// Result of `POST /api/homes/property-suggestions`, fetched right
+    /// after `check-address` clears — the same order RN uses
+    /// (`useHomeForm.ts:625-662`). Drives the Details block's public
+    /// records card and pre-fills the editable fields.
+    private(set) var propertySuggestions: PropertySuggestionsResponse?
+    /// True once the suggestions lookup has finished (success or not), so
+    /// the Details block can switch its headline from "Tell us about your
+    /// home" to "Confirm property details" (RN `DetailsStep.tsx:57-70`).
+    private(set) var propertyLookupComplete: Bool = false
+    /// Copy under the public-records card. Mirrors RN's
+    /// `propertyLookupMessage` (`useHomeForm.ts:641-647`).
+    private(set) var propertyLookupMessage: String = ""
+    /// True while the suggestions call is in flight.
+    private(set) var isLoadingPropertySuggestions: Bool = false
+
     /// Result of `POST /api/homes/check-address`, populated when entering
     /// step 2.
     private(set) var addressCheck: CheckAddressResponse?
@@ -124,6 +145,21 @@ final class AddHomeWizardViewModel: WizardModel {
         .joined(separator: ", ")
     }
 
+    // MARK: - Setup step: networks & codes
+
+    /// Wi-Fi / gate / alarm secrets the user adds while creating the
+    /// home. POSTed to `POST /api/homes/:id/access` once the home row
+    /// exists (RN `useHomeForm.ts:321-336`). Held off `form` so the
+    /// secrets never reach `@SceneStorage`.
+    private(set) var accessItems: [AddHomeAccessItem] = [AddHomeAccessItem()]
+    /// Non-nil while the Wi-Fi QR scanner sheet is up; carries the row
+    /// the scan will fill.
+    var scannerTargetItemID: UUID?
+    /// Set when at least one access secret failed to save after the home
+    /// was created. RN swallows these silently; we surface them because
+    /// the home already exists and the user should know to re-add.
+    private(set) var accessSecretWarning: String?
+
     /// One-shot navigation events the host view consumes.
     var pendingEvent: AddHomeOutboundEvent?
 
@@ -172,9 +208,12 @@ final class AddHomeWizardViewModel: WizardModel {
             progressFraction: progressFraction(for: step),
             leading: leadingControl(for: step),
             primaryCTALabel: primaryCTALabel(for: step),
-            primaryCTAEnabled: primaryEnabled(for: step) && !isSubmitting && !isCheckingAddress,
+            primaryCTAEnabled: primaryEnabled(for: step)
+                && !isSubmitting
+                && !isCheckingAddress
+                && !isLoadingPropertySuggestions,
             secondaryCTA: secondaryCTA(for: step),
-            isSubmitting: isSubmitting || isCheckingAddress,
+            isSubmitting: isSubmitting || isCheckingAddress || isLoadingPropertySuggestions,
             dirty: dirtyForCloseConfirm,
             showsProgressBar: step != .success
         )
@@ -313,6 +352,146 @@ final class AddHomeWizardViewModel: WizardModel {
         form.role = role
     }
 
+    // MARK: - Details step (RN `DetailsStep.tsx`)
+
+    func updateNickname(_ value: String) { form.details.nickname = value }
+    func selectHomeType(_ value: AddHomeHomeType) { form.details.homeType = value }
+    func updateBedrooms(_ value: String) { form.details.bedrooms = digitsOnly(value) }
+    func updateBathrooms(_ value: String) { form.details.bathrooms = decimalOnly(value) }
+    func updateSqFt(_ value: String) { form.details.sqFt = digitsOnly(value) }
+    func updateLotSqFt(_ value: String) { form.details.lotSqFt = digitsOnly(value) }
+    func updateYearBuilt(_ value: String) { form.details.yearBuilt = digitsOnly(value) }
+    func updateDescription(_ value: String) { form.details.description = value }
+
+    private func digitsOnly(_ value: String) -> String {
+        value.filter(\.isNumber)
+    }
+
+    /// Keeps digits plus a single decimal separator — bathrooms accept
+    /// halves (`backend/routes/home.js:95`).
+    private func decimalOnly(_ value: String) -> String {
+        var seenSeparator = false
+        var out = ""
+        for character in value {
+            if character.isNumber {
+                out.append(character)
+            } else if character == ".", !seenSeparator {
+                seenSeparator = true
+                out.append(character)
+            }
+        }
+        return out
+    }
+
+    // MARK: - Setup step (RN `SetupStep.tsx`)
+
+    func addAccessItem() {
+        accessItems.append(AddHomeAccessItem())
+    }
+
+    func removeAccessItem(_ id: UUID) {
+        // RN only offers the trash affordance while more than one row
+        // exists (`SetupStep.tsx:106`); keep the invariant here too.
+        guard accessItems.count > 1 else { return }
+        accessItems.removeAll { $0.id == id }
+    }
+
+    func updateAccessType(_ id: UUID, to type: AddHomeAccessType) {
+        guard let index = accessItems.firstIndex(where: { $0.id == id }) else { return }
+        accessItems[index].accessType = type
+        // Picking a type fills an empty label with that type's default —
+        // RN `SetupStep.tsx:82-90`.
+        if accessItems[index].label.trimmingCharacters(in: .whitespaces).isEmpty {
+            accessItems[index].label = type.defaultLabel
+            accessItems[index].labelError = nil
+        }
+    }
+
+    func updateAccessLabel(_ id: UUID, to value: String) {
+        guard let index = accessItems.firstIndex(where: { $0.id == id }) else { return }
+        accessItems[index].label = value
+        accessItems[index].labelError = nil
+    }
+
+    func updateAccessSecret(_ id: UUID, to value: String) {
+        guard let index = accessItems.firstIndex(where: { $0.id == id }) else { return }
+        accessItems[index].secretValue = value
+        accessItems[index].valueError = nil
+    }
+
+    func toggleAccessSecretRevealed(_ id: UUID) {
+        guard let index = accessItems.firstIndex(where: { $0.id == id }) else { return }
+        accessItems[index].isRevealed.toggle()
+    }
+
+    /// Open the camera QR scanner for `id` (Wi-Fi rows only).
+    func openWifiQRScanner(for id: UUID) {
+        scannerTargetItemID = id
+    }
+
+    func closeWifiQRScanner() {
+        scannerTargetItemID = nil
+    }
+
+    /// Apply a scanned `WIFI:` payload to the targeted row. Returns false
+    /// when the payload isn't a Wi-Fi QR so the sheet can show RN's
+    /// "Invalid QR code" copy (`useHomeForm.ts:221`).
+    @discardableResult
+    func applyScannedWifi(_ raw: String) -> Bool {
+        guard let targetID = scannerTargetItemID,
+              let parsed = parseWifiQRPayload(raw),
+              let index = accessItems.firstIndex(where: { $0.id == targetID })
+        else { return false }
+        accessItems[index].accessType = .wifi
+        if accessItems[index].label.trimmingCharacters(in: .whitespaces).isEmpty {
+            accessItems[index].label = parsed.ssid
+        }
+        if !parsed.password.isEmpty {
+            accessItems[index].secretValue = parsed.password
+        }
+        accessItems[index].labelError = nil
+        accessItems[index].valueError = nil
+        scannerTargetItemID = nil
+        return true
+    }
+
+    /// A row is invalid when exactly one of label / value is filled.
+    /// Mirrors RN's `validateAccessItems` (`useHomeForm.ts:184-200`).
+    @discardableResult
+    func validateAccessItems() -> Bool {
+        var isValid = true
+        for index in accessItems.indices {
+            let hasLabel = !accessItems[index].label.trimmingCharacters(in: .whitespaces).isEmpty
+            let hasSecret = !accessItems[index].secretValue
+                .trimmingCharacters(in: .whitespaces).isEmpty
+            accessItems[index].labelError = nil
+            accessItems[index].valueError = nil
+            guard hasLabel != hasSecret else { continue }
+            isValid = false
+            if !hasLabel {
+                accessItems[index].labelError = "Label is required when a value is entered."
+            }
+            if !hasSecret {
+                accessItems[index].valueError = "Password/code is required when label is entered."
+            }
+        }
+        if !isValid {
+            errorMessage = "Please fix the highlighted fields."
+        }
+        return isValid
+    }
+
+    /// Networks & codes are hidden when joining an existing home — RN
+    /// gates the whole block on `!isClaimingExistingHome`
+    /// (`SetupStep.tsx:66`).
+    var showsAccessSetup: Bool {
+        !isClaimingExistingHome
+    }
+
+    func acknowledgeAccessSecretWarning() {
+        accessSecretWarning = nil
+    }
+
     /// User-tapped on the "Try again" CTA after a check-address error.
     func retryCheckAddress() {
         Task { await runCheckAddress() }
@@ -398,10 +577,99 @@ final class AddHomeWizardViewModel: WizardModel {
                 // a duplicate.
                 isClaimingExistingHome = response.homeId != nil
             }
+            // RN runs the property lookup right after check-address and
+            // only for the create-a-new-home path (`useHomeForm.ts:625`);
+            // the claim paths skip straight to role selection.
+            if !showsClaimedModal, !isClaimingExistingHome {
+                await loadPropertySuggestions()
+            }
         } catch {
             errorMessage = (error as? APIError)?.errorDescription
                 ?? "Couldn't verify that address. Try again."
         }
+    }
+
+    /// `POST /api/homes/property-suggestions` — route
+    /// `backend/routes/home.js:540`. Fills the Details block from public
+    /// records (ATTOM → heuristics → optional LLM). A failure is never
+    /// fatal: the fields stay editable and the card says the lookup was
+    /// unavailable, exactly as RN does (`useHomeForm.ts:657-662`).
+    func loadPropertySuggestions() async {
+        isLoadingPropertySuggestions = true
+        defer { isLoadingPropertySuggestions = false }
+        let source = geocodedAddress
+        let request = PropertySuggestionsRequest(
+            address: source?.street ?? form.address.street,
+            unitNumber: (source?.unit ?? form.address.unit).isEmpty
+                ? nil
+                : (source?.unit ?? form.address.unit),
+            city: source?.city ?? form.address.city,
+            state: (source?.state ?? form.address.state).uppercased(),
+            zipCode: source?.zipCode ?? form.address.zipCode,
+            addressId: nil,
+            classification: nil
+        )
+        do {
+            let response: PropertySuggestionsResponse = try await api.request(
+                HomesEndpoints.propertySuggestions(request)
+            )
+            propertySuggestions = response
+            propertyLookupComplete = true
+            propertyLookupMessage = Self.lookupMessage(for: response)
+            apply(suggestions: response.suggestions)
+        } catch {
+            propertySuggestions = nil
+            propertyLookupComplete = true
+            propertyLookupMessage =
+                "Public property records are unavailable right now. Confirm the details below."
+        }
+    }
+
+    /// RN's three-way message (`useHomeForm.ts:641-647`).
+    private static func lookupMessage(for response: PropertySuggestionsResponse) -> String {
+        if response.hasAttomRecord {
+            return "Public property records found. Review them before continuing."
+        }
+        if !(response.tiersUsed ?? []).isEmpty {
+            return "No ATTOM property record was returned, so we prefilled what we could "
+                + "from address hints."
+        }
+        return "No ATTOM property record was available for this address. Confirm the details below."
+    }
+
+    /// Prefill only — never overwrite something the user already typed.
+    private func apply(suggestions: PropertySuggestionsFields?) {
+        guard let suggestions else { return }
+        if let homeType = AddHomeHomeType.from(canonical: suggestions.homeType) {
+            form.details.homeType = homeType
+        }
+        if let bedrooms = suggestions.bedrooms, form.details.bedrooms.isEmpty {
+            form.details.bedrooms = String(bedrooms)
+        }
+        if let bathrooms = suggestions.bathrooms, form.details.bathrooms.isEmpty {
+            form.details.bathrooms = Self.trimTrailingZero(bathrooms)
+        }
+        if let sqFt = suggestions.sqFt, form.details.sqFt.isEmpty {
+            form.details.sqFt = String(sqFt)
+        }
+        if let lotSqFt = suggestions.lotSqFt, form.details.lotSqFt.isEmpty {
+            form.details.lotSqFt = String(lotSqFt)
+        }
+        if let yearBuilt = suggestions.yearBuilt, form.details.yearBuilt.isEmpty {
+            form.details.yearBuilt = String(yearBuilt)
+        }
+        if let description = suggestions.description,
+           !description.isEmpty,
+           form.details.description.isEmpty {
+            form.details.description = description
+        }
+    }
+
+    /// "2.0" → "2", "2.5" → "2.5".
+    private static func trimTrailingZero(_ value: Double) -> String {
+        value == value.rounded()
+            ? String(Int(value))
+            : String(value)
     }
 
     // MARK: - Address-already-claimed modal
@@ -472,26 +740,82 @@ final class AddHomeWizardViewModel: WizardModel {
             await submitExistingHomeClaim(role: role)
             return
         }
+        // Networks & codes only exist on the create path; validate them
+        // before we make a Home row we can't attach them to
+        // (RN `useHomeForm.ts:450`).
+        guard validateAccessItems() else { return }
         isSubmitting = true
         defer { isSubmitting = false }
+        let details = form.details
+        let trimmedNickname = details.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDescription = details.description.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = CreateHomeRequest(
             address: form.address.street,
             unitNumber: form.address.unit.isEmpty ? nil : form.address.unit,
             city: form.address.city,
             state: form.address.state,
             zipCode: form.address.zipCode,
-            name: role.label
+            // `createHomeSchema` requires coordinates
+            // (`backend/routes/home.js:120-124`); check-address already
+            // resolved them.
+            latitude: geocodedAddress?.latitude,
+            longitude: geocodedAddress?.longitude,
+            homeType: details.homeType.rawValue,
+            // RN falls back to the street when no nickname is typed
+            // (`useHomeForm.ts:302`).
+            name: trimmedNickname.isEmpty ? form.address.street : trimmedNickname,
+            description: trimmedDescription.isEmpty ? nil : trimmedDescription,
+            bedrooms: Int(details.bedrooms),
+            bathrooms: Double(details.bathrooms),
+            sqFt: Int(details.sqFt),
+            lotSqFt: Int(details.lotSqFt),
+            yearBuilt: Int(details.yearBuilt),
+            isOwner: role == .owner,
+            role: role.claimedRole,
+            attomPropertyDetail: propertySuggestions?.attomPropertyDetail.map { JSONEncodable($0) }
         )
         do {
             let response: CreateHomeResponse = try await api.request(
                 HomesEndpoints.create(request)
             )
             createdHomeId = response.home.id
+            await persistAccessSecrets(homeId: response.home.id)
             transition(to: .success)
         } catch {
             errorMessage = (error as? APIError)?.errorDescription
                 ?? "Couldn't add your home. Please try again."
         }
+    }
+
+    /// `POST /api/homes/:id/access` for every filled Setup row — route
+    /// `backend/routes/home.js:5735`. Mirrors RN's `finalizeCreatedHome`
+    /// (`useHomeForm.ts:321-336`): a failure here is non-fatal because
+    /// the home already exists, but we tell the user which rows to re-add
+    /// rather than dropping them silently.
+    private func persistAccessSecrets(homeId: String) async {
+        var failedLabels: [String] = []
+        for item in accessItems where item.isComplete {
+            let label = item.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let secret = item.secretValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            do {
+                _ = try await api.request(
+                    HomesEndpoints.createAccessSecret(
+                        homeId: homeId,
+                        request: CreateAccessSecretRequest(
+                            accessType: item.accessType.rawValue,
+                            label: label,
+                            secretValue: secret
+                        )
+                    )
+                ) as HomeAccessSecretResponse
+            } catch {
+                failedLabels.append(label)
+            }
+        }
+        guard !failedLabels.isEmpty else { return }
+        accessSecretWarning = "Your home was created, but we couldn't save "
+            + failedLabels.joined(separator: ", ")
+            + ". Add them again from Access codes."
     }
 
     // MARK: - Chrome derivation

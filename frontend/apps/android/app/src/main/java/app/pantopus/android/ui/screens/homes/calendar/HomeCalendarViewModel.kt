@@ -33,6 +33,8 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,6 +86,19 @@ data class ParsedCalendarEvent(
 )
 
 /**
+ * A dated agenda item after projection — either a home event or a
+ * derived task / bill / package due date. Bucketing works over these so
+ * both kinds share one grouping pass.
+ *
+ * Parity contract — mirrored in iOS `HomeCalendarViewModel.AgendaEntry`.
+ */
+data class AgendaEntry(
+    val date: Instant,
+    val isoDate: String,
+    val row: RowModel,
+)
+
+/**
  * T6.4c (P18) — drives the Home calendar surface. Fetches
  * `GET /api/homes/:id/events` and projects the response into:
  *  - a [MonthStripState] for [MonthStripHeader] (month label, 7-day
@@ -127,6 +142,15 @@ class HomeCalendarViewModel
 
         private var events: List<CalendarEventDto> = emptyList()
 
+        /**
+         * Task due-dates, bill due-dates and package expected-delivery
+         * dates plotted alongside the home events. RN's month grid does
+         * the same (`src/app/homes/[id]/calendar.tsx:48-74`) so a
+         * household can see everything that lands on a day, not just
+         * calendar entries.
+         */
+        private var derived: List<HomeCalendarDerivedItem> = emptyList()
+
         /** First (Sunday) day of the visible week. */
         private var weekAnchor: LocalDate = weekAnchorFor(clock().atZone(zone).toLocalDate())
         private var selectedIsoDate: String? = null
@@ -154,10 +178,15 @@ class HomeCalendarViewModel
                 when (val result = repo.getHomeEvents(homeId)) {
                     is NetworkResult.Success -> {
                         events = result.data.events
+                        // Events are the primary read — the three derived
+                        // feeds are best-effort side-reads that must never
+                        // fail the calendar.
+                        fetchDerived()
                         rebuild()
                     }
                     is NetworkResult.Failure -> {
                         events = emptyList()
+                        derived = emptyList()
                         _banner.value = null
                         _monthStrip.value = null
                         _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
@@ -165,6 +194,24 @@ class HomeCalendarViewModel
                 }
             }
         }
+
+        /**
+         * `GET /api/homes/:id/tasks`, `…/bills`, `…/packages`. Each is
+         * optional: a member without `tasks.view` / `finance.view` /
+         * `mailbox.view` simply gets fewer dots.
+         */
+        private suspend fun fetchDerived() =
+            coroutineScope {
+                val tasksDeferred = async { repo.getHomeTasks(homeId) }
+                val billsDeferred = async { repo.getHomeBills(homeId) }
+                val packagesDeferred = async { repo.getHomePackages(homeId) }
+                derived =
+                    HomeCalendarDerivedItem.build(
+                        tasks = (tasksDeferred.await() as? NetworkResult.Success)?.data?.tasks.orEmpty(),
+                        bills = (billsDeferred.await() as? NetworkResult.Success)?.data?.bills.orEmpty(),
+                        packages = (packagesDeferred.await() as? NetworkResult.Success)?.data?.packages.orEmpty(),
+                    )
+            }
 
         // MARK: - Mutators driven by MonthStripHeader
 
@@ -224,9 +271,20 @@ class HomeCalendarViewModel
                     )
                 }.sortedBy { it.start }
 
-            _monthStrip.value = buildMonthStripState(parsed, now)
+            // Every dated thing that belongs on this month's grid:
+            // calendar events plus task / bill / package due dates.
+            val agenda =
+                (
+                    parsed.map { AgendaEntry(it.start, it.isoDate, rowFor(it)) } +
+                        derived.mapNotNull { item ->
+                            val date = parseIsoInstant(item.dateIso) ?: return@mapNotNull null
+                            AgendaEntry(date, isoDay(date), rowForDerived(item))
+                        }
+                ).sortedBy { it.date }
 
-            if (parsed.isEmpty() && events.isEmpty()) {
+            _monthStrip.value = buildMonthStripState(agenda, now)
+
+            if (agenda.isEmpty()) {
                 _banner.value = null
                 _state.value =
                     ListOfRowsUiState.Empty(
@@ -244,9 +302,9 @@ class HomeCalendarViewModel
             val selected = selectedIsoDate
             val filtered =
                 if (selected != null) {
-                    parsed.filter { it.isoDate == selected }
+                    agenda.filter { it.isoDate == selected }
                 } else {
-                    parsed
+                    agenda
                 }
 
             if (selected != null && filtered.isEmpty()) {
@@ -289,12 +347,12 @@ class HomeCalendarViewModel
         }
 
         private fun buildMonthStripState(
-            parsed: List<ParsedCalendarEvent>,
+            entries: List<AgendaEntry>,
             now: Instant,
         ): MonthStripState {
             val dotCounts = mutableMapOf<String, Int>()
-            for (ev in parsed) {
-                dotCounts[ev.isoDate] = (dotCounts[ev.isoDate] ?: 0) + 1
+            for (entry in entries) {
+                dotCounts[entry.isoDate] = (dotCounts[entry.isoDate] ?: 0) + 1
             }
             val monthFmt = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
             val dowFmt = DateTimeFormatter.ofPattern("EEE", Locale.US)
@@ -317,10 +375,15 @@ class HomeCalendarViewModel
             )
         }
 
-        /** Bucket events into "Today / Tomorrow / day-name / Next week / Later". */
+        /**
+         * Bucket the agenda into "Today / Tomorrow / day-name / Next
+         * week / Later". Works over already-projected rows so calendar
+         * events and derived task / bill / package due dates share one
+         * grouping pass.
+         */
         @Suppress("LongParameterList")
         internal fun makeSections(
-            events: List<ParsedCalendarEvent>,
+            entries: List<AgendaEntry>,
             now: Instant,
             selectedIsoDate: String?,
         ): List<RowSection> {
@@ -335,12 +398,11 @@ class HomeCalendarViewModel
                 now.atZone(zone).toLocalDate().plusDays(14).atStartOfDay(zone).toInstant()
 
             if (selectedIsoDate != null) {
-                val rows = events.map { rowFor(it) }
                 return listOf(
                     RowSection(
                         id = "day-$selectedIsoDate",
                         header = dayHeader(selectedIsoDate),
-                        rows = rows,
+                        rows = entries.map { it.row },
                     ),
                 )
             }
@@ -351,14 +413,14 @@ class HomeCalendarViewModel
             val nextWeek = mutableListOf<RowModel>()
             val later = mutableListOf<RowModel>()
 
-            for (ev in events) {
-                if (ev.start.isBefore(todayStart)) continue
-                val row = rowFor(ev)
+            for (entry in entries) {
+                if (entry.date.isBefore(todayStart)) continue
+                val row = entry.row
                 when {
-                    ev.start.isBefore(tomorrowStart) -> today.add(row)
-                    ev.start.isBefore(dayAfterTomorrowStart) -> tomorrow.add(row)
-                    ev.start.isBefore(nextWeekStart) -> thisWeek.add(ev.start to row)
-                    ev.start.isBefore(twoWeeksOut) -> nextWeek.add(row)
+                    entry.date.isBefore(tomorrowStart) -> today.add(row)
+                    entry.date.isBefore(dayAfterTomorrowStart) -> tomorrow.add(row)
+                    entry.date.isBefore(nextWeekStart) -> thisWeek.add(entry.date to row)
+                    entry.date.isBefore(twoWeeksOut) -> nextWeek.add(row)
                     else -> later.add(row)
                 }
             }
@@ -447,6 +509,41 @@ class HomeCalendarViewModel
                 body = event.dto.description,
                 chips = chips,
                 timeMeta = timeLabel,
+            )
+        }
+
+        /**
+         * Row projection for a derived due-date. Read-only — these rows
+         * mirror surfaces that own their own screens, so tapping is a
+         * no-op exactly as in RN's calendar.
+         */
+        private fun rowForDerived(item: HomeCalendarDerivedItem): RowModel {
+            val start = parseIsoInstant(item.dateIso)
+            return RowModel(
+                id = item.id,
+                title = item.title,
+                subtitle = item.detail ?: item.kind.label,
+                template = RowTemplate.StatusChip,
+                leading =
+                    RowLeading.TypeIcon(
+                        icon = item.kind.icon,
+                        background = item.kind.background,
+                        foreground = item.kind.foreground,
+                    ),
+                trailing = RowTrailing.None,
+                chips =
+                    listOf(
+                        RowChip(
+                            text = item.kind.label,
+                            icon = item.kind.icon,
+                            tint =
+                                RowChip.Tint.Custom(
+                                    background = item.kind.background,
+                                    foreground = item.kind.foreground,
+                                ),
+                        ),
+                    ),
+                timeMeta = start?.let { formatTime(it, null) },
             )
         }
 

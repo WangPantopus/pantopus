@@ -140,4 +140,77 @@ final class PostcardVerificationViewModelTests: XCTestCase {
         vm.requestNewCode()
         XCTAssertTrue(vm.codeInput.isEmpty)
     }
+
+    // MARK: - Failure routing (RN parity)
+
+    /// Live seam — no `expectedCode`, so `verify()` hits the backend.
+    private func makeLiveVM(homeId: String = "home-1") -> PostcardVerificationViewModel {
+        PostcardVerificationViewModel(
+            homeId: homeId,
+            stage: .delivered,
+            expectedCode: nil,
+            api: APIClient(
+                environment: .current,
+                session: SequencedURLProtocol.makeSession(),
+                retryPolicy: .none
+            ),
+            submitDelayNanos: 0
+        )
+    }
+
+    func testExpiredCodeRoutesBackToTheRequestStep() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(410, body: #"{"error":"Verification code has expired. Request a new one."}"#)
+        ]
+        let vm = makeLiveVM()
+        vm.updateCode("4Q2K7B")
+        vm.verifyTapped()
+        await waitFor("needsNewCode") { vm.needsNewCode }
+        XCTAssertFalse(vm.showsCodeEntryFrame)
+        XCTAssertTrue(vm.codeInput.isEmpty)
+    }
+
+    func testTooManyAttemptsRoutesBackToTheRequestStep() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(429, body: #"{"error":"Too many attempts. Request a new code."}"#)
+        ]
+        let vm = makeLiveVM()
+        vm.updateCode("4Q2K7B")
+        vm.verifyTapped()
+        await waitFor("needsNewCode") { vm.needsNewCode }
+        XCTAssertFalse(vm.showsCodeEntryFrame)
+    }
+
+    func testAttemptsRemainingIsSurfacedOnceItGetsTight() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(400, body: #"{"error":"Invalid verification code","attempts_remaining":2}"#)
+        ]
+        let vm = makeLiveVM()
+        vm.updateCode("4Q2K7B")
+        vm.verifyTapped()
+        await waitFor("attemptsRemaining") { vm.attemptsRemaining != nil }
+        XCTAssertEqual(vm.attemptsRemaining, 2)
+        XCTAssertEqual(vm.attemptsRemainingLabel, "2 attempts remaining")
+        // A wrong-but-live code keeps the user on the entry frame.
+        XCTAssertTrue(vm.showsCodeEntryFrame)
+    }
+
+    func testRequestingAFreshCodeReturnsToTheEntryFrame() async {
+        SequencedURLProtocol.reset()
+        SequencedURLProtocol.sequence = [
+            .status(410, body: #"{"error":"Verification code has expired."}"#),
+            .status(201, body: #"{"message":"Verification postcard requested.","postcard":{"id":"pc-1"}}"#)
+        ]
+        let vm = makeLiveVM()
+        vm.updateCode("4Q2K7B")
+        vm.verifyTapped()
+        await waitFor("needsNewCode") { vm.needsNewCode }
+        XCTAssertFalse(vm.showsCodeEntryFrame)
+        vm.requestNewCode()
+        await waitFor("fresh code requested") { !vm.needsNewCode }
+        XCTAssertTrue(vm.showsCodeEntryFrame)
+    }
 }

@@ -23,6 +23,7 @@ import app.pantopus.android.data.api.models.homes.HomePublicProfileResponse
 import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomeDashboardRepository
 import app.pantopus.android.data.homes.HomesRepository
 import io.mockk.coEvery
@@ -46,12 +47,16 @@ import java.math.BigDecimal
 class HomeDashboardViewModelTest {
     private val repo: HomesRepository = mockk()
     private val intelligenceRepo: HomeDashboardRepository = mockk()
+    private val adminRepo: HomeAdminRepository = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         // Every Home Intelligence read defaults to "unavailable" so each
         // test only stubs what it asserts on.
         coEvery { intelligenceRepo.dashboard(any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
+        // No access record by default → tiles + tabs render ungated, the
+        // same fallback the VM takes on a 403 from `GET /:id/me`.
+        coEvery { adminRepo.myAccess(any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
         coEvery { intelligenceRepo.healthScore(any(), any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
         coEvery { intelligenceRepo.seasonalChecklist(any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
         coEvery { intelligenceRepo.propertyValue(any()) } returns NetworkResult.Failure(NetworkError.Forbidden)
@@ -66,6 +71,7 @@ class HomeDashboardViewModelTest {
         HomeDashboardViewModel(
             repo = repo,
             intelligenceRepo = intelligenceRepo,
+            adminRepo = adminRepo,
             savedStateHandle = SavedStateHandle(mapOf(HOME_DASHBOARD_HOME_ID_KEY to homeId)),
         )
 

@@ -100,8 +100,10 @@ public enum ClaimEvidenceSlot: String, CaseIterable, Sendable {
     public var fixedBackendType: String? {
         switch self {
         case .identity: "idv"
-        case .ownership: "deed"
-        case .residency: nil
+        // The ownership proof is one of five document kinds the
+        // claimant declares (RN `OWNERSHIP_DOC_OPTIONS`,
+        // `evidence.tsx:26-32`), so the type is user-picked, not fixed.
+        case .ownership, .residency: nil
         }
     }
 
@@ -111,12 +113,46 @@ public enum ClaimEvidenceSlot: String, CaseIterable, Sendable {
     }
 
     /// Document kinds this slot accepts. Empty for fixed slots.
-    /// Residency list copied verbatim from RN's `RESIDENCY_DOC_OPTIONS`
-    /// (`evidence.tsx:33-37`).
+    /// Ownership list copied verbatim from RN's `OWNERSHIP_DOC_OPTIONS`
+    /// (`evidence.tsx:26-32`); residency list from
+    /// `RESIDENCY_DOC_OPTIONS` (`evidence.tsx:34-38`).
     public var documentOptions: [ClaimDocumentOption] {
         switch self {
-        case .identity, .ownership:
+        case .identity:
             []
+        case .ownership:
+            [
+                ClaimDocumentOption(
+                    id: "deed",
+                    label: "Deed",
+                    detail: "Property deed or title document",
+                    icon: .fileText
+                ),
+                ClaimDocumentOption(
+                    id: "closing_disclosure",
+                    label: "Closing Disclosure",
+                    detail: "Settlement statement from purchase",
+                    icon: .fileText
+                ),
+                ClaimDocumentOption(
+                    id: "tax_bill",
+                    label: "Property Tax Statement",
+                    detail: "Tax bill showing property owner",
+                    icon: .receipt
+                ),
+                ClaimDocumentOption(
+                    id: "escrow_attestation",
+                    label: "Title/Escrow Attestation",
+                    detail: "Letter from title or escrow company",
+                    icon: .shieldCheck
+                ),
+                ClaimDocumentOption(
+                    id: "title_match",
+                    label: "Title Record Match",
+                    detail: "Public record title match",
+                    icon: .checkCircle
+                )
+            ]
         case .residency:
             [
                 ClaimDocumentOption(

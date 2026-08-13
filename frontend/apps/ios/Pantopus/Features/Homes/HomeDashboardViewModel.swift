@@ -33,6 +33,68 @@ public struct HomeDashboardContent: Sendable {
     public let tabs: [GridTabsTab]
     public let overview: HomeDashboardOverviewContent
     public let attentionSummary: HomeDashboardAttentionSummary?
+    /// Non-nil when the home is in a non-normal security state and the
+    /// banner must render above the tabs. See `HomeSecurityBannerContent`.
+    public let securityBanner: HomeSecurityBannerContent?
+
+    public init(
+        address: String,
+        verified: Bool,
+        isVerifiedOwner: Bool,
+        stats: [HomeHeroStat],
+        quickActions: [QuickActionTile],
+        tabs: [GridTabsTab],
+        overview: HomeDashboardOverviewContent,
+        attentionSummary: HomeDashboardAttentionSummary? = nil,
+        securityBanner: HomeSecurityBannerContent? = nil
+    ) {
+        self.address = address
+        self.verified = verified
+        self.isVerifiedOwner = isVerifiedOwner
+        self.stats = stats
+        self.quickActions = quickActions
+        self.tabs = tabs
+        self.overview = overview
+        self.attentionSummary = attentionSummary
+        self.securityBanner = securityBanner
+    }
+}
+
+/// Projection of the home's `security_state` guard rail onto the
+/// dashboard banner. Mirrors RN `src/components/HomeStatusBanner.tsx`
+/// (copy from `src/constants/ownershipCopy.ts`), which renders nothing
+/// for `normal` / `frozen_silent`.
+public struct HomeSecurityBannerContent: Sendable, Equatable {
+    /// Which action the CTA performs, or `.noAction` when the state has
+    /// no destination we can route to.
+    public enum Action: Sendable, Equatable {
+        case inviteCoOwner
+        case openSecuritySettings
+        case noAction
+    }
+
+    public let state: HomeSecurityState
+    public let icon: PantopusIcon
+    public let title: String
+    public let body: String
+    public let ctaLabel: String?
+    public let action: Action
+
+    public init(
+        state: HomeSecurityState,
+        icon: PantopusIcon,
+        title: String,
+        body: String,
+        ctaLabel: String?,
+        action: Action
+    ) {
+        self.state = state
+        self.icon = icon
+        self.title = title
+        self.body = body
+        self.ctaLabel = ctaLabel
+        self.action = action
+    }
 }
 
 public struct HomeDashboardOverviewContent: Sendable {
@@ -148,6 +210,11 @@ final class HomeDashboardViewModel {
     private var detailData: HomeDetail?
     private var publicData: HomePublicProfileResponse.HomePublicProfile?
     private var dashboardData: HomeDashboardResponse?
+    /// The viewer's own per-home access record. Gates the quick-action
+    /// tiles + tab strip exactly as RN gates its dashboard cards.
+    /// Best-effort: a 403 / offline read leaves this nil and the surface
+    /// renders ungated rather than blank.
+    private(set) var access: HomeAccessDTO?
 
     init(homeId: String, api: APIClient = .shared) {
         self.homeId = homeId
@@ -198,12 +265,15 @@ final class HomeDashboardViewModel {
         await trends
     }
 
-    /// Home detail (identity / ownership) + the dashboard aggregate.
+    /// Home detail (identity / ownership) + the dashboard aggregate +
+    /// the viewer's access record.
     private func fetchCore() async {
         async let detailOutcome = loadDetail()
         async let dashboard = loadDashboard()
+        async let myAccess = loadAccess()
         let outcome = await detailOutcome
         dashboardData = await dashboard
+        access = await myAccess
 
         switch outcome {
         case let .detail(home):
@@ -241,6 +311,20 @@ final class HomeDashboardViewModel {
             HomeDashboardEndpoints.dashboard(homeId: homeId),
             as: HomeDashboardResponse.self
         )
+    }
+
+    /// `GET /api/homes/:id/me` — route `backend/routes/homeIam.js:51`.
+    /// Best-effort: a 403 here means "no access record", which must not
+    /// fail the dashboard.
+    private func loadAccess() async -> HomeAccessDTO? {
+        let record = try? await api.request(
+            HomeAdminEndpoints.myAccess(homeId: homeId),
+            as: HomeAccessDTO.self
+        )
+        // The 403 body decodes into the same shape with hasAccess=false;
+        // treat that as "unknown" so the surface stays ungated.
+        guard let record, record.hasAccess else { return nil }
+        return record
     }
 
     private func fetchPublicProfile() async {
@@ -409,7 +493,11 @@ final class HomeDashboardViewModel {
                 verified: detailData.isOwner || detailData.owners.contains { $0.ownerStatus == "verified" },
                 // Banner gate: I'm the verified owner only when isOwner is
                 // true and there's no pending claim still in flight.
-                isVerifiedOwner: detailData.isOwner && !detailData.isPendingOwner
+                isVerifiedOwner: detailData.isOwner && !detailData.isPendingOwner,
+                securityBanner: Self.securityBanner(
+                    state: detailData.securityState,
+                    claimWindowEndsAt: detailData.claimWindowEndsAt
+                )
             ))
         } else if let publicData {
             state = .loaded(content(
@@ -417,7 +505,9 @@ final class HomeDashboardViewModel {
                 verified: publicData.hasVerifiedOwner,
                 // Public-profile path is hit when the user is NOT a verified
                 // owner; the private detail call returned 403/404 first.
-                isVerifiedOwner: false
+                isVerifiedOwner: false,
+                // The public preview carries no security_state column.
+                securityBanner: nil
             ))
         }
     }
@@ -425,7 +515,8 @@ final class HomeDashboardViewModel {
     private func content(
         address: String,
         verified: Bool,
-        isVerifiedOwner: Bool
+        isVerifiedOwner: Bool,
+        securityBanner: HomeSecurityBannerContent?
     ) -> HomeDashboardContent {
         let counts = dashboardData?.counts
         return HomeDashboardContent(
@@ -433,13 +524,72 @@ final class HomeDashboardViewModel {
             verified: verified,
             isVerifiedOwner: isVerifiedOwner,
             stats: HomeDashboardProjection.stats(counts: counts),
-            quickActions: HomeDashboardProjection.quickActions(counts: counts),
-            tabs: HomeDashboardProjection.tabs,
+            quickActions: HomeDashboardProjection.quickActions(counts: counts, access: access),
+            tabs: HomeDashboardProjection.gatedTabs(access: access),
             overview: HomeDashboardProjection.overview(
                 dashboard: dashboardData,
                 health: healthScore.value
             ),
-            attentionSummary: nil
+            attentionSummary: nil,
+            securityBanner: securityBanner
         )
+    }
+
+    // MARK: - Security-state banner (parity contract — mirrored in Android)
+
+    /// Pure projection of `Home.security_state` onto the dashboard
+    /// banner. Copy is lifted verbatim from RN's `ownershipCopy.ts`
+    /// (`CLAIM_WINDOW` / `REVIEW_REQUIRED` / `DISPUTE` / `FROZEN`) and the
+    /// render gate matches `HomeStatusBanner.tsx:33` — `normal` and
+    /// `frozen_silent` render nothing.
+    static func securityBanner(
+        state: HomeSecurityState,
+        claimWindowEndsAt: String?
+    ) -> HomeSecurityBannerContent? {
+        switch state {
+        case .normal, .frozenSilent:
+            return nil
+        case .claimWindow:
+            let date = HomeOwnershipSecurityViewModel.formattedDate(claimWindowEndsAt)
+            return HomeSecurityBannerContent(
+                state: state,
+                icon: .clock,
+                title: "Claim Window Active",
+                body: date.map { "Co-owners can verify ownership until \($0)." }
+                    ?? "Co-owners can verify ownership while the window is open.",
+                ctaLabel: "Invite Co-Owner",
+                action: .inviteCoOwner
+            )
+        case .reviewRequired:
+            return HomeSecurityBannerContent(
+                state: state,
+                icon: .shield,
+                title: "Review Required",
+                body: "New owner claims require manual review.",
+                ctaLabel: "Learn Why",
+                action: .openSecuritySettings
+            )
+        case .disputed:
+            return HomeSecurityBannerContent(
+                state: state,
+                icon: .alertTriangle,
+                title: "Verification dispute active",
+                body: "Some sensitive actions are temporarily restricted.",
+                ctaLabel: "View Details",
+                action: .openSecuritySettings
+            )
+        case .frozen:
+            // RN renders a "Contact support" label with no handler
+            // (`HomeStatusBanner.tsx:68-72`); we ship the copy without a
+            // dead button rather than a control that does nothing.
+            return HomeSecurityBannerContent(
+                state: state,
+                icon: .lock,
+                title: "Home protections enabled",
+                body: "Some actions require support.",
+                ctaLabel: nil,
+                action: .noAction
+            )
+        }
     }
 }

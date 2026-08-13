@@ -15,10 +15,12 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
+import app.pantopus.android.data.api.models.homes.ClaimRoutingClassification
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.UploadEvidenceRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
+import app.pantopus.android.data.homes.HomeOwnershipClaimRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
@@ -57,7 +59,8 @@ data class ClaimOwnershipUiState(
     val verificationType: ClaimVerificationType = ClaimVerificationType.Owner,
     /**
      * Selected `evidence_type` for slots that accept several document
-     * kinds (residency). `null` until the user picks one.
+     * kinds (ownership proof / residency proof). `null` until the user
+     * picks one on the residency path.
      */
     val selectedDocumentType: String? = null,
     val startContent: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
@@ -93,6 +96,19 @@ data class ClaimOwnershipUiState(
      * Find-or-Add-Home discovery route.
      */
     val blockedByOtherClaimPrompt: String? = null,
+    /**
+     * Non-null when the backend's `routing_classification` needs the
+     * claimant to acknowledge something before their evidence goes up.
+     * The screen renders it as a single-action "Continue" dialog,
+     * matching RN's blocking `Alert.alert(…, [{ text: 'Continue' }])`
+     * (`claim-owner/evidence.tsx:223-241`).
+     */
+    val routingWarning: ClaimRoutingWarning? = null,
+    /**
+     * Extra line on the success step describing what the submission
+     * actually did — a parallel claim, or a challenge that opened.
+     */
+    val submissionOutcomeNote: String? = null,
 ) {
     /**
      * Only render the "ask a verified owner" option when the home has a
@@ -131,6 +147,17 @@ data class ClaimOwnershipUiState(
 }
 
 /**
+ * One blocking acknowledgement the claimant must clear before their
+ * evidence is uploaded.
+ *
+ * Parity contract — mirrored in iOS `ClaimRoutingWarning`.
+ */
+data class ClaimRoutingWarning(
+    val title: String,
+    val message: String,
+)
+
+/**
  * Drives the 3-step claim-ownership wizard. Calls:
  *  1. `POST /api/homes/:id/ownership-claims` to create the claim
  *  2. For each evidence file:
@@ -151,6 +178,7 @@ open class ClaimOwnershipWizardViewModel
     constructor(
         private val repository: HomesRepository,
         private val discoveryRepository: HomeDiscoveryRepository,
+        private val claimRepository: HomeOwnershipClaimRepository,
         private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel(),
@@ -180,6 +208,13 @@ open class ClaimOwnershipWizardViewModel
                 ClaimOwnershipUiState(
                     currentStep = verificationType.steps.first(),
                     verificationType = verificationType,
+                    // Residency forces an explicit pick (RN
+                    // `evidence.tsx:162`). The owner variant starts on
+                    // `deed` — the type this wizard sent before the
+                    // five-option picker existed — and the claimant can
+                    // switch to any other ownership document kind.
+                    selectedDocumentType =
+                        if (verificationType == ClaimVerificationType.Owner) "deed" else null,
                     startContent = ClaimOwnershipSampleData.startContent(homeId),
                 ),
             )
@@ -194,6 +229,18 @@ open class ClaimOwnershipWizardViewModel
          * create a duplicate claim row server-side.
          */
         private var pendingClaimId: String? = null
+
+        /**
+         * `routing_classification` from the claim POST, held across the
+         * warning round-trip and the challenge activation.
+         */
+        private var routingClassification: String? = null
+
+        /**
+         * True once the user tapped "Continue" on the routing warning,
+         * so a resumed submit doesn't re-prompt.
+         */
+        private var acknowledgedRoutingWarning: Boolean = false
 
         /**
          * File URLs successfully pushed through `/api/files/upload` whose
@@ -387,7 +434,7 @@ open class ClaimOwnershipWizardViewModel
             _state.update { it.copy(note = value) }
         }
 
-        /** Picks the `evidence_type` for the residency slot. */
+        /** Picks the `evidence_type` for the active chooser slot. */
         fun selectDocumentType(id: String) {
             if (_state.value.documentOptions.none { it.id == id }) return
             _state.update { it.copy(selectedDocumentType = id, submitError = null) }
@@ -464,8 +511,22 @@ open class ClaimOwnershipWizardViewModel
                             return
                         }
                     pendingClaimId = resolvedId
+                    routingClassification = envelope.routingClassification
                     resolvedId
                 }
+
+            // Step 1b: surface the backend's routing verdict before
+            // anything is uploaded. RN blocks on the same two alerts
+            // (`claim-owner/evidence.tsx:223-241`) and only continues
+            // once the claimant taps "Continue". Residency claims skip
+            // both.
+            if (verificationType != ClaimVerificationType.Residency && !acknowledgedRoutingWarning) {
+                val warning = routingWarningFor(routingClassification)
+                if (warning != null) {
+                    _state.update { it.copy(isSubmitting = false, routingWarning = warning) }
+                    return
+                }
+            }
 
             // Step 2: upload each slot's bytes, then register the URL as
             // evidence. Skip slots already fully uploaded and reuse any
@@ -527,9 +588,45 @@ open class ClaimOwnershipWizardViewModel
                 }
             }
 
+            // Step 3: a challenge-classified claim backed by a strong
+            // ownership document opens a formal challenge against the
+            // verified household. RN does the same at
+            // `claim-owner/evidence.tsx:285-297`; failures are non-fatal
+            // (the backend 409s when the evidence isn't strong enough).
+            var challengeOpened = false
+            val hasStrongDoc =
+                current.activeSlots.any { slot ->
+                    current.evidenceTypeFor(slot) in STRONG_CHALLENGE_DOCS
+                }
+            if (verificationType != ClaimVerificationType.Residency &&
+                routingClassification == ClaimRoutingClassification.CHALLENGE_CLAIM &&
+                hasStrongDoc
+            ) {
+                challengeOpened =
+                    claimRepository.challengeClaim(homeId, claimId) is NetworkResult.Success
+            }
+
             Analytics.track(AnalyticsEvent.CtaClaimOwnershipSubmit(AnalyticsResult.SUCCESS))
-            _state.update { it.copy(isSubmitting = false) }
+            _state.update {
+                it.copy(
+                    isSubmitting = false,
+                    submissionOutcomeNote = outcomeNote(routingClassification, challengeOpened),
+                )
+            }
             transitionTo(ClaimOwnershipStep.Success)
+        }
+
+        /**
+         * "Continue" on the routing warning — resume the same submit
+         * with the already-created claim id.
+         */
+        fun acknowledgeRoutingWarning() {
+            // Idempotent: the dialog fires both `onConfirm` and
+            // `onDismissRequest`, and a second resume would re-run submit.
+            if (_state.value.routingWarning == null) return
+            _state.update { it.copy(routingWarning = null) }
+            acknowledgedRoutingWarning = true
+            viewModelScope.launch { submit() }
         }
 
         private fun failSubmit() {
@@ -631,6 +728,57 @@ open class ClaimOwnershipWizardViewModel
 
         companion object {
             private const val HTTP_CONFLICT = 409
+
+            /**
+             * Evidence types strong enough to challenge a verified
+             * household. Copied from RN's `STRONG_CHALLENGE_DOCS`
+             * (`src/app/homes/[id]/claim-owner/evidence.tsx:40`).
+             */
+            val STRONG_CHALLENGE_DOCS =
+                setOf("deed", "closing_disclosure", "escrow_attestation", "title_match")
+
+            /**
+             * Pre-upload warning copy per `routing_classification`.
+             * Verbatim from RN (`claim-owner/evidence.tsx:223-241`).
+             *
+             * Parity contract — mirrored in iOS
+             * `ClaimOwnershipWizardViewModel.routingWarning(for:)`.
+             */
+            fun routingWarningFor(classification: String?): ClaimRoutingWarning? =
+                when (classification) {
+                    ClaimRoutingClassification.PARALLEL_CLAIM ->
+                        ClaimRoutingWarning(
+                            title = "Another claim is pending",
+                            message =
+                                "Another person has a pending claim on this address. You can still " +
+                                    "submit your own claim. If you are part of the same household, " +
+                                    "the verified occupant may be able to invite you later.",
+                        )
+                    ClaimRoutingClassification.CHALLENGE_CLAIM ->
+                        ClaimRoutingWarning(
+                            title = "Verified household exists",
+                            message =
+                                "This address already has a verified household. You can still " +
+                                    "submit ownership proof. If your documents are stronger, your " +
+                                    "claim can challenge the current verification.",
+                        )
+                    else -> null
+                }
+
+            /** Success-step note describing what the submission did. */
+            fun outcomeNote(
+                classification: String?,
+                challengeOpened: Boolean,
+            ): String? =
+                when {
+                    challengeOpened ->
+                        "Your documents were strong enough to challenge the current verified " +
+                            "household. A reviewer will compare both sets of evidence."
+                    classification == ClaimRoutingClassification.PARALLEL_CLAIM ->
+                        "Another person also has a pending claim on this address. Both claims " +
+                            "will be reviewed."
+                    else -> null
+                }
 
             private const val BLOCKED_BY_OTHER_CLAIM_COPY =
                 "Someone else's verification is already in progress for this home, so you can't " +

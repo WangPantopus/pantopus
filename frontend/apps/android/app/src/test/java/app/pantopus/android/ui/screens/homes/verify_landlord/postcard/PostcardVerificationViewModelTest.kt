@@ -3,8 +3,13 @@
 package app.pantopus.android.ui.screens.homes.verify_landlord.postcard
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.PostcardInfoDto
+import app.pantopus.android.data.api.models.homes.RequestPostcardResponse
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.ui.screens.homes.verify_landlord.VerifyLandlordSubmitState
+import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -145,6 +150,98 @@ class PostcardVerificationViewModelTest {
         vm.requestNewCode()
         assertEquals("", vm.state.value.codeInput)
     }
+
+    // MARK: - Failure routing (RN parity)
+
+    /** Live seam: no `expectedCode`, so `verify()` hits the repository. */
+    private class LiveVm(
+        handle: SavedStateHandle,
+        repo: HomeVerificationRepository,
+    ) : PostcardVerificationViewModel(handle, repo) {
+        override val submitDelayMillis: Long = 0L
+        override val expectedCode: String? = null
+    }
+
+    private fun liveVm(repo: HomeVerificationRepository): LiveVm =
+        LiveVm(SavedStateHandle(mapOf(POSTCARD_VERIFICATION_HOME_ID_KEY to "home-1")), repo)
+
+    @Test fun expired_code_routes_back_to_the_request_step() =
+        runTest {
+            val repo: HomeVerificationRepository = mockk()
+            coEvery { repo.verifyPostcard(any(), any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(
+                        410,
+                        """{"error":"Verification code has expired. Request a new one."}""",
+                    ),
+                )
+            val vm = liveVm(repo)
+            vm.markHasCode()
+            vm.updateCode("4Q2K7B")
+            vm.verifyTapped()
+            assertTrue(vm.state.value.needsNewCode)
+            assertFalse(vm.state.value.showsCodeEntryFrame)
+            assertEquals("", vm.state.value.codeInput)
+        }
+
+    @Test fun too_many_attempts_routes_back_to_the_request_step() =
+        runTest {
+            val repo: HomeVerificationRepository = mockk()
+            coEvery { repo.verifyPostcard(any(), any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(429, """{"error":"Too many attempts. Request a new code."}"""),
+                )
+            val vm = liveVm(repo)
+            vm.markHasCode()
+            vm.updateCode("4Q2K7B")
+            vm.verifyTapped()
+            assertTrue(vm.state.value.needsNewCode)
+            assertFalse(vm.state.value.showsCodeEntryFrame)
+        }
+
+    @Test fun attempts_remaining_is_surfaced_once_it_gets_tight() =
+        runTest {
+            val repo: HomeVerificationRepository = mockk()
+            coEvery { repo.verifyPostcard(any(), any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(
+                        400,
+                        """{"error":"Invalid verification code","attempts_remaining":2}""",
+                    ),
+                )
+            val vm = liveVm(repo)
+            vm.markHasCode()
+            vm.updateCode("4Q2K7B")
+            vm.verifyTapped()
+            assertEquals(2, vm.state.value.attemptsRemaining)
+            assertEquals("2 attempts remaining", vm.state.value.attemptsRemainingLabel)
+            // A wrong-but-live code keeps the user on the entry frame.
+            assertTrue(vm.state.value.showsCodeEntryFrame)
+        }
+
+    @Test fun requesting_a_fresh_code_returns_to_the_entry_frame() =
+        runTest {
+            val repo: HomeVerificationRepository = mockk()
+            coEvery { repo.verifyPostcard(any(), any()) } returns
+                NetworkResult.Failure(
+                    NetworkError.ClientError(410, """{"error":"Verification code has expired."}"""),
+                )
+            coEvery { repo.requestPostcard(any()) } returns
+                NetworkResult.Success(
+                    RequestPostcardResponse(
+                        message = "Verification postcard requested.",
+                        postcard = PostcardInfoDto(id = "pc-1", expiresAt = null),
+                    ),
+                )
+            val vm = liveVm(repo)
+            vm.markHasCode()
+            vm.updateCode("4Q2K7B")
+            vm.verifyTapped()
+            assertFalse(vm.state.value.showsCodeEntryFrame)
+            vm.requestNewCode()
+            assertFalse(vm.state.value.needsNewCode)
+            assertTrue(vm.state.value.showsCodeEntryFrame)
+        }
 
     // MARK: - Outbound dismiss
 

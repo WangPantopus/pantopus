@@ -2440,6 +2440,18 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             // category.
                             navController.navigate(ChildRoutes.composeGig(categoryKey))
                         },
+                        onAddTask = { homeId ->
+                            navController.navigate(ChildRoutes.addHouseholdTask(homeId))
+                        },
+                        onTrackBill = { homeId ->
+                            navController.navigate(ChildRoutes.addBill(homeId))
+                        },
+                        onTrackPackage = { homeId ->
+                            navController.navigate(ChildRoutes.logPackage(homeId))
+                        },
+                        onSendMail = {
+                            navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
+                        },
                     )
                 }
                 composable(
@@ -4838,6 +4850,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     navController.navigate(ChildRoutes.claimOwnership(nav.homeId))
                                 is WaitingRoomNav.CancelClaim ->
                                     navController.navigate(ChildRoutes.cancelClaim(nav.homeId))
+                                // Verification Center action cards.
+                                is WaitingRoomNav.VerifyPostcard ->
+                                    navController.navigate(ChildRoutes.postcardVerification(nav.homeId))
+                                is WaitingRoomNav.UploadProof ->
+                                    navController.navigate(ChildRoutes.verifyResidency(nav.homeId))
+                                is WaitingRoomNav.LandlordVerification ->
+                                    navController.navigate(ChildRoutes.verifyLandlord(nav.homeId))
+                                is WaitingRoomNav.LeaveHome ->
+                                    navController.navigate(ChildRoutes.leaveHome(nav.homeId))
+                                WaitingRoomNav.RequestHelp ->
+                                    navController.navigate(ChildRoutes.SETTINGS_HELP)
                             }
                         },
                     )

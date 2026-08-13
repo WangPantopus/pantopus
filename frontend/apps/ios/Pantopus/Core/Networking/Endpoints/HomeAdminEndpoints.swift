@@ -40,6 +40,26 @@ public enum HomeAdminEndpoints {
         Endpoint(method: .get, path: "/api/homes/\(homeId)/me")
     }
 
+    // MARK: - Audit log
+
+    /// `GET /api/homes/:id/audit-log` — route `backend/routes/homeIam.js:602`.
+    ///
+    /// Who did what to the household, newest first. Requires
+    /// `members.manage` (403 otherwise), joins the actor `User` row, and
+    /// responds `{ entries }`. `limit` / `offset` default to 50 / 0
+    /// server-side; we send them explicitly so the page size is stable.
+    public static func auditLog(
+        homeId: String,
+        limit: Int = 50,
+        offset: Int = 0
+    ) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/homes/\(homeId)/audit-log",
+            query: ["limit": "\(limit)", "offset": "\(offset)"]
+        )
+    }
+
     // MARK: - Member role
 
     /// `POST /api/homes/:id/members/:userId/role` — route

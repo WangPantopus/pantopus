@@ -94,6 +94,24 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
     /// the Find-or-Add-Home discovery route.
     private(set) var blockedByOtherClaimPrompt: String?
 
+    /// Non-nil when the backend's `routing_classification` needs the
+    /// claimant to acknowledge something before their evidence goes up.
+    /// The view renders it as a single-action "Continue" alert, matching
+    /// RN's blocking `Alert.alert(…, [{ text: 'Continue' }])`
+    /// (`claim-owner/evidence.tsx:223-241`).
+    private(set) var routingWarning: ClaimRoutingWarning?
+
+    /// Extra line on the success step describing what the submission
+    /// actually did — a parallel claim, or a challenge that opened.
+    private(set) var submissionOutcomeNote: String?
+
+    /// `routing_classification` from the claim POST, held across the
+    /// warning round-trip and the challenge activation.
+    private var routingClassification: String?
+    /// True once the user tapped "Continue" on the routing warning, so a
+    /// resumed submit doesn't re-prompt.
+    private var acknowledgedRoutingWarning = false
+
     /// RN sends different copy per variant
     /// (`claim-owner/evidence.tsx:206-212`).
     private var blockedByOtherClaimCopy: String {
@@ -147,7 +165,13 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
         currentStep = verificationType.steps.first ?? .start
         // Residency's single slot accepts three document kinds; RN forces
         // an explicit pick (`evidence.tsx:162`), so we start unselected.
-        selectedDocumentType = nil
+        //
+        // The owner variant carries a second, fixed "Government ID" slot
+        // alongside the ownership proof, so its picker starts on `deed` —
+        // the type this wizard sent before the picker existed. The
+        // claimant can switch to any of the other four ownership document
+        // kinds (RN `OWNERSHIP_DOC_OPTIONS`, `evidence.tsx:26-32`).
+        selectedDocumentType = verificationType == .owner ? "deed" : nil
     }
 
     /// Slots this run requires — `verificationType.slots`.
@@ -464,6 +488,18 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
             }
             claimId = id
             pendingClaimId = id
+            routingClassification = claimResponse.claim.routingClassification
+        }
+
+        // Step 1b: surface the backend's routing verdict before anything
+        // is uploaded. RN blocks on the same two alerts
+        // (`claim-owner/evidence.tsx:223-241`) and only continues once
+        // the claimant taps "Continue". Residency claims skip both.
+        if verificationType != .residency,
+           !acknowledgedRoutingWarning,
+           let warning = Self.routingWarning(for: routingClassification) {
+            routingWarning = warning
+            return
         }
 
         // Step 2: upload each slot's file then register evidence. Skip
@@ -518,12 +554,105 @@ final class ClaimOwnershipWizardViewModel: WizardModel {
             }
         }
 
+        // Step 3: a challenge-classified claim backed by a strong
+        // ownership document opens a formal challenge against the
+        // verified household. RN does the same at
+        // `claim-owner/evidence.tsx:285-297`; failures are non-fatal
+        // (the backend 409s when the evidence isn't strong enough).
+        var challengeOpened = false
+        if verificationType != .residency,
+           routingClassification == SubmitClaimResponse.RoutingClassification.challengeClaim,
+           activeSlots.contains(where: { Self.strongChallengeDocs.contains(evidenceType(for: $0)) }) {
+            do {
+                _ = try await api.request(
+                    HomeOwnershipClaimEndpoints.challenge(homeId: homeId, claimId: claimId)
+                ) as ChallengeClaimResponse
+                challengeOpened = true
+            } catch {
+                logger.warning("Challenge activation skipped: \(error)")
+            }
+        }
+        submissionOutcomeNote = Self.outcomeNote(
+            routingClassification: routingClassification,
+            challengeOpened: challengeOpened
+        )
+
         // All uploads succeeded — advance to success.
         Analytics.track(.ctaClaimOwnershipSubmit(result: .success))
         currentStep = .success
     }
 
+    /// "Continue" on the routing warning — resume the same submit with
+    /// the already-created claim id.
+    func acknowledgeRoutingWarning() {
+        // Idempotent: SwiftUI fires both the button action and the
+        // binding's dismiss, and a second resume would re-run submit.
+        guard routingWarning != nil else { return }
+        routingWarning = nil
+        acknowledgedRoutingWarning = true
+        Task { await submit() }
+    }
+
     func acknowledgePendingEvent() {
         pendingEvent = nil
+    }
+
+    // MARK: - Routing classification (parity contract — mirrored in Android)
+
+    /// Evidence types strong enough to challenge a verified household.
+    /// Copied from RN's `STRONG_CHALLENGE_DOCS`
+    /// (`src/app/homes/[id]/claim-owner/evidence.tsx:40`).
+    static let strongChallengeDocs: Set<String> = [
+        "deed", "closing_disclosure", "escrow_attestation", "title_match"
+    ]
+
+    /// Pre-upload warning copy per `routing_classification`. Verbatim
+    /// from RN (`claim-owner/evidence.tsx:223-241`).
+    static func routingWarning(for classification: String?) -> ClaimRoutingWarning? {
+        switch classification {
+        case SubmitClaimResponse.RoutingClassification.parallelClaim:
+            ClaimRoutingWarning(
+                title: "Another claim is pending",
+                message: "Another person has a pending claim on this address. You can still submit "
+                    + "your own claim. If you are part of the same household, the verified occupant "
+                    + "may be able to invite you later."
+            )
+        case SubmitClaimResponse.RoutingClassification.challengeClaim:
+            ClaimRoutingWarning(
+                title: "Verified household exists",
+                message: "This address already has a verified household. You can still submit "
+                    + "ownership proof. If your documents are stronger, your claim can challenge "
+                    + "the current verification."
+            )
+        default:
+            nil
+        }
+    }
+
+    /// Success-step note describing what the submission actually did.
+    static func outcomeNote(
+        routingClassification: String?,
+        challengeOpened: Bool
+    ) -> String? {
+        if challengeOpened {
+            return "Your documents were strong enough to challenge the current verified household. "
+                + "A reviewer will compare both sets of evidence."
+        }
+        if routingClassification == SubmitClaimResponse.RoutingClassification.parallelClaim {
+            return "Another person also has a pending claim on this address. Both claims will be reviewed."
+        }
+        return nil
+    }
+}
+
+/// One blocking acknowledgement the claimant must clear before their
+/// evidence is uploaded.
+public struct ClaimRoutingWarning: Sendable, Equatable {
+    public let title: String
+    public let message: String
+
+    public init(title: String, message: String) {
+        self.title = title
+        self.message = message
     }
 }

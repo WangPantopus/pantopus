@@ -25,6 +25,21 @@ public enum WaitingRoomNav: Sendable, Hashable {
     case viewClaim(claimId: String)
     case updateEvidence(homeId: String, claimId: String)
     case cancelClaim(homeId: String)
+
+    // MARK: Verification Center intents
+
+    /// A12.7 postcard screen — "Enter verification code" / "Verify with
+    /// a mailed code".
+    case verifyPostcard(homeId: String)
+    /// Residency-evidence wizard — "Upload proof".
+    case uploadProof(homeId: String)
+    /// A12 landlord-verification wizard.
+    case landlordVerification(homeId: String)
+    /// "This isn't my home" — the existing Leave home confirm, which
+    /// owns `POST /api/homes/:id/move-out`.
+    case leaveHome(homeId: String)
+    /// "Request help" — Help Center.
+    case requestHelp
 }
 
 @Observable
@@ -81,7 +96,7 @@ public final class WaitingRoomViewModel {
             )
             guard let claim = claimsResponse.claims.first(where: { $0.homeId == homeId }) else {
                 claimId = nil
-                phase = .notice(.noClaim)
+                await applyVerificationFallback()
                 return
             }
             claimId = claim.id
@@ -114,6 +129,49 @@ public final class WaitingRoomViewModel {
         } catch {
             logger.warning("waitingRoom.load failed: \(error.localizedDescription)")
             phase = .notice(.loadFailed)
+        }
+    }
+
+    /// No claim row for this home. RN serves the Verification Center on
+    /// this same route, branching on `verification_status` from
+    /// `GET /api/homes/:id/me` (`src/app/homes/[id]/waiting-room.tsx:26-70`).
+    /// Only when the caller *is* verified (or the call fails) do we fall
+    /// back to the "No claim in review" notice.
+    private func applyVerificationFallback() async {
+        guard let access = try? await api.request(
+            HomeAdminEndpoints.myAccess(homeId: homeId),
+            as: HomeVerificationAccessDTO.self
+        ), access.hasAccess, access.needsVerification else {
+            phase = .notice(.noClaim)
+            return
+        }
+        phase = .verification(
+            HomeVerificationContent.make(
+                status: HomeVerificationStatus.from(raw: access.verificationStatus),
+                isInChallengeWindow: access.isInChallengeWindow,
+                challengeWindowEndsAt: access.challengeWindowEndsAt,
+                postcardExpiresAt: access.postcardExpiresAt
+            )
+        )
+    }
+
+    /// Route one Verification Center action card. Keys are declared on
+    /// `HomeVerificationContent.ActionKey`.
+    public func handleVerificationAction(_ action: HomeVerificationAction) {
+        switch action.actionKey {
+        case HomeVerificationContent.ActionKey.enterCode,
+             HomeVerificationContent.ActionKey.requestMailedCode:
+            pendingNav = .verifyPostcard(homeId: homeId)
+        case HomeVerificationContent.ActionKey.uploadProof:
+            pendingNav = .uploadProof(homeId: homeId)
+        case HomeVerificationContent.ActionKey.landlordVerification:
+            pendingNav = .landlordVerification(homeId: homeId)
+        case HomeVerificationContent.ActionKey.moveOut:
+            pendingNav = .leaveHome(homeId: homeId)
+        case HomeVerificationContent.ActionKey.requestHelp:
+            pendingNav = .requestHelp
+        default:
+            log("verification.\(action.actionKey)")
         }
     }
 

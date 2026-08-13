@@ -69,6 +69,7 @@ public struct PostcardVerificationView: View {
             PostcardHero(
                 stage: viewModel.stage,
                 codeEntryMode: viewModel.showsCodeEntryFrame,
+                needsNewCode: viewModel.needsNewCode,
                 deliveredOn: viewModel.content.deliveredOn
             )
             PostcardStatusTimeline(
@@ -113,7 +114,7 @@ public struct PostcardVerificationView: View {
 
     private var stickyDock: some View {
         VStack(spacing: Spacing.s2) {
-            if !viewModel.showsCodeEntryFrame {
+            if !viewModel.showsCodeEntryFrame, !viewModel.needsNewCode {
                 HStack(spacing: Spacing.s1) {
                     Icon(.bell, size: 12, color: Theme.Color.appTextSecondary)
                     Text("You'll be notified the moment it's delivered")
@@ -205,6 +206,10 @@ private struct PostcardHero: View {
     /// the enter-your-code copy even while the timeline still reads
     /// "in transit".
     let codeEntryMode: Bool
+    /// True when the backend retired the pending code (expired / too
+    /// many attempts / none pending) and the only way forward is a
+    /// fresh mailing.
+    let needsNewCode: Bool
     let deliveredOn: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -265,11 +270,15 @@ private struct PostcardHero: View {
     }
 
     private var headline: String {
-        codeEntryMode ? "Enter the code from the card" : "Your card is on the way"
+        if needsNewCode { return "Request a new code" }
+        return codeEntryMode ? "Enter the code from the card" : "Your card is on the way"
     }
 
     private var subcopy: String {
-        codeEntryMode
+        if needsNewCode {
+            return "That code is no longer valid. We'll mail a fresh one to this address."
+        }
+        return codeEntryMode
             ? "6 characters, printed on the left side. Case doesn't matter."
             : "We'll push you a notification when it lands — or enter the code now if you already have it."
     }

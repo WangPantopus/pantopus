@@ -188,9 +188,15 @@ final class PostcardVerificationViewModel {
     }
 
     /// Whether the screen renders the "enter your code" frame rather
-    /// than the waiting-for-delivery frame.
+    /// than the waiting-for-delivery / request-a-code frame.
+    ///
+    /// `needsNewCode` wins: once the backend says the pending code is
+    /// gone (404 / 410 expired / 429 too many attempts) RN drops the
+    /// user back on the request step
+    /// (`src/app/homes/[id]/verify-postcard.tsx:79-82`), so typing into
+    /// a dead code field is never the foreground affordance.
     var showsCodeEntryFrame: Bool {
-        hasCodeInHand || stage == .delivered
+        !needsNewCode && (hasCodeInHand || stage == .delivered)
     }
 
     /// Whether the primary CTA fires. Mirrors RN: a full-length code is
@@ -225,6 +231,9 @@ final class PostcardVerificationViewModel {
     /// the code-entry frame without waiting on the delivery timeline.
     func markHasCode() {
         hasCodeInHand = true
+        // RN's request step routes straight to `enter` — the user says
+        // they're holding a card, so stop insisting on a new one.
+        needsNewCode = false
         notice = nil
     }
 
@@ -280,6 +289,10 @@ final class PostcardVerificationViewModel {
                 as: RequestPostcardResponse.self
             )
             needsNewCode = false
+            // RN's `handleRequestCode` drops the user on the enter-code
+            // step once the mailer accepts the request
+            // (`verify-postcard.tsx:45`).
+            hasCodeInHand = true
             submitState = .idle
             codeExpiresOn = Self.formatExpiry(response.postcard.expiresAt)
             notice = PostcardNotice(text: response.message, isError: false)

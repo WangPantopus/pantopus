@@ -15,6 +15,11 @@
 //  explicit `frame` keeps the view-model local (the preview / snapshot
 //  seam) and reproduces the original sample frames verbatim.
 //
+//  The one mutation this screen owns is the inline rename on the
+//  identity card — RN's nickname editor
+//  (`src/app/homes/[id]/settings/index.tsx:89-108`) — which PATCHes
+//  `/api/homes/:id`. Everything else is still navigation.
+//
 
 import Foundation
 import Observation
@@ -61,6 +66,22 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
     /// Established vs newly-claimed shape. Seeded for previews; derived
     /// from `isPendingOwner` / `pendingClaimId` on the live path.
     private var frame: HomeSettingsSampleData.Frame
+
+    // MARK: - Inline rename (RN nickname editor)
+
+    /// True when the viewer may rename this home. Mirrors RN's `canEdit`
+    /// (`settings/index.tsx:47`): owner, or an IAM role/permission that
+    /// carries `home.edit`. The backend enforces the same gate on
+    /// `PATCH /api/homes/:id` (`home.js:3110`).
+    public private(set) var canEditHome = false
+    /// True while the identity card renders the text field instead of
+    /// the home name.
+    public private(set) var isRenaming = false
+    /// Draft the text field binds to.
+    public var renameDraft = ""
+    public private(set) var isSavingName = false
+    /// Inline error under the field when the PATCH fails.
+    public private(set) var renameError: String?
 
     /// Non-nil → preview / test seam (project the sample frame, no fetch).
     private let sampleFrame: HomeSettingsSampleData.Frame?
@@ -133,8 +154,8 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
 
         state = .loading
         do {
-            // Member counts are best-effort — a roster failure still lets
-            // the identity card + navigation render.
+            // Member counts + viewer access are best-effort — a failure on
+            // either still lets the identity card + navigation render.
             async let detailRequest = client.request(
                 HomesEndpoints.detail(homeId: homeId),
                 as: HomeDetailResponse.self
@@ -143,14 +164,74 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
                 HomesEndpoints.listOccupants(homeId: homeId),
                 as: OccupantsResponse.self
             )
+            async let accessResult = client.perform(
+                HomeAdminEndpoints.myAccess(homeId: homeId),
+                as: HomeAccessDTO.self
+            )
             let detail = try await detailRequest
             let occupants = try? await (occupantsResult).get()
-            apply(detail: detail.home, occupants: occupants)
+            let access = try? await (accessResult).get()
+            apply(detail: detail.home, occupants: occupants, access: access)
             state = .loaded(groups())
         } catch {
             state = .error(message: "We couldn't load this home's settings. Check your connection and try again.")
         }
     }
+
+    // MARK: - Inline rename
+
+    /// Swap the identity card's name for the text field. No-op when the
+    /// viewer can't edit — RN disables the row the same way.
+    public func beginRenaming() {
+        guard canEditHome, !isSavingName else { return }
+        renameDraft = identity.homeName
+        renameError = nil
+        isRenaming = true
+    }
+
+    /// Discard the draft and drop back to the read-only name — RN's
+    /// close button (`settings/index.tsx:103`).
+    public func cancelRenaming() {
+        isRenaming = false
+        renameDraft = identity.homeName
+        renameError = nil
+    }
+
+    /// `PATCH /api/homes/:id` with the trimmed draft, then re-read the
+    /// home so every derived caption follows the new name.
+    public func saveRenaming() async {
+        let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canEditHome, !isSavingName else { return }
+        guard !trimmed.isEmpty else {
+            renameError = "Enter a name for this home."
+            return
+        }
+        guard trimmed.count <= Self.nameMaxLength else {
+            renameError = "Keep the name under \(Self.nameMaxLength) characters."
+            return
+        }
+        isSavingName = true
+        renameError = nil
+        defer { isSavingName = false }
+        do {
+            _ = try await client.request(
+                HomeSettingsEndpoints.updateHome(
+                    homeId: homeId,
+                    request: UpdateHomeRequest(name: trimmed)
+                ),
+                as: UpdateHomeResponse.self
+            )
+            isRenaming = false
+            await load()
+        } catch {
+            renameError = (error as? APIError)?.errorDescription
+                ?? "Couldn't rename this home. Try again."
+        }
+    }
+
+    /// `updateHomeSchema`'s `name: Joi.string().max(120)`
+    /// (`backend/routes/home.js:143`).
+    static let nameMaxLength = 120
 
     public func tapRow(_ rowId: String) async {
         guard let route = Self.routeByRowId[rowId] else { return }
@@ -163,9 +244,10 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
 
     // MARK: - Live mapping
 
-    private func apply(detail: HomeDetail, occupants: OccupantsResponse?) {
+    private func apply(detail: HomeDetail, occupants: OccupantsResponse?, access: HomeAccessDTO?) {
         let isPending = detail.isPendingOwner || detail.pendingClaimId != nil
         frame = isPending ? .pending : .populated
+        canEditHome = Self.canEdit(detail: detail, access: access)
 
         let homeName = detail.base.name?.nonEmpty
             ?? detail.base.address?.nonEmpty
@@ -182,6 +264,17 @@ public final class HomeSettingsViewModel: GroupedListDataSource {
         resolved.propertyDetails = Self.humanizedHomeType(detail.base.homeType)
         resolved.people = Self.peopleSubtext(occupants: occupants)
         subtexts = resolved
+        if !isRenaming { renameDraft = identity.homeName }
+    }
+
+    /// RN's `canEdit` (`settings/index.tsx:47`): owner, an explicit
+    /// `home.edit` permission, or an owner/admin base role. `GET /:id/me`
+    /// is best-effort, so fall back to the detail payload's `isOwner`.
+    private static func canEdit(detail: HomeDetail, access: HomeAccessDTO?) -> Bool {
+        guard let access else { return detail.isOwner }
+        if access.isOwner || detail.isOwner { return true }
+        if access.permissions.contains("home.edit") { return true }
+        return access.roleBase == "owner" || access.roleBase == "admin"
     }
 
     private static func addressLine(for home: HomeDTO) -> String? {

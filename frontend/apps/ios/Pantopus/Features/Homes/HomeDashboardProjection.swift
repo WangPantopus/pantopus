@@ -11,7 +11,9 @@
 import Foundation
 
 public enum HomeDashboardProjection {
-    /// Grid-tab strip — static chrome, identical on Android.
+    /// Grid-tab strip — static chrome, identical on Android. This is the
+    /// ungated superset; `gatedTabs(access:)` applies the per-home
+    /// permission filter.
     public static let tabs: [GridTabsTab] = [
         GridTabsTab(id: "overview", label: "Overview"),
         GridTabsTab(id: "tasks", label: "Tasks"),
@@ -20,6 +22,26 @@ public enum HomeDashboardProjection {
         GridTabsTab(id: "members", label: "Members"),
         GridTabsTab(id: "ownership", label: "Ownership")
     ]
+
+    /// Permission-gated tab strip. Mirrors RN's
+    /// `src/app/homes/[id]/dashboard.tsx:169-176`, which gates on the
+    /// five navigation booleans from `GET /api/homes/:id/me`
+    /// (`backend/routes/homeIam.js:51`) and never on role strings.
+    /// A nil access record (403 / offline) leaves the strip ungated so a
+    /// failed side-read can't blank the screen — the same fallback RN
+    /// takes at `src/app/homes/[id]/index.tsx:124`.
+    public static func gatedTabs(access: HomeAccessDTO?) -> [GridTabsTab] {
+        guard let access else { return tabs }
+        return tabs.filter { tab in
+            switch tab.id {
+            case "tasks": access.canManageTasks
+            case "bills": access.canManageFinance
+            case "members": access.canManageAccess
+            case "ownership": access.isOwner || access.canManageHome
+            default: true
+            }
+        }
+    }
 
     // MARK: - Hero stats
 
@@ -37,30 +59,55 @@ public enum HomeDashboardProjection {
 
     // MARK: - Quick actions
 
-    static func quickActions(counts: HomeDashboardCountsDTO?) -> [QuickActionTile] {
+    /// Quick-action tiles, permission-gated the same way RN gates its
+    /// dashboard cards (`src/app/homes/[id]/index.tsx:324`, `:353`,
+    /// `:374`) using the IAM permission strings from
+    /// `GET /api/homes/:id/me`. A nil access record leaves every tile in
+    /// place — RN's `can()` also falls through to "allow" when it has no
+    /// permission list to test.
+    static func quickActions(
+        counts: HomeDashboardCountsDTO?,
+        access: HomeAccessDTO? = nil
+    ) -> [QuickActionTile] {
         let counts = counts ?? HomeDashboardCountsDTO()
-        return [
-            tile(
-                id: "view_tasks",
-                label: "Tasks",
-                icon: .listChecks,
-                tone: .warning,
-                count: counts.tasksOpen
-            ),
-            tile(
-                id: "view_bills",
-                label: "Bills",
-                icon: .receipt,
-                tone: .error,
-                count: counts.billsDue
-            ),
-            tile(
-                id: "view_packages",
-                label: "Packages",
-                icon: .package,
-                tone: .business,
-                count: counts.packagesExpected
-            ),
+        func allowed(_ permission: String) -> Bool {
+            access?.can(permission) ?? true
+        }
+        var out: [QuickActionTile] = []
+        if allowed("tasks.view") {
+            out.append(
+                tile(
+                    id: "view_tasks",
+                    label: "Tasks",
+                    icon: .listChecks,
+                    tone: .warning,
+                    count: counts.tasksOpen
+                )
+            )
+        }
+        if allowed("finance.view") {
+            out.append(
+                tile(
+                    id: "view_bills",
+                    label: "Bills",
+                    icon: .receipt,
+                    tone: .error,
+                    count: counts.billsDue
+                )
+            )
+        }
+        if allowed("mailbox.view") {
+            out.append(
+                tile(
+                    id: "view_packages",
+                    label: "Packages",
+                    icon: .package,
+                    tone: .business,
+                    count: counts.packagesExpected
+                )
+            )
+        }
+        out.append(
             tile(
                 id: "add_member",
                 label: "Members",
@@ -69,7 +116,8 @@ public enum HomeDashboardProjection {
                 count: counts.membersActive,
                 showsBadge: false
             )
-        ]
+        )
+        return out
     }
 
     private static func tile(

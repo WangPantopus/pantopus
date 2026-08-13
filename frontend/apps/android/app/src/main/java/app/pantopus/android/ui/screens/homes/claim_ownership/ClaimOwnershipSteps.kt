@@ -86,7 +86,13 @@ enum class ClaimEvidenceSlot(
     val title: String,
 ) {
     Identity("idv", "Government ID"),
-    Ownership("deed", "Proof of ownership"),
+
+    /**
+     * Ownership proof — the claimant declares which of the five
+     * ownership documents they are attaching (RN
+     * `OWNERSHIP_DOC_OPTIONS`, `evidence.tsx:26-32`).
+     */
+    Ownership(null, "Proof of ownership"),
 
     /** Residency proof — the user picks the document kind. */
     Residency(null, "Proof of residency"),
@@ -98,13 +104,47 @@ enum class ClaimEvidenceSlot(
 
     /**
      * Document kinds this slot accepts; empty for fixed slots. The
-     * residency list is copied verbatim from RN's
-     * `RESIDENCY_DOC_OPTIONS` (`evidence.tsx:33-37`).
+     * ownership list is copied verbatim from RN's
+     * `OWNERSHIP_DOC_OPTIONS` (`evidence.tsx:26-32`) and the residency
+     * list from `RESIDENCY_DOC_OPTIONS` (`evidence.tsx:34-38`).
      */
     val documentOptions: List<ClaimDocumentOption>
         get() =
             when (this) {
-                Identity, Ownership -> emptyList()
+                Identity -> emptyList()
+                Ownership ->
+                    listOf(
+                        ClaimDocumentOption(
+                            id = "deed",
+                            label = "Deed",
+                            detail = "Property deed or title document",
+                            icon = PantopusIcon.FileText,
+                        ),
+                        ClaimDocumentOption(
+                            id = "closing_disclosure",
+                            label = "Closing Disclosure",
+                            detail = "Settlement statement from purchase",
+                            icon = PantopusIcon.FileText,
+                        ),
+                        ClaimDocumentOption(
+                            id = "tax_bill",
+                            label = "Property Tax Statement",
+                            detail = "Tax bill showing property owner",
+                            icon = PantopusIcon.Receipt,
+                        ),
+                        ClaimDocumentOption(
+                            id = "escrow_attestation",
+                            label = "Title/Escrow Attestation",
+                            detail = "Letter from title or escrow company",
+                            icon = PantopusIcon.ShieldCheck,
+                        ),
+                        ClaimDocumentOption(
+                            id = "title_match",
+                            label = "Title Record Match",
+                            detail = "Public record title match",
+                            icon = PantopusIcon.CheckCircle,
+                        ),
+                    )
                 Residency ->
                     listOf(
                         ClaimDocumentOption(

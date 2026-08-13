@@ -4,6 +4,7 @@ import app.pantopus.android.data.api.models.homedashboard.HomeDashboardCountsDto
 import app.pantopus.android.data.api.models.homedashboard.HomeDashboardResponse
 import app.pantopus.android.data.api.models.homedashboard.HomeHealthScoreDto
 import app.pantopus.android.data.api.models.homes.BillDto
+import app.pantopus.android.data.api.models.homes.HomeAccessDto
 import app.pantopus.android.ui.screens.shared.content_detail.GridTabsTab
 import app.pantopus.android.ui.screens.shared.content_detail.HomeHeroStat
 import app.pantopus.android.ui.screens.shared.content_detail.QuickActionTile
@@ -31,7 +32,11 @@ import kotlin.math.roundToInt
  */
 @Suppress("TooManyFunctions")
 object HomeDashboardProjection {
-    /** Grid-tab strip — static chrome, identical on iOS. */
+    /**
+     * Grid-tab strip — static chrome, identical on iOS. This is the
+     * ungated superset; [gatedTabs] applies the per-home permission
+     * filter.
+     */
     val tabs: List<GridTabsTab> =
         listOf(
             GridTabsTab("overview", "Overview"),
@@ -41,6 +46,28 @@ object HomeDashboardProjection {
             GridTabsTab("members", "Members"),
             GridTabsTab("ownership", "Ownership"),
         )
+
+    /**
+     * Permission-gated tab strip. Mirrors RN's
+     * `src/app/homes/[id]/dashboard.tsx:169-176`, which gates on the five
+     * navigation booleans from `GET /api/homes/:id/me`
+     * (`backend/routes/homeIam.js:51`) and never on role strings.
+     * A null access record (403 / offline) leaves the strip ungated so a
+     * failed side-read can't blank the screen — the same fallback RN
+     * takes at `src/app/homes/[id]/index.tsx:124`.
+     */
+    fun gatedTabs(access: HomeAccessDto?): List<GridTabsTab> {
+        if (access == null) return tabs
+        return tabs.filter { tab ->
+            when (tab.id) {
+                "tasks" -> access.canManageTasks
+                "bills" -> access.canManageFinance
+                "members" -> access.canManageAccess
+                "ownership" -> access.isOwner || access.canManageHome
+                else -> true
+            }
+        }
+    }
 
     /** Maximum "Upcoming" rows, matching iOS. */
     private const val UPCOMING_LIMIT = 5
@@ -72,14 +99,49 @@ object HomeDashboardProjection {
 
     // ── Quick actions ───────────────────────────────────────────────
 
-    fun quickActions(counts: HomeDashboardCountsDto?): List<QuickActionTile> {
+    /**
+     * Quick-action tiles, permission-gated the same way RN gates its
+     * dashboard cards (`src/app/homes/[id]/index.tsx:324`, `:353`,
+     * `:374`) using the IAM permission strings from
+     * `GET /api/homes/:id/me`. A null access record leaves every tile in
+     * place — RN's `can()` also falls through to "allow" when it has no
+     * permission list to test.
+     */
+    fun quickActions(
+        counts: HomeDashboardCountsDto?,
+        access: HomeAccessDto? = null,
+    ): List<QuickActionTile> {
         val safe = counts ?: HomeDashboardCountsDto()
-        return listOf(
-            tile("view_tasks", "Tasks", PantopusIcon.ListChecks, QuickActionTone.Warning, safe.tasksOpen),
-            tile("view_bills", "Bills", PantopusIcon.Receipt, QuickActionTone.Error, safe.billsDue),
-            tile("view_packages", "Packages", PantopusIcon.Package, QuickActionTone.Business, safe.packagesExpected),
-            tile("add_member", "Members", PantopusIcon.Users, QuickActionTone.Home, safe.membersActive, showsBadge = false),
-        )
+        fun allowed(permission: String): Boolean = access?.can(permission) ?: true
+        return buildList {
+            if (allowed("tasks.view")) {
+                add(tile("view_tasks", "Tasks", PantopusIcon.ListChecks, QuickActionTone.Warning, safe.tasksOpen))
+            }
+            if (allowed("finance.view")) {
+                add(tile("view_bills", "Bills", PantopusIcon.Receipt, QuickActionTone.Error, safe.billsDue))
+            }
+            if (allowed("mailbox.view")) {
+                add(
+                    tile(
+                        "view_packages",
+                        "Packages",
+                        PantopusIcon.Package,
+                        QuickActionTone.Business,
+                        safe.packagesExpected,
+                    ),
+                )
+            }
+            add(
+                tile(
+                    "add_member",
+                    "Members",
+                    PantopusIcon.Users,
+                    QuickActionTone.Home,
+                    safe.membersActive,
+                    showsBadge = false,
+                ),
+            )
+        }
     }
 
     @Suppress("LongParameterList")

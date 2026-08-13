@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.OwnershipClaimDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.status.StatusCta
 import app.pantopus.android.ui.screens.status.StatusWaitingContent
@@ -35,6 +36,29 @@ sealed interface WaitingRoomNav {
     data class UpdateEvidence(val homeId: String, val claimId: String) : WaitingRoomNav
 
     data class CancelClaim(val homeId: String) : WaitingRoomNav
+
+    // ─── Verification Center intents ───────────────────────────────
+
+    /**
+     * A12.7 postcard screen — "Enter verification code" / "Verify with a
+     * mailed code".
+     */
+    data class VerifyPostcard(val homeId: String) : WaitingRoomNav
+
+    /** Residency-evidence wizard — "Upload proof". */
+    data class UploadProof(val homeId: String) : WaitingRoomNav
+
+    /** A12 landlord-verification wizard. */
+    data class LandlordVerification(val homeId: String) : WaitingRoomNav
+
+    /**
+     * "This isn't my home" — the existing Leave home confirm, which owns
+     * `POST /api/homes/:id/move-out`.
+     */
+    data class LeaveHome(val homeId: String) : WaitingRoomNav
+
+    /** "Request help" — Help Center. */
+    data object RequestHelp : WaitingRoomNav
 }
 
 /**
@@ -48,6 +72,7 @@ class WaitingRoomViewModel
     @Inject
     constructor(
         private val homesRepo: HomesRepository,
+        private val homeAdminRepo: HomeAdminRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         val homeId: String =
@@ -92,7 +117,7 @@ class WaitingRoomViewModel
         private suspend fun applyClaims(claim: OwnershipClaimDto?) {
             if (claim == null) {
                 claimId = null
-                _phase.value = WaitingRoomPhase.Notice(WaitingRoomNotice.NoClaim)
+                applyVerificationFallback()
                 return
             }
             claimId = claim.id
@@ -123,6 +148,60 @@ class WaitingRoomViewModel
                     WaitingRoomContent.active(address = address, claimRef = ref)
                 }
             _phase.value = WaitingRoomPhase.Loaded
+        }
+
+        /**
+         * No claim row for this home. RN serves the Verification Center
+         * on this same route, branching on `verification_status` from
+         * `GET /api/homes/:id/me`
+         * (`src/app/homes/[id]/waiting-room.tsx:26-70`). Only when the
+         * caller *is* verified (or the call fails) do we fall back to the
+         * "No claim in review" notice.
+         */
+        private suspend fun applyVerificationFallback() {
+            val access =
+                when (val result = homeAdminRepo.myVerificationAccess(homeId)) {
+                    is NetworkResult.Success -> result.data
+                    is NetworkResult.Failure -> null
+                }
+            if (access == null || !access.hasAccess || !access.needsVerification) {
+                _phase.value = WaitingRoomPhase.Notice(WaitingRoomNotice.NoClaim)
+                return
+            }
+            _phase.value =
+                WaitingRoomPhase.Verification(
+                    HomeVerificationContent.make(
+                        status = HomeVerificationStatus.from(access.verificationStatus),
+                        isInChallengeWindow = access.isInChallengeWindow,
+                        challengeWindowEndsAt = access.challengeWindowEndsAt,
+                        postcardExpiresAt = access.postcardExpiresAt,
+                    ),
+                )
+        }
+
+        /**
+         * Route one Verification Center action card. Keys are declared on
+         * [HomeVerificationContent.ActionKey].
+         */
+        fun handleVerificationAction(action: HomeVerificationAction) {
+            _navEvent.value =
+                when (action.actionKey) {
+                    HomeVerificationContent.ActionKey.ENTER_CODE,
+                    HomeVerificationContent.ActionKey.REQUEST_MAILED_CODE,
+                    -> WaitingRoomNav.VerifyPostcard(homeId)
+                    HomeVerificationContent.ActionKey.UPLOAD_PROOF ->
+                        WaitingRoomNav.UploadProof(homeId)
+                    HomeVerificationContent.ActionKey.LANDLORD_VERIFICATION ->
+                        WaitingRoomNav.LandlordVerification(homeId)
+                    HomeVerificationContent.ActionKey.MOVE_OUT ->
+                        WaitingRoomNav.LeaveHome(homeId)
+                    HomeVerificationContent.ActionKey.REQUEST_HELP ->
+                        WaitingRoomNav.RequestHelp
+                    else -> {
+                        log("verification.${action.actionKey}")
+                        null
+                    }
+                }
         }
 
         /**

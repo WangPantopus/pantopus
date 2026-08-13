@@ -59,6 +59,8 @@ class PetsListViewModelTest {
         breed: String? = "Golden Retriever",
         notes: String? = "Allergic to chicken.",
         photoUrl: String? = null,
+        vetName: String? = null,
+        vetPhone: String? = null,
     ): PetDto =
         PetDto(
             id = id,
@@ -68,7 +70,21 @@ class PetsListViewModelTest {
             breed = breed,
             notes = notes,
             photoUrl = photoUrl,
+            vetName = vetName,
+            vetPhone = vetPhone,
         )
+
+    @Test
+    fun vet_contact_renders_as_a_chip_and_is_absent_when_unset() {
+        val vm = makeVm()
+        val withVet =
+            vm.rowForTest(pet(vetName = "Bay Area Animal Hospital", vetPhone = "(415) 555-0142"))
+        assertEquals(
+            "Bay Area Animal Hospital · (415) 555-0142",
+            withVet.chips?.single()?.text,
+        )
+        assertNull(vm.rowForTest(pet()).chips)
+    }
 
     // MARK: - Lifecycle
 

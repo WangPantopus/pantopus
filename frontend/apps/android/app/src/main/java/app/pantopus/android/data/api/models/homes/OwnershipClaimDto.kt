@@ -46,6 +46,52 @@ data class SubmitClaimRequest(
 data class SubmitClaimEnvelope(
     val id: String? = null,
     val status: String,
+    /**
+     * `routing_classification` decided by `policy.canSubmitOwnerClaim`
+     * and echoed at `backend/routes/homeOwnership.js:472`. One of
+     * `first_claim` / `parallel_claim` / `challenge_claim` (null on the
+     * opaque duplicate path, which returns only `{ id, status }`).
+     * Drives the pre-upload warnings and the challenge activation.
+     */
+    @Json(name = "routing_classification") val routingClassification: String? = null,
+    /** `claim_phase_v2` — `initiated` / `challenged` / … */
+    @Json(name = "claim_phase_v2") val claimPhaseV2: String? = null,
+)
+
+/**
+ * `routing_classification` values the backend emits
+ * (`backend/services/homeClaimRoutingService.js` via
+ * `policy.canSubmitOwnerClaim`).
+ */
+object ClaimRoutingClassification {
+    /** Another person already has a pending claim on this address. */
+    const val PARALLEL_CLAIM = "parallel_claim"
+
+    /**
+     * The address already has a verified household; a strong document
+     * can open a formal challenge.
+     */
+    const val CHALLENGE_CLAIM = "challenge_claim"
+}
+
+/**
+ * Body for `POST /api/homes/:id/ownership-claims/:claimId/challenge` —
+ * `challengeClaimSchema` (`backend/routes/homeOwnership.js:63`) accepts
+ * only an optional `note`.
+ */
+@JsonClass(generateAdapter = true)
+data class ChallengeClaimRequest(
+    val note: String? = null,
+)
+
+/**
+ * Response for the challenge route. The handler answers with a message
+ * plus the updated claim block; we only need to know it succeeded, so
+ * the payload stays loosely typed.
+ */
+@JsonClass(generateAdapter = true)
+data class ChallengeClaimResponse(
+    val message: String? = null,
 )
 
 /** Outer envelope for `POST /api/homes/:id/ownership-claims`. */

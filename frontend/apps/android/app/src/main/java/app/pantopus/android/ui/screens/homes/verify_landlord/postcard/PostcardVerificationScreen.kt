@@ -106,7 +106,7 @@ fun PostcardVerificationScreen(
         topBar = { PostcardTopBar(onBack = viewModel::dismissTapped) },
         bottomBar = {
             PostcardStickyDock(
-                showHint = !state.showsCodeEntryFrame,
+                showHint = !state.showsCodeEntryFrame && !state.needsNewCode,
                 label = state.primaryCtaLabel,
                 enabled = state.primaryCtaEnabled,
                 loading = state.isSubmitting,
@@ -135,6 +135,7 @@ fun PostcardVerificationScreen(
             )
             PostcardHero(
                 codeEntryMode = state.showsCodeEntryFrame,
+                needsNewCode = state.needsNewCode,
                 deliveredOn = state.content.deliveredOn,
                 stage = state.stage,
             )
@@ -291,6 +292,7 @@ private fun TextAction(
 @Composable
 private fun PostcardHero(
     codeEntryMode: Boolean,
+    needsNewCode: Boolean,
     deliveredOn: String?,
     stage: PostcardDeliveryStage,
 ) {
@@ -306,10 +308,10 @@ private fun PostcardHero(
         }
         Text(
             text =
-                if (codeEntryMode) {
-                    "Enter the code from the card"
-                } else {
-                    "Your card is on the way"
+                when {
+                    needsNewCode -> "Request a new code"
+                    codeEntryMode -> "Enter the code from the card"
+                    else -> "Your card is on the way"
                 },
             style = PantopusTextStyle.h2,
             color = PantopusColors.appText,
@@ -318,10 +320,14 @@ private fun PostcardHero(
         )
         Text(
             text =
-                if (codeEntryMode) {
-                    "6 characters, printed on the left side. Case doesn't matter."
-                } else {
-                    "We'll push you a notification when it lands — or enter the code now if you already have it."
+                when {
+                    needsNewCode ->
+                        "That code is no longer valid. We'll mail a fresh one to this address."
+                    codeEntryMode ->
+                        "6 characters, printed on the left side. Case doesn't matter."
+                    else ->
+                        "We'll push you a notification when it lands — or enter the code now " +
+                            "if you already have it."
                 },
             style = PantopusTextStyle.caption,
             color = PantopusColors.appTextSecondary,

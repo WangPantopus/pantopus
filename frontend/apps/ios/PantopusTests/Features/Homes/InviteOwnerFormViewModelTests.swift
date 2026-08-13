@@ -150,6 +150,14 @@ final class InviteOwnerFormViewModelTests: XCTestCase {
         XCTAssertEqual(vm.toast?.kind, .success)
     }
 
+    func testFastTrackDefaultsOnAndSurvivesRefresh() async {
+        let vm = makeVM(draft: InviteOwnerSampleData.valid)
+        XCTAssertTrue(vm.fastTrack, "RN defaults the vouch switch ON.")
+        vm.fastTrack = false
+        await vm.refresh()
+        XCTAssertTrue(vm.fastTrack, "Refresh re-seeds the draft, including the switch.")
+    }
+
     func testSubmitWithInvalidEmailDoesNotDismiss() async {
         let vm = makeVM()
         vm.update(.email, to: "garbage")

@@ -49,6 +49,10 @@ public enum MembersTab {
     /// verified owner" path. Only rendered for viewers who can review
     /// them (`GET /api/homes/:id/me` → `is_owner` or `members.manage`).
     public static let requests = "requests"
+    /// Who did what to the household — `GET /api/homes/:id/audit-log`
+    /// (`backend/routes/homeIam.js:602`). Same `members.manage` gate as
+    /// the Requests queue.
+    public static let audit = "audit"
 }
 
 /// A member row the viewer may act on, plus the roles the backend will
@@ -124,6 +128,13 @@ public final class MembersListViewModel: ListOfRowsDataSource {
                     count: accessRequests.count
                 )
             )
+            out.append(
+                ListOfRowsTab(
+                    id: MembersTab.audit,
+                    label: "Audit Log",
+                    count: auditEntries.count
+                )
+            )
         }
         return out
     }
@@ -143,8 +154,9 @@ public final class MembersListViewModel: ListOfRowsDataSource {
         //
         // A13.1 — the FAB is contextual: on the Guests tab it issues a
         // guest pass; on Members / Pending it invites a member. The
-        // Requests tab is a review queue — no create affordance.
-        if selectedTab == MembersTab.requests { return nil }
+        // Requests and Audit Log tabs are read/review queues — no create
+        // affordance.
+        if selectedTab == MembersTab.requests || selectedTab == MembersTab.audit { return nil }
         if selectedTab == MembersTab.guests {
             return FABAction(
                 icon: .userPlus,
@@ -198,6 +210,7 @@ public final class MembersListViewModel: ListOfRowsDataSource {
     private var occupants: [OccupantDTO] = []
     private var pendingInvites: [PendingInviteDTO] = []
     private var accessRequests: [HouseholdAccessRequestDTO] = []
+    private var auditEntries: [HomeAuditEntryDTO] = []
     private var access: HomeAccessDTO?
     private var loadedOnce = false
 
@@ -408,8 +421,9 @@ public final class MembersListViewModel: ListOfRowsDataSource {
             occupants = response.occupants.filter(\.isActive)
             pendingInvites = response.pendingInvites
             await fetchAccessRequests()
+            await fetchAuditLog()
             loadedOnce = true
-            if selectedTab == MembersTab.requests, !canManageMembers {
+            if [MembersTab.requests, MembersTab.audit].contains(selectedTab), !canManageMembers {
                 selectedTab = MembersTab.members
             }
             applyState()
@@ -439,6 +453,24 @@ public final class MembersListViewModel: ListOfRowsDataSource {
         }
     }
 
+    /// `GET /api/homes/:id/audit-log` — route
+    /// `backend/routes/homeIam.js:602`. 403s for viewers without
+    /// `members.manage`, so it is best-effort and never fails the screen.
+    private func fetchAuditLog() async {
+        guard canManageMembers else {
+            auditEntries = []
+            return
+        }
+        do {
+            let response: HomeAuditLogResponse = try await api.request(
+                HomeAdminEndpoints.auditLog(homeId: homeId)
+            )
+            auditEntries = response.entries
+        } catch {
+            auditEntries = []
+        }
+    }
+
     // MARK: - Buckets
 
     private var members: [OccupantDTO] {
@@ -462,6 +494,11 @@ public final class MembersListViewModel: ListOfRowsDataSource {
             state = rows.isEmpty
                 ? .empty(emptyContent(for: MembersTab.requests))
                 : .loaded(sections: [RowSection(id: "requests", rows: rows)], hasMore: false)
+        case MembersTab.audit:
+            let rows = auditEntries.map { row(forAudit: $0) }
+            state = rows.isEmpty
+                ? .empty(emptyContent(for: MembersTab.audit))
+                : .loaded(sections: [RowSection(id: "audit", rows: rows)], hasMore: false)
         case MembersTab.guests:
             let rows = guests.map { row(forOccupant: $0) }
             state = rows.isEmpty
@@ -489,6 +526,14 @@ public final class MembersListViewModel: ListOfRowsDataSource {
                 icon: .mailbox,
                 headline: "No pending requests",
                 subcopy: "When someone asks to join from the claim flow, their request appears here."
+            )
+        case MembersTab.audit:
+            // Read-only history — no CTA. Copy mirrors RN's empty state
+            // (`src/app/homes/[id]/members/index.tsx:385`).
+            ListOfRowsState.EmptyContent(
+                icon: .fileText,
+                headline: "No audit log entries",
+                subcopy: "Role changes, removals, guest passes, and ownership actions on this home show up here."
             )
         case MembersTab.guests:
             ListOfRowsState.EmptyContent(
@@ -698,6 +743,37 @@ public final class MembersListViewModel: ListOfRowsDataSource {
                     foreground: Theme.Color.home
                 )
             )
+        )
+    }
+
+    /// Audit-log row — action verb as the title, `actor → target` as the
+    /// subtitle, and the timestamp as the trailing meta. Read-only: no
+    /// tap target, no trailing control. Mirrors RN's audit card
+    /// (`src/app/homes/[id]/members/index.tsx:387-399`).
+    public func row(forAudit entry: HomeAuditEntryDTO) -> RowModel {
+        let actor = entry.actorDisplayName
+        let subtitle = entry.targetLabel.map { "\(actor) → \($0)" } ?? actor
+        let stamp = Self.formatRelativeTime(
+            entry.createdAt,
+            now: now(),
+            calendar: calendar,
+            timeZone: timeZone
+        )
+        return RowModel(
+            id: entry.id,
+            title: entry.actionLabel,
+            subtitle: subtitle,
+            template: .statusChip,
+            leading: .typeIcon(
+                .fileText,
+                background: Theme.Color.homeBg,
+                foreground: Theme.Color.home
+            ),
+            trailing: .none,
+            onTap: { /* Audit rows are read-only. */ },
+            body: nil,
+            subtitleIcon: .user,
+            timeMeta: stamp
         )
     }
 

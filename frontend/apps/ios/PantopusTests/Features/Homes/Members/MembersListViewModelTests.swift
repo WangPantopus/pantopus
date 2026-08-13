@@ -136,6 +136,20 @@ final class MembersListViewModelTests: XCTestCase {
     {"requests":[]}
     """
 
+    private static let emptyAuditJSON = """
+    {"entries":[]}
+    """
+
+    private static let populatedAuditJSON = """
+    {"entries":[
+      {"id":"log_1","home_id":"home_1","actor_user_id":"u_owner",
+       "action":"MEMBER_ROLE_CHANGED","target_type":"HomeOccupancy",
+       "target_id":"occ_1","created_at":"2026-05-14T12:00:00Z",
+       "actor":{"id":"u_owner","username":"ada","name":"Ada Lovelace",
+                "profile_picture_url":null}}
+    ]}
+    """
+
     private static let populatedRequestsJSON = """
     {"requests":[
       {"id":"req_1","home_id":"home_1","requester_user_id":"u_asker",
@@ -154,6 +168,7 @@ final class MembersListViewModelTests: XCTestCase {
         occupants: SequencedURLProtocol.Response,
         access: SequencedURLProtocol.Response? = nil,
         requests: SequencedURLProtocol.Response? = nil,
+        audit: SequencedURLProtocol.Response? = nil,
         repeats: Int = 4
     ) {
         var routes: [String: [SequencedURLProtocol.Response]] = [:]
@@ -165,17 +180,22 @@ final class MembersListViewModelTests: XCTestCase {
             routes["/api/homes/\(homeId)/household-access-requests"] =
                 Array(repeating: requests, count: repeats)
         }
+        if let audit {
+            routes["/api/homes/\(homeId)/audit-log"] = Array(repeating: audit, count: repeats)
+        }
         SequencedURLProtocol.routeResponses = routes
     }
 
     private func stubOwner(
         occupantsBody: String = MembersListViewModelTests.populatedJSON,
-        requestsBody: String = MembersListViewModelTests.emptyRequestsJSON
+        requestsBody: String = MembersListViewModelTests.emptyRequestsJSON,
+        auditBody: String = MembersListViewModelTests.emptyAuditJSON
     ) {
         stub(
             occupants: .status(200, body: occupantsBody),
             access: .status(200, body: Self.ownerAccessJSON),
-            requests: .status(200, body: requestsBody)
+            requests: .status(200, body: requestsBody),
+            audit: .status(200, body: auditBody)
         )
     }
 
@@ -337,7 +357,13 @@ final class MembersListViewModelTests: XCTestCase {
         XCTAssertTrue(vm.canManageMembers)
         XCTAssertEqual(
             vm.tabs.map(\.id),
-            [MembersTab.members, MembersTab.guests, MembersTab.pending, MembersTab.requests]
+            [
+                MembersTab.members,
+                MembersTab.guests,
+                MembersTab.pending,
+                MembersTab.requests,
+                MembersTab.audit
+            ]
         )
         vm.selectedTab = MembersTab.requests
         guard case let .loaded(sections, _) = vm.state,
@@ -367,6 +393,49 @@ final class MembersListViewModelTests: XCTestCase {
         }
         XCTAssertEqual(content.headline, "No pending requests")
         XCTAssertNil(content.ctaTitle, "The review queue has no create affordance")
+    }
+
+    // MARK: - Audit Log tab
+
+    func testAuditTabHiddenForViewersWhoCannotManage() async {
+        stub(
+            occupants: .status(200, body: Self.populatedJSON),
+            access: .status(200, body: Self.memberAccessJSON),
+            requests: .status(200, body: Self.populatedRequestsJSON),
+            audit: .status(200, body: Self.populatedAuditJSON)
+        )
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertFalse(vm.tabs.contains { $0.id == MembersTab.audit })
+    }
+
+    func testAuditTabRendersActionActorAndTarget() async {
+        stubOwner(auditBody: Self.populatedAuditJSON)
+        let vm = makeVM()
+        await vm.load()
+        vm.selectedTab = MembersTab.audit
+        guard case let .loaded(sections, _) = vm.state,
+              let row = sections.first?.rows.first else {
+            XCTFail("Expected one audit row, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(row.id, "log_1")
+        XCTAssertEqual(row.title, "Member role changed")
+        XCTAssertEqual(row.subtitle, "Ada Lovelace → Home occupancy")
+    }
+
+    func testEmptyAuditTabShowsReadOnlyEmptyState() async {
+        stubOwner()
+        let vm = makeVM()
+        await vm.load()
+        vm.selectedTab = MembersTab.audit
+        guard case let .empty(content) = vm.state else {
+            XCTFail("Expected .empty for Audit tab, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.headline, "No audit log entries")
+        XCTAssertNil(content.ctaTitle, "The audit log has no create affordance")
+        XCTAssertNil(vm.fab)
     }
 
     func testApproveAccessRequestPostsToApproveRouteAndRefetches() async {

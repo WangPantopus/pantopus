@@ -4,6 +4,8 @@ import app.pantopus.android.data.api.models.homes.ChangeMemberRoleRequest
 import app.pantopus.android.data.api.models.homes.ChangeMemberRoleResponse
 import app.pantopus.android.data.api.models.homes.DeleteHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeAccessDto
+import app.pantopus.android.data.api.models.homes.HomeAuditLogResponse
+import app.pantopus.android.data.api.models.homes.HomeVerificationAccessDto
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestActionResponse
 import app.pantopus.android.data.api.models.homes.HouseholdAccessRequestsResponse
 import app.pantopus.android.data.api.net.NetworkResult
@@ -28,6 +30,17 @@ open class HomeAdminRepository
 
         /** `GET /api/homes/:id/me`. */
         open suspend fun myAccess(homeId: String): NetworkResult<HomeAccessDto> = safeApiCall { api.myAccess(homeId) }
+
+        /** `GET /api/homes/:id/me`, verification slice. */
+        open suspend fun myVerificationAccess(homeId: String): NetworkResult<HomeVerificationAccessDto> =
+            safeApiCall { api.myVerificationAccess(homeId) }
+
+        /** `GET /api/homes/:id/audit-log?limit=…&offset=…`. */
+        open suspend fun auditLog(
+            homeId: String,
+            limit: Int = 50,
+            offset: Int = 0,
+        ): NetworkResult<HomeAuditLogResponse> = safeApiCall { api.auditLog(homeId, limit, offset) }
 
         /** `POST /api/homes/:id/members/:userId/role`. */
         open suspend fun changeMemberRole(

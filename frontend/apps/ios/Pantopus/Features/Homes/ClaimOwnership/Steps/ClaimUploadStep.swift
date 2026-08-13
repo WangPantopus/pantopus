@@ -131,9 +131,12 @@ struct ClaimUploadStepContent: View {
     }
 
     private var uploadSectionLabel: String {
-        documentOptions.isEmpty
-            ? "Documents · \(attachedCount) of \(slots.count) attached"
-            : "2. Upload your document"
+        let heading = documentOptions.isEmpty ? "Documents" : "2. Upload your document"
+        // Multi-slot variants (owner: ID + ownership proof) keep the
+        // attached-count readout; the single-slot residency variant
+        // matches RN's plain "2. Upload your document".
+        guard slots.count > 1 else { return heading }
+        return "\(heading) · \(attachedCount) of \(slots.count) attached"
     }
 }
 

@@ -96,6 +96,11 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     private let timeZone: TimeZone
 
     private var events: [CalendarEventDTO] = []
+    /// Task due-dates, bill due-dates and package expected-delivery
+    /// dates plotted alongside the home events. RN's month grid does the
+    /// same (`src/app/homes/[id]/calendar.tsx:48-74`) so a household can
+    /// see everything that lands on a day, not just calendar entries.
+    private var derived: [HomeCalendarDerivedItem] = []
     /// ISO yyyy-MM-dd anchor for the visible week strip. Defaults to
     /// "the start of the week containing `now()`". Prev / Next chevrons
     /// roll it ±7 days. Selecting a day outside the current strip
@@ -191,14 +196,45 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
                 HomesEndpoints.homeEvents(homeId: homeId)
             )
             events = response.events
+            // Events are the primary read — the three derived feeds are
+            // best-effort side-reads that must never fail the calendar.
+            await fetchDerived()
             rebuild()
         } catch {
             events = []
+            derived = []
             state = .error(
                 message: (error as? APIError)?.errorDescription
                     ?? "Couldn't load your calendar."
             )
         }
+    }
+
+    /// `GET /api/homes/:id/tasks` (`backend/routes/home.js` via
+    /// `HomesEndpoints.tasks`), `…/bills`, and `…/packages`. Each is
+    /// optional: a member without `tasks.view` / `finance.view` /
+    /// `mailbox.view` simply gets fewer dots.
+    private func fetchDerived() async {
+        async let tasksResult: GetHomeTasksResponse? = try? await api.request(
+            HomesEndpoints.tasks(homeId: homeId),
+            as: GetHomeTasksResponse.self
+        )
+        async let billsResult: GetHomeBillsResponse? = try? await api.request(
+            HomesEndpoints.bills(homeId: homeId),
+            as: GetHomeBillsResponse.self
+        )
+        async let packagesResult: GetHomePackagesResponse? = try? await api.request(
+            HomesEndpoints.packages(homeId: homeId),
+            as: GetHomePackagesResponse.self
+        )
+        let tasks = await tasksResult
+        let bills = await billsResult
+        let packages = await packagesResult
+        derived = HomeCalendarDerivedItem.build(
+            tasks: tasks?.tasks ?? [],
+            bills: bills?.bills ?? [],
+            packages: packages?.packages ?? []
+        )
     }
 
     // MARK: - State projection
@@ -212,9 +248,30 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
             return ParsedEvent(dto: dto, start: date, isoDate: Self.isoDay(date, calendar: cal))
         }.sorted { $0.start < $1.start }
 
-        monthStrip = makeMonthStripState(events: parsed, now: nowDate, calendar: cal)
+        // Every dated thing that belongs on this month's grid: calendar
+        // events plus task / bill / package due dates.
+        var agenda: [AgendaEntry] = parsed.map { event in
+            AgendaEntry(
+                date: event.start,
+                isoDate: event.isoDate,
+                row: Self.row(for: event, calendar: cal) { [weak self] eventId in
+                    Task { @MainActor in self?.handleTap(eventId: eventId) }
+                }
+            )
+        }
+        agenda += derived.compactMap { item in
+            guard let date = Self.parseIsoInstant(item.dateISO) else { return nil }
+            return AgendaEntry(
+                date: date,
+                isoDate: Self.isoDay(date, calendar: cal),
+                row: item.row(calendar: cal)
+            )
+        }
+        agenda.sort { $0.date < $1.date }
 
-        if events.isEmpty {
+        monthStrip = makeMonthStripState(entries: agenda, now: nowDate, calendar: cal)
+
+        if agenda.isEmpty {
             state = .empty(
                 ListOfRowsState.EmptyContent(
                     icon: .calendarDays,
@@ -228,9 +285,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
             return
         }
 
-        let filtered: [ParsedEvent]
+        let filtered: [AgendaEntry]
         if let selected = selectedIsoDate {
-            filtered = parsed.filter { $0.isoDate == selected }
+            filtered = agenda.filter { $0.isoDate == selected }
             if filtered.isEmpty {
                 state = .empty(
                     ListOfRowsState.EmptyContent(
@@ -243,17 +300,15 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
                 return
             }
         } else {
-            filtered = parsed
+            filtered = agenda
         }
 
         let sections = Self.makeSections(
-            events: filtered,
+            entries: filtered,
             now: nowDate,
             calendar: cal,
             selectedIsoDate: selectedIsoDate
-        ) { [weak self] eventId in
-            Task { @MainActor in self?.handleTap(eventId: eventId) }
-        }
+        )
         state = .loaded(sections: sections, hasMore: false)
     }
 
@@ -268,7 +323,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// list. `selectedIsoDate` flows straight through so the strip
     /// highlights the user's selection.
     func makeMonthStripState(
-        events parsed: [ParsedEvent],
+        entries: [AgendaEntry],
         now: Date,
         calendar cal: Calendar
     ) -> MonthStripState? {
@@ -287,8 +342,8 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         dayFmt.dateFormat = "d"
 
         var dotCounts: [String: Int] = [:]
-        for ev in parsed {
-            dotCounts[ev.isoDate, default: 0] += 1
+        for entry in entries {
+            dotCounts[entry.isoDate, default: 0] += 1
         }
 
         var days: [MonthStripState.Day] = []
@@ -322,6 +377,28 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         selectedIsoDate: String?,
         onTap: @escaping @MainActor @Sendable (String) -> Void
     ) -> [RowSection] {
+        makeSections(
+            entries: events.map { event in
+                AgendaEntry(
+                    date: event.start,
+                    isoDate: event.isoDate,
+                    row: row(for: event, calendar: calendar, onTap: onTap)
+                )
+            },
+            now: now,
+            calendar: calendar,
+            selectedIsoDate: selectedIsoDate
+        )
+    }
+
+    /// Bucketing over already-projected rows, so calendar events and
+    /// derived task / bill / package due dates share one grouping pass.
+    public static func makeSections(
+        entries: [AgendaEntry],
+        now: Date,
+        calendar: Calendar,
+        selectedIsoDate: String?
+    ) -> [RowSection] {
         var cal = calendar
         cal.timeZone = calendar.timeZone
         let todayStart = cal.startOfDay(for: now)
@@ -332,12 +409,11 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
         if let selected = selectedIsoDate {
             // Single-day filter — one section labelled by the date.
-            let rows = events.map { row(for: $0, calendar: cal, onTap: onTap) }
             return [
                 RowSection(
                     id: "day-\(selected)",
                     header: dayHeader(forIso: selected, calendar: cal),
-                    rows: rows
+                    rows: entries.map(\.row)
                 )
             ]
         }
@@ -348,14 +424,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         var nextWeek: [RowModel] = []
         var later: [RowModel] = []
 
-        for ev in events {
-            let start = ev.start
-            // Skip events from earlier calendar days — the agenda only
-            // surfaces today's remaining events plus everything in the
-            // future. (Past events that happen to be earlier in TODAY
+        for entry in entries {
+            let start = entry.date
+            // Skip items from earlier calendar days — the agenda only
+            // surfaces today's remaining items plus everything in the
+            // future. (Past items that happen to be earlier in TODAY
             // still pass through the `start < tomorrowStart` branch.)
             if start < todayStart { continue }
-            let row = Self.row(for: ev, calendar: cal, onTap: onTap)
+            let row = entry.row
             switch start {
             case _ where start < tomorrowStart:
                 today.append(row)
@@ -526,6 +602,21 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         public let dto: CalendarEventDTO
         public let start: Date
         public let isoDate: String
+    }
+
+    /// A dated agenda item after projection — either a home event or a
+    /// derived task / bill / package due date. Bucketing works over
+    /// these so both kinds share one grouping pass.
+    public struct AgendaEntry: Sendable {
+        public let date: Date
+        public let isoDate: String
+        public let row: RowModel
+
+        public init(date: Date, isoDate: String, row: RowModel) {
+            self.date = date
+            self.isoDate = isoDate
+            self.row = row
+        }
     }
 
     public enum WeekShift: Sendable, Equatable {

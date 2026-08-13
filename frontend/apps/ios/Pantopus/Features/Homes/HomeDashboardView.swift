@@ -15,6 +15,12 @@ struct HomeDashboardView: View {
     @State private var showsInviteOwner = false
 
     private static let actionLabels: [String: String] = [
+        "add_task": "Add Task",
+        "track_bill": "Track Bill",
+        "track_package": "Track Package",
+        "add_pet": "Add Pet",
+        "create_poll": "Create Poll",
+        "send_mail": "Send Mail",
         "log_package": "Log a package",
         "view_packages": "Packages",
         "add_member": "Add member",
@@ -87,6 +93,17 @@ struct HomeDashboardView: View {
     /// so the host can open the gig composer pre-filtered (RN routes to
     /// `/gig-v2/new?initialText=…`).
     private let onHireHelp: ((String) -> Void)?
+    /// FAB → "Add Task". Opens the household-task create form for this
+    /// home. Mirrors RN `homes/[id]/index.tsx:155`
+    /// (`/homes/:id/tasks?create=true`).
+    private let onAddTask: ((String) -> Void)?
+    /// FAB → "Track Bill" (RN `homes/[id]/index.tsx:156`).
+    private let onTrackBill: ((String) -> Void)?
+    /// FAB → "Track Package" (RN `homes/[id]/index.tsx:157`).
+    private let onTrackPackage: ((String) -> Void)?
+    /// FAB → "Send Mail" — opens the mail composer
+    /// (RN `homes/[id]/index.tsx:160`).
+    private let onSendMail: ((String) -> Void)?
 
     init(
         homeId: String,
@@ -107,7 +124,11 @@ struct HomeDashboardView: View {
         onOpenMembers: ((String) -> Void)? = nil,
         onOpenPropertyDetails: ((String) -> Void)? = nil,
         onOpenSettings: (@MainActor @Sendable (String) -> Void)? = nil,
-        onHireHelp: ((String) -> Void)? = nil
+        onHireHelp: ((String) -> Void)? = nil,
+        onAddTask: ((String) -> Void)? = nil,
+        onTrackBill: ((String) -> Void)? = nil,
+        onTrackPackage: ((String) -> Void)? = nil,
+        onSendMail: ((String) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeDashboardViewModel(homeId: homeId))
         self.homeId = homeId
@@ -129,6 +150,10 @@ struct HomeDashboardView: View {
         self.onOpenPropertyDetails = onOpenPropertyDetails
         self.onOpenSettings = onOpenSettings
         self.onHireHelp = onHireHelp
+        self.onAddTask = onAddTask
+        self.onTrackBill = onTrackBill
+        self.onTrackPackage = onTrackPackage
+        self.onSendMail = onSendMail
     }
 
     /// Current signed-in user's email; used by the Invite Owner form
@@ -184,6 +209,12 @@ struct HomeDashboardView: View {
             },
             body: {
                 VStack(spacing: Spacing.s4) {
+                    if let security = content.securityBanner {
+                        HomeSecurityStatusBanner(content: security) {
+                            handleSecurityBannerCTA(security.action)
+                        }
+                        .padding(.horizontal, Spacing.s4)
+                    }
                     if let attention = content.attentionSummary {
                         NeedsAttentionBanner(summary: attention) { handleQuickAction($0) }
                             .padding(.horizontal, Spacing.s4)
@@ -221,11 +252,17 @@ struct HomeDashboardView: View {
                 }
             },
             cta: {
+                // Six one-tap creates, matching RN's `homeFabActions`
+                // (`src/app/homes/[id]/index.tsx:154-161`). Every entry
+                // routes to a real create surface — no placeholders.
                 FABCreateCTA(
                     actions: [
-                        FABSheetAction(id: "log_package", title: "Log a package", icon: .shoppingBag),
-                        FABSheetAction(id: "add_member", title: "Invite owner", icon: .userPlus),
-                        FABSheetAction(id: "add_mail", title: "Add mail", icon: .mailbox)
+                        FABSheetAction(id: "add_task", title: "Add Task", icon: .listChecks),
+                        FABSheetAction(id: "track_bill", title: "Track Bill", icon: .creditCard),
+                        FABSheetAction(id: "track_package", title: "Track Package", icon: .package),
+                        FABSheetAction(id: "add_pet", title: "Add Pet", icon: .pawPrint),
+                        FABSheetAction(id: "create_poll", title: "Create Poll", icon: .barChart3),
+                        FABSheetAction(id: "send_mail", title: "Send Mail", icon: .mail)
                     ]
                 ) { handleFabAction($0) }
             }
@@ -269,11 +306,58 @@ struct HomeDashboardView: View {
         )
     }
 
+    /// Security-banner CTA routing. Mirrors RN's
+    /// `HomeStatusBanner.tsx:53` (claim window → invite co-owner) and
+    /// `:60` / `:66` (review / dispute → the home's security surface).
+    private func handleSecurityBannerCTA(_ action: HomeSecurityBannerContent.Action) {
+        switch action {
+        case .inviteCoOwner:
+            showsInviteOwner = true
+        case .openSecuritySettings:
+            if let onOpenSettings {
+                let id = homeId
+                Task { @MainActor in onOpenSettings(id) }
+            }
+        case .noAction:
+            break
+        }
+    }
+
     private func handleFabAction(_ action: String) {
         switch action {
+        case "add_task":
+            route(onAddTask, fallback: onOpenTasks, action: action)
+        case "track_bill":
+            if let onTrackBill { onTrackBill(homeId) } else if let onOpenBills { onOpenBills() } else {
+                onOpenPlaceholder?(actionLabel(action))
+            }
+        case "track_package":
+            route(onTrackPackage, fallback: onOpenPackages, action: action)
+        case "add_pet":
+            route(onOpenPets, fallback: nil, action: action)
+        case "create_poll":
+            if let onOpenPolls { onOpenPolls() } else { onOpenPlaceholder?(actionLabel(action)) }
+        case "send_mail":
+            route(onSendMail, fallback: nil, action: action)
         case "add_member":
             openMembersOrInvite()
         default:
+            onOpenPlaceholder?(actionLabel(action))
+        }
+    }
+
+    /// Prefer the dedicated create route, fall back to the feature's
+    /// list route, and only then to the host's placeholder screen.
+    private func route(
+        _ primary: ((String) -> Void)?,
+        fallback: ((String) -> Void)?,
+        action: String
+    ) {
+        if let primary {
+            primary(homeId)
+        } else if let fallback {
+            fallback(homeId)
+        } else {
             onOpenPlaceholder?(actionLabel(action))
         }
     }

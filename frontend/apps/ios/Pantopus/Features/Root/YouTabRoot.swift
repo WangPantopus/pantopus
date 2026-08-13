@@ -357,6 +357,15 @@ public enum YouRoute: Hashable {
     case waitingRoom(homeId: String)
     /// Cancel ownership claim from waiting room / home settings.
     case cancelClaim(homeId: String)
+    /// A12 — Landlord-verification wizard. Reached from the waiting
+    /// room's Verification Center action cards.
+    case verifyLandlord(homeId: String)
+    /// A12.7 — Postcard verification / code entry. Reached from the
+    /// waiting room's Verification Center action cards.
+    case postcardVerification(homeId: String)
+    /// "This isn't my home" — the Leave home confirm, which owns
+    /// `POST /api/homes/:id/move-out`.
+    case leaveHome(homeId: String)
     /// Four-moment Ceremonial Mail compose wizard. Production entry point
     /// is the Mailbox root's compose FAB.
     case ceremonialMail
@@ -843,6 +852,17 @@ public struct YouTabRoot: View {
             path.append(.claimOwnership(homeId: id))
         case let .cancelClaim(id):
             path.append(.cancelClaim(homeId: id))
+        // Verification Center action cards.
+        case let .verifyPostcard(id):
+            path.append(.postcardVerification(homeId: id))
+        case let .uploadProof(id):
+            path.append(.verifyResidency(homeId: id))
+        case let .landlordVerification(id):
+            path.append(.verifyLandlord(homeId: id))
+        case let .leaveHome(id):
+            path.append(.leaveHome(homeId: id))
+        case .requestHelp:
+            path.append(.helpCenter)
         }
     }
 
@@ -2192,6 +2212,18 @@ public struct YouTabRoot: View {
                     // gig composer. The You-tab route carries no category
                     // preselection, so the wizard starts on category pick.
                     Task { @MainActor in path.append(.composeTask) }
+                },
+                onAddTask: { id in
+                    Task { @MainActor in path.append(.addHouseholdTask(homeId: id)) }
+                },
+                onTrackBill: { id in
+                    Task { @MainActor in path.append(.addBill(homeId: id)) }
+                },
+                onTrackPackage: { id in
+                    Task { @MainActor in path.append(.logPackage(homeId: id)) }
+                },
+                onSendMail: { _ in
+                    Task { @MainActor in path.append(.ceremonialMail) }
                 }
             )
         case let .homeTasks(homeId):
@@ -2521,6 +2553,47 @@ public struct YouTabRoot: View {
                 viewModel: CancelClaimViewModel(homeId: homeId),
                 onBack: { pop() },
                 onCancelled: { pop() }
+            )
+        case let .verifyLandlord(homeId):
+            VerifyLandlordWizardView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onOpenPostcardVerification: { resolvedHomeId in
+                    // Replace the wizard with the postcard tracker so
+                    // Back returns to the waiting room, not the wizard.
+                    path.removeAll { route in
+                        if case .verifyLandlord = route { return true }
+                        return false
+                    }
+                    path.append(.postcardVerification(homeId: resolvedHomeId))
+                }
+            )
+        case let .postcardVerification(homeId):
+            PostcardVerificationView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onVerified: { _ in
+                    // Pop the tracker — the room refreshes its
+                    // verification status on next appearance.
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .leaveHome(homeId):
+            LeaveHomeView(
+                viewModel: LeaveHomeViewModel(homeId: homeId),
+                onBack: { pop() },
+                onLeft: {
+                    // Move-out revokes membership, so the waiting room
+                    // and dashboard for this home now 403 — drop both.
+                    path.removeAll { route in
+                        switch route {
+                        case let .leaveHome(id) where id == homeId: true
+                        case let .waitingRoom(id) where id == homeId: true
+                        case let .homeDashboard(id) where id == homeId: true
+                        default: false
+                        }
+                    }
+                }
             )
         case .ceremonialMail:
             CeremonialMailWizardView(

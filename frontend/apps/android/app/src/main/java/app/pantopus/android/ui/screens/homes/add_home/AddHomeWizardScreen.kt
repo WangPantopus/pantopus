@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -135,6 +137,7 @@ fun AddHomeWizardScreen(
                     state = state,
                     onApplyGeocodedZip = viewModel::applyGeocodedZip,
                     onPrimaryHomeChange = viewModel::setPrimaryHome,
+                    detailsSection = { AddHomeDetailsSection(state = state, vm = viewModel) },
                 )
             AddHomeStep.Role -> RoleStep(state, viewModel)
             AddHomeStep.Review -> ReviewStep(state)
@@ -150,6 +153,45 @@ fun AddHomeWizardScreen(
             onDismiss = viewModel::dismissClaimedModal,
             onThisIsCorrect = viewModel::showConfirmAddressStep,
             onConfirmAddress = viewModel::confirmClaimedAddress,
+        )
+    }
+
+    // A12.2 Setup — the Wi-Fi QR scanner takes the whole screen so the
+    // viewfinder matches RN's full-screen `QrScannerModal`.
+    if (state.scannerTargetItemId != null) {
+        WifiQrScannerDialog(
+            onScanned = viewModel::applyScannedWifi,
+            onClose = viewModel::closeWifiQrScanner,
+        )
+    }
+
+    state.accessSecretWarning?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::acknowledgeAccessSecretWarning,
+            modifier = Modifier.testTag("addHomeAccessSecretWarning"),
+            title = {
+                Text(
+                    text = "Home created",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                )
+            },
+            text = {
+                Text(
+                    text = message,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::acknowledgeAccessSecretWarning) {
+                    Text(
+                        text = "OK",
+                        style = PantopusTextStyle.body,
+                        color = PantopusColors.primary600,
+                    )
+                }
+            },
         )
     }
 }
@@ -325,6 +367,12 @@ private fun ConfirmStep(
     state: AddHomeUiState,
     onApplyGeocodedZip: () -> Unit,
     onPrimaryHomeChange: (Boolean) -> Unit,
+    /**
+     * A12.2 Details block, supplied by the live screen. The Paparazzi
+     * geocode-confirmation preview omits it so its golden frames keep
+     * locking the address-confirmation geometry on its own.
+     */
+    detailsSection: (@Composable () -> Unit)? = null,
 ) {
     HeadlineBlock("Confirm the property")
     SubcopyBlock(
@@ -346,6 +394,14 @@ private fun ConfirmStep(
             isPrimary = state.form.isPrimary,
             onChange = onPrimaryHomeChange,
         )
+        // A12.2 Details — nickname / type / beds / baths / sizes / year /
+        // description, pre-filled from public records. Hidden on the
+        // join-an-existing-home path, which RN skips too
+        // (`useHomeForm.ts:619-623, :700-705`).
+        if (detailsSection != null && !state.isClaimingExistingHome) {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            detailsSection()
+        }
     }
 }
 
@@ -365,6 +421,13 @@ private fun RoleStep(
                 isSelected = state.form.role == role,
                 onTap = { vm.selectRole(role) },
             )
+        }
+        // A12.2 Setup — RN's Setup step is role picker + "Networks &
+        // codes" in one screen (`SetupStep.tsx:33-174`), and the block is
+        // hidden when joining an existing home (`SetupStep.tsx:66`).
+        if (state.showsAccessSetup) {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            AddHomeAccessSetupSection(state = state, vm = vm)
         }
     }
 }
@@ -386,14 +449,47 @@ private fun ReviewStep(state: AddHomeUiState) {
             append(", ${state.form.address.city}")
             append(", ${state.form.address.state} ${state.form.address.zipCode}")
         }
-    ReviewSummaryBlock(
-        rows =
-            listOf(
-                ReviewSummaryRow("Address", composedAddress),
-                ReviewSummaryRow("Role", state.form.role?.label ?: "—"),
-                ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"),
-            ),
-    )
+    // Address / role / primary, plus everything the Details and Setup
+    // blocks collected — the review step previously showed only the first
+    // three, so nothing the user typed on those blocks was verifiable
+    // before submit.
+    val rows =
+        buildList {
+            add(ReviewSummaryRow("Address", composedAddress))
+            add(ReviewSummaryRow("Role", state.form.role?.label ?: "—"))
+            add(ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"))
+            if (state.isClaimingExistingHome) return@buildList
+            val details = state.form.details
+            if (details.nickname.isNotBlank()) {
+                add(ReviewSummaryRow("Nickname", details.nickname.trim()))
+            }
+            add(ReviewSummaryRow("Home type", details.homeType.label))
+            val size =
+                listOfNotNull(
+                    details.bedrooms.takeIf { it.isNotEmpty() }?.let { "$it bd" },
+                    details.bathrooms.takeIf { it.isNotEmpty() }?.let { "$it ba" },
+                ).joinToString(" · ")
+            if (size.isNotEmpty()) add(ReviewSummaryRow("Size", size))
+            if (details.sqFt.isNotEmpty()) {
+                add(ReviewSummaryRow("Home size", "${details.sqFt} sq ft"))
+            }
+            if (details.lotSqFt.isNotEmpty()) {
+                add(ReviewSummaryRow("Lot size", "${details.lotSqFt} sq ft"))
+            }
+            if (details.yearBuilt.isNotEmpty()) {
+                add(ReviewSummaryRow("Year built", details.yearBuilt))
+            }
+            val secretCount = state.accessItems.count { it.isComplete }
+            if (secretCount > 0) {
+                add(
+                    ReviewSummaryRow(
+                        "Networks & codes",
+                        if (secretCount == 1) "1 entry" else "$secretCount entries",
+                    ),
+                )
+            }
+        }
+    ReviewSummaryBlock(rows = rows)
 }
 
 @Composable

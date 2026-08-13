@@ -132,8 +132,14 @@ class HouseholdTasksListViewModelTest {
             assertEquals(1, loaded.sections[0].rows.size)
             val row = loaded.sections[0].rows[0]
             assertEquals("t1", row.id)
-            // Active trailing = circularAction (round-checkbox).
-            assertTrue(row.trailing is RowTrailing.CircularAction)
+            // Active trailing = the checkbox + trash pair. RN puts a
+            // trash affordance on every task row, so the round-checkbox
+            // now shares the trailing with a destructive icon action.
+            val trailing = row.trailing as RowTrailing.IconActions
+            assertEquals(PantopusIcon.Circle, trailing.primary.icon)
+            assertEquals("Mark done", trailing.primary.accessibilityLabel)
+            assertEquals(PantopusIcon.Trash, trailing.secondary.icon)
+            assertEquals("Delete task", trailing.secondary.accessibilityLabel)
             // Unassigned → typeIcon leading with the category palette.
             val leading = row.leading as RowLeading.TypeIcon
             assertEquals(PantopusIcon.Sparkles, leading.icon)
