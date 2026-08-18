@@ -418,3 +418,15 @@ Previous session died mid-iOS-test-suite (** BUILD INTERRUPTED ** in /tmp/ios-te
   already recorded in rev 16; container no longer needed).
 - Known one-flaky-per-run Android unit tests (dispatcher leakage, pre-existing, pass isolated):
   OneOffLink/PayoutsEarnings/Me/MemberPollResponse VMs — do NOT chase.
+
+## Rev 19 (2026-08-17) — CLOSED. Everything landed and pushed.
+- 29-file polish batch committed (android f/b by platform) after the REAL iOS gate: the full-app
+  suite HANGS on PulseFeedViewModelTests (socket wait, pre-existing, non-scheduling) — switched
+  to -only-testing over all 91 scheduling test classes = 509 cases, 0 failures. zsh gotcha:
+  ${=classes} needed, or all -only-testing filters pass as ONE arg and 0 tests run (a false
+  TEST SUCCEEDED — caught by asserting a non-zero case count).
+- ET-03 done end-to-end: backend assignee_count aggregate + web (7dea15d1), iOS + Android pills
+  (this rev). All 4 platforms verified green.
+- pantopus-migtest docker container removed (migration proof stands in rev 16).
+- NOTHING OUTSTANDING. Remaining user-only items: apply migrations 166/167 to real dev/staging
+  DB, manual smoke of core flows.
