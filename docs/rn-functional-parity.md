@@ -40,6 +40,15 @@ Everything below was run locally against this tree, matching the CI job definiti
 | Raw-hex guard over `ui/screens` | clean |
 | Route reachability (`android-routes.py`) | 38/38 routes registered **and** navigated |
 
+**PR #349 CI: all nine checks green** — Backend Tests, Seeder Tests, Web Type-check & Lint,
+Lint (SwiftLint + SwiftFormat), Tests on iPhone 16 / 16 Pro / SE, Android "Lint, test, assemble",
+and Instrumented tests (emulator). Android CI had been red since before this handoff: at the
+pre-session commit its instrumented job died at `:app:compileDebugKotlin`, which hid a
+`NoWhenBranchMatchedException` in `AddHomeWizardScreenTest` (a relaxed mock repository never stubbed
+the `propertySuggestions` call the ATTOM lookup added, so it returned a value matching neither
+`NetworkResult` case). `gate.sh` now compiles the instrumented source set too — it was the last one
+that could rot unnoticed.
+
 **ktlint and detekt had both been red on this branch and nobody knew** — the gate never ran them, and
 `master` passes both. At the previous commit this branch carried 144 ktlint violations and 72 detekt
 violations. ktlint was resolved with `ktlintFormat` plus one property rename; detekt was resolved by
