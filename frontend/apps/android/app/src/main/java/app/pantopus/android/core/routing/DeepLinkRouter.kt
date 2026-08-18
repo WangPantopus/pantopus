@@ -13,13 +13,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * pushes Uri instances in via [handle]; observers collect [pending]
  * and call [consume] when they've routed it.
  *
- * The router accepts `pantopus://…`, `https://pantopus.app/…`, and (once
- * AASA / assetlinks host both) `https://pantopus.com/…`. RN associated
- * domains use `.com`; native manifest entitlements today declare `.app` —
- * see `docs/ship-readiness.md` § WS6.2. RN historically used `pantopus.com`
- * associated domains; native ships on `pantopus.app`. Custom-scheme
- * links are host-agnostic; HTTPS `pantopus.com` AASA remains a
- * product/infra decision outside this router.
+ * The router accepts `pantopus://…`, `https://pantopus.com/…` and
+ * `https://pantopus.app/…`. Resolution is host-agnostic — only the path
+ * segments matter — so this needed no change when `pantopus.com` became the
+ * verified App Links host; the manifest and assetlinks.json carry that.
  *
  * Full routing table from `docs/07-frontend-mobile-app.md §9`.
  * `Home` (singular) keeps the legacy "go to Hub" semantics; the typed

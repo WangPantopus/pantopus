@@ -241,7 +241,9 @@ class GigDetailSaveViewModelTest {
         assertTrue(GigDetailViewModel.viewerCanReview(markedDone, "worker-9"))
         assertFalse(GigDetailViewModel.viewerCanReview(markedDone, "stranger"))
         assertFalse(GigDetailViewModel.viewerCanReview(markedDone.copy(status = "open"), "poster-1"))
-        assertEquals("https://pantopus.app/gigs/g1", GigDetailViewModel.shareUrl("g1"))
+        // The share link must sit on the domain the app actually claims —
+        // pantopus.com, per the manifest's autoVerify filter.
+        assertEquals("https://pantopus.com/gigs/g1", GigDetailViewModel.shareUrl("g1"))
     }
 
     // MARK: - Phase 5 · owner bids panel + instant accept (flows)

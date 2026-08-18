@@ -34,7 +34,7 @@ struct PantopusApp: App {
                         await authManager.restoreSession()
                     }
                 }
-                // Universal links (`https://pantopus.app/…`) and custom-scheme
+                // Universal links (`https://pantopus.com/…`) and custom-scheme
                 // URLs (`pantopus://…`). Both funnel into the same router the
                 // notification-tap path uses; `RootTabView` observes
                 // `DeepLinkRouter.shared.pending` and dispatches to the right

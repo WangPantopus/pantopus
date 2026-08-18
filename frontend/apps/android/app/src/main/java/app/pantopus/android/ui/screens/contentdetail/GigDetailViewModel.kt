@@ -280,7 +280,7 @@ class GigDetailViewModel
             }
 
             /** Shared web link for the Android share sheet (work item 6). */
-            fun shareUrl(gigId: String): String = "https://pantopus.app/gigs/$gigId"
+            fun shareUrl(gigId: String): String = "https://pantopus.com/gigs/$gigId"
 
             /**
              * Phase 6b — phase line for the ongoing active-task

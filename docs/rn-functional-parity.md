@@ -6,7 +6,7 @@
 
 ---
 
-## CURRENT BRANCH HANDOFF — 149/150 closed; full CI chain green (2026-08-18)
+## CURRENT BRANCH HANDOFF — 150/150 closed; full CI chain green (2026-08-18)
 
 > This block supersedes the 2026-08-13 handoff. That note described an uncommitted, red Wave D
 > worktree on branch `claude/rn-parity-high-severity-fixes`. Since then the tree was committed as
@@ -72,9 +72,9 @@ in both directions:
 | Tier 1 — six one-platform gaps | 6 / 6 closed |
 | Tier 2 — Android Earnings & Spending | 1 / 1 closed |
 | Tier 3 — skills, Gigs tab, AI bio, Portfolio, Reviews tab, Family Mail Party | 6 / 6 closed |
-| Tier 4 — resend-verification (invite-code still blocked, below) | 1 / 2 closed |
-| **Closed total** | **149 / 150** |
-| **Genuinely open** | **1** |
+| Tier 4 — resend-verification + invite-code link | 2 / 2 closed |
+| **Closed total** | **150 / 150** |
+| **Genuinely open** | **0** |
 
 The old count of 119 was pessimistic. Wave D landed more than its checkpoint claimed, and three of the
 five "deferred" Wave B findings turned out to be complete or nearly so.
@@ -144,16 +144,27 @@ compile-gated on both platforms. Kept here with what was actually built, for rev
     layer is missing: ViewModels, discover list, live session view, routes, entry affordances. This is
     the single largest remaining item. **L**
 
-**Tier 4 — one closed, one still blocked**
+**Tier 4 — both closed**
 
-Finding 15 (resend verification) is **closed**: the iOS 403 mapping is fixed and covered by a
-regression test, so the button can now actually render. Finding 14 (invite code from a `/join/:code`
-link) is **the single remaining open finding**. Its code path is built and symmetric on both
-platforms, and two of its three blockers are fixed (the invite-code charset bug and the missing
-`/join/*` AASA entry). It stays open on a hosting question that is not a code decision: the invite URL
-is `https://pantopus.com/join/<code>` while both apps claim `pantopus.app`. Someone who knows the DNS
-and deployment setup needs to say which host is authoritative before either the entitlements or the
-shared URL is changed — see *Production bugs found*, item 2.
+Finding 15 (resend verification): the iOS 403 mapping is fixed and covered by a regression test, so
+the button can actually render.
+
+Finding 14 (invite code from a `/join/:code` link) is now closed too. The owner confirmed on
+2026-08-18 that **`pantopus.com` is the product domain**, which was the one thing blocking it. Both
+apps now claim it:
+
+- iOS `Pantopus.entitlements` gained `applinks:pantopus.com` and `applinks:www.pantopus.com`. The
+  `.app` entries stay — iOS verifies each domain independently, so an unserved one costs nothing and
+  links already shared keep resolving.
+- Android's `autoVerify` filter now lists `pantopus.com` / `www.pantopus.com`, and `pantopus.app`
+  moved to a **separate filter without `autoVerify`**. That split is deliberate: `minSdk` is 26, and
+  below API 31 App Links verification is all-or-nothing across every `autoVerify`'d host, so leaving
+  an unserved `.app` in the same filter would have silently broken verification for `.com`.
+- Both clients' gig share links moved from `pantopus.app/gigs/<id>` to `pantopus.com/gigs/<id>` — a
+  share link on an unclaimed domain has the same defect the invite link had. `DOWNLOAD_URL` /
+  `downloadURLString` stay on `pantopus.app`: those are store landing pages, not deep links.
+- Neither router needed a change — both resolve on path segments and are host-agnostic. New tests on
+  both platforms pin the HTTPS `/join/<code>` and `/gigs/<id>` forms so this cannot regress.
 
 14. **Invite code from a `/join/:code` link.** The nav/DTO plumbing is genuinely built and symmetric on
     both platforms, but the capability cannot fire in production. See *Production bugs found* below;

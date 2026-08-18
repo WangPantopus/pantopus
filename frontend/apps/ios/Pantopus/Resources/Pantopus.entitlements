@@ -6,6 +6,13 @@
 	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<!-- pantopus.com is the product domain: it is what the backend and both
+		     clients put in share and invite links, and it is where the web app
+		     serves .well-known/apple-app-site-association. The .app entries are
+		     kept so any link already in circulation still resolves; iOS verifies
+		     each domain independently, so an unserved one costs nothing. -->
+		<string>applinks:pantopus.com</string>
+		<string>applinks:www.pantopus.com</string>
 		<string>applinks:pantopus.app</string>
 		<string>applinks:www.pantopus.app</string>
 	</array>

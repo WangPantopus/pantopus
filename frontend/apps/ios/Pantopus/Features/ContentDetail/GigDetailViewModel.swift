@@ -833,9 +833,10 @@ public final class GigDetailViewModel {
     }
 
     /// Universal-link share URL — `DeepLinkRouter` resolves
-    /// `https://pantopus.app/gigs/<id>` back to this detail.
+    /// `https://pantopus.com/gigs/<id>` back to this detail. It has to be the
+    /// domain the app actually claims, or the shared link opens the browser.
     public var shareURL: URL {
-        URL(string: "https://pantopus.app/gigs/\(gigId)") ?? AppEnvironment.current.apiBaseURL
+        URL(string: "https://pantopus.com/gigs/\(gigId)") ?? AppEnvironment.current.apiBaseURL
     }
 
     /// The interactive owner bids panel renders below the modules while

@@ -559,6 +559,20 @@ final class DeepLinkRouterAliasTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.shared.pending, .joinInvite(code: "CODE-7"))
     }
 
+    /// The invite the backend hands out is an `https://pantopus.com/join/<code>`
+    /// link. Until that domain was claimed and `/join/*` was added to the AASA,
+    /// tapping one only ever opened a browser.
+    func testHTTPSJoinLinkResolvesToJoinInvite() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.com/join/CODE-7")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .joinInvite(code: "CODE-7"))
+    }
+
+    /// Share links are built on the claimed domain — see `GigDetailViewModel.shareURL`.
+    func testHTTPSGigShareLinkResolvesToGig() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.com/gigs/g_3")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .gig(id: "g_3"))
+    }
+
     func testShortUserAlias() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://u/u_demo")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .user(id: "u_demo"))

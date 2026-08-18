@@ -57,8 +57,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep links: https://pantopus.app/... -->
+            <!-- Deep links: https://pantopus.com/... — the product domain. It is
+                 what the backend and both clients build share and invite links
+                 on, and the only host that serves .well-known/assetlinks.json. -->
             <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="pantopus.com" />
+                <data android:scheme="https" android:host="www.pantopus.com" />
+            </intent-filter>
+
+            <!-- pantopus.app links already in circulation still open the app,
+                 but deliberately WITHOUT autoVerify: minSdk is 26, and below
+                 API 31 verification is all-or-nothing across every autoVerify'd
+                 host, so an unserved assetlinks.json on .app would silently
+                 break verification for .com too. -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

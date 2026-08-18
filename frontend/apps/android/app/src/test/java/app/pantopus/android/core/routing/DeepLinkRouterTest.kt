@@ -171,6 +171,12 @@ class DeepLinkRouterTest {
             DeepLinkRouter.Destination.Gig("g_2"),
             DeepLinkRouter.resolveString("https://pantopus.app/gigs/g_2"),
         )
+        // pantopus.com is the verified App Links host and what shareUrl builds;
+        // .app above stays covered because links already shared still land here.
+        assertEquals(
+            DeepLinkRouter.Destination.Gig("g_3"),
+            DeepLinkRouter.resolveString("https://pantopus.com/gigs/g_3"),
+        )
     }
 
     @Test
@@ -293,6 +299,13 @@ class DeepLinkRouterTest {
         assertEquals(
             DeepLinkRouter.Destination.JoinInvite("CODE-7"),
             DeepLinkRouter.resolveString("pantopus://join/CODE-7"),
+        )
+        // The invite the backend hands out is an https://pantopus.com/join/<code>
+        // link, so that form has to resolve — before the domain was claimed and
+        // /join/* was added to assetlinks, tapping one only ever opened a browser.
+        assertEquals(
+            DeepLinkRouter.Destination.JoinInvite("CODE-7"),
+            DeepLinkRouter.resolveString("https://pantopus.com/join/CODE-7"),
         )
     }
 

@@ -426,7 +426,7 @@
 | **5.1 Tax documents** | Backend 1099 / tax-docs API + product design. |
 | **5.3 GDPR export** | Backend async export job (`POST /api/users/export` or equivalent). |
 | **5.5 AI history** | Backend message persistence + `GET /api/ai/conversations/:id/messages`. |
-| **6.2 Domain parity** | Product/infra: host AASA + Digital Asset Links for **both** `pantopus.app` (native entitlements today) and `pantopus.com` (RN associated domains). Resolver accepts both HTTPS hosts once linked. |
+| **6.2 Domain parity** | **Resolved 2026-08-18: `pantopus.com` is the product domain.** Both apps now claim it — iOS `applinks:pantopus.com` / `www.pantopus.com`, Android an `autoVerify` filter on the same two hosts — and the web app serves AASA + assetlinks.json there. `pantopus.app` stays claimed on iOS and keeps a non-`autoVerify` Android filter so links already shared still open the app; it is deliberately excluded from Android verification because below API 31 that is all-or-nothing across hosts. Share and invite links are built on `.com` on both platforms. |
 
 ---
 

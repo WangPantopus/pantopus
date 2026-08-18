@@ -340,11 +340,10 @@ final class DeepLinkRouter {
 
     // MARK: - URL parsing
 
-    /// Accepts `pantopus://…` and `https://pantopus.app/…`.
-    /// RN historically advertised `pantopus.com` associated domains; native
-    /// ships on `pantopus.app`. Custom-scheme links are host-agnostic. Adding
-    /// `pantopus.com` HTTPS hosts here is safe for resolve; AASA/entitlements
-    /// for that domain remain a product/infra decision outside this router.
+    /// Accepts `pantopus://…`, `https://pantopus.com/…` and
+    /// `https://pantopus.app/…`. Resolution is host-agnostic — only the path
+    /// segments matter — so this needed no change when `pantopus.com` became
+    /// the claimed associated domain; the entitlement and the AASA carry that.
     func resolve(url: URL) -> Destination {
         let segments = routeSegments(for: url)
         let firstSegment = segments.first ?? ""
