@@ -9,6 +9,7 @@ import app.pantopus.android.data.api.models.offers.MyBidsResponse
 import app.pantopus.android.data.api.models.offers.ReceivedOffersResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
@@ -33,6 +34,9 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class OffersViewModelTest {
     private val repo: OffersRepository = mockk()
+
+    // Accept / reject route through the gig bid endpoints, not the offers ones.
+    private val gigsRepo: GigsRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -134,7 +138,7 @@ class OffersViewModelTest {
         runTest {
             coEvery { repo.receivedOffers(any()) } returns NetworkResult.Success(oneReceived)
             coEvery { repo.myBids(any()) } returns NetworkResult.Success(oneSent)
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             vm.load()
             val state = vm.state.value
             assertTrue(state is ListOfRowsUiState.Loaded)
@@ -150,7 +154,7 @@ class OffersViewModelTest {
         runTest {
             coEvery { repo.receivedOffers(any()) } returns NetworkResult.Success(emptyReceived)
             coEvery { repo.myBids(any()) } returns NetworkResult.Success(emptySent)
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             vm.load()
             val state = vm.state.value
             assertTrue(state is ListOfRowsUiState.Empty)
@@ -164,7 +168,7 @@ class OffersViewModelTest {
         runTest {
             coEvery { repo.receivedOffers(any()) } returns NetworkResult.Success(emptyReceived)
             coEvery { repo.myBids(any()) } returns NetworkResult.Success(emptySent)
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             vm.load()
             vm.selectTab(OffersTab.SENT)
             val state = vm.state.value
@@ -181,7 +185,7 @@ class OffersViewModelTest {
                 NetworkResult.Failure(NetworkError.Server(500, null))
             coEvery { repo.myBids(any()) } returns
                 NetworkResult.Failure(NetworkError.Server(500, null))
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             vm.load()
             val state = vm.state.value
             assertTrue(state is ListOfRowsUiState.Error)
@@ -362,7 +366,7 @@ class OffersViewModelTest {
     @Test
     fun filter_top_bar_action_always_present() =
         runTest {
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             assertNotNull(vm.topBarAction.value)
             assertEquals(PantopusIcon.Filter, vm.topBarAction.value?.icon)
             assertEquals(true, vm.topBarAction.value?.isEnabled)
@@ -370,7 +374,7 @@ class OffersViewModelTest {
 
     @Test
     fun tabs_expose_received_and_sent_in_order() {
-        val vm = OffersViewModel(repo)
+        val vm = OffersViewModel(repo, gigsRepo)
         assertEquals(2, vm.tabs.value.size)
         assertEquals(OffersTab.RECEIVED, vm.tabs.value[0].id)
         assertEquals("Received", vm.tabs.value[0].label)
@@ -383,7 +387,7 @@ class OffersViewModelTest {
         runTest {
             coEvery { repo.receivedOffers(any()) } returns NetworkResult.Success(oneReceived)
             coEvery { repo.myBids(any()) } returns NetworkResult.Success(oneSent)
-            val vm = OffersViewModel(repo)
+            val vm = OffersViewModel(repo, gigsRepo)
             vm.load()
             vm.selectTab(OffersTab.SENT)
             val state = vm.state.value

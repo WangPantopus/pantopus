@@ -111,6 +111,22 @@ final class PaymentsViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
+        stubSupplementaryLoadRoutes()
+    }
+
+    /// `load()` fans out to five routes, but the ordered `sequence` below
+    /// describes only the two the tests actually assert on (methods, then
+    /// history) plus the add-card flow. The three supplementary reads —
+    /// earnings, spending and the Connect account — each degrade to `nil` on
+    /// their own and are not part of any assertion, so they are answered by
+    /// route instead. `routeResponses` is consulted before `sequence`, which
+    /// keeps them from eating the entries the add-card assertions depend on.
+    private func stubSupplementaryLoadRoutes() {
+        // Enough entries for the reloads a single test performs.
+        let empty = Array(repeating: SequencedURLProtocol.Response.status(200, body: "{}"), count: 4)
+        SequencedURLProtocol.routeResponses["/api/payments/earnings"] = empty
+        SequencedURLProtocol.routeResponses["/api/payments/spending"] = empty
+        SequencedURLProtocol.routeResponses["/api/payments/connect/account"] = empty
     }
 
     private func makeAPI() -> APIClient {
@@ -416,6 +432,59 @@ final class PaymentsViewModelTests: XCTestCase {
         }
         XCTAssertEqual(loaded.methods.count, 1)
         XCTAssertEqual(loaded.methods.first?.id, "pm_1")
+    }
+
+    /// The destructive path is gated behind a second step: tapping
+    /// "Remove Card" only queues the confirmation, and nothing reaches
+    /// `DELETE /api/payments/methods/{id}` until it is confirmed.
+    func testRemoveMethodRequiresConfirmationBeforeDelete() async {
+        let afterRemovalJSON = Self.methodsResponse(
+            Self.cardJSON(Self.defaultVisa)
+        )
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
+            .status(200, body: "{\"message\":\"ok\"}"),
+            .status(200, body: afterRemovalJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, let method = loaded.methods.last else {
+            XCTFail("Expected .loaded with methods, got \(vm.state)")
+            return
+        }
+
+        // Tapping the action menu's destructive item only queues the card.
+        vm.requestRemoval(method)
+        XCTAssertEqual(vm.pendingRemoval?.id, "pm_2")
+        XCTAssertEqual(vm.pendingRemoval?.last4, "4444", "The confirmation names the card by its last4")
+        XCTAssertTrue(Self.deleteRequests().isEmpty, "No DELETE before the user confirms")
+        guard case let .loaded(queued) = vm.state else {
+            XCTFail("Queuing a removal shouldn't change the render state")
+            return
+        }
+        XCTAssertEqual(queued.methods.count, 2, "The row stays put until the removal is confirmed")
+
+        // Dismissing the confirmation still issues nothing.
+        vm.cancelRemoval()
+        XCTAssertNil(vm.pendingRemoval)
+        XCTAssertTrue(Self.deleteRequests().isEmpty, "Cancelling leaves the card on file")
+
+        // Confirming is the only path that reaches the backend.
+        vm.requestRemoval(method)
+        await vm.removeMethod(method.id)
+        XCTAssertNil(vm.pendingRemoval, "Confirming clears the queued removal")
+        XCTAssertEqual(Self.deleteRequests().count, 1)
+        XCTAssertEqual(Self.deleteRequests().first?.url?.path, "/api/payments/methods/pm_2")
+        guard case let .loaded(removed) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(removed.methods.map(\.id), ["pm_1"])
+    }
+
+    private static func deleteRequests() -> [URLRequest] {
+        SequencedURLProtocol.capturedRequests.filter { $0.httpMethod == "DELETE" }
     }
 }
 

@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +80,8 @@ fun PublicProfileScreen(
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
     val connectState by viewModel.connectState.collectAsStateWithLifecycle()
+    val connection by viewModel.connection.collectAsStateWithLifecycle()
+    val showDisconnectConfirm by viewModel.showDisconnectConfirm.collectAsStateWithLifecycle()
     val showHandshake by viewModel.showFollowHandshake.collectAsStateWithLifecycle()
     val handshakeTier by viewModel.handshakePreselectedTierRank.collectAsStateWithLifecycle()
     val isFollowing by viewModel.isFollowing.collectAsStateWithLifecycle()
@@ -136,6 +140,7 @@ fun PublicProfileScreen(
                                 isFollowing = isFollowing,
                                 isInFlight = isFollowInFlight,
                             ),
+                        connection = connection,
                         onFollow = { viewModel.follow() },
                     )
                 } else {
@@ -151,6 +156,7 @@ fun PublicProfileScreen(
                                 isFollowing = isFollowing,
                                 isInFlight = isFollowInFlight,
                             ),
+                        connection = connection,
                         onFollow = { viewModel.follow() },
                         onMessage = { onOpenMessages(content.profile) },
                         onConnect = { viewModel.connect() },
@@ -213,6 +219,34 @@ fun PublicProfileScreen(
                 )
             }
         }
+        // Tapping "Connected" removes the edge, and RN gates the same
+        // `DELETE api/relationships/:id` behind a "Disconnect · Remove this
+        // connection?" alert (`src/app/connections.tsx:69-77`), so confirm
+        // first. Mirrors iOS `PublicProfileView`'s disconnect dialog.
+        if (showDisconnectConfirm) {
+            val name = (state as? PublicProfileUiState.Loaded)?.content?.header?.displayName?.trim().orEmpty()
+            AlertDialog(
+                onDismissRequest = { viewModel.cancelDisconnect() },
+                title = { Text(if (name.isEmpty()) "Disconnect" else "Disconnect from $name") },
+                text = { Text("Remove this connection?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = { viewModel.disconnect() },
+                        modifier = Modifier.testTag("publicProfileDisconnectConfirm"),
+                    ) {
+                        Text("Remove", color = PantopusColors.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { viewModel.cancelDisconnect() },
+                        modifier = Modifier.testTag("publicProfileDisconnectCancel"),
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -233,8 +267,9 @@ internal data class ProfileFollowState(
  * snapshot tests can render the populated view without spinning up a
  * Hilt VM.
  *
- * [connectState] drives the local profile's Connect → Requested flip and
- * [follow] drives the Follow → Following flip; iOS
+ * [connection] drives the local profile's Connect → Requested → Accept →
+ * Connected label ([connectState] only greys the control while a call is
+ * in flight) and [follow] drives the Follow → Following flip; iOS
  * `PublicProfileView.identityActions` renders exactly the same pair.
  */
 @Composable
@@ -250,6 +285,7 @@ internal fun PublicProfileLoadedFrame(
     onOverflow: () -> Unit,
     onUnlock: (PublicProfilePost) -> Unit,
     follow: ProfileFollowState = ProfileFollowState(),
+    connection: ProfileConnection = ProfileConnection.None,
     onOpenInsights: () -> Unit = {},
     onEditPersona: () -> Unit = {},
     onComposeBroadcast: () -> Unit = {},
@@ -323,12 +359,11 @@ internal fun PublicProfileLoadedFrame(
                                 }
                             }
                         } else {
-                            val requested = connectState is PublicProfileActionState.Succeeded
-                            BeaconHeaderGhostButton(
-                                icon = PantopusIcon.UserPlus,
-                                actionLabel = if (requested) "Requested" else "Connect",
-                                onClick = onConnect,
-                                title = if (requested) "Requested" else "Connect",
+                            ConnectHeaderButton(
+                                connection = connection,
+                                connectState = connectState,
+                                canFollow = follow.canFollow,
+                                onConnect = onConnect,
                             )
                             BeaconHeaderPrimaryButton(
                                 title = "Message",
@@ -389,6 +424,7 @@ internal fun LocalProfileLoadedFrame(
     onConnect: () -> Unit,
     onOverflow: () -> Unit,
     follow: ProfileFollowState = ProfileFollowState(),
+    connection: ProfileConnection = ProfileConnection.None,
     onFollow: () -> Unit = {},
 ) {
     ContentDetailShell(
@@ -423,12 +459,11 @@ internal fun LocalProfileLoadedFrame(
                         avatarUrl = content.header.avatarUrl,
                         stats = content.stats.stats,
                     ) {
-                        val requested = connectState is PublicProfileActionState.Succeeded
-                        BeaconHeaderGhostButton(
-                            icon = PantopusIcon.UserPlus,
-                            actionLabel = if (requested) "Requested" else "Connect",
-                            onClick = onConnect,
-                            title = if (requested) "Requested" else "Connect",
+                        ConnectHeaderButton(
+                            connection = connection,
+                            connectState = connectState,
+                            canFollow = follow.canFollow,
+                            onConnect = onConnect,
                         )
                         BeaconHeaderPrimaryButton(
                             title = "Message",
@@ -470,6 +505,42 @@ internal fun LocalProfileLoadedFrame(
             }
         },
     )
+}
+
+/**
+ * The relationship-driven Connect header action.
+ *
+ * The label, the glyph and whether the tap does anything all come from the
+ * edge `GET api/users/:id/relationship` reported: Connect → Requested →
+ * Accept → Connected. An outstanding request renders inert (RN's
+ * `disabled={actionLoading || connectionState === 'pending_sent'}`). The
+ * control disappears altogether on your own profile, for a signed-out
+ * viewer, and once the viewer has blocked this neighbour — RN drops the
+ * whole action row in those cases (`src/app/user/[id].tsx:391-398,523`).
+ * Mirrors iOS `PublicProfileView.identityActions`.
+ */
+@Composable
+private fun ConnectHeaderButton(
+    connection: ProfileConnection,
+    connectState: PublicProfileActionState,
+    canFollow: Boolean,
+    onConnect: () -> Unit,
+) {
+    if (!canFollow || connection == ProfileConnection.Blocked) return
+    Box(modifier = Modifier.testTag("publicProfileConnectCta")) {
+        BeaconHeaderGhostButton(
+            icon =
+                when (connection) {
+                    ProfileConnection.Connected -> PantopusIcon.Check
+                    ProfileConnection.PendingSent -> PantopusIcon.Clock
+                    else -> PantopusIcon.UserPlus
+                },
+            actionLabel = connection.accessibilityLabel,
+            onClick = onConnect,
+            title = connection.label,
+            enabled = connection.isActionable && connectState !is PublicProfileActionState.InFlight,
+        )
+    }
 }
 
 /**

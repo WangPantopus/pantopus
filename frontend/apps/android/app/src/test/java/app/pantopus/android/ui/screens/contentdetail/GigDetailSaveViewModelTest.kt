@@ -92,6 +92,7 @@ class GigDetailSaveViewModelTest {
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
     private val reviewsRepo: ReviewsRepository = mockk()
+    private val gigsV2Repo: app.pantopus.android.data.gigs.GigsV2Repository = mockk(relaxed = true)
     private val socket: SocketManager = mockk(relaxed = true)
     private val activeNotifier = RecordingActiveNotifier()
 
@@ -141,6 +142,7 @@ class GigDetailSaveViewModelTest {
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -263,6 +265,7 @@ class GigDetailSaveViewModelTest {
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -343,6 +346,7 @@ class GigDetailSaveViewModelTest {
                     reviewsRepo,
                     socket,
                     activeNotifier,
+                    gigsV2Repo,
                     SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
                 )
             vm.load()
@@ -398,6 +402,7 @@ class GigDetailSaveViewModelTest {
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()

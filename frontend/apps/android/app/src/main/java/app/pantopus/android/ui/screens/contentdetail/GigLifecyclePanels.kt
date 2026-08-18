@@ -81,6 +81,7 @@ import java.util.Locale
 @Composable
 fun GigLifecycleSections(viewModel: GigDetailViewModel) {
     val bids by viewModel.bids.collectAsStateWithLifecycle()
+    val offerRankings by viewModel.offerRankings.collectAsStateWithLifecycle()
     val bidActionInFlight by viewModel.bidActionInFlight.collectAsStateWithLifecycle()
     val activeTask by viewModel.activeTask.collectAsStateWithLifecycle()
     val reviewState by viewModel.reviewState.collectAsStateWithLifecycle()
@@ -114,6 +115,7 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
             onCounter = { counterTarget = it },
             onReject = { rejectTarget = it },
             onWithdrawCounter = { withdrawCounterTarget = it },
+            rankings = offerRankings,
         )
     }
 
@@ -319,6 +321,7 @@ private fun GigOwnerBidsPanel(
     onCounter: (GigBidDto) -> Unit,
     onReject: (GigBidDto) -> Unit,
     onWithdrawCounter: (GigBidDto) -> Unit,
+    rankings: Map<String, GigOfferRanking> = emptyMap(),
 ) {
     Column(
         modifier =
@@ -359,6 +362,7 @@ private fun GigOwnerBidsPanel(
                     onCounter = { onCounter(bid) },
                     onReject = { onReject(bid) },
                     onWithdrawCounter = { onWithdrawCounter(bid) },
+                    ranking = rankings[bid.id],
                 )
             }
         }
@@ -373,6 +377,7 @@ private fun GigOwnerBidRow(
     onCounter: () -> Unit,
     onReject: () -> Unit,
     onWithdrawCounter: () -> Unit,
+    ranking: GigOfferRanking? = null,
 ) {
     val identity = bid.bidderIdentity()
     val name = identity?.resolvedDisplayName() ?: "Bidder"
@@ -413,6 +418,31 @@ private fun GigOwnerBidRow(
                 relativeAgeLabel(bid.createdAt)?.let { age ->
                     Text(text = age, fontSize = 11.sp, color = PantopusColors.appTextMuted)
                 }
+                // v2 scored offers carry a trust capsule — "4.9★ · 12 tasks"
+                // (`backend/routes/offersV2.js:47`); the `/bids` fallback has none.
+                ranking?.trustLine?.let { trust ->
+                    Text(
+                        text = trust,
+                        fontSize = 11.sp,
+                        color = PantopusColors.appTextSecondary,
+                        modifier = Modifier.testTag("gigDetail.bid_${bid.id}.trust"),
+                    )
+                }
+            }
+            if (ranking?.isRecommended == true) {
+                Text(
+                    text = "BEST MATCH",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    color = PantopusColors.primary700,
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .background(PantopusColors.primary50)
+                            .padding(horizontal = Spacing.s2, vertical = 2.dp)
+                            .testTag("gigDetail.bid_${bid.id}.bestMatch"),
+                )
             }
             Text(
                 text = formatBidAmount(amount),

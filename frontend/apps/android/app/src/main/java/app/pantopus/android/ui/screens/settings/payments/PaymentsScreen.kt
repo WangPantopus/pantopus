@@ -31,6 +31,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.core.security.SecureScreenEffect
+import app.pantopus.android.core.security.SensitiveScreenGuard
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroPayoutFooter
 import app.pantopus.android.ui.components.ToastController
@@ -82,6 +84,7 @@ import com.stripe.android.paymentsheet.rememberPaymentSheet
  * [PaymentsViewModel.events]. Payout rows route to Wallet, which owns the
  * live Stripe Connect onboarding/dashboard/withdraw flow.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaymentsScreen(
     onBack: () -> Unit = {},
@@ -89,6 +92,7 @@ fun PaymentsScreen(
     viewModel: PaymentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val toastController = remember { ToastController() }
     val context = LocalContext.current
 
@@ -122,23 +126,39 @@ fun PaymentsScreen(
 
     SecureScreenEffect()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        PaymentsScreenContent(
-            state = state,
-            actions =
-                PaymentsScreenActions(
-                    onBack = onBack,
-                    onAddMethod = viewModel::tapAddMethod,
-                    onSetDefault = viewModel::setDefault,
-                    onRemove = viewModel::removeMethod,
-                    onTapRow = { id ->
-                        if (id.startsWith("payouts.")) onOpenWallet() else viewModel.tapRow(id)
-                    },
-                    onCloseAccount = viewModel::tapCloseAccount,
-                    onRetry = viewModel::refresh,
-                ),
-        )
-        ToastHost(controller = toastController)
+    // Money surface — RN wraps this route in `SensitiveScreenGuard`
+    // (`app/settings/payments.tsx:31`), so the device credential is checked
+    // before any card / payout detail is composed. A 5-minute grace means
+    // Wallet → Payments doesn't prompt twice.
+    SensitiveScreenGuard(reason = "Verify to access Payments & Payouts", onRejected = onBack) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // iOS keeps a `.refreshable` on the Payments content
+            // (`Features/Settings/Payments/PaymentsView.swift:169`) — without
+            // it the saved cards and payout status can only be re-read by
+            // leaving and re-entering the screen.
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                PaymentsScreenContent(
+                    state = state,
+                    actions =
+                        PaymentsScreenActions(
+                            onBack = onBack,
+                            onAddMethod = viewModel::tapAddMethod,
+                            onSetDefault = viewModel::setDefault,
+                            onRemove = viewModel::removeMethod,
+                            onTapRow = { id ->
+                                if (id.startsWith("payouts.")) onOpenWallet() else viewModel.tapRow(id)
+                            },
+                            onCloseAccount = viewModel::tapCloseAccount,
+                            onRetry = viewModel::refresh,
+                        ),
+                )
+            }
+            ToastHost(controller = toastController)
+        }
     }
 }
 

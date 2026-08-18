@@ -122,6 +122,9 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    // The Connect control only renders for a signed-in
+                    // viewer on someone else's profile.
+                    follow = ProfileFollowState(canFollow = true),
                 )
             }
         }
@@ -142,6 +145,9 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    follow = ProfileFollowState(canFollow = true),
+                    // An outstanding request: "Requested", clock glyph, inert.
+                    connection = ProfileConnection.PendingSent,
                 )
             }
         }
@@ -162,6 +168,7 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    follow = ProfileFollowState(canFollow = true),
                 )
             }
         }

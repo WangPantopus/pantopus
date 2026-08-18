@@ -7,35 +7,17 @@
 # revokeGuestPass / earnBalance / pending declared with zero call sites).
 # This re-checks that shape for everything the branch added.
 set -uo pipefail
-ROOT=/Users/yingpengwang/pantopus/native/pantopus
+ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 AND="$ROOT/frontend/apps/android/app/src/main/java/app/pantopus/android"
 IOS="$ROOT/frontend/apps/ios/Pantopus"
 cd "$ROOT"
 
 echo "############ ANDROID ROUTES ############"
-printf '%-32s %-10s %-10s %s\n' ROUTE COMPOSABLE NAV_SITES VERDICT
-git diff master...HEAD -- "${AND#$ROOT/}/ui/screens/root/RootTabScreen.kt" \
-  | grep -E '^\+[[:space:]]+const val [A-Z_]+' \
-  | sed -E 's/^\+[[:space:]]+const val ([A-Z_]+).*/\1/' \
-  | grep -vE '_KEY$' | sort -u \
-  | while read -r r; do
-      [ -z "$r" ] && continue
-      # a composable(...) block registered for it. Registration is usually
-      # multi-line (`composable(\n    route = ChildRoutes.X,`), so match the
-      # `route =` form as well as the single-line positional form.
-      comp=$(grep -cE "route = ChildRoutes\.$r,|composable\(ChildRoutes\.$r[,)]" \
-             "$AND/ui/screens/root/RootTabScreen.kt")
-      # Parameterised routes are navigated through a camelCase builder
-      # (GUEST_PASSES -> ChildRoutes.guestPasses(homeId)), not the constant,
-      # so count both forms.
-      camel=$(echo "$r" | awk -F_ '{printf "%s", tolower($1); for(i=2;i<=NF;i++) printf "%s%s", toupper(substr($i,1,1)), tolower(substr($i,2))}')
-      nav=$(grep -rnE "ChildRoutes\.($r\b|$camel\()" "$AND" --include='*.kt' 2>/dev/null \
-            | grep -vE "const val $r|route = ChildRoutes\.$r,|fun $camel\(" | wc -l | tr -d ' ')
-      if [ "$comp" -gt 0 ] && [ "$nav" -gt 0 ]; then v=ok
-      elif [ "$comp" -eq 0 ]; then v="NO-COMPOSABLE"
-      else v="NO-NAV-SITE"; fi
-      printf '%-32s %-10s %-10s %s\n' "$r" "$comp" "$nav" "$v"
-    done
+# Parsing lives in android-routes.py — the registration and navigation forms in
+# RootTabScreen.kt are too varied for a grep, and earlier grep-only versions
+# reported PROFILE, TODAY_DETAIL and NOTIFICATIONS_ROUTE as unreachable when all
+# three were fine.
+python3 "$(dirname "${BASH_SOURCE[0]}")/android-routes.py" "$ROOT" "$AND"
 
 echo
 echo "############ ANDROID: new Api methods with zero repository/VM call sites ############"

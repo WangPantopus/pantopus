@@ -118,19 +118,25 @@ public struct PaymentMethod: Identifiable, Sendable, Hashable {
     /// Optional chip rendered before the trailing chevron — used for
     /// the "Default" badge on the active method.
     public let chip: PaymentMethodChip?
+    /// Last four digits of the card / bank account, when the server sent
+    /// them. Only used to name the method in the destructive remove
+    /// confirmation ("…ending in 4421").
+    public let last4: String?
 
     public init(
         id: String,
         brand: PaymentMethodBrand,
         label: String,
         subtext: String? = nil,
-        chip: PaymentMethodChip? = nil
+        chip: PaymentMethodChip? = nil,
+        last4: String? = nil
     ) {
         self.id = id
         self.brand = brand
         self.label = label
         self.subtext = subtext
         self.chip = chip
+        self.last4 = last4
     }
 }
 

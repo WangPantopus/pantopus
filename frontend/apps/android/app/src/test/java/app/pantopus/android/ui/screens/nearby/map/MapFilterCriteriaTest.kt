@@ -37,7 +37,13 @@ class MapFilterCriteriaTest {
 
     @Test fun sections_lead_with_entity_type_then_distance_then_gig_dimensions() {
         assertEquals(
-            listOf("entityType", "distance", "category", "budget", "schedule", "openToBids", "postedWithin"),
+            listOf(
+                "entityType", "distance", "category", "budget", "schedule", "openToBids", "postedWithin",
+                // The map keeps its own radius range AND the gig radius presets, so
+                // "distance" appears twice by design — retitled "Gig radius" the
+                // second time. Both parse sides discriminate on control type.
+                "distance", "deadline", "archetype",
+            ),
             MapFilterCriteria().toSections().map { it.id },
         )
     }

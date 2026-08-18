@@ -8,6 +8,10 @@ import app.pantopus.android.data.api.models.posts.MyPostsResponse
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.profile.PublicProfileReview
 import app.pantopus.android.data.api.models.relationships.ConnectionRequestResponse
+import app.pantopus.android.data.api.models.relationships.PendingRequestDto
+import app.pantopus.android.data.api.models.relationships.PendingRequestsResponse
+import app.pantopus.android.data.api.models.relationships.RelationshipActionEcho
+import app.pantopus.android.data.api.models.relationships.RelationshipUserDto
 import app.pantopus.android.data.api.models.users.FollowActionResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.users.UserRelationshipDto
@@ -15,6 +19,7 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.connections.ConnectionsRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
@@ -44,6 +49,8 @@ class PublicProfileViewModelTest {
     private val repo: ProfileRepository = mockk()
     private val social: UserSocialRepository = mockk(relaxed = true)
     private val relationships: RelationshipsRepository = mockk()
+    // Owns the disconnect half of `/api/relationships` (S5 split).
+    private val connections: ConnectionsRepository = mockk(relaxed = true)
     private val blocks: BlocksRepository = mockk()
     private val authRepository: AuthRepository = mockk(relaxed = true)
     private val posts: PostsRepository = mockk()
@@ -72,6 +79,7 @@ class PublicProfileViewModelTest {
             repo = repo,
             social = social,
             relationships = relationships,
+            connections = connections,
             blocks = blocks,
             authRepository = authRepository,
             posts = posts,
@@ -174,6 +182,112 @@ class PublicProfileViewModelTest {
             vm.connect()
             assertTrue(vm.connectState.value is PublicProfileActionState.Failed)
             assertTrue(!vm.toastMessage.value.isNullOrEmpty())
+        }
+
+    // The relationship-driven Connect control. `GET
+    // api/users/:id/relationship` reports the edge; the header button reads
+    // its label, its enabled pose and its action off that.
+
+    @Test fun every_relationship_state_projects_onto_the_connect_control() =
+        runTest {
+            // edge → label, tappable
+            val poses =
+                listOf(
+                    Triple(ProfileConnection.None, "Connect", true),
+                    Triple(ProfileConnection.PendingSent, "Requested", false),
+                    Triple(ProfileConnection.PendingReceived, "Accept", true),
+                    Triple(ProfileConnection.Connected, "Connected", true),
+                    Triple(ProfileConnection.Blocked, "Connect", true),
+                )
+            poses.forEach { (edge, label, tappable) ->
+                signedInAs("viewer")
+                coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+                coEvery { social.relationship("u1") } returns
+                    NetworkResult.Success(UserRelationshipDto(relationship = edge.apiValue, following = false))
+                val vm = makeVm()
+                vm.load()
+                assertEquals(edge, vm.connection.value)
+                assertEquals(label, vm.connection.value.label)
+                assertEquals(tappable, vm.isConnectEnabled())
+                // A blocked edge drops the control; every other edge keeps it.
+                assertEquals(edge != ProfileConnection.Blocked, vm.showsConnectAction())
+            }
+        }
+
+    @Test fun connect_control_is_hidden_for_a_signed_out_viewer() =
+        runTest {
+            coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+            val vm = makeVm()
+            vm.load()
+            assertFalse(vm.canFollow.value)
+            assertFalse(vm.showsConnectAction())
+            assertEquals(ProfileConnection.None, vm.connection.value)
+        }
+
+    @Test fun connect_is_inert_while_a_request_is_outstanding() =
+        runTest {
+            signedInAs("viewer")
+            coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+            coEvery { social.relationship("u1") } returns
+                NetworkResult.Success(UserRelationshipDto(relationship = "pending_sent", following = false))
+            val vm = makeVm()
+            vm.load()
+            vm.connect()
+            assertEquals(ProfileConnection.PendingSent, vm.connection.value)
+            coVerify(exactly = 0) { relationships.sendRequest(any(), any()) }
+        }
+
+    @Test fun connect_on_an_inbound_request_accepts_it() =
+        runTest {
+            signedInAs("viewer")
+            coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+            coEvery { social.relationship("u1") } returns
+                NetworkResult.Success(UserRelationshipDto(relationship = "pending_received", following = false))
+            coEvery { relationships.pendingRequests() } returns
+                NetworkResult.Success(
+                    PendingRequestsResponse(
+                        listOf(PendingRequestDto(id = "r1", requester = RelationshipUserDto(id = "u1"))),
+                    ),
+                )
+            coEvery { relationships.accept("r1") } returns
+                NetworkResult.Success(RelationshipActionEcho(message = "ok"))
+            val vm = makeVm()
+            vm.load()
+            vm.connect()
+            assertEquals(ProfileConnection.Connected, vm.connection.value)
+            assertEquals("Connected", vm.toastMessage.value)
+            coVerify(exactly = 1) { relationships.accept("r1") }
+        }
+
+    @Test fun connect_on_a_connected_edge_confirms_before_removing_it() =
+        runTest {
+            signedInAs("viewer")
+            coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+            coEvery { social.relationship("u1") } returns
+                NetworkResult.Success(UserRelationshipDto(relationship = "connected", following = true))
+            val vm = makeVm()
+            vm.load()
+            vm.connect()
+            assertTrue(vm.showDisconnectConfirm.value)
+            coVerify(exactly = 0) { relationships.sendRequest(any(), any()) }
+            vm.cancelDisconnect()
+            assertFalse(vm.showDisconnectConfirm.value)
+            assertEquals(ProfileConnection.Connected, vm.connection.value)
+        }
+
+    @Test fun blocking_drops_the_connect_control() =
+        runTest {
+            signedInAs("viewer")
+            coEvery { repo.publicProfile(ROUTE_ID) } returns NetworkResult.Success(profile())
+            coEvery { social.relationship("u1") } returns
+                NetworkResult.Success(UserRelationshipDto(relationship = "none", following = false))
+            coEvery { blocks.block("u1") } returns NetworkResult.Success(Unit)
+            val vm = makeVm()
+            vm.load()
+            assertTrue(vm.showsConnectAction())
+            vm.block()
+            assertEquals(ProfileConnection.Blocked, vm.connection.value)
+            assertFalse(vm.showsConnectAction())
         }
 
     @Test fun block_succeeds_and_emits_toast() =

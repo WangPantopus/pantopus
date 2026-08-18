@@ -1,5 +1,5 @@
 //
-//  EarningsDTOs.swift
+//  PaymentsEarningsDTOs.swift
 //  Pantopus
 //
 //  DTOs for `GET /api/payments/earnings` (backend/routes/pays.js:1111) and
@@ -33,8 +33,9 @@ private func decodeCents<K: CodingKey>(
 
 // MARK: - Earnings
 
-/// `GET /api/payments/earnings` envelope.
-public struct EarningsSummaryResponse: Decodable, Sendable, Hashable {
+/// `GET /api/payments/earnings` envelope. Named apart from Mailbox's
+/// `EarningsSummaryResponse`, which decodes the unrelated Earn dashboard.
+public struct PaymentsEarningsResponse: Decodable, Sendable, Hashable {
     public let earnings: EarningsSummary
 
     private enum CodingKeys: String, CodingKey {

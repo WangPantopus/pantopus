@@ -110,7 +110,16 @@ public struct MapFilterCriteria: Sendable, Hashable {
                 )
             )
         ]
-        sections.append(contentsOf: gig.sections())
+        // The map contributes its own radius *range* and the gig criteria
+        // contribute radius *presets*; both are kept deliberately, and they
+        // intersect when filtering. Two headers reading "Distance" would be
+        // unreadable, so the gig-supplied one is retitled here only. The ids
+        // stay as they are — both parse sides discriminate on control type,
+        // and the shell iterates by index, so the repeat is harmless.
+        sections.append(contentsOf: gig.sections().map { section in
+            guard section.id == "distance" else { return section }
+            return FilterSection(id: section.id, title: "Gig radius", control: section.control)
+        })
         return sections
     }
 

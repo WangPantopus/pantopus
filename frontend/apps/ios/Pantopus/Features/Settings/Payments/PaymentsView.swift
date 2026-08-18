@@ -63,6 +63,27 @@ public struct PaymentsView: View {
         ) {
             methodActions
         }
+        // Second, destructive step before `DELETE /api/payments/methods/{id}`
+        // — mirrors Android's `RemoveMethodDialog` (`PaymentsScreen.kt:244`),
+        // an `AlertDialog` naming the card. Same shape as the Members screen's
+        // action-sheet → remove-confirm chain (`MembersListView.swift:176`).
+        .alert(
+            "Remove card",
+            isPresented: Binding(
+                get: { viewModel.pendingRemoval != nil },
+                set: { if !$0 { viewModel.cancelRemoval() } }
+            ),
+            presenting: viewModel.pendingRemoval
+        ) { method in
+            Button("Remove", role: .destructive) {
+                Task { await viewModel.removeMethod(method.id) }
+            }
+            .accessibilityIdentifier("paymentsRemoveConfirm")
+            Button("Cancel", role: .cancel) { viewModel.cancelRemoval() }
+                .accessibilityIdentifier("paymentsRemoveCancel")
+        } message: { method in
+            Text("Are you sure you want to remove \(Self.removalSubject(method))?")
+        }
         .alert(
             "Something went wrong",
             isPresented: Binding(
@@ -85,11 +106,24 @@ public struct PaymentsView: View {
                 .accessibilityIdentifier("paymentsRow_\(method.id)_setDefault")
             }
             Button("Remove Card", role: .destructive) {
-                Task { await viewModel.removeMethod(method.id) }
+                // Dismiss the action menu and hand off to the destructive
+                // confirmation — the DELETE only fires once the user confirms.
+                actionMethod = nil
+                viewModel.requestRemoval(method)
             }
             .accessibilityIdentifier("paymentsRow_\(method.id)_remove")
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    /// Names the method the way the confirmation body reads — "the card
+    /// ending in 4421" when the server sent the digits, otherwise the row's
+    /// own "<Brand> •• <last4>" label.
+    private static func removalSubject(_ method: PaymentMethod) -> String {
+        if let last4 = method.last4, !last4.isEmpty {
+            return "the card ending in \(last4)"
+        }
+        return method.label
     }
 }
 

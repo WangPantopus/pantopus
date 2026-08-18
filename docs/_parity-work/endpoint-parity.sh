@@ -4,7 +4,7 @@
 # distinctive path fragment, so it survives the two apps' different idioms
 # (Swift string interpolation / a path() helper vs Retrofit annotations).
 set -uo pipefail
-ROOT=/Users/yingpengwang/pantopus/native/pantopus
+ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 IOS="$ROOT/frontend/apps/ios/Pantopus"
 AND="$ROOT/frontend/apps/android/app/src/main/java/app/pantopus/android"
 

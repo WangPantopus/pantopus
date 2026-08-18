@@ -4,7 +4,7 @@
 # unknown coverage. Probe each finding by the symbol/route it would have to
 # introduce, on BOTH platforms.
 set -uo pipefail
-ROOT=/Users/yingpengwang/pantopus/native/pantopus
+ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 IOS="$ROOT/frontend/apps/ios/Pantopus"
 AND="$ROOT/frontend/apps/android/app/src/main/java/app/pantopus/android"
 

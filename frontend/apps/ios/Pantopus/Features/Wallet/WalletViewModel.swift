@@ -285,13 +285,22 @@ public final class WalletViewModel {
 
     // MARK: - Withdraw amount validation (pure — unit-test surface)
 
+    /// Outcome of parsing the withdraw field. Not `Result<Int, String>` —
+    /// `String` does not conform to `Error`, so the failure payload needs its
+    /// own case, matching `GigDetailViewModel.RemindWorkerOutcome`. The failure
+    /// string is the inline copy the field shows verbatim.
+    enum WithdrawAmount: Sendable, Equatable {
+        case success(Int)
+        case failure(String)
+    }
+
     /// Parse the decimal-pad string into integer cents, mirroring RN's three
     /// guards: a positive number, at or under the available balance, and the
     /// server's $1.00 floor (`backend/services/walletService.js:92`).
     static func parseWithdrawAmount(
         _ raw: String,
         availableCents: Int
-    ) -> Result<Int, String> {
+    ) -> WithdrawAmount {
         let cleaned = raw
             .replacingOccurrences(of: "$", with: "")
             .replacingOccurrences(of: ",", with: "")

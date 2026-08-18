@@ -5,7 +5,7 @@
 # platforms' differing placeholder syntax ({id} vs \(id)), and reports paths
 # that exist on only one side. A compile gate cannot catch this class of drift.
 set -uo pipefail
-ROOT=/Users/yingpengwang/pantopus/native/pantopus
+ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 IOS="$ROOT/frontend/apps/ios/Pantopus/Core/Networking/Endpoints"
 AND="$ROOT/frontend/apps/android/app/src/main/java/app/pantopus/android/data/api/services"
 

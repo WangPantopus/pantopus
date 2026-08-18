@@ -149,6 +149,17 @@ fun GigDetailScreen(
             onOpenChat(event.roomId, event.displayName, event.initials, event.verified)
         }
     }
+    // A freshly minted status link goes straight to the clipboard — RN's
+    // `ETATracker` copies and never opens the system share sheet
+    // (`components/gig-detail-v2/ETATracker.tsx:57`).
+    LaunchedEffect(Unit) {
+        viewModel.liveStatusEvents.collect { event ->
+            val clipboard =
+                context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Live status link", event.url))
+            toastText = "Live status link copied — it expires in 24 hours."
+        }
+    }
     // Tip success → toast (PaymentSheet itself surfaces decline / SCA errors).
     LaunchedEffect(tipStatus) {
         if (tipStatus is TipStatus.Succeeded) toastText = "Tip sent — thank you!"
@@ -180,6 +191,18 @@ fun GigDetailScreen(
 
     val overflowItems =
         buildList {
+            // Poster or assigned helper on a live task can mint a 24h public
+            // status link (`POST /api/gigs/:gigId/share-status`); the link is
+            // copied, not shared through the system sheet.
+            if (viewModel.canShareLiveStatus()) {
+                add(
+                    ContentDetailOverflowItem(
+                        label = "Share live status",
+                        testTag = "gigDetail.shareLiveStatus",
+                        onClick = { viewModel.shareLiveStatus() },
+                    ),
+                )
+            }
             add(ContentDetailOverflowItem(label = "Share", testTag = "gigDetail.share", onClick = shareGig))
             add(
                 ContentDetailOverflowItem(

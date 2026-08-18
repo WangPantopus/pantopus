@@ -64,6 +64,10 @@ class PaymentsViewModel
         /** Non-null → fixture mode (previews / snapshots / projection tests). */
         private var fixtureSeed: PaymentsSeed? = null
 
+        /** Drives the pull-to-refresh indicator. */
+        private val _refreshing = MutableStateFlow(false)
+        val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
         /** Override the active seed before [load] runs (fixture mode). */
         fun seed(seed: PaymentsSeed) {
             fixtureSeed = seed
@@ -81,21 +85,28 @@ class PaymentsViewModel
                     )
                 return
             }
-            _state.value = PaymentsUiState.Loading
-            viewModelScope.launch {
-                when (val result = repository.paymentMethods()) {
-                    is NetworkResult.Success ->
-                        _state.value =
-                            PaymentsUiState.Loaded(
-                                PaymentsMapper.liveFrame(
-                                    methods = result.data.paymentMethods.map(PaymentsMapper::toUiMethod),
-                                    activity = fetchActivity(),
-                                    connectAccount = fetchConnectAccount(),
-                                ),
-                            )
-                    is NetworkResult.Failure ->
-                        _state.value = PaymentsUiState.Error(result.error.displayMessage("Couldn't load Payments."))
-                }
+            viewModelScope.launch { fetch(showLoading = true) }
+        }
+
+        /**
+         * `showLoading == false` keeps the current frame visible while a
+         * pull-to-refresh re-read runs, so the screen doesn't flash the
+         * loading shell.
+         */
+        private suspend fun fetch(showLoading: Boolean) {
+            if (showLoading) _state.value = PaymentsUiState.Loading
+            when (val result = repository.paymentMethods()) {
+                is NetworkResult.Success ->
+                    _state.value =
+                        PaymentsUiState.Loaded(
+                            PaymentsMapper.liveFrame(
+                                methods = result.data.paymentMethods.map(PaymentsMapper::toUiMethod),
+                                activity = fetchActivity(),
+                                connectAccount = fetchConnectAccount(),
+                            ),
+                        )
+                is NetworkResult.Failure ->
+                    _state.value = PaymentsUiState.Error(result.error.displayMessage("Couldn't load Payments."))
             }
         }
 
@@ -122,8 +133,22 @@ class PaymentsViewModel
         private suspend fun fetchConnectAccount(): ConnectAccountDto? =
             (connectRepository.accountStatus() as? NetworkResult.Success)?.data?.account
 
+        /**
+         * Pull-to-refresh + the error frame's Retry. Keeps a loaded frame on
+         * screen while re-reading (the pull indicator is the progress signal);
+         * only an error frame falls back to the loading shell. Mirrors the
+         * Wallet surface's `refresh()`.
+         */
         fun refresh() {
-            load()
+            if (fixtureSeed != null) {
+                load()
+                return
+            }
+            _refreshing.value = true
+            viewModelScope.launch {
+                fetch(showLoading = _state.value is PaymentsUiState.Error)
+                _refreshing.value = false
+            }
         }
 
         // MARK: - Add a card (Stripe PaymentSheet, SetupIntent)

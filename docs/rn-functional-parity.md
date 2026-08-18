@@ -6,127 +6,228 @@
 
 ---
 
-## CURRENT BRANCH HANDOFF — 119/150 committed; Wave D is dirty and red (2026-08-13)
+## CURRENT BRANCH HANDOFF — both gates green; 9 findings open (2026-08-18)
+
+> This block supersedes the 2026-08-13 handoff. That note described an uncommitted, red Wave D
+> worktree on branch `claude/rn-parity-high-severity-fixes`. Since then the tree was committed as
+> `c1c03ca2` and merged into `claude/rn-native-parity-audit-fixes` via PR #350, so **the worktree is
+> clean** and nothing needs preserving. Every number below was re-measured on 2026-08-17, not carried
+> forward.
 
 ### What this branch is trying to finish
 
-Branch `claude/rn-parity-high-severity-fixes` is the implementation branch for this audit. The goal is
-to close the 150 RN → native functional gaps on **both iOS and Android**, using:
+Close the 150 RN → native functional gaps on **both iOS and Android**, using React Native as the
+behaviour oracle, the A-series designs as the layout oracle, and `backend/app.js` plus the mounted
+router as the endpoint-contract oracle. Functional parity, not visual redesign. Marketplace/Listings,
+styling/copy-only differences, dead RN code and debug-only screens stay out of scope. A finding is
+closed only when both platforms have live data, a production entry point/call site, honest
+loading/empty/error/populated states, and a green compile/test gate.
 
-- React Native as the behaviour oracle;
-- the attached A-series designs as the layout oracle; and
-- `backend/app.js` plus the mounted router as the endpoint-contract oracle.
+### Verified state — 2026-08-17
 
-This is a functional-parity pass, not a visual redesign. Marketplace/Listings, styling/copy-only
-differences, dead RN code and debug-only screens remain outside this audit's scope. A finding is not
-closed merely because a view or endpoint helper exists: both platforms need live data, the production
-entry point/call site, honest loading/empty/error/populated states, and the relevant compile/test gate.
+| Gate | Result |
+|---|---|
+| iOS `make build` | **BUILD SUCCEEDED** |
+| Android `:app:compileDebugKotlin` | **BUILD SUCCESSFUL** |
+| Android `:app:testDebugUnitTest` | **3,316 tests, 6 failed** (2 distinct tests) |
+| iOS `PantopusTests` | **9 failures across 5 tests** |
+| SwiftLint | 218 warnings, **0 errors** (pre-existing; branch adds no new rule class) |
 
-### Where the branch actually is
+All four blockers named in the previous handoff are fixed on the working tree — see *Repairs landed*
+below. The remaining test failures are pre-existing defects the repaired gates have now made visible.
 
-| Pass | Findings | Current state |
-|---|---:|---|
-| High severity | 64 / 64 | Committed in six waves; full verification recorded below |
-| Medium/low Wave A — homes | 18 / 18 | Committed as `b0c18b60`; both compile gates green |
-| Medium/low Wave B — mailbox + gigs | 18 / 23 | Partial wave committed as `28cf1ca9`; five findings explicitly deferred |
-| Medium/low Wave C — tabs/social + creator/business | 19 / 19 | Committed as `9b23bb6f`; both compile gates green |
-| Medium/low Wave D — auth/settings + money | 0 / 26 accepted | Large uncommitted worktree; both compile gates currently fail |
-| **Committed/accepted total** | **119 / 150** | **31 findings are not yet accepted** |
+### Finding accounting after a per-finding both-platform re-audit
 
-The formal count remains 119 because Wave D has not passed a gate or landed. Static inspection of the
-Wave D worktree found **19 findings with an implementation present on both platforms**, **six incomplete
-findings** listed below, and one finding (`recentLocations`) that appears to have been satisfied already
-by Wave C's viewing-location work but was never reclassified in the tracker. Treat those 19 as
-*implementation candidates*, not completed findings, until the wave compiles, is audited and is
-committed.
+The 31 findings the old handoff listed as outstanding were re-audited individually against both
+platforms, then every claimed-complete one was adversarially re-checked. That pass moved the numbers
+in both directions:
 
-The pre-handoff product worktree must be preserved: it contains 72 modified tracked files (4,154
-insertions / 311 deletions) and 21 untracked files; this handoff note is one additional tracked change.
-The untracked set includes new production/test sources as well as the Wave-B recovery workflow. Do not
-reset or clean this tree.
+| | Count |
+|---|---:|
+| High severity | 64 / 64 closed |
+| Medium/low Wave A — homes (`b0c18b60`) | 18 / 18 closed |
+| Medium/low Wave B — mailbox + gigs, committed half (`28cf1ca9`) | 18 / 23 closed |
+| Medium/low Wave C — tabs/social + creator/biz (`9b23bb6f`) | 19 / 19 closed |
+| Medium/low re-audited (the old "31 outstanding") | **16 closed**, 15 still open |
+| Tier 1 — six one-platform gaps, closed 2026-08-18 | 6 / 6 closed |
+| **Closed total** | **141 / 150** |
+| **Genuinely open** | **9** |
 
-### First blockers on resume — current Wave D does not compile
+The old count of 119 was pessimistic. Wave D landed more than its checkpoint claimed, and three of the
+five "deferred" Wave B findings turned out to be complete or nearly so.
 
-`bash docs/_parity-work/gate.sh both` was rerun on 2026-08-13. `git diff --check` is clean, but both
-platform gates are red:
+**Corrections to the previous handoff's list of six incomplete Wave D findings:**
 
-- **iOS:** Xcode stops before compiling sources because two source files have the basename
-  `EarningsDTOs.swift`: the new
-  `Core/Networking/Models/Payments/EarningsDTOs.swift` and the existing
-  `Core/Networking/Models/Mailbox/EarningsDTOs.swift`. Rename the new payments DTO file to a unique
-  basename, regenerate the project through the normal `make build` path, then continue compiling; there
-  may be further errors hidden behind this first failure.
-- **Android:** `BeaconIdentityBlock.kt:379` cannot resolve `alpha` / `DISABLED_ALPHA`.
-  `WalletScreen.kt` also lacks resolvable imports/references for `rememberCoroutineScope`,
-  `rememberSensitiveActionGuard`, `SensitiveScreenGuard`, `PullToRefreshBox`, `verifyIdentity`,
-  `AppLockManager`, `BasicTextField`, `KeyboardOptions`, `KeyboardType`, `TextStyle`, `SolidColor` and
-  the decoration-box `inner` lambda. These are compile failures, not test failures; fix the imports and
-  any remaining symbol/API mismatch, then rerun the gate.
+- `recentLocations` is **closed** — Wave C's viewing-location work does satisfy it. Reclassified.
+- Machine translation and the package-help request form, both listed as deferred Wave B, are **closed**.
+- Professional pricing/service-area/categories, professional verification start, show-email/show-phone,
+  the payments History tab, partial withdrawal, the wallet frozen flag, lifetime totals, the Connect
+  tri-state, the Payouts scaffold, the pending-release breakdown, the app-lock setup prompt and the
+  muted/hidden filter layer are all **closed on both platforms**.
 
-No Wave D unit-test result is valid while the main targets do not compile. The iOS 3,139 / Android
-3,264 green suite counts below describe the completed **high-severity** pass, not the current worktree.
-Waves A–C record compile success in their commits, but no full post-medium/low suite run is documented.
+### Findings status
 
-### Six Wave D findings are still incomplete
+Ordered by the sequence they should be worked in. Effort is per finding, both platforms.
 
-These are incomplete even before considering the red compile gates:
+**Tier 1 — CLOSED 2026-08-18.** All six were one-platform gaps; each is now implemented and
+compile-gated on both platforms. Kept here with what was actually built, for review:
 
-1. **Portfolio tab + add/delete:** iOS has new DTO/endpoint/view/view-model files, but the new
-   `ProfilePortfolioSection` has no production call site; Android has no equivalent endpoint or
-   public-profile implementation.
-2. **Edit general profile skills:** iOS declares `ProfileTabsEndpoints.updateSkills`, but it has zero
-   call sites; Android has no matching `PUT /api/users/skills` wiring. The professional-category editor
-   in this worktree is a different finding and does not close this one.
-3. **Public-profile Gigs tab:** iOS defines `ProfileGigsSection`, but it is not mounted; Android has no
-   equivalent implementation.
-4. **Public-profile gig Reviews tab:** iOS defines `ProfileGigReviewsSection`, but it is not mounted;
-   Android has no equivalent implementation.
-5. **Generate bio with AI:** no Edit Profile call to `POST /api/ai/draft/post` exists on either native
-   platform.
-6. **Earnings & Spending summary:** iOS has a live implementation candidate for
-   `GET /api/payments/earnings` and `/api/payments/spending` (currently also the source of the duplicate
-   filename build stop); Android has neither route wired into the payments surface.
+1. **Gig live-status share link — Android UI only.** Endpoint, repository, `canShareLiveStatus()` and
+   `shareLiveStatus()` all exist (`GigDetailViewModel.kt:829-856`). Missing: the overflow entry in the
+   `buildList` at `GigDetailScreen.kt:181`, and a `LaunchedEffect` collecting `liveStatusEvents` to copy
+   the URL and toast. Mirror `GigDetailView.swift:226-239`. **S**
+2. **v2 scored offers — Android presentation only.** `GigsV2Api`/`GigsV2Repository`/`fetchOwnerBids`
+   fallback all present. Missing: pass `rankings` into `GigOwnerBidsPanel` (`GigLifecyclePanels.kt:315`,
+   call site :110) and render `trustLine` + the `isRecommended` "BEST MATCH" pill, matching
+   `GigLifecycleSections.swift:123-140`. **S**
+3. **Pull-to-refresh on Payments — Android only.** Wallet has it
+   (`WalletScreen.kt:184`); `ui/screens/settings/payments/` has zero refresh wiring. Add a `refreshing`
+   StateFlow to `PaymentsViewModel` and a `PullToRefreshBox` around the loaded frame. iOS has both. **S**
+4. **Remove-card confirmation — now missing on iOS, not Android.** The finding has inverted since it
+   was written. Android gained a real `AlertDialog` naming the last4 (`PaymentsScreen.kt:225-278`).
+   iOS's `confirmationDialog` at `PaymentsView.swift:56-64` is the *action menu*, and its "Remove Card"
+   item fires the DELETE immediately (`PaymentsView.swift:87-89`). Add a second confirmation step. **S**
+5. **Relationship-driven Connect control — Android reads it but never renders it.** The endpoint,
+   repository and `PublicProfileViewModel.kt:604-634` are all correct, but no composable consumes
+   `_connection`; the control is dead code. Bind it in the public-profile chrome. iOS is complete. **S**
+6. **`SensitiveScreenGuard` on Payments — Android only.** `grep 'SensitiveScreenGuard('` returns the
+   definition plus exactly one call site (`WalletScreen.kt:179`). Wrap `PaymentsScreen` the same way.
+   Separately, both platforms still lack the action-level re-verify before Stripe Connect
+   onboarding / continue-setup / open-dashboard that the withdraw path already has. **S**
 
-The endpoint cross-platform sweep corroborates the one-platform gaps: the new portfolio, profile-review,
-skills, earnings and spending paths appear iOS-only. Its Swift interpolation normalisation also emits
-some noisy false positives, so use those rows as prompts for manual inspection rather than as the final
-verdict.
+**Tier 2 — OPEN. Absent on Android, built on iOS**
 
-### Five Wave B findings have never landed
+7. **Earnings & Spending summary — Android.** iOS is complete end to end
+   (`EarningsEndpoints.swift`, `PaymentsEarningsDTOs.swift`, `PaymentsViewModel.fetchEarnings`).
+   Android has nothing: no endpoint, DTO, repository or card. Note `GET api/mailbox/earnings/summary`
+   is a *different* capability — do not reuse it. **M**
 
-The partial Wave B commit intentionally deferred these on both platforms:
+**Tier 3 — OPEN. Absent or orphaned on both platforms**
 
-- Family Mail Party (start/join/discover/reactions/assign/solo-decline);
-- real machine translation in place of the hard-coded translation fixture, with retry;
-- package-help request form tied to the mail item and created gig;
-- time-limited gig live-status share link; and
-- v2 scored offers for curated/quotes gigs, with fallback to plain bids.
+8. **Edit-profile skills editor.** iOS declares `updateSkills` (`ProfileTabsEndpoints.swift:93`) with
+   zero callers; Android has no `PUT /api/users/skills` at all. Neither Edit Profile collects skills. **M**
+9. **Public-profile Gigs tab.** iOS has `ProfileGigsViewModel` + `ProfileGigsSection`, unmounted.
+   Android's `GigsApi.kt:76-91` has no `user_id` param and `GigsTabContent()` is a hard-coded
+   "No recent gigs" stub. **M**
+10. **Generate bio with AI.** `POST /api/ai/draft/post` is wired on neither platform; both Edit Profile
+    bio fields are plain text editors. **M**
+11. **Portfolio tab + add/delete.** iOS has endpoints, uploader, ViewModel and a full section with add
+    sheet, filters, delete confirm and viewer — with zero call sites. Android has nothing (the
+    professional editor's `PortfolioLink` is a different, sample-data-backed capability). **L**
+12. **Public-profile gig Reviews tab.** iOS has the full stack unmounted; Android has no
+    `GET /api/reviews/user/:userId` route at all. **L**
+13. **Family Mail Party.** Both platforms have the complete network layer — all six routes, all DTOs,
+    a repository, a Hilt provider — and **zero consumers on either side**. Everything above the network
+    layer is missing: ViewModels, discover list, live session view, routes, entry affordances. This is
+    the single largest remaining item. **L**
 
-The recovery workflow is already written at `docs/_parity-work/wf-med-brem.js`, but it is currently
-**untracked**. Preserve it, and re-read the files before running it because Wave B's partial work already
-changed the same mailbox/gigs folders.
+**Tier 4 — the blocking defects are now fixed; the findings need re-verification**
 
-### Recommended completion order
+14. **Invite code from a `/join/:code` link.** The nav/DTO plumbing is genuinely built and symmetric on
+    both platforms, but the capability cannot fire in production. See *Production bugs found* below;
+    fix those first, then re-verify. **S once unblocked**
+15. **Resend verification email — iOS gate is unsatisfiable.** Android is closed. On iOS the button's
+    render condition can never be true. See *Production bugs found*. **S**
 
-1. Preserve the existing dirty tree and repair the Wave D iOS/Android compile blockers.
-2. Complete the six Wave D gaps above, including mounting the iOS tab sections and implementing their
-   Android counterparts. Confirm every new endpoint against the actual backend mount table.
-3. Run the Wave D platform audits, then `gate.sh both`; after it is green, run the affected tests and the
-   two full native unit suites before committing Wave D.
-4. Land the five-item Wave B remainder using `wf-med-brem.js`, compile-gate both platforms, audit and
-   commit it separately.
-5. Run the final branch checks: full iOS and Android unit suites, SwiftLint, `verifyPantopusIcons`, route
-   reachability, endpoint parity and a per-finding review of all 86 medium/low items. The existing
-   `reachability.sh` diffs `master...HEAD`, so it will not see Wave D's uncommitted changes until they
-   are committed. `endpoint-parity.sh` was written for the 64 high findings; extend the manual checklist
-   to cover the medium/low endpoints rather than assuming that script covers them.
-6. Reconcile the `recentLocations` overlap, update the accepted count and this status block only after
-   the corresponding work is committed and verified.
+### Production bugs found while auditing (not in the original 150)
 
-Working instructions and recovery helpers live in `docs/_parity-work/BRIEF.md`,
-`docs/_parity-work/BRIEF-MEDIUM.md`, `docs/_parity-work/gate.sh`,
-`docs/_parity-work/reachability.sh`, `docs/_parity-work/xplatform.sh` and
-`docs/_parity-work/endpoint-parity.sh`.
+Each was confirmed by reading the cited source, not inferred.
+
+1. **~22% of invite codes hard-fail registration.** Codes are minted as
+   `crypto.randomBytes(6).toString('base64url').slice(0, 8)` (`backend/routes/users.js:2872`, retry
+   `:2890`) — the base64url alphabet includes `-` and `_` — while `registerSchema` requires
+   `Joi.string().alphanum()` (`backend/routes/users.js:724`) and `backend/middleware/validate.js:66-90`
+   400s the whole request. `(62/64)^8 ≈ 0.776`, so roughly one invite code in 4.5 blocks account
+   creation instead of crediting a referral. The code comment above the generator even says
+   "8-char alphanumeric". Fix at the generator (restrict the alphabet) rather than at the schema.
+2. **Invite links can never open either app.** The invite URL is `https://pantopus.com/join/<code>` —
+   built identically by the backend (`users.js:2867,2899,2908`), iOS (`MeViewModel.swift:69`) and
+   Android (`MeViewModel.kt:80`). Neither app claims that host: iOS `Pantopus.entitlements` declares
+   only `applinks:pantopus.app` / `www.pantopus.app`, and `AndroidManifest.xml:61-67` autoVerifies the
+   same two `.app` hosts. The only way to reach the join wiring today is hand-typing
+   `pantopus://join/<code>`.
+3. **`/join/*` is absent from the AASA.** `frontend/apps/web/public/.well-known/apple-app-site-association`
+   lists `/invite/*` but no `/join/*`, so even on a host iOS did claim, a join link would go to Safari.
+   Android's filter is host-wide, making the HTTPS half of this capability Android-only.
+4. **iOS never surfaces "Resend verification email".** `APIClient.swift:254` throws `APIError.forbidden`
+   for 403 *before* the generic `400..<500` case, discarding the body. `mapSignInError`
+   (`AuthManager+ErrorMapping.swift:12-20`) has no `.forbidden` case, so it falls to `.unknown` →
+   "Something went wrong. Please try again." `LoginView.swift:487` gates the button on the copy
+   containing "verify", so it never renders. The doc comment at `LoginView.swift:485` asserts the 403
+   maps to `.serverError(_)`; it does not. One-line fix: add
+   `case .forbidden: .serverError("Please verify your email before signing in.")`.
+5. **The map filter sheet renders two Distance sections, on both platforms.** Wave B added
+   `distance` / `deadline` / `archetype` chips to `GigFilterCriteria.toSections()`. `MapFilterCriteria`
+   already contributes its own range-slider `distance` section and then appends `gig.toSections()`
+   (`MapFilterSheet.kt:88`, mirrored on iOS), so the sheet now contains two sections with
+   `id == "distance"`. `fromSections` survives it only because it discriminates on control type. This
+   is what `MapFilterCriteriaTest` / `MapFilterSheetTests` are actually catching — the assertion is not
+   merely stale. Decide whether the map sheet should exclude the gig-level distance chips (recommended)
+   and then update both suites.
+6. **`ProfileTabsEndpoints.updateSkills`, and the whole Family Mail Party network layer on both
+   platforms, are declared with zero call sites.** Symmetric across platforms, so `xplatform.sh` will
+   not flag them; only the reachability check will.
+
+### Repairs landed on the working tree (uncommitted)
+
+Five files, 30 insertions, 5 deletions — the minimum needed to turn both gates green:
+
+- `BeaconIdentityBlock.kt` — add the missing `androidx.compose.ui.draw.alpha` import and define the
+  `DISABLED_ALPHA` constant the code already referenced (it existed nowhere in the tree).
+- `WalletScreen.kt` — add eleven missing imports (`PullToRefreshBox`, `rememberCoroutineScope`,
+  `BasicTextField`, `KeyboardOptions`, `KeyboardType`, `TextStyle`, `SolidColor`,
+  `SensitiveScreenGuard`, `rememberSensitiveActionGuard`, `AppLockManager`, `kotlinx.coroutines.launch`).
+- `Payments/EarningsDTOs.swift` → `Payments/PaymentsEarningsDTOs.swift`, and its
+  `EarningsSummaryResponse` renamed to `PaymentsEarningsResponse`. The previous handoff described this
+  as a duplicate *filename*; it was also a duplicate *public type* — `Mailbox/EarningsDTOs.swift:16`
+  already owns `EarningsSummaryResponse` in the same module, and `EarnViewModel` decodes the mailbox
+  shape through it. Renaming the file alone would have produced a redeclaration error.
+- `PaymentsViewModel.swift` — the one call site follows the rename.
+- `WalletViewModel.swift` — `parseWithdrawAmount` returned `Result<Int, String>`, which cannot compile
+  because `String` does not conform to `Error`. Replaced with a `WithdrawAmount` enum carrying the same
+  two cases, matching `GigDetailViewModel.RemindWorkerOutcome`, which solved this exact problem earlier.
+- Four Android test files (`GigDetailSaveViewModelTest`, `GigTipViewModelTest`, `OffersViewModelTest`,
+  `PublicProfileViewModelTest`) updated for constructor parameters added by Waves B and D.
+
+### The gate itself was the root cause — fix this before the next wave
+
+**`gate.sh` compiles `:app:compileDebugKotlin` and `make build` only. Neither touches a test source
+set.** The Android unit-test target has not compiled since **Wave B (`28cf1ca9`)**, which added
+`gigsV2Repo` to `GigDetailViewModel` and `gigsRepo` to `OffersViewModel` without updating their tests;
+Wave D then added `connections` to `PublicProfileViewModel`. **Waves B, C and D therefore landed with
+no Android unit test having run at all** — the same failure mode the high-severity pass hit on iOS and
+recorded as fixed. The recorded "Android 3,264 green" applies only to the high-severity pass.
+
+Also broken for any checkout at a different path:
+
+- `gate.sh`, `reachability.sh`, `waveb-audit.sh`, `endpoint-parity.sh`, `xplatform.sh` and all twelve
+  `wf-*.js` hardcode `ROOT=/Users/yingpengwang/pantopus/native/pantopus`, which does not exist here.
+  Make them derive the root from `git rev-parse --show-toplevel`.
+- `gate.sh` sets `JAVA_HOME` to a `temurin-17.jdk` that is not installed; this machine has `zulu-17.jdk`.
+- Android needs `ANDROID_HOME` or `local.properties` (gitignored); without it Gradle fails at
+  configuration with "SDK location not found", *before* any Kotlin compiles — which reads like a
+  compile failure but is not one.
+
+Add `:app:compileDebugUnitTestKotlin` (or the full `testDebugUnitTest`) and the iOS test target to the
+gate before starting Tier 1.
+
+### Recommended order
+
+1. Repair the gate: derive `ROOT` from git, correct `JAVA_HOME`, document the `ANDROID_HOME`
+   requirement, and add both test targets. Commit the five-file compile repair with it.
+2. Fix the six current test failures. Two of them (map filter distance) need the product decision above;
+   the four iOS `PaymentsViewModelTests` failures come from Wave D's new earnings/spending/connect
+   requests hitting an unstubbed fake that 599s — stub the new paths.
+3. Tier 1 (findings 1-6): six small one-platform gaps. Compile-gate and test after each pair.
+4. The five production bugs above, which are cheap and user-visible, then re-verify findings 14 and 15.
+5. Tier 2, then Tier 3 in the order listed. Family Mail Party last — it is the only one that needs a
+   full feature build on both platforms.
+6. Final branch checks: both full unit suites, SwiftLint, `verifyPantopusIcons`, route reachability,
+   endpoint parity, and a per-finding review of all 86 medium/low items. `reachability.sh` diffs
+   `master...HEAD` and `endpoint-parity.sh` was written for the 64 high findings — extend its checklist
+   to the medium/low endpoints rather than assuming it covers them.
+
+Working instructions live in `docs/_parity-work/BRIEF.md` and `docs/_parity-work/BRIEF-MEDIUM.md`.
 
 ---
 

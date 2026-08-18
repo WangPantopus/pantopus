@@ -30,6 +30,10 @@ public final class PaymentsViewModel {
     /// Transient, user-facing error from a row action (set-default /
     /// remove / add-card). The view surfaces it as an alert.
     public private(set) var actionError: String?
+    /// Card queued for removal — drives the destructive confirmation. The
+    /// DELETE only fires once the user confirms, so the action menu's
+    /// "Remove Card" item sets this instead of calling `removeMethod(_:)`.
+    public private(set) var pendingRemoval: PaymentMethod?
 
     private let api: APIClient
     private let sheetPresenter: any PaymentSheetPresenting
@@ -58,11 +62,18 @@ public final class PaymentsViewModel {
     // MARK: - Load
 
     public func load() async {
+        await load(showLoading: true)
+    }
+
+    /// `showLoading == false` keeps the current frame on screen while re-reading,
+    /// so a pull-to-refresh does not tear the list down under the user's finger.
+    /// Mirrors `WalletViewModel.fetchLive(showLoading:)`.
+    private func load(showLoading: Bool) async {
         if let seed {
             state = .loaded(Self.fixture(for: seed))
             return
         }
-        state = .loading
+        if showLoading { state = .loading }
         do {
             let methods = try await fetchMethods()
             // History + lifetime totals are supplementary — a failure there
@@ -82,8 +93,13 @@ public final class PaymentsViewModel {
         }
     }
 
+    /// Pull-to-refresh + the error frame's Retry. Keeps a loaded frame on screen
+    /// while re-reading (the pull indicator is the progress signal); only an
+    /// error frame falls back to the loading shell, exactly as Wallet does on
+    /// both platforms.
     public func refresh() async {
-        await load()
+        let showLoading: Bool = if case .error = state { true } else { false }
+        await load(showLoading: showLoading)
     }
 
     // MARK: - Add a card (Stripe PaymentSheet, SetupIntent)
@@ -129,7 +145,20 @@ public final class PaymentsViewModel {
         }
     }
 
+    /// Queue `method` for the destructive confirmation. Nothing is sent to
+    /// the backend until `removeMethod(_:)` runs from its confirm action.
+    public func requestRemoval(_ method: PaymentMethod) {
+        pendingRemoval = method
+    }
+
+    public func cancelRemoval() {
+        pendingRemoval = nil
+    }
+
+    /// Confirm action of the removal confirmation — the only caller that
+    /// issues `DELETE /api/payments/methods/{id}`.
     public func removeMethod(_ id: String) async {
+        pendingRemoval = nil
         guard seed == nil, case let .loaded(loaded) = state else { return }
         let previous = loaded
         state = .loaded(loaded.removingMethod(id))
@@ -179,7 +208,7 @@ public final class PaymentsViewModel {
     /// and when *neither* could be read the card is hidden rather than
     /// claiming the user earned and spent nothing.
     private func fetchEarnings() async -> PaymentsEarnings? {
-        let earned: EarningsSummaryResponse? = try? await api.request(EarningsEndpoints.earnings())
+        let earned: PaymentsEarningsResponse? = try? await api.request(EarningsEndpoints.earnings())
         let spent: SpendingSummaryResponse? = try? await api.request(EarningsEndpoints.spending())
         return Self.earnings(earned: earned?.earnings, spent: spent?.spending)
     }
@@ -497,7 +526,8 @@ public final class PaymentsViewModel {
             brand: isBank ? .bank : brand(from: dto.cardBrand),
             label: label,
             subtext: subtext,
-            chip: dto.isDefault ? PaymentMethodChip(label: "Default", tone: .primary) : nil
+            chip: dto.isDefault ? PaymentMethodChip(label: "Default", tone: .primary) : nil,
+            last4: isBank ? dto.bankLast4 : dto.cardLast4
         )
     }
 
@@ -544,7 +574,8 @@ private extension PaymentsLoaded {
                 brand: method.brand,
                 label: method.label,
                 subtext: method.subtext,
-                chip: method.id == id ? PaymentMethodChip(label: "Default", tone: .primary) : nil
+                chip: method.id == id ? PaymentMethodChip(label: "Default", tone: .primary) : nil,
+                last4: method.last4
             )
         })
     }
