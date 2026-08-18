@@ -33,6 +33,7 @@ private struct OverflowAnchorKey: PreferenceKey {
     }
 }
 
+// swiftlint:disable:next type_body_length
 struct EventTypeListView: View {
     @State private var viewModel: EventTypeListViewModel
     /// Resolved CGRect of the tapped overflow button (coordinate space: root VStack).

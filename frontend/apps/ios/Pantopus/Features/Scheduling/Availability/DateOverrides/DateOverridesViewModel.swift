@@ -12,14 +12,16 @@
 import Observation
 import SwiftUI
 
-/// One date override the user is managing.
+/// One date override the user is managing. A custom-hours date can carry
+/// SEVERAL entries (one per time block — see `customBlocks`), so the identity
+/// is the date *and* its window rather than the date alone.
 struct OverrideEntry: Identifiable, Hashable {
     let date: String // YYYY-MM-DD
     var isUnavailable: Bool
     var start: TimeOfDay?
     var end: TimeOfDay?
     var id: String {
-        date
+        "\(date)|\(start?.hhmm ?? "")|\(end?.hhmm ?? "")"
     }
 }
 
@@ -52,8 +54,11 @@ final class DateOverridesViewModel {
     // Composer state
     var selectedDate = Date()
     var mode: OverrideMode = .unavailable
-    var customStart: TimeOfDay = .nineAM
-    var customEnd: TimeOfDay = .fivePM
+    /// Design AVAIL-08 (`PickerBlock` "+ Add a block"): custom hours are a LIST
+    /// of blocks, each persisted as its own override row for the date — the
+    /// availability engine honours split windows on the same date. Mirrors the
+    /// web `DateOverrideEditor` `customBlocks` state.
+    var customBlocks: [TimeRange] = [TimeRange(start: .nineAM, end: .fivePM)]
     var isRange = false
     var rangeEndDate = Date()
 
@@ -124,7 +129,7 @@ final class DateOverridesViewModel {
 
     var canAddCustom: Bool {
         guard !isRange, mode == .customHours else { return true }
-        return TimeRange(start: customStart, end: customEnd).isValid
+        return !customBlocks.isEmpty && customBlocks.allSatisfy(\.isValid)
     }
 
     /// Upper bound for the date-range picker so a blocked range can't exceed
@@ -187,6 +192,28 @@ final class DateOverridesViewModel {
         await persist(overrides.filter { $0.date != date })
     }
 
+    // MARK: Custom-hours blocks (design "+ Add a block")
+
+    /// Append a second window to the selected date. Seeded past the last block
+    /// so the new row doesn't overlap what's already there.
+    func addCustomBlock() {
+        let previousEnd: TimeOfDay = customBlocks.last?.end ?? TimeOfDay.nineAM
+        let start = TimeOfDay(hour: min(previousEnd.hour + 1, 22), minute: 0)
+        let end = TimeOfDay(hour: min(start.hour + 2, 23), minute: 0)
+        customBlocks.append(TimeRange(start: start, end: end))
+    }
+
+    func removeCustomBlock(_ id: UUID) {
+        guard customBlocks.count > 1 else { return }
+        customBlocks.removeAll { $0.id == id }
+    }
+
+    func updateCustomBlock(_ id: UUID, start: TimeOfDay, end: TimeOfDay) {
+        guard let index = customBlocks.firstIndex(where: { $0.id == id }) else { return }
+        customBlocks[index].start = start
+        customBlocks[index].end = end
+    }
+
     func toggleHolidays(_ enable: Bool) async {
         let holidayDates = Set(currentYearHolidays.map(\.date))
         // Strip only IMPORT-SHAPED entries (full-day unavailable, no times).
@@ -220,9 +247,10 @@ final class DateOverridesViewModel {
         if mode == .unavailable {
             return [OverrideEntry(date: key, isUnavailable: true, start: nil, end: nil)]
         }
-        let range = TimeRange(start: customStart, end: customEnd)
-        guard range.isValid else { return [] }
-        return [OverrideEntry(date: key, isUnavailable: false, start: customStart, end: customEnd)]
+        // One override row per valid block (design AVAIL-08 multi-block day).
+        return customBlocks
+            .filter(\.isValid)
+            .map { OverrideEntry(date: key, isUnavailable: false, start: $0.start, end: $0.end) }
     }
 
     private func persist(_ newList: [OverrideEntry]) async {

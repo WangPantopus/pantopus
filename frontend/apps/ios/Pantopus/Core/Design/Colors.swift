@@ -57,6 +57,13 @@ public extension Theme.Color {
     static let warningLight = SwiftUI.Color("Semantic/WarningLight", bundle: Theme.bundle)
     /// Warning background — `#FFFBEB`.
     static let warningBg = SwiftUI.Color("Semantic/WarningBg", bundle: Theme.bundle)
+    /// Warning-card title text — `#92400E` (Tailwind amber-800). The design's
+    /// amber cards set their heading in this deeper amber; `warning` stays on
+    /// the icon accent. Mirrors Android's `warningStrong`.
+    static let warningStrong = SwiftUI.Color("Semantic/WarningStrong", bundle: Theme.bundle)
+    /// Warning-card body text — `#78350F` (Tailwind amber-900). Pairs with
+    /// `warningStrong` on `warningBg` surfaces. Mirrors Android's `warningDeep`.
+    static let warningDeep = SwiftUI.Color("Semantic/WarningDeep", bundle: Theme.bundle)
 
     /// Error base — `#DC2626`.
     static let error = SwiftUI.Color("Semantic/Error", bundle: Theme.bundle)

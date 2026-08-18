@@ -9,6 +9,7 @@
 //  `SchedulingOwner`; 409 `SLUG_TAKEN` + 400 validation map back onto fields.
 //
 
+// swiftlint:disable file_length
 import Observation
 import SwiftUI
 
@@ -86,6 +87,10 @@ final class EventTypeEditorViewModel {
     var saveError: String?
     private(set) var isSaving = false
     private(set) var stripeConnected: Bool?
+    /// Intake questions already attached to this event type — drives the
+    /// design `LinksCard` "N questions" value on the link row. `nil` until the
+    /// detail response lands (create mode never sets it).
+    private(set) var questionCount: Int?
 
     // MARK: Dependencies
 
@@ -157,6 +162,7 @@ final class EventTypeEditorViewModel {
                 SchedulingEndpoints.getEventType(owner: owner, id: id)
             )
             apply(response.eventType)
+            questionCount = response.questions?.count
             baselineSignature = signature()
             phase = .ready
             await loadPaymentsStatus()
@@ -259,6 +265,26 @@ final class EventTypeEditorViewModel {
 
     func connectStripe() {
         push(.paymentsSetup(owner: owner))
+    }
+
+    // MARK: Link-row values
+
+    // The design `LinkRow` carries the field's CURRENT value under the label
+    // ("2 questions", "Off", …) rather than a static description. These mirror
+    // Android's `EventTypeEditorScreen` link-row values one-for-one.
+
+    /// "2 questions" / "1 question" / "Add questions" while none are attached.
+    var intakeQuestionsValue: String {
+        guard let questionCount else { return "Add questions" }
+        return questionCount == 1 ? "1 question" : "\(questionCount) questions"
+    }
+
+    /// "4h notice · 8/day", or "Off" when neither limit is set.
+    var bookingLimitsValue: String {
+        var parts: [String] = []
+        if minNoticeHours > 0 { parts.append("\(minNoticeHours)h notice") }
+        if dailyCap > 0 { parts.append("\(dailyCap)/day") }
+        return parts.isEmpty ? "Off" : parts.joined(separator: " · ")
     }
 }
 

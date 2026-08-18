@@ -58,9 +58,10 @@ struct AvailabilityCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             if let overline {
+                // Design `Card` overline — 9.5pt bold, 0.08em tracking.
                 Text(overline.uppercased())
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.6)
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(0.7)
                     .foregroundStyle(Theme.Color.personal)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -74,7 +75,8 @@ struct AvailabilityCard<Content: View>: View {
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .padding(.horizontal, Spacing.s4)
+        // Design `Body` gutter — 12px (`padding:'8px 12px'`), not 16.
+        .padding(.horizontal, Spacing.s3)
     }
 }
 

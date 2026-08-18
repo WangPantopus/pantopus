@@ -131,7 +131,7 @@ struct EventTypeEditorView: View {
         PillarFieldGroup("Basics", accent: accent) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 BorderedTextField(label: "Name", isError: viewModel.nameError != nil || viewModel.slugError != nil) {
-                    TextField("Name (e.g. Intro call)", text: Binding(
+                    TextField("e.g. Intro call", text: Binding(
                         get: { viewModel.name },
                         set: { viewModel.updateName($0) }
                     ))
@@ -144,14 +144,15 @@ struct EventTypeEditorView: View {
                 }
             }
             BorderedTextField(label: "Description") {
-                TextField("Description (optional)", text: $viewModel.detailDescription, axis: .vertical)
+                TextField("What should people expect?", text: $viewModel.detailDescription, axis: .vertical)
                     .lineLimit(2...4)
                     .accessibilityIdentifier("scheduling.eventType.descriptionField")
             }
             VStack(alignment: .leading, spacing: Spacing.s2) {
-                Text("Colour")
+                Text("Color")
                     .pantopusTextStyle(.caption)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
                 EventTypeColorPicker(selection: $viewModel.swatch)
             }
         }
@@ -184,7 +185,8 @@ struct EventTypeEditorView: View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Text("Length")
                 .pantopusTextStyle(.caption)
-                .foregroundStyle(Theme.Color.appTextSecondary)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.Color.appTextStrong)
             HStack(spacing: Spacing.s2) {
                 CompactDurationStepper(value: singleDurationBinding)
                     .accessibilityIdentifier("scheduling.eventType.singleDuration")
@@ -230,11 +232,14 @@ struct EventTypeEditorView: View {
                 accessibilityID: "scheduling.eventType.location"
             )
             if let field = viewModel.location.detailField {
-                TextField(field.placeholder, text: $viewModel.locationDetail)
-                    .font(Theme.Font.body)
-                    .foregroundStyle(Theme.Color.appText)
-                    .accessibilityLabel(field.label)
-                    .accessibilityIdentifier("scheduling.eventType.locationDetail")
+                // Design `LocationCard` renders the detail as a labelled
+                // `TextInput` (label above, 1.5px bordered box) — not a bare
+                // field. Mirrors Android's `EtTextField(label = …)`.
+                BorderedTextField(label: field.label) {
+                    TextField(field.placeholder, text: $viewModel.locationDetail)
+                        .accessibilityLabel(field.label)
+                        .accessibilityIdentifier("scheduling.eventType.locationDetail")
+                }
             }
         }
     }
@@ -246,7 +251,7 @@ struct EventTypeEditorView: View {
             EventTypeNavRow(
                 icon: .calendarClock,
                 title: "Schedule",
-                subtitle: "Working hours this event uses"
+                subtitle: "Working hours"
             ) { viewModel.openAvailability() }
         }
     }
@@ -406,7 +411,8 @@ struct EventTypeEditorView: View {
                     VStack(alignment: .leading, spacing: Spacing.s2) {
                         Text("Price")
                             .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.appTextStrong)
                         TextField("0", text: $viewModel.priceDollars)
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .foregroundStyle(Theme.Color.appText)
@@ -416,7 +422,8 @@ struct EventTypeEditorView: View {
                     VStack(alignment: .leading, spacing: Spacing.s2) {
                         Text("Currency")
                             .pantopusTextStyle(.caption)
-                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.appTextStrong)
                         EventTypeSegmented(
                             options: ["USD", "EUR"],
                             selection: $viewModel.currency,
@@ -430,7 +437,8 @@ struct EventTypeEditorView: View {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     Text("Collect")
                         .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextStrong)
                     EventTypeSegmented(
                         options: CollectMode.allCases,
                         selection: $viewModel.collectMode,
@@ -449,21 +457,21 @@ struct EventTypeEditorView: View {
             EventTypeNavRow(
                 icon: .listChecks,
                 title: "Intake questions",
-                subtitle: linkSubtitle("Ask bookers a few things"),
+                subtitle: linkSubtitle(viewModel.intakeQuestionsValue),
                 isEnabled: viewModel.isEditing
             ) { viewModel.openIntakeQuestions() }
             Divider().background(Theme.Color.appBorderSubtle)
             EventTypeNavRow(
                 icon: .gauge,
                 title: "Booking limits",
-                subtitle: linkSubtitle("Notice, caps & start times"),
+                subtitle: linkSubtitle(viewModel.bookingLimitsValue),
                 isEnabled: viewModel.isEditing
             ) { viewModel.openBookingLimits() }
             Divider().background(Theme.Color.appBorderSubtle)
             EventTypeNavRow(
                 icon: .bell,
                 title: "Reminders",
-                subtitle: "Automatic nudges before the meeting"
+                subtitle: "Default"
             ) { viewModel.openReminders() }
         }
     }

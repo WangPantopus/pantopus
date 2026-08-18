@@ -56,14 +56,18 @@ struct BookingLimitsView: View {
             onClose: { dismiss() },
             onCommit: { Task { if await viewModel.save() { dismiss() } } },
             content: {
-                sheetOverline
-                helper
-                noticeRow
-                windowRow
-                dailyCapRow
-                weeklyCapRow
-                perPersonRow
-                startTimesRow
+                // Design `Body` stacks its cards 12px apart — the shared shell's
+                // default 20pt rhythm is looser than the availability frames.
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    sheetOverline
+                    helper
+                    noticeRow
+                    windowRow
+                    dailyCapRow
+                    weeklyCapRow
+                    perPersonRow
+                    startTimesRow
+                }
             }
         )
     }
@@ -77,7 +81,7 @@ struct BookingLimitsView: View {
             .tracking(0.8)
             .foregroundStyle(Theme.Color.personal)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
+            .padding(.horizontal, Spacing.s3)
             .accessibilityIdentifier("scheduling.bookingLimits.overline")
     }
 
@@ -86,7 +90,7 @@ struct BookingLimitsView: View {
             .pantopusTextStyle(.caption)
             .foregroundStyle(Theme.Color.appTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
+            .padding(.horizontal, Spacing.s3)
     }
 
     private var noticeRow: some View {
@@ -129,12 +133,15 @@ struct BookingLimitsView: View {
     }
 
     /// NOTE: backend has no weekly_cap field — row is rendered per the design
-    /// as a disabled placeholder until the backend exposes the field.
+    /// as a disabled placeholder until the backend exposes the field. The
+    /// design's `StepperRow label="Max per week"` shows a real value
+    /// (booking-limits-frames.jsx:151), so the placeholder carries the frame's
+    /// number rather than a dash — same as Android's `form.maxPerWeek`.
     private var weeklyCapRow: some View {
         stepperRow(
             "Max per week",
             caption: "Most bookings you'll take in a week.",
-            value: "–",
+            value: "20",
             unit: nil,
             identifier: "scheduling.bookingLimits.weeklyCapStepper",
             disabled: true,
@@ -160,13 +167,14 @@ struct BookingLimitsView: View {
             Text("Start times")
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
-            Picker("Start times", selection: $viewModel.slotInterval) {
-                ForEach(SlotInterval.allCases) { interval in
-                    Text(interval.label).tag(interval)
-                }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("scheduling.bookingLimits.slotInterval")
+            // Design `SegmentRow` uses the shell's `Segmented` (sunken track,
+            // white selected card) — not the native segmented Picker.
+            EventTypeSegmented(
+                options: SlotInterval.allCases,
+                selection: $viewModel.slotInterval,
+                label: { $0.label },
+                accessibilityID: "scheduling.bookingLimits.slotInterval"
+            )
             Text("Where bookings can start within the hour.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.Color.appTextSecondary)
@@ -238,15 +246,16 @@ struct BookingLimitsView: View {
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .padding(.horizontal, Spacing.s4)
+        // Design `Body` gutter — 12px, matching the availability cards.
+        .padding(.horizontal, Spacing.s3)
     }
 
     private var loadingSkeleton: some View {
         ScrollView {
-            VStack(spacing: Spacing.s5) {
+            VStack(spacing: Spacing.s3) {
                 ForEach(0..<6, id: \.self) { _ in
                     Shimmer(height: 64, cornerRadius: Radii.lg)
-                        .padding(.horizontal, Spacing.s4)
+                        .padding(.horizontal, Spacing.s3)
                 }
             }
             .padding(.vertical, Spacing.s4)

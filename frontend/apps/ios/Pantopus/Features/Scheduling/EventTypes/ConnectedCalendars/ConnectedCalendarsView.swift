@@ -123,8 +123,11 @@ struct ConnectedCalendarsView: View {
             VStack(spacing: Spacing.s5) {
                 pillarOverline
                 if viewModel.isComingSoon {
+                    // Design `FramePlaceholder` carries the calm coming-soon card
+                    // ALONE — the helper line and the per-provider connect rows
+                    // belong to `FrameNone`. The two are distinct states and must
+                    // not be stacked (mirrors Android's `ComingSoonState`).
                     comingSoonHero
-                    providerRows
                 } else {
                     connectedAccounts
                     // Design FrameNone/FrameConnecting: the conflict-check helper sits
@@ -408,11 +411,26 @@ struct ConnectedCalendarsView: View {
         }
     }
 
+    /// Relative sync label from the row's real `last_synced_at` — "Synced just
+    /// now", "Synced 12 min ago", "Synced 3 hr ago", or "Synced Jun 4" once
+    /// it's a day+ old (design `ConnectedRow`: "Synced 2 min ago"). An absent
+    /// or unparseable timestamp renders a bare "Synced" rather than raw ISO.
+    /// Mirrors Android's `syncedAgo`.
     private func syncedLine(_ calendar: ConnectedCalendarDTO) -> String {
-        if let synced = calendar.lastSyncedAt {
-            return "Synced \(synced)"
+        guard let raw = calendar.lastSyncedAt,
+              let synced = SchedulingTime.parseUTC(raw)
+        else { return "Synced" }
+        let minutes = Int(Date().timeIntervalSince(synced) / 60)
+        switch minutes {
+        case ..<1: return "Synced just now"
+        case ..<60: return "Synced \(minutes) min ago"
+        case ..<(24 * 60): return "Synced \(minutes / 60) hr ago"
+        default:
+            let formatter = DateFormatter()
+            formatter.locale = .current
+            formatter.dateFormat = "MMM d"
+            return "Synced \(formatter.string(from: synced))"
         }
-        return "Synced"
     }
 
     // MARK: Re-auth needed row (warning banner + Reconnect)

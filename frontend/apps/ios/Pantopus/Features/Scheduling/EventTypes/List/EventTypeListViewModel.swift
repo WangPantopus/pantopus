@@ -14,6 +14,12 @@
 import Observation
 import SwiftUI
 
+// Reorder mode (B1 FRAME 6) pushed this past the 500-line ceiling. Splitting it into a
+// cross-file extension would mean widening `eventTypes` / `client` / `fetch` / the
+// `isReordering` setter to internal, trading real encapsulation for a line count — so this
+// follows the same opt-out the sibling scheduling view-models already use.
+// swiftlint:disable file_length
+
 /// Active / Hidden tab for the event-type list.
 enum EventTypeTab: String {
     case active
@@ -22,6 +28,7 @@ enum EventTypeTab: String {
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class EventTypeListViewModel: ListOfRowsDataSource {
     // MARK: ListOfRowsDataSource chrome
 

@@ -409,28 +409,37 @@ struct ConfettiBurst: View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 ForEach(0..<pieces, id: \.self) { index in
-                    let width = index % 3 == 0 ? 5.0 : 6.0
-                    let height = index % 2 == 0 ? 9.0 : 6.0
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(palette[index % palette.count])
-                        .frame(width: width, height: height)
-                        .position(
-                            x: geo.size.width * (0.06 + Double(index) * 0.056).truncatingRemainder(dividingBy: 0.94),
-                            y: fall ? 280 : -14
-                        )
-                        .rotationEffect(.degrees(fall ? 420 : 0))
-                        .opacity(fall ? 0 : 1)
-                        .animation(
-                            .easeIn(duration: 1.8 + Double(index % 5) * 0.25)
-                                .delay(Double(index % 8) * 0.12),
-                            value: fall
-                        )
+                    piece(index: index, containerWidth: geo.size.width)
                 }
             }
             .frame(maxWidth: .infinity)
         }
         .frame(height: 300)
         .onAppear { fall = true }
+    }
+
+    /// Split out of `body` with fully-annotated locals: as one chained expression
+    /// inside ForEach this exceeded the Swift type-checker's budget outright
+    /// ("unable to type-check this expression in reasonable time").
+    @ViewBuilder
+    private func piece(index: Int, containerWidth: CGFloat) -> some View {
+        let size: CGSize = .init(
+            width: index % 3 == 0 ? 5 : 6,
+            height: index % 2 == 0 ? 9 : 6
+        )
+        let spread: Double = (0.06 + Double(index) * 0.056).truncatingRemainder(dividingBy: 0.94)
+        let xPosition: CGFloat = containerWidth * CGFloat(spread)
+        let yPosition: CGFloat = fall ? 280 : -14
+        let duration: Double = 1.8 + Double(index % 5) * 0.25
+        let delay: Double = Double(index % 8) * 0.12
+
+        RoundedRectangle(cornerRadius: 1.5)
+            .fill(palette[index % palette.count])
+            .frame(width: size.width, height: size.height)
+            .position(x: xPosition, y: yPosition)
+            .rotationEffect(.degrees(fall ? 420 : 0))
+            .opacity(fall ? 0 : 1)
+            .animation(.easeIn(duration: duration).delay(delay), value: fall)
     }
 }
 

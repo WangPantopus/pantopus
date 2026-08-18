@@ -19,7 +19,8 @@ import SwiftUI
 // swiftlint:disable:next type_body_length
 struct DateOverridesView: View {
     @State private var viewModel: DateOverridesViewModel
-    @State private var showCustomHoursPicker = false
+    /// The custom-hours block currently open in the time-range picker.
+    @State private var editingBlock: TimeRange?
     @Environment(\.dismiss) private var dismiss
 
     init(viewModel: DateOverridesViewModel) {
@@ -36,12 +37,9 @@ struct DateOverridesView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .task { await viewModel.load() }
         .accessibilityIdentifier("scheduling.dateOverrides")
-        .sheet(isPresented: $showCustomHoursPicker) {
-            TimeRangePickerSheet(
-                range: TimeRange(start: viewModel.customStart, end: viewModel.customEnd)
-            ) { start, end in
-                viewModel.customStart = start
-                viewModel.customEnd = end
+        .sheet(item: $editingBlock) { block in
+            TimeRangePickerSheet(range: block) { start, end in
+                viewModel.updateCustomBlock(block.id, start: start, end: end)
             }
         }
         .alert("Couldn't save", isPresented: errorPresented) {
@@ -297,19 +295,21 @@ struct DateOverridesView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.Color.personal)
 
-            Picker("What happens", selection: $viewModel.mode) {
-                ForEach(OverrideMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
+            // Design `Segmented` (sunken track, white selected card) — the
+            // native segmented Picker carried none of that chrome.
+            EventTypeSegmented(
+                options: OverrideMode.allCases,
+                selection: $viewModel.mode,
+                label: { $0.label },
+                accessibilityID: "scheduling.dateOverrides.mode"
+            )
 
             if viewModel.mode == .customHours {
                 Text("Hours for this day")
                     .font(.system(size: 11, weight: .semibold))
                     .kerning(-0.05)
                     .foregroundStyle(Theme.Color.appTextSecondary)
-                customHoursRow
+                customHoursBlocks
             } else {
                 Text("People can't book you on this date.")
                     .font(.system(size: 11.5))
@@ -328,17 +328,38 @@ struct DateOverridesView: View {
         .pantopusShadow(.sm)
     }
 
-    /// A single labeled time-range button (clock · "10:00 AM – 2:00 PM" · chevron)
-    /// that opens a picker sheet — mirrors the design's TimeRangeButton and
-    /// Android's A3TimeRangeButton (replaces the two inline DatePickers).
-    private var customHoursRow: some View {
-        AvailabilityTimeRangeButton(
-            label: TimeRange(start: viewModel.customStart, end: viewModel.customEnd).display,
-            isValid: TimeRange(start: viewModel.customStart, end: viewModel.customEnd).isValid,
-            onTap: { showCustomHoursPicker = true },
-            onRemove: nil
-        )
-        .accessibilityIdentifier("scheduling.dateOverrides.customHoursButton")
+    /// The custom-hours block list: one labelled time-range button per block
+    /// (clock · "10:00 AM – 2:00 PM" · chevron), each opening a picker sheet,
+    /// under a "+ Add a block" affordance. Design `PickerBlock` (AVAIL-08) —
+    /// a day can hold several windows, and each block persists as its own
+    /// override row for that date (mirrors the web `DateOverrideEditor`).
+    private var customHoursBlocks: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            ForEach(viewModel.customBlocks) { block in
+                AvailabilityTimeRangeButton(
+                    label: block.display,
+                    isValid: block.isValid,
+                    onTap: { editingBlock = block },
+                    onRemove: viewModel.customBlocks.count > 1
+                        ? { viewModel.removeCustomBlock(block.id) }
+                        : nil
+                )
+                .accessibilityIdentifier("scheduling.dateOverrides.customHoursButton")
+            }
+            Button {
+                viewModel.addCustomBlock()
+            } label: {
+                HStack(spacing: Spacing.s1) {
+                    Icon(.plus, size: 13, strokeWidth: 2.4, color: Theme.Color.primary600)
+                    Text("Add a block")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.primary600)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add a time block to this day")
+            .accessibilityIdentifier("scheduling.dateOverrides.addBlock")
+        }
     }
 
     private var primaryCTA: some View {

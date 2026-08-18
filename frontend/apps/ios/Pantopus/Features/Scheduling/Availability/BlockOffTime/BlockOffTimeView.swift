@@ -37,19 +37,23 @@ struct BlockOffTimeView: View {
             onClose: { dismiss() },
             onCommit: { Task { if await viewModel.save() { dismiss() } } },
             content: {
-                sheetOverline
-                detailsCard
-                if let conflict = viewModel.conflict {
-                    conflictCard(conflict)
-                }
-                repeatsCard
-                if viewModel.isSaving {
-                    savingBar
-                } else {
-                    AvailabilityLockFootnote(
-                        text: "This time won't be offered for booking. It's private to you."
-                    )
-                    .padding(.horizontal, Spacing.s4)
+                // Design `Body` stacks its cards 12px apart — the shared shell's
+                // default 20pt rhythm is looser than the availability frames.
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    sheetOverline
+                    detailsCard
+                    if let conflict = viewModel.conflict {
+                        conflictCard(conflict)
+                    }
+                    repeatsCard
+                    if viewModel.isSaving {
+                        savingBar
+                    } else {
+                        AvailabilityLockFootnote(
+                            text: "This time won't be offered for booking. It's private to you."
+                        )
+                        .padding(.horizontal, Spacing.s3)
+                    }
                 }
             }
         )
@@ -72,7 +76,7 @@ struct BlockOffTimeView: View {
             .tracking(0.8)
             .foregroundStyle(Theme.Color.personal)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.s4)
+            .padding(.horizontal, Spacing.s3)
             .accessibilityIdentifier("scheduling.blockOff.overline")
     }
 
@@ -101,15 +105,14 @@ struct BlockOffTimeView: View {
                 ) { activePicker = .date }
                     .accessibilityIdentifier("scheduling.blockOff.dateField")
             }
-            Toggle(isOn: $viewModel.allDay) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("All day").pantopusTextStyle(.body).foregroundStyle(Theme.Color.appText)
-                    Text("Block the whole day")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            .tint(Theme.Color.primary600)
+            // Design `DetailsCard` renders this as a `ToggleRow icon="sun"` —
+            // a 30pt leading tile, not a bare labelled switch.
+            IconToggleRow(
+                icon: .sun,
+                title: "All day",
+                subtitle: "Block the whole day",
+                isOn: $viewModel.allDay
+            )
             .disabled(viewModel.isSaving)
             if !viewModel.allDay {
                 HStack(spacing: Spacing.s2) {
@@ -195,7 +198,7 @@ struct BlockOffTimeView: View {
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.appTextMuted)
         }
-        .padding(.horizontal, Spacing.s4)
+        .padding(.horizontal, Spacing.s3)
         .accessibilityIdentifier("scheduling.blockOff.savingBar")
     }
 
@@ -259,7 +262,7 @@ struct BlockOffTimeView: View {
             RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
                 .stroke(Theme.Color.warningLight, lineWidth: 1)
         )
-        .padding(.horizontal, Spacing.s4)
+        .padding(.horizontal, Spacing.s3)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("scheduling.blockOff.conflictWarning")
     }

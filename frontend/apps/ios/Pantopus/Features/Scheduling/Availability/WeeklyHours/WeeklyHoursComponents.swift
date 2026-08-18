@@ -278,13 +278,16 @@ struct NoHoursWarningCard: View {
             HStack(alignment: .top, spacing: Spacing.s2) {
                 Icon(.alertTriangle, size: 17, color: Theme.Color.warning)
                 VStack(alignment: .leading, spacing: 2) {
+                    // Design `WarningCard` (weekly-hours-frames.jsx:209-210):
+                    // amber-800 title over an amber-900 body — the amber-600
+                    // `warning` stays on the triangle glyph.
                     Text("No hours set")
                         .pantopusTextStyle(.body)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Theme.Color.appText)
+                        .foregroundStyle(Theme.Color.warningStrong)
                     Text("People can't book you until you add at least one block.")
                         .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .foregroundStyle(Theme.Color.warningDeep)
                 }
             }
             QuickDefaultButton(onTap: onUseDefault)
@@ -297,7 +300,7 @@ struct NoHoursWarningCard: View {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.warningLight, lineWidth: 1)
         )
-        .padding(.horizontal, Spacing.s4)
+        .padding(.horizontal, Spacing.s3)
         .accessibilityIdentifier("scheduling.weeklyHours.noHoursWarning")
     }
 }
@@ -329,7 +332,7 @@ struct CompositionGapCard: View {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.primary200, lineWidth: 1)
         )
-        .padding(.horizontal, Spacing.s4)
+        .padding(.horizontal, Spacing.s3)
         .accessibilityIdentifier("scheduling.weeklyHours.compositionGap")
     }
 }

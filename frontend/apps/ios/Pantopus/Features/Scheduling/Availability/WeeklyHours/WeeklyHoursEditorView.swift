@@ -91,27 +91,35 @@ struct WeeklyHoursEditorView: View {
         FormShell(
             title: formTitle,
             leading: .back,
-            rightActionLabel: nil,
+            // Design `TopBar` carries a trailing Save / Saving text action on
+            // every editor frame, above the full-width save bar — the label
+            // greys to fg4 while the commit is in flight.
+            rightActionLabel: viewModel.isSaving ? "Saving…" : "Save",
             bottomActionLabel: "Save schedule",
+            showsTopActionWithBottom: true,
             isValid: viewModel.formValid && viewModel.isDirty,
             isDirty: viewModel.isDirty,
             isSaving: viewModel.isSaving,
             onClose: { dismiss() },
             onCommit: { Task { await viewModel.save() } },
             content: {
-                AvailabilityHeaderPill()
-                if viewModel.isUnset {
-                    CompositionGapCard()
-                    WeeklyHoursEmptyHero { viewModel.applyNineToFiveDefault() }
-                    linkGroup
-                } else {
-                    if viewModel.allOff {
-                        NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+                // Design `Body` stacks its cards 12px apart — the shared shell's
+                // default 20pt rhythm is looser than the availability frames.
+                VStack(alignment: .leading, spacing: Spacing.s3) {
+                    AvailabilityHeaderPill()
+                    if viewModel.isUnset {
+                        CompositionGapCard()
+                        WeeklyHoursEmptyHero { viewModel.applyNineToFiveDefault() }
+                        linkGroup
+                    } else {
+                        if viewModel.allOff {
+                            NoHoursWarningCard { viewModel.applyNineToFiveDefault() }
+                        }
+                        nameGroup
+                        timezoneGroup
+                        weeklyHoursGroup
+                        linkGroup
                     }
-                    nameGroup
-                    timezoneGroup
-                    weeklyHoursGroup
-                    linkGroup
                 }
             }
         )
@@ -140,17 +148,14 @@ struct WeeklyHoursEditorView: View {
                 timezoneFieldButton
             }
             Divider().background(Theme.Color.appBorderSubtle)
-            Toggle(isOn: Binding(get: { viewModel.lockTimezone }, set: viewModel.setLockTimezone)) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Lock to my timezone")
-                        .pantopusTextStyle(.body)
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("Keep these hours even when you travel")
-                        .pantopusTextStyle(.caption)
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                }
-            }
-            .tint(Theme.Color.primary600)
+            // Design `TimezoneCard` closes on a `ToggleRow icon="lock"` — a
+            // 30pt leading tile, not a bare labelled switch.
+            IconToggleRow(
+                icon: .lock,
+                title: "Lock to my timezone",
+                subtitle: "Keep these hours even when you travel",
+                isOn: Binding(get: { viewModel.lockTimezone }, set: viewModel.setLockTimezone)
+            )
             .disabled(viewModel.isSaving)
         }
     }
@@ -256,7 +261,7 @@ struct WeeklyHoursEditorView: View {
                         .background(Theme.Color.appSurface)
                         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
                     }
-                    .padding(.horizontal, Spacing.s4)
+                    .padding(.horizontal, Spacing.s3)
                 }
             }
             .padding(.vertical, Spacing.s4)

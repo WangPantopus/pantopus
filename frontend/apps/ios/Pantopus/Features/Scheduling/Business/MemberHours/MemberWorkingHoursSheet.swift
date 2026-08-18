@@ -295,6 +295,11 @@ struct MemberWorkingHoursSheet: View {
     private var readOnlyBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
+                // The design's `Header` carries the timezone chip on EVERY
+                // frame, `FrameInherits` included — inert here, since a
+                // teammate's hours are read-only.
+                tzChip
+                    .disabled(true)
                 inheritsLinkRow
                 weekCard(readonly: true)
                     .opacity(0.6)
@@ -392,13 +397,15 @@ struct MemberWorkingHoursSheet: View {
 
 // MARK: - Flow layout for range pills
 
-/// Minimal wrapping HStack for the range chips in a day row.
+/// Wrapping chip row for a day's ranges. The design `DayRow` lays the chips out
+/// with `flexWrap:'wrap'` and a 6px gap — they run horizontally and only wrap
+/// when the row is full, rather than stacking one per line.
 private struct FlowRanges<Content: View>: View {
     let ranges: [TimeRange]
     @ViewBuilder let content: (TimeRange) -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        ExtrasFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
             ForEach(ranges) { range in
                 content(range)
             }
