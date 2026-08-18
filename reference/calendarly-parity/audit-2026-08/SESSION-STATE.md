@@ -336,3 +336,85 @@ re-recording (never blind-accepted):
 NEVER touched = arm64 re-render noise. Those 6 were REVERTED and paparazziVerify still passes
 (BUILD SUCCESSFUL), which confirms they were noise. Committed only the 5 scheduling baselines.
 Rule for future records here: revert any rewritten baseline on a screen you didn't change.
+
+
+## Rev 16 (2026-08-12) — REAL toolchain verification (user approved the 8.5GB platform download)
+iOS PLATFORM INSTALLED (`xcodebuild -downloadPlatform iOS` -> iOS 26.5 sim, 8.52GB). Destinations
+now resolve. THE FIRST REAL iOS COMPILE FOUND A HARD BUILD FAILURE that every lint gate passed:
+  InviteeConfirmedView.swift:414 "the compiler is unable to type-check this expression in
+  reasonable time" — ConfettiBurst's ForEach body was one chained SwiftUI expression
+  (.fill/.frame/.position/.rotationEffect/.opacity/.animation) with untyped numeric literals.
+  FIXED: extracted `piece(index:containerWidth:)` with fully annotated locals (CGSize, Double,
+  CGFloat). Rebuild in progress.
+  LESSON: SwiftFormat/SwiftLint/icon/hex gates do NOT substitute for a compile. Never again
+  report iOS as "validated" on lint alone.
+  Build gotcha: two concurrent xcodebuild runs on the same DerivedData => "database is locked"
+  (error 65) which LOOKS like a compile error. Run one at a time.
+
+MIGRATIONS PROVEN ON REAL POSTGRES (docker postgis/postgis:16-3.4 — the stock postgres image
+lacks postgis and the schema uses geography in 44 places; shims needed: auth schema + auth.uid()/
+auth.role(), roles authenticated/service_role/anon, uuid-ossp, pgcrypto, btree_gist):
+  schema.sql (frozen snapshot) then 159..167 ALL APPLY CLEAN (9/9).
+  Objects verified: cancellation_policy=jsonb, cohost_of_booking_id=uuid, ics_sequence=int
+  default 0, AvailabilityBlock.timezone + HomeCalendarEvent.timezone=text, triggers
+  booking_daily_cap_trg + booking_group_cap_trg + homeresource_predelete_trg present,
+  WalletTransaction_type_check includes withdrawal_reversal, EmailSuppression has owner_type
+  + owner_id.
+  FUNCTIONAL PROOF (live DB, rolled back):
+    · group seat_cap=2 -> seat1 OK, seat2 OK (IMPOSSIBLE before this audit), seat3 rejected
+      "GROUP_SLOT_FULL: 2 of 2 seats taken".
+    · daily_cap=1 -> 1st OK, 2nd same-UTC-day rejected "DAILY_CAP_REACHED: 1 of 1",
+      co-host shadow (distinct host_user_id) STILL accepted on a full day (exemption works),
+      next day free again.
+    · Booking_no_overlap correctly rejected a malformed test that reused one host_user_id for
+      the shadow — the constraint is live and doing its job.
+  NOTE: numbered migrations are INCREMENTAL patches, not a from-scratch schema; a bare DB needs
+  backend/database/schema.sql applied first (base tables like "User"/"Home" live only there).
+
+
+## Rev 17 (2026-08-12) — design-polish tail DONE + a CI-breaker I introduced, caught
+POLISH SWEEP (workflow wf_7b06f769-77b, sequential pair, both agents completed):
+- android-polish: 12 fixed (RR-02 overline grey, RR-03 shimmer loading, CO-01 git-merge glyph,
+  AVAIL-06 four override glyphs, AVAIL-07 holiday footnote, AVAIL-11 saving frame, AVAIL-12
+  removed the "Applies to" card + its dead plumbing, AVAIL-13 warningStrong/warningDeep,
+  AVAIL-14 mini-toggle 36x20, AVAIL-15 globe grey, AVAIL-16 Save/Saving action, CC-01 split
+  coming-soon vs none-connected). 5 verified ALREADY-CORRECT and left untouched (ET-04/05/06,
+  AVAIL-17, icon registration). Android gate BUILD SUCCESSFUL; no Paparazzi drift.
+- ios-polish: ED-03/04/05/06, AVAIL-02/03/04/05/08/09/10/13/16/17, CC-01/CC-02 fixed.
+  ET-03 correctly NOT done — DATA-BLOCKED: GET /event-types returns no assignee/host count, so
+  an "N hosts" badge needs a backend field; neither Android nor web renders it either. Route as
+  a backend+3-client item, not iOS polish. (Good call by the agent; agreed.)
+
+CI-BREAKER I CAUSED (found via the agent's report, then confirmed myself):
+  .github/workflows/ios-ci.yml:60 runs `swiftlint lint --strict` — warnings are ERRORS there.
+  My committed reorder work took EventTypeListViewModel.swift from 496 -> 560 lines (limit 500)
+  and both List VM + View past type_body_length 300. That would have failed CI.
+  FIX: tried extracting reorder into EventTypeListViewModel+Reorder.swift, but a cross-file
+  extension cannot touch `private` members (eventTypes/client/fetch) nor set `private(set)
+  isReordering` — it would have required widening 5 members to internal, trading real
+  encapsulation for a line count. REVERTED that and used the project's existing opt-out
+  (`// swiftlint:disable file_length` + `disable:next type_body_length`), which sibling
+  scheduling files already use. EventTypes now strict-clean.
+  Remaining --strict errors are 6 pre-existing force_unwrap hits in Mailbox/Media files this
+  branch never touched (local SwiftLint 0.63.2 vs CI-pinned 0.63.3 skew, documented in the
+  workflow).
+ALSO: swiftformat had 4 violations in my ConfettiBurst fix (spaceAroundOperators/docComments)
+  — formatted; whole app back to 0/1732.
+IN FLIGHT: full iOS build+test (first ever with the polish changes) + full Android gate.
+
+## Rev 18 (2026-08-17) — resume after 5-day cutoff; final gate re-run
+Previous session died mid-iOS-test-suite (** BUILD INTERRUPTED ** in /tmp/ios-test2.log after
+291 suites / 0 failures — no final verdict). State on resume:
+- 29 files UNCOMMITTED (16 iOS + 13 Android): the whole design-polish tail (12 Android + 16 iOS
+  fixes), my swiftlint --strict CI-breaker fix (EventTypeList disables), ConfettiBurst
+  type-check fix. HEAD still be81a1fb.
+- ALREADY VERIFIED on this exact batch (do not redo): Android full gate BUILD SUCCESSFUL
+  (compile+unit+ktlint+detekt+paparazziVerify — no snapshot drift); iOS make verify-icons clean;
+  no raw hex in either diff; swiftformat 0/1732; EventTypes strict-lint clean; iOS
+  BUILD SUCCEEDED (build w/o test, ios-build3.log).
+- ONLY REMAINING GATE: full iOS test suite → /tmp/ios-test3.log (relaunched this rev).
+- THEN: commit all 29 files + SESSION-STATE + push. Nothing else outstanding.
+- Docker pantopus-migtest (postgis 16) still up 5 days — remove after push (migration proof
+  already recorded in rev 16; container no longer needed).
+- Known one-flaky-per-run Android unit tests (dispatcher leakage, pre-existing, pass isolated):
+  OneOffLink/PayoutsEarnings/Me/MemberPollResponse VMs — do NOT chase.
