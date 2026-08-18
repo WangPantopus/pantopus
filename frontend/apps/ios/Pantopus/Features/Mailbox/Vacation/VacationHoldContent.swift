@@ -19,7 +19,7 @@ public struct VacationHoldScope: Sendable, Hashable, Identifiable {
     public enum Kind: String, Sendable, Hashable {
         case mail
         case packages
-        case magicTask
+        case marketplacePickups
         case civic
     }
 
@@ -201,6 +201,55 @@ public struct VacationScheduleDraft: Sendable, Hashable {
     /// they're delivery, not hold).
     public var isValid: Bool {
         spanDays >= 1 && scopes.contains { $0.isOn && !$0.isLocked }
+    }
+
+    /// Blank composer the live screen opens with when
+    /// `GET /vacation/status` reports no hold. Only the scope copy is
+    /// canned (it's UI labelling, not user data) — the dates default to
+    /// today → +7 days the way RN's `vacation.tsx:37-41` does, and the
+    /// forwarding address / emergency contact stay empty rather than
+    /// showing a fixture as if it were the user's own. Mirrors Android
+    /// `VacationScheduleDraft.liveDefault`.
+    public static func liveDefault(today: Date = Date()) -> VacationScheduleDraft {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let from = calendar.startOfDay(for: today)
+        let to = calendar.date(byAdding: .day, value: 7, to: from) ?? from
+        return VacationScheduleDraft(
+            fromDate: from,
+            toDate: to,
+            scopes: [
+                VacationHoldScope(
+                    kind: .mail,
+                    label: "Mail & flyers",
+                    sub: "Postal hold via USPS API",
+                    isOn: true
+                ),
+                VacationHoldScope(
+                    kind: .packages,
+                    label: "Packages",
+                    sub: "Carriers hold at neighborhood hub",
+                    isOn: true
+                ),
+                VacationHoldScope(
+                    kind: .marketplacePickups,
+                    label: "Marketplace pickups",
+                    sub: "Buyers see away status",
+                    isOn: true
+                ),
+                VacationHoldScope(
+                    kind: .civic,
+                    label: "Civic notices",
+                    sub: "Permits, voting, service alerts",
+                    isOn: false,
+                    isLocked: true
+                )
+            ],
+            forwardingEnabled: false,
+            forwarding: nil,
+            emergency: nil,
+            footerBlurb: "Applies to your primary home address."
+        )
     }
 }
 

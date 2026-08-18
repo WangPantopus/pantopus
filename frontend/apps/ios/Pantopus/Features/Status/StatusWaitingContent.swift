@@ -224,13 +224,22 @@ public extension StatusWaitingContent {
     // MARK: A18.2 — Claim submitted
 
     /// A18.2 — right after a claim POST (`approved == false`) or revisited
-    /// once the claim resolves (`approved == true`). Timeline dates mirror
-    /// the design sample frames pending backend date wiring.
+    /// once the claim resolves (`approved == true`).
+    ///
+    /// `submittedOn` / `decidedOn` are pre-formatted captions built from the
+    /// claim's real `created_at` / `updated_at`. They are **optional on
+    /// purpose**: the design frames show sample dates, but the app must never
+    /// print a date it can't source from the API, so a nil argument drops the
+    /// caption (and the date fragment of the pill) rather than inventing one.
     static func claimSubmitted(
         homeName: String?,
-        approved: Bool = false
+        approved: Bool = false,
+        submittedOn: String? = nil,
+        decidedOn: String? = nil
     ) -> StatusWaitingContent {
         let chip = homeName?.isEmpty == false ? homeName : nil
+        let submittedCaption = submittedOn?.isEmpty == false ? submittedOn : nil
+        let decidedCaption = decidedOn?.isEmpty == false ? decidedOn : nil
         if approved {
             return StatusWaitingContent(
                 halo: StatusHalo(tone: .success, icon: .badgeCheck),
@@ -238,17 +247,17 @@ public extension StatusWaitingContent {
                 subcopy: "Your ownership claim was approved. The Home badge now shows on your profile and household.",
                 addressChip: chip,
                 statusPill: StatusWaitingPill(
-                    text: "Approved · 3 days ago",
+                    text: decidedCaption.map { "Approved · \($0)" } ?? "Approved",
                     icon: .checkCircle,
                     tone: .success
                 ),
                 timeline: [
-                    StatusTimelineStage(id: "submitted", label: "Submitted", sub: "Oct 10", state: .done),
-                    StatusTimelineStage(id: "review", label: "Under review", sub: "Oct 11", state: .done),
-                    StatusTimelineStage(id: "decision", label: "Approved", sub: "Oct 14", state: .done)
+                    StatusTimelineStage(id: "submitted", label: "Submitted", sub: submittedCaption, state: .done),
+                    StatusTimelineStage(id: "review", label: "Under review", state: .done),
+                    StatusTimelineStage(id: "decision", label: "Approved", sub: decidedCaption, state: .done)
                 ],
                 primaryCta: StatusCTA(label: "Open your home", actionKey: "open_home", icon: .arrowRight),
-                secondaryCta: StatusCTA(label: "See your Home badge", actionKey: "view_badge")
+                secondaryCta: StatusCTA(label: "View claim", actionKey: "view_claim")
             )
         }
         return StatusWaitingContent(
@@ -257,12 +266,12 @@ public extension StatusWaitingContent {
             subcopy: "We'll review your deed and address match within 3 business days and send you a decision.",
             addressChip: chip,
             statusPill: StatusWaitingPill(
-                text: "Decision expected by Oct 17",
+                text: "Decision usually within 3 business days",
                 icon: .calendarClock,
                 tone: .success
             ),
             timeline: [
-                StatusTimelineStage(id: "submitted", label: "Submitted", sub: "Oct 10", state: .done),
+                StatusTimelineStage(id: "submitted", label: "Submitted", sub: submittedCaption, state: .done),
                 StatusTimelineStage(id: "review", label: "Under review", state: .pending),
                 StatusTimelineStage(id: "decision", label: "Decision", state: .pending)
             ],
@@ -277,13 +286,21 @@ public extension StatusWaitingContent {
     /// (`confirmed == false`) or the landlord has signed off and Pantopus
     /// is doing the final review (`confirmed == true`). The primary CTA is
     /// "Back to home" (the user can't speed this up), inverting A18.2.
+    ///
+    /// `submittedOn` / `confirmedOn` are pre-formatted captions built from the
+    /// real lease-request timestamps; nil drops the caption rather than
+    /// printing one of the design's sample dates.
     static func verificationSubmitted(
         homeName: String?,
         landlordEmail: String,
         landlordName: String? = nil,
-        confirmed: Bool = false
+        confirmed: Bool = false,
+        submittedOn: String? = nil,
+        confirmedOn: String? = nil
     ) -> StatusWaitingContent {
         let chip = homeName?.isEmpty == false ? homeName : nil
+        let submittedCaption = submittedOn?.isEmpty == false ? submittedOn : nil
+        let confirmedCaption = confirmedOn?.isEmpty == false ? confirmedOn : nil
         let backToHome = StatusCTA(label: "Back to home", actionKey: "back_to_home", icon: .home)
         let viewStatus = StatusCTA(label: "View status", actionKey: "view_status")
         if confirmed {
@@ -296,13 +313,18 @@ public extension StatusWaitingContent {
                 bodyEmphasis: who,
                 addressChip: chip,
                 statusPill: StatusWaitingPill(
-                    text: "Decision expected today",
+                    text: "Final review in progress",
                     icon: .calendarClock,
                     tone: .primary
                 ),
                 timeline: [
-                    StatusTimelineStage(id: "lease", label: "Lease + ID", sub: "Oct 10", state: .done),
-                    StatusTimelineStage(id: "landlord", label: "Landlord confirms", sub: "Oct 11", state: .done),
+                    StatusTimelineStage(id: "lease", label: "Lease + ID", sub: submittedCaption, state: .done),
+                    StatusTimelineStage(
+                        id: "landlord",
+                        label: "Landlord confirms",
+                        sub: confirmedCaption,
+                        state: .done
+                    ),
                     StatusTimelineStage(id: "verified", label: "Verified", sub: "In review", state: .current)
                 ],
                 primaryCta: backToHome,
@@ -322,7 +344,7 @@ public extension StatusWaitingContent {
                 tone: .success
             ),
             timeline: [
-                StatusTimelineStage(id: "lease", label: "Lease + ID", sub: "Oct 10", state: .done),
+                StatusTimelineStage(id: "lease", label: "Lease + ID", sub: submittedCaption, state: .done),
                 StatusTimelineStage(id: "landlord", label: "Landlord confirms", state: .pending),
                 StatusTimelineStage(id: "verified", label: "Verified", state: .pending)
             ],

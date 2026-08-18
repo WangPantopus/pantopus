@@ -137,12 +137,19 @@ enum GigMagicPostBuilder {
         // One-time needs its date; aPlace needs a complete address.
         if form.scheduleType == .oneTime, form.scheduledStartISO == nil { return nil }
         if form.locationMode == .aPlace, !form.placeAddress.isComplete { return nil }
+        let group = moduleGroup(for: form)
+        // Pro-service: a deposit toggle with no amount is incomplete.
+        if group == .proService, form.proServiceDetails?.isDepositAmountMissing == true { return nil }
 
         let wireSchedule = form.scheduleType?.wireValue ?? "flexible"
         let location = form.locationMode.flatMap { composedLocation(for: $0, form: form, coordinate: coordinate) }
         let isVirtual = form.locationMode == .virtual
         let items = form.items.filter { !($0.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        let group = moduleGroup(for: form)
+        // Flat module columns only ride when their module is the active
+        // one — mirrors RN's `showDelivery` / `showProServices` gates
+        // (`gig-v2/new.tsx:325-343`).
+        let delivery = group == .delivery ? form.deliveryDetails : nil
+        let pro = group == .proService ? form.proServiceDetails : nil
         let draft = MagicPostDraft(
             title: title,
             description: description,
@@ -167,7 +174,18 @@ enum GigMagicPostBuilder {
             logisticsDetails: group == .logistics ? form.logisticsDetails : nil,
             remoteDetails: group == .remote ? form.remoteDetails : nil,
             urgentDetails: form.isUrgent ? form.urgentDetails : nil,
-            eventDetails: group == .event ? form.eventDetails : nil
+            eventDetails: group == .event ? form.eventDetails : nil,
+            pickupAddress: trimmedOrNil(delivery?.pickupAddress),
+            pickupNotes: trimmedOrNil(delivery?.pickupNotes),
+            dropoffAddress: trimmedOrNil(delivery?.dropoffAddress),
+            dropoffNotes: trimmedOrNil(delivery?.dropoffNotes),
+            deliveryProofRequired: delivery.map { $0.proofRequired ?? false },
+            requiresLicense: pro.map { $0.requiresLicense ?? false },
+            licenseType: trimmedOrNil(pro?.licenseType),
+            requiresInsurance: pro.map { $0.requiresInsurance ?? false },
+            scopeDescription: trimmedOrNil(pro?.scopeDescription),
+            depositRequired: pro.map { $0.depositRequired ?? false },
+            depositAmount: pro.flatMap { $0.depositRequired == true ? Double($0.depositAmount ?? "") : nil }
         )
         // magic-post requires `text` (min 3 chars) — manual/classic posts
         // may have an empty describe field, so fall back to the title.
@@ -209,17 +227,25 @@ enum GigMagicPostBuilder {
         case "home_service", "quick_help", "recurring_service": return .logistics
         case "remote_task": return .remote
         case "event_shift": return .event
-        case "delivery_errand": return .items
-        case "pro_service_quote", "general": return nil
+        case "delivery_errand": return .delivery
+        case "pro_service_quote": return .proService
+        case "general": return nil
         default:
             break
         }
         switch form.category {
         case .petcare, .childcare: return .care
         case .handyman, .cleaning, .moving, .tutoring, .tech: return .logistics
-        case .delivery: return .items
+        case .delivery: return .delivery
         case .other, nil: return nil
         }
+    }
+
+    /// Whitespace-trimmed, or nil when the field is blank — RN sends
+    /// `value || null` for every optional module string.
+    private static func trimmedOrNil(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// `draft.location_mode` wire value (home | current | address |

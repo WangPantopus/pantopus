@@ -9,13 +9,16 @@ import app.pantopus.android.data.api.models.posts.PostCreateResponse
 import app.pantopus.android.data.api.models.posts.PostCreateResponsePost
 import app.pantopus.android.data.api.models.posts.PostDetailDto
 import app.pantopus.android.data.api.models.posts.PostDetailResponse
+import app.pantopus.android.data.api.models.posts.PostPrecheckResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.models.posts.PostUpdateResponse
 import app.pantopus.android.data.api.models.posts.PostUpdateResponsePost
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPostsRepository
 import app.pantopus.android.data.location.FallbackLocationProvider
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.posts.PostPrecheckRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.data.upload.UploadRepository
@@ -52,6 +55,14 @@ class PulseComposeViewModelTest {
     private val networkMonitor: NetworkMonitor = mockk()
     private val postsRefresh = PulsePostsRefreshNotifier()
     private val locationProvider = FallbackLocationProvider()
+    private val businessPosts: BusinessPostsRepository = mockk()
+
+    // Pre-post safety precheck — relaxed so it always fails open.
+    private val precheckRepo: PostPrecheckRepository =
+        mockk {
+            coEvery { precheck(any()) } returns
+                NetworkResult.Success(PostPrecheckResponse(ok = true, canPost = true))
+        }
     private val isOnline = MutableStateFlow(true)
 
     @Before fun setUp() {
@@ -69,7 +80,16 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.INTENT_KEY, intent.key)
             }
-        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, locationProvider, savedState)
+        return PulseComposeViewModel(
+            repo,
+            uploadRepo,
+            networkMonitor,
+            postsRefresh,
+            locationProvider,
+            savedState,
+            businessPosts,
+            precheckRepo,
+        )
     }
 
     // MARK: - Defaults
@@ -363,7 +383,16 @@ class PulseComposeViewModelTest {
             SavedStateHandle().apply {
                 set(PulseComposeViewModel.POST_ID_KEY, postId)
             }
-        return PulseComposeViewModel(repo, uploadRepo, networkMonitor, postsRefresh, locationProvider, savedState)
+        return PulseComposeViewModel(
+            repo,
+            uploadRepo,
+            networkMonitor,
+            postsRefresh,
+            locationProvider,
+            savedState,
+            businessPosts,
+            precheckRepo,
+        )
     }
 
     private data class SamplePost(

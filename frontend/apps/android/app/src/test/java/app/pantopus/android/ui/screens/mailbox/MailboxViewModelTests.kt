@@ -2,8 +2,6 @@ package app.pantopus.android.ui.screens.mailbox
 
 import app.pantopus.android.data.api.models.mailbox.MailItem
 import app.pantopus.android.data.api.models.mailbox.MailboxListResponse
-import app.pantopus.android.data.api.models.mailbox.v2.Drawer
-import app.pantopus.android.data.api.models.mailbox.v2.DrawerListResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -127,45 +125,5 @@ class MailboxViewModelTests {
             vm.load()
             vm.selectTab(MailboxTab.Starred.id)
             assertEquals(MailboxTab.Starred.id, vm.selectedTab.value)
-        }
-
-    @Test
-    fun drawers_happy_path() =
-        runTest {
-            coEvery { repo.drawers() } returns
-                NetworkResult.Success(
-                    DrawerListResponse(
-                        drawers =
-                            listOf(
-                                Drawer(
-                                    drawer = "personal",
-                                    displayName = "Personal",
-                                    icon = "inbox",
-                                    unreadCount = 3,
-                                    urgentCount = 1,
-                                    lastItemAt = null,
-                                ),
-                            ),
-                    ),
-                )
-            val vm = MailboxDrawersViewModel(repo)
-            vm.load()
-            val loaded = vm.state.value as ListOfRowsUiState.Loaded
-            assertEquals(
-                "Personal",
-                loaded.sections
-                    .first()
-                    .rows
-                    .first()
-                    .title,
-            )
-            assertEquals(
-                "3 unread · 1 urgent",
-                loaded.sections
-                    .first()
-                    .rows
-                    .first()
-                    .subtitle,
-            )
         }
 }

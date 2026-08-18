@@ -55,6 +55,9 @@ class PrivacyHandshakeViewModel
         private val personaHandle: String =
             savedStateHandle.get<String>(HANDLE_KEY) ?: ""
 
+        private val preselectedTierRank: Int? =
+            savedStateHandle.get<String>(PRESELECTED_TIER_RANK_KEY)?.toIntOrNull()
+
         private var ready: HandshakeReadyContent? = null
         private var isSubmitting: Boolean = false
 
@@ -108,7 +111,11 @@ class PrivacyHandshakeViewModel
             val isMember = followStatus.following == true || followStatus.status == "active"
             val preview = previewFrom(persona)
             val options = tiers.tiers.map(::option)
-            val defaultRank = options.firstOrNull { it.rank == 1 }?.rank ?: options.firstOrNull()?.rank ?: 1
+            val defaultRank =
+                preselectedTierRank
+                    ?: options.firstOrNull { it.rank == 1 }?.rank
+                    ?: options.firstOrNull()?.rank
+                    ?: 1
             val content =
                 HandshakeReadyContent(
                     persona = preview,
@@ -352,6 +359,7 @@ class PrivacyHandshakeViewModel
 
         companion object {
             const val HANDLE_KEY = "personaHandle"
+            const val PRESELECTED_TIER_RANK_KEY = "preselectedTierRank"
 
             internal fun previewFrom(persona: PersonaSummaryDto): HandshakePersonaPreview =
                 HandshakePersonaPreview(

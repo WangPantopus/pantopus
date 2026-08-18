@@ -4,7 +4,10 @@
 //
 //  Edit Profile screen. Fields mirror `updateProfileSchema` at
 //  `backend/routes/users.js:324-351`. Section ordering matches the P10
-//  design: About, Contact, Address, Social, Visibility.
+//  design: About, Skills, Contact, Address, Social, Visibility.
+//
+//  Skills are the one group that doesn't ride the profile PATCH — they
+//  commit through `PUT /api/users/skills` in the same `save()`.
 //
 
 import SwiftUI
@@ -115,7 +118,9 @@ public struct EditProfileView: View {
             onClose: { dismiss() },
             onCommit: { Task { await viewModel.save() } },
             content: {
+                avatarSection
                 aboutSection
+                skillsSection
                 contactSection
                 addressSection
                 socialSection

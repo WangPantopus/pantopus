@@ -1,12 +1,18 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "LongMethod")
 
 package app.pantopus.android.ui.screens.homes.tasks
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,6 +46,10 @@ fun HouseholdTasksListScreen(
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val banner by viewModel.banner.collectAsStateWithLifecycle()
+    val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
+    val actionError by viewModel.actionError.collectAsStateWithLifecycle()
+
+    var deleteTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(
@@ -49,6 +59,16 @@ fun HouseholdTasksListScreen(
         )
         viewModel.load()
         Analytics.track(AnalyticsEvent.ScreenHouseholdTasksViewed)
+    }
+
+    LaunchedEffect(pendingEvent) {
+        when (val event = pendingEvent) {
+            null -> Unit
+            is HouseholdTasksListEvent.ConfirmDelete -> {
+                deleteTarget = event.taskId to event.title
+                viewModel.acknowledgeEvent()
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().testTag("householdTasksList")) {
@@ -64,6 +84,37 @@ fun HouseholdTasksListScreen(
             fab = viewModel.fab(),
             onBack = onBack,
             banner = banner,
+        )
+    }
+
+    deleteTarget?.let { (taskId, title) ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Delete task") },
+            text = { Text("Delete “$title”? This can’t be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTask(taskId)
+                        deleteTarget = null
+                    },
+                    modifier = Modifier.testTag("householdTasksList_deleteConfirm"),
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearActionError() },
+            title = { Text("Couldn’t delete task") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearActionError() }) { Text("OK") }
+            },
         )
     }
 }

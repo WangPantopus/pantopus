@@ -47,8 +47,14 @@ class VerifyEmailViewModel
             val errorMessage: AuthError? = null,
             val resendCooldownUntilEpochMs: Long? = null,
         ) {
-            val canResend: Boolean
-                get() = !isResending && !email.isNullOrEmpty() && resendCooldownUntilEpochMs == null
+            /**
+             * True when the resend CTA is tappable (no in-flight call AND no
+             * active cooldown AND we have an email to resend to). Mirrors iOS
+             * `VerifyEmailViewModel.canResend` — the cooldown is wall-clock
+             * based, so it must be evaluated against a supplied `now` rather
+             * than a stored flag that nothing ever clears.
+             */
+            fun canResend(nowEpochMs: Long): Boolean = !isResending && !email.isNullOrEmpty() && cooldownRemaining(nowEpochMs) == null
 
             fun cooldownRemaining(nowEpochMs: Long): Long? {
                 val until = resendCooldownUntilEpochMs ?: return null
@@ -106,7 +112,7 @@ class VerifyEmailViewModel
          */
         fun resend() {
             val snapshot = _uiState.value
-            if (!snapshot.canResend) return
+            if (!snapshot.canResend(clock.millis())) return
             val email = snapshot.email ?: return
             _uiState.update { it.copy(isResending = true, didResend = false, errorMessage = null) }
             viewModelScope.launch {

@@ -16,6 +16,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.MyGigDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.offers.OffersCategory
@@ -415,7 +416,7 @@ class MyTasksViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = ListOfRowsUiState.Error(result.error.message)
+                            _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                         }
                     }
                 }

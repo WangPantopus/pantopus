@@ -157,6 +157,66 @@ public struct PostGigV1View: View {
             )
         }
 
+        // A13.8 P5 — the rest of RN's editable field set, so an edit can
+        // touch every column the PATCH schema accepts (`gigs.js:642`).
+        FormFieldGroup("More details") {
+            PostGigV1DeadlineField(
+                deadline: viewModel.state.form.deadline
+            ) { viewModel.updateDeadline($0) }
+
+            PantopusTextField(
+                "Estimated duration (hours)",
+                text: Binding(
+                    get: { viewModel.state.form.estimatedDuration },
+                    set: { viewModel.updateEstimatedDuration($0) }
+                ),
+                placeholder: "1.5",
+                state: fieldState(.estimatedDuration),
+                keyboardType: .decimalPad,
+                identifier: "postGigV1_estimatedDuration"
+            )
+
+            PantopusTextField(
+                "Tags",
+                text: Binding(
+                    get: { viewModel.state.form.tags },
+                    set: { viewModel.updateTags($0) }
+                ),
+                placeholder: "heavy lifting, weekend, two-person",
+                identifier: "postGigV1_tags"
+            )
+
+            Text("Comma-separated · up to \(PostGigV1SampleData.maxTags)")
+                .font(.system(size: 11, weight: .regular))
+                .italic()
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityIdentifier("postGigV1_tagsHint")
+
+            PostGigV1UrgentToggle(
+                isOn: Binding(
+                    get: { viewModel.state.form.isUrgent },
+                    set: { viewModel.updateIsUrgent($0) }
+                )
+            )
+        }
+
+        FormFieldGroup("Items") {
+            PostGigV1ItemsField(
+                items: viewModel.state.form.items,
+                canAdd: viewModel.state.form.items.count < PostGigV1SampleData.maxItems,
+                onAdd: { viewModel.addItem() },
+                onUpdate: { viewModel.updateItem($0) },
+                onRemove: { viewModel.removeItem(id: $0) }
+            )
+        }
+
+        FormFieldGroup("Cancellation") {
+            PostGigV1CancellationPolicyField(
+                selected: viewModel.state.form.cancellationPolicy,
+                onSelect: viewModel.updateCancellationPolicy
+            )
+        }
+
         PostGigV1LegacyStamp()
     }
 

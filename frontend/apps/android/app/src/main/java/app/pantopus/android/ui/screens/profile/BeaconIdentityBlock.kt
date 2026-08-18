@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -369,16 +370,18 @@ fun BeaconHeaderGhostButton(
     actionLabel: String,
     onClick: () -> Unit,
     title: String? = null,
+    enabled: Boolean = true,
 ) {
     if (title == null) {
         Box(
             modifier =
                 Modifier
                     .size(36.dp)
+                    .alpha(if (enabled) 1f else DISABLED_ALPHA)
                     .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                    .clickable(onClick = onClick)
+                    .clickable(enabled = enabled, onClick = onClick)
                     .semantics { contentDescription = actionLabel },
             contentAlignment = Alignment.Center,
         ) {
@@ -394,10 +397,11 @@ fun BeaconHeaderGhostButton(
             modifier =
                 Modifier
                     .height(36.dp)
+                    .alpha(if (enabled) 1f else DISABLED_ALPHA)
                     .clip(RoundedCornerShape(Radii.md))
                     .background(PantopusColors.appSurface)
                     .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                    .clickable(onClick = onClick)
+                    .clickable(enabled = enabled, onClick = onClick)
                     .padding(horizontal = Spacing.s3)
                     .semantics { contentDescription = actionLabel },
             verticalAlignment = Alignment.CenterVertically,
@@ -432,3 +436,10 @@ private fun avatarIdentity(identity: BeaconIdentity): IdentityPillar =
         BeaconIdentity.Home -> IdentityPillar.Home
         BeaconIdentity.Business -> IdentityPillar.Business
     }
+
+/**
+ * Dimming applied to a disabled beacon action. Matches iOS, which fades the
+ * same Connect control with `.opacity(isConnectEnabled ? 1 : 0.7)`
+ * (`Features/Profile/PublicProfileView.swift:410`).
+ */
+private const val DISABLED_ALPHA = 0.7f

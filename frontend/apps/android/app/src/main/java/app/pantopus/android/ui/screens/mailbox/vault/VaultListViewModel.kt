@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "TooManyFunctions", "LongMethod")
 
 package app.pantopus.android.ui.screens.mailbox.vault
 
@@ -7,9 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultMailItemDto
+import app.pantopus.android.data.api.models.mailbox.vault.VaultSearchResultDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.components.StatusChipVariant
+import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
@@ -20,8 +23,10 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,11 +75,35 @@ class VaultListViewModel
          *  folder pickers (Save to vault). */
         val folders: StateFlow<List<VaultFolderDto>> = _folders.asStateFlow()
 
+        private val _selectedDrawer = MutableStateFlow(DRAWER_TABS.first().id)
+
+        /** Selected drawer tab — `personal` / `home` / `business`. */
+        val selectedDrawer: StateFlow<String> = _selectedDrawer.asStateFlow()
+
         private var allRows: List<VaultListRow> = emptyList()
         private var onOpenItem: (String) -> Unit = {}
         private var onAddTapped: () -> Unit = {}
         private var onOpenMailbox: () -> Unit = {}
-        private val drawer: String = "personal"
+        private var searchJob: Job? = null
+
+        /**
+         * True while server search results (rather than the locally-narrowed
+         * folder rows) are what the list is showing. Keeps every keystroke
+         * after the first from flashing the folder view back on screen while
+         * the debounced search is in flight.
+         */
+        private var showingSearchResults: Boolean = false
+
+        private val drawer: String
+            get() = _selectedDrawer.value
+
+        /**
+         * `true` once the trimmed query clears RN's two-character threshold —
+         * the point at which the vault stops filtering the fetched folder rows
+         * and starts asking the server to search the whole archive.
+         */
+        private val isSearching: Boolean
+            get() = _query.value.trim().length >= MIN_SEARCH_LENGTH
 
         /** Wire nav callbacks before first load. */
         fun configureNavigation(
@@ -95,20 +124,105 @@ class VaultListViewModel
 
         /** Pull-to-refresh / retry. */
         fun refresh() {
+            if (isSearching) {
+                viewModelScope.launch { performSearch() }
+                return
+            }
             _state.value = ListOfRowsUiState.Loading
             viewModelScope.launch {
                 when (val result = repo.folders(drawer = drawer)) {
                     is NetworkResult.Success -> applyFolders(result.data.folders)
                     is NetworkResult.Failure ->
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                 }
             }
         }
 
-        /** Update the search query and recompute the visible rows. */
+        /**
+         * Switch the drawer the folder pane is scoped to (RN's `DRAWER_TABS`,
+         * `src/app/mailbox/vault.tsx:12`) and refetch its folders.
+         */
+        fun onSelectDrawer(id: String) {
+            if (_selectedDrawer.value == id) return
+            _selectedDrawer.value = id
+            searchJob?.cancel()
+            allRows = emptyList()
+            refresh()
+        }
+
+        /**
+         * Update the search query. Below RN's two-character threshold this
+         * just narrows the already-fetched folder rows; above it, a debounced
+         * `GET …/vault/search` searches the whole archive server-side.
+         */
         fun onQueryChange(value: String) {
             _query.value = value
-            applyRows(allRows)
+            searchJob?.cancel()
+            if (!isSearching) {
+                applyRows(allRows)
+                return
+            }
+            // Narrow the fetched rows straight away so the field feels live,
+            // then let the debounced server search replace them. Once server
+            // results are already on screen we leave them be rather than
+            // flashing back through the folder view on every keystroke.
+            if (!showingSearchResults) applyRows(allRows)
+            searchJob =
+                viewModelScope.launch {
+                    delay(SEARCH_DEBOUNCE_MS)
+                    performSearch()
+                }
+        }
+
+        /**
+         * `GET /api/mailbox/v2/p2/vault/search` — searches every drawer, not
+         * just the rows the folder pane already fetched.
+         */
+        private suspend fun performSearch() {
+            val trimmed = _query.value.trim()
+            if (trimmed.length < MIN_SEARCH_LENGTH) return
+            when (val result = repo.search(query = trimmed)) {
+                is NetworkResult.Success -> {
+                    // A slower in-flight search must not clobber a newer query.
+                    if (_query.value.trim() != trimmed) return
+                    applySearchResults(result.data.results, result.data.total ?: result.data.results.size)
+                }
+                is NetworkResult.Failure -> {
+                    if (_query.value.trim() != trimmed) return
+                    _state.value =
+                        ListOfRowsUiState.Error(result.error.displayMessage("Couldn't search your vault."))
+                }
+            }
+        }
+
+        private fun applySearchResults(
+            results: List<VaultSearchResultDto>,
+            total: Int,
+        ) {
+            showingSearchResults = true
+            if (results.isEmpty()) {
+                _state.value =
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.Search,
+                        headline = "No matches found",
+                        subcopy =
+                            "Nothing in your archive matches that. Try a sender name, an amount " +
+                                "like \$87, or a month like March 2025.",
+                    )
+                return
+            }
+            _state.value =
+                ListOfRowsUiState.Loaded(
+                    sections =
+                        listOf(
+                            RowSection(
+                                id = "vaultSearch",
+                                header = "$total result${if (total == 1) "" else "s"} · All drawers",
+                                rows = results.map(::searchRowFor),
+                            ),
+                        ),
+                    hasMore = false,
+                )
         }
 
         /** FAB tap dispatcher — wired to the screen's FAB onClick. */
@@ -152,6 +266,7 @@ class VaultListViewModel
         }
 
         private fun applyRows(rows: List<VaultListRow>) {
+            showingSearchResults = false
             _subtitle.value =
                 if (rows.isEmpty()) {
                     "Saved from Mailbox"
@@ -205,7 +320,87 @@ class VaultListViewModel
             )
         }
 
+        /**
+         * Row projection for a server-side search hit. Mirrors RN's result
+         * card (`src/app/mailbox/vault.tsx:134`): sender + date on the top
+         * line, preview underneath, and a drawer chip plus a "→ subject"
+         * matched-field chip.
+         */
+        private fun searchRowFor(result: VaultSearchResultDto): RowModel {
+            val mailType = MailboxVaultMailType.fromRaw(result.mailType ?: result.type)
+            val chips =
+                buildList {
+                    result.drawer?.takeIf { it.isNotEmpty() }?.let {
+                        add(
+                            RowChip(
+                                text = it.replaceFirstChar { c -> c.uppercase(Locale.ROOT) },
+                                tint = RowChip.Tint.Status(StatusChipVariant.Neutral),
+                            ),
+                        )
+                    }
+                    result.matchField?.takeIf { it.isNotEmpty() }?.let {
+                        add(
+                            RowChip(
+                                text = "→ $it",
+                                tint = RowChip.Tint.Status(StatusChipVariant.Success),
+                            ),
+                        )
+                    }
+                }
+            val preview =
+                result.matchExcerpt?.takeIf { it.isNotEmpty() }
+                    ?: result.previewText
+                    ?: result.subject
+            val subtitle =
+                listOfNotNull(preview, savedAtLabel(result.createdAt))
+                    .filter { it.isNotEmpty() }
+                    .joinToString(" · ")
+            return RowModel(
+                id = result.id,
+                title = result.senderDisplay ?: result.senderBusinessName ?: result.subject ?: "Saved mail",
+                subtitle = subtitle.ifEmpty { null },
+                template = RowTemplate.FileChevron,
+                leading = RowLeading.Icon(icon = mailType.icon, tint = mailType.accent),
+                trailing = RowTrailing.Chevron,
+                onTap = { onOpenItem(result.id) },
+                chips = chips.ifEmpty { null },
+            )
+        }
+
         companion object {
+            /** RN's `DRAWER_TABS` (`src/app/mailbox/vault.tsx:12`). */
+            val DRAWER_TABS: List<ListOfRowsTab> =
+                listOf(
+                    ListOfRowsTab(id = "personal", label = "Me"),
+                    ListOfRowsTab(id = "home", label = "Home"),
+                    ListOfRowsTab(id = "business", label = "Business"),
+                )
+
+            /** RN debounces the search field by 300 ms (`vault.tsx:56`). */
+            private const val SEARCH_DEBOUNCE_MS = 300L
+
+            /**
+             * RN only searches once the trimmed query is longer than one
+             * character (`vault.tsx:55`).
+             */
+            private const val MIN_SEARCH_LENGTH = 2
+
+            /** Shared "Saved MMM d" stamp for both row projections. */
+            internal fun savedAtLabel(iso: String?): String? {
+                if (iso.isNullOrEmpty()) return null
+                val parsers =
+                    listOf(
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
+                    )
+                parsers.forEach { it.timeZone = TimeZone.getTimeZone("UTC") }
+                val date =
+                    parsers.firstNotNullOfOrNull { runCatching { it.parse(iso) }.getOrNull() }
+                        ?: return null
+                return "Saved ${SimpleDateFormat("MMM d", Locale.US).format(date)}"
+            }
+
             /** Visible for tests — flatten the per-folder items into a single
              *  cross-folder list sorted by created_at desc. */
             internal fun flatten(
@@ -259,24 +454,9 @@ data class VaultListRow(
     val subtitle: String
         get() {
             val sender = item.senderBusinessName ?: item.senderAddress ?: "Unknown sender"
-            val saved = savedAtLabel(item.createdAt)
+            val saved = VaultListViewModel.savedAtLabel(item.createdAt)
             return if (saved != null) "$sender · $saved" else sender
         }
-
-    private fun savedAtLabel(iso: String?): String? {
-        if (iso.isNullOrEmpty()) return null
-        val parsers =
-            listOf(
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
-            )
-        parsers.forEach { it.timeZone = TimeZone.getTimeZone("UTC") }
-        val date =
-            parsers.firstNotNullOfOrNull { runCatching { it.parse(iso) }.getOrNull() }
-                ?: return null
-        return "Saved ${SimpleDateFormat("MMM d", Locale.US).format(date)}"
-    }
 }
 
 /**

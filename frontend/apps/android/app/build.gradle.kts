@@ -236,6 +236,8 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    // On-device QR decoding for the Add-Home wizard's "Scan WiFi QR".
+    implementation(libs.mlkit.barcode.scanning)
     // EXIF orientation read for Snap & Sell photo normalization.
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.browser)

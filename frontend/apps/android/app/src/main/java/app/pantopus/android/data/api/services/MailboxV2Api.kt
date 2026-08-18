@@ -91,12 +91,16 @@ interface MailboxV2Api {
     ): ResolveRoutingResponse
 
     /**
-     * `POST /api/mailbox/v2/community/rsvp` — route
+     * `POST /api/mailbox/v2/p3/community/rsvp` — route
      * `backend/routes/mailboxV2Phase3.js:746`. Adds a `will_attend`
      * reaction to the `CommunityMailItem` and returns the updated
      * RSVP count. The backend treats RSVP as idempotent.
+     *
+     * The Phase-3 router is mounted at `api/mailbox/v2/p3`
+     * (`backend/app.js:317`); the previously-shipped
+     * `api/mailbox/v2/community/rsvp` spelling had no matching route.
      */
-    @POST("api/mailbox/v2/community/rsvp")
+    @POST("api/mailbox/v2/p3/community/rsvp")
     suspend fun communityRsvp(
         @Body body: CommunityRsvpRequest,
     ): CommunityRsvpResponse

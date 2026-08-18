@@ -109,16 +109,37 @@ data class SupportTrainReservationDto(
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
     @Json(name = "canceled_at") val canceledAt: String? = null,
-    /** Backend nests the helper as `User` (capitalised). */
-    @Json(name = "User") val helper: SupportTrainHelperDto? = null,
+    /** Email-only (guest) signup address. */
+    @Json(name = "guest_email") val guestEmail: String? = null,
+    /**
+     * True once the organizer shared the exact address with this helper
+     * (`SupportTrainAddressGrant`) or emailed the guest
+     * (`backend/routes/supportTrains.js:3415`).
+     */
+    @Json(name = "exact_address_shared") val exactAddressShared: Boolean? = null,
+    /**
+     * The handler responds with a lowercase `user` object
+     * (`backend/routes/supportTrains.js:3418`); [legacyHelper] keeps the
+     * capitalised Supabase alias decoding for older fixtures.
+     */
+    @Json(name = "user") val helper: SupportTrainHelperDto? = null,
+    @Json(name = "User") val legacyHelper: SupportTrainHelperDto? = null,
 ) {
+    /** Helper account behind this signup, whichever key it arrived under. */
+    val helperUser: SupportTrainHelperDto?
+        get() = helper ?: legacyHelper
+
     /** True when `updatedAt > createdAt` — projects the "Edited" chip. */
     val wasEdited: Boolean
         get() = !updatedAt.isNullOrBlank() && updatedAt != createdAt
 
     /** Best-effort display name: `helper.name` → `username` → `guestName` → "Helper". */
     val displayName: String
-        get() = helper?.name ?: helper?.username ?: guestName ?: "Helper"
+        get() = helperUser?.name ?: helperUser?.username ?: guestName ?: "Helper"
+
+    /** Guest signups have no linked account — organizers email them. */
+    val isGuestSignup: Boolean
+        get() = userId == null && (guestName != null || guestEmail != null)
 }
 
 @JsonClass(generateAdapter = true)

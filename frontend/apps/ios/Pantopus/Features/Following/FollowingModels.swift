@@ -92,6 +92,59 @@ public struct FollowingSection: Identifiable, Sendable, Hashable {
     }
 }
 
+// MARK: - Notification level
+
+/// Per-Beacon notification level. Wire values are validated server-side
+/// against `all | highlights | none`
+/// (`notificationPreferenceSchema`, `backend/routes/personas.js:88`).
+public enum FollowingNotificationLevel: String, CaseIterable, Sendable, Hashable {
+    case all
+    case highlights
+    case none
+
+    /// Decodes the row's `notificationLevel` string, defaulting to `.all`
+    /// the way the serializer's own fallback does.
+    public static func from(_ raw: String?) -> FollowingNotificationLevel {
+        FollowingNotificationLevel(rawValue: (raw ?? "").lowercased()) ?? .all
+    }
+
+    /// Short label rendered under the inline bell.
+    public var label: String {
+        switch self {
+        case .all: "All"
+        case .highlights: "Highlights"
+        case .none: "Off"
+        }
+    }
+
+    /// Toast copy after a successful change — mirrors RN's
+    /// "Notifications: All updates / Highlights only / Off".
+    public var toastLabel: String {
+        switch self {
+        case .all: "All updates"
+        case .highlights: "Highlights only"
+        case .none: "Off"
+        }
+    }
+
+    public var icon: PantopusIcon {
+        switch self {
+        case .all: .bell
+        case .highlights: .bellRing
+        case .none: .bellOff
+        }
+    }
+
+    /// Tap order: All → Highlights → Off → All.
+    public var next: FollowingNotificationLevel {
+        switch self {
+        case .all: .highlights
+        case .highlights: .none
+        case .none: .all
+        }
+    }
+}
+
 // MARK: - Avatar tone
 
 /// Deterministic per-Beacon avatar tint, mapped only onto existing design
@@ -161,6 +214,13 @@ public struct FollowingRow: Identifiable, Sendable, Hashable {
     public let timeLabel: String?
     public let trailing: FollowingRowTrailing
     public let isMuted: Bool
+    /// Current per-Beacon notification level — drives the inline bell.
+    public let notificationLevel: FollowingNotificationLevel
+    /// Paid memberships can't be unfollowed here (the backend answers 409);
+    /// bulk unfollow skips them and the sheet routes to billing.
+    public let isPaid: Bool
+    /// Paused Beacons render dimmed and the bell is disabled (RN parity).
+    public let isPaused: Bool
 
     public var tone: FollowingAvatarTone {
         FollowingAvatarTone.forKey(toneKey)
@@ -180,7 +240,9 @@ public struct FollowingRow: Identifiable, Sendable, Hashable {
             initials: initials,
             toneKey: toneKey,
             verified: verified,
-            isMuted: isMuted
+            isMuted: isMuted,
+            notificationLevel: notificationLevel,
+            isPaid: isPaid
         )
     }
 }
@@ -195,6 +257,8 @@ public struct FollowingActionTarget: Identifiable, Sendable, Hashable {
     public let toneKey: String
     public let verified: Bool
     public let isMuted: Bool
+    public var notificationLevel: FollowingNotificationLevel = .all
+    public var isPaid: Bool = false
 
     public var tone: FollowingAvatarTone {
         FollowingAvatarTone.forKey(toneKey)
@@ -233,6 +297,35 @@ public enum FollowingMutePreset: Sendable, Hashable, CaseIterable {
 
 /// Largest custom mute the backend accepts (`muteFollowingSchema` max).
 public let followingMuteMaxDays = 365
+
+// MARK: - Bulk unfollow
+
+/// Confirm-dialog payload for the long-press multi-select bulk unfollow.
+/// Mirrors RN's `performBulkUnfollow` alert: the title counts the rows that
+/// will actually be dropped, and the body warns about paid memberships the
+/// client skips (the backend answers those with 409 anyway).
+public struct FollowingBulkUnfollowRequest: Identifiable, Sendable, Hashable {
+    public let id = UUID()
+    /// Membership ids that will be removed.
+    public let membershipIDs: [String]
+    /// Persona ids the fan-out `DELETE` calls key off.
+    public let personaIDs: [String]
+    /// Selected rows that are paid memberships and get skipped.
+    public let skippedPaidCount: Int
+
+    public var title: String {
+        "Unfollow \(personaIDs.count) \(personaIDs.count == 1 ? "Beacon" : "Beacons")?"
+    }
+
+    public var message: String {
+        if skippedPaidCount > 0 {
+            let plural = skippedPaidCount == 1 ? "" : "s"
+            return "\(skippedPaidCount) paid membership\(plural) will be skipped "
+                + "\u{2014} manage those in Audience."
+        }
+        return "You can re-follow any Beacon later."
+    }
+}
 
 // MARK: - View state
 
@@ -321,7 +414,10 @@ public enum FollowingProjection {
             bodyIsQuiet: bodyIsQuiet,
             timeLabel: timeLabel,
             trailing: trailing,
-            isMuted: muted
+            isMuted: muted,
+            notificationLevel: FollowingNotificationLevel.from(dto.notificationLevel),
+            isPaid: (dto.paidTier?.rank ?? 0) > 1,
+            isPaused: dto.persona.status?.lowercased() == "paused"
         )
         return (kind, row)
     }

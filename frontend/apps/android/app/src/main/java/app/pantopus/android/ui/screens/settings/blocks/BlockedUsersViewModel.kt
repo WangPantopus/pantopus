@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.settings.PrivacyBlockDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
@@ -43,11 +44,21 @@ class BlockedUsersViewModel
     @Inject
     constructor(
         private val privacy: PrivacyRepository,
+        private val auth: AuthRepository,
     ) : ViewModel() {
         val title: String = "Blocked users"
 
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
+
+        /** A14.4 MonoFooter — signed-in user's name · short ID, same
+         *  pattern as the Settings index / Payments mono footers. */
+        val monoFooter: String?
+            get() {
+                val session = auth.state.value as? AuthRepository.State.SignedIn ?: return null
+                val name = session.user.displayName ?: session.user.email
+                return "$name · ID ${session.user.id.take(8)}"
+            }
 
         private var blocks: MutableList<PrivacyBlockDto> = mutableListOf()
 
@@ -137,6 +148,7 @@ class BlockedUsersViewModel
                         listOf(
                             RowSection(
                                 id = "blocked",
+                                header = "Blocked · ${blocks.size}",
                                 footer =
                                     "Blocked people can't message you, see your profile, or bid on " +
                                         "your tasks. Unblocking doesn't notify them.",

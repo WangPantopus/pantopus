@@ -17,17 +17,46 @@ public enum AudienceProfileEndpoints {
     public static let me = Endpoint(method: .get, path: "/api/personas/me")
 
     /// `GET /api/personas/me/audience` — fan list + counts by tier.
+    /// `sort` ∈ `recent / tenure / tier / alpha` (anything else falls back
+    /// to `recent`); `limit` is clamped server-side to 1…200 and `offset`
+    /// drives the `pagination.nextOffset` cursor echoed in the response.
     /// Route `backend/routes/personas.js:649`.
     public static func audience(
         sort: String? = nil,
         status: String? = nil,
-        tierRank: Int? = nil
+        tierRank: Int? = nil,
+        limit: Int? = nil,
+        offset: Int? = nil
     ) -> Endpoint {
         var query: [String: String] = [:]
         if let sort { query["sort"] = sort }
         if let status { query["status"] = status }
         if let tierRank { query["tier_rank"] = String(tierRank) }
+        if let limit { query["limit"] = String(limit) }
+        if let offset, offset > 0 { query["offset"] = String(offset) }
         return Endpoint(method: .get, path: "/api/personas/me/audience", query: query)
+    }
+
+    /// `PATCH /api/personas/:id/followers/:followId` — the owner-side
+    /// follower record update. `followId` is the **membership id**: the
+    /// handler looks the row up in `PersonaMembership` by `id`
+    /// (`backend/routes/personas.js:964-969`), so an id taken from
+    /// `/me/audience` resolves here unchanged. `status` ∈
+    /// `pending / active / muted / blocked / removed`
+    /// (`ownerFollowerUpdateSchema`, `backend/routes/personas.js:108`).
+    /// This is the only route that can set `blocked` — the
+    /// `/me/audience/:membershipId` action verb list has no block action.
+    /// Route `backend/routes/personas.js:960`.
+    public static func followerStatus(
+        personaId: String,
+        followId: String,
+        status: String
+    ) -> Endpoint {
+        Endpoint(
+            method: .patch,
+            path: "/api/personas/\(personaId)/followers/\(followId)",
+            body: AudienceFollowerStatusBody(status: status)
+        )
     }
 
     /// `PATCH /api/personas/me/audience/:membershipId` — owner-side action
@@ -93,22 +122,50 @@ public enum AudienceProfileEndpoints {
     }
 }
 
+/// One already-hosted media item riding along with the publish call.
+/// `broadcastMediaItemsFromPayload` (`backend/routes/broadcastChannels.js:113`)
+/// reads `url` + `type` (+ optional `thumbnailUrl` / `liveVideoUrl`) and
+/// fans them out onto the Post's parallel media arrays.
+public struct BroadcastMediaPayload: Encodable, Sendable, Hashable {
+    public var url: String
+    public var type: String
+    public var thumbnailUrl: String?
+    public var liveVideoUrl: String?
+
+    public init(url: String, type: String, thumbnailUrl: String? = nil, liveVideoUrl: String? = nil) {
+        self.url = url
+        self.type = type
+        self.thumbnailUrl = thumbnailUrl
+        self.liveVideoUrl = liveVideoUrl
+    }
+}
+
 /// Body for the broadcast-publish route. `visibility` valid values:
 /// `public / followers / tier_or_above / subscribers`. When `tier_or_above`
-/// is selected, `target_tier_rank` (1-4) is required.
+/// is selected, `target_tier_rank` (1-4) is required. `media` carries
+/// already-uploaded items (max 10); locally-picked files are attached
+/// after publish via `POST /api/upload/post-media/:messageId`, because a
+/// broadcast message *is* a Post row and that route needs its id.
 public struct PublishUpdateBody: Encodable, Sendable {
     public var body: String
     public var visibility: String
     public var targetTierRank: Int?
+    public var media: [BroadcastMediaPayload]?
 
-    public init(body: String, visibility: String, targetTierRank: Int? = nil) {
+    public init(
+        body: String,
+        visibility: String,
+        targetTierRank: Int? = nil,
+        media: [BroadcastMediaPayload]? = nil
+    ) {
         self.body = body
         self.visibility = visibility
         self.targetTierRank = targetTierRank
+        self.media = media?.isEmpty == true ? nil : media
     }
 
     enum CodingKeys: String, CodingKey {
-        case body, visibility
+        case body, visibility, media
         case targetTierRank = "target_tier_rank"
     }
 }
@@ -121,5 +178,16 @@ public struct AudienceMemberActionBody: Encodable, Sendable {
 
     public init(action: String) {
         self.action = action
+    }
+}
+
+/// Body for `PATCH /api/personas/:id/followers/:followId`. Only `status`
+/// is sent; the schema also accepts `relationship_type` /
+/// `notification_level` but the block flow never changes those.
+public struct AudienceFollowerStatusBody: Encodable, Sendable {
+    public let status: String
+
+    public init(status: String) {
+        self.status = status
     }
 }

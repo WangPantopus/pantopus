@@ -348,6 +348,89 @@ public struct GigComposeIdentityOption: Identifiable, Sendable, Equatable, Hasha
     )
 }
 
+/// Delivery/errand route fields. Unlike the archetype JSONB modules
+/// these ride as **flat snake_case columns** on the gig
+/// (`pickup_address`, `pickup_notes`, `dropoff_address`,
+/// `dropoff_notes`, `delivery_proof_required` — see
+/// `backend/routes/gigs.js:481-486` for the column contract and
+/// `GigDTO.pickupAddress` for the read side).
+public struct GigDeliveryDetails: Codable, Sendable, Hashable, Equatable {
+    public var pickupAddress: String?
+    public var pickupNotes: String?
+    public var dropoffAddress: String?
+    public var dropoffNotes: String?
+    public var proofRequired: Bool?
+
+    public init(
+        pickupAddress: String? = nil,
+        pickupNotes: String? = nil,
+        dropoffAddress: String? = nil,
+        dropoffNotes: String? = nil,
+        proofRequired: Bool? = nil
+    ) {
+        self.pickupAddress = pickupAddress
+        self.pickupNotes = pickupNotes
+        self.dropoffAddress = dropoffAddress
+        self.dropoffNotes = dropoffNotes
+        self.proofRequired = proofRequired
+    }
+
+    /// True once the user typed or toggled anything here.
+    public var hasAnyData: Bool {
+        !(pickupAddress ?? "").isEmpty
+            || !(pickupNotes ?? "").isEmpty
+            || !(dropoffAddress ?? "").isEmpty
+            || !(dropoffNotes ?? "").isEmpty
+            || proofRequired == true
+    }
+}
+
+/// Pro-service quote requirements — flat columns again
+/// (`requires_license`, `license_type`, `requires_insurance`,
+/// `scope_description`, `deposit_required`, `deposit_amount`;
+/// `backend/routes/gigs.js:499-505`). `depositAmount` is held as text
+/// like the budget fields and parsed at send time.
+public struct GigProServiceDetails: Codable, Sendable, Hashable, Equatable {
+    public var requiresLicense: Bool?
+    public var licenseType: String?
+    public var requiresInsurance: Bool?
+    public var scopeDescription: String?
+    public var depositRequired: Bool?
+    public var depositAmount: String?
+
+    public init(
+        requiresLicense: Bool? = nil,
+        licenseType: String? = nil,
+        requiresInsurance: Bool? = nil,
+        scopeDescription: String? = nil,
+        depositRequired: Bool? = nil,
+        depositAmount: String? = nil
+    ) {
+        self.requiresLicense = requiresLicense
+        self.licenseType = licenseType
+        self.requiresInsurance = requiresInsurance
+        self.scopeDescription = scopeDescription
+        self.depositRequired = depositRequired
+        self.depositAmount = depositAmount
+    }
+
+    /// A deposit toggle with no (positive) amount blocks the step —
+    /// mirrors RN's "amount required when the deposit toggle is on".
+    public var isDepositAmountMissing: Bool {
+        guard depositRequired == true else { return false }
+        return (Double(depositAmount ?? "") ?? 0) <= 0
+    }
+
+    public var hasAnyData: Bool {
+        requiresLicense == true
+            || !(licenseType ?? "").isEmpty
+            || requiresInsurance == true
+            || !(scopeDescription ?? "").isEmpty
+            || depositRequired == true
+            || !(depositAmount ?? "").isEmpty
+    }
+}
+
 /// Snapshot of all wizard form state. Encoded into `@SceneStorage` so
 /// the in-progress wizard survives process death and config changes.
 public struct GigComposeFormState: Codable, Sendable, Equatable {
@@ -402,6 +485,11 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
     public var remoteDetails: GigRemoteDetails?
     public var urgentDetails: GigUrgentDetails?
     public var eventDetails: GigEventDetails?
+    /// delivery_errand route (flat `pickup_*` / `dropoff_*` columns).
+    /// Optional so older `@SceneStorage` snapshots stay decodable.
+    public var deliveryDetails: GigDeliveryDetails?
+    /// pro_service_quote requirements (flat `requires_*` columns).
+    public var proServiceDetails: GigProServiceDetails?
     /// P6c — persona switching. nil posts as yourself; a business user id
     /// rides magic-post's `beneficiary_user_id`. Optional fields keep old
     /// `@SceneStorage` snapshots decodable.
@@ -439,6 +527,8 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         remoteDetails: GigRemoteDetails? = nil,
         urgentDetails: GigUrgentDetails? = nil,
         eventDetails: GigEventDetails? = nil,
+        deliveryDetails: GigDeliveryDetails? = nil,
+        proServiceDetails: GigProServiceDetails? = nil,
         beneficiaryUserId: String? = nil,
         beneficiaryName: String? = nil
     ) {
@@ -471,6 +561,8 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
         self.remoteDetails = remoteDetails
         self.urgentDetails = urgentDetails
         self.eventDetails = eventDetails
+        self.deliveryDetails = deliveryDetails
+        self.proServiceDetails = proServiceDetails
         self.beneficiaryUserId = beneficiaryUserId
         self.beneficiaryName = beneficiaryName
     }
@@ -499,5 +591,7 @@ public struct GigComposeFormState: Codable, Sendable, Equatable {
             || !tags.isEmpty
             || !estimatedHours.isEmpty
             || !items.isEmpty
+            || deliveryDetails?.hasAnyData == true
+            || proServiceDetails?.hasAnyData == true
     }
 }

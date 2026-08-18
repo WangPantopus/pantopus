@@ -1,6 +1,7 @@
 package app.pantopus.android
 
 import android.app.Application
+import app.pantopus.android.core.routing.PendingDeepLinkStore
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.PostHogAnalytics
 import app.pantopus.android.data.observability.Observability
@@ -33,6 +34,9 @@ class PantopusApplication :
 
     override fun onCreate() {
         super.onCreate()
+
+        // Workstream 1.4 — persist pre-auth deep links across process death.
+        PendingDeepLinkStore.init(this)
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())

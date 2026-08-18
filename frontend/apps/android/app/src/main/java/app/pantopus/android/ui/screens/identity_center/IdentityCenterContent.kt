@@ -92,6 +92,7 @@ data class IdentityCenterLoaded(
     val bridges: List<IdentityBridgeRow>,
     val privacyRows: List<IdentityRowContent>,
     val disclosureRows: List<IdentityRowContent>,
+    val setupRemainingCount: Int = 0,
 )
 
 sealed interface IdentityCenterUiState {

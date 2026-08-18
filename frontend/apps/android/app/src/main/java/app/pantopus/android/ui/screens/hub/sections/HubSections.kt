@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "UnusedPrivateMember", "LongMethod", "LongParameterList", "TopLevelPropertyNaming")
+@file:Suppress("MagicNumber", "UnusedPrivateMember", "LongMethod", "LongParameterList", "TopLevelPropertyNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.hub.sections
 
@@ -47,6 +47,7 @@ import app.pantopus.android.ui.screens.hub.ActivityEntry
 import app.pantopus.android.ui.screens.hub.DiscoveryCardContent
 import app.pantopus.android.ui.screens.hub.DiscoveryKind
 import app.pantopus.android.ui.screens.hub.FirstRunContent
+import app.pantopus.android.ui.screens.hub.HubDiscoveryFilter
 import app.pantopus.android.ui.screens.hub.JumpBackItem
 import app.pantopus.android.ui.screens.hub.PillarTile
 import app.pantopus.android.ui.screens.hub.SetupBannerContent
@@ -69,6 +70,14 @@ fun HubTopBar(
     onAvatarTap: () -> Unit,
     onBellTap: () -> Unit,
     onMenuTap: () -> Unit,
+    /**
+     * S5 — Beacon-zone megaphone shortcut. Rendered only when the account
+     * has unread audience notifications (RN gates the same button on the
+     * `audience_profile` flag, which native doesn't carry; the backend's
+     * `byContext.audience` count is the honest native equivalent). `null`
+     * hides the button entirely.
+     */
+    onAudienceTap: (() -> Unit)? = null,
 ) {
     Column {
         Row(
@@ -132,6 +141,36 @@ fun HubTopBar(
                                 .background(PantopusColors.error)
                                 .border(2.dp, PantopusColors.appSurface, CircleShape),
                     )
+                }
+            }
+            if (onAudienceTap != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clickable(onClick = onAudienceTap)
+                            .testTag("hubAudienceBellButton")
+                            .semantics { contentDescription = "Audience notifications" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.Megaphone,
+                        contentDescription = null,
+                        size = Radii.xl2,
+                        tint = PantopusColors.success,
+                    )
+                    if (content.audienceUnreadCount > 0) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(PantopusColors.success)
+                                    .border(2.dp, PantopusColors.appSurface, CircleShape),
+                        )
+                    }
                 }
             }
             Box(
@@ -591,7 +630,12 @@ private fun PillarChip(
 fun HubDiscoveryRail(
     items: List<DiscoveryCardContent>,
     onTap: (DiscoveryCardContent) -> Unit,
+    activeFilter: HubDiscoveryFilter = HubDiscoveryFilter.Gigs,
+    onFilterChange: ((HubDiscoveryFilter) -> Unit)? = null,
+    isLoading: Boolean = false,
     onSeeAll: (() -> Unit)? = null,
+    onExploreMap: (() -> Unit)? = null,
+    onFindBusinesses: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -600,9 +644,26 @@ fun HubDiscoveryRail(
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             SectionHeader("Discover nearby")
             Spacer(Modifier.weight(1f))
+            if (onFindBusinesses != null) {
+                DiscoveryHeaderLink(
+                    label = "Find Businesses",
+                    tint = PantopusColors.home,
+                    tag = "hubDiscoveryRail.findBusinesses",
+                    onClick = onFindBusinesses,
+                )
+            }
+            if (onExploreMap != null) {
+                DiscoveryHeaderLink(
+                    label = "Explore Map",
+                    tint = PantopusColors.primary600,
+                    tag = "hubDiscoveryRail.exploreMap",
+                    onClick = onExploreMap,
+                )
+            }
             if (onSeeAll != null) {
                 Row(
                     modifier =
@@ -627,18 +688,147 @@ fun HubDiscoveryRail(
                 }
             }
         }
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.s4),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-        ) {
-            items.forEach { item ->
-                DiscoveryCard(item = item, onTap = { onTap(item) })
+        if (onFilterChange != null) {
+            DiscoveryFilterTabs(active = activeFilter, onSelect = onFilterChange)
+        }
+        when {
+            isLoading -> DiscoverySkeletonRail()
+            items.isEmpty() -> DiscoveryEmptyRow()
+            else ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.s4),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                ) {
+                    items.forEach { item ->
+                        DiscoveryCard(item = item, onTap = { onTap(item) })
+                    }
+                }
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryHeaderLink(
+    label: String,
+    tint: Color,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Text(
+        label,
+        style = PantopusTextStyle.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+        color = tint,
+        maxLines = 1,
+        modifier =
+            Modifier
+                .clickable { onClick() }
+                .testTag(tag)
+                .semantics { contentDescription = label },
+    )
+}
+
+/**
+ * Tasks / People / Businesses / Posts — RN
+ * `src/components/hub/HubDiscovery.tsx:9-14`. Selecting a tab re-requests
+ * `GET /api/hub/discovery?filter=…`.
+ */
+@Composable
+private fun DiscoveryFilterTabs(
+    active: HubDiscoveryFilter,
+    onSelect: (HubDiscoveryFilter) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s4)
+                .testTag("hubDiscoveryFilters"),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        HubDiscoveryFilter.entries.forEach { tab ->
+            val selected = tab == active
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(if (selected) PantopusColors.primary600 else PantopusColors.appSurface)
+                        .border(
+                            1.dp,
+                            if (selected) PantopusColors.primary600 else PantopusColors.appBorder,
+                            RoundedCornerShape(Radii.pill),
+                        )
+                        .clickable { onSelect(tab) }
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .testTag("hubDiscoveryFilter_${tab.queryValue}"),
+            ) {
+                Text(
+                    tab.label,
+                    style = PantopusTextStyle.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                    color = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun DiscoverySkeletonRail() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s4)
+                .testTag("hubDiscoverySkeleton"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        repeat(3) {
+            Column(
+                modifier =
+                    Modifier
+                        .width(140.dp)
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(Radii.lg))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg)),
+            ) {
+                Shimmer(width = 140.dp, height = 80.dp, cornerRadius = Radii.xs)
+                Column(
+                    modifier = Modifier.padding(Spacing.s2),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+                ) {
+                    Shimmer(width = 116.dp, height = 11.dp, cornerRadius = Radii.xs)
+                    Shimmer(width = 70.dp, height = 9.dp, cornerRadius = Radii.xs)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryEmptyRow() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(vertical = Spacing.s6)
+                .testTag("hubDiscoveryEmpty"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "Nothing nearby yet",
+            style = PantopusTextStyle.caption.copy(fontSize = 13.sp),
+            color = PantopusColors.appTextSecondary,
+        )
     }
 }
 

@@ -68,6 +68,21 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
     /// ETA in minutes riding a `running_late` worker-ack (1–480). Feeds
     /// the "Running ~X min late" badge on the active-task strip.
     public let workerAckEtaMinutes: Int?
+    /// Timestamp of the poster's last "Remind worker" nudge. The backend
+    /// enforces a 15-minute cooldown off this column
+    /// (`backend/routes/gigs.js:5769`), so the detail screen mirrors the
+    /// remaining window on the button.
+    public let lastWorkerReminderAt: String?
+    /// `flexible` / `standard` / `strict` — drives the composer's
+    /// cancellation-policy picker in edit mode (`gigs.js:642`).
+    public let cancellationPolicy: String?
+    /// Hours, `Joi.number().positive()`. Composer edit prefill.
+    public let estimatedDuration: Double?
+    /// Errand / shopping line items (`Gig.items` jsonb). Composer edit prefill.
+    public let items: [GigItemDTO]?
+    /// Urgent-task flag's sibling — the backend gates the live
+    /// fulfillment routes on `is_urgent || starts_asap` (`gigs.js:8703`).
+    public let startsAsap: Bool?
     public let creator: GigCreator?
 
     enum CodingKeys: String, CodingKey {
@@ -104,6 +119,11 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         case startedAt = "started_at"
         case workerAckStatus = "worker_ack_status"
         case workerAckEtaMinutes = "worker_ack_eta_minutes"
+        case lastWorkerReminderAt = "last_worker_reminder_at"
+        case cancellationPolicy = "cancellation_policy"
+        case estimatedDuration = "estimated_duration"
+        case items
+        case startsAsap = "starts_asap"
         case creator
         case legacyCreator = "User"
     }
@@ -150,6 +170,13 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         startedAt = try c.decodeIfPresent(String.self, forKey: .startedAt)
         workerAckStatus = try c.decodeIfPresent(String.self, forKey: .workerAckStatus)
         workerAckEtaMinutes = try c.decodeIfPresent(Int.self, forKey: .workerAckEtaMinutes)
+        lastWorkerReminderAt = try c.decodeIfPresent(String.self, forKey: .lastWorkerReminderAt)
+        cancellationPolicy = try c.decodeIfPresent(String.self, forKey: .cancellationPolicy)
+        estimatedDuration = try c.decodeIfPresent(Double.self, forKey: .estimatedDuration)
+        // Legacy rows can carry a JSON string here — drop rather than fail
+        // the whole gig decode.
+        items = try? c.decode([GigItemDTO].self, forKey: .items)
+        startsAsap = try c.decodeIfPresent(Bool.self, forKey: .startsAsap)
         creator = try c.decodeIfPresent(GigCreator.self, forKey: .creator)
             ?? c.decodeIfPresent(GigCreator.self, forKey: .legacyCreator)
     }
@@ -193,7 +220,12 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         attachments: [String]? = nil,
         startedAt: String? = nil,
         workerAckStatus: String? = nil,
-        workerAckEtaMinutes: Int? = nil
+        workerAckEtaMinutes: Int? = nil,
+        lastWorkerReminderAt: String? = nil,
+        cancellationPolicy: String? = nil,
+        estimatedDuration: Double? = nil,
+        items: [GigItemDTO]? = nil,
+        startsAsap: Bool? = nil
     ) {
         self.id = id
         self.title = title
@@ -234,6 +266,11 @@ public struct GigDTO: Decodable, Sendable, Hashable, Identifiable {
         self.startedAt = startedAt
         self.workerAckStatus = workerAckStatus
         self.workerAckEtaMinutes = workerAckEtaMinutes
+        self.lastWorkerReminderAt = lastWorkerReminderAt
+        self.cancellationPolicy = cancellationPolicy
+        self.estimatedDuration = estimatedDuration
+        self.items = items
+        self.startsAsap = startsAsap
     }
 }
 
@@ -329,16 +366,47 @@ public struct TopBidderDTO: Decodable, Sendable, Hashable, Identifiable {
     public let color: String
 }
 
+/// Paging envelope emitted by the **spatial** branch of `GET /api/gigs`
+/// (`backend/routes/gigs.js:2388`). The keys are already camelCase on the
+/// wire. The non-spatial branch omits this object entirely and returns an
+/// exact `total` row count instead (`backend/routes/gigs.js:2588`).
+public struct GigsListPagination: Decodable, Sendable, Hashable {
+    public let limit: Int?
+    public let offset: Int?
+    public let hasMore: Bool?
+
+    public init(limit: Int? = nil, offset: Int? = nil, hasMore: Bool? = nil) {
+        self.limit = limit
+        self.offset = offset
+        self.hasMore = hasMore
+    }
+}
+
 /// Top-level envelope from `/api/gigs`.
 public struct GigsListResponse: Decodable, Sendable {
     public let gigs: [GigDTO]
     public let total: Int?
     public let radiusMeters: Int?
+    /// Present only on the spatial branch — see `GigsListPagination`.
+    public let pagination: GigsListPagination?
 
     enum CodingKeys: String, CodingKey {
         case gigs
         case total
         case radiusMeters
+        case pagination
+    }
+
+    /// Whether another page exists after the one just decoded.
+    ///
+    /// Preference order matches what the backend actually sends:
+    /// 1. the spatial branch's explicit `pagination.hasMore`,
+    /// 2. the non-spatial branch's exact `total` (`{ count: 'exact' }`),
+    /// 3. the "did we get a full page" heuristic as a last resort.
+    public func hasMorePages(offset: Int, limit: Int) -> Bool {
+        if let flag = pagination?.hasMore { return flag }
+        if let total { return offset + gigs.count < total }
+        return gigs.count >= limit
     }
 }
 
@@ -595,6 +663,10 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
     public let cancellationPolicy: String?
     public let isUrgent: Bool?
     public let tags: [String]?
+    /// Hours (`Joi.number().positive()`, `gigs.js:433`).
+    public let estimatedDuration: Double?
+    /// Errand / shopping line items (`gigs.js:487`).
+    public let items: [GigItemDTO]?
     public let location: CreateGigLocation
 
     public init(
@@ -611,6 +683,8 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         cancellationPolicy: String? = nil,
         isUrgent: Bool? = nil,
         tags: [String]? = nil,
+        estimatedDuration: Double? = nil,
+        items: [GigItemDTO]? = nil,
         location: CreateGigLocation
     ) {
         self.title = title
@@ -626,6 +700,8 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         self.cancellationPolicy = cancellationPolicy
         self.isUrgent = isUrgent
         self.tags = tags
+        self.estimatedDuration = estimatedDuration
+        self.items = items
         self.location = location
     }
 
@@ -640,6 +716,8 @@ public struct CreateGigBody: Encodable, Sendable, Equatable {
         case cancellationPolicy = "cancellation_policy"
         case isUrgent = "is_urgent"
         case tags
+        case estimatedDuration = "estimated_duration"
+        case items
         case location
     }
 }
@@ -660,6 +738,16 @@ public struct UpdateGigBody: Encodable, Sendable, Equatable {
     public let scheduleType: String?
     public let scheduledStart: String?
     public let attachments: [String]?
+    /// ISO-8601. `Joi.date().iso().min('now')` — the schema has no
+    /// `allow(null)`, so an unset deadline is *omitted*, never cleared.
+    public let deadline: String?
+    public let cancellationPolicy: String?
+    public let isUrgent: Bool?
+    public let tags: [String]?
+    /// Hours. `Joi.number().positive()` — same "omit, never clear" rule
+    /// as `deadline`.
+    public let estimatedDuration: Double?
+    public let items: [GigItemDTO]?
     public let location: CreateGigLocation?
 
     public init(
@@ -671,6 +759,12 @@ public struct UpdateGigBody: Encodable, Sendable, Equatable {
         scheduleType: String?,
         scheduledStart: String?,
         attachments: [String]?,
+        deadline: String? = nil,
+        cancellationPolicy: String? = nil,
+        isUrgent: Bool? = nil,
+        tags: [String]? = nil,
+        estimatedDuration: Double? = nil,
+        items: [GigItemDTO]? = nil,
         location: CreateGigLocation?
     ) {
         self.title = title
@@ -681,6 +775,12 @@ public struct UpdateGigBody: Encodable, Sendable, Equatable {
         self.scheduleType = scheduleType
         self.scheduledStart = scheduledStart
         self.attachments = attachments
+        self.deadline = deadline
+        self.cancellationPolicy = cancellationPolicy
+        self.isUrgent = isUrgent
+        self.tags = tags
+        self.estimatedDuration = estimatedDuration
+        self.items = items
         self.location = location
     }
 
@@ -690,6 +790,12 @@ public struct UpdateGigBody: Encodable, Sendable, Equatable {
         case scheduleType = "schedule_type"
         case scheduledStart = "scheduled_start"
         case attachments
+        case deadline
+        case cancellationPolicy = "cancellation_policy"
+        case isUrgent = "is_urgent"
+        case tags
+        case estimatedDuration = "estimated_duration"
+        case items
         case location
     }
 }

@@ -16,6 +16,7 @@ import SwiftUI
 /// stashed place is saved by `HubTabRoot`.
 struct PlaceLaunchHost: View {
     @State private var showAuth = false
+    @State private var deepLink = DeepLinkRouter.shared
 
     var body: some View {
         PlaceLaunchView(
@@ -25,6 +26,31 @@ struct PlaceLaunchHost: View {
         .fullScreenCover(isPresented: $showAuth) {
             LoginView()
         }
+        // Workstream 1.4 — RN AuthGate parity: a deferred protected (or
+        // auth-owned) deep link auto-presents the existing Sign-in cover
+        // without replacing the Place funnel underneath.
+        //
+        // The trigger is `DeepLinkRouter.prefersLoginPresentation`, NOT the
+        // presence of a stashed link. The stash survives process death for
+        // 24h, so keying off it would force Sign-in over the Place funnel on
+        // every launch after a link the user chose not to sign in for. A link
+        // that arrives during this process — including the one that
+        // cold-started the app — always sets the flag before this host
+        // appears, and the stash is still replayed by the sign-in transition
+        // in `RootView`. Identical on Android (`PantopusNavHost`'s
+        // `PlaceLaunchHost`).
+        .onAppear {
+            presentLoginIfRequested()
+        }
+        .onChange(of: deepLink.prefersLoginPresentation) { _, _ in
+            presentLoginIfRequested()
+        }
+    }
+
+    private func presentLoginIfRequested() {
+        guard deepLink.prefersLoginPresentation else { return }
+        showAuth = true
+        deepLink.acknowledgeLoginPresentation()
     }
 }
 
@@ -105,7 +131,7 @@ struct PlaceLaunchView: View {
             HStack(spacing: 6) {
                 Icon(.lock, size: 13, strokeWidth: 2, color: Theme.Color.appTextMuted)
                 Text("Private by default. Verification builds trust, not exposure.")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
             .padding(.bottom, Spacing.s6)
@@ -145,7 +171,7 @@ struct PlaceLaunchView: View {
             Icon(.mapPin, size: 18, strokeWidth: 2, color: addressFocused ? Theme.Color.primary600 : Theme.Color.appTextMuted)
             TextField("Type your home address", text: $viewModel.query)
                 .focused($addressFocused)
-                .font(.system(size: 16))
+                .font(Theme.Font.body)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .onSubmit { if !viewModel.query.isEmpty { viewModel.loadPreview(address: viewModel.query) } }

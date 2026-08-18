@@ -7,6 +7,47 @@ import Foundation
 
 /// Endpoint builders for `backend/routes/users.js` auth routes.
 public enum AuthEndpoints {
+    /// Query parameter carrying the per-attempt OAuth CSRF nonce. Mirrors
+    /// Android `OAuthSessionStore.NONCE_PARAM`.
+    public static let oauthNonceParam = "app_nonce"
+
+    /// `GET /api/users/oauth/:provider` — route
+    /// `backend/routes/users.js:3715`.
+    ///
+    /// `nonce` rides on `redirectTo`; the backend only validates the
+    /// `pantopus:` protocol and passes the URI through to Supabase, so it
+    /// comes back on the callback where `AuthManager` verifies it.
+    public static func oauthURL(provider: OAuthProvider, nonce: String) -> Endpoint {
+        Endpoint(
+            method: .get,
+            path: "/api/users/oauth/\(provider.rawValue)",
+            query: ["redirectTo": "pantopus://auth/callback?\(oauthNonceParam)=\(nonce)"],
+            authenticated: false
+        )
+    }
+
+    /// `POST /api/users/oauth/callback` — route
+    /// `backend/routes/users.js:3862`.
+    public static func exchangeOAuthCode(_ code: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/users/oauth/callback",
+            body: OAuthCodeExchangeRequest(code: code),
+            authenticated: false
+        )
+    }
+
+    /// `POST /api/users/oauth/token` — legacy fragment-token path.
+    /// Route: `backend/routes/users.js:3792`.
+    public static func exchangeOAuthToken(accessToken: String, refreshToken: String) -> Endpoint {
+        Endpoint(
+            method: .post,
+            path: "/api/users/oauth/token",
+            body: OAuthTokenExchangeRequest(accessToken: accessToken, refreshToken: refreshToken),
+            authenticated: false
+        )
+    }
+
     /// `POST /api/users/login` — route `backend/routes/users.js:1492`.
     public static func login(email: String, password: String) -> Endpoint {
         Endpoint(

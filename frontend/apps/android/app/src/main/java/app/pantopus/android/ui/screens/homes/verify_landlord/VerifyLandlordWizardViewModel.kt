@@ -5,13 +5,16 @@ package app.pantopus.android.ui.screens.homes.verify_landlord
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.tenant.TenantRequestApprovalRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomeVerificationRepository
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.tenant.TenantRepository
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardModel
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
+import app.pantopus.android.ui.screens.shared.wizard.WizardSecondaryCta
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +44,11 @@ data class VerifyLandlordUiState(
      */
     val errors: VerifyLandlordValidationErrors? = null,
     val submitState: VerifyLandlordSubmitState = VerifyLandlordSubmitState.Idle,
+    /**
+     * Populated once the tenant approval request resolved. Drives the
+     * [VerifyLandlordStep.Sent] content — every field comes off the wire.
+     */
+    val approvalResult: VerifyLandlordApprovalResult? = null,
 ) {
     val isSubmitting: Boolean get() = submitState is VerifyLandlordSubmitState.Submitting
 
@@ -56,14 +64,21 @@ data class VerifyLandlordUiState(
 /**
  * Drives the A12.5 / A12.6 wizard state machine:
  *
- *     Start -> Details -> submit -> OpenPostcardVerification(homeId)
+ *     Start -> Details -> submit -+- 201 -> Sent (landlord now has it)
+ *                                 +- 409 -> Sent (existing pending/active lease)
+ *                                 +- 400 -> OpenPostcardVerification(homeId)
  *
- * On submit it requests the verification postcard via
- * `POST /api/homes/:id/request-postcard` (route
- * `backend/routes/homeOwnership.js:2452`) then dispatches the outbound
- * `OpenPostcardVerification` event. The landlord/PM details collected in
- * the form have no backend representation (request-postcard takes no
- * body), so they stay client-side.
+ * Submit posts a real tenant approval request to
+ * `POST /api/v1/tenant/request-approval` (route
+ * `backend/routes/landlordTenant.js:483`, mounted at `/api/v1` in
+ * `backend/app.js:397`) carrying the move-in date + message the user
+ * entered, with the landlord / PM details appended to the message
+ * (`tenantRequestSchema` has no structured column for them). When the
+ * home has no verified landlord authority the backend answers 400 —
+ * that is RN's "no landlord on file" branch, and we fall back to the
+ * mailed-code path: `POST /api/homes/:id/request-postcard` (route
+ * `backend/routes/homeOwnership.js:2452`) followed by the outbound
+ * `OpenPostcardVerification` event.
  */
 @HiltViewModel
 open class VerifyLandlordWizardViewModel
@@ -72,6 +87,7 @@ open class VerifyLandlordWizardViewModel
         private val networkMonitor: NetworkMonitor,
         savedStateHandle: SavedStateHandle,
         private val verificationRepository: HomeVerificationRepository,
+        private val tenantRepository: TenantRepository,
     ) : ViewModel(),
         WizardModel {
         private val homeId: String =
@@ -101,7 +117,8 @@ open class VerifyLandlordWizardViewModel
 
         override fun onLeading() {
             when (_state.value.currentStep) {
-                VerifyLandlordStep.Start -> pendingEvent.value = VerifyLandlordOutboundEvent.Dismiss
+                VerifyLandlordStep.Start, VerifyLandlordStep.Sent ->
+                    pendingEvent.value = VerifyLandlordOutboundEvent.Dismiss
                 VerifyLandlordStep.Details -> {
                     _state.update { it.copy(currentStep = VerifyLandlordStep.Start, errors = null) }
                 }
@@ -118,10 +135,16 @@ open class VerifyLandlordWizardViewModel
                     _state.update { it.copy(currentStep = VerifyLandlordStep.Details) }
                 }
                 VerifyLandlordStep.Details -> viewModelScope.launch { submit() }
+                VerifyLandlordStep.Sent -> pendingEvent.value = VerifyLandlordOutboundEvent.Dismiss
             }
         }
 
-        override fun onSecondary() = Unit
+        override fun onSecondary() {
+            // Only the Sent step carries a secondary — the mailed-code
+            // fallback (RN's "Verify with a mailed code" alternative path).
+            if (_state.value.currentStep != VerifyLandlordStep.Sent) return
+            viewModelScope.launch { startPostcardFallback() }
+        }
 
         // MARK: - Field mutations
 
@@ -149,6 +172,13 @@ open class VerifyLandlordWizardViewModel
         fun setPMEmail(value: String) = updateForm { it.copy(pmEmail = value) }
 
         fun setPMPhone(value: String) = updateForm(revalidate = false) { it.copy(pmPhone = value) }
+
+        fun setMoveInDate(value: String) = updateForm { it.copy(moveInDate = value) }
+
+        fun setMessageToLandlord(value: String) =
+            updateForm(revalidate = false) {
+                it.copy(messageToLandlord = value.take(VerifyLandlordForm.MESSAGE_MAX_LENGTH))
+            }
 
         /**
          * Used by previews / sample-data toggles + the dashboard
@@ -196,11 +226,88 @@ open class VerifyLandlordWizardViewModel
                 }
                 return
             }
-            // The landlord / property-manager details collected above have
-            // no backend representation today — `request-postcard` takes no
-            // body — so finishing the wizard simply mails the verification
-            // postcard and routes to code entry. The details stay client-side.
+            // Real submit: ask the home's verified landlord to approve the
+            // tenancy. Everything the user typed travels with it — the
+            // move-in date as `start_at`, and the note + landlord / PM
+            // details folded into `message`.
             if (submitDelayMillis > 0) delay(submitDelayMillis)
+            val form = _state.value.form
+            val request =
+                TenantRequestApprovalRequest(
+                    homeId = homeId,
+                    startAt = form.startAtISO,
+                    message = form.composedMessage,
+                )
+            when (val result = tenantRepository.requestApproval(request)) {
+                is NetworkResult.Success -> {
+                    val lease = result.data.lease
+                    _state.update {
+                        it.copy(
+                            submitState = VerifyLandlordSubmitState.Submitted,
+                            currentStep = VerifyLandlordStep.Sent,
+                            approvalResult =
+                                VerifyLandlordApprovalResult(
+                                    kind = VerifyLandlordApprovalResult.Kind.Submitted,
+                                    submittedAt = lease.createdAt,
+                                    requestedStartAt = lease.startAt,
+                                    message = lease.metadata?.message,
+                                ),
+                        )
+                    }
+                }
+                is NetworkResult.Failure -> handleApprovalFailure(result)
+            }
+        }
+
+        /**
+         * Branches the `request-approval` non-2xx answers into the states
+         * we can observe without a tenant status endpoint.
+         */
+        private suspend fun handleApprovalFailure(result: NetworkResult.Failure) {
+            val message = result.error.message
+            when (result.error.code) {
+                HTTP_CONFLICT -> {
+                    // Duplicate request — the server just told us the real
+                    // state, so render it instead of failing the wizard.
+                    val kind =
+                        if (message.contains("active lease", ignoreCase = true)) {
+                            VerifyLandlordApprovalResult.Kind.AlreadyActive
+                        } else {
+                            VerifyLandlordApprovalResult.Kind.AlreadyPending
+                        }
+                    _state.update {
+                        it.copy(
+                            submitState = VerifyLandlordSubmitState.Submitted,
+                            currentStep = VerifyLandlordStep.Sent,
+                            approvalResult =
+                                VerifyLandlordApprovalResult(kind = kind, serverMessage = message),
+                        )
+                    }
+                }
+                HTTP_BAD_REQUEST, HTTP_NOT_FOUND ->
+                    // "This property has no verified landlord…" — RN's
+                    // no-landlord branch. Fall back to the mailed-code path
+                    // so the tenant still has a way through.
+                    startPostcardFallback()
+                else ->
+                    _state.update {
+                        it.copy(
+                            submitState =
+                                VerifyLandlordSubmitState.Error(
+                                    message.ifEmpty { "Couldn't send the request. Try again." },
+                                ),
+                        )
+                    }
+            }
+        }
+
+        /**
+         * Mails the verification postcard and hands the user off to the
+         * A12.7 tracker. Used both as the no-landlord fallback and as the
+         * Sent step's secondary CTA.
+         */
+        suspend fun startPostcardFallback() {
+            _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitting) }
             when (val result = verificationRepository.requestPostcard(homeId)) {
                 is NetworkResult.Success -> {
                     _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
@@ -211,7 +318,7 @@ open class VerifyLandlordWizardViewModel
                     // means a postcard is already on its way — proceed to
                     // enter it. Other failures surface inline so the user
                     // can retry.
-                    if (result.error.code == 400 || result.error.code == 429) {
+                    if (result.error.code == HTTP_BAD_REQUEST || result.error.code == HTTP_TOO_MANY_REQUESTS) {
                         _state.update { it.copy(submitState = VerifyLandlordSubmitState.Submitted) }
                         pendingEvent.value = VerifyLandlordOutboundEvent.OpenPostcardVerification(homeId)
                     } else {
@@ -263,6 +370,23 @@ open class VerifyLandlordWizardViewModel
                         showsProgressBar = true,
                     )
                 }
+                VerifyLandlordStep.Sent ->
+                    WizardChrome(
+                        title = "Verify landlord",
+                        progressLabel = WizardProgressLabel.StepOf(TOTAL_STEPS, TOTAL_STEPS),
+                        progressFraction = 1f,
+                        leading = WizardLeadingControl.Close,
+                        primaryCtaLabel = "Done",
+                        primaryCtaEnabled = !state.isSubmitting,
+                        secondaryCta =
+                            WizardSecondaryCta(
+                                label = "Mail me a code",
+                                testTag = "verifyLandlordMailCodeCTA",
+                            ),
+                        isSubmitting = state.isSubmitting,
+                        dirty = false,
+                        showsProgressBar = true,
+                    )
             }
 
         // MARK: - Helpers
@@ -288,5 +412,10 @@ open class VerifyLandlordWizardViewModel
              *  (the sibling postcard verification screen). */
             const val TOTAL_STEPS: Int = 3
             const val SUBMIT_DELAY_DEFAULT_MILLIS: Long = 800L
+
+            private const val HTTP_BAD_REQUEST = 400
+            private const val HTTP_NOT_FOUND = 404
+            private const val HTTP_CONFLICT = 409
+            private const val HTTP_TOO_MANY_REQUESTS = 429
         }
     }

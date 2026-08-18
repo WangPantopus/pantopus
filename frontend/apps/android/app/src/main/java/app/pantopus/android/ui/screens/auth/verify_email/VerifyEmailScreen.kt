@@ -1,33 +1,27 @@
-@file:Suppress("PackageNaming", "MatchingDeclarationName", "MagicNumber", "LongMethod", "ReturnCount", "TooManyFunctions")
+@file:Suppress("PackageNaming", "MatchingDeclarationName")
 
 package app.pantopus.android.ui.screens.auth.verify_email
 
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -37,31 +31,47 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.auth.AuthError
+import app.pantopus.android.ui.screens.status.StatusActionButton
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
+import app.pantopus.android.ui.screens.status.StatusWaitingScreen
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
-import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.delay
 
 object VerifyEmailScreenTags {
     const val ROOT = "verifyEmailScreen"
-    const val ILLUSTRATION = "verifyEmailIllustration"
-    const val OPEN_MAIL = "verifyEmailOpenMailButton"
-    const val RESEND = "verifyEmailResendButton"
-    const val DO_LATER = "verifyEmailDoLaterButton"
-    const val CHANGE_EMAIL = "verifyEmailChangeEmailButton"
+    const val BACK = "verifyEmailBackButton"
     const val BANNER = "verifyEmailBanner"
 }
 
+/** Heartbeat for the wall-clock resend countdown. */
+private const val COUNTDOWN_TICK_MS = 1_000L
+private const val SECONDS_PER_MINUTE = 60
+private const val MILLIS_PER_SECOND = 1_000L
+
+private val TopBarHeight = 52.dp
+private val TopBarHorizontalPadding = 10.dp
+private val BackTargetSize = 36.dp
+private val BackChevronSize = 20.dp
+private val TopBarTitleSize = 15.sp
+
 /**
- * Verify-email surface. Big mail icon + headline + body + action stack
- * (Open mail / Resend / I'll do this later [soft-gate only] / Wrong
- * email). When the view-model carries a token (deep-link path), kicks
- * the verification call on appear and renders a status banner.
+ * A18.1 "Verify Email Sent" — the post-signup surface. Renders the designed
+ * [StatusWaitingContent.checkYourEmail] frame (halo + headline + status pill +
+ * Open Mail / Resend / Use a different email stack + footnote) rather than the
+ * older bespoke mail-disc layout it replaced. Mirrors iOS `VerifyEmailView`.
+ *
+ * The verification email's deep link lands on `VerifyEmailLandingScreen`
+ * (§1B-2), so in production this screen is always reached with a null token.
+ * The token path is kept because the route still accepts one: when present the
+ * view-model fires the verification call on appear and the banner reports it.
  */
 @Composable
 fun VerifyEmailScreen(
@@ -71,11 +81,28 @@ fun VerifyEmailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(state.token) { viewModel.verifyOnAppearIfNeeded() }
     LaunchedEffect(state.didComplete) {
         if (state.didComplete) onDone()
     }
+    // The cooldown is wall-clock based, so the disabled button's
+    // "Resend in m:ss" label needs a heartbeat to redraw.
+    LaunchedEffect(state.resendCooldownUntilEpochMs) {
+        while (state.cooldownRemaining(now) != null) {
+            delay(COUNTDOWN_TICK_MS)
+            now = System.currentTimeMillis()
+        }
+    }
+
+    val remaining = state.cooldownRemaining(now)
+    val content =
+        StatusWaitingContent.checkYourEmail(
+            email = state.email,
+            resent = remaining != null,
+            resendCountdown = countdownLabel(remaining ?: 0L),
+        )
 
     Column(
         modifier =
@@ -84,71 +111,84 @@ fun VerifyEmailScreen(
                 .background(PantopusColors.appSurface)
                 .testTag(VerifyEmailScreenTags.ROOT),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.s5),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.s5),
-        ) {
-            Spacer(modifier = Modifier.height(Spacing.s10))
-            Illustration()
-            HeadlineBlock(email = state.email)
-            BannerLine(state = state)
-            Spacer(modifier = Modifier.height(Spacing.s10))
-        }
-
-        ActionStack(
-            state = state,
-            onOpenMail = { openMailApp(context) },
-            onResend = viewModel::resend,
-            onDoLater = onDone,
-            onChangeEmail = { onChangeEmail(state.email.orEmpty()) },
+        TopBar(showBack = state.softGate, onBack = onDone)
+        BannerLine(state = state)
+        StatusWaitingScreen(
+            content = content,
+            onStackAction = { button ->
+                handleStackAction(
+                    button = button,
+                    onOpenMail = { openMailApp(context) },
+                    onResend = viewModel::resend,
+                    onChangeEmail = { onChangeEmail(state.email.orEmpty()) },
+                )
+            },
+            modifier = Modifier.weight(1f),
         )
     }
 }
 
+private fun handleStackAction(
+    button: StatusActionButton,
+    onOpenMail: () -> Unit,
+    onResend: () -> Unit,
+    onChangeEmail: () -> Unit,
+) {
+    when (button.actionKey) {
+        "open_mail" -> onOpenMail()
+        "resend_email" -> onResend()
+        "change_email" -> onChangeEmail()
+        else -> Unit
+    }
+}
+
+/** "0:42" — minutes:seconds, matching the design frame. */
+internal fun countdownLabel(remainingMs: Long): String {
+    val total = ((remainingMs + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).coerceAtLeast(0L)
+    return "${total / SECONDS_PER_MINUTE}:${(total % SECONDS_PER_MINUTE).toString().padStart(2, '0')}"
+}
+
+/**
+ * A18.1's back-chevron + title bar. The chevron is the soft-gate exit
+ * ("verify later"); hard-gate hosts pass `softGate = false` and it hides.
+ */
 @Composable
-private fun Illustration() {
+private fun TopBar(
+    showBack: Boolean,
+    onBack: () -> Unit,
+) {
     Box(
         modifier =
             Modifier
-                .size(140.dp)
-                .clip(CircleShape)
-                .background(PantopusColors.primary50)
-                .testTag(VerifyEmailScreenTags.ILLUSTRATION),
-        contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .height(TopBarHeight)
+                .background(PantopusColors.appSurface)
+                .padding(horizontal = TopBarHorizontalPadding),
     ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Mailbox,
-            contentDescription = null,
-            size = 80.dp,
-            tint = PantopusColors.primary500,
-        )
-    }
-}
-
-@Composable
-private fun HeadlineBlock(email: String?) {
-    val recipient = email ?: "your email"
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
+        if (showBack) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .size(BackTargetSize)
+                        .clickable(onClick = onBack)
+                        .testTag(VerifyEmailScreenTags.BACK)
+                        .semantics { contentDescription = "Back" },
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronLeft,
+                    contentDescription = null,
+                    size = BackChevronSize,
+                    tint = PantopusColors.appText,
+                )
+            }
+        }
         Text(
-            text = "Verify your email",
-            style = PantopusTextStyle.h2,
+            text = "Check your email",
+            style = PantopusTextStyle.body.copy(fontSize = TopBarTitleSize, fontWeight = FontWeight.Bold),
             color = PantopusColors.appText,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text = "We sent a verification link to $recipient. Click it to unlock all features.",
-            style = PantopusTextStyle.small,
-            color = PantopusColors.appTextSecondary,
-            textAlign = TextAlign.Center,
+            modifier = Modifier.align(Alignment.Center).semantics { heading() },
         )
     }
 }
@@ -166,7 +206,6 @@ private fun BannerLine(state: VerifyEmailViewModel.UiState) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radii.md))
                 .background(copy.background)
                 .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
                 .testTag(VerifyEmailScreenTags.BANNER),
@@ -181,6 +220,10 @@ private fun BannerLine(state: VerifyEmailViewModel.UiState) {
     }
 }
 
+/**
+ * Only states the A18.1 frame can't express itself: the deep-link verify
+ * progress and any error. "Resent" is covered by the status pill.
+ */
 private fun bannerCopyFor(state: VerifyEmailViewModel.UiState): BannerCopy? {
     if (state.isVerifying) {
         return BannerCopy(
@@ -203,136 +246,10 @@ private fun bannerCopyFor(state: VerifyEmailViewModel.UiState): BannerCopy? {
             background = PantopusColors.errorBg,
         )
     }
-    if (state.didResend) {
-        return BannerCopy(
-            text = "Verification email sent.",
-            color = PantopusColors.primary700,
-            background = PantopusColors.primary50,
-        )
-    }
     return null
 }
 
 private fun errorBlurb(error: AuthError): String = error.message
-
-@Composable
-private fun ActionStack(
-    state: VerifyEmailViewModel.UiState,
-    onOpenMail: () -> Unit,
-    onResend: () -> Unit,
-    onDoLater: () -> Unit,
-    onChangeEmail: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        PrimaryButton(
-            label = "Open mail app",
-            onClick = onOpenMail,
-            tag = VerifyEmailScreenTags.OPEN_MAIL,
-        )
-        GhostButton(
-            label = "Resend email",
-            isLoading = state.isResending,
-            isEnabled = state.canResend,
-            onClick = onResend,
-            tag = VerifyEmailScreenTags.RESEND,
-        )
-        if (state.softGate) {
-            Text(
-                text = "I'll do this later",
-                style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
-                color = PantopusColors.primary600,
-                modifier =
-                    Modifier
-                        .clickable(onClick = onDoLater)
-                        .padding(vertical = Spacing.s1)
-                        .testTag(VerifyEmailScreenTags.DO_LATER)
-                        .semantics { contentDescription = "I'll do this later" },
-            )
-        }
-        Text(
-            text = "Wrong email? Change it",
-            style = PantopusTextStyle.caption,
-            color = PantopusColors.appTextSecondary,
-            modifier =
-                Modifier
-                    .clickable(onClick = onChangeEmail)
-                    .padding(vertical = Spacing.s1)
-                    .testTag(VerifyEmailScreenTags.CHANGE_EMAIL)
-                    .semantics { contentDescription = "Change email" },
-        )
-    }
-}
-
-@Composable
-private fun PrimaryButton(
-    label: String,
-    onClick: () -> Unit,
-    tag: String,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.primary600)
-                .clickable(onClick = onClick)
-                .testTag(tag)
-                .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = PantopusTextStyle.body.copy(fontWeight = FontWeight.SemiBold),
-            color = PantopusColors.appTextInverse,
-        )
-    }
-}
-
-@Composable
-private fun GhostButton(
-    label: String,
-    isLoading: Boolean,
-    isEnabled: Boolean,
-    onClick: () -> Unit,
-    tag: String,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(Radii.lg))
-                .background(PantopusColors.appSurface)
-                .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
-                .clickable(enabled = isEnabled, onClick = onClick)
-                .testTag(tag)
-                .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                color = PantopusColors.appText,
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(20.dp),
-            )
-        } else {
-            Text(
-                text = label,
-                style = PantopusTextStyle.body.copy(fontWeight = FontWeight.SemiBold),
-                color = if (isEnabled) PantopusColors.appText else PantopusColors.appTextMuted,
-            )
-        }
-    }
-}
 
 /**
  * Fires an [Intent.ACTION_VIEW] against `mailto:` so the system picker

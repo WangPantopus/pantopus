@@ -7,6 +7,8 @@
 //  shared `FormShell` archetype with a sticky "Send pass" CTA.
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import SwiftUI
 
 public struct AddGuestFormView: View {
@@ -16,6 +18,13 @@ public struct AddGuestFormView: View {
     @State private var showsCustomRange = false
     @State private var customStart = Date()
     @State private var customEnd = Date().addingTimeInterval(86400)
+
+    /// A13.6 — "Share this pass now?" confirm, raised the moment the
+    /// create call returns the one-time token (RN parity:
+    /// `src/app/homes/[id]/share.tsx:60-70`).
+    @State private var shareOffer: GuestPassShare?
+    /// Non-nil while the OS share sheet is presented.
+    @State private var sharePayload: GuestPassShare?
 
     public init(viewModel: AddGuestFormViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -66,6 +75,50 @@ public struct AddGuestFormView: View {
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 dismiss()
             }
+        }
+        .onChange(of: viewModel.createdShare) { _, share in
+            shareOffer = share
+        }
+        .confirmationDialog(
+            "Guest pass created",
+            isPresented: Binding(
+                get: { shareOffer != nil },
+                set: { if !$0 { shareOffer = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: shareOffer
+        ) { offer in
+            Button("Share") {
+                shareOffer = nil
+                // Let the dialog finish dismissing before the activity
+                // controller presents — chaining them in the same runloop
+                // tick drops the sheet on iOS.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    sharePayload = offer
+                }
+            }
+            .accessibilityIdentifier("addGuest_shareNow")
+            Button("Later", role: .cancel) {
+                shareOffer = nil
+                viewModel.acknowledgeShare()
+            }
+            .accessibilityIdentifier("addGuest_shareLater")
+        } message: { _ in
+            Text("Share this pass now?")
+        }
+        // Hosted on a zero-size background so it doesn't collide with the
+        // custom-range `.sheet` attached to the same view below — SwiftUI
+        // only honours one `.sheet` per view level.
+        .background {
+            Color.clear
+                .sheet(
+                    item: $sharePayload,
+                    onDismiss: { viewModel.acknowledgeShare() }
+                ) { payload in
+                    SystemShareSheet(items: payload.activityItems)
+                        .accessibilityIdentifier("addGuest_shareSheet")
+                }
         }
         .sheet(isPresented: $showsCustomRange) {
             GuestDateRangeSheet(

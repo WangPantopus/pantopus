@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,19 +74,26 @@ import app.pantopus.android.ui.screens.business_profile.BusinessServiceRow
 import app.pantopus.android.ui.screens.business_profile.components.CategoryRow
 import app.pantopus.android.ui.screens.business_profile.components.EmptyBlock
 import app.pantopus.android.ui.screens.business_profile.components.HoursTable
+import app.pantopus.android.ui.screens.businesses.catalog.BusinessCatalogScreen
+import app.pantopus.android.ui.screens.businesses.inbox.BusinessInboxScreen
+import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.FoundingOfferBanner
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.InsightTiles
+import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerComposeFab
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerHeaderBanner
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerLiveBar
+import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerNavRow
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.OwnerTopBar
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.PreviewBar
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.ProfileStrengthCard
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.components.ReviewReplyComposer
+import app.pantopus.android.ui.screens.compose.pulse.PulseComposeScreen
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.delay
 
 /**
  * A10.7 — the single-business owner dashboard, the owner-facing twin of
@@ -107,10 +116,24 @@ fun BusinessOwnerScreen(
     onOpenInsights: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenTeam: () -> Unit = {},
+    /** C4 — opens the custom Pages CMS (block builder + revision history). */
+    onOpenPages: () -> Unit = {},
+    /** C3 — owner money + legal surfaces. */
+    onOpenPayments: () -> Unit = {},
+    onOpenInvoices: () -> Unit = {},
+    onOpenLegal: () -> Unit = {},
+    /** Business-inbox row taps — opens a chat room (`roomId`, counterpart
+     *  name, counterpart handle) or a matched neighborhood post. */
+    onOpenChatRoom: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenPost: (String) -> Unit = {},
     viewModel: BusinessOwnerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
     var mode by remember { mutableStateOf(OwnerViewMode.Owner) }
+
+    /** C2 — bumped per composer open so each post starts from a blank draft. */
+    var composeSession by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -150,22 +173,108 @@ fun BusinessOwnerScreen(
                                 onOpenInsights = onOpenInsights,
                                 onOpenSettings = onOpenSettings,
                                 onOpenTeam = onOpenTeam,
+                                onOpenPages = onOpenPages,
+                                onOpenPayments = onOpenPayments,
+                                onOpenInvoices = onOpenInvoices,
+                                onOpenLegal = onOpenLegal,
                                 onPreview = { mode = OwnerViewMode.Preview },
+                                onManageCatalog = { mode = OwnerViewMode.Catalog },
+                                onOpenInbox = { mode = OwnerViewMode.Inbox },
+                                onComposePost = {
+                                    composeSession += 1
+                                    mode = OwnerViewMode.Compose
+                                },
                                 onSubmitReply = { id, text -> viewModel.submitReply(id, text) },
+                                onClaimFounding = viewModel::claimFoundingOffer,
+                                onDismissFounding = viewModel::dismissFoundingBanner,
                             )
                         OwnerViewMode.Preview ->
                             OwnerPreviewFrame(
                                 content = current.content.publicProfile,
                                 onExit = { mode = OwnerViewMode.Owner },
                             )
+                        OwnerViewMode.Catalog ->
+                            BusinessCatalogScreen(
+                                onBack = {
+                                    mode = OwnerViewMode.Owner
+                                    viewModel.refresh()
+                                },
+                            )
+                        OwnerViewMode.Inbox ->
+                            BusinessInboxScreen(
+                                onBack = { mode = OwnerViewMode.Owner },
+                                onOpenRoom = onOpenChatRoom,
+                                onOpenPost = onOpenPost,
+                            )
+                        OwnerViewMode.Compose ->
+                            // C2 — reuse the shared Pulse composer, pointed at
+                            // `POST /api/businesses/:businessId/posts`.
+                            PulseComposeScreen(
+                                onBack = { mode = OwnerViewMode.Owner },
+                                // A fresh key per open so the composer starts
+                                // blank instead of reusing the last draft.
+                                viewModel = hiltViewModel(key = "businessPost-$composeSession"),
+                                onPosted = {
+                                    mode = OwnerViewMode.Owner
+                                    viewModel.refresh()
+                                },
+                                businessAuthorId = current.content.businessId,
+                            )
                     }
                 }
         }
+
+        // Founding-claim confirmation / error copy. RN raises an `Alert`;
+        // native uses the same transient toast idiom as the rest of the app.
+        OwnerToastOverlay(message = toast, onDismiss = viewModel::consumeToast)
+    }
+}
+
+@Composable
+private fun BoxScope.OwnerToastOverlay(
+    message: String?,
+    onDismiss: () -> Unit,
+) {
+    if (message == null) return
+    LaunchedEffect(message) {
+        delay(3_000)
+        onDismiss()
+    }
+    Box(
+        modifier =
+            Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 140.dp, start = Spacing.s4, end = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.appText)
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                .testTag("businessOwner.toast"),
+    ) {
+        Text(
+            text = message,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.appTextInverse,
+        )
     }
 }
 
 /** Which frame the owner dashboard is showing. */
-enum class OwnerViewMode { Owner, Preview }
+enum class OwnerViewMode {
+    Owner,
+    Preview,
+
+    /** C2 — the catalog manager (services / products CRUD + reorder). */
+    Catalog,
+
+    /** C2 — "Post as this business" (role-gated). */
+    Compose,
+
+    /** The business-side inbox — rooms addressed to the business identity
+     *  plus neighborhood posts matched to it. */
+    Inbox,
+}
 
 // MARK: - Owner / edit frame
 
@@ -179,6 +288,21 @@ internal fun OwnerEditFrame(
     onOpenTeam: () -> Unit,
     onPreview: () -> Unit,
     onSubmitReply: (String, String) -> Unit,
+    /** C4 — opens the custom Pages CMS. */
+    onOpenPages: () -> Unit = {},
+    /** C3 — owner money + legal surfaces. */
+    onOpenPayments: () -> Unit = {},
+    onOpenInvoices: () -> Unit = {},
+    onOpenLegal: () -> Unit = {},
+    /** C2 — opens the catalog manager frame ("Manage" / "Add a service"). */
+    onManageCatalog: () -> Unit = {},
+    /** Opens the business inbox frame (Messages + Mentions). */
+    onOpenInbox: () -> Unit = {},
+    /** C2 — opens the "Post as this business" composer. */
+    onComposePost: () -> Unit = {},
+    /** Founding-business offer banner actions. */
+    onClaimFounding: () -> Unit = {},
+    onDismissFounding: () -> Unit = {},
 ) {
     val profile = content.publicProfile
     Box(modifier = Modifier.fillMaxSize().testTag("businessOwner.edit")) {
@@ -209,10 +333,30 @@ internal fun OwnerEditFrame(
                         onEditPage = onEditPage,
                         onOpenInsights = onOpenInsights,
                         onOpenTeam = onOpenTeam,
+                        onOpenPages = onOpenPages,
+                        onOpenPayments = onOpenPayments,
+                        onOpenInvoices = onOpenInvoices,
+                        onOpenLegal = onOpenLegal,
+                        onManageCatalog = onManageCatalog,
+                        onOpenInbox = onOpenInbox,
                         onSubmitReply = onSubmitReply,
+                        onClaimFounding = onClaimFounding,
+                        onDismissFounding = onDismissFounding,
                     )
                 }
             }
+        }
+        // C2 — "Post as this business". RN floats the same FAB above its
+        // dock, gated on `access.role_base`.
+        if (content.canPostAsBusiness) {
+            OwnerComposeFab(
+                onClick = onComposePost,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = Spacing.s4, bottom = 88.dp),
+            )
         }
         OwnerDock(
             onPreview = onPreview,
@@ -234,8 +378,25 @@ private fun OwnerSections(
     onEditPage: () -> Unit,
     onOpenInsights: () -> Unit,
     onOpenTeam: () -> Unit,
+    /** C4 — opens the custom Pages CMS. */
+    onOpenPages: () -> Unit,
+    onOpenPayments: () -> Unit,
+    onOpenInvoices: () -> Unit,
+    onOpenLegal: () -> Unit,
+    onManageCatalog: () -> Unit,
+    onOpenInbox: () -> Unit,
     onSubmitReply: (String, String) -> Unit,
+    onClaimFounding: () -> Unit,
+    onDismissFounding: () -> Unit,
 ) {
+    content.foundingOffer?.let { offer ->
+        FoundingOfferBanner(
+            offer = offer,
+            onClaim = onClaimFounding,
+            onDismiss = onDismissFounding,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+    }
     InsightTiles(
         insights = content.insights,
         onOpenInsights = onOpenInsights,
@@ -303,15 +464,69 @@ private fun OwnerSections(
         title = "Services",
         actionLabel = "Manage",
         actionIcon = PantopusIcon.SlidersHorizontal,
-        onAction = onEditPage,
+        onAction = onManageCatalog,
     )
-    ManageServicesList(services = profile.services, onManage = onEditPage)
+    ManageServicesList(services = profile.services, onManage = onManageCatalog)
 
     OwnerSectionHeader(title = "Photos")
     ManageGalleryRail(gallery = profile.gallery, onAdd = onEditPage, onEditTile = onEditPage)
 
     OwnerSectionHeader(title = "Team", actionLabel = "Manage", actionIcon = PantopusIcon.Users, onAction = onOpenTeam)
     TeamSummaryRow(onOpen = onOpenTeam)
+
+    // C4 — custom Pages CMS (block builder + revision history).
+    OwnerSectionHeader(
+        title = "Pages",
+        actionLabel = "Manage",
+        actionIcon = PantopusIcon.FileText,
+        onAction = onOpenPages,
+    )
+    OwnerNavRow(
+        icon = PantopusIcon.FileText,
+        title = "Custom pages",
+        subtitle = "Build menus, about pages and more with content blocks",
+        testTagValue = "businessOwner.pagesRow",
+        onOpen = onOpenPages,
+    )
+
+    OwnerSectionHeader(
+        title = "Inbox",
+        actionLabel = "Open",
+        actionIcon = PantopusIcon.Inbox,
+        onAction = onOpenInbox,
+    )
+    OwnerNavRow(
+        icon = PantopusIcon.Inbox,
+        title = "Messages & mentions",
+        subtitle = "Conversations with this business and posts that mention it",
+        testTagValue = "businessOwner.inboxRow",
+        onOpen = onOpenInbox,
+    )
+
+    OwnerSectionHeader(title = "Money & legal")
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        OwnerNavRow(
+            icon = PantopusIcon.CreditCard,
+            title = "Payments",
+            subtitle = "Connect Stripe so this business can get paid",
+            testTagValue = "businessOwner.paymentsRow",
+            onOpen = onOpenPayments,
+        )
+        OwnerNavRow(
+            icon = PantopusIcon.ReceiptText,
+            title = "Invoices",
+            subtitle = "Bill a customer and track what's been paid",
+            testTagValue = "businessOwner.invoicesRow",
+            onOpen = onOpenInvoices,
+        )
+        OwnerNavRow(
+            icon = PantopusIcon.ShieldCheck,
+            title = "Legal & verification",
+            subtitle = "Legal name, tax ID and verification documents",
+            testTagValue = "businessOwner.legalRow",
+            onOpen = onOpenLegal,
+        )
+    }
 
     OwnerSectionHeader(title = "Reviews", actionLabel = content.reviewsToReplyLabel, actionIcon = PantopusIcon.MessageSquare)
     val summary = profile.reviewSummary

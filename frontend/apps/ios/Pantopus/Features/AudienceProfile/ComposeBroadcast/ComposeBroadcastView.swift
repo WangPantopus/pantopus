@@ -20,7 +20,7 @@ public struct ComposeBroadcastView: View {
     @State private var showsAudienceSheet = false
     @State private var showsScheduleSheet = false
     @State private var showsPhotosPicker = false
-    @State private var photoSelection: PhotosPickerItem?
+    @State private var photoSelections: [PhotosPickerItem] = []
     @State private var scheduleDraftDate = Date()
 
     private let onClose: @MainActor () -> Void
@@ -41,12 +41,15 @@ public struct ComposeBroadcastView: View {
         .background(Theme.Color.appBg)
         .toolbar(.hidden, for: .tabBar)
         .task { await viewModel.load() }
+        // Multi-select up to the remaining slots — RN parity
+        // (`pickPostMediaFromLibrary(9 - mediaFiles.length)`).
         .photosPicker(
             isPresented: $showsPhotosPicker,
-            selection: $photoSelection,
+            selection: $photoSelections,
+            maxSelectionCount: max(1, viewModel.remainingMediaSlots),
             matching: .any(of: [.images, .videos])
         )
-        .onChange(of: photoSelection) { _, newValue in
+        .onChange(of: photoSelections) { _, newValue in
             handlePicked(newValue)
         }
         .sheet(isPresented: $showsAudienceSheet) { audienceSheet }
@@ -150,7 +153,7 @@ public struct ComposeBroadcastView: View {
             isOverLimit: viewModel.isOverLimit,
             placeholder: "What's worth sharing with your beacons today?",
             onAddMedia: { showsPhotosPicker = true },
-            onRemoveMedia: { viewModel.removeMedia() },
+            onRemoveMedia: { id in viewModel.removeMedia(id: id) },
             onChangeAudience: { showsAudienceSheet = true }
         )
     }
@@ -656,20 +659,29 @@ public struct ComposeBroadcastView: View {
         Date().addingTimeInterval(3600)
     }
 
-    private func handlePicked(_ item: PhotosPickerItem?) {
-        guard let item else { return }
-        let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+    /// Load every picked asset's bytes, then hand the batch to the VM.
+    /// Videos keep their bytes too — the post-media route accepts both.
+    private func handlePicked(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
         Task {
-            let data = try? await item.loadTransferable(type: Data.self)
-            await MainActor.run {
-                viewModel.attachMedia(
+            var picked: [ComposeMediaPreview] = []
+            for item in items {
+                let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+                guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                let mime = item.supportedContentTypes.first?.preferredMIMEType
+                    ?? (isVideo ? "video/mp4" : "image/jpeg")
+                picked.append(
                     ComposeMediaPreview(
                         kind: isVideo ? .video : .image,
                         caption: isVideo ? "Video attached" : "Photo attached",
-                        imageData: isVideo ? nil : data
+                        data: data,
+                        mimeType: mime
                     )
                 )
-                photoSelection = nil
+            }
+            await MainActor.run {
+                viewModel.attachMedia(picked)
+                photoSelections = []
             }
         }
     }

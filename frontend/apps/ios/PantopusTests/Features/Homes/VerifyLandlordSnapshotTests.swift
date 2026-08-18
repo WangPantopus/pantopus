@@ -87,8 +87,9 @@ final class VerifyLandlordSnapshotTests: XCTestCase {
                 onVerified: { _ in }
             )
         )
-        XCTAssertFalse(vm.isCodeInputUnlocked)
-        XCTAssertFalse(vm.primaryCTAEnabled)
+        XCTAssertTrue(vm.isCodeInputUnlocked, "The field stays live while the card is in transit")
+        XCTAssertFalse(vm.primaryCTAEnabled, "…but an empty code still can't submit")
+        XCTAssertFalse(vm.showsCodeEntryFrame)
     }
 
     func test_postcard_delivered_renders() {

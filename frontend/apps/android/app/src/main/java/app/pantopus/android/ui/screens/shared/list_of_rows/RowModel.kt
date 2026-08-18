@@ -380,6 +380,25 @@ data class RowEngagement(
     val cta: RowEngagementCta? = null,
 )
 
+// MARK: - Destructive row action
+
+/**
+ * Optional destructive action attached to a row. The shell surfaces it
+ * with the platform idiom on each side so parity holds without forcing
+ * one gesture onto both: Android renders a long-press dropdown
+ * (`combinedClickable(onLongClick = …)`); iOS renders a trailing swipe
+ * action plus a long-press context menu.
+ *
+ * The handler should open a confirmation before destroying anything —
+ * the shell never confirms on the screen's behalf.
+ */
+data class RowDestructiveAction(
+    val label: String,
+    /** UI-test anchor; mirror the iOS `accessibilityIdentifier(…)` string. */
+    val testTag: String? = null,
+    val onClick: () -> Unit,
+)
+
 // MARK: - Body emphasis
 
 /**
@@ -503,6 +522,12 @@ data class RowModel(
      * the overline entirely.
      */
     val archetypeOverline: String? = null,
+    /**
+     * Optional destructive row action (Notifications "Delete",
+     * Connections "Remove"). Surfaced as a long-press dropdown by the
+     * shell; iOS mirrors it with swipe + context menu.
+     */
+    val destructiveAction: RowDestructiveAction? = null,
 )
 
 // MARK: - Section

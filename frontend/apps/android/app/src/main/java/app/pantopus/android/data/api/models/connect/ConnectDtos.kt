@@ -31,6 +31,12 @@ data class ConnectAccountDto(
     @Json(name = "charges_enabled") val chargesEnabled: Boolean = false,
     @Json(name = "payouts_enabled") val payoutsEnabled: Boolean = false,
     @Json(name = "details_submitted") val detailsSubmitted: Boolean = false,
+    /**
+     * `StripeAccount.created_at` — when the seller first connected. The handler
+     * returns the whole row (`stripe/stripeService.js:449`), so this is real
+     * data; it dates the "Connected …" row on A14.6 Payments.
+     */
+    @Json(name = "created_at") val createdAt: String? = null,
 )
 
 // GET /api/payments/connect/account — backend/routes/pays.js:243

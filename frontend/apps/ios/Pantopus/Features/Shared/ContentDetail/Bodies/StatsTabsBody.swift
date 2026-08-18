@@ -3,8 +3,16 @@
 //  Pantopus
 //
 //  `stats_tabs` slot for the Public profile detail. Raised stats strip
-//  overlapping the header → action button row → About/Reviews/Gigs tab
-//  strip → tab content panel.
+//  overlapping the header → action button row → About/Reviews/Gigs/
+//  Portfolio tab strip → tab content panel.
+//
+//  With `profileUserId`, the Reviews / Gigs / Portfolio panels mount the
+//  live sections in `Features/Profile/Tabs/ProfileTabsSections.swift`,
+//  backed by `GET /api/reviews/user/:userId` (`reviews.js:149`),
+//  `GET /api/gigs?user_id=…` (`gigs.js:2089`) and
+//  `GET /api/files/portfolio[/:userId]` (`files.js:489` / `:526`).
+//  Without an id the body keeps the caller-supplied static content and
+//  hides Portfolio, since there is nothing to fetch.
 //
 // swiftlint:disable multiple_closures_with_trailing_closure
 
@@ -25,7 +33,7 @@ public struct ProfileStatCell: Sendable, Hashable, Identifiable {
 
 /// Tab identifier for `StatsTabsBody`.
 public enum ProfileTab: String, Sendable, CaseIterable, Identifiable {
-    case about, reviews, gigs
+    case about, reviews, gigs, portfolio
 
     public var id: String {
         rawValue
@@ -36,6 +44,7 @@ public enum ProfileTab: String, Sendable, CaseIterable, Identifiable {
         case .about: "About"
         case .reviews: "Reviews"
         case .gigs: "Gigs"
+        case .portfolio: "Portfolio"
         }
     }
 }
@@ -98,26 +107,46 @@ public struct StatsTabsBody: View {
     @Binding private var selectedTab: ProfileTab
     private let showStats: Bool
     private let showActionRow: Bool
+    private let profileUserId: String?
+    private let isOwnProfile: Bool
     private let onMessage: @MainActor () -> Void
     private let onConnect: @MainActor () -> Void
     private let onOverflow: @MainActor () -> Void
+    private let onOpenGig: @MainActor (String) -> Void
+    private let onOpenReviewer: @MainActor (String) -> Void
 
     public init(
         content: StatsTabsContent,
         selectedTab: Binding<ProfileTab>,
         showStats: Bool = true,
         showActionRow: Bool = true,
+        profileUserId: String? = nil,
+        isOwnProfile: Bool = false,
         onMessage: @escaping @MainActor () -> Void = {},
         onConnect: @escaping @MainActor () -> Void = {},
-        onOverflow: @escaping @MainActor () -> Void = {}
+        onOverflow: @escaping @MainActor () -> Void = {},
+        onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenReviewer: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         self.content = content
         _selectedTab = selectedTab
         self.showStats = showStats
         self.showActionRow = showActionRow
+        self.profileUserId = profileUserId
+        self.isOwnProfile = isOwnProfile
         self.onMessage = onMessage
         self.onConnect = onConnect
         self.onOverflow = onOverflow
+        self.onOpenGig = onOpenGig
+        self.onOpenReviewer = onOpenReviewer
+    }
+
+    /// Portfolio only exists once the host knows *whose* profile this is —
+    /// there is no static portfolio payload to fall back on.
+    private var visibleTabs: [ProfileTab] {
+        profileUserId == nil
+            ? [.about, .reviews, .gigs]
+            : ProfileTab.allCases
     }
 
     public var body: some View {
@@ -143,6 +172,7 @@ public struct StatsTabsBody: View {
                 case .about: aboutTabContent
                 case .reviews: reviewsTabContent
                 case .gigs: gigsTabContent
+                case .portfolio: portfolioTabContent
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -214,7 +244,7 @@ public struct StatsTabsBody: View {
 
     private var tabStrip: some View {
         HStack(spacing: Spacing.s0) {
-            ForEach(ProfileTab.allCases) { tab in
+            ForEach(visibleTabs) { tab in
                 Button {
                     selectedTab = tab
                 } label: {
@@ -264,8 +294,13 @@ public struct StatsTabsBody: View {
         }
     }
 
+    /// Live `GET /api/reviews/user/:userId` panel — summary header, the
+    /// worker | poster | all filter and the media viewer. Falls back to
+    /// the caller-supplied cards when no profile id is threaded.
     @ViewBuilder private var reviewsTabContent: some View {
-        if content.reviews.isEmpty {
+        if let profileUserId {
+            ProfileGigReviewsSection(userId: profileUserId, onOpenReviewer: onOpenReviewer)
+        } else if content.reviews.isEmpty {
             EmptyState(
                 icon: .star,
                 headline: "No reviews yet",
@@ -281,15 +316,34 @@ public struct StatsTabsBody: View {
         }
     }
 
-    private var gigsTabContent: some View {
-        // The public gigs feed is not surfaced on profile yet; this
-        // empty state stands in until the Gigs feature lands (T2.3).
-        EmptyState(
-            icon: .hammer,
-            headline: "No recent gigs",
-            subcopy: "Recent gigs from this user will appear here."
-        )
-        .frame(minHeight: 200)
+    /// Live `GET /api/gigs?user_id=…` panel; rows deep-link into gig
+    /// detail through the host's route stack.
+    @ViewBuilder private var gigsTabContent: some View {
+        if let profileUserId {
+            ProfileGigsSection(userId: profileUserId, onOpenGig: onOpenGig)
+        } else {
+            EmptyState(
+                icon: .hammer,
+                headline: "No recent gigs",
+                subcopy: "Recent gigs from this user will appear here."
+            )
+            .frame(minHeight: 200)
+        }
+    }
+
+    /// Live `GET /api/files/portfolio[/:userId]` panel. `isOwnProfile`
+    /// unlocks the add sheet and the per-card delete confirm.
+    @ViewBuilder private var portfolioTabContent: some View {
+        if let profileUserId {
+            ProfilePortfolioSection(userId: profileUserId, isOwnProfile: isOwnProfile)
+        } else {
+            EmptyState(
+                icon: .image,
+                headline: "No portfolio yet",
+                subcopy: "Portfolio work from this user will appear here."
+            )
+            .frame(minHeight: 200)
+        }
     }
 }
 

@@ -63,6 +63,7 @@ fun PickCategorySearchStep(
     onPickHit: (CategorySearchHit) -> Unit,
     onSubmitCustom: () -> Unit,
 ) {
+    val query = state.searchText.trim()
     BusinessIdentityChip()
 
     HeadlineBlock("What does your business do?")
@@ -75,24 +76,37 @@ fun PickCategorySearchStep(
 
     SearchResultsHeader(
         matchCount = state.searchHits.size,
-        query = state.searchText.trim(),
+        query = query,
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         state.searchHits.forEach { hit ->
             SearchResultRow(
                 hit = hit,
-                query = state.searchText.trim(),
+                query = query,
                 selected = state.selectedCategory == hit.category,
                 onPick = { onPickHit(hit) },
             )
         }
     }
 
-    AddCustomCategoryRow(
-        label = state.searchText.trim(),
-        onTap = onSubmitCustom,
-    )
+    if (state.searchHits.isEmpty() && query.isNotEmpty()) {
+        // No-match fallback from the design pack. Submitting is still
+        // logged-only — there is no POST /custom-categories to invent — so
+        // the row's subcopy promises exactly what happens.
+        AddCustomCategoryRow(
+            label = query,
+            isSubmitting = state.isSubmittingCustom,
+            onTap = onSubmitCustom,
+        )
+    } else {
+        Text(
+            text = "Custom categories aren't available yet. Pick a listed category above.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.testTag("createBusinessCustomCategoryBlocked"),
+        )
+    }
 
     state.submitError?.let { message ->
         Text(
@@ -272,9 +286,18 @@ private fun highlightedText(
 
 // MARK: - Dashed-violet "Add as custom category" fallback row
 
+/**
+ * Spoken label for the fallback row. Matches iOS
+ * `AddCustomCategoryRow.accessibilityLabel`.
+ */
+private fun customCategoryAccessibilityLabel(label: String): String =
+    "Add $label as a custom category. " +
+        "We'll pass the request on — custom categories aren't live yet."
+
 @Composable
 private fun AddCustomCategoryRow(
     label: String,
+    isSubmitting: Boolean,
     onTap: () -> Unit,
 ) {
     val shape = RoundedCornerShape(Radii.lg)
@@ -287,11 +310,11 @@ private fun AddCustomCategoryRow(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
+                    enabled = !isSubmitting,
                     onClick = onTap,
                 ).semantics {
                     role = Role.Button
-                    contentDescription =
-                        "Add $label as a custom category. We'll review it within a day."
+                    contentDescription = customCategoryAccessibilityLabel(label)
                 }.testTag("createBusinessAddCustomCategory"),
     ) {
         // Draw a dashed violet border via Canvas because Compose's `border()`
@@ -347,7 +370,7 @@ private fun AddCustomCategoryRow(
                     color = PantopusColors.businessDark,
                 )
                 Text(
-                    text = "We'll review it within a day · listings stay private until approved.",
+                    text = "We'll pass the request on — custom categories aren't live yet.",
                     style = PantopusTextStyle.caption,
                     color = PantopusColors.appTextSecondary,
                 )

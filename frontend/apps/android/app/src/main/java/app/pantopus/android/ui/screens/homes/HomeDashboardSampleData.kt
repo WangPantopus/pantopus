@@ -14,15 +14,8 @@ object HomeDashboardSampleData {
     const val EMPTY_HOME_ID = "sample-home-empty"
     const val NEEDS_ATTENTION_HOME_ID = "sample-home-needs-attention"
 
-    val tabs =
-        listOf(
-            GridTabsTab("overview", "Overview"),
-            GridTabsTab("tasks", "Tasks"),
-            GridTabsTab("bills", "Bills"),
-            GridTabsTab("packages", "Packages"),
-            GridTabsTab("members", "Members"),
-            GridTabsTab("ownership", "Ownership"),
-        )
+    /** Static chrome, not a fixture — owned by [HomeDashboardProjection]. */
+    val tabs: List<GridTabsTab> = HomeDashboardProjection.tabs
 
     val populatedQuickActions =
         listOf(

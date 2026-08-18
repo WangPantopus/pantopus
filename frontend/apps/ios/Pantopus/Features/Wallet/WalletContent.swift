@@ -107,6 +107,98 @@ public struct WalletPayoutMethod: Equatable, Sendable {
     }
 }
 
+/// One Connect capability tile — "CARD PAYMENTS · Enabled" /
+/// "PAYOUTS · Disabled". Mirrors RN `PayoutsTab`'s `detailsGrid`, which
+/// renders `charges_enabled` and `payouts_enabled` as separate tiles
+/// instead of collapsing the account to a single boolean.
+public struct WalletPayoutCapability: Identifiable, Equatable, Sendable {
+    public var id: String {
+        key
+    }
+
+    /// Stable key used for the accessibility identifier / Android test tag —
+    /// `cardPayments` / `payouts`.
+    public let key: String
+    /// Tile overline, rendered uppercased — "Card payments" / "Payouts".
+    public let label: String
+    /// Server-reported flag; the view renders "Enabled" / "Disabled".
+    public let enabled: Bool
+
+    public init(key: String, label: String, enabled: Bool) {
+        self.key = key
+        self.label = label
+        self.enabled = enabled
+    }
+}
+
+/// Connected-payout-account card payload, derived from the real Stripe
+/// Connect status (`GET /api/payments/connect/account`). Stripe does not
+/// hand the platform a bank name or last-4 for an Express account, so this
+/// card describes the *account* (what it can do, and how to manage it in
+/// Stripe's own dashboard) rather than inventing bank details.
+public struct WalletPayoutAccount: Equatable, Sendable {
+    /// `Stripe account connected` / `Account verification in progress`.
+    public let headline: String
+    /// Supporting line — capability summary or the verification note.
+    public let bodyText: String
+    /// Dock label for the trailing control — "Open Stripe Dashboard" once
+    /// onboarded, "Continue setup" while Stripe is still verifying.
+    public let actionLabel: String
+    /// `true` → the account exists but isn't onboarded yet: amber treatment,
+    /// and the action resumes hosted onboarding instead of the dashboard.
+    public let warn: Bool
+    /// Per-capability tiles rendered under the row once the account is
+    /// connected — "CARD PAYMENTS" (`charges_enabled`) and "PAYOUTS"
+    /// (`payouts_enabled`), each Enabled/Disabled. Empty while the account is
+    /// still verifying (Stripe has not reported capabilities yet), which keeps
+    /// the verifying frame identical to RN's.
+    public let capabilities: [WalletPayoutCapability]
+
+    public init(
+        headline: String,
+        bodyText: String,
+        actionLabel: String,
+        warn: Bool,
+        capabilities: [WalletPayoutCapability] = []
+    ) {
+        self.headline = headline
+        self.bodyText = bodyText
+        self.actionLabel = actionLabel
+        self.warn = warn
+        self.capabilities = capabilities
+    }
+}
+
+/// Escrow breakdown behind the hero's single "Pending" figure, projected
+/// from `GET /api/wallet/pending-release`. RN renders the same two lines
+/// (`WalletTab.tsx:161-173`); collapsing them to `total_pending_cents`
+/// hides *why* money is held — funds still inside the cooling-off review
+/// window read very differently from funds already queued for transfer.
+/// Both strings are pre-formatted (`"$140.00"`); the counts come straight
+/// from the same payload.
+public struct WalletPendingBreakdown: Equatable, Sendable {
+    /// `in_review_cents` — still inside the cooling-off window.
+    public let inReview: String
+    /// `releasing_soon_cents` — past cooling-off, awaiting the transfer job.
+    public let releasingSoon: String
+    /// `in_review_count`.
+    public let inReviewCount: Int
+    /// `releasing_soon_count`.
+    public let releasingSoonCount: Int
+
+    public init(
+        inReview: String,
+        releasingSoon: String,
+        inReviewCount: Int = 0,
+        releasingSoonCount: Int = 0
+    ) {
+        self.inReview = inReview
+        self.releasingSoon = releasingSoon
+        self.inReviewCount = inReviewCount
+        self.releasingSoonCount = releasingSoonCount
+    }
+}
+
 /// Tax-docs row payload. `ready` lights up the home-green icon tile +
 /// `New` chip + "1099-NEC ready" body. Otherwise the row renders the
 /// neutral grey YTD line.
@@ -154,11 +246,26 @@ public struct WalletContent: Equatable, Sendable {
     public let available: String
     public let pending: String
     public let pendingMeta: String
+    /// Split of `pending` into "In review" / "Releasing soon". `nil` when
+    /// nothing is in escrow (or the supplementary call failed) — the
+    /// section is hidden rather than showing two `$0.00` lines, matching
+    /// RN's `total_pending_cents > 0` gate.
+    public let pendingBreakdown: WalletPendingBreakdown?
     public let monthValue: String
     public let monthMeta: String
     public let activity: [WalletActivityItem]
-    public let payoutMethod: WalletPayoutMethod
-    public let taxDocs: WalletTaxDocs
+    /// `nil` until a real payout method is known — the live read path has
+    /// no Stripe payout-method feed yet, and the section is hidden rather
+    /// than filled with fabricated bank details.
+    public let payoutMethod: WalletPayoutMethod?
+    /// The seller's Stripe Connect account, when they have one. Drives the
+    /// "Payout account" card — and with it the "Open Stripe Dashboard"
+    /// action, which is otherwise unreachable. `nil` when no connected
+    /// account exists (the bottom bar's "Set up payouts" covers that case).
+    public let payoutAccount: WalletPayoutAccount?
+    /// `nil` until real tax-document data is known — same rule as
+    /// `payoutMethod`; never show invented YTD earnings.
+    public let taxDocs: WalletTaxDocs?
     /// Populated only in the `.hold` variant.
     public let holdState: WalletHoldState?
     /// Block 3C — whether the seller's Stripe Connect account has payouts
@@ -166,32 +273,73 @@ public struct WalletContent: Equatable, Sendable {
     /// Defaults `true` so the existing fixtures / snapshots render the Withdraw
     /// CTA unchanged; the live path sets it from `GET /connect/account`.
     public let payoutsEnabled: Bool
+    /// Lifetime credited earnings (`Wallet.lifetime_received`), pre-formatted
+    /// as `"$4,120.00"`. RN surfaces this as "Total Earned" beside the balance
+    /// (`WalletTab.tsx:152`). `nil` when the payload omitted the column — the
+    /// section hides rather than claiming `$0.00`.
+    public let lifetimeEarned: String?
+    /// Lifetime withdrawals (`Wallet.lifetime_withdrawals`), pre-formatted.
+    /// RN's "Withdrawn" figure (`WalletTab.tsx:157`).
+    public let lifetimeWithdrawn: String?
+    /// The server's `Wallet.frozen` flag (`GET /api/wallet`). A frozen wallet
+    /// rejects `POST /api/wallet/withdraw` with 403, so the CTA is locked
+    /// rather than left tappable — RN's `canWithdraw` includes `!frozen`
+    /// (`components/payments/WalletTab.tsx:121`).
+    public let frozen: Bool
+    /// `false` when the available balance is zero — RN's `balance > 0` leg of
+    /// `canWithdraw`, which renders the disabled "No funds to withdraw" CTA.
+    public let hasBalance: Bool
+
+    /// `true` when the server sent at least one lifetime total — drives the
+    /// "Lifetime" section's visibility.
+    public var hasLifetimeTotals: Bool {
+        lifetimeEarned != nil || lifetimeWithdrawn != nil
+    }
 
     public var isOnHold: Bool {
         holdState != nil
+    }
+
+    /// RN `canWithdraw = hasWallet && !wallet.frozen && balance > 0`, plus the
+    /// native payouts-enabled gate (the server also requires a verified
+    /// Connect account) and the designed hold frame.
+    public var canWithdraw: Bool {
+        payoutsEnabled && !frozen && hasBalance && !isOnHold
     }
 
     public init(
         available: String,
         pending: String,
         pendingMeta: String,
+        pendingBreakdown: WalletPendingBreakdown? = nil,
         monthValue: String,
         monthMeta: String,
         activity: [WalletActivityItem],
-        payoutMethod: WalletPayoutMethod,
-        taxDocs: WalletTaxDocs,
+        payoutMethod: WalletPayoutMethod? = nil,
+        payoutAccount: WalletPayoutAccount? = nil,
+        taxDocs: WalletTaxDocs? = nil,
         holdState: WalletHoldState? = nil,
-        payoutsEnabled: Bool = true
+        payoutsEnabled: Bool = true,
+        lifetimeEarned: String? = nil,
+        lifetimeWithdrawn: String? = nil,
+        frozen: Bool = false,
+        hasBalance: Bool = true
     ) {
         self.available = available
         self.pending = pending
         self.pendingMeta = pendingMeta
+        self.pendingBreakdown = pendingBreakdown
         self.monthValue = monthValue
         self.monthMeta = monthMeta
         self.activity = activity
         self.payoutMethod = payoutMethod
+        self.payoutAccount = payoutAccount
         self.taxDocs = taxDocs
         self.holdState = holdState
         self.payoutsEnabled = payoutsEnabled
+        self.lifetimeEarned = lifetimeEarned
+        self.lifetimeWithdrawn = lifetimeWithdrawn
+        self.frozen = frozen
+        self.hasBalance = hasBalance
     }
 }

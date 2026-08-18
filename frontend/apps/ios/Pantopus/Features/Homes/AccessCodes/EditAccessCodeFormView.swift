@@ -65,6 +65,7 @@ public struct EditAccessCodeFormView: View {
             }
         )
         .accessibilityIdentifier(EditAccessCodeA11y.screen)
+        .sensitiveScreen()
         .formShakeOnChange(of: viewModel.shakeTrigger)
         .overlay(alignment: .bottom) { toastOverlay }
         .task { await viewModel.load() }

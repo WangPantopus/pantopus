@@ -5,7 +5,7 @@
 //  A14.6 Payments — one row inside a grouped card. Renders the
 //  leading 38×26 brand badge, label, optional sub-label, optional
 //  status chip, and the trailing affordance (chevron / chip-chevron /
-//  CTA chip / gated em-dash). Mirrors the `Row` / `BrandBadge`
+//  CTA chip / gated em-dash "—"). Mirrors the `Row` / `BrandBadge`
 //  primitives in `docs/designs/A14/payments-frames.jsx`.
 //
 
@@ -36,7 +36,7 @@ struct PaymentMethodRow: View {
                     .lineLimit(1)
                 if let subtext, !subtext.isEmpty {
                     Text(subtext)
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .lineLimit(1)
                 }
@@ -73,13 +73,10 @@ struct PaymentMethodRow: View {
             PaymentsChipView(label: label, tone: tone)
                 .accessibilityIdentifier("paymentsRow_\(rowIdentifier)_cta")
         case .gatedDash:
-            HStack(spacing: Spacing.s2) {
-                Icon(.lock, size: 14, strokeWidth: 2, color: Theme.Color.appTextMuted)
-                Text("—")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Color.appTextMuted)
-            }
-            .accessibilityIdentifier("paymentsRow_\(rowIdentifier)_gated")
+            Text("—")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .accessibilityIdentifier("paymentsRow_\(rowIdentifier)_gated")
         }
     }
 }
@@ -197,16 +194,16 @@ struct PaymentsChipView: View {
     VStack(alignment: .leading, spacing: Spacing.s0) {
         PaymentMethodRow(
             brand: .visa,
-            label: "Visa •• 4523",
-            subtext: "Expires 03/24",
+            label: "Visa •• 4421",
+            subtext: "Expires 09/27",
             chip: PaymentMethodChip(label: "Default", tone: .primary),
             trailing: .chevron,
             rowIdentifier: "preview1"
         )
         PaymentMethodRow(
             brand: .mastercard,
-            label: "Mastercard •• 7892",
-            subtext: "Expires 04/25",
+            label: "Mastercard •• 8830",
+            subtext: "Expires 03/26",
             chip: nil,
             trailing: .chevron,
             rowIdentifier: "preview2"
@@ -230,7 +227,7 @@ struct PaymentsChipView: View {
         PaymentMethodRow(
             brand: nil,
             label: "Payout method",
-            subtext: "Available after Stripe connect",
+            subtext: "Add after connecting Stripe",
             chip: nil,
             trailing: .gatedDash,
             rowIdentifier: "preview5"

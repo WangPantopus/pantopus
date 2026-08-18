@@ -28,11 +28,59 @@ public final class MeViewModel {
     /// Transient toast surface.
     public var toastMessage: String?
 
+    /// Monthly Receipt for the completed month (`GET /api/users/me/monthly-receipt`).
+    /// Nil hides the card — RN does the same when the fetch fails.
+    public private(set) var monthlyReceipt: MonthlyReceiptDTO?
+
+    /// Invite / referral progress (`GET /api/users/me/invite-progress`).
+    public private(set) var inviteProgress: InviteProgressDTO?
+
+    /// The user's stable invite code (`GET /api/users/me/invite-code`),
+    /// used to build the share link.
+    public private(set) var inviteCode: String?
+
+    /// Set when the profile was opened from the `monthly_receipt` push —
+    /// the receipt card renders expanded.
+    public private(set) var expandMonthlyReceipt: Bool
+
     private let api: APIClient
+    private let now: @Sendable () -> Date
     private let logger = Logger(label: "app.pantopus.ios.Me")
 
-    init(api: APIClient = .shared) {
+    init(
+        api: APIClient = .shared,
+        expandMonthlyReceipt: Bool = false,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.api = api
+        self.expandMonthlyReceipt = expandMonthlyReceipt
+        self.now = now
+    }
+
+    /// Share text for the receipt card — RN `handleShareReceipt`.
+    public var receiptShareMessage: String? {
+        monthlyReceipt.map(MonthlyReceiptCard.shareMessage)
+    }
+
+    /// Share text for the invite CTA — RN `handleShareInvite`.
+    public var inviteShareMessage: String {
+        let code = inviteCode?.isEmpty == false ? (inviteCode ?? "INVITE") : "INVITE"
+        return "Join me on Pantopus! Use my invite code to get started: "
+            + "https://pantopus.com/join/\(code)"
+    }
+
+    /// The month the receipt covers: the previous calendar month, 1-based —
+    /// mirrors RN `fetchReceipt` (`(tabs)/profile.tsx:102`).
+    static func receiptPeriod(now: Date, calendar: Calendar = .current) -> (year: Int, month: Int) {
+        let components = calendar.dateComponents([.year, .month], from: now)
+        var year = components.year ?? 1970
+        // `month` is 1-based, so subtracting one gives the previous month.
+        var month = (components.month ?? 1) - 1
+        if month == 0 {
+            month = 12
+            year -= 1
+        }
+        return (year, month)
     }
 
     /// First-time load — no-op when we already have content.
@@ -76,6 +124,28 @@ public final class MeViewModel {
         let home = Self.buildHome(homes: homes?.homes ?? [], profileLocality: Self.localityString(profile.user))
         let business = Self.buildBusiness(profile: profile.user)
         state = .loaded(personal: personal, home: home, business: business)
+        await fetchInsights()
+    }
+
+    /// Monthly Receipt + invite progress + invite code. All three degrade to
+    /// a hidden card rather than failing the tab, matching RN's
+    /// `Promise.allSettled` handling in `(tabs)/profile.tsx:117`.
+    private func fetchInsights() async {
+        let period = Self.receiptPeriod(now: now())
+        let receipt: MonthlyReceiptDTO? = await optional {
+            try await self.api.request(
+                ProfileInsightsEndpoints.monthlyReceipt(year: period.year, month: period.month)
+            )
+        }
+        let progress: InviteProgressDTO? = await optional {
+            try await self.api.request(ProfileInsightsEndpoints.inviteProgress())
+        }
+        let code: InviteCodeDTO? = await optional {
+            try await self.api.request(ProfileInsightsEndpoints.inviteCode())
+        }
+        monthlyReceipt = receipt
+        inviteProgress = progress
+        inviteCode = code?.inviteCode
     }
 
     private func optional<T: Sendable>(_ operation: @Sendable () async throws -> T) async -> T? {

@@ -9,6 +9,8 @@
 //  key off `persona.id` per the backend routes.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 @Observable
@@ -25,6 +27,15 @@ public final class FollowingViewModel {
 
     /// Transient confirmation / error banner.
     public var toast: ToastMessage?
+
+    /// True while the long-press multi-select mode is active.
+    public private(set) var isSelecting = false
+
+    /// Membership ids currently ticked in multi-select mode.
+    public private(set) var selectedRowIDs: Set<String> = []
+
+    /// Bound to the view's bulk-unfollow `confirmationDialog`.
+    public var pendingBulkUnfollow: FollowingBulkUnfollowRequest?
 
     // MARK: - Dependencies
 
@@ -203,6 +214,192 @@ public final class FollowingViewModel {
         }
     }
 
+    // MARK: - Notification level (inline bell)
+
+    /// Cycle the row's bell All → Highlights → Off → All. Optimistic; rolls
+    /// the level back and toasts on failure, exactly like RN's
+    /// `handleBellCycle` (`pantopus/frontend/apps/mobile/src/app/beacons/following.tsx:121`).
+    public func cycleNotificationLevel(_ row: FollowingRow) async {
+        guard !row.isPaused else { return }
+        guard let index = items.firstIndex(where: { $0.membershipId == row.id }) else { return }
+        let previous = items[index].notificationLevel
+        let next = row.notificationLevel.next
+        items[index] = items[index].notificationLevelCopy(next.rawValue)
+        rebuild()
+        do {
+            let response = try await api.request(
+                FollowingEndpoints.notificationLevel(personaId: row.personaId, level: next.rawValue),
+                as: FollowPreferencesResponse.self
+            )
+            // Reconcile with the server's authoritative value.
+            if let idx = items.firstIndex(where: { $0.membershipId == row.id }),
+               let serverLevel = response.notificationLevel {
+                items[idx] = items[idx].notificationLevelCopy(serverLevel)
+                rebuild()
+            }
+            toast = ToastMessage(text: "Notifications: \(next.toastLabel)", kind: .success)
+        } catch {
+            if let idx = items.firstIndex(where: { $0.membershipId == row.id }) {
+                items[idx] = items[idx].notificationLevelCopy(previous)
+                rebuild()
+            }
+            toast = ToastMessage(text: "Couldn't change notifications.", kind: .error)
+        }
+    }
+
+    /// Set an explicit level from the action sheet's segmented control.
+    public func setNotificationLevel(
+        _ target: FollowingActionTarget,
+        level: FollowingNotificationLevel
+    ) async {
+        guard let index = items.firstIndex(where: { $0.membershipId == target.id }) else { return }
+        let previous = items[index].notificationLevel
+        items[index] = items[index].notificationLevelCopy(level.rawValue)
+        actionTarget?.notificationLevel = level
+        rebuild()
+        do {
+            _ = try await api.request(
+                FollowingEndpoints.notificationLevel(personaId: target.personaId, level: level.rawValue),
+                as: FollowPreferencesResponse.self
+            )
+            toast = ToastMessage(text: "Notifications: \(level.toastLabel)", kind: .success)
+        } catch {
+            if let idx = items.firstIndex(where: { $0.membershipId == target.id }) {
+                items[idx] = items[idx].notificationLevelCopy(previous)
+                rebuild()
+            }
+            actionTarget?.notificationLevel = FollowingNotificationLevel.from(previous)
+            toast = ToastMessage(text: "Couldn't change notifications.", kind: .error)
+        }
+    }
+
+    // MARK: - Multi-select + bulk unfollow
+
+    /// Long-press a row: enter select mode with that row ticked.
+    public func beginSelection(_ row: FollowingRow) {
+        isSelecting = true
+        selectedRowIDs = [row.id]
+    }
+
+    /// Tap a row while selecting: toggle its tick.
+    public func toggleSelection(_ row: FollowingRow) {
+        if selectedRowIDs.contains(row.id) {
+            selectedRowIDs.remove(row.id)
+        } else {
+            selectedRowIDs.insert(row.id)
+        }
+    }
+
+    public func isSelected(_ row: FollowingRow) -> Bool {
+        selectedRowIDs.contains(row.id)
+    }
+
+    /// Cancel — leaves the rows untouched.
+    public func exitSelection() {
+        isSelecting = false
+        selectedRowIDs = []
+    }
+
+    /// Build the confirm-dialog payload for the current selection. Paid
+    /// memberships are counted separately and skipped, matching RN.
+    public func requestBulkUnfollow() {
+        let selected = items.filter { selectedRowIDs.contains($0.membershipId) }
+        guard !selected.isEmpty else { return }
+        let unfollowable = selected.filter { ($0.paidTier?.rank ?? 0) <= 1 }
+        guard !unfollowable.isEmpty else {
+            toast = ToastMessage(
+                text: "Paid memberships are managed in Audience.",
+                kind: .error
+            )
+            return
+        }
+        pendingBulkUnfollow = FollowingBulkUnfollowRequest(
+            membershipIDs: unfollowable.map(\.membershipId),
+            personaIDs: unfollowable.map(\.persona.id),
+            skippedPaidCount: selected.count - unfollowable.count
+        )
+    }
+
+    public func cancelBulkUnfollow() {
+        pendingBulkUnfollow = nil
+    }
+
+    /// Fan out `DELETE /api/personas/:id/follow` over the selection. There is
+    /// no bulk route server-side — RN's `unfollowMany`
+    /// (`pantopus/frontend/packages/api/src/endpoints/personas.ts:286`) fans
+    /// out the same way and buckets the results into
+    /// succeeded / skippedPaid / failed.
+    public func confirmBulkUnfollow(_ request: FollowingBulkUnfollowRequest) async {
+        pendingBulkUnfollow = nil
+        let previous = items
+        let previousCounts = counts
+        let removing = Set(request.membershipIDs)
+        items.removeAll { removing.contains($0.membershipId) }
+        counts = FollowingCountsDTO(
+            totalFollowing: max(0, counts.totalFollowing - removing.count),
+            unreadBeacons: counts.unreadBeacons
+        )
+        exitSelection()
+        rebuild()
+
+        var succeeded = 0
+        var skippedPaid = 0
+        var failed: [String] = []
+        for (index, personaId) in request.personaIDs.enumerated() {
+            do {
+                _ = try await api.request(FollowingEndpoints.unfollow(personaId: personaId))
+                succeeded += 1
+            } catch {
+                if Self.isPaidMembershipConflict(error) {
+                    skippedPaid += 1
+                } else {
+                    failed.append(request.membershipIDs[index])
+                }
+            }
+        }
+
+        if !failed.isEmpty {
+            // Restore only the rows the server refused.
+            let restore = Set(failed)
+            let restored = previous.filter { restore.contains($0.membershipId) }
+            items.append(contentsOf: restored)
+            counts = FollowingCountsDTO(
+                totalFollowing: min(previousCounts.totalFollowing, counts.totalFollowing + restored.count),
+                unreadBeacons: counts.unreadBeacons
+            )
+            rebuild()
+        }
+
+        if !failed.isEmpty {
+            toast = ToastMessage(text: "\(failed.count) couldn't be unfollowed.", kind: .error)
+        } else if skippedPaid > 0 {
+            toast = ToastMessage(
+                text: "\(skippedPaid) paid membership\(skippedPaid == 1 ? "" : "s") skipped.",
+                kind: .neutral
+            )
+        } else if succeeded > 0 {
+            toast = ToastMessage(
+                text: "Unfollowed \(succeeded) Beacon\(succeeded == 1 ? "" : "s").",
+                kind: .success
+            )
+        }
+        // Re-sync from the server to settle any partial state.
+        await fetch()
+    }
+
+    /// The backend answers a paid membership with 409 +
+    /// `code: paid_membership_managed_by_subscription`
+    /// (`backend/routes/personas.js:1190`). The client maps 4xx onto
+    /// `.clientError(status:message:)`, so match on the status.
+    private static func isPaidMembershipConflict(_ error: Error) -> Bool {
+        guard let apiError = error as? APIError else { return false }
+        if case let .clientError(status, message) = apiError {
+            if status == 409 { return true }
+            return (message ?? "").lowercased().contains("paid membership")
+        }
+        return false
+    }
+
     // MARK: - Time helpers
 
     private func isoNow(offsetDays: Int = 0) -> String {
@@ -234,6 +431,21 @@ extension FollowingRowDTO {
             unreadCount: 0,
             followedAt: followedAt,
             lastSeenAt: iso
+        )
+    }
+
+    func notificationLevelCopy(_ level: String?) -> FollowingRowDTO {
+        FollowingRowDTO(
+            membershipId: membershipId,
+            persona: persona,
+            fanHandle: fanHandle,
+            notificationLevel: level,
+            mutedUntil: mutedUntil,
+            paidTier: paidTier,
+            latestPost: latestPost,
+            unreadCount: unreadCount,
+            followedAt: followedAt,
+            lastSeenAt: lastSeenAt
         )
     }
 

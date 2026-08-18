@@ -8,6 +8,7 @@ import app.pantopus.android.data.api.models.transaction_reviews.TransactionRevie
 import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewerDto
 import app.pantopus.android.data.api.models.transaction_reviews.TransactionReviewsResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.transaction_reviews.TransactionReviewsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,7 +107,7 @@ class ReceivedReviewsViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedOnce) {
-                            _state.value = ReceivedReviewsUiState.Error(result.error.message)
+                            _state.value = ReceivedReviewsUiState.Error(result.error.displayMessage("Couldn't load reviews."))
                         }
                     }
                 }

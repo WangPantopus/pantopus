@@ -41,18 +41,39 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
+        <!-- singleTask: the browser OAuth redirect (pantopus://auth/callback)
+             must return to the RUNNING instance via onNewIntent instead of
+             stacking a second MainActivity and rebuilding the Compose tree.
+             It also re-fronts the app over Custom Tabs once the redirect
+             lands, which is what dismisses the browser after sign-in. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.Pantopus">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep links: https://pantopus.app/... -->
+            <!-- Deep links: https://pantopus.com/... — the product domain. It is
+                 what the backend and both clients build share and invite links
+                 on, and the only host that serves .well-known/assetlinks.json. -->
             <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="pantopus.com" />
+                <data android:scheme="https" android:host="www.pantopus.com" />
+            </intent-filter>
+
+            <!-- pantopus.app links already in circulation still open the app,
+                 but deliberately WITHOUT autoVerify: minSdk is 26, and below
+                 API 31 verification is all-or-nothing across every autoVerify'd
+                 host, so an unserved assetlinks.json on .app would silently
+                 break verification for .com too. -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -60,7 +81,12 @@
                 <data android:scheme="https" android:host="www.pantopus.app" />
             </intent-filter>
 
-            <!-- Custom scheme: pantopus://... -->
+            <!-- Custom scheme: pantopus://... — including the browser OAuth
+                 callback pantopus://auth/callback, which MainActivity hands
+                 to OAuthSessionStore before the deep-link router sees it
+                 (mirrors iOS PantopusApp's isOAuthCallback guard). A second
+                 activity with a scheme+host+path filter would collide with
+                 this one and pop a disambiguation chooser. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

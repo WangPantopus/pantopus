@@ -3,7 +3,9 @@
 package app.pantopus.android.ui.screens.homes.members
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +31,12 @@ const val MEMBERS_LIST_TAG = "membersList"
  * [ListOfRowsScreen]; the VM supplies the rows + chrome and emits a
  * [MembersListEvent] when a row action needs the screen to present a
  * sheet or confirm dialog.
+ *
+ * Reaches `GET /api/homes/:id/occupants`, `GET /api/homes/:id/me`,
+ * `GET /api/homes/:id/household-access-requests`,
+ * `POST /api/homes/:id/invite`, `POST …/members/:userId/role`,
+ * `POST …/household-access-requests/:requestId/(approve|reject)`, and
+ * `DELETE …/members/:userId`.
  */
 @Composable
 fun MembersListScreen(
@@ -40,9 +48,14 @@ fun MembersListScreen(
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
+    val actionError by viewModel.actionError.collectAsStateWithLifecycle()
 
     var inviting by remember { mutableStateOf(false) }
     var removeTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var actionsTarget by remember { mutableStateOf<MemberActionTarget?>(null) }
+    var roleTarget by remember { mutableStateOf<MemberActionTarget?>(null) }
+    var approveTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var declineTarget by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.load()
@@ -60,8 +73,20 @@ fun MembersListScreen(
                 onAddGuest()
                 viewModel.acknowledgeEvent()
             }
+            is MembersListEvent.OpenMemberActions -> {
+                actionsTarget = event.target
+                viewModel.acknowledgeEvent()
+            }
             is MembersListEvent.ConfirmRemove -> {
                 removeTarget = event.userId to event.name
+                viewModel.acknowledgeEvent()
+            }
+            is MembersListEvent.ConfirmApproveRequest -> {
+                approveTarget = event.requestId to event.name
+                viewModel.acknowledgeEvent()
+            }
+            is MembersListEvent.ConfirmDeclineRequest -> {
+                declineTarget = Triple(event.requestId, event.name, event.identity)
                 viewModel.acknowledgeEvent()
             }
         }
@@ -91,6 +116,32 @@ fun MembersListScreen(
         )
     }
 
+    actionsTarget?.let { target ->
+        MemberActionsDialog(
+            target = target,
+            onChangeRole = {
+                actionsTarget = null
+                roleTarget = target
+            },
+            onRemove = {
+                actionsTarget = null
+                removeTarget = target.userId to target.name
+            },
+            onDismiss = { actionsTarget = null },
+        )
+    }
+
+    roleTarget?.let { target ->
+        ChangeMemberRoleDialog(
+            target = target,
+            onPick = { role ->
+                roleTarget = null
+                viewModel.changeRole(target.userId, role)
+            },
+            onDismiss = { roleTarget = null },
+        )
+    }
+
     removeTarget?.let { (userId, name) ->
         AlertDialog(
             onDismissRequest = { removeTarget = null },
@@ -110,4 +161,124 @@ fun MembersListScreen(
             },
         )
     }
+
+    approveTarget?.let { (requestId, _) ->
+        AlertDialog(
+            onDismissRequest = { approveTarget = null },
+            title = { Text("Send invitation") },
+            text = { Text("This will create a personal invitation for them to accept in the app.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.approveAccessRequest(requestId)
+                        approveTarget = null
+                    },
+                    modifier = Modifier.testTag("membersList_approveRequestConfirm"),
+                ) { Text("Approve") }
+            },
+            dismissButton = {
+                TextButton(onClick = { approveTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    declineTarget?.let { (requestId, name, identity) ->
+        AlertDialog(
+            onDismissRequest = { declineTarget = null },
+            title = { Text("Decline request") },
+            text = { Text("Decline $name’s request to join as $identity?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.rejectAccessRequest(requestId)
+                        declineTarget = null
+                    },
+                    modifier = Modifier.testTag("membersList_declineRequestConfirm"),
+                ) { Text("Decline") }
+            },
+            dismissButton = {
+                TextButton(onClick = { declineTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearActionError() },
+            title = { Text("Something went wrong") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearActionError() }) { Text("OK") }
+            },
+        )
+    }
+}
+
+/**
+ * Row kebab → what the viewer may do to this member. Only the entries
+ * the backend would accept are rendered (see [HomeRoleAssignment]).
+ */
+@Composable
+private fun MemberActionsDialog(
+    target: MemberActionTarget,
+    onChangeRole: () -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(target.name) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (target.assignableRoles.isNotEmpty()) {
+                    TextButton(
+                        onClick = onChangeRole,
+                        modifier = Modifier.fillMaxWidth().testTag("membersList_changeRole"),
+                    ) { Text("Change role") }
+                }
+                if (target.canRemove) {
+                    TextButton(
+                        onClick = onRemove,
+                        modifier = Modifier.fillMaxWidth().testTag("membersList_removeAction"),
+                    ) { Text("Remove from home") }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+/**
+ * Action sheet of assignable roles. The list is already filtered to what
+ * `POST /api/homes/:id/members/:userId/role` will accept for this actor
+ * / target pair, so every entry is actionable.
+ */
+@Composable
+private fun ChangeMemberRoleDialog(
+    target: MemberActionTarget,
+    onPick: (HomeAssignableRole) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change role: ${target.name}") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("Current role: ${MemberRole.parse(target.currentRole).label}")
+                target.assignableRoles.forEach { role ->
+                    TextButton(
+                        onClick = { onPick(role) },
+                        modifier = Modifier.fillMaxWidth().testTag("membersList_role_${role.wire}"),
+                    ) { Text(role.label) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }

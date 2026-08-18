@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
@@ -355,7 +356,7 @@ class TasksMapViewModel
                     recompute()
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = TasksMapUiState.Error(result.error.message)
+                    _state.value = TasksMapUiState.Error(result.error.displayMessage("Couldn't load the map."))
                 }
             }
         }

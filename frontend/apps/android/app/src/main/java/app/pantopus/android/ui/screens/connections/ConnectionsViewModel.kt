@@ -1,22 +1,27 @@
 @file:Suppress(
-    "MagicNumber",
-    "LongMethod",
-    "PackageNaming",
-    "TooManyFunctions",
+    "ComplexCondition",
     "ComplexMethod",
     "CyclomaticComplexMethod",
+    "LongMethod",
     "LongParameterList",
+    "MagicNumber",
+    "PackageNaming",
+    "TooManyFunctions",
 )
 
 package app.pantopus.android.ui.screens.connections
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.connections.BlockedRelationshipDto
+import app.pantopus.android.data.api.models.connections.SentRequestDto
 import app.pantopus.android.data.api.models.relationships.PendingRequestDto
 import app.pantopus.android.data.api.models.relationships.RelationshipDto
 import app.pantopus.android.data.api.models.relationships.RelationshipUserDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.connections.ConnectionsRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
+import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBackground
 import app.pantopus.android.ui.screens.shared.list_of_rows.AvatarBadgeSize
 import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
@@ -25,8 +30,10 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.GradientPair
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowDestructiveAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowPillTone
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
@@ -53,7 +60,22 @@ object ConnectionsTab {
     const val ALL = "all"
     const val NEIGHBORS = "neighbors"
     const val PENDING = "pending"
+
+    /** S5 — outbound requests awaiting a decision. RN `connections.tsx:19`. */
+    const val SENT = "sent"
+
+    /** S5 — people the viewer has blocked. RN `connections.tsx:20`. */
+    const val BLOCKED = "blocked"
 }
+
+/**
+ * Pending "remove this connection?" confirmation. Names the person so the
+ * dialog copy can't be mistaken for a generic destructive prompt.
+ */
+data class ConnectionRemovalRequest(
+    val id: String,
+    val displayName: String,
+)
 
 /**
  * Routing payload emitted by the Connections row's message-CTA. The host
@@ -111,22 +133,34 @@ enum class ConnectionAvatarTone {
  * mapping, same optimistic accept / reject pattern with rollback on
  * failure.
  *
- * Two GETs fire in parallel on initial load (`/api/relationships` +
- * `/api/relationships/requests/pending`); subsequent tab switches
- * segment over the cached payload.
+ * S5 (RN parity, `src/app/connections.tsx:16-21,70-82,126-148`) adds the
+ * Sent + Blocked tabs and the per-row Remove (disconnect, confirmed) and
+ * Unblock actions. Four GETs fire in parallel on initial load
+ * (`/api/relationships`, `…/requests/pending`, `…/requests/sent`,
+ * `…/blocked`); subsequent tab switches segment over the cached payload.
  */
 @HiltViewModel
 class ConnectionsViewModel
     @Inject
     constructor(
         private val repo: RelationshipsRepository,
+        // S5 — Sent / Blocked / disconnect / unblock live in their own
+        // repository so this feature doesn't contend with the trust-graph
+        // half of `/api/relationships`.
+        private val connectionsRepo: ConnectionsRepository,
     ) : ViewModel() {
         private var accepted: List<RelationshipDto> = emptyList()
         private var pending: List<PendingRequestDto> = emptyList()
+        private var sent: List<SentRequestDto> = emptyList()
+        private var blocked: List<BlockedRelationshipDto> = emptyList()
         private var loadedOnce: Boolean = false
 
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
+
+        /** Row awaiting disconnect confirmation. Null = no dialog. */
+        private val _pendingRemoval = MutableStateFlow<ConnectionRemovalRequest?>(null)
+        val pendingRemoval: StateFlow<ConnectionRemovalRequest?> = _pendingRemoval.asStateFlow()
 
         private val _selectedTab = MutableStateFlow(ConnectionsTab.ALL)
         val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
@@ -242,14 +276,85 @@ class ConnectionsViewModel
             }
         }
 
+        // ─── Remove (disconnect) / Unblock ─────────────────────────
+
+        /**
+         * Ask for confirmation before disconnecting. The screen renders an
+         * `AlertDialog` off [pendingRemoval]; RN shows the same
+         * Cancel / Remove alert (`src/app/connections.tsx:70-77`).
+         */
+        fun requestRemoval(relationshipId: String) {
+            val rel = accepted.firstOrNull { it.id == relationshipId } ?: return
+            _pendingRemoval.value =
+                ConnectionRemovalRequest(
+                    id = relationshipId,
+                    displayName = displayNameFor(rel.otherUser) ?: "this connection",
+                )
+        }
+
+        /** Dismiss the confirmation without disconnecting. */
+        fun cancelRemoval() {
+            _pendingRemoval.value = null
+        }
+
+        /** Run the confirmed disconnect. */
+        fun confirmRemoval() {
+            val request = _pendingRemoval.value ?: return
+            _pendingRemoval.value = null
+            disconnect(request.id)
+        }
+
+        /**
+         * `DELETE /api/relationships/:id`. Optimistic — the row disappears
+         * immediately and is restored if the call fails.
+         */
+        fun disconnect(relationshipId: String) {
+            val previous = accepted
+            accepted = accepted.filterNot { it.id == relationshipId }
+            applyState()
+            viewModelScope.launch {
+                when (connectionsRepo.disconnect(relationshipId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        accepted = previous
+                        applyState()
+                    }
+                }
+            }
+        }
+
+        /**
+         * `POST /api/relationships/:id/unblock`. Optimistic — the row leaves
+         * the Blocked tab and is restored if the call fails. The backend
+         * deletes the row outright, so nothing moves into Connections.
+         */
+        fun unblock(relationshipId: String) {
+            val previous = blocked
+            blocked = blocked.filterNot { it.id == relationshipId }
+            applyState()
+            viewModelScope.launch {
+                when (connectionsRepo.unblock(relationshipId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        blocked = previous
+                        applyState()
+                    }
+                }
+            }
+        }
+
         private fun reload() {
             _state.value = ListOfRowsUiState.Loading
             viewModelScope.launch {
                 val acceptedDeferred = async { fetchAccepted() }
                 val pendingDeferred = async { fetchPending() }
+                val sentDeferred = async { fetchSent() }
+                val blockedDeferred = async { fetchBlocked() }
                 val acceptedOk = acceptedDeferred.await()
                 val pendingOk = pendingDeferred.await()
-                if (!acceptedOk && !pendingOk) {
+                val sentOk = sentDeferred.await()
+                val blockedOk = blockedDeferred.await()
+                if (!acceptedOk && !pendingOk && !sentOk && !blockedOk) {
                     _state.value =
                         ListOfRowsUiState.Error("Couldn't load your connections. Try again.")
                     return@launch
@@ -258,6 +363,24 @@ class ConnectionsViewModel
                 applyState()
             }
         }
+
+        private suspend fun fetchSent(): Boolean =
+            when (val result = connectionsRepo.sentRequests()) {
+                is NetworkResult.Success -> {
+                    sent = result.data.requests
+                    true
+                }
+                is NetworkResult.Failure -> false
+            }
+
+        private suspend fun fetchBlocked(): Boolean =
+            when (val result = connectionsRepo.blocked()) {
+                is NetworkResult.Success -> {
+                    blocked = result.data.blocked
+                    true
+                }
+                is NetworkResult.Failure -> false
+            }
 
         private suspend fun fetchAccepted(): Boolean =
             when (val result = repo.list(status = "accepted")) {
@@ -284,6 +407,8 @@ class ConnectionsViewModel
             val rows: List<RowModel> =
                 when (_selectedTab.value) {
                     ConnectionsTab.PENDING -> filteredPending().map { rowForPending(it, now, zone) }
+                    ConnectionsTab.SENT -> filteredSent().map { rowForSent(it, now, zone) }
+                    ConnectionsTab.BLOCKED -> filteredBlocked().map { rowForBlocked(it, now, zone) }
                     ConnectionsTab.NEIGHBORS -> filteredNeighbors().map { rowForAccepted(it, now, zone) }
                     else -> filteredAccepted().map { rowForAccepted(it, now, zone) }
                 }
@@ -304,6 +429,8 @@ class ConnectionsViewModel
                     count = filteredNeighbors().size,
                 ),
                 ListOfRowsTab(id = ConnectionsTab.PENDING, label = "Pending", count = filteredPending().size),
+                ListOfRowsTab(id = ConnectionsTab.SENT, label = "Sent", count = filteredSent().size),
+                ListOfRowsTab(id = ConnectionsTab.BLOCKED, label = "Blocked", count = filteredBlocked().size),
             )
 
         private fun makeTopBarAction(handler: () -> Unit): TopBarAction =
@@ -336,6 +463,20 @@ class ConnectionsViewModel
                         headline = "No pending requests",
                         subcopy = "When someone sends you a connection request, it'll show up here.",
                     )
+                ConnectionsTab.SENT ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.Send,
+                        headline = "No sent requests",
+                        subcopy = "Requests you send will appear here until accepted or declined.",
+                    )
+                ConnectionsTab.BLOCKED ->
+                    ListOfRowsUiState.Empty(
+                        icon = PantopusIcon.Ban,
+                        headline = "No blocked users",
+                        subcopy = "People you block stop seeing your posts and can't message you.",
+                        tint = PantopusColors.appSurfaceSunken,
+                        accent = PantopusColors.appTextSecondary,
+                    )
                 ConnectionsTab.NEIGHBORS ->
                     ListOfRowsUiState.Empty(
                         icon = PantopusIcon.MapPin,
@@ -366,6 +507,10 @@ class ConnectionsViewModel
         }
 
         private fun filteredPending(): List<PendingRequestDto> = applySearch(pending) { it.requester.searchableText() }
+
+        private fun filteredSent(): List<SentRequestDto> = applySearch(sent) { it.addressee.searchableText() }
+
+        private fun filteredBlocked(): List<BlockedRelationshipDto> = applySearch(blocked) { it.blockedUser.searchableText() }
 
         private fun <T> applySearch(
             items: List<T>,
@@ -420,6 +565,90 @@ class ConnectionsViewModel
                 body = "Connected $timeFragment",
                 subtitleIcon = if (locality != null) PantopusIcon.MapPin else null,
                 bodyIcon = PantopusIcon.UserPlus,
+                destructiveAction =
+                    RowDestructiveAction(
+                        label = "Remove",
+                        testTag = "connections.row.${rel.id}.remove",
+                        onClick = { requestRemoval(rel.id) },
+                    ),
+            )
+        }
+
+        /**
+         * Outbound request row — no actions, just the "Pending" status the
+         * RN screen shows (`src/app/connections.tsx:141-143`).
+         */
+        internal fun rowForSent(
+            request: SentRequestDto,
+            now: Instant,
+            zone: ZoneId,
+        ): RowModel {
+            val user = request.addressee
+            val displayName = displayNameFor(user) ?: "Member"
+            val timeFragment = formatRelativeTime(request.createdAt, now, zone) ?: "just now"
+            val locality = localityText(user)
+            return RowModel(
+                id = request.id,
+                title = displayName,
+                subtitle = locality,
+                template = RowTemplate.StatusChip,
+                leading =
+                    RowLeading.AvatarWithBadge(
+                        name = displayName,
+                        imageUrl = user?.profilePictureUrl,
+                        background =
+                            AvatarBackground.Gradient(
+                                ConnectionAvatarTone.toneFor(user?.id ?: request.id).gradient,
+                            ),
+                        size = AvatarBadgeSize.Large,
+                        verified = false,
+                    ),
+                trailing = RowTrailing.Status(text = "Pending", variant = StatusChipVariant.Warning),
+                body = "Sent $timeFragment",
+                subtitleIcon = if (locality != null) PantopusIcon.MapPin else null,
+                bodyIcon = PantopusIcon.Clock,
+            )
+        }
+
+        /**
+         * Blocked row — trailing neutral "Unblock" pill, matching the A14.4
+         * blocked-users treatment the shell already ships.
+         */
+        internal fun rowForBlocked(
+            rel: BlockedRelationshipDto,
+            now: Instant,
+            zone: ZoneId,
+        ): RowModel {
+            val user = rel.blockedUser
+            val displayName = displayNameFor(user) ?: "Member"
+            val timeFragment = formatRelativeTime(rel.respondedAt ?: rel.createdAt, now, zone) ?: "recently"
+            val locality = localityText(user)
+            return RowModel(
+                id = rel.id,
+                title = displayName,
+                subtitle = locality,
+                template = RowTemplate.StatusChip,
+                leading =
+                    RowLeading.AvatarWithBadge(
+                        name = displayName,
+                        imageUrl = user?.profilePictureUrl,
+                        background =
+                            AvatarBackground.Gradient(
+                                ConnectionAvatarTone.toneFor(user?.id ?: rel.id).gradient,
+                            ),
+                        size = AvatarBadgeSize.Large,
+                        verified = false,
+                    ),
+                trailing =
+                    RowTrailing.PillButton(
+                        label = "Unblock",
+                        tone = RowPillTone.Neutral,
+                        onClick = { unblock(rel.id) },
+                    ),
+                body = "Blocked $timeFragment",
+                subtitleIcon = if (locality != null) PantopusIcon.MapPin else null,
+                bodyIcon = PantopusIcon.Ban,
+                note = rel.blockReason?.takeIf { it.isNotEmpty() },
             )
         }
 

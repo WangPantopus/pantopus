@@ -4,6 +4,9 @@ package app.pantopus.android.ui.screens.support_trains.manage
 
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainFundDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainOrganizersResponse
+import app.pantopus.android.data.api.models.support_trains.SupportTrainReservationsResponse
 import app.pantopus.android.data.api.models.support_trains.SupportTrainSlotDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
@@ -41,6 +44,10 @@ class ManageTrainViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         coEvery { repo.postUpdate(any(), any()) } returns NetworkResult.Success(Unit)
         coEvery { repo.complete(any()) } returns NetworkResult.Success(Unit)
+        // S1 — `load()` now fans out to the organizer-only feeds as well.
+        coEvery { repo.reservations(any()) } returns NetworkResult.Success(SupportTrainReservationsResponse())
+        coEvery { repo.organizers(any()) } returns NetworkResult.Success(SupportTrainOrganizersResponse())
+        coEvery { repo.fund(any()) } returns NetworkResult.Success(SupportTrainFundDto())
     }
 
     @After

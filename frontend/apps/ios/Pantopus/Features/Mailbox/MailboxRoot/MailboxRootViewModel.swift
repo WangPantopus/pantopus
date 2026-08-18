@@ -1,3 +1,5 @@
+// swiftlint:disable file_length type_body_length
+
 import Observation
 import SwiftUI
 
@@ -110,19 +112,34 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         }
     }
 
-    /// Scan-line FAB (JSX `MailboxScreen` FAB). Wired to the Mailbox map
-    /// so the physical-venue surface stays reachable now that the drawers
-    /// root (which hosted the map top-bar action) is gone. Hidden on the
-    /// empty state, mirroring the design's `mode !== 'empty'` guard.
+    /// Compose FAB — the canonical create action of the Mailbox, opening
+    /// the four-moment Ceremonial Mail wizard (Porch Call → Address It →
+    /// Write It → Seal & Send). Mirrors RN's compose FAB
+    /// (`src/app/mailbox/index.tsx:300-307`).
+    ///
+    /// Shown in **every** state, including empty: an empty mailbox is
+    /// exactly when a user wants to write. The design's
+    /// `mode !== 'empty'` guard applied to the old scan-line FAB, which
+    /// now lives in the top-bar overflow menu ("Find a mailbox") so the
+    /// map surface stays reachable.
     public var fab: FABAction? {
-        if case .empty = state { return nil }
-        return FABAction(
-            icon: .scanLine,
-            accessibilityLabel: "Find a mailbox",
+        FABAction(
+            icon: .pencil,
+            accessibilityLabel: "Write a letter",
             variant: .canonicalCreate
         ) { [weak self] in
-            Task { @MainActor in self?.onOpenMap() }
+            Task { @MainActor in self?.onOpenCompose() }
         }
+    }
+
+    /// Count of mail sitting in `MailRoutingQueue` unresolved — drives the
+    /// "N items need routing" banner. `0` hides the banner.
+    /// Source: `GET /api/mailbox/v2/pending` (`backend/routes/mailboxV2.js:612`).
+    public private(set) var pendingRoutingCount: Int = 0
+
+    /// Banner copy — RN `src/app/mailbox/index.tsx:183-185`.
+    public var pendingRoutingLabel: String {
+        "\(pendingRoutingCount) item\(pendingRoutingCount == 1 ? "" : "s") need routing"
     }
 
     // MARK: - Header inputs
@@ -191,6 +208,20 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// A17.14 — overflow-menu "Scan an item" entry. The scan/add affordance
     /// that opens the Unboxing scan-capture flow.
     private let onOpenUnboxingHandler: @MainActor () -> Void
+    /// A17.4 — overflow-menu entry for the Community mail feed.
+    private let onOpenCommunityHandler: @MainActor () -> Void
+    /// Home Records — overflow-menu entry for the linked-asset hub.
+    private let onOpenRecordsHandler: @MainActor () -> Void
+    /// A17.12 — overflow-menu "Mail tasks" entry. Opens the mail-linked
+    /// task list (`GET /api/mailbox/v2/p3/tasks`).
+    private let onOpenMailTasksHandler: @MainActor () -> Void
+    /// Compose FAB — opens the Ceremonial Mail wizard.
+    private let onOpenCompose: @MainActor () -> Void
+    /// "N items need routing" banner — opens the disambiguation queue.
+    private let onOpenRoutingQueueHandler: @MainActor () -> Void
+    /// Overflow-menu "Mail party" entry. Opens the Family Mail Party
+    /// surface (`GET /api/mailbox/v2/p2/party/active` and friends).
+    private let onOpenMailPartyHandler: @MainActor () -> Void
     /// Preview/test seam. Non-nil → sample mode: the screen projects this
     /// fixture and never touches the network. Nil → live mode (production).
     private let sampleProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])?
@@ -227,6 +258,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         onOpenStamps: @escaping @MainActor () -> Void = {},
         onOpenUnboxing: @escaping @MainActor () -> Void = {},
+        onOpenCompose: @escaping @MainActor () -> Void = {},
+        onOpenRoutingQueue: @escaping @MainActor () -> Void = {},
+        onOpenMailParty: @escaping @MainActor () -> Void = {},
+        onOpenCommunity: @escaping @MainActor () -> Void = {},
+        onOpenRecords: @escaping @MainActor () -> Void = {},
+        onOpenMailTasks: @escaping @MainActor () -> Void = {},
         dataProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])? = nil,
         seededState: ListOfRowsState? = nil
     ) {
@@ -242,6 +279,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
             onOpenVacationHold: onOpenVacationHold,
             onOpenStamps: onOpenStamps,
             onOpenUnboxing: onOpenUnboxing,
+            onOpenCompose: onOpenCompose,
+            onOpenRoutingQueue: onOpenRoutingQueue,
+            onOpenMailParty: onOpenMailParty,
+            onOpenCommunity: onOpenCommunity,
+            onOpenRecords: onOpenRecords,
+            onOpenMailTasks: onOpenMailTasks,
             dataProvider: dataProvider,
             seededState: seededState
         )
@@ -261,6 +304,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenVacationHold: @escaping @MainActor () -> Void = {},
         onOpenStamps: @escaping @MainActor () -> Void = {},
         onOpenUnboxing: @escaping @MainActor () -> Void = {},
+        onOpenCompose: @escaping @MainActor () -> Void = {},
+        onOpenRoutingQueue: @escaping @MainActor () -> Void = {},
+        onOpenMailParty: @escaping @MainActor () -> Void = {},
+        onOpenCommunity: @escaping @MainActor () -> Void = {},
+        onOpenRecords: @escaping @MainActor () -> Void = {},
+        onOpenMailTasks: @escaping @MainActor () -> Void = {},
         dataProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])? = nil,
         seededState: ListOfRowsState? = nil
     ) {
@@ -275,6 +324,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenVacationHoldHandler = onOpenVacationHold
         onOpenStampsHandler = onOpenStamps
         onOpenUnboxingHandler = onOpenUnboxing
+        self.onOpenCompose = onOpenCompose
+        onOpenRoutingQueueHandler = onOpenRoutingQueue
+        onOpenMailPartyHandler = onOpenMailParty
+        onOpenCommunityHandler = onOpenCommunity
+        onOpenRecordsHandler = onOpenRecords
+        onOpenMailTasksHandler = onOpenMailTasks
         sampleProvider = dataProvider
         self.seededState = seededState
     }
@@ -298,6 +353,42 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenUnboxingHandler()
     }
 
+    /// Invoked from `MailboxRootView`'s overflow menu "Find a mailbox"
+    /// entry. The Mailbox map moved off the FAB when the compose FAB
+    /// landed; it stays reachable here.
+    public func openMap() {
+        onOpenMap()
+    }
+
+    /// Invoked from the "N items need routing" banner in the header.
+    public func openRoutingQueue() {
+        onOpenRoutingQueueHandler()
+    }
+
+    /// Invoked from `MailboxRootView`'s overflow menu when the user taps
+    /// "Mail party". Opens the household co-opening surface.
+    public func openMailParty() {
+        onOpenMailPartyHandler()
+    }
+
+    /// A17.4 — invoked from `MailboxRootView`'s overflow menu when the
+    /// user taps "Community mail". Opens the neighborhood / civic feed.
+    public func openCommunity() {
+        onOpenCommunityHandler()
+    }
+
+    /// Invoked from `MailboxRootView`'s overflow menu when the user taps
+    /// "Home records". Opens the linked-asset hub.
+    public func openRecords() {
+        onOpenRecordsHandler()
+    }
+
+    /// A17.12 — invoked from `MailboxRootView`'s overflow menu when the
+    /// user taps "Mail tasks". Opens the mail-linked task list.
+    public func openMailTasks() {
+        onOpenMailTasksHandler()
+    }
+
     // MARK: - Lifecycle
 
     public func load() async {
@@ -312,6 +403,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         if case .loaded = state, !loadedMail.isEmpty { return }
         state = .loading
         await fetchDrawerBadges()
+        await fetchPendingRouting()
         await reloadActiveCombo()
     }
 
@@ -322,6 +414,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
             return
         }
         await fetchDrawerBadges()
+        await fetchPendingRouting()
         await reloadActiveCombo()
     }
 
@@ -401,6 +494,21 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
             // Badges are non-blocking chrome — leave them empty on failure
             // so the list still renders.
             drawerUnread = [:]
+        }
+    }
+
+    /// Poll the disambiguation queue on appear / pull-to-refresh, exactly
+    /// like RN (`src/app/mailbox/index.tsx:65-70`). The banner is
+    /// non-blocking chrome — a failure just leaves the count at zero so
+    /// the list still renders.
+    private func fetchPendingRouting() async {
+        do {
+            let response: PendingRoutingResponse = try await api.request(
+                MailboxRoutingEndpoints.pending()
+            )
+            pendingRoutingCount = response.pending.count
+        } catch {
+            pendingRoutingCount = 0
         }
     }
 

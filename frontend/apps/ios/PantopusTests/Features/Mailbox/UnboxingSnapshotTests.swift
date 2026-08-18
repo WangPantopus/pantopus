@@ -68,10 +68,12 @@ final class UnboxingSnapshotTests: XCTestCase {
     }
 
     /// Confirm files the item (capture → filed); Undo returns to capture.
-    func testConfirmThenUndoTogglesPhase() {
+    /// The seeded view-model never touches the network, so `confirm()`
+    /// resolves immediately.
+    func testConfirmThenUndoTogglesPhase() async {
         let viewModel = UnboxingViewModel(phase: .capture)
         XCTAssertEqual(viewModel.phase, .capture)
-        viewModel.confirm()
+        await viewModel.confirm()
         XCTAssertEqual(viewModel.phase, .filed)
         viewModel.undo()
         XCTAssertEqual(viewModel.phase, .capture)

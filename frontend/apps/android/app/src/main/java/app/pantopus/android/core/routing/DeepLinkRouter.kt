@@ -3,6 +3,7 @@
 package app.pantopus.android.core.routing
 
 import android.net.Uri
+import app.pantopus.android.data.auth.OAuthSessionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,16 +13,35 @@ import kotlinx.coroutines.flow.asStateFlow
  * pushes Uri instances in via [handle]; observers collect [pending]
  * and call [consume] when they've routed it.
  *
- * The router accepts both `pantopus://…` and `https://pantopus.app/…`
- * URLs. The first segment after the host (or the host itself for the
- * custom scheme) names the route.
+ * The router accepts `pantopus://…`, `https://pantopus.com/…` and
+ * `https://pantopus.app/…`. Resolution is host-agnostic — only the path
+ * segments matter — so this needed no change when `pantopus.com` became the
+ * verified App Links host; the manifest and assetlinks.json carry that.
  *
  * Full routing table from `docs/07-frontend-mobile-app.md §9`.
  * `Home` (singular) keeps the legacy "go to Hub" semantics; the typed
  * `HomeDetail` / `HomeDashboard` / `HomeMemberRequests` variants
  * cover `/homes/:id/[*]`.
+ *
+ * Workstream 1.4 — when signed out, content destinations are persisted
+ * via [PendingDeepLinkStore] for one-shot post-login replay. OAuth
+ * callback, auth reset/verify, and [Destination.Unknown] are never stashed.
  */
 object DeepLinkRouter {
+    /**
+     * How a resolved destination should be handled relative to auth.
+     */
+    private enum class RoutingKind {
+        /** OAuth callback / Unknown — never stash, never park as content. */
+        Discard,
+
+        /** Reset / verify / join-invite — auth stack owns these; never persist. */
+        AuthOwned,
+
+        /** Content. When signed out, persist for post-login replay. */
+        Content,
+    }
+
     sealed interface Destination {
         data object Feed : Destination
 
@@ -90,6 +110,12 @@ object DeepLinkRouter {
         data class Conversation(val id: String, val name: String? = null) : Destination
 
         data class User(val id: String) : Destination
+
+        /** `pantopus://persona/:handle` or `/@handle` — public Beacon profile. */
+        data class BeaconProfile(val handle: String) : Destination
+
+        /** `pantopus://join/:code` — signup invite code (RN `/join/[code]` alias). */
+        data class JoinInvite(val code: String) : Destination
 
         data class Invite(val token: String) : Destination
 
@@ -174,6 +200,16 @@ object DeepLinkRouter {
         data class BusinessProfile(val businessId: String) : Destination
 
         /**
+         * C4 — `pantopus://b/:username/:slug` (and
+         * `pantopus://business/:username?pageSlug=…`): the public profile with
+         * one named custom page opened. RN redirects the short link to
+         * `/business/:username?pageSlug=slug`; dropping the slug here would
+         * silently land the user on the plain profile. Mirrors iOS
+         * `businessPage`.
+         */
+        data class BusinessPage(val businessId: String, val pageSlug: String) : Destination
+
+        /**
          * `pantopus://businesses/:id/page-editor` — A13.10 Edit Business Page
          * (owner-only). Mirrors iOS `editBusinessPage`.
          */
@@ -185,14 +221,65 @@ object DeepLinkRouter {
         /** `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room. */
         data class WaitingRoom(val homeId: String) : Destination
 
+        /**
+         * `pantopus://hub-today?deliveryId=&kind=morning|evening` — the Hub
+         * "Today" briefing opened from a Morning/Evening Briefing push. The
+         * notification's metadata carries `briefing_delivery_id` +
+         * `briefing_kind`; with an id the screen resolves that stored delivery
+         * rather than only the live `/api/hub/today` snapshot. Mirrors RN
+         * `resolveNotificationRoute`'s `/hub-today?…` target
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`).
+         */
+        data class HubToday(
+            val briefingDeliveryId: String?,
+            val kind: String?,
+        ) : Destination
+
+        /**
+         * `pantopus://profile?tab=receipt` — the profile tab with the Monthly
+         * Receipt card auto-expanded, the target RN resolves for a
+         * `monthly_receipt` notification
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:29`).
+         */
+        data object MonthlyReceipt : Destination
+
         data class Unknown(val uri: String) : Destination
     }
 
     private val _pending = MutableStateFlow<Destination?>(null)
     val pending: StateFlow<Destination?> = _pending.asStateFlow()
 
+    /**
+     * Set when a signed-out deep link should auto-present Sign-in
+     * (auth-owned or deferred content). The signed-out Place launch host
+     * observes this and opens the existing auth cover without disrupting
+     * the Place funnel.
+     */
+    private val _prefersLoginPresentation = MutableStateFlow(false)
+    val prefersLoginPresentation: StateFlow<Boolean> = _prefersLoginPresentation.asStateFlow()
+
+    /**
+     * Bound once from [app.pantopus.android.data.auth.AuthRepository] so
+     * the object router can classify without Hilt.
+     */
+    @Volatile
+    private var signedInProvider: () -> Boolean = { false }
+
+    fun bindSignedInProvider(provider: () -> Boolean) {
+        signedInProvider = provider
+    }
+
     fun handle(uri: Uri) {
-        _pending.value = resolve(uri)
+        // Browser OAuth callbacks belong to the in-flight sign-in attempt:
+        // `MainActivity.forwardDeepLink` hands them to `OAuthSessionStore`
+        // and never reaches here. Guarded anyway so they are never parked as
+        // content destinations. Mirrors iOS `DeepLinkRouter.handle(url:)`,
+        // which calls the same `AuthManager.isOAuthCallback` predicate.
+        if (OAuthSessionStore.isOAuthCallback(uri)) return
+        apply(
+            destination = resolve(uri),
+            persistencePath = Paths.normalized(uri.toString()),
+        )
     }
 
     /**
@@ -201,13 +288,12 @@ object DeepLinkRouter {
      * full URL deep links.
      */
     fun handle(path: String) {
-        val normalized =
-            when {
-                path.startsWith("pantopus://") || path.startsWith("http") -> path
-                path.startsWith("/") -> "pantopus://" + path.drop(1)
-                else -> "pantopus://$path"
-            }
-        _pending.value = resolveString(normalized)
+        val normalized = Paths.normalizeIncoming(path)
+        if (Paths.isOAuthCallback(normalized)) return
+        apply(
+            destination = resolveString(normalized),
+            persistencePath = Paths.normalized(normalized),
+        )
     }
 
     fun consume(): Destination? {
@@ -215,6 +301,68 @@ object DeepLinkRouter {
         _pending.value = null
         return current
     }
+
+    /** Drop in-memory pending + login prompt (sign-out / invalid). */
+    fun clearPending() {
+        _pending.value = null
+        _prefersLoginPresentation.value = false
+    }
+
+    fun acknowledgeLoginPresentation() {
+        _prefersLoginPresentation.value = false
+    }
+
+    private fun apply(
+        destination: Destination,
+        persistencePath: String,
+    ) {
+        when (routingKind(destination)) {
+            RoutingKind.Discard -> {
+                // Never stash / never treat Unknown (or OAuth, already filtered)
+                // as a content destination.
+            }
+            RoutingKind.AuthOwned -> {
+                // Auth stack ([AuthNavHost]) owns reset / verify — park
+                // in-memory only; do NOT persist across process death.
+                _pending.value = destination
+                if (!signedInProvider()) {
+                    _prefersLoginPresentation.value = true
+                }
+            }
+            RoutingKind.Content -> {
+                // Product choice (documented): RN allows gig/post/listing/
+                // invite/business/user public routes signed-out. Native today
+                // only shows PlaceLaunchHost while signed out — there is no
+                // signed-out content browser — so we still persist these for
+                // post-login replay rather than dropping them.
+                if (signedInProvider()) {
+                    _prefersLoginPresentation.value = false
+                    _pending.value = destination
+                } else {
+                    PendingDeepLinkStore.stash(persistencePath)
+                    _pending.value = null
+                    _prefersLoginPresentation.value = true
+                }
+            }
+        }
+    }
+
+    private fun routingKind(destination: Destination): RoutingKind =
+        when (destination) {
+            is Destination.Unknown -> RoutingKind.Discard
+            is Destination.ResetPassword, is Destination.VerifyEmail -> RoutingKind.AuthOwned
+            // RN sends a signed-out `/join/:code` straight to the register
+            // form with the code pre-filled — it never parks the link for
+            // post-login replay, because the code only matters while the
+            // account is still being created
+            // (`pantopus/frontend/apps/mobile/src/app/_layout.tsx:76`,
+            // `src/app/join/[code].tsx:20`). Auth-owned keeps it in memory so
+            // [app.pantopus.android.ui.screens.auth.AuthNavHost] can push
+            // Sign-up with the code, while a signed-in viewer still gets the
+            // token-accept surface from `RootTabScreen`.
+            is Destination.JoinInvite -> RoutingKind.AuthOwned
+            else -> RoutingKind.Content
+        }
 
     internal fun resolve(uri: Uri): Destination = resolveString(uri.toString())
 
@@ -249,7 +397,11 @@ object DeepLinkRouter {
                 parts
             }
         if (segments.isEmpty()) return Destination.Unknown(raw)
-        val tabQuery = parseQueryParam(queryPart, "tab")
+        val first = segments.first()
+        if (first.startsWith("@") && first.length > 1) {
+            return Destination.BeaconProfile(first.drop(1))
+        }
+        val tabQuery = Paths.queryParam(queryPart, "tab")
         // Auth deep links carry `token` / `token_hash` (Supabase's two
         // recovery-link param names) and an optional `email`. Auth-callback
         // emails sometimes encode params in the fragment instead of the
@@ -257,19 +409,33 @@ object DeepLinkRouter {
         val fragmentPart =
             rest.substringAfter('#', missingDelimiterValue = "")
         val tokenQuery =
-            parseQueryParam(queryPart, "token")
-                ?: parseQueryParam(queryPart, "token_hash")
-                ?: parseQueryParam(fragmentPart, "token")
-                ?: parseQueryParam(fragmentPart, "token_hash")
+            Paths.queryParam(queryPart, "token")
+                ?: Paths.queryParam(queryPart, "token_hash")
+                ?: Paths.queryParam(fragmentPart, "token")
+                ?: Paths.queryParam(fragmentPart, "token_hash")
         val emailQuery =
-            parseQueryParam(queryPart, "email") ?: parseQueryParam(fragmentPart, "email")
+            Paths.queryParam(queryPart, "email") ?: Paths.queryParam(fragmentPart, "email")
         // B1.6 — `?id=` seeds the translation / unboxing mailbox sub-screens.
-        val idQuery = parseQueryParam(queryPart, "id")
+        val idQuery = Paths.queryParam(queryPart, "id")
 
         return when (segments.first()) {
             "feed" -> Destination.Feed
             "home" -> Destination.Home
             "notifications" -> Destination.Notifications
+            "hub-today", "hub_today", "today" ->
+                // `?deliveryId=` + `?kind=` ride the Morning/Evening Briefing push.
+                Destination.HubToday(
+                    briefingDeliveryId =
+                        Paths.queryParam(queryPart, "deliveryId")
+                            ?: Paths.queryParam(queryPart, "briefing_delivery_id"),
+                    kind =
+                        Paths.queryParam(queryPart, "kind")
+                            ?: Paths.queryParam(queryPart, "briefing_kind"),
+                )
+            "profile" ->
+                // Only `?tab=receipt` is deep-linkable today (the monthly-receipt
+                // push). A bare `pantopus://profile` falls through to Unknown.
+                if (tabQuery?.lowercase() == "receipt") Destination.MonthlyReceipt else Destination.Unknown(raw)
             "connections" -> Destination.Connections
             "beacons", "beacon-updates", "beacon_updates" -> Destination.Beacons
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
@@ -283,7 +449,8 @@ object DeepLinkRouter {
                     else -> Destination.SupportTrain(id)
                 }
             }
-            "post", "posts" -> {
+            // `/broadcast/:id` aliases Pulse/persona post detail (RN parity).
+            "post", "posts", "broadcast", "broadcasts" -> {
                 val id = segments.getOrNull(1)
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.Post(id)
             }
@@ -337,20 +504,47 @@ object DeepLinkRouter {
             }
             "business" -> {
                 // Singular `business/:username` is the A10.6 public profile.
+                // `?pageSlug=` is RN's redirect target for `/b/:username/:slug`.
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
+                val pageSlug = Paths.queryParam(queryPart, "pageSlug")
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
             }
             "chat", "message", "messages", "conversation" -> {
                 val id = segments.getOrNull(1)
                 val name =
-                    parseQueryParam(queryPart, "name")?.let { encoded ->
+                    Paths.queryParam(queryPart, "name")?.let { encoded ->
                         runCatching { java.net.URLDecoder.decode(encoded, "UTF-8") }.getOrNull()
                     }
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.Conversation(id, name)
             }
-            "user", "users" -> {
+            "user", "users", "u" -> {
                 val id = segments.getOrNull(1)
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.User(id)
+            }
+            "b" -> {
+                // Public business short link `pantopus://b/:username` and its
+                // named-page variant `pantopus://b/:username/:slug`. RN
+                // redirects the latter to `/business/:username?pageSlug=slug`,
+                // so the slug has to survive the parse (C4).
+                val id = segments.getOrNull(1)
+                val pageSlug = segments.getOrNull(2)
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
+            }
+            "persona" -> {
+                val handle = segments.getOrNull(1)
+                if (handle.isNullOrBlank()) Destination.Unknown(raw) else Destination.BeaconProfile(handle)
+            }
+            "join" -> {
+                val code = segments.getOrNull(1)
+                if (code.isNullOrBlank()) Destination.Unknown(raw) else Destination.JoinInvite(code)
             }
             "invite" -> {
                 val token = segments.getOrNull(1)
@@ -380,6 +574,7 @@ object DeepLinkRouter {
                 if (segments.getOrNull(1) == "preview") Destination.ViewAs else Destination.Unknown(raw)
             "auth" -> {
                 when (segments.getOrNull(1)) {
+                    "callback" -> Destination.Unknown(raw)
                     "reset-password", "reset_password" ->
                         if (tokenQuery.isNullOrEmpty()) {
                             Destination.Unknown(raw)
@@ -423,17 +618,66 @@ object DeepLinkRouter {
         }
     }
 
-    private fun parseQueryParam(
-        query: String,
-        key: String,
-    ): String? {
-        if (query.isBlank()) return null
-        for (pair in query.split('&')) {
-            val eq = pair.indexOf('=')
-            if (eq < 0) continue
-            val k = pair.substring(0, eq)
-            if (k == key) return pair.substring(eq + 1)
+    /**
+     * Pure string plumbing for incoming links. Nothing here touches
+     * `android.net.Uri`, so notification payloads (which arrive as raw
+     * paths) and the JVM unit tests share the same code without
+     * Robolectric.
+     */
+    private object Paths {
+        private const val SCHEME_SEPARATOR = "://"
+
+        /**
+         * String-shaped sibling of [OAuthSessionStore.isOAuthCallback], for the
+         * path-style links that arrive from notification payloads (where there is
+         * no `Uri` to parse and unit tests run without Robolectric).
+         */
+        fun isOAuthCallback(raw: String): Boolean {
+            val pathPart =
+                raw.substringAfter(SCHEME_SEPARATOR, missingDelimiterValue = raw)
+                    .substringBefore('?')
+                    .substringBefore('#')
+            val parts = pathPart.split('/').filter { it.isNotBlank() }
+            return parts.size >= 2 &&
+                parts[0].equals("auth", ignoreCase = true) &&
+                parts[1].equals("callback", ignoreCase = true)
         }
-        return null
+
+        fun normalizeIncoming(path: String): String =
+            when {
+                path.startsWith("pantopus://") || path.startsWith("http") -> path
+                path.startsWith("/") -> "pantopus://" + path.drop(1)
+                else -> "pantopus://$path"
+            }
+
+        /**
+         * Collapse `https://pantopus.app/…` into a stable `pantopus://…` form
+         * so replay goes through the same resolver.
+         */
+        fun normalized(raw: String): String {
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) return trimmed
+            val schemeEnd = trimmed.indexOf(SCHEME_SEPARATOR)
+            if (schemeEnd < 0) return normalizeIncoming(trimmed)
+            val scheme = trimmed.substring(0, schemeEnd)
+            if (scheme != "http" && scheme != "https") return trimmed
+            val rest = trimmed.substring(schemeEnd + SCHEME_SEPARATOR.length)
+            val pathAndQuery = rest.substringAfter('/', missingDelimiterValue = "")
+            return "pantopus://$pathAndQuery"
+        }
+
+        fun queryParam(
+            query: String,
+            key: String,
+        ): String? {
+            if (query.isBlank()) return null
+            for (pair in query.split('&')) {
+                val eq = pair.indexOf('=')
+                if (eq < 0) continue
+                val k = pair.substring(0, eq)
+                if (k == key) return pair.substring(eq + 1)
+            }
+            return null
+        }
     }
 }

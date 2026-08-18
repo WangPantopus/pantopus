@@ -115,7 +115,7 @@ object ComposeBroadcastSampleData {
                 ComposeBroadcastDraft(
                     body = DRAFT_TEXT,
                     audience = BroadcastAudience.AllBeacons,
-                    media = mediaPreview,
+                    media = listOf(mediaPreview),
                 ),
             recents = recentBroadcasts,
         )
@@ -134,7 +134,7 @@ object ComposeBroadcastSampleData {
                 ComposeBroadcastDraft(
                     body = DRAFT_TEXT,
                     audience = BroadcastAudience.BronzePlus,
-                    media = mediaPreview,
+                    media = listOf(mediaPreview),
                 ),
             recents = recentBroadcasts,
             scheduledAtMillis = SCHEDULED_AT_MILLIS,
@@ -148,7 +148,7 @@ object ComposeBroadcastSampleData {
                 ComposeBroadcastDraft(
                     body = DRAFT_TEXT,
                     audience = BroadcastAudience.AllBeacons,
-                    media = mediaPreview,
+                    media = listOf(mediaPreview),
                 ),
             recents = recentBroadcasts,
             phase = ComposePhase.Sending,

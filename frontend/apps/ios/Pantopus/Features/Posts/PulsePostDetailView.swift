@@ -21,13 +21,17 @@ public struct PulsePostDetailView: View {
     private let onBack: @MainActor () -> Void
     private let onOpenProfile: @MainActor (String) -> Void
     private let onEdit: @MainActor (String) -> Void
+    /// Tap-through from a "Nearby Providers" row. Carries the business
+    /// *username* (the `/business/:username` public-profile key).
+    private let onOpenBusiness: @MainActor (String) -> Void
 
     public init(
         postId: String,
         currentUserId: String? = nil,
         onBack: @escaping @MainActor () -> Void,
         onOpenProfile: @escaping @MainActor (String) -> Void = { _ in },
-        onEdit: @escaping @MainActor (String) -> Void = { _ in }
+        onEdit: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenBusiness: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: PulsePostDetailViewModel(
             postId: postId,
@@ -36,6 +40,7 @@ public struct PulsePostDetailView: View {
         self.onBack = onBack
         self.onOpenProfile = onOpenProfile
         self.onEdit = onEdit
+        self.onOpenBusiness = onOpenBusiness
     }
 
     public var body: some View {
@@ -55,6 +60,7 @@ public struct PulsePostDetailView: View {
         .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
         .accessibilityIdentifier("pulsePostDetail")
         .task { await viewModel.load() }
+        .task { await viewModel.loadNearbyProviders() }
         .onChange(of: viewModel.didDeletePost) { _, deleted in
             if deleted { onBack() }
         }
@@ -149,6 +155,8 @@ public struct PulsePostDetailView: View {
             selectedReactionEmoji: viewModel.selectedReactionEmoji,
             topBarAction: overflowAction,
             topBarSecondaryAction: shareAction,
+            nearbyProviders: viewModel.nearbyProviders,
+            onOpenBusiness: onOpenBusiness,
             onBack: onBack,
             onOpenProfile: onOpenProfile,
             onReactionTap: { kind in Task { await viewModel.tapReaction(kind) } },
@@ -197,6 +205,9 @@ public struct PulsePostDetailLoadedContent: View {
     private let selectedReactionEmoji: String?
     private let topBarAction: ContentDetailTopBarAction?
     private let topBarSecondaryAction: ContentDetailTopBarAction?
+    /// Organically matched local businesses — empty hides the card.
+    private let nearbyProviders: [NearbyProviderRow]
+    private let onOpenBusiness: @MainActor (String) -> Void
     private let onBack: @MainActor () -> Void
     private let onOpenProfile: @MainActor (String) -> Void
     private let onReactionTap: @MainActor (PostReactionKind) -> Void
@@ -217,6 +228,8 @@ public struct PulsePostDetailLoadedContent: View {
         selectedReactionEmoji: String? = nil,
         topBarAction: ContentDetailTopBarAction? = nil,
         topBarSecondaryAction: ContentDetailTopBarAction? = nil,
+        nearbyProviders: [NearbyProviderRow] = [],
+        onOpenBusiness: @escaping @MainActor (String) -> Void = { _ in },
         onBack: @escaping @MainActor () -> Void = {},
         onOpenProfile: @escaping @MainActor (String) -> Void = { _ in },
         onReactionTap: @escaping @MainActor (PostReactionKind) -> Void = { _ in },
@@ -236,6 +249,8 @@ public struct PulsePostDetailLoadedContent: View {
         self.selectedReactionEmoji = selectedReactionEmoji
         self.topBarAction = topBarAction
         self.topBarSecondaryAction = topBarSecondaryAction
+        self.nearbyProviders = nearbyProviders
+        self.onOpenBusiness = onOpenBusiness
         self.onBack = onBack
         self.onOpenProfile = onOpenProfile
         self.onReactionTap = onReactionTap
@@ -288,7 +303,15 @@ public struct PulsePostDetailLoadedContent: View {
                     onCancelReply: onCancelReply,
                     onCommentReply: onCommentReply,
                     onCommentLike: onCommentLike,
-                    onCommentDelete: onCommentDelete
+                    onCommentDelete: onCommentDelete,
+                    belowReactions: nearbyProviders.isEmpty
+                        ? nil
+                        : AnyView(
+                            NearbyProvidersCard(
+                                rows: nearbyProviders,
+                                onOpenBusiness: onOpenBusiness
+                            )
+                        )
                 ) { userId in
                     onOpenProfile(userId)
                 }

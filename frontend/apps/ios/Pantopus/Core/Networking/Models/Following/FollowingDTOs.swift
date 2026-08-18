@@ -92,6 +92,30 @@ public struct FollowingMuteResponse: Decodable, Sendable, Hashable {
     public let mutedUntil: String?
 }
 
+/// `PATCH /api/personas/:id/follow/preferences` echo.
+/// Route `backend/routes/personas.js:1743`.
+public struct FollowPreferencesResponse: Decodable, Sendable, Hashable {
+    public let following: Bool?
+    public let status: String?
+    public let relationshipType: String?
+    public let notificationLevel: String?
+}
+
+/// Body for the notification-level PATCH. The validator requires
+/// `notification_level` ∈ `all | highlights | none`
+/// (`backend/routes/personas.js:88`).
+public struct FollowNotificationLevelBody: Encodable, Sendable {
+    public let notificationLevel: String
+
+    public init(notificationLevel: String) {
+        self.notificationLevel = notificationLevel
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case notificationLevel = "notification_level"
+    }
+}
+
 /// Body for the mute PATCH. The backend validator
 /// (`muteFollowingSchema`, `backend/routes/personas.js:95`) makes `days`
 /// **required** while allowing `null` (which clears the mute), so the key

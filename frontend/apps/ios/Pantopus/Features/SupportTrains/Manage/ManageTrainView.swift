@@ -19,6 +19,8 @@
 //  bottom sheet over a dimmed body.
 //
 
+// swiftlint:disable file_length function_body_length type_body_length
+
 import SwiftUI
 
 @MainActor
@@ -43,6 +45,9 @@ public struct ManageTrainView: View {
         self.onInviteHelpers = onInviteHelpers
     }
 
+    /// Gift-fund goal input, in whole dollars (the API takes cents).
+    @State private var fundGoalDollars: String = ""
+
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             topBar
@@ -53,6 +58,46 @@ public struct ManageTrainView: View {
         .overlay(alignment: .bottom) { closeSheetOverlay }
         .overlay(alignment: .bottom) { toastOverlay }
         .accessibilityIdentifier("manageTrain")
+        .sheet(item: $viewModel.slotEditor) { editor in
+            SlotEditorSheet(
+                editor: editor,
+                isSubmitting: viewModel.isSubmitting,
+                onSave: { edited in Task { await viewModel.saveSlot(edited) } },
+                onCancel: { viewModel.dismissSlotEditor() }
+            )
+        }
+        .alert(
+            viewModel.pendingConfirm?.title ?? "",
+            isPresented: Binding(
+                get: { viewModel.pendingConfirm != nil },
+                set: { if !$0 { viewModel.dismissConfirm() } }
+            ),
+            presenting: viewModel.pendingConfirm
+        ) { confirm in
+            Button("Cancel", role: .cancel) { viewModel.dismissConfirm() }
+            Button(confirm.confirmLabel, role: .destructive) {
+                // Capture the kind — SwiftUI clears `pendingConfirm`
+                // through the binding before the Task gets to run.
+                let kind = confirm.kind
+                Task { await viewModel.perform(kind) }
+            }
+        } message: { confirm in
+            Text(confirm.message)
+        }
+        .alert(
+            "Something went wrong",
+            isPresented: Binding(
+                get: { viewModel.actionError != nil },
+                set: { if !$0 { viewModel.acknowledgeActionError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { viewModel.acknowledgeActionError() }
+        } message: {
+            Text(viewModel.actionError ?? "")
+        }
+        .onChange(of: viewModel.didDeleteTrain) { _, deleted in
+            if deleted { onClose() }
+        }
     }
 
     // MARK: - Top bar
@@ -191,10 +236,50 @@ public struct ManageTrainView: View {
                     }
                 }
 
+                organizerControls(content)
+
                 sectionOverline("Wind down")
                 WindDownSection(row: content.closeRow) {
                     viewModel.showCloseSheet()
                 }
+
+                ManageLifecycleSection(
+                    status: content.status,
+                    viewerRole: content.viewerRole,
+                    isBusy: viewModel.isSubmitting,
+                    onPause: { Task { await viewModel.pauseTrain() } },
+                    onResume: { Task { await viewModel.resumeTrain() } },
+                    onUnpublish: {
+                        viewModel.requestConfirm(
+                            ManageDestructiveConfirm(
+                                kind: .unpublishTrain,
+                                title: "Unpublish this train?",
+                                message: "\(content.title) goes back to draft and neighbors stop seeing it.",
+                                confirmLabel: "Unpublish"
+                            )
+                        )
+                    },
+                    onArchive: {
+                        viewModel.requestConfirm(
+                            ManageDestructiveConfirm(
+                                kind: .archiveTrain,
+                                title: "Archive this train?",
+                                message: "\(content.title) moves out of your active list.",
+                                confirmLabel: "Archive"
+                            )
+                        )
+                    },
+                    onDelete: {
+                        viewModel.requestConfirm(
+                            ManageDestructiveConfirm(
+                                kind: .deleteTrain,
+                                title: "Delete \(content.title)?",
+                                message: "This permanently deletes the train, its dates, updates and invites.",
+                                confirmLabel: "Delete"
+                            )
+                        )
+                    }
+                )
             }
             .padding(.horizontal, Spacing.s4)
             .padding(.top, Spacing.s4)
@@ -203,6 +288,99 @@ public struct ManageTrainView: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom, spacing: Spacing.s0) { stickyCTA(content: content) }
         .accessibilityIdentifier("manageTrainScroll")
+    }
+
+    /// S1 — dates / helpers / co-organizers / nudge / gift fund. Every
+    /// block is gated on the viewer's organizer tier so no one sees a
+    /// control the backend would 403.
+    @ViewBuilder
+    private func organizerControls(_ content: ManageTrainContent) -> some View {
+        ManageDatesSection(
+            rows: viewModel.slotRows,
+            isBusy: viewModel.isSubmitting,
+            onAdd: { viewModel.startAddSlot() },
+            onEdit: { viewModel.startEditSlot($0) },
+            onRemove: { row in
+                viewModel.requestConfirm(
+                    ManageDestructiveConfirm(
+                        kind: .cancelSlot(slotId: row.id),
+                        title: "Remove date",
+                        message: "Remove \(row.dateLabel) from this Support Train?",
+                        confirmLabel: "Remove"
+                    )
+                )
+            }
+        )
+
+        ManageHelpersSection(
+            rows: viewModel.helperRows,
+            isBusy: viewModel.isSubmitting,
+            onShareAddress: { row in
+                Task { await viewModel.shareExactAddress(reservationId: row.id) }
+            },
+            onConfirm: { row in
+                Task { await viewModel.confirmDelivery(reservationId: row.id) }
+            },
+            onRemove: { row in
+                viewModel.requestConfirm(
+                    ManageDestructiveConfirm(
+                        kind: .removeHelper(reservationId: row.id),
+                        title: "Remove helper from slot?",
+                        message: "Reopen \(row.slotLabel.isEmpty ? "this date" : row.slotLabel) for someone else?",
+                        confirmLabel: "Remove"
+                    )
+                )
+            }
+        )
+
+        ManageOrganizersSection(
+            rows: viewModel.organizerRows,
+            canEdit: content.viewerRole == .primaryOrganizer,
+            isBusy: viewModel.isSubmitting,
+            newOrganizerUserId: $viewModel.newOrganizerUserId,
+            onAdd: { Task { await viewModel.addOrganizer() } },
+            onRemove: { row in
+                guard let userId = row.userId else { return }
+                viewModel.requestConfirm(
+                    ManageDestructiveConfirm(
+                        kind: .removeOrganizer(userId: userId),
+                        title: "Remove organizer",
+                        message: "Remove \(row.name) as a co-organizer?",
+                        confirmLabel: "Remove"
+                    )
+                )
+            }
+        )
+
+        ManageNudgeSection(
+            openSlotCount: content.slotsOpen,
+            draft: viewModel.nudgeDraft,
+            isBusy: viewModel.isSubmitting,
+            onDraft: { Task { await viewModel.draftNudge() } },
+            onEditDraft: { viewModel.nudgeDraft = $0 },
+            onSend: { Task { await viewModel.sendNudge() } },
+            onDiscard: { viewModel.discardNudge() }
+        )
+
+        ManageFundSection(
+            fund: viewModel.fund,
+            canDisable: content.viewerRole == .primaryOrganizer,
+            isBusy: viewModel.isSubmitting,
+            goalDollars: $fundGoalDollars,
+            onEnable: {
+                Task { await viewModel.enableFund(goalDollars: Int(fundGoalDollars)) }
+            },
+            onDisable: {
+                viewModel.requestConfirm(
+                    ManageDestructiveConfirm(
+                        kind: .disableFund,
+                        title: "Disable the gift fund?",
+                        message: "Neighbors won't be able to chip in money any more.",
+                        confirmLabel: "Disable"
+                    )
+                )
+            }
+        )
     }
 
     private func sectionOverline(_ text: String) -> some View {

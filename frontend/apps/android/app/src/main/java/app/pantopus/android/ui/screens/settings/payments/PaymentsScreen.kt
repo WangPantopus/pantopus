@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "FunctionNaming")
+@file:Suppress(
+    "MagicNumber",
+    "LongMethod",
+    "PackageNaming",
+    "CyclomaticComplexMethod",
+    "FunctionNaming",
+    "TooManyFunctions",
+)
 
 package app.pantopus.android.ui.screens.settings.payments
 
@@ -20,9 +27,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,10 +49,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
+import app.pantopus.android.core.security.SensitiveScreenGuard
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroPayoutFooter
 import app.pantopus.android.ui.components.ToastController
@@ -72,6 +84,7 @@ import com.stripe.android.paymentsheet.rememberPaymentSheet
  * [PaymentsViewModel.events]. Payout rows route to Wallet, which owns the
  * live Stripe Connect onboarding/dashboard/withdraw flow.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaymentsScreen(
     onBack: () -> Unit = {},
@@ -79,6 +92,7 @@ fun PaymentsScreen(
     viewModel: PaymentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val toastController = remember { ToastController() }
     val context = LocalContext.current
 
@@ -110,23 +124,41 @@ fun PaymentsScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        PaymentsScreenContent(
-            state = state,
-            actions =
-                PaymentsScreenActions(
-                    onBack = onBack,
-                    onAddMethod = viewModel::tapAddMethod,
-                    onSetDefault = viewModel::setDefault,
-                    onRemove = viewModel::removeMethod,
-                    onTapRow = { id ->
-                        if (id.startsWith("payouts.")) onOpenWallet() else viewModel.tapRow(id)
-                    },
-                    onCloseAccount = viewModel::tapCloseAccount,
-                    onRetry = viewModel::refresh,
-                ),
-        )
-        ToastHost(controller = toastController)
+    SecureScreenEffect()
+
+    // Money surface — RN wraps this route in `SensitiveScreenGuard`
+    // (`app/settings/payments.tsx:31`), so the device credential is checked
+    // before any card / payout detail is composed. A 5-minute grace means
+    // Wallet → Payments doesn't prompt twice.
+    SensitiveScreenGuard(reason = "Verify to access Payments & Payouts", onRejected = onBack) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // iOS keeps a `.refreshable` on the Payments content
+            // (`Features/Settings/Payments/PaymentsView.swift:169`) — without
+            // it the saved cards and payout status can only be re-read by
+            // leaving and re-entering the screen.
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                PaymentsScreenContent(
+                    state = state,
+                    actions =
+                        PaymentsScreenActions(
+                            onBack = onBack,
+                            onAddMethod = viewModel::tapAddMethod,
+                            onSetDefault = viewModel::setDefault,
+                            onRemove = viewModel::removeMethod,
+                            onTapRow = { id ->
+                                if (id.startsWith("payouts.")) onOpenWallet() else viewModel.tapRow(id)
+                            },
+                            onCloseAccount = viewModel::tapCloseAccount,
+                            onRetry = viewModel::refresh,
+                        ),
+                )
+            }
+            ToastHost(controller = toastController)
+        }
     }
 }
 
@@ -151,6 +183,11 @@ internal fun PaymentsScreenContent(
     actions: PaymentsScreenActions,
 ) {
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
+    // Removing a card detaches it from the Stripe customer and cannot be
+    // undone, so the DELETE is gated behind a destructive confirmation naming
+    // the card — mirroring RN's Alert (`PaymentMethodsTab.tsx:48-69`) and the
+    // iOS `confirmationDialog`.
+    var pendingRemoval by remember { mutableStateOf<PaymentMethod?>(null) }
 
     Column(
         modifier =
@@ -182,10 +219,83 @@ internal fun PaymentsScreenContent(
         MethodActionSheet(
             method = method,
             onSetDefault = actions.onSetDefault,
-            onRemove = actions.onRemove,
+            onRemove = { pendingRemoval = method },
             onDismiss = { selectedMethod = null },
         )
     }
+
+    pendingRemoval?.let { method ->
+        RemoveMethodDialog(
+            method = method,
+            onConfirm = {
+                actions.onRemove(method.id)
+                pendingRemoval = null
+            },
+            onDismiss = { pendingRemoval = null },
+        )
+    }
+}
+
+/**
+ * Destructive confirmation before `DELETE api/payments/methods/{id}`. Copy
+ * mirrors RN's Alert — "Remove Card" / "Are you sure you want to remove the
+ * card ending in 4421?" (`PaymentMethodsTab.tsx:50-53`).
+ */
+@Composable
+private fun RemoveMethodDialog(
+    method: PaymentMethod,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val subject =
+        method.last4?.takeIf { it.isNotEmpty() }?.let { "the card ending in $it" }
+            ?: method.label
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = PantopusColors.appSurface,
+        title = {
+            Text(
+                text = "Remove card",
+                color = PantopusColors.appText,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Text(
+                text = "Are you sure you want to remove $subject?",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 14.sp,
+            )
+        },
+        confirmButton = {
+            Text(
+                text = "Remove",
+                color = PantopusColors.error,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onConfirm)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveConfirm"),
+            )
+        },
+        dismissButton = {
+            Text(
+                text = "Cancel",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveCancel"),
+            )
+        },
+        modifier = Modifier.testTag("paymentsRemoveConfirmDialog"),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -193,7 +303,7 @@ internal fun PaymentsScreenContent(
 private fun MethodActionSheet(
     method: PaymentMethod,
     onSetDefault: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -232,7 +342,9 @@ private fun MethodActionSheet(
                 color = PantopusColors.error,
                 testTag = "paymentsRow_${method.id}_remove",
                 onClick = {
-                    onRemove(method.id)
+                    // Hands off to the destructive confirmation — the DELETE
+                    // only fires once the user confirms.
+                    onRemove()
                     onDismiss()
                 },
             )
@@ -352,6 +464,12 @@ private fun LoadedFrame(
                             .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
                             .testTag("paymentsHelper_payouts"),
                 )
+            }
+        }
+        if (loaded.earnings != null) {
+            item(key = "overline_earnings") { SectionOverline("Earnings & spending", id = "earnings") }
+            item(key = "card_earnings") {
+                EarningsCard(earnings = loaded.earnings)
             }
         }
         item(key = "overline_activity") { SectionOverline("Activity", id = "activity") }
@@ -481,6 +599,83 @@ private fun PayoutsCard(
     }
 }
 
+/**
+ * "Earnings & Spending" — the two lifetime totals from
+ * `GET api/payments/earnings` + `/spending`. A figure the server wouldn't
+ * hand back stays an em-dash rather than reading as "$0.00".
+ */
+@Composable
+private fun EarningsCard(earnings: PaymentsEarnings) {
+    Card(id = "earnings") {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s4),
+        ) {
+            EarningsTile(
+                label = "Total earned",
+                value = earnings.totalEarned,
+                tint = PantopusColors.success,
+                tileTestTag = "paymentsTotalEarned",
+                modifier = Modifier.weight(1f),
+            )
+            EarningsTile(
+                label = "Total spent",
+                value = earnings.totalSpent,
+                tint = PantopusColors.primary600,
+                tileTestTag = "paymentsTotalSpent",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            text = earnings.caption,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 11.5.sp,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s4)
+                    .testTag("paymentsEarningsCaption"),
+        )
+    }
+}
+
+@Composable
+private fun EarningsTile(
+    label: String,
+    value: String,
+    tint: Color,
+    tileTestTag: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .background(tint.copy(alpha = 0.08f))
+                .border(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(Radii.md))
+                .padding(Spacing.s3)
+                .testTag(tileTestTag),
+    ) {
+        Text(
+            text = label.uppercase(),
+            color = tint,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+        )
+        Text(
+            text = value,
+            color = PantopusColors.appText,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
 @Composable
 private fun ActivityCard(
     activity: PaymentsActivity,
@@ -498,8 +693,91 @@ private fun ActivityCard(
                         Divider()
                     }
                 }
+            is PaymentsActivity.Transactions ->
+                activity.rows.forEachIndexed { index, transaction ->
+                    TransactionRow(transaction = transaction)
+                    if (index < activity.rows.size - 1) {
+                        Divider()
+                    }
+                }
             is PaymentsActivity.Empty -> ActivityEmptyRow(title = activity.title, body = activity.body)
         }
+    }
+}
+
+/**
+ * One row of the real transaction-history feed
+ * (`GET api/payments/history`). Icon + tint mirror RN's `HistoryTab`: tips
+ * get the star, payouts the primary arrow disc, money-out red, money-in green.
+ */
+@Composable
+private fun TransactionRow(transaction: PaymentsTransaction) {
+    val tint =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusColors.warning
+            PaymentsTransaction.Kind.Payout -> PantopusColors.primary600
+            PaymentsTransaction.Kind.Sent -> PantopusColors.error
+            PaymentsTransaction.Kind.Received -> PantopusColors.success
+        }
+    val icon =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusIcon.Star
+            PaymentsTransaction.Kind.Payout -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Sent -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Received -> PantopusIcon.ArrowDown
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag("paymentsTransaction_${transaction.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2.2f,
+                tint = tint,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = transaction.title,
+                color = PantopusColors.appText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (transaction.meta.isNotEmpty()) {
+                Text(
+                    text = transaction.meta,
+                    color = PantopusColors.appTextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        Text(
+            text = transaction.amount,
+            color = if (transaction.isOutgoing) PantopusColors.error else PantopusColors.success,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

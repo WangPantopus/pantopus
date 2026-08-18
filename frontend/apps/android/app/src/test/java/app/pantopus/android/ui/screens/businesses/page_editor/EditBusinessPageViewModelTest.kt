@@ -3,10 +3,14 @@
 package app.pantopus.android.ui.screens.businesses.page_editor
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.businesses.BusinessesRepository
+import app.pantopus.android.data.network.NetworkMonitor
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -18,11 +22,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * P4.2 — A13.10 Edit Business Page. View-model behaviour:
- *  - preview-seeded state lands in `Loaded`
- *  - `save()` clears dirty bits + zeroes unsavedCount in Published mode
- *  - `discardConfirmed()` reverts every field to its original
- *  - toast messages flip per action
+ * P4.2 — A13.10 Edit Business Page. Preview-seeded local-persistence
+ * behaviour (snapshots + unit coverage of dirty/discard).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditBusinessPageViewModelTest {
@@ -34,9 +35,14 @@ class EditBusinessPageViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private val networkMonitor: NetworkMonitor =
+        mockk { every { isOnline } returns MutableStateFlow(true) }
+
     private fun makeVm(): EditBusinessPageViewModel =
         EditBusinessPageViewModel(
             SavedStateHandle(mapOf(EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY to "biz-1")),
+            mockk<BusinessesRepository>(relaxed = true),
+            networkMonitor,
         )
 
     @Test
@@ -72,16 +78,13 @@ class EditBusinessPageViewModelTest {
         }
 
     @Test
-    fun liveLoadedSaveDoesNotPretendToPersist() =
-        runTest {
-            val vm = makeVm()
-            vm.load()
-            advanceUntilIdle()
-
-            vm.save()
-
-            assertEquals("Business page editing is not connected to the backend yet.", vm.toast.value)
-        }
+    fun update_marksFieldDirty() {
+        val vm = makeVm()
+        vm.seedForPreview(EditBusinessPageSampleData.publishedRoostCafe)
+        vm.update(EditBusinessPageFieldKey.Name, "Roost Café & Bakery")
+        assertTrue(loadedName(vm).isDirty)
+        assertEquals("Roost Café & Bakery", loadedName(vm).current)
+    }
 
     @Test
     fun discardConfirmed_revertsCurrentToOriginal() =
@@ -122,15 +125,6 @@ class EditBusinessPageViewModelTest {
             vm.saveDraft()
             assertEquals("Draft saved", vm.toast.value)
         }
-
-    @Test
-    fun discardRequested_flipsConfirmFlag() {
-        val vm = makeVm()
-        vm.seedForPreview(EditBusinessPageSampleData.publishedRoostCafe)
-        assertFalse(vm.showsDiscardConfirm.value)
-        vm.discardRequested()
-        assertTrue(vm.showsDiscardConfirm.value)
-    }
 
     private fun loadedName(vm: EditBusinessPageViewModel): EditBusinessPageField =
         (vm.state.value as EditBusinessPageUiState.Loaded).content.name

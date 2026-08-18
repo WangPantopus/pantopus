@@ -40,8 +40,13 @@ fun LanguageBadge(
     languages: TranslationLanguages,
     confirmed: Boolean,
 ) {
+    val confidence = languages.confidence
     val detail =
-        if (confirmed) "Confirmed translation" else "Auto-detected, ${languages.confidence} percent match"
+        when {
+            confirmed -> "Confirmed translation"
+            confidence != null -> "Auto-detected, $confidence percent match"
+            else -> "Auto-detected"
+        }
     TranslationCard(
         modifier =
             Modifier
@@ -87,8 +92,16 @@ fun LanguageBadge(
 @Composable
 private fun DetectionLine(
     confirmed: Boolean,
-    confidence: Int,
+    confidence: Int?,
 ) {
+    // The translator only reports a confidence on surfaces that measure
+    // one; without it the badge says "Auto-detected" and stops there.
+    val label =
+        when {
+            confirmed -> "Confirmed translation"
+            confidence != null -> "Auto-detected · $confidence% match"
+            else -> "Auto-detected"
+        }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
@@ -100,7 +113,7 @@ private fun DetectionLine(
             tint = if (confirmed) PantopusColors.success else PantopusColors.appTextSecondary,
         )
         Text(
-            text = if (confirmed) "Confirmed translation" else "Auto-detected · $confidence% match",
+            text = label,
             fontSize = 11.sp,
             color = PantopusColors.appTextSecondary,
         )

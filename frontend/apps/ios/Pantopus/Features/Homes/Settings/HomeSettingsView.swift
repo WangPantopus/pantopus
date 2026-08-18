@@ -28,7 +28,7 @@ public struct HomeSettingsView: View {
             dataSource: viewModel,
             onBack: onBack,
             headerView: AnyView(
-                HomeSettingsIdentityCard(identity: viewModel.identity)
+                HomeSettingsIdentityCard(viewModel: viewModel)
             )
         )
         .accessibilityIdentifier("homeSettings")
@@ -37,16 +37,23 @@ public struct HomeSettingsView: View {
 
 /// Identity strip rendered at the top of the per-home Settings list.
 /// Holds the home name plus the "Home" identity chip and the
-/// address-verified (or amber `Verifying`) chip.
+/// address-verified (or amber `Verifying`) chip. When the viewer holds
+/// `home.edit`, the name swaps for RN's inline nickname editor
+/// (`src/app/homes/[id]/settings/index.tsx:89-108`).
 struct HomeSettingsIdentityCard: View {
-    let identity: HomeSettingsSampleData.Identity
+    @Bindable var viewModel: HomeSettingsViewModel
+
+    private var identity: HomeSettingsSampleData.Identity {
+        viewModel.identity
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text(identity.homeName)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Theme.Color.appText)
-                .accessibilityIdentifier("homeSettingsIdentityName")
+            if viewModel.isRenaming {
+                renameEditor
+            } else {
+                nameRow
+            }
             HStack(spacing: Spacing.s2) {
                 identityChip
                 addressChip
@@ -60,6 +67,81 @@ struct HomeSettingsIdentityCard: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    /// Read-only name + (owner-only) pencil affordance.
+    private var nameRow: some View {
+        HStack(spacing: Spacing.s2) {
+            Text(identity.homeName)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityIdentifier("homeSettingsIdentityName")
+            if viewModel.canEditHome {
+                Button {
+                    viewModel.beginRenaming()
+                } label: {
+                    Icon(.edit2, size: 16, color: Theme.Color.appTextMuted)
+                        .frame(width: 44, height: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Rename home")
+                .accessibilityIdentifier("homeSettingsRenameButton")
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+    }
+
+    private var renameFieldState: PantopusFieldState {
+        if let error = viewModel.renameError { return .error(error) }
+        return .default
+    }
+
+    /// RN's inline nickname editor: field + save + cancel.
+    private var renameEditor: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            PantopusTextField(
+                "Home name",
+                text: $viewModel.renameDraft,
+                placeholder: "14 Elm Park Lane",
+                state: renameFieldState,
+                identifier: "homeSettingsRenameField"
+            )
+            HStack(spacing: Spacing.s2) {
+                Button {
+                    Task { await viewModel.saveRenaming() }
+                } label: {
+                    Text(viewModel.isSavingName ? "Saving…" : "Save")
+                        .pantopusTextStyle(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(minHeight: 36)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSavingName)
+                .accessibilityIdentifier("homeSettingsRenameSave")
+
+                Button {
+                    viewModel.cancelRenaming()
+                } label: {
+                    Text("Cancel")
+                        .pantopusTextStyle(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(minHeight: 36)
+                        .background(Theme.Color.appSurfaceSunken)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSavingName)
+                .accessibilityIdentifier("homeSettingsRenameCancel")
+                Spacer(minLength: Spacing.s0)
+            }
+        }
+        .accessibilityIdentifier("homeSettingsRenameEditor")
     }
 
     private var identityChip: some View {

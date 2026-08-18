@@ -18,6 +18,12 @@ struct HubTopBar: View {
     let content: TopBarContent
     let onAvatarTap: () -> Void
     let onBellTap: () -> Void
+    /// S5 — Beacon-zone megaphone shortcut. Rendered only when the
+    /// account has unread audience notifications (RN gates the same
+    /// button on the `audience_profile` flag, which native doesn't
+    /// carry; the backend's `byContext.audience` count is the honest
+    /// native equivalent). `nil` hides the button entirely.
+    var onAudienceTap: (() -> Void)?
     let onMenuTap: () -> Void
 
     var body: some View {
@@ -62,6 +68,30 @@ struct HubTopBar: View {
                         .frame(width: 8, height: 8)
                         .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
                         .offset(x: -8, y: 8)
+                }
+            }
+            if let onAudienceTap {
+                ZStack(alignment: .topTrailing) {
+                    Button(action: onAudienceTap) {
+                        ZStack {
+                            Color.clear
+                            Icon(.megaphone, size: 20, color: Theme.Color.success)
+                        }
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Audience notifications")
+                    .accessibilityIdentifier("hubAudienceBellButton")
+                    if content.audienceUnreadCount > 0 {
+                        Circle()
+                            .fill(Theme.Color.success)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
+                            .offset(x: -8, y: 8)
+                    }
                 }
             }
             Button(action: onMenuTap) {
@@ -435,43 +465,187 @@ private struct PillarChip: View {
 struct HubDiscoveryRail: View {
     let items: [DiscoveryCardContent]
     let onTap: (DiscoveryCardContent) -> Void
+    /// Active filter tab — drives `?filter=` on `/api/hub/discovery`.
+    var activeFilter: HubDiscoveryFilter = .gigs
+    /// Filter-tab tap. Nil hides the tab row (previews / snapshots).
+    var onFilterChange: ((HubDiscoveryFilter) -> Void)?
+    /// True while the filter refetch is in flight.
+    var isLoading = false
     /// Optional `See all` action — pushes to the typed Discover hub
     /// screen (T5.4.1).
     var onSeeAll: (() -> Void)?
+    /// "Explore Map" header link — RN `(tabs)/index.tsx:505`.
+    var onExploreMap: (() -> Void)?
+    /// "Find Businesses" header link — RN `(tabs)/index.tsx:506`.
+    var onFindBusinesses: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                SectionHeader("Discover nearby")
-                Spacer()
-                if let onSeeAll {
-                    Button(action: onSeeAll) {
-                        HStack(spacing: 2) {
-                            Text("See all")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.Color.primary600)
-                            Icon(.chevronRight, size: 13, color: Theme.Color.primary600)
+            header
+            if onFilterChange != nil {
+                filterTabs
+            }
+            if isLoading {
+                skeletonRail
+            } else if items.isEmpty {
+                emptyRow
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.s2) {
+                        ForEach(items) { item in
+                            Button { onTap(item) } label: {
+                                DiscoveryCard(item: item)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(item.title), \(item.meta)")
                         }
                     }
+                    .padding(.horizontal, Spacing.s4)
+                }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: Spacing.s2) {
+            SectionHeader("Discover nearby")
+            Spacer(minLength: Spacing.s2)
+            if let onFindBusinesses {
+                headerLink(
+                    "Find Businesses",
+                    tint: Theme.Color.home,
+                    identifier: "hubDiscoveryRail.findBusinesses",
+                    action: onFindBusinesses
+                )
+            }
+            if let onExploreMap {
+                headerLink(
+                    "Explore Map",
+                    tint: Theme.Color.primary600,
+                    identifier: "hubDiscoveryRail.exploreMap",
+                    action: onExploreMap
+                )
+            }
+            if let onSeeAll {
+                Button(action: onSeeAll) {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.Color.primary600)
+                        Icon(.chevronRight, size: 13, color: Theme.Color.primary600)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("See all discovery")
+                .accessibilityIdentifier("hubDiscoveryRail.seeAll")
+            }
+        }
+        .padding(.horizontal, Spacing.s4)
+    }
+
+    private func headerLink(
+        _ label: String,
+        tint: Color,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// Tasks / People / Businesses / Posts — RN
+    /// `src/components/hub/HubDiscovery.tsx:9-14`.
+    private var filterTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(HubDiscoveryFilter.allCases) { tab in
+                    let active = tab == activeFilter
+                    Button {
+                        onFilterChange?(tab)
+                    } label: {
+                        Text(tab.label)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary
+                            )
+                            .padding(.horizontal, 14)
+                            .frame(height: 30)
+                            .background(active ? Theme.Color.primary600 : Theme.Color.appSurface)
+                            .overlay(
+                                Capsule().stroke(
+                                    active ? Theme.Color.primary600 : Theme.Color.appBorder,
+                                    lineWidth: 1
+                                )
+                            )
+                            .clipShape(Capsule())
+                            .contentShape(Capsule())
+                    }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("See all discovery")
-                    .accessibilityIdentifier("hubDiscoveryRail.seeAll")
+                    .accessibilityIdentifier("hubDiscoveryFilter_\(tab.rawValue)")
+                    .accessibilityAddTraits(active ? [.isSelected] : [])
                 }
             }
             .padding(.horizontal, Spacing.s4)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Spacing.s2) {
-                    ForEach(items) { item in
-                        Button { onTap(item) } label: {
-                            DiscoveryCard(item: item)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(item.title), \(item.meta)")
-                    }
-                }
-                .padding(.horizontal, Spacing.s4)
-            }
         }
+        .accessibilityIdentifier("hubDiscoveryFilters")
+    }
+
+    private var skeletonRail: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s2) {
+                ForEach(0..<3, id: \.self) { _ in
+                    VStack(spacing: Spacing.s0) {
+                        Rectangle()
+                            .fill(Theme.Color.appSurfaceSunken)
+                            .frame(height: 80)
+                        VStack(alignment: .leading, spacing: Spacing.s1) {
+                            RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
+                                .fill(Theme.Color.appSurfaceSunken)
+                                .frame(height: 11)
+                            RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
+                                .fill(Theme.Color.appSurfaceSunken)
+                                .frame(width: 70, height: 9)
+                        }
+                        .padding(Spacing.s2)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .frame(width: 140, height: 180)
+                    .background(Theme.Color.appSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
+                    )
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+        }
+        .accessibilityIdentifier("hubDiscoverySkeleton")
+        .accessibilityLabel("Loading nearby discovery")
+    }
+
+    private var emptyRow: some View {
+        Text("Nothing nearby yet")
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.s6)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("hubDiscoveryEmpty")
     }
 }
 

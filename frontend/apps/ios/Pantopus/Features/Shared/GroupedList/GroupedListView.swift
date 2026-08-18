@@ -170,6 +170,11 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             }
             .padding(.bottom, Spacing.s6)
         }
+        // The data source is the source of truth the moment it emits a
+        // new projection: confirmed mutations re-emit the same value
+        // (clearing is a no-op) and rolled-back ones re-emit the server
+        // value, which has to win over the optimistic override.
+        .onChange(of: groups) { _, _ in optimisticOverrides.removeAll() }
         .accessibilityIdentifier("groupedListContent")
     }
 
@@ -268,6 +273,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                     sliderControl(rowId: row.id, stops: stops, index: index)
                         .padding(.top, 6)
                 }
+                if case let .chips(options, selected) = activeControl {
+                    chipStrip(rowId: row.id, options: options, selected: selected)
+                        .padding(.top, Spacing.s2)
+                }
             }
             Spacer(minLength: Spacing.s0)
             rightControl(rowId: row.id, control: activeControl)
@@ -276,19 +285,19 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         .padding(.vertical, 14)
         .frame(minHeight: 48)
 
-        if case .channelTriad = activeControl {
-            // Triad rows expose each P/E/S chip as its own VoiceOver
-            // element. `.combine` would flatten the three buttons into
-            // the row label and lose the per-channel toggles; the chips
-            // also own their own taps, so the row carries no tap gesture.
+        if activeControl.ownsInnerTaps {
+            // Triad + chip-strip rows expose every chip as its own
+            // VoiceOver element. `.combine` would flatten the buttons
+            // into the row label and lose the per-chip controls; the
+            // chips also own their taps, so the row carries no gesture.
             rowBody
-                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityIdentifier(row.accessibilityIdentifier ?? "groupedListRow_\(row.id)")
                 .accessibilityElement(children: .contain)
         } else {
             rowBody
                 .contentShape(Rectangle())
                 .onTapGesture { handleTap(rowId: row.id, control: activeControl, destructive: row.destructive) }
-                .accessibilityIdentifier("groupedListRow_\(row.id)")
+                .accessibilityIdentifier(row.accessibilityIdentifier ?? "groupedListRow_\(row.id)")
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(accessibilityLabel(row, control: activeControl))
                 .accessibilityAddTraits(accessibilityTraits(control: activeControl))
@@ -319,7 +328,9 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
                     Icon(.chevronRight, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
                 }
             }
-        case .slider:
+        case .slider, .chips:
+            // Both render inline under the row label, not in the
+            // trailing slot.
             EmptyView()
         case let .channelTriad(p, e, s, locked):
             ChannelTriad(
@@ -368,6 +379,41 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             .padding(.vertical, 3)
             .background(bg)
             .clipShape(Capsule())
+    }
+
+    /// A14.5 — horizontally scrolling single-select value chips under
+    /// the row label (briefing send time, quiet-hours bounds). The raw
+    /// option string is both the label and the wire value.
+    private func chipStrip(rowId: String, options: [String], selected: String) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(options, id: \.self) { option in
+                    let isActive = option == selected
+                    let traits: AccessibilityTraits = isActive ? [.isButton, .isSelected] : [.isButton]
+                    Button {
+                        flipChip(rowId: rowId, options: options, value: option, selected: selected)
+                    } label: {
+                        Text(option)
+                            .font(.system(size: 13, weight: isActive ? .bold : .medium))
+                            .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                            .padding(.horizontal, Spacing.s3)
+                            .padding(.vertical, 6)
+                            .background(isActive ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(isActive ? Theme.Color.primary600 : Theme.Color.appBorder, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("groupedListChipOption_\(rowId)_\(option)")
+                    .accessibilityLabel(option)
+                    .accessibilityAddTraits(traits)
+                }
+            }
+            .padding(.trailing, Spacing.s1)
+        }
+        .accessibilityIdentifier("groupedListChipStrip_\(rowId)")
     }
 
     @ViewBuilder
@@ -459,10 +505,10 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         case .radio:
             optimisticOverrides[rowId] = .radio(isSelected: true)
             Task { await dataSource.selectRadio(rowId) }
-        case .toggle, .slider, .channelTriad:
-            // Toggle / slider / channel chips already drive their own
-            // callbacks. Chevron / chipStatus rows also handle taps for
-            // navigation even when destructive.
+        case .toggle, .slider, .channelTriad, .chips:
+            // Toggle / slider / channel chips / value chips already
+            // drive their own callbacks. Chevron / chipStatus rows also
+            // handle taps for navigation even when destructive.
             if destructive {
                 Task { await dataSource.tapRow(rowId) }
             }
@@ -484,6 +530,12 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         guard newIndex != previousIndex else { return }
         optimisticOverrides[rowId] = .slider(stops: stops, index: newIndex)
         Task { await dataSource.setSlider(rowId, index: newIndex) }
+    }
+
+    private func flipChip(rowId: String, options: [String], value: String, selected: String) {
+        guard value != selected else { return }
+        optimisticOverrides[rowId] = .chips(options: options, selected: value)
+        Task { await dataSource.selectChip(rowId, value: value) }
     }
 
     private func flipChannel(rowId: String, control: RowControl, glyph: ChannelGlyph) {
@@ -533,6 +585,8 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
             parts.append(label)
         case let .slider(stops, index):
             if stops.indices.contains(index) { parts.append("currently \(stops[index])") }
+        case let .chips(_, selected):
+            parts.append("currently \(selected)")
         case let .channelTriad(p, e, s, locked):
             for (glyph, isOn) in [(ChannelGlyph.p, p), (.e, e), (.s, s)] {
                 let word = locked.contains(glyph) ? "locked on" : (isOn ? "on" : "off")
@@ -548,7 +602,7 @@ public struct GroupedListView<DataSource: GroupedListDataSource>: View {
         switch control {
         case .toggle, .radio: .isButton
         case .chevron, .chipStatus, .slider: .isButton
-        case .channelTriad: []
+        case .channelTriad, .chips: []
         }
     }
 }

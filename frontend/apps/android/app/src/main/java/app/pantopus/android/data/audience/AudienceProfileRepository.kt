@@ -1,5 +1,7 @@
 package app.pantopus.android.data.audience
 
+import app.pantopus.android.data.api.models.audience.AudienceFollowerStatusBody
+import app.pantopus.android.data.api.models.audience.AudienceFollowerUpdateResponse
 import app.pantopus.android.data.api.models.audience.AudienceListResponse
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionBody
 import app.pantopus.android.data.api.models.audience.AudienceMemberActionResponse
@@ -28,11 +30,24 @@ class AudienceProfileRepository
 
         suspend fun audience(): NetworkResult<AudienceListResponse> = safeApiCall { api.audience() }
 
-        /** A22.2 "Your audience" — filtered fan list + counts by tier. */
+        /** A22.2 "Your audience" — filtered + sorted fan page. `offset` walks
+         *  the `pagination.nextOffset` cursor the handler echoes back. */
         suspend fun audienceMembers(
             status: String?,
             tierRank: Int?,
-        ): NetworkResult<AudienceListResponse> = safeApiCall { api.audience(status = status, tierRank = tierRank) }
+            sort: String? = null,
+            limit: Int? = null,
+            offset: Int? = null,
+        ): NetworkResult<AudienceListResponse> =
+            safeApiCall {
+                api.audience(
+                    sort = sort,
+                    status = status,
+                    tierRank = tierRank,
+                    limit = limit,
+                    offset = offset?.takeIf { it > 0 },
+                )
+            }
 
         /** A22.2 — approve / decline / remove / mute / unmute one member. */
         suspend fun audienceMemberAction(
@@ -40,6 +55,18 @@ class AudienceProfileRepository
             action: String,
         ): NetworkResult<AudienceMemberActionResponse> =
             safeApiCall { api.audienceMemberAction(membershipId, AudienceMemberActionBody(action)) }
+
+        /** A22.2 — block (or otherwise re-status) one follower. The
+         *  `/me/audience` action verbs have no block, so this goes through
+         *  the follower route, which resolves `followId` as a membership id. */
+        suspend fun updateFollowerStatus(
+            personaId: String,
+            membershipId: String,
+            status: String,
+        ): NetworkResult<AudienceFollowerUpdateResponse> =
+            safeApiCall {
+                api.updateFollowerStatus(personaId, membershipId, AudienceFollowerStatusBody(status))
+            }
 
         suspend fun posts(handle: String): NetworkResult<PersonaPostsResponse> = safeApiCall { api.posts(handle) }
 

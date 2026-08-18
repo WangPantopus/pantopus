@@ -24,6 +24,18 @@ final class PulseFeedViewModelTests: XCTestCase {
         )
     }
 
+    /// The view-model's default `locationProvider` is `DeviceLocationProvider.shared`,
+    /// which waits on a `CLLocationManager` callback the simulator never delivers —
+    /// the suite hung here rather than failing. Every case builds the view-model
+    /// through `makeVM()` so the coordinate is supplied synchronously.
+    private static let fixedLocation = FixedLocationProvider(
+        UserCoordinate(latitude: 40.7484, longitude: -73.9857, accuracyMeters: 100)
+    )
+
+    private func makeVM() -> PulseFeedViewModel {
+        PulseFeedViewModel(api: makeAPI(), locationProvider: Self.fixedLocation)
+    }
+
     private static let askPostJSON = """
     {
       "id": "p1",
@@ -51,7 +63,7 @@ final class PulseFeedViewModelTests: XCTestCase {
 
     func testLoadTransitionsLoadedWhenPostsReturned() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.feedJSON(Self.askPostJSON))]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case let .loaded(rows) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
@@ -64,7 +76,7 @@ final class PulseFeedViewModelTests: XCTestCase {
 
     func testLoadEmptyTransitionsEmpty() async {
         SequencedURLProtocol.sequence = [.status(200, body: Self.feedJSON())]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case .empty = vm.state else {
             XCTFail("Expected .empty, got \(vm.state)")
@@ -74,7 +86,7 @@ final class PulseFeedViewModelTests: XCTestCase {
 
     func testLoadFailureTransitionsError() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{}")]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case .error = vm.state else {
             XCTFail("Expected .error, got \(vm.state)")
@@ -87,7 +99,7 @@ final class PulseFeedViewModelTests: XCTestCase {
             .status(200, body: Self.feedJSON(Self.askPostJSON)),
             .status(200, body: Self.feedJSON())
         ]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.selectIntent(.event)
         XCTAssertEqual(vm.activeIntent, .event)
@@ -102,7 +114,7 @@ final class PulseFeedViewModelTests: XCTestCase {
             .status(200, body: Self.feedJSON(Self.askPostJSON)),
             .status(200, body: "{\"liked\":true,\"likeCount\":13,\"message\":\"Post liked\"}")
         ]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.tapReaction(postId: "p1")
         guard case let .loaded(rows) = vm.state else {
@@ -130,7 +142,7 @@ final class PulseFeedViewModelTests: XCTestCase {
         }
         """
         SequencedURLProtocol.sequence = [.status(200, body: Self.feedJSON(photoPostJSON))]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case let .loaded(rows) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
@@ -156,7 +168,7 @@ final class PulseFeedViewModelTests: XCTestCase {
         }
         """
         SequencedURLProtocol.sequence = [.status(200, body: Self.feedJSON(photoPostJSON))]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         guard case let .loaded(rows) = vm.state else {
             XCTFail("Expected .loaded, got \(vm.state)")
@@ -170,7 +182,7 @@ final class PulseFeedViewModelTests: XCTestCase {
             .status(200, body: Self.feedJSON(Self.askPostJSON)),
             .status(500, body: "{}")
         ]
-        let vm = PulseFeedViewModel(api: makeAPI())
+        let vm = makeVM()
         await vm.load()
         await vm.tapReaction(postId: "p1")
         guard case let .loaded(rows) = vm.state else {

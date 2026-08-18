@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +51,7 @@ class PlaceSwitcherViewModel
                     when (val result = homesRepository.myHomes()) {
                         is NetworkResult.Success ->
                             PlaceSwitcherUiState.Loaded(result.data.homes.map(::rowFor))
-                        is NetworkResult.Failure -> PlaceSwitcherUiState.Error(result.error.message)
+                        is NetworkResult.Failure -> PlaceSwitcherUiState.Error(result.error.displayMessage("Couldn't load homes."))
                     }
             }
         }

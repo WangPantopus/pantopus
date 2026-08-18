@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.api.models.membership
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
@@ -27,6 +28,32 @@ data class PersonaMembershipDto(
     val cancelAtPeriodEnd: Boolean? = null,
     val currentPeriodStart: String? = null,
     val currentPeriodEnd: String? = null,
+    /**
+     * Present once a tier change has been scheduled — it lands at
+     * `currentPeriodEnd`, not immediately.
+     */
+    val scheduledTierChange: MembershipScheduledTierChangeDto? = null,
+    /**
+     * Message-thread + video-call credits left this period. `msgThreads` is
+     * null when the tier grants unlimited (or no) threads — the distinction
+     * comes from `tier.msgThreadsPerPeriod`.
+     */
+    val quotaRemaining: MembershipQuotaRemainingDto? = null,
+)
+
+/**
+ * `serializeMembershipForFan` emits `{ tierId }` only — the target tier's
+ * name is resolved client-side against the public tier ladder.
+ */
+@JsonClass(generateAdapter = true)
+data class MembershipScheduledTierChangeDto(
+    val tierId: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class MembershipQuotaRemainingDto(
+    val msgThreads: Int? = null,
+    val videoCalls: Int? = null,
 )
 
 /** The persona the fan supports — shared `serializeAudienceProfileForViewer`. */
@@ -60,4 +87,39 @@ data class MembershipTierDto(
     val msgThreadsPerPeriod: Int? = null,
     val creatorCanInitiateDm: Boolean? = null,
     val replyPolicy: String? = null,
+)
+
+// MARK: - GET /api/personas/:handle/tiers  (public tier ladder)
+
+/**
+ * The tier ladder the change-tier picker offers. Emitted by
+ * `backend/routes/personas.js:1111` with `stripe_price_id` stripped.
+ */
+@JsonClass(generateAdapter = true)
+data class PersonaPublicTiersResponse(
+    val tiers: List<PersonaPublicTierDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class PersonaPublicTierDto(
+    val id: String,
+    val rank: Int,
+    val name: String? = null,
+    val description: String? = null,
+    val priceCents: Int? = null,
+    val currency: String? = null,
+    val billingInterval: String? = null,
+    val msgThreadsPerPeriod: Int? = null,
+    val replyPolicy: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class MembershipTierChangeBody(
+    @Json(name = "tier_rank") val tierRank: Int,
+)
+
+@JsonClass(generateAdapter = true)
+data class MembershipRefundRequestBody(
+    val reason: String,
+    @Json(name = "thread_id") val threadId: String? = null,
 )

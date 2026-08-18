@@ -19,7 +19,10 @@ import app.pantopus.android.data.api.models.mailbox.v2.RecordsDetailDto
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderDto
 import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.mailbox.MailboxDocumentRepository
+import app.pantopus.android.data.mailbox.MailboxPackageRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -27,6 +30,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MailTrust
 import app.pantopus.android.ui.screens.mailbox.item_detail.PackageBodyContent
 import app.pantopus.android.ui.screens.mailbox.mail_detail.variants.decodePackageDetail
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
+import app.pantopus.android.ui.screens.shared.mail_item_detail.AIElfBullet
 import app.pantopus.android.ui.screens.shared.mail_item_detail.MailDetailTrust
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,6 +81,17 @@ private data class PendingGigBidAcceptance(
 data class MailDetailContent(
     val mailId: String,
     val category: MailItemCategory,
+    /**
+     * Raw backend `Mail.category` (`bill` / `legal` / `notice` / `receipt` /
+     * `community` / `promo` / `other`). Distinct from [category], which
+     * projects `mail_type`. Drives the A17.1 per-category ACTIONS row.
+     */
+    val mailCategoryKey: String? = null,
+    /**
+     * True when the sender resolves to RN's `unknown` trust bucket —
+     * suppresses the Pay / Sign tiles (`detail.tsx:69-72`).
+     */
+    val isSenderUnknown: Boolean = false,
     val trust: MailTrust,
     val detailTrust: MailDetailTrust,
     val senderDisplayName: String,
@@ -94,6 +109,8 @@ data class MailDetailContent(
     val bodyParagraphs: List<String>,
     val attachments: List<String>,
     val aiSummary: String?,
+    /** A17.1 — optional bullet list under the elf summary (`mail-detail.jsx` ELF.bullets). */
+    val aiBullets: List<AIElfBullet> = emptyList(),
     val ackRequired: Boolean,
     val isAcknowledged: Boolean,
     val isArchived: Boolean = false,
@@ -148,6 +165,8 @@ class MailDetailViewModel
         private val repo: MailboxRepository,
         private val vaultRepo: MailboxVaultRepository,
         private val gigsRepo: GigsRepository,
+        private val packageRepo: MailboxPackageRepository,
+        private val documentRepo: MailboxDocumentRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val mailId: String =
@@ -186,6 +205,13 @@ class MailDetailViewModel
         private val _recordsFileInFlight = MutableStateFlow(false)
         val recordsFileInFlight: StateFlow<Boolean> = _recordsFileInFlight.asStateFlow()
 
+        /**
+         * A17.8 — a package dashboard write (share ETA / report issue) is in
+         * flight; keeps the overflow entries from double-firing.
+         */
+        private val _packageActionInFlight = MutableStateFlow(false)
+        val packageActionInFlight: StateFlow<Boolean> = _packageActionInFlight.asStateFlow()
+
         /** T6.5e (P19.5) — Save-to-vault picker visibility. */
         private val _showsSaveToVaultPicker = MutableStateFlow(false)
         val showsSaveToVaultPicker: StateFlow<Boolean> = _showsSaveToVaultPicker.asStateFlow()
@@ -197,7 +223,54 @@ class MailDetailViewModel
         private val _saveToVaultInFlight = MutableStateFlow(false)
         val saveToVaultInFlight: StateFlow<Boolean> = _saveToVaultInFlight.asStateFlow()
 
+        /** A17.2 — booklet PDF download in flight; disables the "PDF" tile. */
+        private val _bookletDownloadInFlight = MutableStateFlow(false)
+        val bookletDownloadInFlight: StateFlow<Boolean> = _bookletDownloadInFlight.asStateFlow()
+
+        /** A17.3 — certified legal-proof fetch in flight. */
+        private val _certifiedProofInFlight = MutableStateFlow(false)
+        val certifiedProofInFlight: StateFlow<Boolean> = _certifiedProofInFlight.asStateFlow()
+
+        /**
+         * A17.3 — `true` once the legal delivery proof has been fetched, so
+         * the tile flips to "Saved" (RN's `✓ Saved`,
+         * `src/app/mailbox/certified.tsx:205`).
+         */
+        private val _certifiedProofSaved = MutableStateFlow(false)
+        val certifiedProofSaved: StateFlow<Boolean> = _certifiedProofSaved.asStateFlow()
+
+        /**
+         * A17.1 — per-category action currently POSTing to
+         * `/item/:id/action`; disables the ACTIONS row while it runs.
+         */
+        private val _categoryActionInFlight = MutableStateFlow<MailCategoryAction?>(null)
+        val categoryActionInFlight: StateFlow<MailCategoryAction?> = _categoryActionInFlight.asStateFlow()
+
+        /**
+         * A17.1 — destructive category action awaiting confirmation (today
+         * only `Dismiss`, which shreds the item).
+         */
+        private val _pendingDestructiveAction = MutableStateFlow<MailCategoryAction?>(null)
+        val pendingDestructiveAction: StateFlow<MailCategoryAction?> = _pendingDestructiveAction.asStateFlow()
+
         private var pendingGigBidAcceptance: PendingGigBidAcceptance? = null
+
+        /**
+         * Set to this mail's id when the loaded item carries a stationery
+         * theme — i.e. it came out of the Ceremonial Mail compose flow and
+         * belongs in the ceremonial open experience (envelope tap-to-open,
+         * voice postscript, ceremonial CTAs) rather than the plain detail.
+         * The host observes this and *replaces* the current route, mirroring
+         * RN's `router.replace('/mailbox/open?id=…')`
+         * (`src/app/mailbox/detail.tsx:43-49`).
+         */
+        private val _ceremonialRedirectMailId = MutableStateFlow<String?>(null)
+        val ceremonialRedirectMailId: StateFlow<String?> = _ceremonialRedirectMailId.asStateFlow()
+
+        /** Clear the redirect once the host has navigated. */
+        fun acknowledgeCeremonialRedirect() {
+            _ceremonialRedirectMailId.value = null
+        }
 
         fun load() {
             if (_state.value is MailDetailUiState.Loaded) return
@@ -209,9 +282,17 @@ class MailDetailViewModel
             viewModelScope.launch {
                 when (val result = repo.detail(mailId)) {
                     is NetworkResult.Success ->
-                        _state.value = MailDetailUiState.Loaded(project(result.data.mail))
+                        // Ceremonial mail never lands on the generic detail —
+                        // hand it straight to the open experience and hold the
+                        // loading frame so the plain layout never flashes (RN
+                        // short-circuits before `setLoading(false)`).
+                        if (result.data.mail.stationeryTheme != null) {
+                            _ceremonialRedirectMailId.value = mailId
+                        } else {
+                            _state.value = MailDetailUiState.Loaded(project(result.data.mail))
+                        }
                     is NetworkResult.Failure ->
-                        _state.value = MailDetailUiState.Error(result.error.message)
+                        _state.value = MailDetailUiState.Error(result.error.displayMessage("Couldn't load this item."))
                 }
             }
         }
@@ -298,6 +379,118 @@ class MailDetailViewModel
                 CommunityRsvpStatus.Undecided -> "RSVP cleared"
             }
 
+        // MARK: - Per-category actions (A17.1)
+
+        /**
+         * The ACTIONS row for the loaded item — RN's
+         * `CATEGORY_ACTIONS[item.category] || CATEGORY_ACTIONS.other`, minus
+         * Pay / Sign for unknown senders (`detail.tsx:56-72`).
+         */
+        fun categoryActions(): List<MailCategoryAction> {
+            val content = (_state.value as? MailDetailUiState.Loaded)?.content ?: return emptyList()
+            return MailCategoryActions.actions(
+                rawCategory = content.mailCategoryKey,
+                isSenderUnknown = content.isSenderUnknown,
+            )
+        }
+
+        /**
+         * Route a tile tap. Destructive tiles park in
+         * [pendingDestructiveAction] for the screen's confirm dialog; the
+         * rest fire straight away.
+         */
+        fun tapCategoryAction(action: MailCategoryAction) {
+            if (action.isDestructive) {
+                _pendingDestructiveAction.value = action
+                return
+            }
+            performCategoryAction(action)
+        }
+
+        fun dismissDestructiveAction() {
+            _pendingDestructiveAction.value = null
+        }
+
+        /**
+         * `POST /api/mailbox/v2/item/:id/action` — route
+         * `backend/routes/mailboxV2.js:459`. The handler records a
+         * `mail_action_clicked` event itself, so (unlike RN, which posts a
+         * second `/event` write) one call is enough.
+         */
+        fun performCategoryAction(action: MailCategoryAction) {
+            if (_state.value !is MailDetailUiState.Loaded) return
+            if (_categoryActionInFlight.value != null) return
+            _pendingDestructiveAction.value = null
+            _categoryActionInFlight.value = action
+            viewModelScope.launch {
+                when (val result = repo.itemAction(mailId, action.actionKey)) {
+                    is NetworkResult.Success -> {
+                        // RN only toasts (`detail.tsx:56-66`) — the generic
+                        // detail renders nothing derived from `lifecycle`, so
+                        // a refetch would buy a skeleton flash and nothing else.
+                        _toast.value = action.successToast
+                        _categoryActionInFlight.value = null
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value = result.error.displayMessage("Action failed")
+                        _categoryActionInFlight.value = null
+                    }
+                }
+            }
+        }
+
+        // MARK: - Package dashboard actions (A17.8)
+
+        /**
+         * A17.8 — "Share ETA with household". Drops a package-arriving
+         * notice into every other resident's Home drawer via
+         * `POST api/mailbox/v2/package/:mailId/share-eta`
+         * (`backend/routes/mailboxV2.js:727`) and toasts how many people
+         * were notified. Mirrors RN `src/app/mailbox/package.tsx:40-48`.
+         */
+        fun sharePackageEta() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            if (current.content.category != MailItemCategory.Package) return
+            if (_packageActionInFlight.value) return
+            _packageActionInFlight.value = true
+            viewModelScope.launch {
+                _toast.value =
+                    when (val result = packageRepo.shareEta(mailId)) {
+                        is NetworkResult.Success -> {
+                            val notified = result.data.notified ?: 0
+                            val noun = if (notified == 1) "member" else "members"
+                            "ETA shared with $notified household $noun"
+                        }
+                        is NetworkResult.Failure -> result.error.displayMessage("Failed to share")
+                    }
+                _packageActionInFlight.value = false
+            }
+        }
+
+        /**
+         * A17.8 — "Report issue". RN logs a `package_issue_reported` event
+         * against the mail item (`src/app/mailbox/package.tsx:60-64`); the
+         * native overflow entry used to be a no-op.
+         */
+        fun reportPackageIssue() {
+            val current = _state.value as? MailDetailUiState.Loaded ?: return
+            if (current.content.category != MailItemCategory.Package) return
+            if (_packageActionInFlight.value) return
+            _packageActionInFlight.value = true
+            viewModelScope.launch {
+                _toast.value =
+                    when (
+                        val result =
+                            repo.logEvent(eventType = "package_issue_reported", mailId = mailId)
+                    ) {
+                        is NetworkResult.Success -> "Package issue has been reported"
+                        is NetworkResult.Failure ->
+                            result.error.displayMessage("Couldn't report this issue")
+                    }
+                _packageActionInFlight.value = false
+            }
+        }
+
         // MARK: - Save to vault (T6.5e / P19.5)
 
         /** Open the save-to-vault picker. Fetches folders on the first
@@ -318,13 +511,77 @@ class MailDetailViewModel
                         }
                     }
                     is NetworkResult.Failure ->
-                        _toast.value = result.error.message
+                        _toast.value = result.error.displayMessage("Couldn't load your vault folders.")
                 }
             }
         }
 
         fun dismissSaveToVaultPicker() {
             _showsSaveToVaultPicker.value = false
+        }
+
+        // ── Document artefacts (A17.2 booklet PDF / A17.3 proof) ─
+
+        /**
+         * A17.2 — `POST api/mailbox/v2/p2/booklet/:mailId/download`
+         * (`backend/routes/mailboxV2Phase2.js:447`). Mirrors RN's
+         * "Download Started · Downloading X.X MB" confirmation
+         * (`src/app/mailbox/booklet.tsx:43`). The backend answers 404 when
+         * the booklet has no rendered PDF, which surfaces as RN's
+         * "Download not available".
+         */
+        fun downloadBookletPdf() {
+            if (_bookletDownloadInFlight.value) return
+            _bookletDownloadInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    when (val result = documentRepo.bookletDownload(mailId)) {
+                        is NetworkResult.Success -> {
+                            val label = megabytesLabel(result.data.sizeBytes)
+                            _toast.value =
+                                if (label != null) "Download started · $label" else "Download started"
+                        }
+                        is NetworkResult.Failure -> _toast.value = "Download not available"
+                    }
+                } finally {
+                    _bookletDownloadInFlight.value = false
+                }
+            }
+        }
+
+        /**
+         * A17.3 — `GET api/mailbox/v2/p2/certified/:mailId/proof`
+         * (`backend/routes/mailboxV2Phase2.js:705`). The route rejects with
+         * 400 until the item is acknowledged, which is exactly when RN
+         * surfaces the button (`src/app/mailbox/certified.tsx:200`), so the
+         * failure copy matches RN's "Proof not available yet".
+         */
+        fun downloadCertifiedProof() {
+            if (_certifiedProofInFlight.value || _certifiedProofSaved.value) return
+            _certifiedProofInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    when (val result = documentRepo.certifiedProof(mailId)) {
+                        is NetworkResult.Success ->
+                            if (result.data.proof == null) {
+                                _toast.value = "Proof not available yet"
+                            } else {
+                                _certifiedProofSaved.value = true
+                                _toast.value = "Delivery proof saved"
+                            }
+                        is NetworkResult.Failure -> _toast.value = "Proof not available yet"
+                    }
+                } finally {
+                    _certifiedProofInFlight.value = false
+                }
+            }
+        }
+
+        /** "2.4 MB" — the label RN puts in its "Download Started" alert. */
+        private fun megabytesLabel(sizeBytes: Long?): String? {
+            if (sizeBytes == null || sizeBytes <= 0L) return null
+            val megabytes = sizeBytes.toDouble() / (1024 * 1024)
+            return String.format(Locale.US, "%.1f MB", megabytes)
         }
 
         // ── Ceremonial variant mutations (A17.5–A17.8) ───────────
@@ -528,30 +785,93 @@ class MailDetailViewModel
         }
 
         /**
-         * A17.10 — File the archival record in its suggested vault folder.
-         * Stub: flips the local `isFiled` flag and toasts (the real
-         * vault-filing backend is out of scope for P6.6). The body
-         * prepends the Status row, swaps the hero stamp + retention
-         * banner, switches the elf copy, and reveals the related strip.
+         * A17.10 — File the archival record in its suggested vault folder
+         * via the same `POST …/vault/file` path as Save to vault.
          */
         fun fileRecordToVault() {
             val current = _state.value as? MailDetailUiState.Loaded ?: return
             val records = current.content.recordsDetail ?: return
             if (current.content.category != MailItemCategory.Records || records.isFiled) return
+            // Claim the in-flight flag synchronously — a second tap while the
+            // folders fetch is awaiting would otherwise POST /vault/file twice.
             if (_recordsFileInFlight.value) return
             _recordsFileInFlight.value = true
+            viewModelScope.launch {
+                try {
+                    fileRecordToVaultInner(current.content, records)
+                } finally {
+                    _recordsFileInFlight.value = false
+                }
+            }
+        }
+
+        private suspend fun fileRecordToVaultInner(
+            content: MailDetailContent,
+            records: RecordsDetailDto,
+        ) {
+            if (_saveToVaultFolders.value.isEmpty()) {
+                when (val result = vaultRepo.folders(drawer = "personal")) {
+                    is NetworkResult.Success -> _saveToVaultFolders.value = result.data.folders
+                    is NetworkResult.Failure -> {
+                        _toast.value = result.error.displayMessage("Couldn't load your vault folders.")
+                        return
+                    }
+                }
+            }
+            val folderId = suggestedVaultFolderId(records)
+            if (folderId == null) {
+                // No vault folder matches the record's suggested trail — let
+                // the user pick rather than filing it somewhere arbitrary.
+                openSaveToVaultPicker()
+                return
+            }
             _state.value =
                 MailDetailUiState.Loaded(
-                    current.content.copy(
-                        recordsDetail =
-                            records.copy(
-                                isFiled = true,
-                                filedAtLabel = "Today 2:14 PM · retention 7y",
-                            ),
+                    content.copy(
+                        recordsDetail = records.copy(isFiled = true, filedAtLabel = filedAtStamp()),
                     ),
                 )
-            _toast.value = "Filed in Vault"
-            _recordsFileInFlight.value = false
+            when (val result = vaultRepo.file(mailId = mailId, folderId = folderId)) {
+                is NetworkResult.Success -> {
+                    val label = _saveToVaultFolders.value.firstOrNull { it.id == folderId }?.label
+                    _toast.value = label?.let { "Filed in $it" } ?: "Filed in Vault"
+                }
+                is NetworkResult.Failure -> {
+                    _state.value = MailDetailUiState.Loaded(content)
+                    _toast.value = result.error.displayMessage("Couldn't file to vault. Try again.")
+                }
+            }
+        }
+
+        /**
+         * Resolve the vault folder the record should be filed in by matching
+         * the payload's `vault_trail` crumbs against the user's real folders,
+         * most-specific crumb first. The `Mailbox` / `Vault` crumbs are
+         * chrome, not folders. Returns null when nothing matches — the caller
+         * opens the picker instead of guessing (no system folder is named
+         * "Records" or "Archive", so a label-contains heuristic silently filed
+         * every record into whichever folder happened to sort first).
+         */
+        private fun suggestedVaultFolderId(records: RecordsDetailDto): String? {
+            val folders = _saveToVaultFolders.value
+            if (folders.isEmpty()) return null
+            return records.vaultTrail
+                .asReversed()
+                .asSequence()
+                .map { it.label.trim() }
+                .filter { it.isNotEmpty() && !it.equals("Mailbox", true) && !it.equals("Vault", true) }
+                .mapNotNull { crumb -> folders.firstOrNull { it.label.equals(crumb, ignoreCase = true) } }
+                .firstOrNull()
+                ?.id
+        }
+
+        /**
+         * "Today 2:14 PM · retention 7y" — the optimistic filed-at stamp.
+         * Mirrors iOS `formatFiledAtNow()`.
+         */
+        private fun filedAtStamp(): String {
+            val formatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+            return "Today ${formatter.format(java.time.LocalTime.now())} · retention 7y"
         }
 
         private fun currentUnsavedMemoryContent(): Pair<MailDetailContent, MemoryDetailDto>? {
@@ -578,7 +898,7 @@ class MailDetailViewModel
                         _toast.value = folderLabel?.let { "Saved to $it" } ?: "Saved to vault"
                     }
                     is NetworkResult.Failure ->
-                        _toast.value = result.error.message
+                        _toast.value = result.error.displayMessage("Couldn't save to vault. Try again.")
                 }
                 _showsSaveToVaultPicker.value = false
                 _saveToVaultInFlight.value = false
@@ -622,6 +942,8 @@ class MailDetailViewModel
                 return MailDetailContent(
                     mailId = detail.id,
                     category = category,
+                    mailCategoryKey = detail.category,
+                    isSenderUnknown = resolveSenderTrust(detail) == "unknown",
                     trust = trust,
                     detailTrust = trust.detailTrust,
                     senderDisplayName = senderDisplayName,
@@ -652,6 +974,30 @@ class MailDetailViewModel
                     partyDetail = variants.party,
                     recordsDetail = variants.records,
                 )
+            }
+
+            /**
+             * RN `getSenderTrust` (`src/components/mailbox/sender.ts:39-58`)
+             * — the same fallback ladder the backend's `resolveSenderTrust`
+             * (`backend/routes/mailboxV2.js:198`) uses. Only the `unknown`
+             * bucket matters to the ACTIONS row (it suppresses Pay / Sign).
+             */
+            @JvmStatic
+            fun resolveSenderTrust(detail: MailDetail): String {
+                val known =
+                    setOf(
+                        "verified_gov",
+                        "verified_utility",
+                        "verified_business",
+                        "pantopus_user",
+                        "unknown",
+                    )
+                val raw = detail.senderTrust?.trim().orEmpty()
+                if (raw in known) return raw
+                val business = detail.senderBusinessName?.trim().orEmpty()
+                if (business.isNotEmpty()) return "verified_business"
+                if (detail.senderUserId != null || detail.sender != null) return "pantopus_user"
+                return "unknown"
             }
 
             private data class VariantDetails(

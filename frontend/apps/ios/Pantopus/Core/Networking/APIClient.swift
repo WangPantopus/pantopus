@@ -230,6 +230,15 @@ final class APIClient: @unchecked Sendable {
         } catch {
             throw APIError.invalidResponse
         }
+        // An endpoint that opts out of the protocol cache must not leave a
+        // copy behind either: `URLRequest.CachePolicy` only governs *reads*,
+        // so CFNetwork still heuristically writes a 200 GET with no
+        // `Cache-Control` into the on-disk `pantopus-http` cache. Sensitive
+        // reads (e.g. the business private record — legal name, tax id) rely
+        // on this purge, so the bytes never outlive the request.
+        if endpoint.cachePolicy != .useProtocolCachePolicy {
+            session.configuration.urlCache?.removeCachedResponse(for: request)
+        }
         guard let http = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }

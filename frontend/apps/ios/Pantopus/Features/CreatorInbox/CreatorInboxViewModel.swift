@@ -9,6 +9,11 @@
 //  derive from the loaded thread list so they always match what the
 //  user sees.
 //
+//  Row taps route into `PersonaDmThreadView` by (personaId, threadId).
+//  They do **not** push generic chat: the persona-DM serializer carries
+//  no `user_id` for either side, so there is no counterparty user id to
+//  route on (`backend/routes/personaDms.js:56`).
+//
 
 import Foundation
 import Observation
@@ -21,6 +26,9 @@ public final class CreatorInboxViewModel {
 
     private let api: APIClient
     private var threads: [PersonaThreadDTO] = []
+    /// Persona whose inbox this is — the `:id` path segment every
+    /// `/api/personas/:id/dms/...` call from a row needs.
+    private var personaId: String = ""
     private var header = CreatorInboxHeader(
         title: "Creator Inbox",
         handle: nil,
@@ -55,8 +63,9 @@ public final class CreatorInboxViewModel {
                 isCrossPersona: false
             )
             header = resolvedHeader
+            personaId = persona.id
             let response: PersonaThreadsResponse =
-                try await api.request(AudienceProfileEndpoints.threads(personaId: persona.id))
+                try await api.request(PersonaDmEndpoints.threads(personaId: persona.id))
             threads = response.threads
             rebuild()
         } catch {
@@ -74,13 +83,15 @@ public final class CreatorInboxViewModel {
         rebuild()
     }
 
-    /// Resolve a thread row's counterparty for the `ChatConversationView`
-    /// push — prefer the explicit `counterpartyUserId`, fall back to the
-    /// row id (server defaults that to the membership id today).
-    public func conversationDestination(for row: CreatorInboxRowContent) -> CreatorInboxConversationDestination {
-        let userId = row.counterpartyUserId ?? row.id
-        return CreatorInboxConversationDestination(
-            userId: userId,
+    /// Resolve a row into the persona-DM thread push.
+    ///
+    /// The row id **is** the `PersonaDmThread` id — persona DMs carry no
+    /// counterparty user id, so there is nothing to fall back to and
+    /// nothing that could masquerade as one.
+    public func threadDestination(for row: CreatorInboxRowContent) -> CreatorInboxThreadDestination {
+        CreatorInboxThreadDestination(
+            personaId: row.personaId.isEmpty ? personaId : row.personaId,
+            threadId: row.id,
             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
             initials: row.initials,
             verified: row.verifiedLocal,
@@ -96,7 +107,7 @@ public final class CreatorInboxViewModel {
             state = .empty(header: header)
             return
         }
-        let rows = threads.compactMap(Self.row)
+        let rows = threads.compactMap { Self.row($0, personaId: personaId) }
         let counts = CreatorInboxCounts(
             total: rows.count,
             unread: rows.filter(\.unread).count,
@@ -132,7 +143,7 @@ public final class CreatorInboxViewModel {
         }
     }
 
-    static func row(_ dto: PersonaThreadDTO) -> CreatorInboxRowContent? {
+    static func row(_ dto: PersonaThreadDTO, personaId: String) -> CreatorInboxRowContent? {
         let handle = dto.fanHandle ?? ""
         let displayName = dto.fanDisplayName ?? (handle.isEmpty ? "Follower" : handle)
         let initials = initials(of: displayName, handle: handle)
@@ -150,7 +161,9 @@ public final class CreatorInboxViewModel {
             flagged: dto.flagged ?? false,
             verifiedLocal: dto.verifiedLocal ?? false,
             counterpartyUserId: dto.counterpartyUserId,
-            personaChip: nil
+            personaChip: nil,
+            personaId: personaId,
+            membershipId: dto.membershipId
         )
     }
 

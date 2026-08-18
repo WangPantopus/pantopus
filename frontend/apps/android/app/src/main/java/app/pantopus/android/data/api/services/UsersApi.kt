@@ -7,12 +7,15 @@ import app.pantopus.android.data.api.models.settings.ResendVerificationBody
 import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
+import app.pantopus.android.data.api.models.users.UpdateSkillsRequest
+import app.pantopus.android.data.api.models.users.UpdateSkillsResponse
 import app.pantopus.android.data.api.models.users.UserSearchResponse
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -27,6 +30,15 @@ interface UsersApi {
     suspend fun updateProfile(
         @Body body: ProfileUpdateRequest,
     ): ProfileUpdateResponse
+
+    /** `PUT /api/users/skills` — replace the caller's whole skill list.
+     *  Route `backend/routes/users.js:2246`; the handler trims, dedupes,
+     *  caps each entry at 100 chars and the list at 50, then echoes the
+     *  cleaned array. Mirrors iOS `ProfileTabsEndpoints.updateSkills`. */
+    @PUT("api/users/skills")
+    suspend fun updateSkills(
+        @Body body: UpdateSkillsRequest,
+    ): UpdateSkillsResponse
 
     /** `GET /api/users/id/:id` — route `backend/routes/users.js:2041`. */
     @GET("api/users/id/{id}")

@@ -20,8 +20,6 @@ import Foundation
 /// not invent ad-hoc names — extend the enum instead.
 public enum AnalyticsEvent: Sendable, Equatable {
     case screenHubViewed
-    case screenMailboxListViewed
-    case screenMailboxDrawersViewed
     case screenMailboxRootViewed
     case screenMyHomesViewed
     case screenHomeDashboardViewed
@@ -101,8 +99,6 @@ public enum AnalyticsEvent: Sendable, Equatable {
     public var name: String {
         switch self {
         case .screenHubViewed: "screen.hub.viewed"
-        case .screenMailboxListViewed: "screen.mailbox_list.viewed"
-        case .screenMailboxDrawersViewed: "screen.mailbox_drawers.viewed"
         case .screenMailboxRootViewed: "screen.mailbox_root.viewed"
         case .screenMyHomesViewed: "screen.my_homes.viewed"
         case .screenHomeDashboardViewed: "screen.home_dashboard.viewed"
@@ -216,8 +212,6 @@ public enum AnalyticsEvent: Sendable, Equatable {
         case let .ctaPollVoteSubmit(result):
             ["result": result.rawValue]
         case .screenHubViewed,
-             .screenMailboxListViewed,
-             .screenMailboxDrawersViewed,
              .screenMailboxRootViewed,
              .screenMyHomesViewed,
              .screenHomeDashboardViewed,

@@ -26,28 +26,112 @@ public struct StampsView: View {
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             StampsNav { viewModel.tapBack() }
+            StampsModeHeader(
+                mode: viewModel.mode,
+                progressLabel: progressLabel
+            ) { viewModel.toggleMode() }
             stateBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("stamps")
+        .overlay(alignment: .bottom) { toastOverlay }
         .task {
             await viewModel.load()
             Analytics.track(.screenStampsViewed(state: viewModel.state.analyticsTag))
         }
     }
 
+    /// "3 of 13 collected" under the title, matching RN `stamps.tsx:104`.
+    /// Nil while the collection hasn't loaded, or in the themes view.
+    private var progressLabel: String? {
+        guard viewModel.mode == .stamps,
+              case let .loaded(collection) = viewModel.collection else { return nil }
+        return collection.progressLabel
+    }
+
     @ViewBuilder private var stateBody: some View {
-        switch viewModel.state {
-        case .loading:
-            StampsLoadingBody()
-        case let .loaded(content):
-            StampsPopulatedBody(content: content) { viewModel.buyMore() }
-        case let .empty(content):
-            StampsEmptyBody(content: content) { viewModel.purchaseStarterBook() }
-        case let .error(message):
-            StampsErrorBody(message: message) { Task { await viewModel.refresh() } }
+        if viewModel.mode == .themes {
+            StampsThemesBody(
+                state: viewModel.themes,
+                applyingThemeId: viewModel.applyingThemeId,
+                onApply: { id in Task { await viewModel.applyTheme(id: id) } },
+                onRetry: { Task { await viewModel.fetchThemes() } }
+            )
+        } else {
+            switch viewModel.state {
+            case .loading:
+                StampsLoadingBody()
+            case let .loaded(content):
+                StampsPopulatedBody(content: content, collection: viewModel.collection) {
+                    viewModel.buyMore()
+                }
+            case let .empty(content):
+                StampsEmptyBody(content: content) { viewModel.purchaseStarterBook() }
+            case let .error(message):
+                StampsErrorBody(message: message) { Task { await viewModel.refresh() } }
+            }
         }
+    }
+
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            Text(toast)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appText.opacity(0.9))
+                .clipShape(Capsule())
+                .padding(.bottom, Spacing.s10)
+                .accessibilityIdentifier("stamps_toast")
+                .task {
+                    try? await Task.sleep(nanoseconds: 2_200_000_000)
+                    viewModel.consumeToast()
+                }
+        }
+    }
+}
+
+// MARK: - Mode header
+
+/// Title + "N of M collected" subtitle + the Stamps ⇄ Themes toggle.
+/// Mirrors RN's header row (`src/app/mailbox/stamps.tsx:94-113`).
+private struct StampsModeHeader: View {
+    let mode: StampsViewMode
+    let progressLabel: String?
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(mode.title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                if let progressLabel {
+                    Text(progressLabel)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+            }
+            Spacer(minLength: Spacing.s0)
+            Button(action: onToggle) {
+                Text(mode.toggleLabel)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.vertical, 6)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show \(mode.toggleLabel.lowercased())")
+            .accessibilityIdentifier("stamps_modeToggle")
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
+        .frame(minHeight: 44)
+        .background(Theme.Color.appBg)
     }
 }
 
@@ -119,6 +203,10 @@ private struct StampsNav: View {
 
 private struct StampsPopulatedBody: View {
     let content: StampsContent
+    /// Live `GET /api/mailbox/v2/p3/stamps` collection. `nil` (the
+    /// default) skips the section entirely, so the VM-free snapshot
+    /// frames keep rendering the pure wallet stack.
+    var collection: StampCollectionState?
     let onBuyMore: () -> Void
 
     var body: some View {
@@ -128,6 +216,9 @@ private struct StampsPopulatedBody: View {
                 StampBookHero(book: content.book)
                 AIElfStripView(content: elf)
                 StampSheet(book: content.book)
+                if let collection {
+                    StampCollectionSection(state: collection)
+                }
                 WalletRail(stamps: content.wallet, summary: content.walletSummary)
                 UsageHistoryCard(usage: content.usage, window: content.usageWindow)
                 StampsIssuerCard(issuer: content.issuer)
@@ -554,6 +645,312 @@ private struct StampsErrorBody: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("stampsError")
+    }
+}
+
+// MARK: - Collection section (GET /p3/stamps)
+
+/// The live stamp gallery: a two-column grid of earned stamps followed by
+/// the LOCKED catalogue list. Ports RN `stamps.tsx:116-148`.
+private struct StampCollectionSection: View {
+    let state: StampCollectionState
+
+    var body: some View {
+        StampCard {
+            StampSectionLabel("Collection") { EmptyView() }
+            switch state {
+            case .loading:
+                loading
+            case let .loaded(content):
+                loaded(content)
+            case .empty:
+                emptyBody
+            case let .error(message):
+                errorBody(message)
+            }
+        }
+        .accessibilityIdentifier("stamps_collection")
+    }
+
+    private var loading: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            ForEach(0..<3, id: \.self) { _ in
+                Shimmer(width: nil, height: 54, cornerRadius: Radii.md)
+            }
+        }
+        .accessibilityIdentifier("stamps_collection_loading")
+    }
+
+    private func loaded(_ content: StampCollectionContent) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            if content.earned.isEmpty {
+                Text("Nothing collected yet — keep using your mailbox.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            } else {
+                VStack(spacing: Spacing.s2) {
+                    ForEach(content.earned) { stamp in
+                        CollectedStampRow(stamp: stamp)
+                    }
+                }
+            }
+            if !content.locked.isEmpty {
+                Text("LOCKED")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.7)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                VStack(spacing: Spacing.s2) {
+                    ForEach(content.locked) { stamp in
+                        CollectedStampRow(stamp: stamp)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("stamps_collection_loaded")
+    }
+
+    private var emptyBody: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("No stamps to collect yet")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("Stamps unlock as you receive, file and act on mail.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("stamps_collection_empty")
+    }
+
+    private func errorBody(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("Couldn't load your collection")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("stamps_collection_error")
+    }
+}
+
+/// One earned / locked stamp row — rarity swatch, name, blurb and either
+/// the earned date or a lock glyph.
+private struct CollectedStampRow: View {
+    let stamp: CollectedStamp
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(stamp.rarity.accentBg)
+                Icon(
+                    stamp.isLocked ? .lock : .stamp,
+                    size: 16,
+                    color: stamp.rarity.accent
+                )
+            }
+            .frame(width: 38, height: 38)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: Spacing.s1) {
+                    Text(stamp.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(stamp.rarity.label)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.4)
+                        .foregroundStyle(stamp.rarity.accent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(stamp.rarity.accentBg)
+                        .clipShape(Capsule())
+                }
+                if let detail = stamp.detail {
+                    Text(detail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let earnedLabel = stamp.earnedLabel {
+                    Text(earnedLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .opacity(stamp.isLocked ? 0.55 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("stamps_collection_row_\(stamp.id)")
+    }
+}
+
+// MARK: - Themes body (GET /p3/themes)
+
+/// The "Seasonal Themes" half of the screen: an active-theme preview over
+/// the available-theme list. Tapping an unlocked row applies it. Ports RN
+/// `stamps.tsx:151-195`.
+private struct StampsThemesBody: View {
+    let state: StampThemesState
+    let applyingThemeId: String?
+    let onApply: (String) -> Void
+    let onRetry: () -> Void
+
+    var body: some View {
+        switch state {
+        case .loading:
+            loading
+        case let .loaded(content):
+            loaded(content)
+        case .empty:
+            ScrollView {
+                EmptyState(
+                    icon: .palette,
+                    headline: "No themes yet",
+                    subcopy: "Seasonal mailbox themes unlock through the year and with stamp milestones.",
+                    cta: EmptyState.CTA(title: "Refresh") { onRetry() },
+                    tint: Theme.Color.magicBg,
+                    accent: Theme.Color.magic
+                )
+                .frame(maxWidth: .infinity, minHeight: 360)
+            }
+            .accessibilityIdentifier("stamps_themes_empty")
+        case let .error(message):
+            ScrollView {
+                ErrorState(headline: "Couldn't load themes", message: message) { onRetry() }
+                    .frame(maxWidth: .infinity, minHeight: 360)
+            }
+            .accessibilityIdentifier("stamps_themes_error")
+        }
+    }
+
+    private var loading: some View {
+        ScrollView {
+            VStack(spacing: Spacing.s3) {
+                Shimmer(width: nil, height: 140, cornerRadius: Radii.xl)
+                ForEach(0..<4, id: \.self) { _ in
+                    Shimmer(width: nil, height: 64, cornerRadius: Radii.lg)
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+        }
+        .accessibilityIdentifier("stamps_themes_loading")
+    }
+
+    private func loaded(_ content: StampThemesContent) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let active = content.activeTheme {
+                    ActiveThemePreview(theme: active)
+                }
+                Text("AVAILABLE THEMES")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.7)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                VStack(spacing: Spacing.s2) {
+                    ForEach(content.themes) { theme in
+                        ThemeRow(
+                            theme: theme,
+                            isActive: theme.id == content.activeThemeId,
+                            isApplying: applyingThemeId == theme.id,
+                            isBusy: applyingThemeId != nil
+                        ) { onApply(theme.id) }
+                    }
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+            .padding(.bottom, Spacing.s10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("stamps_themes_loaded")
+    }
+}
+
+/// Hero preview of the currently-applied theme.
+private struct ActiveThemePreview: View {
+    let theme: MailboxTheme
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 2) {
+                Spacer(minLength: Spacing.s0)
+                Text(theme.name)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text(theme.season.label)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .padding(Spacing.s5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Active Theme")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(Theme.Color.appText.opacity(0.3))
+                .clipShape(Capsule())
+                .padding(10)
+        }
+        .frame(height: 140)
+        .background(theme.season.accentBg)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .accessibilityIdentifier("stamps_themes_active")
+    }
+}
+
+/// One row in "Available themes". Locked rows dim and don't respond.
+private struct ThemeRow: View {
+    let theme: MailboxTheme
+    let isActive: Bool
+    let isApplying: Bool
+    let isBusy: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.s3) {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(theme.season.accent)
+                    .frame(width: 38, height: 38)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(theme.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(theme.subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                Spacer(minLength: Spacing.s0)
+                if isApplying {
+                    ProgressView().tint(theme.season.accent)
+                } else if isActive {
+                    Icon(.checkCircle, size: 18, color: theme.season.accent)
+                } else if !theme.isUnlocked {
+                    Icon(.lock, size: 16, color: Theme.Color.appTextMuted)
+                }
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(
+                        isActive ? theme.season.accent : Theme.Color.appBorder,
+                        lineWidth: isActive ? 2 : 1
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .opacity(theme.isUnlocked ? 1 : 0.5)
+        }
+        .buttonStyle(.plain)
+        .disabled(!theme.isUnlocked || isBusy)
+        .accessibilityLabel("\(theme.name), \(theme.subtitle)\(theme.isUnlocked ? "" : ", locked")")
+        .accessibilityIdentifier("stamps_themes_row_\(theme.id)")
     }
 }
 

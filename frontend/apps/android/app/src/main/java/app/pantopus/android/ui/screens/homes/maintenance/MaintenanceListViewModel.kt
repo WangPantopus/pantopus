@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.MaintenanceTaskDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
@@ -139,13 +140,16 @@ class MaintenanceListViewModel
         private var tasks: List<MaintenanceTaskDto>? = null
         private var onOpenTask: (String) -> Unit = {}
         private var onAddTask: () -> Unit = {}
+        private var onOpenIssues: (() -> Unit)? = null
 
         fun configureNavigation(
             onOpenTask: (String) -> Unit = {},
             onAddTask: () -> Unit = {},
+            onOpenIssues: (() -> Unit)? = null,
         ) {
             this.onOpenTask = onOpenTask
             this.onAddTask = onAddTask
+            this.onOpenIssues = onOpenIssues
         }
 
         fun load() {
@@ -160,7 +164,7 @@ class MaintenanceListViewModel
                     is NetworkResult.Failure -> {
                         tasks = null
                         _banner.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                     }
                 }
             }
@@ -180,8 +184,22 @@ class MaintenanceListViewModel
                 onClick = { onAddTask() },
             )
 
-        /** Top-bar action is `null` by design — mirrors Bills T6.0a. */
-        val topBarAction: TopBarAction? = null
+        /**
+         * Trailing top-bar action routes to the per-home **issue tracker**
+         * (`/api/homes/:id/issues`) — a different backend collection from
+         * the maintenance-task log this screen renders. RN files both
+         * under "Maintenance", so this is the least-surprising place to
+         * reach it. Null when the host didn't wire `onOpenIssues`.
+         */
+        val topBarAction: TopBarAction?
+            get() =
+                onOpenIssues?.let { open ->
+                    TopBarAction(
+                        icon = PantopusIcon.AlertCircle,
+                        contentDescription = "Home issues",
+                        onClick = open,
+                    )
+                }
 
         fun currentBannerSummary(): MaintenanceBannerSummary {
             val loaded = tasks ?: return MaintenanceBannerSummary(0, null, null)

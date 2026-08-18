@@ -140,6 +140,7 @@ internal fun MailTranslationScreenContent(
                         onListen = onListen,
                         onReply = onReply,
                         onToast = onToast,
+                        onRetranslate = onRetry,
                     )
                 is MailTranslationUiState.Error ->
                     EmptyState(
@@ -186,6 +187,7 @@ private fun LoadedBody(
     onListen: (TranslationListenColumn) -> Unit,
     onReply: () -> Unit,
     onToast: (String) -> Unit,
+    onRetranslate: () -> Unit,
 ) {
     Column(
         modifier =
@@ -227,7 +229,11 @@ private fun LoadedBody(
             AIElfStripView(content = elfContent(content.elf))
         }
 
-        TranslatorNotes(notes = content.glossary)
+        // The translate route carries no glossary; the card only appears
+        // when the payload actually has notes.
+        if (content.glossary.isNotEmpty()) {
+            TranslatorNotes(notes = content.glossary)
+        }
 
         TranslationSenderCard(sender = content.sender)
 
@@ -235,7 +241,10 @@ private fun LoadedBody(
             TranslationConfirmedActions(
                 replyName = content.sender.replyName,
                 onReply = onReply,
-                onRetranslate = { onToast("Re-translating…") },
+                onRetranslate = {
+                    onToast("Re-translating…")
+                    onRetranslate()
+                },
                 onShowOriginal = { onSelectViewMode(TranslationViewMode.Original) },
                 onShare = { onToast("Sharing translation…") },
                 onArchive = { onToast("Archived") },

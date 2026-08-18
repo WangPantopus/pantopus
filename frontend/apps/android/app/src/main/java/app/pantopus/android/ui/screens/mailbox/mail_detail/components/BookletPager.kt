@@ -44,9 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -79,6 +81,7 @@ fun BookletPager(
     pages: List<String>,
     modifier: Modifier = Modifier,
     pageCount: Int = pages.size,
+    ocrTexts: List<String> = emptyList(),
     initialPage: Int = 0,
     initialMode: BookletPagerMode = BookletPagerMode.Page,
 ) {
@@ -100,6 +103,7 @@ fun BookletPager(
                 PageMode(
                     pages = pages,
                     totalPages = totalPages,
+                    ocrTexts = ocrTexts,
                     state = pagerState,
                     onPrev = {
                         if (pagerState.currentPage > 0) {
@@ -132,6 +136,7 @@ fun BookletPager(
 private fun PageMode(
     pages: List<String>,
     totalPages: Int,
+    ocrTexts: List<String>,
     state: androidx.compose.foundation.pager.PagerState,
     onPrev: () -> Unit,
     onNext: () -> Unit,
@@ -164,6 +169,133 @@ private fun PageMode(
                 modifier = Modifier.fillMaxHeight(),
             )
         }
+    }
+    // A17.2 — per-page OCR transcript, when the sample data carries one.
+    val ocrText = ocrTexts.getOrNull(state.currentPage)
+    if (!ocrText.isNullOrEmpty()) {
+        BookletOcrCard(text = ocrText)
+    }
+}
+
+/**
+ * OCR transcript card (booklet.jsx OCRCard): scan chip + "Text from this
+ * page" header with the OCR confidence pill, the per-page transcript
+ * (first line = overline, second = title, rest = body), and inert
+ * Copy / Translate / Read aloud actions.
+ */
+@Composable
+private fun BookletOcrCard(text: String) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s3)
+                .testTag("bookletPager_ocrCard"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(Radii.sm))
+                        .background(PantopusColors.appSurfaceSunken),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ScanLine,
+                    contentDescription = null,
+                    size = 13.dp,
+                    tint = PantopusColors.appTextSecondary,
+                )
+            }
+            Text(
+                text = "Text from this page",
+                modifier = Modifier.weight(1f).semantics { heading() },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "OCR · 99%",
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.successBg)
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.success,
+            )
+        }
+        // Transcript lines map onto the JSX kinds by position: line 0 is
+        // the overline, line 1 the title, the remainder body copy.
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            text.split("\n").forEachIndexed { idx, line ->
+                when (idx) {
+                    0 ->
+                        Text(
+                            text = line.uppercase(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    1 ->
+                        Text(
+                            text = line,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PantopusColors.appText,
+                        )
+                    else ->
+                        Text(
+                            text = line,
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                }
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            OcrAction(icon = PantopusIcon.Copy, label = "Copy text", color = PantopusColors.primary600)
+            OcrAction(icon = PantopusIcon.Globe, label = "Translate", color = PantopusColors.appTextMuted)
+            OcrAction(icon = PantopusIcon.Megaphone, label = "Read aloud", color = PantopusColors.appTextMuted)
+        }
+    }
+}
+
+@Composable
+private fun OcrAction(
+    icon: PantopusIcon,
+    label: String,
+    color: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = icon,
+            contentDescription = null,
+            size = 12.dp,
+            tint = color,
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+        )
     }
 }
 

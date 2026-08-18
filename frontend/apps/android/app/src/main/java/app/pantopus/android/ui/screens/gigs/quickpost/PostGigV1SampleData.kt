@@ -10,6 +10,15 @@ object PostGigV1SampleData {
     const val DESCRIPTION_MIN_LENGTH = 40
     const val DESCRIPTION_MAX_LENGTH = 600
 
+    /** `Joi.array().items(Joi.string().max(50)).max(5)` (`gigs.js:461`). */
+    const val MAX_TAGS = 5
+
+    /**
+     * `Joi.array()…max(20)` on create / `.max(50)` on update — the
+     * stricter create cap wins so one form can post *and* patch.
+     */
+    const val MAX_ITEMS = 20
+
     val referenceNow: LocalDateTime = LocalDateTime.of(2026, 5, 24, 12, 0)
 
     val filledForm =

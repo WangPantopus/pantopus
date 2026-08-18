@@ -2,91 +2,327 @@
 //  EditPersonaView.swift
 //  Pantopus
 //
-//  A13.12 — Edit persona. The creator-facing editor for a persona / Public
-//  Profile. Built on `FormShell` (X + title + @handle subtitle, no
-//  top-right action) with a custom persona sticky bar below the scroll.
+//  A13.12 — Edit Beacon. The creator-facing editor for a Beacon
+//  (persona). Built on `FormShell` (X + title + @handle subtitle) with a
+//  bespoke sticky save bar below the scroll.
 //
-//  Persona accent is sky / `primary600`, flat — see EditPersonaContent.swift
-//  for why we mirror the shipped persona surfaces instead of the design
-//  source's fuchsia gradient.
+//  Every control here writes into `EditPersonaViewModel.form` and is
+//  persisted by `save()` → `POST /api/personas` / `PATCH /api/personas/:id`
+//  plus `POST /api/upload/persona-media/:id`. Sections the persona write
+//  contract does not cover (tiers, Stripe Connect, posting cap, quiet
+//  hours, analytics) are intentionally absent rather than rendered from a
+//  fixture — they belong to the tier/monetization routes.
+//
+//  Beacon accent is sky / `primary600`, flat.
 //
 
 // swiftlint:disable file_length
 
+import PhotosUI
 import SwiftUI
-
-/// Shared no-op for the editor's placeholder affordances (Preview, Save,
-/// Connect, Copy/Share, Add tier). Keeping `action:` a reference rather than
-/// an inline `{}` keeps SwiftLint's closure rules satisfied while these
-/// stay non-wired in the no-backend build.
-@MainActor private let personaNoOp: @Sendable () -> Void = {}
+import UIKit
 
 public struct EditPersonaView: View {
     @State private var viewModel: EditPersonaViewModel
     private let onClose: @MainActor () -> Void
+    private let onViewBeacon: @MainActor (String) -> Void
 
-    public init(
-        viewModel: EditPersonaViewModel,
-        onClose: @escaping @MainActor () -> Void = {}
+    @State private var avatarSelection: PhotosPickerItem?
+    @State private var bannerSelection: PhotosPickerItem?
+    @State private var showsSavedPrompt = false
+
+    /// Not `public`: the default `EditPersonaViewModel()` argument reaches an
+    /// internal initialiser (it takes the internal `APIClient`), and a public
+    /// init cannot carry an internal default. Same-module callers are
+    /// unaffected.
+    init(
+        viewModel: EditPersonaViewModel = EditPersonaViewModel(),
+        onClose: @escaping @MainActor () -> Void = {},
+        onViewBeacon: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onClose = onClose
+        self.onViewBeacon = onViewBeacon
     }
 
     public var body: some View {
         content
             .background(Theme.Color.appBg)
             .task { await viewModel.load() }
+            .onChange(of: avatarSelection) { _, item in
+                loadPick(item) { viewModel.attachAvatar($0) }
+                avatarSelection = nil
+            }
+            .onChange(of: bannerSelection) { _, item in
+                loadPick(item) { viewModel.attachBanner($0) }
+                bannerSelection = nil
+            }
+            .alert("Saved", isPresented: $showsSavedPrompt) {
+                Button("Stay Here", role: .cancel) {}
+                Button("View Beacon") {
+                    if let handle = viewModel.savedHandle { onViewBeacon(handle) }
+                }
+            } message: {
+                Text(viewModel.statusMessage ?? "Beacon saved.")
+            }
+            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
             .accessibilityIdentifier("editPersona")
     }
 
     @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
-            shell(subtitle: nil, isDirty: false, body: { EditPersonaLoadingBody() }, stickyBottom: nil)
-        case let .live(loaded):
+            shell(subtitle: nil, body: { EditPersonaLoadingBody() }, stickyBottom: nil)
+        case .editing:
             shell(
-                subtitle: loaded.atHandle,
-                isDirty: false,
-                body: { EditPersonaEditor(content: loaded, variant: .live) },
-                stickyBottom: { AnyView(PersonaStickyBar(variant: .live, onDiscard: onClose)) }
-            )
-        case let .setup(loaded, done, total):
-            shell(
-                subtitle: loaded.atHandle,
-                isDirty: true,
-                body: { EditPersonaEditor(content: loaded, variant: .setup, stepsDone: done, stepsTotal: total) },
-                stickyBottom: { AnyView(PersonaStickyBar(variant: .setup, onDiscard: onClose)) }
+                subtitle: viewModel.form.atHandle.isEmpty ? nil : viewModel.form.atHandle,
+                body: { editor },
+                stickyBottom: { AnyView(stickyBar) }
             )
         case let .error(message):
             shell(
                 subtitle: nil,
-                isDirty: false,
-                body: { EditPersonaErrorBody(message: message) { Task { await viewModel.load() } } },
+                body: { EditPersonaErrorBody(message: message) { Task { await viewModel.refresh() } } },
                 stickyBottom: nil
             )
         }
     }
 
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: Spacing.s5) {
+            if viewModel.isCreate {
+                EditPersonaCreateHero()
+            }
+            mediaSection
+            identitySection
+            categorySection
+            audienceSection
+            linksSection
+            if !viewModel.form.shareURL.isEmpty, !viewModel.isCreate {
+                shareSection
+            }
+        }
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("editPersonaContent")
+    }
+
     /// Compose `FormShell` (chrome + scroll + dirty-close confirm) with the
-    /// shared `stickyBottom` slot for the persona-aware sticky save bar.
+    /// bespoke sticky save bar.
     private func shell(
         subtitle: String?,
-        isDirty: Bool,
         @ViewBuilder body: () -> some View,
         stickyBottom: (() -> AnyView)?
     ) -> some View {
         FormShell(
-            title: "Edit persona",
+            title: viewModel.isCreate ? "Create Beacon" : "Edit Beacon",
             subtitle: subtitle,
             rightActionLabel: nil,
-            isValid: true,
-            isDirty: isDirty,
+            isValid: viewModel.isValid,
+            isDirty: viewModel.isDirty,
             onClose: onClose,
-            onCommit: personaNoOp,
+            onCommit: {},
             content: { body() },
             stickyBottom: stickyBottom
         )
+    }
+
+    // MARK: - Media
+
+    private var mediaSection: some View {
+        PersonaSection("Beacon media") {
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                PersonaBannerPicker(
+                    imageData: viewModel.form.bannerPick?.data,
+                    remoteURL: viewModel.form.bannerURL,
+                    selection: $bannerSelection,
+                    hasPick: viewModel.form.bannerPick != nil
+                ) { viewModel.removeBannerPick() }
+                PersonaAvatarPicker(
+                    imageData: viewModel.form.avatarPick?.data,
+                    remoteURL: viewModel.form.avatarURL,
+                    selection: $avatarSelection,
+                    hasPick: viewModel.form.avatarPick != nil
+                ) { viewModel.removeAvatarPick() }
+            }
+        }
+    }
+
+    // MARK: - Identity
+
+    private var identitySection: some View {
+        PersonaSection("Identity") {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
+                    PLabel("Handle", required: true, hint: "3–40 chars · letters, numbers, . _ -")
+                    PersonaHandleField(handle: $viewModel.form.handle)
+                }
+                VStack(alignment: .leading, spacing: Spacing.s0) {
+                    PLabel("Display name", required: true)
+                    PersonaTextField(
+                        text: $viewModel.form.displayName,
+                        placeholder: "What your audience sees",
+                        identifier: "editPersonaDisplayName"
+                    )
+                }
+                VStack(alignment: .leading, spacing: Spacing.s0) {
+                    PLabel("Bio")
+                    PersonaBioEditor(text: $viewModel.form.bio)
+                    Text(viewModel.form.bioCharCount)
+                        .font(.system(size: 11))
+                        .foregroundStyle(
+                            viewModel.form.bio.count > EditPersonaForm.bioLimit
+                                ? Theme.Color.error
+                                : Theme.Color.appTextMuted
+                        )
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.top, Spacing.s1)
+                        .accessibilityIdentifier("editPersonaBioCount")
+                }
+            }
+        }
+    }
+
+    // MARK: - Category
+
+    private var categorySection: some View {
+        PersonaSection("Category") {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text("What this Beacon is for. Sensitive professional categories stay gated until credentials are verified.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                FilterSheetFlowLayout(spacing: 6) {
+                    ForEach(viewModel.categories) { option in
+                        PersonaChoiceChip(
+                            label: option.isEnabled ? option.label : "\(option.label) (gated)",
+                            icon: option.isEnabled ? nil : .lock,
+                            isSelected: viewModel.form.category == option.value,
+                            isDisabled: !option.isEnabled,
+                            identifier: "editPersonaCategory_\(option.value)"
+                        ) {
+                            viewModel.setCategory(option.value)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Audience
+
+    private var audienceSection: some View {
+        PersonaSection("Audience") {
+            VStack(alignment: .leading, spacing: Spacing.s4) {
+                VStack(alignment: .leading, spacing: Spacing.s0) {
+                    PLabel("What you call them")
+                    FilterSheetFlowLayout(spacing: 6) {
+                        ForEach(PersonaAudienceLabel.allCases) { option in
+                            PersonaChoiceChip(
+                                label: option.label,
+                                icon: nil,
+                                isSelected: viewModel.form.audienceLabel == option,
+                                isDisabled: false,
+                                identifier: "editPersonaAudienceLabel_\(option.rawValue)"
+                            ) {
+                                viewModel.setAudienceLabel(option)
+                            }
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: Spacing.s2) {
+                    PLabel("How they join")
+                    ForEach(PersonaAudienceMode.allCases) { option in
+                        PersonaModeRow(
+                            option: option,
+                            isSelected: viewModel.form.audienceMode == option
+                        ) {
+                            viewModel.setAudienceMode(option)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Public links
+
+    private var linksSection: some View {
+        PersonaSection("Public links") {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                if viewModel.form.links.isEmpty {
+                    Text("Add up to 8 links your audience can open from your Beacon.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                ForEach(viewModel.form.links) { link in
+                    PersonaLinkRow(
+                        link: link,
+                        onLabel: { viewModel.updateLink(id: link.id, label: $0) },
+                        onURL: { viewModel.updateLink(id: link.id, url: $0) },
+                        onRemove: { viewModel.removeLink(id: link.id) }
+                    )
+                }
+                if viewModel.form.hasIncompleteLink {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(.alertCircle, size: 12, color: Theme.Color.error)
+                        Text("Each public link needs both a label and a URL.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.error)
+                    }
+                    .accessibilityIdentifier("editPersonaLinkError")
+                }
+                PersonaAddLinkRow(disabled: !viewModel.canAddLink) { viewModel.addLink() }
+            }
+        }
+    }
+
+    // MARK: - Share
+
+    private var shareSection: some View {
+        PersonaSection("Share") {
+            PersonaShareCardView(url: viewModel.form.shareURL) {
+                onViewBeacon(viewModel.form.normalizedHandle)
+            }
+        }
+    }
+
+    // MARK: - Sticky bar
+
+    private var stickyBar: some View {
+        PersonaStickyBar(
+            label: viewModel.saveButtonLabel,
+            isSaving: viewModel.isSaving,
+            isEnabled: viewModel.isValid && !viewModel.isSaving,
+            statusMessage: viewModel.statusMessage,
+            errorMessage: viewModel.saveError,
+            onDiscard: onClose
+        ) {
+            Task {
+                if await viewModel.save() != nil { showsSavedPrompt = true }
+            }
+        }
+    }
+
+    // MARK: - Picker plumbing
+
+    private func loadPick(_ item: PhotosPickerItem?, assign: @escaping @MainActor (PersonaImagePick) -> Void) {
+        guard let item else { return }
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            let mime = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+            let ext = mime == "image/png" ? "png" : "jpg"
+            await MainActor.run {
+                // Randomised filename — the picker's `IMG_xxxx` never reaches
+                // S3 / access logs. Mirrors RN's persona media firewall.
+                assign(
+                    PersonaImagePick(
+                        data: data,
+                        fileName: "beacon-\(UUID().uuidString.prefix(8)).\(ext)",
+                        mimeType: mime
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -112,7 +348,7 @@ private struct EditPersonaErrorBody: View {
     var body: some View {
         VStack(spacing: Spacing.s3) {
             Icon(.alertCircle, size: 40, color: Theme.Color.error)
-            Text("Couldn't load persona")
+            Text("Couldn't load Beacon")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityAddTraits(.isHeader)
@@ -139,165 +375,36 @@ private struct EditPersonaErrorBody: View {
     }
 }
 
-// MARK: - Editor body (holds interactive control state)
+// MARK: - Create hero
 
-private struct EditPersonaEditor: View {
-    let content: EditPersonaContent
-    let variant: EditPersonaVariant
-    let stepsDone: Int
-    let stepsTotal: Int
-
-    @State private var cap: PersonaCapOption
-    @State private var quietHoursOn: Bool
-    @State private var analyticsOn: Bool
-
-    init(
-        content: EditPersonaContent,
-        variant: EditPersonaVariant,
-        stepsDone: Int = 0,
-        stepsTotal: Int = 0
-    ) {
-        self.content = content
-        self.variant = variant
-        self.stepsDone = stepsDone
-        self.stepsTotal = stepsTotal
-        _cap = State(initialValue: content.cap)
-        _quietHoursOn = State(initialValue: content.quietHoursOn)
-        _analyticsOn = State(initialValue: content.analyticsOn)
-    }
-
+private struct EditPersonaCreateHero: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s5) {
-            hero
-            identitySection
-            policySection
-            tiersSection
-            broadcastSection
-            shareSection
-            analyticsSection
-        }
-        .padding(.horizontal, Spacing.s4)
-        .accessibilityIdentifier("editPersonaContent")
-    }
-
-    @ViewBuilder private var hero: some View {
-        switch variant {
-        case .live:
-            PersonaLiveHero(content: content)
-        case .setup:
-            PersonaSetupHero(content: content, stepsDone: stepsDone, stepsTotal: stepsTotal)
-        }
-    }
-
-    // MARK: Identity
-
-    private var identitySection: some View {
-        PersonaSection("Identity") {
-            VStack(alignment: .leading, spacing: Spacing.s4) {
-                VStack(alignment: .leading, spacing: Spacing.s0) {
-                    PLabel("Handle", required: true, hint: "lowercase · 3–24 chars")
-                    PersonaHandleField(handle: content.handle, status: content.handleStatus)
-                    if let note = content.handleNote {
-                        HStack(spacing: Spacing.s1) {
-                            Icon(.checkCircle, size: 11, color: Theme.Color.success)
-                            Text(note)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Theme.Color.success)
-                        }
-                        .padding(.top, Spacing.s2)
-                    }
-                }
-                VStack(alignment: .leading, spacing: Spacing.s0) {
-                    PLabel("Display name", required: true)
-                    PersonaTextDisplay(text: content.displayName, identifier: "editPersonaDisplayName")
-                }
-                VStack(alignment: .leading, spacing: Spacing.s0) {
-                    PLabel("Bio")
-                    PersonaTextDisplay(
-                        text: content.bio,
-                        minHeight: 88,
-                        identifier: "editPersonaBio"
-                    )
-                    Text(content.bioCharCount)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextMuted)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.top, Spacing.s1)
-                }
+        HStack(spacing: Spacing.s3) {
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .fill(Theme.Color.primary600)
+                .frame(width: 40, height: 40)
+                .overlay { Icon(.radio, size: 18, color: Theme.Color.appTextInverse) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Create your Beacon")
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("A public identity, separate from your personal profile. Pick a handle and you're live.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Color.primary700)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: Spacing.s0)
         }
-    }
-
-    // MARK: Category policy
-
-    private var policySection: some View {
-        PersonaSection("Category policy") {
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                PersonaPolicyRow(
-                    kind: .allow,
-                    title: "Allowed on this persona",
-                    sub: content.categoriesAllowSub,
-                    chips: content.categoriesAllow
-                )
-                PersonaPolicyRow(
-                    kind: .off,
-                    title: "Off-topic — blocked auto-suggest",
-                    sub: content.categoriesOffSub,
-                    chips: content.categoriesOff
-                )
-                if let note = content.policyNote {
-                    Text(note)
-                        .font(.system(size: 11))
-                        .italic()
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .padding(.top, Spacing.s1)
-                }
-            }
-        }
-    }
-
-    // MARK: Tiers
-
-    private var tiersSection: some View {
-        PersonaSection("Tiers") {
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                PersonaStripeConnectCard(state: content.stripe)
-                ForEach(content.tiers) { tier in
-                    PersonaTierCardView(tier: tier)
-                }
-                PersonaAddTierRow(disabled: !content.canAddTier)
-            }
-        }
-    }
-
-    // MARK: Broadcast
-
-    private var broadcastSection: some View {
-        PersonaSection("Broadcast") {
-            VStack(alignment: .leading, spacing: Spacing.s4) {
-                VStack(alignment: .leading, spacing: Spacing.s0) {
-                    PLabel("Posts per week", hint: "hard cap, not a target")
-                    PersonaCapSelector(selection: $cap)
-                }
-                PersonaQuietHoursRow(isOn: $quietHoursOn, range: content.quietHoursRange)
-            }
-        }
-    }
-
-    // MARK: Share
-
-    private var shareSection: some View {
-        PersonaSection("Share") {
-            PersonaShareCardView(url: content.shareUrl, isPublic: content.shareIsPublic)
-        }
-    }
-
-    // MARK: Analytics
-
-    private var analyticsSection: some View {
-        PersonaSection("Analytics") {
-            PersonaAnalyticsRow(isOn: $analyticsOn, scope: content.analyticsScope)
-        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.primary50)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.primary200, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("editPersonaCreateHero")
     }
 }
 
@@ -357,237 +464,174 @@ private struct PLabel: View {
     }
 }
 
-// MARK: - Live hero (flat sky banner)
+// MARK: - Media pickers
 
-private struct PersonaLiveHero: View {
-    let content: EditPersonaContent
-
-    var body: some View {
-        VStack(spacing: Spacing.s3) {
-            HStack(spacing: Spacing.s3) {
-                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                    .fill(Theme.Color.appTextInverse.opacity(0.18))
-                    .frame(width: 44, height: 44)
-                    .overlay { Icon(.radio, size: 19, color: Theme.Color.appTextInverse) }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(content.displayName)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
-                    Text("Live persona · published & broadcasting")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextInverse.opacity(0.8))
-                }
-                Spacer(minLength: Spacing.s2)
-                Text(content.liveBadge.uppercased())
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Theme.Color.appTextInverse.opacity(0.22))
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
-            }
-            HStack(spacing: Spacing.s2) {
-                statTile(content.followers, "Followers")
-                statTile(content.posts, "Posts · 30d")
-                statTile(content.rating, "Avg rating")
-            }
-        }
-        .padding(Spacing.s3)
-        .background(Theme.Color.primary600)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(content.displayName), live persona. "
-                + "\(content.followers) followers, \(content.posts) posts in 30 days, \(content.rating) average rating."
-        )
-        .accessibilityIdentifier("editPersonaLiveHero")
-    }
-
-    private func statTile(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Theme.Color.appTextInverse)
-            Text(label.uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextInverse.opacity(0.8))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Spacing.s2)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.Color.appTextInverse.opacity(0.14))
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-    }
-}
-
-// MARK: - Setup hero (checklist)
-
-private struct PersonaSetupHero: View {
-    let content: EditPersonaContent
-    let stepsDone: Int
-    let stepsTotal: Int
+private struct PersonaBannerPicker: View {
+    let imageData: Data?
+    let remoteURL: String?
+    @Binding var selection: PhotosPickerItem?
+    let hasPick: Bool
+    let onRemove: @MainActor () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            HStack(spacing: Spacing.s3) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(Theme.Color.primary600)
-                    .frame(width: 40, height: 40)
-                    .overlay { Icon(.sparkles, size: 18, color: Theme.Color.appTextInverse) }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Finish your persona")
-                        .font(.system(size: 13.5, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text(content.checklistSummary)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.Color.primary700)
-                }
-                Spacer(minLength: Spacing.s2)
-                Text("Draft")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.appTextInverse)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
-            }
-            HStack(spacing: Spacing.s1) {
-                ForEach(0..<max(stepsTotal, 1), id: \.self) { index in
-                    Capsule()
-                        .fill(index < stepsDone ? Theme.Color.primary600 : Theme.Color.primary100)
-                        .frame(height: 5)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                ForEach(content.checklist) { step in
-                    checklistRow(step)
-                }
-            }
-        }
-        .padding(Spacing.s3)
-        .background(Theme.Color.primary50)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.primary200, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityIdentifier("editPersonaSetupHero")
-    }
-
-    private func checklistRow(_ step: PersonaChecklistStep) -> some View {
-        HStack(spacing: Spacing.s2) {
-            if step.done {
-                Icon(.checkCircle, size: 12, color: Theme.Color.success)
-            } else {
-                Circle()
-                    .strokeBorder(
-                        step.isNext ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
-                        lineWidth: 1.5
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            PLabel("Banner", hint: "16:6")
+            ZStack(alignment: .topTrailing) {
+                PhotosPicker(selection: $selection, matching: .images) {
+                    Group {
+                        if let imageData, let image = UIImage(data: imageData) {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        } else if let remoteURL, let url = URL(string: remoteURL) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Color.clear
+                            }
+                        } else {
+                            placeholder
+                        }
+                    }
+                    .frame(height: 96)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .background(Theme.Color.appSurfaceSunken)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                            .stroke(Theme.Color.appBorder, lineWidth: 1)
                     )
-                    .background(Circle().fill(step.isNext ? Theme.Color.primary50 : Color.clear))
-                    .frame(width: 12, height: 12)
-            }
-            Text(step.label)
-                .font(.system(size: 11.5, weight: step.isNext ? .semibold : .medium))
-                .foregroundStyle(stepColor(step))
-            Spacer(minLength: Spacing.s0)
-            if step.isNext {
-                Text("NEXT")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(Theme.Color.primary700)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Choose banner image")
+                .accessibilityIdentifier("editPersonaBannerPicker")
+
+                if hasPick {
+                    RemovePickButton(action: onRemove, identifier: "editPersonaBannerRemove")
+                }
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(step.label)\(step.done ? ", done" : step.isNext ? ", next" : "")")
     }
 
-    private func stepColor(_ step: PersonaChecklistStep) -> Color {
-        if step.isNext { return Theme.Color.primary700 }
-        return step.done ? Theme.Color.appTextStrong : Theme.Color.appTextSecondary
+    private var placeholder: some View {
+        VStack(spacing: Spacing.s1) {
+            Icon(.imagePlus, size: 20, color: Theme.Color.appTextMuted)
+            Text("Add a banner")
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - Handle field
+private struct PersonaAvatarPicker: View {
+    let imageData: Data?
+    let remoteURL: String?
+    @Binding var selection: PhotosPickerItem?
+    let hasPick: Bool
+    let onRemove: @MainActor () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack(alignment: .topTrailing) {
+                PhotosPicker(selection: $selection, matching: .images) {
+                    Group {
+                        if let imageData, let image = UIImage(data: imageData) {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        } else if let remoteURL, let url = URL(string: remoteURL) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Color.clear
+                            }
+                        } else {
+                            Icon(.imagePlus, size: 20, color: Theme.Color.appTextMuted)
+                        }
+                    }
+                    .frame(width: 72, height: 72)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Theme.Color.appBorder, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Choose avatar image")
+                .accessibilityIdentifier("editPersonaAvatarPicker")
+
+                if hasPick {
+                    RemovePickButton(action: onRemove, identifier: "editPersonaAvatarRemove")
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Avatar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                Text("Use an image that isn't your personal profile photo — your Beacon is a separate identity.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+    }
+}
+
+private struct RemovePickButton: View {
+    let action: @MainActor () -> Void
+    let identifier: String
+
+    var body: some View {
+        Button(action: action) {
+            Icon(.x, size: 12, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
+                .frame(width: 24, height: 24)
+                .background(Theme.Color.appTextStrong)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(Spacing.s1)
+        .accessibilityLabel("Remove picked image")
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+// MARK: - Fields
 
 private struct PersonaHandleField: View {
-    let handle: String
-    let status: PersonaHandleStatus
+    @Binding var handle: String
 
     var body: some View {
         HStack(spacing: Spacing.s1) {
             Text("@")
                 .font(.system(size: 14, weight: .bold, design: .monospaced))
                 .foregroundStyle(Theme.Color.primary600)
-            Text(handle)
+            TextField("yourhandle", text: $handle)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Theme.Color.appText)
-            Spacer(minLength: Spacing.s2)
-            statusPill
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("editPersonaHandle")
         }
         .padding(.horizontal, Spacing.s3)
         .frame(height: 44)
         .background(Theme.Color.appSurface)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(borderColor, lineWidth: 1.5)
+                .stroke(Theme.Color.appBorder, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Handle @\(handle), \(statusLabel)")
-        .accessibilityIdentifier("editPersonaHandle")
-    }
-
-    @ViewBuilder private var statusPill: some View {
-        switch status {
-        case .available:
-            HStack(spacing: 3) {
-                Icon(.checkCircle, size: 13, color: Theme.Color.success)
-                Text("Available").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.success)
-            }
-        case .reserved:
-            HStack(spacing: 3) {
-                Icon(.lock, size: 12, color: Theme.Color.primary700)
-                Text("Reserved").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.primary700)
-            }
-        case .taken:
-            HStack(spacing: 3) {
-                Icon(.alertCircle, size: 12, color: Theme.Color.error)
-                Text("Taken").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.error)
-            }
-        }
-    }
-
-    private var borderColor: Color {
-        switch status {
-        case .available: Theme.Color.success
-        case .reserved: Theme.Color.primary300
-        case .taken: Theme.Color.error
-        }
-    }
-
-    private var statusLabel: String {
-        switch status {
-        case .available: "available"
-        case .reserved: "reserved"
-        case .taken: "taken"
-        }
+        .accessibilityLabel("Beacon handle")
     }
 }
 
-private struct PersonaTextDisplay: View {
-    let text: String
-    var minHeight: CGFloat = 44
+private struct PersonaTextField: View {
+    @Binding var text: String
+    let placeholder: String
     let identifier: String
 
     var body: some View {
-        Text(text)
-            .pantopusTextStyle(.small)
+        TextField(placeholder, text: $text)
+            .font(.system(size: 14))
             .foregroundStyle(Theme.Color.appText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: minHeight, alignment: .topLeading)
             .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, Spacing.s2)
+            .frame(height: 44)
             .background(Theme.Color.appSurface)
             .overlay(
                 RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
@@ -598,251 +642,199 @@ private struct PersonaTextDisplay: View {
     }
 }
 
-// MARK: - Category chips + policy rows
-
-private enum PersonaPolicyKind { case allow, off }
-
-private struct PersonaCatChip: View {
-    let chip: PersonaCategoryChip
-    let kind: PersonaPolicyKind
+private struct PersonaBioEditor: View {
+    @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 5) {
-            Icon(chip.icon, size: 12, color: foreground)
-            Text(chip.label)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(foreground)
-                .strikethrough(kind == .off, color: Theme.Color.appTextMuted)
+        ZStack(alignment: .topLeading) {
+            if text.isEmpty {
+                Text("What do you post about?")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .padding(.horizontal, Spacing.s3 + 2)
+                    .padding(.vertical, Spacing.s3)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            TextEditor(text: $text)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.Color.appText)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, Spacing.s2)
+                .padding(.vertical, Spacing.s2)
+                .frame(minHeight: 96)
+                .accessibilityIdentifier("editPersonaBio")
+                .accessibilityLabel("Bio")
         }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, 6)
-        .background(background)
-        .overlay(Capsule().stroke(border, lineWidth: 1))
-        .clipShape(Capsule())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(kind == .off ? "\(chip.label), off-topic" : chip.label)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+    }
+}
+
+// MARK: - Choice chips
+
+private struct PersonaChoiceChip: View {
+    let label: String
+    let icon: PantopusIcon?
+    let isSelected: Bool
+    let isDisabled: Bool
+    let identifier: String
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let icon {
+                    Icon(icon, size: 11, color: foreground)
+                }
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(foreground)
+            }
+            .padding(.horizontal, Spacing.s3)
+            .frame(minHeight: 34)
+            .background(background)
+            .overlay(Capsule().stroke(border, lineWidth: 1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier(identifier)
     }
 
     private var foreground: Color {
-        kind == .allow ? Theme.Color.primary700 : Theme.Color.appTextSecondary
+        if isDisabled { return Theme.Color.appTextMuted }
+        return isSelected ? Theme.Color.primary700 : Theme.Color.appTextStrong
     }
 
     private var background: Color {
-        kind == .allow ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken
+        if isDisabled { return Theme.Color.appSurfaceSunken }
+        return isSelected ? Theme.Color.primary50 : Theme.Color.appSurface
     }
 
     private var border: Color {
-        kind == .allow ? Theme.Color.primary200 : Theme.Color.appBorder
+        if isDisabled { return Theme.Color.appBorder }
+        return isSelected ? Theme.Color.primary200 : Theme.Color.appBorder
     }
 }
 
-private struct PersonaPolicyRow: View {
-    let kind: PersonaPolicyKind
-    let title: String
-    let sub: String
-    let chips: [PersonaCategoryChip]
+private struct PersonaModeRow: View {
+    let option: PersonaAudienceMode
+    let isSelected: Bool
+    let action: @MainActor () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 18, height: 18)
-                    .overlay {
-                        Icon(kind == .allow ? .check : .x, size: 11, strokeWidth: 3, color: Theme.Color.appTextInverse)
-                    }
-                Text(title)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(titleColor)
-                Spacer(minLength: Spacing.s2)
-                Text(sub)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-            FilterSheetFlowLayout(spacing: 6) {
-                ForEach(chips) { chip in
-                    PersonaCatChip(chip: chip, kind: kind)
-                }
-            }
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityIdentifier("editPersonaPolicyRow_\(kind == .allow ? "allow" : "off")")
-    }
-
-    private var dotColor: Color {
-        kind == .allow ? Theme.Color.success : Theme.Color.appTextMuted
-    }
-
-    private var titleColor: Color {
-        kind == .allow ? Theme.Color.success : Theme.Color.appTextStrong
-    }
-
-    private var background: Color {
-        kind == .allow ? Theme.Color.successBg : Theme.Color.appSurfaceSunken
-    }
-
-    private var border: Color {
-        kind == .allow ? Theme.Color.successLight : Theme.Color.appBorder
-    }
-}
-
-// MARK: - Tier card (creator-side)
-
-private struct PersonaTierStripeFooter {
-    let icon: PantopusIcon
-    let text: String
-    let color: Color
-}
-
-private struct PersonaTierCardView: View {
-    let tier: PersonaTierCard
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(alignment: .top, spacing: Spacing.s2) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(iconBackground)
-                    .frame(width: 36, height: 36)
-                    .overlay { Icon(iconName, size: 16, color: iconForeground) }
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
-                        Text(tier.name)
-                            .font(.system(size: 13.5, weight: .bold))
-                            .foregroundStyle(Theme.Color.appText)
-                        priceLabel
-                    }
-                    Text(tier.blurb)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Spacing.s0)
-                if tier.kind != .paidLocked {
-                    Icon(.slidersHorizontal, size: 15, color: Theme.Color.appTextMuted)
-                }
-            }
-            if !tier.perks.isEmpty {
-                VStack(alignment: .leading, spacing: Spacing.s1) {
-                    ForEach(tier.perks, id: \.self) { perk in
-                        HStack(spacing: Spacing.s1) {
-                            Icon(.check, size: 12, color: Theme.Color.primary600)
-                            Text(perk)
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(Theme.Color.appTextStrong)
-                        }
-                    }
-                }
-                .padding(.leading, 46)
-            }
-            if let footer = stripeFooter {
-                Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-                HStack(spacing: 7) {
-                    Icon(footer.icon, size: 12, color: footer.color)
-                    Text(footer.text)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(footer.color)
-                }
-            }
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(tier.isFresh ? Theme.Color.primary200 : Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .opacity(tier.kind == .paidLocked ? 0.6 : 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier("editPersonaTier_\(tier.id)")
-    }
-
-    @ViewBuilder private var priceLabel: some View {
-        switch tier.kind {
-        case .free:
-            Text("Always free")
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-        case .paid, .paidLocked:
-            HStack(spacing: Spacing.s0) {
-                Text("$\(tier.priceLabel ?? "—")")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundStyle(tier.kind == .paidLocked ? Theme.Color.appTextMuted : Theme.Color.appText)
-                if let period = tier.period {
-                    Text(" / \(period)")
+        Button(action: action) {
+            HStack(spacing: Spacing.s3) {
+                Icon(
+                    isSelected ? .checkCircle : .circle,
+                    size: 18,
+                    color: isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong
+                )
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(option.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(option.blurb)
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
+                Spacer(minLength: Spacing.s0)
             }
-        }
-    }
-
-    private var iconName: PantopusIcon {
-        switch tier.kind {
-        case .free: .users
-        case .paid: .star
-        case .paidLocked: .lock
-        }
-    }
-
-    private var iconBackground: Color {
-        tier.kind == .free ? Theme.Color.appSurfaceSunken : Theme.Color.primary50
-    }
-
-    private var iconForeground: Color {
-        tier.kind == .free ? Theme.Color.appTextStrong : Theme.Color.primary700
-    }
-
-    private var stripeFooter: PersonaTierStripeFooter? {
-        switch tier.stripeState {
-        case .none:
-            nil
-        case .ready:
-            PersonaTierStripeFooter(
-                icon: .shieldCheck,
-                text: "Stripe ready · payouts every Friday",
-                color: Theme.Color.success
+            .padding(.horizontal, Spacing.s3)
+            .padding(.vertical, Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(isSelected ? Theme.Color.primary200 : Theme.Color.appBorder, lineWidth: 1)
             )
-        case .needsStripe:
-            PersonaTierStripeFooter(
-                icon: .link,
-                text: "Connect Stripe to enable paid tiers",
-                color: Theme.Color.primary700
-            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
         }
-    }
-
-    private var accessibilityLabel: String {
-        switch tier.kind {
-        case .free: "\(tier.name), always free. \(tier.blurb)"
-        case .paid: "\(tier.name), $\(tier.priceLabel ?? "") per \(tier.period ?? "month"). \(tier.blurb)"
-        case .paidLocked: "\(tier.name), locked until Stripe is connected. \(tier.blurb)"
-        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("editPersonaAudienceMode_\(option.rawValue)")
     }
 }
 
-private struct PersonaAddTierRow: View {
-    let disabled: Bool
+// MARK: - Public links
+
+private struct PersonaLinkRow: View {
+    let link: PersonaLinkDraft
+    let onLabel: @MainActor (String) -> Void
+    let onURL: @MainActor (String) -> Void
+    let onRemove: @MainActor () -> Void
 
     var body: some View {
-        Button(action: personaNoOp) {
+        HStack(spacing: Spacing.s2) {
+            VStack(spacing: Spacing.s2) {
+                TextField(
+                    "Label",
+                    text: Binding(get: { link.label }, set: { onLabel($0) })
+                )
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.appText)
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 40)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                .accessibilityIdentifier("editPersonaLinkLabel")
+
+                TextField(
+                    "https://",
+                    text: Binding(get: { link.url }, set: { onURL($0) })
+                )
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(Theme.Color.appText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 40)
+                .background(Theme.Color.appSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+                .accessibilityIdentifier("editPersonaLinkUrl")
+            }
+            Button(action: onRemove) {
+                Icon(.trash, size: 16, color: Theme.Color.error)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove link \(link.label)")
+            .accessibilityIdentifier("editPersonaRemoveLink")
+        }
+        .padding(Spacing.s2)
+        .background(Theme.Color.appSurfaceSunken)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+    }
+}
+
+private struct PersonaAddLinkRow: View {
+    let disabled: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
             HStack(spacing: Spacing.s2) {
                 Icon(.plusCircle, size: 15, color: disabled ? Theme.Color.appTextMuted : Theme.Color.primary700)
-                Text("Add paid tier")
+                Text("Add link")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(disabled ? Theme.Color.appTextMuted : Theme.Color.primary700)
                 Spacer(minLength: Spacing.s0)
-                Text("up to 4")
+                Text("up to 8")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
@@ -858,182 +850,8 @@ private struct PersonaAddTierRow: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .accessibilityLabel("Add paid tier, up to 4")
-        .accessibilityIdentifier("editPersonaAddTier")
-    }
-}
-
-// MARK: - Stripe connect card
-
-private struct PersonaStripeConnectCard: View {
-    let state: PersonaStripeState
-
-    var body: some View {
-        switch state {
-        case let .connected(account):
-            connected(account: account)
-        case .notConnected:
-            notConnected
-        }
-    }
-
-    private func connected(account: String) -> some View {
-        HStack(spacing: Spacing.s3) {
-            stripeBadge
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Connected · \(account)")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                HStack(spacing: Spacing.s1) {
-                    Icon(.checkCircle, size: 10, color: Theme.Color.success)
-                    Text("Charges enabled · payouts enabled")
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.success)
-                }
-            }
-            Spacer(minLength: Spacing.s0)
-            Text("Manage")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.Color.primary600)
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.successBg)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.successLight, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityIdentifier("editPersonaStripeConnected")
-    }
-
-    private var notConnected: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            HStack(spacing: Spacing.s3) {
-                stripeBadge
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Connect Stripe to charge for tiers")
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("~3 min · ID + bank account · we never touch the money.")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Spacing.s0)
-            }
-            Button(action: personaNoOp) {
-                HStack(spacing: 7) {
-                    Icon(.externalLink, size: 13, color: Theme.Color.appTextInverse)
-                    Text("Connect with Stripe")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextInverse)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(Theme.Color.primary600)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Connect with Stripe")
-            .accessibilityIdentifier("editPersonaStripeConnect")
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.primary50)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.primary200, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityIdentifier("editPersonaStripeCard")
-    }
-
-    private var stripeBadge: some View {
-        Text("stripe")
-            .font(.system(size: 9, weight: .heavy))
-            .foregroundStyle(Theme.Color.appTextInverse)
-            .frame(width: 32, height: 22)
-            .background(Theme.Color.primary600)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
-            .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Cap selector (segmented)
-
-private struct PersonaCapSelector: View {
-    @Binding var selection: PersonaCapOption
-
-    var body: some View {
-        HStack(spacing: Spacing.s0) {
-            ForEach(PersonaCapOption.allCases) { option in
-                let isOn = option == selection
-                Button {
-                    selection = option
-                } label: {
-                    Text(option.label)
-                        .font(.system(size: 12, weight: isOn ? .bold : .medium))
-                        .foregroundStyle(isOn ? Theme.Color.appText : Theme.Color.appTextSecondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(isOn ? Theme.Color.appSurface : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
-                .accessibilityIdentifier("editPersonaCap_\(option.rawValue)")
-            }
-        }
-        .padding(3)
-        .background(Theme.Color.appSurfaceSunken)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityIdentifier("editPersonaCapSelector")
-    }
-}
-
-// MARK: - Quiet hours
-
-private struct PersonaQuietHoursRow: View {
-    @Binding var isOn: Bool
-    let range: String
-
-    var body: some View {
-        HStack(spacing: Spacing.s3) {
-            Icon(.clock, size: 16, color: Theme.Color.appTextSecondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Quiet hours")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Color.appText)
-                Text(isOn ? displayRange : "Broadcasts allowed any time")
-                    .font(.system(size: 11, design: isOn ? .monospaced : .default))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-            Spacer(minLength: Spacing.s2)
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(Theme.Color.primary600)
-                .accessibilityLabel("Quiet hours")
-                .accessibilityIdentifier("editPersonaQuietHoursToggle")
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-    }
-
-    private var displayRange: String {
-        range.isEmpty ? "10:00 PM → 7:00 AM" : range
+        .accessibilityLabel("Add link, up to 8")
+        .accessibilityIdentifier("editPersonaAddLink")
     }
 }
 
@@ -1041,33 +859,52 @@ private struct PersonaQuietHoursRow: View {
 
 private struct PersonaShareCardView: View {
     let url: String
-    let isPublic: Bool
+    let onOpen: @MainActor () -> Void
+
+    @State private var didCopy = false
 
     var body: some View {
-        HStack(spacing: Spacing.s3) {
-            qrStamp
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                Text((isPublic ? "Public link · scan to follow" : "Private preview · only you").uppercased())
-                    .font(.system(size: 10.5, weight: .bold))
-                    .foregroundStyle(isPublic ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
-                Text(url)
-                    .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(Theme.Color.appTextStrong)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, Spacing.s2)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.Color.appSurfaceMuted)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
-                            .stroke(Theme.Color.appBorder, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
-                HStack(spacing: 6) {
-                    shareButton(.copy, "Copy", id: "editPersonaShareCopy")
-                    shareButton(.share, "Share", id: "editPersonaShareShare")
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Public link · anyone can follow".uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundStyle(Theme.Color.primary700)
+            Text(url)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundStyle(Theme.Color.appTextStrong)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, Spacing.s2)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.Color.appSurfaceMuted)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            HStack(spacing: 6) {
+                Button {
+                    UIPasteboard.general.string = url
+                    didCopy = true
+                } label: {
+                    shareButtonLabel(.copy, didCopy ? "Copied" : "Copy")
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Copy Beacon link")
+                .accessibilityIdentifier("editPersonaShareCopy")
+
+                ShareLink(item: url) {
+                    shareButtonLabel(.share, "Share")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("editPersonaShareShare")
+
+                Button(action: onOpen) {
+                    shareButtonLabel(.externalLink, "View")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View Beacon")
+                .accessibilityIdentifier("editPersonaShareView")
             }
         }
         .padding(Spacing.s3)
@@ -1081,135 +918,77 @@ private struct PersonaShareCardView: View {
         .accessibilityIdentifier("editPersonaShareCard")
     }
 
-    private var qrStamp: some View {
-        ZStack {
-            ForEach(Array(qrFinders.enumerated()), id: \.offset) { _, point in
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .stroke(qrColor, lineWidth: 2)
-                    .frame(width: 16, height: 16)
-                    .position(x: point.x, y: point.y)
-            }
-            RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
-                .fill(qrColor)
-                .frame(width: 22, height: 22)
-                .overlay { Icon(.radio, size: 12, color: Theme.Color.appTextInverse) }
+    private func shareButtonLabel(_ icon: PantopusIcon, _ label: String) -> some View {
+        HStack(spacing: 5) {
+            Icon(icon, size: 12, color: Theme.Color.appText)
+            Text(label)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
         }
-        .frame(width: 72, height: 72)
-        .padding(6)
-        .background(isPublic ? Theme.Color.appSurface : Theme.Color.appSurfaceSunken)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityHidden(true)
-    }
-
-    private var qrColor: Color {
-        isPublic ? Theme.Color.primary600 : Theme.Color.appTextMuted
-    }
-
-    private var qrFinders: [CGPoint] {
-        [CGPoint(x: 12, y: 12), CGPoint(x: 60, y: 12), CGPoint(x: 12, y: 60)]
-    }
-
-    private func shareButton(_ icon: PantopusIcon, _ label: String, id: String) -> some View {
-        Button(action: personaNoOp) {
-            HStack(spacing: 5) {
-                Icon(icon, size: 12, color: isPublic ? Theme.Color.appText : Theme.Color.appTextMuted)
-                Text(label)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(isPublic ? Theme.Color.appText : Theme.Color.appTextMuted)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 30)
-            .background(isPublic ? Theme.Color.appSurface : Theme.Color.appSurfaceSunken)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isPublic)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(id)
-    }
-}
-
-// MARK: - Analytics row
-
-private struct PersonaAnalyticsRow: View {
-    @Binding var isOn: Bool
-    let scope: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s3) {
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .fill(isOn ? Theme.Color.primary50 : Theme.Color.appSurfaceSunken)
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Icon(.arrowUpRight, size: 16, color: isOn ? Theme.Color.primary600 : Theme.Color.appTextMuted)
-                    }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Audience analytics")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                    Text("Aggregated reach & growth — never individual followers.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Spacing.s2)
-                Toggle("", isOn: $isOn)
-                    .labelsHidden()
-                    .tint(Theme.Color.primary600)
-                    .accessibilityLabel("Audience analytics")
-                    .accessibilityIdentifier("editPersonaAnalyticsToggle")
-            }
-            if isOn, !scope.isEmpty {
-                FilterSheetFlowLayout(spacing: 6) {
-                    ForEach(scope, id: \.self) { item in
-                        HStack(spacing: Spacing.s1) {
-                            Icon(.check, size: 10, color: Theme.Color.primary700)
-                            Text(item).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.Color.primary700)
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(Theme.Color.primary50)
-                        .overlay(Capsule().stroke(Theme.Color.primary200, lineWidth: 1))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, Spacing.s3)
-        .padding(.vertical, Spacing.s3)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .frame(height: 34)
         .background(Theme.Color.appSurface)
         .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .accessibilityIdentifier("editPersonaAnalyticsRow")
+        .clipShape(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
     }
 }
 
 // MARK: - Sticky bar
 
 private struct PersonaStickyBar: View {
-    let variant: EditPersonaVariant
+    let label: String
+    let isSaving: Bool
+    let isEnabled: Bool
+    let statusMessage: String?
+    let errorMessage: String?
     let onDiscard: @MainActor () -> Void
+    let onSave: @MainActor () -> Void
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
-            Group {
-                switch variant {
-                case .live: liveBar
-                case .setup: setupBar
+            VStack(spacing: Spacing.s2) {
+                if let errorMessage {
+                    banner(icon: .alertCircle, text: errorMessage, tone: .error)
+                } else if let statusMessage {
+                    banner(icon: .checkCircle, text: statusMessage, tone: .success)
+                }
+                HStack(spacing: Spacing.s2) {
+                    Button(action: onDiscard) {
+                        Text("Cancel")
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextStrong)
+                            .frame(height: 42)
+                            .padding(.horizontal, Spacing.s3)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("editPersonaDiscard")
+
+                    Spacer(minLength: Spacing.s0)
+
+                    Button(action: onSave) {
+                        HStack(spacing: 6) {
+                            if isSaving {
+                                ProgressView().tint(Theme.Color.appTextInverse)
+                            } else {
+                                Icon(.check, size: 15, color: Theme.Color.appTextInverse)
+                            }
+                            Text(label)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.Color.appTextInverse)
+                        }
+                        .frame(height: 42)
+                        .padding(.horizontal, Spacing.s5)
+                        .background(isEnabled ? Theme.Color.primary600 : Theme.Color.appBorder)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEnabled)
+                    .accessibilityLabel(label)
+                    .accessibilityIdentifier("editPersonaSave")
                 }
             }
             .padding(.horizontal, Spacing.s4)
@@ -1218,99 +997,30 @@ private struct PersonaStickyBar: View {
         .background(Theme.Color.appSurface)
     }
 
-    private var liveBar: some View {
+    private enum Tone { case success, error }
+
+    private func banner(icon: PantopusIcon, text: String, tone: Tone) -> some View {
         HStack(spacing: Spacing.s2) {
-            HStack(spacing: 5) {
-                Circle().fill(Theme.Color.success).frame(width: 7, height: 7)
-                Text("Live · saved 2m ago")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
+            Icon(icon, size: 13, color: tone == .error ? Theme.Color.error : Theme.Color.success)
+            Text(text)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(tone == .error ? Theme.Color.error : Theme.Color.success)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Spacing.s0)
-            Button(action: personaNoOp) {
-                HStack(spacing: 5) {
-                    Icon(.eye, size: 14, color: Theme.Color.appTextStrong)
-                    Text("Preview").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.Color.appTextStrong)
-                }
-                .frame(height: 42)
-                .padding(.horizontal, Spacing.s3)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Preview")
-            .accessibilityIdentifier("editPersonaPreview")
-            Text("Save")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.Color.appTextMuted)
-                .padding(.horizontal, Spacing.s5)
-                .frame(height: 42)
-                .background(Theme.Color.appBorder)
-                .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                .accessibilityLabel("Save, no changes")
-                .accessibilityIdentifier("editPersonaSave")
         }
-    }
-
-    private var setupBar: some View {
-        VStack(spacing: Spacing.s2) {
-            HStack(spacing: Spacing.s2) {
-                Icon(.info, size: 13, color: Theme.Color.primary700)
-                Text("Save anytime — publish unlocks after Stripe + schedule")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Theme.Color.primary700)
-                Spacer(minLength: Spacing.s0)
-            }
-            .padding(.horizontal, Spacing.s2)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.primary50)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                    .stroke(Theme.Color.primary200, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            HStack(spacing: Spacing.s2) {
-                HStack(spacing: 6) {
-                    Circle().fill(Theme.Color.warning).frame(width: 6, height: 6)
-                    Text("7 UNSAVED").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.Color.warning)
-                }
-                .padding(.horizontal, Spacing.s2)
-                .padding(.vertical, Spacing.s1)
-                .background(Theme.Color.warningBg)
-                .overlay(Capsule().stroke(Theme.Color.warningLight, lineWidth: 1))
-                .clipShape(Capsule())
-                Spacer(minLength: Spacing.s0)
-                Button(action: onDiscard) {
-                    Text("Discard")
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appTextStrong)
-                        .frame(height: 42)
-                        .padding(.horizontal, Spacing.s3)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Discard draft")
-                .accessibilityIdentifier("editPersonaDiscard")
-                Button(action: personaNoOp) {
-                    HStack(spacing: 6) {
-                        Icon(.check, size: 15, color: Theme.Color.appTextInverse)
-                        Text("Save draft").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.Color.appTextInverse)
-                    }
-                    .frame(height: 42)
-                    .padding(.horizontal, Spacing.s5)
-                    .background(Theme.Color.primary600)
-                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Save draft")
-                .accessibilityIdentifier("editPersonaSaveDraft")
-            }
-        }
+        .padding(.horizontal, Spacing.s2)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tone == .error ? Theme.Color.errorBg : Theme.Color.successBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(tone == .error ? Theme.Color.errorLight : Theme.Color.successLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier("editPersonaStatusBanner")
     }
 }
 
-#Preview("Live") {
-    EditPersonaView(viewModel: EditPersonaViewModel(personaId: EditPersonaSampleData.personaId, variant: .live))
-}
-
-#Preview("Setup") {
-    EditPersonaView(viewModel: EditPersonaViewModel(personaId: "persona_sourdough_sat", variant: .setup))
+#Preview("Edit Beacon") {
+    EditPersonaView()
 }

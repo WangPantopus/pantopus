@@ -740,7 +740,7 @@ public struct ExploreMapView: View {
 
 // MARK: - Pin
 
-private struct ExploreTypedPin: View {
+struct ExploreTypedPin: View {
     let entity: ExploreEntity
     let isActive: Bool
     @State private var pulse = false
@@ -785,7 +785,7 @@ private struct ExploreTypedPin: View {
 }
 
 /// Cluster glyph — larger disc with the entity count.
-private struct ExploreClusterDot: View {
+struct ExploreClusterDot: View {
     let cluster: ExploreCluster
 
     var body: some View {
@@ -805,7 +805,7 @@ private struct ExploreClusterDot: View {
     }
 }
 
-private struct ExploreYouAreHereDot: View {
+struct ExploreYouAreHereDot: View {
     var body: some View {
         Circle()
             .fill(Theme.Color.primary600)

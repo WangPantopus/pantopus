@@ -91,6 +91,14 @@ public struct HouseholdTasksBannerSummary: Sendable, Equatable {
     }
 }
 
+/// One-shot event the view turns into a confirm sheet. Mirrors the
+/// `MyHomesListEvent` pattern: the VM never presents UI itself.
+enum HouseholdTasksListEvent: Equatable {
+    /// The row's trash affordance was tapped — the view opens the
+    /// destructive confirm naming `title`.
+    case confirmDelete(taskId: String, title: String)
+}
+
 /// Pure projection of one task into a row's display fields.
 public struct HouseholdTaskRowProjection: Sendable, Equatable {
     public let title: String
@@ -185,6 +193,14 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
     }
 
     private(set) var state: ListOfRowsState = .loading
+
+    /// Set when a row's trash affordance fires. The view drains it into
+    /// a `confirmationDialog` and clears it.
+    var pendingEvent: HouseholdTasksListEvent?
+
+    /// Surfaced by the view as an alert when a delete fails (403 no
+    /// permission, network, …).
+    var actionError: String?
 
     /// Last successful payload — held so a tab change can re-filter
     /// without re-fetching.
@@ -294,6 +310,41 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
         }
     }
 
+    /// Row trash tapped — hand the confirm to the view. RN raises the
+    /// same confirm from the row's trash glyph
+    /// (`src/app/homes/[id]/tasks.tsx:76-84`).
+    func requestDelete(taskId: String) {
+        guard let task = tasks?.first(where: { $0.id == taskId }) else { return }
+        pendingEvent = .confirmDelete(taskId: taskId, title: task.title)
+    }
+
+    /// `DELETE /api/homes/:id/tasks/:taskId` — route
+    /// `backend/routes/home.js:4354`. Optimistically drops the row, then
+    /// restores it (and surfaces `actionError`) if the server refuses.
+    func deleteTask(taskId: String) async {
+        guard let loaded = tasks, let idx = loaded.firstIndex(where: { $0.id == taskId }) else {
+            return
+        }
+        let original = loaded[idx]
+        var pruned = loaded
+        pruned.remove(at: idx)
+        tasks = pruned
+        rebuildState()
+        do {
+            let _: EmptyResponse = try await api.request(
+                HomesEndpoints.deleteTask(homeId: homeId, taskId: taskId)
+            )
+        } catch {
+            // Roll back — put the row back where it was.
+            var rolled = tasks ?? []
+            rolled.insert(original, at: min(idx, rolled.count))
+            tasks = rolled
+            rebuildState()
+            actionError = (error as? APIError)?.errorDescription
+                ?? "Couldn't delete that task. Try again."
+        }
+    }
+
     private func rebuildState() {
         guard let tasks else { return }
         let nowDate = now()
@@ -384,6 +435,12 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
         )
     }
 
+    /// Active + Done rows carry a two-button trailing: the checkbox that
+    /// toggles the task **both ways** (RN's checkbox does `done → open`
+    /// as well, `src/app/homes/[id]/tasks.tsx:52-58`) and the trash
+    /// affordance RN puts on every row (`:167-169`). Recurring keeps its
+    /// kebab — a recurring chore is still deletable from the Active tab,
+    /// where the same row also appears.
     private func trailing(
         for task: HomeTaskDTO,
         tab: HouseholdTasksTab,
@@ -391,20 +448,30 @@ final class HouseholdTasksListViewModel: ListOfRowsDataSource {
         taskId: String
     ) -> RowTrailing {
         switch tab {
-        case .active:
+        case .active, .done:
             let isDone = task.status == "done"
-            return .circularAction(
-                icon: isDone ? .check : .circle,
-                accessibilityLabel: isDone ? "Mark not done" : "Mark done",
-                background: isDone ? Theme.Color.homeBg : Theme.Color.appSurface,
-                foreground: isDone ? Theme.Color.home : Theme.Color.appTextMuted
-            ) { [weak self] in
-                Task { @MainActor [weak self] in
-                    await self?.toggleDone(taskId: taskId)
+            return .iconActions(
+                primary: RowIconAction(
+                    icon: isDone ? .check : .circle,
+                    accessibilityLabel: isDone ? "Mark not done" : "Mark done",
+                    background: isDone ? Theme.Color.homeBg : Theme.Color.appSurface,
+                    foreground: isDone ? Theme.Color.home : Theme.Color.appTextMuted
+                ) { [weak self] in
+                    Task { @MainActor [weak self] in
+                        await self?.toggleDone(taskId: taskId)
+                    }
+                },
+                secondary: RowIconAction(
+                    icon: .trash,
+                    accessibilityLabel: "Delete task",
+                    background: Theme.Color.appSurfaceSunken,
+                    foreground: Theme.Color.error
+                ) { [weak self] in
+                    Task { @MainActor [weak self] in
+                        self?.requestDelete(taskId: taskId)
+                    }
                 }
-            }
-        case .done:
-            return .statusChip(text: "Done", variant: .success)
+            )
         case .recurring:
             return .kebab
         }

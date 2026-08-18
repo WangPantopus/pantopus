@@ -49,7 +49,6 @@ public struct ConfirmSheetParty: Identifiable, Equatable, Sendable {
 @MainActor
 public struct FaceIDConfirmSheet: View {
     public let parties: [ConfirmSheetParty]
-    public let amount: Int
     public let recipientName: String
     public let homeAddress: String
     public let coOwnerNames: String
@@ -61,7 +60,6 @@ public struct FaceIDConfirmSheet: View {
 
     public init(
         parties: [ConfirmSheetParty],
-        amount: Int,
         recipientName: String,
         homeAddress: String,
         coOwnerNames: String,
@@ -72,7 +70,6 @@ public struct FaceIDConfirmSheet: View {
         onConfirm: @escaping () -> Void
     ) {
         self.parties = parties
-        self.amount = amount
         self.recipientName = recipientName
         self.homeAddress = homeAddress
         self.coOwnerNames = coOwnerNames
@@ -213,8 +210,13 @@ public struct FaceIDConfirmSheet: View {
     }
 
     private var legalGrantCopy: String {
-        "you grant \(recipientName) \(amount)% ownership of \(homeAddress) "
-            + "and forfeit that share. \(coOwnerNames) keep their stakes. Recorded on chain at "
+        let coOwnerClause = coOwnerNames.isEmpty
+            ? ""
+            : "\(coOwnerNames) must approve before it takes effect. "
+        return "you grant \(recipientName) ownership of \(homeAddress) and forfeit your own "
+            + "owner record. They must verify ownership before the transfer completes. "
+            + coOwnerClause
+            + "Recorded on chain at "
     }
 
     private var legal: some View {
@@ -298,23 +300,22 @@ public struct FaceIDConfirmSheet: View {
                 initials: "DK",
                 avatarStart: Theme.Color.primary500,
                 avatarEnd: Theme.Color.primary700,
-                fromPercent: 60,
-                toPercent: 35
+                fromPercent: 100,
+                toPercent: 0
             ),
             ConfirmSheetParty(
                 id: "maya",
                 role: "To",
-                name: "Maya Fortune",
-                initials: "MF",
+                name: "buyer@example.com",
+                initials: "B",
                 avatarStart: Theme.Color.business,
                 avatarEnd: Theme.Color.businessDark,
                 fromPercent: 0,
-                toPercent: 25,
+                toPercent: 100,
                 verified: true
             )
         ],
-        amount: 25,
-        recipientName: "Maya",
+        recipientName: "buyer@example.com",
         homeAddress: "412 Elm St.",
         coOwnerNames: "Mateo & Jin",
         timestamp: "14:23 May 26",

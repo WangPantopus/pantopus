@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
@@ -70,6 +72,8 @@ data class GroupedListCallbacks(
     val onSetSlider: (String, Int) -> Unit = { _, _ -> },
     /** A14.5 — tap on one chip of a channelTriad row. `Boolean` is the value after the flip. */
     val onToggleChannel: (String, ChannelGlyph, Boolean) -> Unit = { _, _, _ -> },
+    /** A14.5 — tap on one option of a chips row. `String` is the raw (wire) option value. */
+    val onSelectChip: (String, String) -> Unit = { _, _ -> },
     /** A14.5 — tap on the banner action pill (e.g. Resume). */
     val onTapBanner: () -> Unit = {},
     /** A14.7 — release the location-fuzz slider on `stop`. */
@@ -207,15 +211,11 @@ internal fun LoadedFrame(
 ) {
     val optimistic = remember { mutableStateMapOf<String, RowControl>() }
     LaunchedEffect(groups) {
-        // Drop overrides for rows that no longer exist (or whose
-        // server-side state now matches our optimistic override).
-        val live = groups.flatMap { it.rows }.associateBy { it.id }
-        val drop =
-            optimistic.keys.filter { id ->
-                val row = live[id] ?: return@filter true
-                row.control == optimistic[id]
-            }
-        drop.forEach { optimistic.remove(it) }
+        // The view-model is the source of truth the moment it emits a
+        // new projection: confirmed mutations re-emit the same value
+        // (dropping the override is a no-op) and rolled-back ones
+        // re-emit the server value, which has to win.
+        optimistic.clear()
     }
 
     LazyColumn(
@@ -421,16 +421,17 @@ private fun RowItem(
                 }
         }
     }
-    // Triad rows own their chip taps; the row itself isn't tappable.
-    val isTriad = control is RowControl.ChannelTriad
+    // Triad + chip-strip rows own their chip taps; the row itself
+    // isn't tappable.
+    val ownsInnerTaps = control.ownsInnerTaps
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .then(if (isTriad) Modifier else Modifier.clickable(onClick = onClickRow))
+                .then(if (ownsInnerTaps) Modifier else Modifier.clickable(onClick = onClickRow))
                 .padding(horizontal = Spacing.s4, vertical = 14.dp)
-                .testTag("groupedListRow_${row.id}"),
+                .testTag(row.testTag ?: "groupedListRow_${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
@@ -479,6 +480,19 @@ private fun RowItem(
                     },
                 )
             }
+            if (control is RowControl.Chips) {
+                ChipStrip(
+                    rowId = row.id,
+                    options = control.options,
+                    selected = control.selected,
+                    onSelect = { value ->
+                        if (value != control.selected) {
+                            optimistic[row.id] = RowControl.Chips(control.options, value)
+                            callbacks.onSelectChip(row.id, value)
+                        }
+                    },
+                )
+            }
         }
         when (control) {
             is RowControl.Chevron -> ChevronGlyph()
@@ -504,7 +518,9 @@ private fun RowItem(
                     if (control.includesChevron) ChevronGlyph()
                 }
             }
-            is RowControl.Slider -> {}
+            // Both render inline under the row label, not in the
+            // trailing slot.
+            is RowControl.Slider, is RowControl.Chips -> {}
             is RowControl.ChannelTriad ->
                 ChannelTriad(
                     p = channelState(control.p, ChannelGlyph.P, control.locked),
@@ -629,6 +645,57 @@ private fun ChipView(
             color = fg,
             letterSpacing = 0.4.sp,
         )
+    }
+}
+
+/**
+ * A14.5 — horizontally scrolling single-select value chips under the
+ * row label (briefing send time, quiet-hours bounds). The raw option
+ * string is both the label and the wire value.
+ */
+@Composable
+private fun ChipStrip(
+    rowId: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.s2)
+                .horizontalScroll(rememberScrollState())
+                .testTag("groupedListChipStrip_$rowId"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEach { option ->
+            val isActive = option == selected
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(if (isActive) PantopusColors.primary50 else PantopusColors.appSurfaceSunken)
+                        .border(
+                            1.dp,
+                            if (isActive) PantopusColors.primary600 else PantopusColors.appBorder,
+                            RoundedCornerShape(Radii.pill),
+                        )
+                        .clickable { onSelect(option) }
+                        .padding(horizontal = Spacing.s3, vertical = 6.dp)
+                        .semantics { this.contentDescription = option }
+                        .testTag("groupedListChipOption_${rowId}_$option"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = option,
+                    fontSize = 13.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isActive) PantopusColors.primary700 else PantopusColors.appTextSecondary,
+                )
+            }
+        }
     }
 }
 

@@ -55,7 +55,7 @@ fun LocationFuzzSlider(
     onChange: (FuzzStop) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val stops = listOf(FuzzStop.Exact, FuzzStop.Building, FuzzStop.Block, FuzzStop.BlockDefault, FuzzStop.Neighborhood)
+    val stops = listOf(FuzzStop.Exact, FuzzStop.Block, FuzzStop.QuarterMile, FuzzStop.HalfMile, FuzzStop.Neighborhood)
     val index = stops.indexOf(stop).coerceAtLeast(0)
 
     Column(modifier = modifier.fillMaxWidth().testTag("locationFuzzSlider")) {

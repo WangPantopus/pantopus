@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package app.pantopus.android.ui.screens.gigs
@@ -73,10 +73,19 @@ fun GigsFeedScreen(
     onOpenMap: (GigsCategory) -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    /**
+     * Feed-scope extras — a merged Support Train row, and the two quick
+     * links RN keeps under the scope chips (`gigs.tsx:433-441`).
+     */
+    onOpenSupportTrain: (String) -> Unit = {},
+    onOpenMyTasks: (() -> Unit)? = null,
+    onOpenMySupportTrains: (() -> Unit)? = null,
     viewModel: GigsFeedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeCategory by viewModel.activeCategory.collectAsStateWithLifecycle()
+    val feedScope by viewModel.feedScope.collectAsStateWithLifecycle()
+    val feedRows by viewModel.feedRows.collectAsStateWithLifecycle()
     val activeSort by viewModel.activeSort.collectAsStateWithLifecycle()
     val activeFilterCount by viewModel.activeFilterCount.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
@@ -85,6 +94,8 @@ fun GigsFeedScreen(
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     val savedSearches by viewModel.savedSearches.collectAsStateWithLifecycle()
     val draftBanner by viewModel.draftBanner.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
+    val loadingMore by viewModel.loadingMore.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
     var showSavedSearches by remember { mutableStateOf(false) }
 
@@ -113,6 +124,11 @@ fun GigsFeedScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             GigsTopBar(onBack = onBack, onOpenMap = { onOpenMap(activeCategory) })
             GigsSearchBar(onOpenSearch = onOpenSearch)
+            GigsFeedScopeChipRow(active = feedScope, onSelect = viewModel::selectScope)
+            GigsFeedQuickLinksRow(
+                onOpenMyTasks = onOpenMyTasks,
+                onOpenMySupportTrains = onOpenMySupportTrains,
+            )
             GigsCategoryChipRow(
                 active = activeCategory,
                 onSelect = viewModel::selectCategory,
@@ -145,13 +161,23 @@ fun GigsFeedScreen(
                 when (val s = state) {
                     is GigsFeedUiState.Loading -> LoadingFrame()
                     is GigsFeedUiState.BrowseLoading -> BrowseLoadingFrame()
-                    is GigsFeedUiState.Empty -> EmptyFrame(radiusMiles = s.radiusMiles) { onCompose(activeCategory) }
+                    is GigsFeedUiState.Empty ->
+                        EmptyFrame(
+                            radiusMiles = s.radiusMiles,
+                            headline = feedScope.emptyHeadline,
+                            body = feedScope.emptyBody,
+                        ) { onCompose(activeCategory) }
                     is GigsFeedUiState.Loaded ->
                         PopulatedFrame(
                             rows = s.rows,
                             onOpenGig = onOpenGig,
                             onDismissGig = viewModel::dismissGig,
                             onHideCategory = viewModel::hideCategory,
+                            hasMore = hasMore,
+                            loadingMore = loadingMore,
+                            onLoadMore = viewModel::loadMore,
+                            feedRows = feedRows,
+                            onOpenSupportTrain = onOpenSupportTrain,
                         )
                     is GigsFeedUiState.BrowseLoaded ->
                         BrowseFrame(
@@ -515,9 +541,204 @@ internal fun LoadingFrame() {
     }
 }
 
+/**
+ * RN's three scope chips above the category row (`gigs.tsx:398-421`).
+ */
+@Composable
+private fun GigsFeedScopeChipRow(
+    active: GigsFeedScope,
+    onSelect: (GigsFeedScope) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                .testTag("gigsFeed.scopeChips"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GigsFeedScope.entries.forEach { scope ->
+            val selected = scope == active
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(if (selected) PantopusColors.primary600 else PantopusColors.appSurfaceSunken)
+                        .border(
+                            1.dp,
+                            if (selected) PantopusColors.primary600 else PantopusColors.appBorder,
+                            RoundedCornerShape(Radii.pill),
+                        )
+                        .clickable { onSelect(scope) }
+                        .padding(horizontal = 14.dp)
+                        .height(32.dp)
+                        .testTag("gigsFeed.scope.${scope.key}")
+                        .semantics {
+                            contentDescription = if (selected) "${scope.label}, selected" else scope.label
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = scope.label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) PantopusColors.appTextInverse else PantopusColors.appTextSecondary,
+                )
+            }
+        }
+    }
+}
+
+/** "My Tasks · My Support Trains" quick links (RN `gigs.tsx:433-441`). */
+@Composable
+private fun GigsFeedQuickLinksRow(
+    onOpenMyTasks: (() -> Unit)?,
+    onOpenMySupportTrains: (() -> Unit)?,
+) {
+    if (onOpenMyTasks == null && onOpenMySupportTrains == null) return
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .testTag("gigsFeed.quickLinks"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onOpenMyTasks != null) {
+            Text(
+                text = "My Tasks",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onOpenMyTasks)
+                        .heightIn(min = 32.dp)
+                        .testTag("gigsFeed.quickLink.myTasks"),
+            )
+        }
+        if (onOpenMyTasks != null && onOpenMySupportTrains != null) {
+            Text(text = "·", fontSize = 12.5.sp, color = PantopusColors.appTextMuted)
+        }
+        if (onOpenMySupportTrains != null) {
+            Text(
+                text = "My Support Trains",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onOpenMySupportTrains)
+                        .heightIn(min = 32.dp)
+                        .testTag("gigsFeed.quickLink.mySupportTrains"),
+            )
+        }
+    }
+}
+
+/**
+ * One nearby Support Train row interleaved into the Tasks feed. Mirrors
+ * RN `components/gig-browse/SupportTrainRow.tsx`.
+ */
+@Composable
+internal fun SupportTrainFeedRow(
+    content: SupportTrainRowContent,
+    onTap: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
+                .clickable(onClick = onTap)
+                .padding(Spacing.s3)
+                .testTag("gigsSupportTrainRow_${content.id}"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Heart,
+                contentDescription = null,
+                size = 22.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.primary600,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = content.title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.primary50)
+                            .padding(horizontal = Spacing.s2, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = "SUPPORT TRAIN",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PantopusColors.primary700,
+                    )
+                }
+                if (content.metaLine.isNotEmpty()) {
+                    Text(
+                        text = content.metaLine,
+                        fontSize = 10.sp,
+                        color = PantopusColors.appTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                text = content.subtitle,
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 16.dp,
+            strokeWidth = 2f,
+            tint = PantopusColors.appTextMuted,
+        )
+    }
+}
+
 @Composable
 internal fun EmptyFrame(
     radiusMiles: Double,
+    headline: String = "No gigs nearby",
+    body: String = "Be the first to post one.",
     onPostTask: () -> Unit,
 ) {
     Column(
@@ -547,7 +768,7 @@ internal fun EmptyFrame(
         }
         Spacer(modifier = Modifier.size(Spacing.s3))
         Text(
-            text = "No gigs nearby",
+            text = headline,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = PantopusColors.appText,
@@ -555,7 +776,7 @@ internal fun EmptyFrame(
         )
         Spacer(modifier = Modifier.size(Spacing.s1))
         Text(
-            text = "Be the first to post one.",
+            text = body,
             fontSize = 13.5.sp,
             color = PantopusColors.appTextSecondary,
         )
@@ -641,7 +862,18 @@ internal fun PopulatedFrame(
     onOpenGig: (String) -> Unit,
     onDismissGig: (String) -> Unit = {},
     onHideCategory: (GigsCategory) -> Unit = {},
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
+    /**
+     * Merged gig + Support Train rows, newest first. Empty falls back to
+     * [rows] so gig-only callers render exactly as before.
+     */
+    feedRows: List<GigsFeedRow> = emptyList(),
+    onOpenSupportTrain: (String) -> Unit = {},
 ) {
+    val merged =
+        feedRows.ifEmpty { rows.map { GigsFeedRow.Gig(it, 0L) } }
     LazyColumn(
         modifier =
             Modifier
@@ -650,13 +882,37 @@ internal fun PopulatedFrame(
         contentPadding = PaddingValues(start = Spacing.s4, end = Spacing.s4, top = Spacing.s1, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        items(items = rows, key = { it.id }) { row ->
-            DismissableGigRow(
-                content = row,
-                onTap = { onOpenGig(row.id) },
-                onDismiss = { onDismissGig(row.id) },
-                onHideCategory = { onHideCategory(row.category) },
-            )
+        items(items = merged, key = { it.rowKey }) { row ->
+            when (row) {
+                is GigsFeedRow.Gig ->
+                    DismissableGigRow(
+                        content = row.content,
+                        onTap = { onOpenGig(row.content.id) },
+                        onDismiss = { onDismissGig(row.content.id) },
+                        onHideCategory = { onHideCategory(row.content.category) },
+                    )
+                is GigsFeedRow.SupportTrain ->
+                    SupportTrainFeedRow(
+                        content = row.content,
+                        onTap = { onOpenSupportTrain(row.content.id) },
+                    )
+            }
+        }
+        // Infinite scroll — composing the footer means the user reached
+        // the bottom, which kicks the next `GET /api/gigs` page. While it
+        // is in flight the footer renders a skeleton row so the state
+        // mirrors the loaded geometry instead of a bare spinner.
+        if (hasMore) {
+            item(key = "gigsFeedLoadMore") {
+                LaunchedEffect(merged.size) { onLoadMore() }
+                Box(modifier = Modifier.fillMaxWidth().testTag("gigsFeedLoadMore")) {
+                    if (loadingMore) {
+                        Box(modifier = Modifier.testTag("gigsFeedLoadingMore")) { FeedSkeletonCard() }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp))
+                    }
+                }
+            }
         }
     }
 }

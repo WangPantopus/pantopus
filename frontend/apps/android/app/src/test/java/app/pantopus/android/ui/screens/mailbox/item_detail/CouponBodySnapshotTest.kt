@@ -32,7 +32,11 @@ class CouponBodySnapshotTest {
     @Test fun coupon_unused_body() {
         paparazzi.snapshot {
             Root {
-                CouponBody(coupon = MailItemSampleData.couponUnused, state = CouponBodyState.Unused)
+                CouponBody(
+                    coupon = MailItemSampleData.couponUnused,
+                    state = CouponBodyState.Unused,
+                    similarOffers = MailItemSampleData.couponSimilarOffers,
+                )
             }
         }
     }
@@ -40,7 +44,13 @@ class CouponBodySnapshotTest {
     @Test fun coupon_redeemed_body() {
         paparazzi.snapshot {
             Root {
-                CouponBody(coupon = MailItemSampleData.couponRedeemed, state = CouponBodyState.Redeemed)
+                CouponBody(
+                    coupon = MailItemSampleData.couponRedeemed,
+                    state = CouponBodyState.Redeemed,
+                    similarOffers = MailItemSampleData.couponSimilarOffers,
+                    walletReminderDetail = MailItemSampleData.COUPON_WALLET_REMINDER_DETAIL,
+                    walletArrivalDetail = MailItemSampleData.COUPON_WALLET_ARRIVAL_DETAIL,
+                )
             }
         }
     }
@@ -48,7 +58,11 @@ class CouponBodySnapshotTest {
     @Test fun coupon_expired_body() {
         paparazzi.snapshot {
             Root {
-                CouponBody(coupon = MailItemSampleData.couponExpired, state = CouponBodyState.Expired)
+                CouponBody(
+                    coupon = MailItemSampleData.couponExpired,
+                    state = CouponBodyState.Expired,
+                    similarOffers = MailItemSampleData.couponSimilarOffers,
+                )
             }
         }
     }
@@ -60,6 +74,7 @@ class CouponBodySnapshotTest {
                     coupon = MailItemSampleData.couponUnused,
                     state = CouponBodyState.Unused,
                     barcodeInitiallyExpanded = true,
+                    similarOffers = MailItemSampleData.couponSimilarOffers,
                 )
             }
         }

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "TooManyFunctions", "PackageNaming")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 
@@ -31,6 +31,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -96,6 +100,9 @@ fun PostGigV1Screen(
 
     // P0.3 — real Material3 date + time pickers behind the date field.
     var showDateTimePicker by remember { mutableStateOf(false) }
+
+    // A13.8 P5 — the same picker pair, driving the optional `deadline`.
+    var showDeadlinePicker by remember { mutableStateOf(false) }
 
     // P0.2 — modern photo picker; picked URIs are copied to bytes and
     // uploaded immediately by the VM.
@@ -204,6 +211,17 @@ fun PostGigV1Screen(
                             onTakePhoto = onTakePhoto,
                             onRemovePhoto = viewModel::removePhoto,
                             onRetryPhoto = viewModel::retryPhotoUpload,
+                            onCancellationPolicy = viewModel::updateCancellationPolicy,
+                            onIsUrgent = viewModel::updateIsUrgent,
+                            onTags = viewModel::updateTags,
+                            onEstimatedDuration = viewModel::updateEstimatedDuration,
+                            onDeadlineToggle = { enabled ->
+                                if (enabled) showDeadlinePicker = true else viewModel.updateDeadline(null)
+                            },
+                            onPickDeadline = { showDeadlinePicker = true },
+                            onAddItem = viewModel::addItem,
+                            onUpdateItem = viewModel::updateItem,
+                            onRemoveItem = viewModel::removeItem,
                         ),
                 )
         }
@@ -217,6 +235,17 @@ fun PostGigV1Screen(
                 viewModel.updateScheduledAt(picked)
             },
             onDismiss = { showDateTimePicker = false },
+        )
+    }
+
+    if (showDeadlinePicker) {
+        FutureDateTimePickerDialogs(
+            initial = content?.form?.deadline ?: content?.form?.scheduledAt,
+            onPicked = { picked ->
+                showDeadlinePicker = false
+                viewModel.updateDeadline(picked)
+            },
+            onDismiss = { showDeadlinePicker = false },
         )
     }
 }
@@ -235,6 +264,17 @@ data class PostGigV1Actions(
     val onRemovePhoto: (String) -> Unit = {},
     /** P0.2 — tap-to-retry on a failed upload tile. */
     val onRetryPhoto: (String) -> Unit = {},
+    // A13.8 P5 — the rest of RN's editable field set.
+    val onCancellationPolicy: (PostGigV1CancellationPolicy) -> Unit = {},
+    val onIsUrgent: (Boolean) -> Unit = {},
+    val onTags: (String) -> Unit = {},
+    val onEstimatedDuration: (String) -> Unit = {},
+    /** Opens the deadline picker; `false` clears the deadline outright. */
+    val onDeadlineToggle: (Boolean) -> Unit = {},
+    val onPickDeadline: () -> Unit = {},
+    val onAddItem: () -> Unit = {},
+    val onUpdateItem: (String, (PostGigV1Item) -> PostGigV1Item) -> Unit = { _, _ -> },
+    val onRemoveItem: (String) -> Unit = {},
 )
 
 @Composable
@@ -320,7 +360,352 @@ fun PostGigV1Content(
         )
     }
 
+    // A13.8 P5 — the rest of RN's editable field set, so an edit can touch
+    // every column the PATCH schema accepts (`gigs.js:642`).
+    FormFieldGroup(title = "More details") {
+        DeadlineField(
+            deadline = form.deadline,
+            onToggle = actions.onDeadlineToggle,
+            onPick = actions.onPickDeadline,
+        )
+        PantopusTextField(
+            label = "Estimated duration (hours)",
+            value = form.estimatedDuration,
+            onValueChange = actions.onEstimatedDuration,
+            placeholder = "1.5",
+            state = errors.fieldState(PostGigV1Field.EstimatedDuration),
+            keyboardType = KeyboardType.Decimal,
+            fieldTestTag = "postGigV1_estimatedDuration",
+        )
+        PantopusTextField(
+            label = "Tags",
+            value = form.tags,
+            onValueChange = actions.onTags,
+            placeholder = "heavy lifting, weekend, two-person",
+            fieldTestTag = "postGigV1_tags",
+        )
+        Text(
+            text = "Comma-separated · up to ${PostGigV1SampleData.MAX_TAGS}",
+            fontSize = 11.sp,
+            fontStyle = FontStyle.Italic,
+            color = PantopusColors.appTextSecondary,
+            modifier = Modifier.testTag("postGigV1_tagsHint"),
+        )
+        UrgentToggle(isOn = form.isUrgent, onToggle = actions.onIsUrgent)
+    }
+
+    FormFieldGroup(title = "Items") {
+        ItemsField(
+            items = form.items,
+            canAdd = form.items.size < PostGigV1SampleData.MAX_ITEMS,
+            onAdd = actions.onAddItem,
+            onUpdate = actions.onUpdateItem,
+            onRemove = actions.onRemoveItem,
+        )
+    }
+
+    FormFieldGroup(title = "Cancellation") {
+        CancellationPolicyField(
+            selected = form.cancellationPolicy,
+            onSelect = actions.onCancellationPolicy,
+        )
+    }
+
     LegacyStamp()
+}
+
+/**
+ * Optional `deadline` — off by default; enabling reveals the picker.
+ * `Joi.date().iso().min('now')` has no `allow(null)`, so once a deadline
+ * exists the editor can move it but not clear it server-side.
+ */
+@Composable
+private fun DeadlineField(
+    deadline: LocalDateTime?,
+    onToggle: (Boolean) -> Unit,
+    onPick: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .testTag("postGigV1_deadlineToggle"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Text(
+                text = "Set a deadline",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = deadline != null,
+                onCheckedChange = onToggle,
+                colors =
+                    SwitchDefaults.colors(
+                        checkedThumbColor = PantopusColors.appTextInverse,
+                        checkedTrackColor = PantopusColors.primary600,
+                    ),
+            )
+        }
+        if (deadline != null) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurface)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                        .clickable(onClick = onPick)
+                        .padding(horizontal = Spacing.s3)
+                        .testTag("postGigV1_deadline")
+                        .semantics { contentDescription = "Deadline" },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.CalendarClock,
+                    contentDescription = null,
+                    size = Radii.xl,
+                    tint = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = deadline.format(PostGigV1DateFormatter),
+                    style = PantopusTextStyle.small,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                PantopusIconImage(
+                    icon = PantopusIcon.ChevronDown,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+        }
+    }
+}
+
+/** `is_urgent` toggle — RN's "urgent" checkbox. */
+@Composable
+private fun UrgentToggle(
+    isOn: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("postGigV1_isUrgent"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Mark as urgent",
+                style = PantopusTextStyle.small,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                text = "Surfaces the task in the urgent feed and unlocks the live status stepper.",
+                fontSize = 11.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Switch(
+            checked = isOn,
+            onCheckedChange = onToggle,
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = PantopusColors.appTextInverse,
+                    checkedTrackColor = PantopusColors.primary600,
+                ),
+        )
+    }
+}
+
+/** Errand / shopping line items (`items[]`) — add / edit / remove. */
+@Composable
+private fun ItemsField(
+    items: List<PostGigV1Item>,
+    canAdd: Boolean,
+    onAdd: () -> Unit,
+    onUpdate: (String, (PostGigV1Item) -> PostGigV1Item) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            FieldLabel("Items to pick up", required = false)
+            Text(
+                text = "(up to ${PostGigV1SampleData.MAX_ITEMS})",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+        if (items.isEmpty()) {
+            Text(
+                text = "Add a shopping or errand list so your helper knows exactly what to get.",
+                fontSize = 11.sp,
+                fontStyle = FontStyle.Italic,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.testTag("postGigV1_itemsHint"),
+            )
+        }
+        items.forEach { item ->
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurfaceMuted)
+                        .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                        .padding(Spacing.s3),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Item",
+                        style = PantopusTextStyle.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appText,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(28.dp)
+                                .clickable(onClick = { onRemove(item.id) })
+                                .testTag("postGigV1_removeItem_${item.id}")
+                                .semantics { contentDescription = "Remove item" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.X,
+                            contentDescription = null,
+                            size = 14.dp,
+                            tint = PantopusColors.error,
+                        )
+                    }
+                }
+                PantopusTextField(
+                    label = "Name",
+                    value = item.name,
+                    onValueChange = { value -> onUpdate(item.id) { it.copy(name = value) } },
+                    fieldTestTag = "postGigV1_itemName_${item.id}",
+                )
+                PantopusTextField(
+                    label = "Notes",
+                    value = item.notes,
+                    onValueChange = { value -> onUpdate(item.id) { it.copy(notes = value) } },
+                    fieldTestTag = "postGigV1_itemNotes_${item.id}",
+                )
+                PantopusTextField(
+                    label = "Budget cap",
+                    value = item.budgetCap,
+                    onValueChange = { value -> onUpdate(item.id) { it.copy(budgetCap = value) } },
+                    fieldTestTag = "postGigV1_itemBudget_${item.id}",
+                )
+                PantopusTextField(
+                    label = "Preferred store",
+                    value = item.preferredStore,
+                    onValueChange = { value -> onUpdate(item.id) { it.copy(preferredStore = value) } },
+                    fieldTestTag = "postGigV1_itemStore_${item.id}",
+                )
+            }
+        }
+        if (canAdd) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.primary50)
+                        .clickable(onClick = onAdd)
+                        .testTag("postGigV1_addItem"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1, Alignment.CenterHorizontally),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Plus,
+                    contentDescription = null,
+                    size = 14.dp,
+                    tint = PantopusColors.primary600,
+                )
+                Text(
+                    text = "Add item",
+                    style = PantopusTextStyle.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.primary600,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * `cancellation_policy` picker — one card per policy with the backend's
+ * own blurb (`gigs.js:541`), so the poster sees the real fee rule.
+ */
+@Composable
+private fun CancellationPolicyField(
+    selected: PostGigV1CancellationPolicy,
+    onSelect: (PostGigV1CancellationPolicy) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+        FieldLabel("Cancellation policy", required = false)
+        PostGigV1CancellationPolicy.entries.forEach { policy ->
+            val isSelected = policy == selected
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(
+                            if (isSelected) PantopusColors.primary50 else PantopusColors.appSurface,
+                        ).border(
+                            width = 1.dp,
+                            color = if (isSelected) PantopusColors.primary600 else PantopusColors.appBorder,
+                            shape = RoundedCornerShape(Radii.md),
+                        ).clickable { onSelect(policy) }
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("postGigV1_cancellationPolicy_${policy.wire}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                RadioButton(
+                    selected = isSelected,
+                    onClick = { onSelect(policy) },
+                    colors = RadioButtonDefaults.colors(selectedColor = PantopusColors.primary600),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = policy.label,
+                        style = PantopusTextStyle.caption,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = PantopusColors.appText,
+                    )
+                    Text(
+                        text = policy.blurb,
+                        fontSize = 11.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -983,7 +1368,16 @@ private fun LegacyStamp() {
 
 @Composable
 private fun PostGigV1Loading() {
-    listOf("Category", "Details", "Pay", "When", "Photos").forEach { title ->
+    listOf(
+        "Category",
+        "Details",
+        "Pay",
+        "When",
+        "Photos",
+        "More details",
+        "Items",
+        "Cancellation",
+    ).forEach { title ->
         FormFieldGroup(title = title) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                 Box(

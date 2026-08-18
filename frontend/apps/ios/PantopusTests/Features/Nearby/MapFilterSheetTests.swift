@@ -30,7 +30,13 @@ final class MapFilterSheetTests: XCTestCase {
 
     func testSectionsLeadWithEntityTypeThenDistanceThenGigDimensions() {
         let ids = MapFilterCriteria().sections().map(\.id)
-        XCTAssertEqual(ids, ["entityType", "distance", "category", "budget", "schedule", "openToBids", "postedWithin"])
+        // The map keeps its own radius range AND the gig radius presets, so
+        // "distance" appears twice by design — retitled "Gig radius" the second
+        // time. Both parse sides discriminate on control type.
+        XCTAssertEqual(ids, [
+            "entityType", "distance", "category", "budget", "schedule", "openToBids", "postedWithin",
+            "distance", "deadline", "archetype"
+        ])
     }
 
     func testParseRoundTripPreservesEverySelection() {

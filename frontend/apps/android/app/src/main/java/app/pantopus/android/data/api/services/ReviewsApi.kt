@@ -1,11 +1,14 @@
 package app.pantopus.android.data.api.services
 
+import app.pantopus.android.data.api.models.profile.GigReviewsResponse
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.models.reviews.CreateReviewResponse
 import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Reviews endpoints from `backend/routes/reviews.js`. Mounted at
@@ -30,4 +33,17 @@ interface ReviewsApi {
      */
     @GET("api/reviews/my-pending")
     suspend fun myPending(): MyPendingReviewsResponse
+
+    /**
+     * `GET /api/reviews/user/{userId}` — gig reviews *received* by a
+     * user, with the server-computed `average_rating`, `total` and
+     * per-role `counts` plus a `received_as` discriminator on each row.
+     * Route `backend/routes/reviews.js:149`; the handler clamps `limit`
+     * to 50. Public — no `verifyToken`.
+     */
+    @GET("api/reviews/user/{userId}")
+    suspend fun userReviews(
+        @Path("userId") userId: String,
+        @Query("limit") limit: Int = 50,
+    ): GigReviewsResponse
 }

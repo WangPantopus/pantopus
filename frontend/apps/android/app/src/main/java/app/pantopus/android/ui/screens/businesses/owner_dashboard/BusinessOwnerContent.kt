@@ -52,6 +52,19 @@ data class OwnerReviewItem(
 )
 
 /**
+ * First-50 "Founding Business" offer banner. Present only when the offer is
+ * still active, this business has not already claimed a slot, and the owner
+ * has not dismissed the banner — the same three-way gate RN applies
+ * (`src/app/businesses/[id]/index.tsx:108-119`).
+ */
+data class OwnerFoundingOffer(
+    /** `slots_remaining` from `GET /api/businesses/founding-offer/status`. */
+    val slotsRemaining: Int,
+    /** True while `POST …/founding-offer/claim` is in flight. */
+    val isClaiming: Boolean = false,
+)
+
+/**
  * Top-level content for the owner dashboard. [publicProfile] is the A10.6
  * render reused verbatim by the preview frame and read by the owner frame's
  * shared sections, so the two frames always describe one business.
@@ -66,6 +79,16 @@ data class BusinessOwnerContent(
     val reviewsToReplyLabel: String?,
     val reviews: List<OwnerReviewItem>,
     val publicProfile: BusinessProfileContent,
+    /**
+     * True when `access.role_base` is owner / admin / editor — the same gate
+     * React Native puts on its "Post as this business" composer
+     * (`src/app/businesses/[id]/index.tsx:67`). `POST
+     * /api/businesses/:businessId/posts` requires `profile.edit`, so a staff
+     * or viewer seat never sees the affordance.
+     */
+    val canPostAsBusiness: Boolean = false,
+    /** Founding-business offer banner; `null` renders nothing. */
+    val foundingOffer: OwnerFoundingOffer? = null,
 ) {
     /** Returns a copy with [reply] set on the review matching [reviewId]. */
     fun applyingReply(
@@ -81,6 +104,14 @@ data class BusinessOwnerContent(
             reviews = updated,
             reviewsToReplyLabel = if (pending > 0) "$pending to reply" else null,
         )
+    }
+
+    companion object {
+        /**
+         * Roles the backend's `profile.edit` permission resolves to for the
+         * business-post route (`backend/routes/businesses.js:4198`).
+         */
+        val POSTING_ROLES = setOf("owner", "admin", "editor")
     }
 }
 

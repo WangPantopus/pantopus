@@ -72,6 +72,31 @@ data class VisibilityRow(
         get() = isOn != originalOn
 }
 
+/**
+ * The professional record's verification leg — `verification_tier` +
+ * `verification_status` (`professional.js:372`). [canStart] gates the
+ * "Start verification" CTA exactly like RN (`professional.tsx:385`, which
+ * shows it only when nothing has been submitted).
+ */
+data class ProVerificationSummary(
+    val status: ProVerificationStatus,
+    val tier: Int? = null,
+    /** True while `POST /verification/start` is in flight. */
+    val isStarting: Boolean = false,
+) {
+    /** One-line status copy — mirrors RN `professional.tsx:378`. */
+    val summary: String
+        get() =
+            when (status) {
+                ProVerificationStatus.Verified -> tier?.let { "Tier $it verified" } ?: "Verified"
+                ProVerificationStatus.Pending -> "Pending"
+                else -> "Not verified"
+            }
+
+    val canStart: Boolean
+        get() = status != ProVerificationStatus.Verified && status != ProVerificationStatus.Pending
+}
+
 data class ProfessionalProfileContent(
     val proName: String,
     val strength: Int,
@@ -82,13 +107,45 @@ data class ProfessionalProfileContent(
     val certifications: List<Certification>,
     val portfolio: List<PortfolioLink>,
     val visibility: List<VisibilityRow>,
+    /**
+     * Selected backend category keys — written to `categories[]` on
+     * `PATCH api/professional/profile/me`. Capped at
+     * [ProfessionalCategory.SELECTION_LIMIT].
+     */
+    val categories: List<String> = emptyList(),
+    /** Last-saved category baseline, used for dirty tracking. */
+    val originalCategories: List<String> = categories,
+    /** `service_area.city` / `.state` / `.radius_km`. */
+    val serviceCity: FormFieldState = FormFieldState(id = "serviceCity"),
+    val serviceState: FormFieldState = FormFieldState(id = "serviceState"),
+    val serviceRadiusKm: FormFieldState = FormFieldState(id = "serviceRadiusKm"),
+    /** `pricing_meta.hourly_rate` (currency is always USD, like RN). */
+    val hourlyRate: FormFieldState = FormFieldState(id = "hourlyRate"),
+    /** Verification tier + status, and whether a start call is in flight. */
+    val verification: ProVerificationSummary = ProVerificationSummary(ProVerificationStatus.Unverified),
 ) {
+    /** True when the category selection differs from the last-saved set. */
+    val categoriesAreDirty: Boolean
+        get() = categories != originalCategories
+
+    /**
+     * False once the server's 5-category cap is reached
+     * (`professional.js:45`) — unselected chips go disabled.
+     */
+    val canSelectMoreCategories: Boolean
+        get() = categories.size < ProfessionalCategory.SELECTION_LIMIT
+
     val dirtyCount: Int
         get() =
             listOf(
                 title.isDirty,
                 yearsInRole.isDirty,
                 company.isDirty,
+                categoriesAreDirty,
+                serviceCity.isDirty,
+                serviceState.isDirty,
+                serviceRadiusKm.isDirty,
+                hourlyRate.isDirty,
             ).count { it } +
                 skills.count { it.isFresh } +
                 certifications.count { it.isFresh } +
@@ -112,8 +169,53 @@ data class ProfessionalProfileContent(
             }
 }
 
+/**
+ * Working copy for the "professional mode is off" state — the fields
+ * `POST api/professional/profile` accepts (`professional.js:42`). Mirrors
+ * RN's create-mode form (`professional.tsx:123`) and the iOS
+ * `ProfessionalEnableDraft`.
+ */
+data class ProfessionalEnableDraft(
+    val headline: String = "",
+    val bio: String = "",
+    /** Selected backend category keys, capped at [ProfessionalCategory.SELECTION_LIMIT]. */
+    val categories: List<String> = emptyList(),
+    val city: String = "",
+    val state: String = "",
+    /** Digits only; blank falls back to 50 like RN. */
+    val radiusKm: String = "50",
+    /** Digits + one decimal separator; blank omits `pricing_meta`. */
+    val hourlyRate: String = "",
+    val isPublic: Boolean = true,
+    /**
+     * True when a soft-disabled row already exists, so the CTA re-enables it
+     * (`PATCH is_active = true`) instead of creating a new one.
+     */
+    val isReEnable: Boolean = false,
+    /** A create/re-enable request is in flight. */
+    val isSubmitting: Boolean = false,
+    /** Last failure from the enable call, shown inline above the CTA. */
+    val errorMessage: String? = null,
+) {
+    /** False once the 5-category cap is reached. */
+    val canSelectMoreCategories: Boolean
+        get() = categories.size < ProfessionalCategory.SELECTION_LIMIT
+
+    /** CTA label — "Enable" first time, "Re-enable" for a disabled record. */
+    val ctaLabel: String
+        get() = if (isReEnable) "Re-enable professional mode" else "Enable professional mode"
+}
+
 sealed interface ProfessionalProfileUiState {
     data object Loading : ProfessionalProfileUiState
+
+    /**
+     * Professional mode is **off** — either no record at all, or a
+     * soft-disabled one. Renders the enable form + CTA.
+     */
+    data class Create(
+        val draft: ProfessionalEnableDraft,
+    ) : ProfessionalProfileUiState
 
     data class Verified(
         val content: ProfessionalProfileContent,

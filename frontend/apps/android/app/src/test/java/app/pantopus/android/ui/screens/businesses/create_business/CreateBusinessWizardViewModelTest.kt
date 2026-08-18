@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.businesses.create_business
 
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -29,7 +30,11 @@ class CreateBusinessWizardViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm(): CreateBusinessWizardViewModel = CreateBusinessWizardViewModel()
+    private fun makeVm(): CreateBusinessWizardViewModel =
+        CreateBusinessWizardViewModel(
+            businessesRepository = mockk(relaxed = true),
+            uploadRepository = mockk(relaxed = true),
+        )
 
     @Test
     fun initial_state_is_pick_category_with_home_default() {
@@ -104,18 +109,51 @@ class CreateBusinessWizardViewModelTest {
     }
 
     @Test
-    fun primary_chains_through_legal_profile_confirm() {
+    fun primary_from_legal_info_requires_basic_fields() {
         val vm = makeVm()
         vm.onPrimary() // → legal
-        vm.onPrimary() // → profile
-        assertEquals(CreateBusinessStep.Profile, vm.state.value.currentStep)
-        assertEquals(
-            WizardProgressLabel.StepOf(current = 3, total = 4),
-            vm.chrome.progressLabel,
+        vm.onPrimary() // blocked without fields
+        assertEquals(CreateBusinessStep.LegalInfo, vm.state.value.currentStep)
+        assertNotNull(vm.state.value.submitError)
+    }
+
+    /**
+     * A12.10 parity: Save-as-draft is a confirm-step-only ghost, so the
+     * earlier steps must not render it.
+     */
+    @Test
+    fun save_as_draft_ghost_is_confirm_step_only() {
+        val vm = makeVm()
+        assertNull(vm.chrome.secondaryCta)
+        vm.onPrimary() // → legal info
+        assertNull(vm.chrome.secondaryCta)
+        // Secondary taps outside the confirm step are inert.
+        vm.onSecondary()
+        assertEquals(CreateBusinessStep.LegalInfo, vm.state.value.currentStep)
+        assertNull(vm.pendingEvent.value)
+    }
+
+    @Test
+    fun logo_pick_is_held_until_create_and_can_be_skipped() {
+        val vm = makeVm()
+        assertNull(vm.state.value.logoPick)
+
+        vm.setLogoPick(
+            CreateBusinessLogoPick(
+                bytes = byteArrayOf(1),
+                fileName = "business-logo-abc.jpg",
+                mimeType = "image/jpeg",
+            ),
         )
-        vm.onPrimary() // → confirm
-        assertEquals(CreateBusinessStep.Confirm, vm.state.value.currentStep)
-        assertEquals("Confirm", vm.chrome.primaryCtaLabel)
+        assertEquals("business-logo-abc.jpg", vm.state.value.logoPick?.fileName)
+        assertFalse(vm.state.value.logoSkipped)
+
+        vm.skipLogo()
+        assertNull(vm.state.value.logoPick)
+        assertTrue(vm.state.value.logoSkipped)
+
+        vm.unskipLogo()
+        assertFalse(vm.state.value.logoSkipped)
     }
 
     @Test
@@ -124,6 +162,34 @@ class CreateBusinessWizardViewModelTest {
         vm.onPrimary()
         vm.onLeading()
         assertEquals(CreateBusinessStep.PickCategory, vm.state.value.currentStep)
+    }
+
+    @Test
+    fun back_clears_submit_error_so_it_does_not_leak_onto_the_previous_step() {
+        val vm = makeVm()
+        vm.onPrimary() // → legal
+        vm.onPrimary() // blocked, sets submitError
+        assertNotNull(vm.state.value.submitError)
+
+        vm.onLeading() // → pick category
+
+        assertEquals(CreateBusinessStep.PickCategory, vm.state.value.currentStep)
+        assertNull(vm.state.value.submitError)
+    }
+
+    /**
+     * `createBusinessFullSchema` rejects `name > 100` / `description > 2000`,
+     * so the setters clamp instead of letting the wizard reach a 400.
+     * (`username` is covered by inspection — its setter also schedules the
+     * availability check, which would fire a request from a unit test.)
+     */
+    @Test
+    fun field_setters_clamp_to_create_full_schema_limits() {
+        val vm = makeVm()
+        vm.setBusinessName("a".repeat(150))
+        vm.setDescription("c".repeat(2500))
+        assertEquals(MAX_BUSINESS_NAME_LENGTH, vm.state.value.businessName.length)
+        assertEquals(MAX_BUSINESS_DESCRIPTION_LENGTH, vm.state.value.description.length)
     }
 
     @Test
@@ -143,7 +209,7 @@ class CreateBusinessWizardViewModelTest {
             assertEquals(CreateBusinessStep.PickCategory, vm.state.value.currentStep)
             assertEquals("alpaca grooming", vm.state.value.searchText)
             assertEquals(
-                "Custom categories are not accepted by the backend yet.",
+                "Custom categories aren't available yet. Pick a listed category instead.",
                 vm.state.value.submitError,
             )
             assertFalse(vm.state.value.isSubmittingCustom)

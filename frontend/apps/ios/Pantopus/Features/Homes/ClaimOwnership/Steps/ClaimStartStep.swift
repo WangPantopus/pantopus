@@ -9,10 +9,24 @@ import SwiftUI
 
 struct ClaimStartStep: View {
     let content: ClaimOwnershipStartContent
+    /// Only true when the home has a verified owner AND the viewer is
+    /// not already a member — RN's condition at
+    /// `src/app/homes/[id]/claim-owner/index.tsx:52`.
+    let showsAskVerifiedOwner: Bool
+    let selectedMethod: ClaimStartMethod
+    let onSelectMethod: @MainActor (ClaimStartMethod) -> Void
     @State private var isWhyExpanded = false
 
-    init(content: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart) {
+    init(
+        content: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
+        showsAskVerifiedOwner: Bool = false,
+        selectedMethod: ClaimStartMethod = .verifyOwnership,
+        onSelectMethod: @escaping @MainActor (ClaimStartMethod) -> Void = { _ in }
+    ) {
         self.content = content
+        self.showsAskVerifiedOwner = showsAskVerifiedOwner
+        self.selectedMethod = selectedMethod
+        self.onSelectMethod = onSelectMethod
     }
 
     var body: some View {
@@ -26,8 +40,18 @@ struct ClaimStartStep: View {
             content.isContested ? "File a competing claim" : "Let's verify you own this home",
             subtitle: content.isContested ? contestedSubcopy : canonicalSubcopy
         )
-        RequirementsCardBlock(rows: requirementsRows)
-        WhyWeAskSection(isExpanded: $isWhyExpanded)
+
+        if showsAskVerifiedOwner {
+            ClaimMethodPicker(
+                selected: selectedMethod,
+                onSelect: onSelectMethod
+            )
+        }
+
+        if selectedMethod == .verifyOwnership {
+            RequirementsCardBlock(rows: requirementsRows)
+            WhyWeAskSection(isExpanded: $isWhyExpanded)
+        }
     }
 
     private var canonicalSubcopy: String {
@@ -83,6 +107,103 @@ struct ClaimStartStep: View {
                 subcopy: "Deed, tax record, or mortgage statement."
             )
         ]
+    }
+}
+
+/// A12.3 method picker. Rendered only when the home already has a
+/// verified owner and the viewer is not a member, so a non-member can
+/// ask the owners to add them instead of filing an ownership claim.
+private struct ClaimMethodPicker: View {
+    let selected: ClaimStartMethod
+    let onSelect: @MainActor (ClaimStartMethod) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            Text("Verification method")
+                .pantopusTextStyle(.overline)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+
+            methodRow(
+                method: .verifyOwnership,
+                icon: .fileText,
+                label: "Upload ownership document",
+                subcopy: "Deed, tax bill, or closing disclosure.",
+                identifier: "claimOwnershipMethod.verifyOwnership"
+            )
+            methodRow(
+                method: .askVerifiedOwner,
+                icon: .users,
+                label: "Ask a verified owner to add me",
+                subcopy: "Sends a notification to verified owner(s). "
+                    + "They can add you from Members with the role you need.",
+                identifier: "claimOwnershipMethod.askVerifiedOwner"
+            )
+        }
+        .accessibilityIdentifier("claimOwnershipMethodPicker")
+    }
+
+    private func methodRow(
+        method: ClaimStartMethod,
+        icon: PantopusIcon,
+        label: String,
+        subcopy: String,
+        identifier: String
+    ) -> some View {
+        let isSelected = selected == method
+        return Button { onSelect(method) } label: {
+            HStack(alignment: .top, spacing: Spacing.s3) {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .fill(isSelected ? Theme.Color.personalBg : Theme.Color.appSurfaceSunken)
+                    .frame(width: 42, height: 42)
+                    .overlay {
+                        Icon(
+                            icon,
+                            size: 20,
+                            strokeWidth: 2,
+                            color: isSelected ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                        )
+                    }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(isSelected ? Theme.Color.primary600 : Theme.Color.appText)
+                        .multilineTextAlignment(.leading)
+                    Text(subcopy)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: Spacing.s0)
+                Circle()
+                    .stroke(
+                        isSelected ? Theme.Color.primary600 : Theme.Color.appBorderStrong,
+                        lineWidth: 2
+                    )
+                    .frame(width: 22, height: 22)
+                    .overlay {
+                        if isSelected {
+                            Circle().fill(Theme.Color.primary600).frame(width: 12, height: 12)
+                        }
+                    }
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? Theme.Color.primary50 : Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .stroke(
+                        isSelected ? Theme.Color.primary600 : Theme.Color.appBorder,
+                        lineWidth: 1.5
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+        .accessibilityLabel("\(label). \(subcopy)")
+        .accessibilityIdentifier(identifier)
     }
 }
 

@@ -26,6 +26,9 @@ final class WalletPayoutTests: XCTestCase {
         #"{"in_review_cents":0,"releasing_soon_cents":0,"total_pending_cents":0,"in_review_count":0,"releasing_soon_count":0}"#
     private static let connectEnabledJSON =
         #"{"account":{"stripe_account_id":"acct_1","charges_enabled":true,"payouts_enabled":true,"details_submitted":true}}"#
+    /// Account created, Stripe still verifying — charges/payouts not enabled.
+    private static let connectPendingJSON =
+        #"{"account":{"stripe_account_id":"acct_1","charges_enabled":false,"payouts_enabled":false,"details_submitted":true}}"#
     private static let withdrawOkJSON =
         #"{"success":true,"message":"$847.50 withdrawal initiated.","#
             + #""transaction":{"id":"wtx1","type":"withdrawal","amount":84750,"status":"completed"}}"#
@@ -127,6 +130,51 @@ final class WalletPayoutTests: XCTestCase {
             return XCTFail("Expected refreshed wallet after onboarding, got \(vm.state)")
         }
         XCTAssertTrue(content.payoutsEnabled, "Returning from onboarding flips the gate when payouts are enabled")
+    }
+
+    /// An onboarded account renders the Payout-account card — the only
+    /// reachable entry point to the Stripe Express dashboard.
+    func testOnboardedAccountSurfacesDashboardAction() async {
+        SequencedURLProtocol.sequence = Self.liveLoad(payoutsEnabled: true)
+        let vm = makeVM()
+        await vm.load()
+        guard case let .populated(content) = vm.state else {
+            return XCTFail("Expected .populated, got \(vm.state)")
+        }
+        XCTAssertEqual(content.payoutAccount?.headline, "Stripe account connected")
+        XCTAssertEqual(content.payoutAccount?.actionLabel, "Open Stripe Dashboard")
+        XCTAssertEqual(content.payoutAccount?.warn, false)
+    }
+
+    /// An account that exists but isn't onboarded resumes hosted onboarding.
+    func testPendingAccountSurfacesContinueSetup() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.balanceJSON),
+            .status(200, body: Self.txJSON),
+            .status(200, body: Self.pendingJSON),
+            .status(200, body: Self.connectPendingJSON)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        guard case let .populated(content) = vm.state else {
+            return XCTFail("Expected .populated, got \(vm.state)")
+        }
+        XCTAssertEqual(content.payoutAccount?.actionLabel, "Continue setup")
+        XCTAssertEqual(content.payoutAccount?.warn, true)
+        XCTAssertFalse(content.payoutsEnabled)
+    }
+
+    /// No connected account → no card (the bottom bar's "Set up payouts"
+    /// stays the entry point) and nothing fabricated.
+    func testNoConnectAccountHidesPayoutCard() async {
+        SequencedURLProtocol.sequence = Self.liveLoad(payoutsEnabled: false)
+        let vm = makeVM()
+        await vm.load()
+        guard case let .populated(content) = vm.state else {
+            return XCTFail("Expected .populated, got \(vm.state)")
+        }
+        XCTAssertNil(content.payoutAccount)
+        XCTAssertNil(content.payoutMethod, "Live path never invents bank details")
     }
 
     func testOpenDashboardPresentsExpressLink() async {

@@ -20,6 +20,8 @@
 //  test fallback when the fetch can't complete.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 
@@ -106,6 +108,87 @@ public final class MailDayViewModel {
             .populated(seededContent ?? MailDaySampleData.populated)
         case .empty:
             .empty(seededContent ?? MailDaySampleData.empty)
+        }
+    }
+
+    // MARK: - Settings sub-view (A13.16 · gear from the day header)
+
+    /// `true` while the settings frame is on screen instead of the triage
+    /// body. RN swaps the whole view the same way
+    /// (`src/app/mailbox/mailday.tsx:77`).
+    public private(set) var isShowingSettings = false
+    /// `GET /api/mailbox/v2/p3/mailday/settings` projection.
+    public private(set) var settings: MailDaySettingsState = .loading
+    /// A PATCH is in flight — the header shows a saving indicator.
+    public private(set) var settingsSaving = false
+    /// Transient banner shown when a PATCH fails.
+    public var settingsToast: String?
+
+    /// Open the settings frame and fetch the row on first entry.
+    public func openSettings() async {
+        isShowingSettings = true
+        if case .loaded = settings { return }
+        await loadSettings()
+    }
+
+    public func closeSettings() {
+        isShowingSettings = false
+    }
+
+    public func consumeSettingsToast() {
+        settingsToast = nil
+    }
+
+    public func loadSettings() async {
+        settings = .loading
+        do {
+            let dto: MailDaySettingsDTO = try await api.request(MailDaySettingsEndpoints.settings())
+            settings = .loaded(MailDaySettingsForm(dto: dto))
+        } catch {
+            settings = .error(
+                message: (error as? APIError)?.errorDescription
+                    ?? "We couldn't load your Mail Day settings."
+            )
+        }
+    }
+
+    /// Flip one switch. Optimistic — the UI moves immediately, then a
+    /// single-key PATCH persists it and rolls back on failure. Mirrors RN
+    /// `updateSetting` (`src/app/mailbox/mailday.tsx:52-64`).
+    public func setSetting(_ key: MailDaySettingKey, to value: Bool) async {
+        guard case let .loaded(form) = settings, !settingsSaving else { return }
+        var optimistic = form
+        optimistic.set(key, to: value)
+        settings = .loaded(optimistic)
+        settingsSaving = true
+        defer { settingsSaving = false }
+        do {
+            let _: MailDaySettingsPatchResponse = try await api.request(
+                MailDaySettingsEndpoints.updateSettings(key.patch(value))
+            )
+        } catch {
+            settings = .loaded(form)
+            settingsToast = (error as? APIError)?.errorDescription ?? "Failed to save setting"
+        }
+    }
+
+    /// Pick a notification sound. Same optimistic + rollback shape.
+    public func setSoundType(_ sound: MailDaySoundType) async {
+        guard case let .loaded(form) = settings, !settingsSaving, form.soundType != sound else { return }
+        var optimistic = form
+        optimistic.soundType = sound
+        settings = .loaded(optimistic)
+        settingsSaving = true
+        defer { settingsSaving = false }
+        var patch = MailDaySettingsPatch()
+        patch.soundType = sound.rawValue
+        do {
+            let _: MailDaySettingsPatchResponse = try await api.request(
+                MailDaySettingsEndpoints.updateSettings(patch)
+            )
+        } catch {
+            settings = .loaded(form)
+            settingsToast = (error as? APIError)?.errorDescription ?? "Failed to save setting"
         }
     }
 

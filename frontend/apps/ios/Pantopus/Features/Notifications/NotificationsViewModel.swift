@@ -18,23 +18,95 @@
 //      notifications" CTA that re-keys the tab to All (per §1.9).
 //    - Empty All tab: bell icon + "All caught up".
 //
-//  Backend (unchanged):
-//    - `GET /api/notifications?limit=&offset=&unread=true`
-//    - `PATCH /api/notifications/:id/read`
-//    - `POST /api/notifications/read-all`
+//  S5 (RN parity) adds:
+//    - a third "Read" filter tab (client-side — the backend only
+//      understands `?unread=true`),
+//    - long-press / swipe delete backed by `DELETE /api/notifications/:id`
+//      behind a confirmation,
+//    - the Personal / Audience (Beacon) firewall zone split, entered
+//      either from the Hub megaphone (`?context=audience`) or from the
+//      in-screen zone strip.
 //
+//  Backend:
+//    - `GET /api/notifications?limit=&offset=&unread=true&context=`
+//      (`backend/routes/notifications.js:85`)
+//    - `PATCH /api/notifications/:id/read`
+//      (`backend/routes/notifications.js:381`)
+//    - `POST /api/notifications/read-all` with `{contexts: […]}`
+//      (`backend/routes/notifications.js:412`)
+//    - `DELETE /api/notifications/:id`
+//      (`backend/routes/notifications.js:452`)
+//
+
+// swiftlint:disable multiple_closures_with_trailing_closure
 
 import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 /// Stable tab ids — public so the screen + tests can address them
 /// without sprinkling string literals.
 public enum NotificationsTab {
     public static let all = "all"
     public static let unread = "unread"
+    /// P2.3 parity with RN (`src/app/notifications.tsx:56`) — read rows
+    /// are filtered client-side; the backend only understands
+    /// `?unread=true`.
+    public static let read = "read"
+}
+
+/// Identity-firewall context values the backend validates against
+/// (`backend/routes/notifications.js:21-22`).
+public enum NotificationContext: String, Sendable, CaseIterable {
+    case personal
+    case audience
+    case platform
+}
+
+/// Notification zone (P2.3 / unified-IA §6.1). The Personal zone folds
+/// `platform` announcements in with `personal`; the Audience (Beacon)
+/// zone is isolated so persona traffic never leaks into the personal
+/// stream. Mirrors RN `src/app/notifications.tsx:84-91`.
+public enum NotificationsZone: String, Sendable, CaseIterable, Hashable {
+    case personal
+    case audience
+
+    /// Firewall contexts this zone pulls from `GET /api/notifications`.
+    public var contexts: [String] {
+        switch self {
+        case .personal: [NotificationContext.personal.rawValue, NotificationContext.platform.rawValue]
+        case .audience: [NotificationContext.audience.rawValue]
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .personal: "Personal"
+        case .audience: "Audience"
+        }
+    }
+
+    /// Does a notification belong to this zone? Unset context defaults to
+    /// `personal`, matching RN.
+    public func matches(context: String?) -> Bool {
+        let resolved = (context?.isEmpty == false ? context : nil) ?? NotificationContext.personal.rawValue
+        return contexts.contains(resolved)
+    }
+}
+
+/// Pending "delete this notification?" confirmation. The screen binds a
+/// `confirmationDialog` to this; the VM never destroys anything until
+/// `confirmDelete()` runs.
+public struct NotificationDeleteRequest: Sendable, Identifiable, Hashable {
+    public let id: String
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
 }
 
 /// Seven type buckets the Notifications design surfaces. Each one drives
@@ -174,7 +246,8 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     public var tabs: [ListOfRowsTab] {
         [
             ListOfRowsTab(id: NotificationsTab.all, label: "All", count: notifications.count),
-            ListOfRowsTab(id: NotificationsTab.unread, label: "Unread", count: unreadCount)
+            ListOfRowsTab(id: NotificationsTab.unread, label: "Unread", count: unreadCount),
+            ListOfRowsTab(id: NotificationsTab.read, label: "Read", count: readCount)
         ]
     }
 
@@ -184,6 +257,22 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
             Task { @MainActor in await reloadForTab() }
         }
     }
+
+    /// Active firewall zone. Switching re-fetches against the new
+    /// context set.
+    public private(set) var zone: NotificationsZone = .personal
+
+    /// Whether the Personal / Audience strip should render. True when the
+    /// route explicitly asked for a zone, or once the loaded list has
+    /// actually returned an audience-context row. Never assumed — no
+    /// probe, no fabricated zone.
+    public private(set) var showsZoneStrip: Bool = false
+
+    /// Zone options rendered by the screen's segmented strip.
+    public let zoneOptions: [NotificationsZone] = NotificationsZone.allCases
+
+    /// Row awaiting delete confirmation. `nil` = no dialog.
+    public var pendingDelete: NotificationDeleteRequest?
 
     public var fab: FABAction? {
         nil
@@ -216,19 +305,64 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     private var notifications: [NotificationDTO] = []
     private var hasMore: Bool = false
     private var loadingPage: Bool = false
+    /// Per-context pagination cursors. The Personal zone fans out over
+    /// two contexts, so a single `notifications.count` offset would skip
+    /// rows on the second page (RN keeps the same per-context map —
+    /// `src/app/notifications.tsx:16-18`).
+    private var offsets: [String: Int] = [:]
+    /// True once the route explicitly requested a zone (Hub megaphone →
+    /// `?context=audience`). Keeps the strip visible from first paint.
+    private let hasExplicitZone: Bool
+    /// True once the user picked a zone from the strip. Until then the
+    /// list stays unscoped, matching RN's flag-off behaviour.
+    private var zoneWasChosen: Bool = false
+    private let pageSize = 20
 
     init(
         api: APIClient = .shared,
+        initialContext: String? = nil,
         onSelect: @escaping @MainActor (NotificationDTO) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
         calendar: Calendar = .current,
         timeZone: TimeZone = .current
     ) {
         self.api = api
+        let requested = NotificationsZone(rawValue: initialContext ?? "")
+        hasExplicitZone = requested != nil
+        zone = requested ?? .personal
+        showsZoneStrip = requested != nil
         self.onSelect = onSelect
         self.now = now
         self.calendar = calendar
         self.timeZone = timeZone
+    }
+
+    // MARK: - Zone switching
+
+    /// Switch the firewall zone and refetch. Also the moment the list
+    /// stops being unscoped: once the user (or the route) has named a
+    /// zone we start sending `?context=`.
+    public func selectZone(_ next: NotificationsZone) {
+        let becomesScoped = !useScopedZones
+        guard zone != next || becomesScoped else { return }
+        zone = next
+        zoneWasChosen = true
+        Task { @MainActor in await reloadForTab() }
+    }
+
+    /// Contexts the current view is scoped to — `nil` while nobody has
+    /// named a zone, which keeps the legacy unscoped list so Beacon rows
+    /// are not silently hidden (RN `src/app/notifications.tsx:60-66`).
+    private var activeContexts: [String]? {
+        useScopedZones ? zone.contexts : nil
+    }
+
+    private var useScopedZones: Bool {
+        hasExplicitZone || zoneWasChosen
+    }
+
+    private var readCount: Int {
+        notifications.filter { $0.isRead == true }.count
     }
 
     // MARK: - ListOfRowsDataSource
@@ -274,6 +408,10 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     }
 
     /// Mark every unread row as read. Same optimistic + rollback pattern.
+    ///
+    /// Scoped to the active zone so "Mark all read" in the Personal zone
+    /// never silently clears the Beacon stream (RN
+    /// `src/app/notifications.tsx:206-214`).
     public func markAllRead() async {
         guard unreadCount > 0 else { return }
         let previous = notifications
@@ -283,11 +421,55 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         rebuild()
         do {
             let _: NotificationActionEcho = try await api.request(
-                NotificationsEndpoints.markAllRead
+                NotificationsEndpoints.markAllRead(contexts: activeContexts)
             )
         } catch {
             notifications = previous
             unreadCount = previousCount
+            rebuild()
+        }
+    }
+
+    // MARK: - Delete
+
+    /// Ask for confirmation before deleting a row. The screen renders a
+    /// `confirmationDialog` off `pendingDelete`.
+    public func requestDelete(id: String) {
+        guard let target = notifications.first(where: { $0.id == id }) else { return }
+        pendingDelete = NotificationDeleteRequest(
+            id: target.id,
+            title: target.title ?? "this notification"
+        )
+    }
+
+    /// Dismiss the confirmation without deleting.
+    public func cancelDelete() {
+        pendingDelete = nil
+    }
+
+    /// `DELETE /api/notifications/:id`. Optimistic — the row disappears
+    /// immediately and is restored if the call fails.
+    public func confirmDelete() async {
+        guard let request = pendingDelete else { return }
+        pendingDelete = nil
+        await delete(id: request.id)
+    }
+
+    /// Delete without the confirmation hop. Exposed for tests.
+    public func delete(id: String) async {
+        guard let target = notifications.first(where: { $0.id == id }) else { return }
+        let previous = notifications
+        let previousUnread = unreadCount
+        notifications.removeAll { $0.id == id }
+        if target.isRead != true { unreadCount = max(0, previousUnread - 1) }
+        rebuild()
+        do {
+            let _: NotificationActionEcho = try await api.request(
+                NotificationsEndpoints.delete(id: id)
+            )
+        } catch {
+            notifications = previous
+            unreadCount = previousUnread
             rebuild()
         }
     }
@@ -299,6 +481,9 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     public func handleIncoming(_ dto: NotificationDTO) {
         // Dedupe — sockets and the GET can race.
         if notifications.contains(where: { $0.id == dto.id }) { return }
+        // Zone firewall: an audience notification must not land in the
+        // personal stream (RN `src/app/notifications.tsx:180`).
+        if useScopedZones, !zone.matches(context: dto.context) { return }
         notifications.insert(dto, at: 0)
         if dto.isRead != true { unreadCount += 1 }
         rebuild()
@@ -309,6 +494,7 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     private func reloadForTab() async {
         notifications = []
         hasMore = false
+        offsets = [:]
         state = .loading
         await fetch(reset: true)
     }
@@ -316,25 +502,46 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
     // MARK: - Fetching
 
     private func fetch(reset: Bool) async {
-        let unreadOnly = selectedTab == NotificationsTab.unread
-        let offset = reset ? 0 : notifications.count
         loadingPage = true
         defer { loadingPage = false }
+        if reset { offsets = [:] }
+        await fetchPage(reset: reset)
+    }
+
+    /// Pull one page for the active zone.
+    private func fetchPage(reset: Bool) async {
+        let unreadOnly = selectedTab == NotificationsTab.unread
         do {
-            let response: NotificationsListResponse = try await api.request(
-                NotificationsEndpoints.list(
-                    limit: 20,
-                    offset: offset,
-                    unreadOnly: unreadOnly
+            let contexts = activeContexts ?? [""]
+            var incoming: [NotificationDTO] = []
+            var anyMore = false
+            var scopedUnread = 0
+            var sawUnreadCount = false
+            for context in contexts {
+                let response: NotificationsListResponse = try await api.request(
+                    NotificationsEndpoints.list(
+                        limit: pageSize,
+                        offset: offsets[context] ?? 0,
+                        unreadOnly: unreadOnly,
+                        context: context.isEmpty ? nil : context
+                    )
                 )
-            )
-            if reset {
-                notifications = response.notifications
-            } else {
-                notifications.append(contentsOf: response.notifications)
+                incoming.append(contentsOf: response.notifications)
+                offsets[context] = (offsets[context] ?? 0) + response.notifications.count
+                anyMore = anyMore || (response.hasMore ?? false)
+                if let count = response.unreadCount {
+                    scopedUnread += count
+                    sawUnreadCount = true
+                }
             }
-            hasMore = response.hasMore ?? false
-            unreadCount = response.unreadCount ?? notifications.filter { $0.isRead != true }.count
+            notifications = reset
+                ? Self.sortedByRecency(incoming)
+                : Self.merged(existing: notifications, incoming: incoming)
+            hasMore = anyMore
+            unreadCount = sawUnreadCount
+                ? scopedUnread
+                : notifications.filter { $0.isRead != true }.count
+            revealZoneStripIfAudienceSeen()
             rebuild()
         } catch {
             if reset {
@@ -345,18 +552,65 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         }
     }
 
+    /// Reveal the Personal / Audience strip once the unscoped list has
+    /// actually returned a Beacon row. No probe request, no feature
+    /// flag, no fabricated zone — the strip only appears when the
+    /// backend has handed us audience-context data.
+    private func revealZoneStripIfAudienceSeen() {
+        guard !showsZoneStrip else { return }
+        showsZoneStrip = notifications.contains {
+            $0.context == NotificationContext.audience.rawValue
+        }
+    }
+
+    /// Newest-first, matching the backend's `created_at desc` ordering
+    /// after a multi-context fan-out has interleaved two pages.
+    private static func sortedByRecency(_ items: [NotificationDTO]) -> [NotificationDTO] {
+        items.sorted { lhs, rhs in
+            let left = parseDate(lhs.createdAt) ?? .distantPast
+            let right = parseDate(rhs.createdAt) ?? .distantPast
+            return left > right
+        }
+    }
+
+    private static func merged(
+        existing: [NotificationDTO],
+        incoming: [NotificationDTO]
+    ) -> [NotificationDTO] {
+        var seen = Set(existing.map(\.id))
+        var next = existing
+        for item in incoming where !seen.contains(item.id) {
+            seen.insert(item.id)
+            next.append(item)
+        }
+        return sortedByRecency(next)
+    }
+
     // MARK: - State projection
 
+    /// Rows for the active tab. `read` has no backend filter — the
+    /// handler only understands `?unread=true` — so it is applied
+    /// client-side exactly like RN (`src/app/notifications.tsx:259`).
+    private var displayedNotifications: [NotificationDTO] {
+        selectedTab == NotificationsTab.read
+            ? notifications.filter { $0.isRead == true }
+            : notifications
+    }
+
     private func rebuild() {
-        if notifications.isEmpty {
+        let rows = displayedNotifications
+        if rows.isEmpty {
             state = .empty(emptyContent(for: selectedTab))
             return
         }
         let sections = Self.makeSections(
-            notifications,
+            rows,
             now: now(),
             calendar: calendar,
-            timeZone: timeZone
+            timeZone: timeZone,
+            onDelete: { [weak self] id in
+                Task { @MainActor in self?.requestDelete(id: id) }
+            }
         ) { [weak self] dto in
             Task { @MainActor in self?.handleTap(dto: dto) }
         }
@@ -376,11 +630,24 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
                     self?.selectedTab = NotificationsTab.all
                 }
             }
+        case NotificationsTab.read:
+            ListOfRowsState.EmptyContent(
+                icon: .bellOff,
+                headline: "No read notifications",
+                subcopy: "Notifications you\u{2019}ve already opened will collect here.",
+                ctaTitle: "View all notifications"
+            ) { [weak self] in
+                Task { @MainActor in
+                    self?.selectedTab = NotificationsTab.all
+                }
+            }
         default:
             ListOfRowsState.EmptyContent(
                 icon: .bell,
-                headline: "All caught up",
-                subcopy: "When something needs your attention, it'll show up here."
+                headline: zone == .audience ? "No audience activity" : "All caught up",
+                subcopy: zone == .audience
+                    ? "Replies, follows, and mentions on your Beacon land here."
+                    : "When something needs your attention, it'll show up here."
             )
         }
     }
@@ -404,6 +671,7 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         now: Date,
         calendar: Calendar,
         timeZone: TimeZone,
+        onDelete: (@Sendable (String) -> Void)? = nil,
         onTap: @escaping @Sendable (NotificationDTO) -> Void
     ) -> [RowSection] {
         var cal = calendar
@@ -418,7 +686,8 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
                 dto: dto,
                 now: now,
                 calendar: cal,
-                timeZone: timeZone
+                timeZone: timeZone,
+                onDelete: onDelete
             ) { onTap(dtoSnapshot) }
             if created >= startOfToday {
                 todayRows.append(row)
@@ -444,10 +713,18 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
         now: Date = Date(),
         calendar: Calendar = .current,
         timeZone: TimeZone = .current,
+        onDelete: (@Sendable (String) -> Void)? = nil,
         onSelect: @Sendable @escaping () -> Void
     ) -> RowModel {
         let unread = dto.isRead != true
         let category = NotificationCategory.from(rawType: dto.type)
+        let rowId = dto.id
+        let destructive = onDelete.map { handler in
+            RowDestructiveAction(
+                label: "Delete",
+                identifier: "notifications.row.\(rowId).delete"
+            ) { handler(rowId) }
+        }
         return RowModel(
             id: dto.id,
             title: dto.title ?? "Notification",
@@ -473,7 +750,8 @@ public final class NotificationsViewModel: ListOfRowsDataSource {
                 calendar: calendar,
                 timeZone: timeZone
             ),
-            highlight: unread ? .unread : nil
+            highlight: unread ? .unread : nil,
+            destructiveAction: destructive
         )
     }
 

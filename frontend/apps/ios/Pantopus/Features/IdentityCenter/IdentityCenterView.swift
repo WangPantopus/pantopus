@@ -108,10 +108,18 @@ public struct IdentityCenterView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s0) {
                 identityCards(loaded.identities)
-                if !loaded.bridges.isEmpty {
-                    sectionOverline("Profile links")
+                sectionOverline("Profile links")
+                if loaded.bridges.isEmpty {
+                    emptyBridgesCard
+                        .padding(.horizontal, Spacing.s3)
+                } else {
                     bridgesCard(loaded.bridges)
                         .padding(.horizontal, Spacing.s3)
+                }
+                if loaded.setupRemainingCount > 0 {
+                    firstRunHintCard(remaining: loaded.setupRemainingCount)
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.top, Spacing.s2)
                 }
                 sectionOverline("Privacy")
                 rowsCard(loaded.privacyRows, idPrefix: "privacy")
@@ -254,6 +262,50 @@ public struct IdentityCenterView: View {
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private var emptyBridgesCard: some View {
+        HStack(spacing: Spacing.s3) {
+            Icon(.link, size: 18, color: Theme.Color.appTextMuted)
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nothing to link yet")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                Text("Set up Persona or Professional to connect profile links.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(Spacing.s4)
+        .background(Theme.Color.appSurfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("identityCenterEmptyBridges")
+    }
+
+    private func firstRunHintCard(remaining: Int) -> some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.info, size: 14, strokeWidth: 2.2, color: Theme.Color.primary600)
+            Text(remaining == 1 ? "One more profile to go" : "\(remaining) more profiles to go")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.primary700)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2)
+        .background(Theme.Color.primary50)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.primary200, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("identityCenterFirstRunHint")
     }
 
     private func rowsCard(_ rows: [IdentityRowContent], idPrefix: String) -> some View {

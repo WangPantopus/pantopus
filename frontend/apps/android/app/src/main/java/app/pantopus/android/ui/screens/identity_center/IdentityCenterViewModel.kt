@@ -169,11 +169,16 @@ class IdentityCenterViewModel
                             subtext = "Download everything we know about your identities.",
                         ),
                     )
+                val setupRemaining =
+                    identities.count { card ->
+                        card.status is IdentityStatus.SetupNeeded
+                    }
                 return IdentityCenterLoaded(
                     identities = identities,
                     bridges = bridges,
                     privacyRows = privacyRows,
                     disclosureRows = disclosureRows,
+                    setupRemainingCount = setupRemaining,
                 )
             }
 

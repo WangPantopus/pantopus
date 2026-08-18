@@ -5,6 +5,7 @@ package app.pantopus.android.ui.screens.following
 import androidx.compose.ui.graphics.Color
 import app.pantopus.android.data.api.models.following.FollowingRowDto
 import app.pantopus.android.ui.theme.PantopusColors
+import app.pantopus.android.ui.theme.PantopusIcon
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -46,6 +47,40 @@ data class FollowingSection(
 ) {
     val count: Int get() = rows.size
     val isTinted: Boolean get() = kind == FollowingSectionKind.NewUpdates
+}
+
+// endregion
+
+// region Notification level
+
+/**
+ * Per-Beacon notification level. Wire values are validated server-side
+ * against `all | highlights | none` (`notificationPreferenceSchema`,
+ * `backend/routes/personas.js:88`).
+ */
+enum class FollowingNotificationLevel(
+    val wire: String,
+    val label: String,
+    val toastLabel: String,
+    val icon: PantopusIcon,
+) {
+    All("all", "All", "All updates", PantopusIcon.Bell),
+    Highlights("highlights", "Highlights", "Highlights only", PantopusIcon.BellRing),
+    Off("none", "Off", "Off", PantopusIcon.BellOff),
+    ;
+
+    /** Tap order: All → Highlights → Off → All. */
+    val next: FollowingNotificationLevel
+        get() =
+            when (this) {
+                All -> Highlights
+                Highlights -> Off
+                Off -> All
+            }
+
+    companion object {
+        fun from(raw: String?): FollowingNotificationLevel = entries.firstOrNull { it.wire == raw?.lowercase() } ?: All
+    }
 }
 
 // endregion
@@ -103,6 +138,12 @@ data class FollowingRow(
     val timeLabel: String?,
     val trailing: FollowingRowTrailing,
     val isMuted: Boolean,
+    /** Current per-Beacon notification level — drives the inline bell. */
+    val notificationLevel: FollowingNotificationLevel = FollowingNotificationLevel.All,
+    /** Paid memberships answer 409 on unfollow; bulk unfollow skips them. */
+    val isPaid: Boolean = false,
+    /** Paused Beacons render dimmed and their bell is disabled (RN parity). */
+    val isPaused: Boolean = false,
 ) {
     val tone: FollowingAvatarTone get() = FollowingAvatarTone.forKey(toneKey)
     val subtitle: String
@@ -118,6 +159,8 @@ data class FollowingRow(
             toneKey = toneKey,
             verified = verified,
             isMuted = isMuted,
+            notificationLevel = notificationLevel,
+            isPaid = isPaid,
         )
 }
 
@@ -130,8 +173,33 @@ data class FollowingActionTarget(
     val toneKey: String,
     val verified: Boolean,
     val isMuted: Boolean,
+    val notificationLevel: FollowingNotificationLevel = FollowingNotificationLevel.All,
+    val isPaid: Boolean = false,
 ) {
     val tone: FollowingAvatarTone get() = FollowingAvatarTone.forKey(toneKey)
+}
+
+/**
+ * Confirm-dialog payload for the long-press multi-select bulk unfollow.
+ * Mirrors RN's `performBulkUnfollow` alert
+ * (`pantopus/frontend/apps/mobile/src/app/beacons/following.tsx:193`).
+ */
+data class FollowingBulkUnfollowRequest(
+    val membershipIds: List<String>,
+    val personaIds: List<String>,
+    val skippedPaidCount: Int,
+) {
+    val title: String
+        get() = "Unfollow ${personaIds.size} ${if (personaIds.size == 1) "Beacon" else "Beacons"}?"
+
+    val message: String
+        get() =
+            if (skippedPaidCount > 0) {
+                val plural = if (skippedPaidCount == 1) "" else "s"
+                "$skippedPaidCount paid membership$plural will be skipped — manage those in Audience."
+            } else {
+                "You can re-follow any Beacon later."
+            }
 }
 
 // endregion
@@ -251,6 +319,9 @@ object FollowingProjection {
                 timeLabel = timeLabel,
                 trailing = trailing,
                 isMuted = muted,
+                notificationLevel = FollowingNotificationLevel.from(dto.notificationLevel),
+                isPaid = (dto.paidTier?.rank ?: 0) > 1,
+                isPaused = dto.persona.status?.lowercase() == "paused",
             )
         return kind to row
     }

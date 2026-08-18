@@ -168,10 +168,7 @@ object AddHomeSampleData {
 
     private val addressCheck =
         CheckAddressResponse(
-            exists = false,
-            homeCount = 0,
-            hasVerifiedMembers = false,
-            verdictStatus = null,
+            status = CheckAddressResponse.STATUS_NOT_FOUND,
         )
 
     fun geocodedReadyState(): AddHomeUiState =

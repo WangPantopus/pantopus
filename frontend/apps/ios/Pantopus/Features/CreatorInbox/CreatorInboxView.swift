@@ -7,7 +7,8 @@
 //  + filter trailing actions). Sunken counts banner. Filter chip strip
 //  with All / Unread / Bronze+ / Flagged. Avatar-first row list reusing
 //  the visual language of `ConversationRow` plus a tier chip + flagged
-//  indicator. Tap a row to push the existing `ChatConversationView`.
+//  indicator. Tap a row to push the persona-DM thread (`PersonaDmThreadView`),
+//  addressed by thread id — not generic chat.
 //
 
 // swiftlint:disable file_length type_body_length

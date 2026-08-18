@@ -95,7 +95,8 @@ import java.util.Locale
 @Composable
 fun BusinessProfileScreen(
     onBack: () -> Unit,
-    onOpenMessages: () -> Unit = {},
+    onOpenMessages: (roomId: String, displayName: String, initials: String, verified: Boolean) -> Unit =
+        { _, _, _, _ -> },
     onShare: () -> Unit = {},
     onOpenReport: () -> Unit = {},
     onOpenWebsite: (String) -> Unit = {},
@@ -107,6 +108,7 @@ fun BusinessProfileScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toastMessage.collectAsStateWithLifecycle()
     val showOverflow by viewModel.showOverflow.collectAsStateWithLifecycle()
+    val namedPage by viewModel.namedPage.collectAsStateWithLifecycle()
     val savedPlaces by savedPlacesStore.saved.collectAsStateWithLifecycle()
     val pendingSave by savedPlacesStore.pendingSave.collectAsStateWithLifecycle()
     val undo by savedPlacesStore.undo.collectAsStateWithLifecycle()
@@ -116,6 +118,11 @@ fun BusinessProfileScreen(
     LaunchedEffect(Unit) {
         viewModel.load()
         savedPlacesStore.loadIfNeeded()
+    }
+    LaunchedEffect(Unit) {
+        viewModel.openChatEvents.collect { event ->
+            onOpenMessages(event.roomId, event.displayName, event.initials, event.verified)
+        }
     }
     LaunchedEffect(toast) {
         if (toast != null) {
@@ -159,9 +166,10 @@ fun BusinessProfileScreen(
                         onShare = onShare,
                         onMore = { viewModel.setShowOverflow(true) },
                         onToggleSavedPlace = { pending?.let(savedPlacesStore::toggle) },
-                        onContact = onOpenMessages,
+                        onContact = viewModel::startInquiry,
                         onBook = onBook,
                         onCall = { telUri(current.content.phoneNumber)?.let(onOpenWebsite) },
+                        namedPage = namedPage,
                     )
                 }
         }
@@ -258,6 +266,9 @@ internal fun BusinessProfileLoadedFrame(
     onContact: () -> Unit,
     onBook: () -> Unit,
     onCall: () -> Unit,
+    // C4 — the named custom page from `pantopus://b/:username/:slug`.
+    // Defaults to `None` so every existing call site is untouched.
+    namedPage: BusinessProfileNamedPageState = BusinessProfileNamedPageState.None,
 ) {
     Box(modifier = Modifier.fillMaxSize().testTag("businessProfile.loaded")) {
         Column(
@@ -280,6 +291,7 @@ internal fun BusinessProfileLoadedFrame(
                         .padding(horizontal = Spacing.s4)
                         .padding(top = 14.dp, bottom = 132.dp),
             ) {
+                BusinessProfileNamedPageSection(state = namedPage)
                 Sections(content)
             }
         }

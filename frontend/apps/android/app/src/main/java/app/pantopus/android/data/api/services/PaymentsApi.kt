@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
 import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodAckResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
+import app.pantopus.android.data.api.models.payments.PaymentsEarningsResponse
+import app.pantopus.android.data.api.models.payments.SpendingSummaryResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.models.payments.TipResponse
@@ -65,6 +67,22 @@ interface PaymentsApi {
     suspend fun tipRefreshStatus(
         @Path("paymentId") paymentId: String,
     ): TipRefreshStatusResponse
+
+    /**
+     * `GET api/payments/earnings` — route `backend/routes/pays.js:1111`.
+     * Lifetime earned / paid / escrowed / available for the signed-in user,
+     * in integer cents. Distinct from `GET api/mailbox/earnings/summary`,
+     * which counts mailbox offer-engagement points.
+     */
+    @GET("api/payments/earnings")
+    suspend fun earnings(): PaymentsEarningsResponse
+
+    /**
+     * `GET api/payments/spending` — route `backend/routes/pays.js:1142`.
+     * Lifetime spent / paid / refunded for the signed-in user, integer cents.
+     */
+    @GET("api/payments/spending")
+    suspend fun spending(): SpendingSummaryResponse
 
     /** `PUT /api/payments/methods/{id}/default` — route `backend/routes/pays.js:754`. */
     @PUT("api/payments/methods/{id}/default")

@@ -8,9 +8,8 @@
 //  every high-trust claim (company affiliation, certifications) carries a
 //  verification status, and the sticky-save bar is verification-aware.
 //
-//  Backend was removed from the repo, so these models are hydrated from
-//  `ProfessionalProfileSampleData`; the shapes still mirror the eventual
-//  API contract so the wiring is a drop-in once a route exists.
+//  Hydrated from `backend/routes/professional.js` (`profile/me`); previews
+//  and tests seed the same shapes from `ProfessionalProfileSampleData`.
 //
 
 import SwiftUI
@@ -226,6 +225,39 @@ public struct ProVisibilityRow: Sendable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Verification
+
+/// The professional record's verification leg —
+/// `verification_tier` + `verification_status` (`professional.js:372`).
+/// `canStart` gates the "Start verification" CTA exactly like RN
+/// (`professional.tsx:385`, which shows it only for status `none`).
+public struct ProVerificationSummary: Sendable, Hashable {
+    public var status: ProVerificationStatus
+    public var tier: Int?
+    /// True while `POST /verification/start` is in flight.
+    public var isStarting: Bool
+
+    public init(status: ProVerificationStatus, tier: Int? = nil, isStarting: Bool = false) {
+        self.status = status
+        self.tier = tier
+        self.isStarting = isStarting
+    }
+
+    /// One-line status copy — mirrors RN `professional.tsx:378`.
+    public var summary: String {
+        switch status {
+        case .verified: tier.map { "Tier \($0) verified" } ?? "Verified"
+        case .pending: "Pending"
+        default: "Not verified"
+        }
+    }
+
+    /// RN only offers the CTA when nothing has been submitted yet.
+    public var canStart: Bool {
+        status != .verified && status != .pending
+    }
+}
+
 // MARK: - Aggregate content
 
 /// The full editable Professional-profile payload.
@@ -241,6 +273,19 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
     public var certifications: [Certification]
     public var portfolio: [PortfolioLink]
     public var visibility: [ProVisibilityRow]
+    /// Selected backend category keys — written to `categories[]` on
+    /// `PATCH /profile/me`. Capped at `ProfessionalCategory.selectionLimit`.
+    public var categories: [String]
+    /// Last-saved category baseline, used for dirty tracking.
+    public var originalCategories: [String]
+    /// `service_area.city` / `.state` / `.radius_km`.
+    public var serviceCity: FormFieldState
+    public var serviceState: FormFieldState
+    public var serviceRadiusKm: FormFieldState
+    /// `pricing_meta.hourly_rate` (currency is always USD, like RN).
+    public var hourlyRate: FormFieldState
+    /// Verification tier + status, and whether a start call is in flight.
+    public var verification: ProVerificationSummary
 
     public init(
         proName: String,
@@ -251,7 +296,13 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         skills: [ProSkill],
         certifications: [Certification],
         portfolio: [PortfolioLink],
-        visibility: [ProVisibilityRow]
+        visibility: [ProVisibilityRow],
+        categories: [String] = [],
+        serviceCity: FormFieldState = FormFieldState(id: "serviceCity", originalValue: ""),
+        serviceState: FormFieldState = FormFieldState(id: "serviceState", originalValue: ""),
+        serviceRadiusKm: FormFieldState = FormFieldState(id: "serviceRadiusKm", originalValue: ""),
+        hourlyRate: FormFieldState = FormFieldState(id: "hourlyRate", originalValue: ""),
+        verification: ProVerificationSummary = ProVerificationSummary(status: .unverified)
     ) {
         self.proName = proName
         self.strength = strength
@@ -262,6 +313,24 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         self.certifications = certifications
         self.portfolio = portfolio
         self.visibility = visibility
+        self.categories = categories
+        originalCategories = categories
+        self.serviceCity = serviceCity
+        self.serviceState = serviceState
+        self.serviceRadiusKm = serviceRadiusKm
+        self.hourlyRate = hourlyRate
+        self.verification = verification
+    }
+
+    /// True when the category selection differs from the last-saved set.
+    public var categoriesAreDirty: Bool {
+        categories != originalCategories
+    }
+
+    /// False once the server's 5-category cap is reached
+    /// (`professional.js:45`) — unselected chips go disabled.
+    public var canSelectMoreCategories: Bool {
+        categories.count < ProfessionalCategory.selectionLimit
     }
 
     /// Number of unsaved edits made this session — drives the "N edits"
@@ -275,6 +344,11 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
         count += certifications.filter(\.isFresh).count
         count += portfolio.filter(\.isFresh).count
         count += visibility.filter(\.isDirty).count
+        if categoriesAreDirty { count += 1 }
+        if serviceCity.isDirty { count += 1 }
+        if serviceState.isDirty { count += 1 }
+        if serviceRadiusKm.isDirty { count += 1 }
+        if hourlyRate.isDirty { count += 1 }
         return count
     }
 
@@ -300,11 +374,97 @@ public struct ProfessionalProfileContent: Sendable, Equatable {
     }
 }
 
+// MARK: - Enable (create) draft
+
+/// Working copy for the "Professional mode is off" state — the fields
+/// `POST /api/professional/profile` accepts (`professional.js:42`). Mirrors
+/// RN's create-mode form (`professional.tsx:123`).
+public struct ProfessionalEnableDraft: Sendable, Equatable {
+    public var headline: String
+    public var bio: String
+    /// Selected backend category keys, capped at
+    /// `ProfessionalCategory.selectionLimit`.
+    public var categories: [String]
+    public var city: String
+    public var state: String
+    /// Digits only; blank falls back to 50 like RN.
+    public var radiusKm: String
+    /// Digits + one decimal separator; blank omits `pricing_meta`.
+    public var hourlyRate: String
+    public var isPublic: Bool
+    /// True when a soft-disabled row already exists, so the CTA re-enables
+    /// it (`PATCH is_active: true`) instead of creating a new one.
+    public var isReEnable: Bool
+    /// A create/re-enable request is in flight.
+    public var isSubmitting: Bool
+    /// Last failure from the enable call, shown inline above the CTA.
+    public var errorMessage: String?
+
+    public init(
+        headline: String = "",
+        bio: String = "",
+        categories: [String] = [],
+        city: String = "",
+        state: String = "",
+        radiusKm: String = "50",
+        hourlyRate: String = "",
+        isPublic: Bool = true,
+        isReEnable: Bool = false,
+        isSubmitting: Bool = false,
+        errorMessage: String? = nil
+    ) {
+        self.headline = headline
+        self.bio = bio
+        self.categories = categories
+        self.city = city
+        self.state = state
+        self.radiusKm = radiusKm
+        self.hourlyRate = hourlyRate
+        self.isPublic = isPublic
+        self.isReEnable = isReEnable
+        self.isSubmitting = isSubmitting
+        self.errorMessage = errorMessage
+    }
+
+    /// False once the 5-category cap is reached — unselected chips go
+    /// disabled rather than silently no-op'ing.
+    public var canSelectMoreCategories: Bool {
+        categories.count < ProfessionalCategory.selectionLimit
+    }
+
+    /// CTA label — "Enable" for a first-time profile, "Re-enable" when a
+    /// disabled record is being switched back on.
+    public var ctaLabel: String {
+        isReEnable ? "Re-enable professional mode" : "Enable professional mode"
+    }
+
+    /// Seed a draft from an existing (disabled) backend record so
+    /// re-enabling keeps what the user already wrote.
+    public static func from(_ dto: ProfessionalProfileDTO?) -> ProfessionalEnableDraft {
+        guard let dto else { return ProfessionalEnableDraft() }
+        let rate = dto.pricingMeta?.hourlyRate
+        return ProfessionalEnableDraft(
+            headline: dto.headline ?? "",
+            bio: dto.bio ?? "",
+            categories: dto.categories ?? [],
+            city: dto.serviceArea?.city ?? "",
+            state: dto.serviceArea?.state ?? "",
+            radiusKm: dto.serviceArea?.radiusKm.map { String(Int($0)) } ?? "50",
+            hourlyRate: rate.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? "",
+            isPublic: dto.isPublic ?? true,
+            isReEnable: true
+        )
+    }
+}
+
 // MARK: - Screen state
 
 /// Top-level render state for the Professional Profile editor.
 public enum ProfessionalProfileState: Sendable, Equatable {
     case loading
+    /// Professional mode is **off** — either no record at all, or a
+    /// soft-disabled one. Renders the enable form + CTA.
+    case create(ProfessionalEnableDraft)
     /// Published & clean — no unsaved edits. Save is disabled.
     case verified(ProfessionalProfileContent)
     /// Unsaved edits present — `dirtyCount` edits, `pendingCount` of which

@@ -25,6 +25,13 @@ struct GigOwnerBidsPanel: View {
     let onAccept: @MainActor (GigBidDTO) -> Void
     let onCounter: @MainActor (GigBidDTO) -> Void
     let onReject: @MainActor (GigBidDTO) -> Void
+    /// Poster pulls back the counter they sent (`/counter/withdraw`).
+    /// Mirrors RN's "Withdraw Counter" (`OffersPanel.tsx:475`).
+    var onWithdrawCounter: @MainActor (GigBidDTO) -> Void = { _ in }
+    /// Server ranking per bid id, present only when the list came from
+    /// `GET /api/v2/gigs/:gigId/offers`. Empty on the `/bids` fallback,
+    /// which renders exactly as before.
+    var rankings: [String: GigOfferRanking] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -113,8 +120,25 @@ struct GigOwnerBidsPanel: View {
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Theme.Color.appTextSecondary)
                 }
+                if let trust = rankings[bid.id]?.trustLine {
+                    Text(trust)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .accessibilityIdentifier("gigDetail.bid_\(bid.id).trust")
+                }
             }
             Spacer(minLength: Spacing.s2)
+            if rankings[bid.id]?.isRecommended == true {
+                Text("BEST MATCH")
+                    .font(.system(size: 9, weight: .bold))
+                    .kerning(0.5)
+                    .foregroundStyle(Theme.Color.primary700)
+                    .padding(.horizontal, Spacing.s2)
+                    .padding(.vertical, 2)
+                    .background(Theme.Color.primary50)
+                    .clipShape(Capsule())
+                    .accessibilityIdentifier("gigDetail.bid_\(bid.id).bestMatch")
+            }
             Text(Self.amountLabel(bid.bidAmount ?? bid.amount ?? 0))
                 .font(.system(size: 15, weight: .heavy).monospacedDigit())
                 .foregroundStyle(Theme.Color.primary600)
@@ -130,6 +154,22 @@ struct GigOwnerBidsPanel: View {
                 fg: Theme.Color.primary700,
                 bg: Theme.Color.primary50
             )
+            // RN keeps the poster in control while the bidder mulls it
+            // over: the counter can be pulled back and the bid reverts to
+            // its original amount (`OffersPanel.tsx:443`).
+            if (bid.counterStatus ?? "").lowercased() == "pending" {
+                Text("Waiting for the bidder to respond to your counter.")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                panelButton(
+                    "Withdraw counter",
+                    icon: .undo2,
+                    style: .outline,
+                    identifier: "gigDetail.bid_\(bid.id).withdrawCounter"
+                ) { onWithdrawCounter(bid) }
+                    .disabled(inFlight)
+                    .opacity(inFlight ? 0.6 : 1)
+            }
         } else if status == "rejected" {
             statusPill(label: "Rejected", icon: .x, fg: Theme.Color.appTextSecondary, bg: Theme.Color.appSurfaceSunken)
         } else if status == "pending" {
@@ -292,11 +332,23 @@ struct GigActiveTaskPanel: View {
     var runningLateLabel: String?
     /// Worker-only "Running late" secondary action (Phase 5b).
     var canReportRunningLate: Bool = false
+    /// Worker-only "Can't make it" self-release — assigned, pre-start
+    /// (`POST /worker-release`).
+    var canReleaseAssignment: Bool = false
+    /// Poster-only "Remind worker" nudge — assigned, pre-start
+    /// (`POST /remind-worker`).
+    var canRemindWorker: Bool = false
+    /// End of the server's 15-minute reminder cooldown. `nil` (or a past
+    /// date) means a reminder can be sent right now; the button ticks its
+    /// own countdown off this via `TimelineView`.
+    var reminderCooldownEnds: Date?
     let onWorkerAck: @MainActor () -> Void
     let onStartTask: @MainActor () -> Void
     let onConfirmCompletion: @MainActor () -> Void
     let onReportNoShow: @MainActor () -> Void
     var onRunningLate: @MainActor () -> Void = {}
+    var onCantMakeIt: @MainActor () -> Void = {}
+    var onRemindWorker: @MainActor () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -404,6 +456,16 @@ struct GigActiveTaskPanel: View {
                 action: onStartTask
             )
         }
+        if canRemindWorker {
+            // The countdown ticks itself so the button re-enables the
+            // moment the server's window lapses (RN ticks every 15s).
+            TimelineView(.periodic(from: .now, by: 15)) { context in
+                remindButton(now: context.date)
+            }
+            Text("Nudges the worker to begin. You can send one every 15 minutes.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
         if canConfirmCompletion {
             actionButton(
                 "Confirm completion",
@@ -428,6 +490,54 @@ struct GigActiveTaskPanel: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("gigDetail.noShow")
         }
+        if canReleaseAssignment {
+            Button(action: onCantMakeIt) {
+                HStack(spacing: 6) {
+                    Icon(.xCircle, size: 14, strokeWidth: 2.2, color: Theme.Color.error)
+                    Text("Can't make it")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.Color.error)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(Theme.Color.errorBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gigDetail.cantMakeIt")
+            Text("Releases you and reopens the task for new bids.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+    }
+
+    /// "Remind worker" / "Sent · retry in 12m" — disabled while the
+    /// server's 15-minute cooldown stands.
+    private func remindButton(now: Date) -> some View {
+        let remaining = reminderCooldownEnds.flatMap {
+            GigDetailViewModel.cooldownRemaining(until: $0, now: now)
+        }
+        let onCooldown = remaining != nil
+        return Button(action: onRemindWorker) {
+            HStack(spacing: 6) {
+                Icon(
+                    .bell,
+                    size: 14,
+                    strokeWidth: 2.2,
+                    color: onCooldown ? Theme.Color.appTextMuted : Theme.Color.appTextInverse
+                )
+                Text(remaining.map { "Sent · retry in \($0)" } ?? "Remind worker")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(onCooldown ? Theme.Color.appTextMuted : Theme.Color.appTextInverse)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(onCooldown ? Theme.Color.appSurfaceSunken : Theme.Color.primary600)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(onCooldown)
+        .accessibilityIdentifier("gigDetail.remindWorker")
     }
 
     private func actionButton(

@@ -3,6 +3,7 @@
 package app.pantopus.android.ui.screens.support_trains.detail
 
 import app.pantopus.android.data.api.models.support_trains.SupportTrainCoarseLocationDto
+import app.pantopus.android.data.api.models.support_trains.SupportTrainContributionMode
 import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
 import app.pantopus.android.data.api.models.support_trains.SupportTrainModesDto
 import app.pantopus.android.data.api.models.support_trains.SupportTrainMyReservationDto
@@ -53,6 +54,11 @@ object SupportTrainDetailProjection {
                 extraCount = maxOf(0, covered - minOf(organizers.size, 4)),
             )
         val isFull = typeDates.isFullyCovered
+        val mineSlotIds = reservations.mapNotNull { it.slotId }.toSet()
+        val openSlots =
+            slots
+                .filter { !it.isCovered && (it.status ?: "open") == "open" && it.id !in mineSlotIds }
+                .sortedBy { it.slotDate ?: "" }
 
         return SupportTrainDetailContent(
             trainId = dto.id,
@@ -71,7 +77,61 @@ object SupportTrainDetailProjection {
                 } else {
                     null
                 },
+            reserveOptions = openSlots.map { reserveOption(it) },
+            reserveContext =
+                ReserveSheetContext(
+                    enabledModes = enabledModes(dto.supportModes),
+                    restrictionChips = (dto.dietaryRestrictions ?: emptyList()) + (dto.dietaryPreferences ?: emptyList()),
+                    contactlessPreferred = dto.contactlessPreferred == true,
+                ),
+            viewerRole = viewerRole(dto),
+            exactAddress = dto.address?.singleLineLabel?.takeIf { it.isNotBlank() },
+            deliveryInstructions = dto.deliveryInstructions,
         )
+    }
+
+    /**
+     * `viewer_level` + `viewer_support_train_role` → the client-side
+     * permission gate (`backend/routes/supportTrains.js:3693`).
+     */
+    fun viewerRole(dto: SupportTrainDetailDto): SupportTrainViewerRole =
+        when (dto.viewerSupportTrainRole) {
+            "primary" -> SupportTrainViewerRole.PRIMARY_ORGANIZER
+            "co_organizer", "recipient_delegate" -> SupportTrainViewerRole.CO_ORGANIZER
+            "recipient" -> SupportTrainViewerRole.RECIPIENT
+            "helper" -> SupportTrainViewerRole.HELPER
+            else ->
+                if (dto.viewerLevel == "organizer") {
+                    SupportTrainViewerRole.CO_ORGANIZER
+                } else {
+                    SupportTrainViewerRole.VIEWER
+                }
+        }
+
+    private fun enabledModes(modes: SupportTrainModesDto?): List<SupportTrainContributionMode> {
+        if (modes == null) return SupportTrainContributionMode.entries.toList()
+        return buildList {
+            if (modes.homeCookedMeals == true) add(SupportTrainContributionMode.COOK)
+            if (modes.takeout == true) add(SupportTrainContributionMode.TAKEOUT)
+            if (modes.groceries == true) add(SupportTrainContributionMode.GROCERIES)
+        }
+    }
+
+    private fun reserveOption(slot: SupportTrainSlotDto): ReserveSlotOption {
+        val date = parseDate(slot.slotDate)
+        return ReserveSlotOption(
+            id = slot.id,
+            dateLabel = date?.let { format(it, "EEEE, MMMM d") } ?: (slot.slotDate ?: ""),
+            slotLabel = slot.slotLabel ?: slot.supportMode?.replaceFirstChar { it.uppercase() } ?: "Slot",
+            windowLabel = windowLabel(slot),
+        )
+    }
+
+    private fun windowLabel(slot: SupportTrainSlotDto): String? {
+        val start = slot.startTime
+        if (start.isNullOrEmpty()) return null
+        val end = slot.endTime
+        return if (end.isNullOrEmpty()) "${shortTime(start)}+" else "${shortTime(start)} – ${shortTime(end)}"
     }
 
     private fun recipient(
@@ -205,6 +265,7 @@ object SupportTrainDetailProjection {
             title = if (covered) label else "Open · $label",
             subtitle = dropWindow(slot.endTime),
             mine = false,
+            slotId = slot.id,
         )
     }
 
@@ -227,6 +288,9 @@ object SupportTrainDetailProjection {
             title = title,
             subtitle = arrivalLabel(reservation.estimatedArrivalAt) ?: reservation.noteToRecipient,
             mine = true,
+            slotId = reservation.slotId,
+            reservationId = reservation.id,
+            reservationStatus = reservation.status,
         )
     }
 

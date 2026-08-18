@@ -7,14 +7,27 @@
 //  Uses the FormShell archetype with its new `bottomActionLabel` slot.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 struct SignUpView: View {
     @Environment(AuthManager.self) private var auth
     @State private var viewModel = SignUpViewModel()
 
+    /// Referral code carried in from a `pantopus://join/:code` deep link.
+    /// Seeds the optional Invite code field on first appear so it rides the
+    /// register call as `invite_code`, exactly like RN's
+    /// `/(auth)/register?invite_code=CODE`
+    /// (`pantopus/frontend/apps/mobile/src/app/(auth)/register.tsx:129`).
+    var inviteCode: String?
     /// Caller-supplied dismiss hook — invoked by the top-bar X.
     let onClose: () -> Void
+    /// Push an A19 legal document. Fired by the individually-tappable
+    /// "Terms" / "Privacy Policy" runs in the consent sentence, which must
+    /// **not** toggle the acceptance checkbox — mirrors RN
+    /// (`src/app/(auth)/register.tsx:303-341`).
+    var onOpenLegal: (LegalDocument) -> Void = { _ in }
     /// Invoked when signUp returns 201, with the email that was registered
     /// so the host can push `AuthRoute.verifyEmail(email:)` onto the auth
     /// stack and the verify-email surface can render + resend correctly.
@@ -36,6 +49,22 @@ struct SignUpView: View {
                     .padding(.horizontal, Spacing.s4)
                     .accessibilityIdentifier("signUpErrorBanner")
             }
+
+            if hasInvite {
+                invitedNote
+            }
+
+            OAuthButtonGroup(
+                isLoading: viewModel.isSubmitting,
+                onGoogle: { signIn(with: .google) },
+                onApple: { signIn(with: .apple) },
+                googleIdentifier: "signUpGoogleButton",
+                appleIdentifier: "signUpAppleButton"
+            )
+            .padding(.horizontal, Spacing.s4)
+
+            AuthOAuthTermsLine(identifier: "signUpLegalTermsLine", onOpenLegal: onOpenLegal)
+                .padding(.horizontal, Spacing.s4)
 
             FormFieldGroup("Account") {
                 emailField
@@ -67,17 +96,53 @@ struct SignUpView: View {
             }
 
             TermsCheckbox(
-                isOn: Binding(get: { viewModel.agreedToTerms }, set: { viewModel.agreedToTerms = $0 })
+                isOn: Binding(get: { viewModel.agreedToTerms }, set: { viewModel.agreedToTerms = $0 }),
+                onOpenLegal: onOpenLegal
             )
             .accessibilityIdentifier("signUpTermsCheckbox")
             .padding(.horizontal, Spacing.s4)
         }
+        .onAppear { seedInviteCode() }
         .onChange(of: viewModel.didSucceed) { _, succeeded in
             guard succeeded else { return }
             let email = viewModel.email.trimmingCharacters(in: .whitespaces).lowercased()
             viewModel.acknowledgeSuccess()
             onSuccess(email)
         }
+    }
+
+    // MARK: - Invite
+
+    /// True when the screen was reached from a `join/:code` link.
+    private var hasInvite: Bool {
+        !(inviteCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// RN swaps the sign-up subtitle for the invited copy when the register
+    /// route carries `invite_code`
+    /// (`pantopus/frontend/apps/mobile/src/app/(auth)/register.tsx:174`).
+    private var invitedNote: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.userPlus, size: 16, color: Theme.Color.primary600)
+            Text("You've been invited to join Pantopus!")
+                .pantopusTextStyle(.small)
+                .foregroundStyle(Theme.Color.appText)
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.s3)
+        .background(Theme.Color.primary50)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .padding(.horizontal, Spacing.s4)
+        .accessibilityIdentifier("signUpInvitedBanner")
+    }
+
+    /// Seed the optional Invite code field once, without clobbering a value
+    /// the user typed themselves.
+    private func seedInviteCode() {
+        guard viewModel.inviteCode.isEmpty,
+              let code = inviteCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else { return }
+        viewModel.inviteCode = code
     }
 
     // MARK: - Field bindings
@@ -275,6 +340,10 @@ struct SignUpView: View {
         Task { await viewModel.submit(using: auth) }
     }
 
+    private func signIn(with provider: OAuthProvider) {
+        Task { await viewModel.signIn(with: provider, using: auth) }
+    }
+
     private func state(for field: SignUpField) -> PantopusFieldState {
         if let message = visibleError(for: field) { return .error(message) }
         return .default
@@ -363,15 +432,25 @@ private struct PasswordStrengthMeter: View {
     }
 }
 
-/// Terms agreement checkbox with linked Terms / Privacy text.
+/// Terms agreement checkbox with individually tappable Terms / Privacy
+/// links.
+///
+/// The checkbox and the sentence are **separate** hit targets: tapping a
+/// link opens the A19 document and leaves `isOn` untouched, exactly like
+/// RN's register screen, where the checkbox is its own `TouchableOpacity`
+/// and the two link runs carry their own `onPress`
+/// (`src/app/(auth)/register.tsx:303-341`). Wrapping the whole row in one
+/// Button (the previous native shape) is what made the documents
+/// unreachable before sign-in.
 private struct TermsCheckbox: View {
     @Binding var isOn: Bool
+    let onOpenLegal: (LegalDocument) -> Void
 
     var body: some View {
-        Button {
-            isOn.toggle()
-        } label: {
-            HStack(alignment: .top, spacing: Spacing.s2) {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Button {
+                isOn.toggle()
+            } label: {
                 RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                     .fill(isOn ? Theme.Color.primary600 : SwiftUI.Color.clear)
                     .overlay(
@@ -387,29 +466,21 @@ private struct TermsCheckbox: View {
                         }
                     }
                     .frame(width: 20, height: 20)
-                termsText
-                    .pantopusTextStyle(.small)
-                    .foregroundStyle(Theme.Color.appText)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: Spacing.s0)
             }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isOn
-            ? "Agreed to terms and privacy"
-            : "Not agreed to terms and privacy")
-    }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("signUpTermsCheckboxToggle")
+            .accessibilityLabel(isOn
+                ? "Agreed to terms and privacy"
+                : "Not agreed to terms and privacy")
 
-    private var termsText: Text {
-        Text("I agree to the ")
-            + Text("Terms")
-            .foregroundColor(Theme.Color.primary600)
-            .underline()
-            + Text(" and ")
-            + Text("Privacy Policy")
-            .foregroundColor(Theme.Color.primary600)
-            .underline()
-            + Text(".")
+            Text(AuthLegalLink.consentSentence)
+                .pantopusTextStyle(.small)
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.leading)
+                .legalLinkHandler(onOpenLegal)
+                .accessibilityIdentifier("signUpTermsLinks")
+            Spacer(minLength: Spacing.s0)
+        }
     }
 }
 

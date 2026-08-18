@@ -127,7 +127,7 @@ private struct ReceivedCard: View {
                 PlaceChip(model: PlaceChipModel(tone: .success, text: "Verified", icon: .shieldCheck))
             }
             Text(message.body)
-                .font(.system(size: 16))
+                .pantopusTextStyle(.body)
                 .lineSpacing(4)
                 .foregroundStyle(Theme.Color.appText)
                 .fixedSize(horizontal: false, vertical: true)

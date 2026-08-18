@@ -137,7 +137,7 @@ class WalletViewModelTest {
     fun populated_fixture_shape() {
         val content = WalletSampleData.populated
         assertEquals(7, content.activity.size)
-        assertEquals("7421", content.payoutMethod.last4)
+        assertEquals("7421", content.payoutMethod?.last4)
         assertEquals("\$1,284.50", content.monthValue)
         assertEquals("Today", content.activity[0].day)
         assertEquals("Yesterday", content.activity[2].day)
@@ -148,7 +148,7 @@ class WalletViewModelTest {
         val content = WalletSampleData.onHold
         assertNotNull(content.holdState)
         assertEquals(4, content.activity.size)
-        assertTrue(content.taxDocs.bodyText.contains("1099-NEC"))
+        assertTrue(content.taxDocs?.bodyText?.contains("1099-NEC") == true)
         assertEquals(
             "Re-verify your bank above to unlock payouts.",
             content.holdState?.withdrawFootnote,

@@ -22,16 +22,36 @@ public enum WalletSampleData {
         monthValue: "$1,284.50",
         monthMeta: "8 tasks · ▲22% vs Oct",
         activity: activitySample,
-        payoutMethod: WalletPayoutMethod(
-            bankLabel: "Chase checking",
-            last4: "7421",
-            bodyText: "Instant payout · 1–3 minutes",
-            warn: false
-        ),
-        taxDocs: WalletTaxDocs(
-            ready: false,
-            bodyText: "YTD earnings $3,184 · docs available mid-Jan"
-        )
+        payoutMethod: payoutMethodSample,
+        taxDocs: taxDocsSample
+    )
+
+    /// Fixture payout method for the populated frame (previews / snapshots).
+    public static let payoutMethodSample = WalletPayoutMethod(
+        bankLabel: "Chase checking",
+        last4: "7421",
+        bodyText: "Instant payout · 1–3 minutes",
+        warn: false
+    )
+
+    /// Fixture tax-docs row for the populated frame (previews / snapshots).
+    public static let taxDocsSample = WalletTaxDocs(
+        ready: false,
+        bodyText: "YTD earnings $3,184 · docs available mid-Jan"
+    )
+
+    /// Fixture payout method for the hold frame (previews / snapshots).
+    public static let payoutMethodHoldSample = WalletPayoutMethod(
+        bankLabel: "Chase checking",
+        last4: "7421",
+        bodyText: "Verification expired Nov 30",
+        warn: true
+    )
+
+    /// Fixture tax-docs row for the hold frame (previews / snapshots).
+    public static let taxDocsHoldSample = WalletTaxDocs(
+        ready: true,
+        bodyText: "1099-NEC for 2025 ready · $9,847 reported"
     )
 
     /// Payout-on-hold variant. Same balance, amber banner over the
@@ -45,16 +65,8 @@ public enum WalletSampleData {
         monthValue: "$1,284.50",
         monthMeta: "8 tasks · ▲22% vs Oct",
         activity: Array(activitySample.prefix(4)),
-        payoutMethod: WalletPayoutMethod(
-            bankLabel: "Chase checking",
-            last4: "7421",
-            bodyText: "Verification expired Nov 30",
-            warn: true
-        ),
-        taxDocs: WalletTaxDocs(
-            ready: true,
-            bodyText: "1099-NEC for 2025 ready · $9,847 reported"
-        ),
+        payoutMethod: payoutMethodHoldSample,
+        taxDocs: taxDocsHoldSample,
         holdState: WalletHoldState(
             bannerHeadline: "Bank verification expired",
             bannerBody:

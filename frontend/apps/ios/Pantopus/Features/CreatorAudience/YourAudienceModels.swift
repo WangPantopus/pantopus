@@ -51,6 +51,37 @@ public enum AudienceFilter: Hashable, Sendable {
     }
 }
 
+// MARK: - Sort
+
+/// Order the audience list is fetched in. Raw values match the backend's
+/// `audienceSortValues` (`backend/routes/personas.js:101`); the header
+/// control cycles them in this declaration order, exactly like RN's
+/// `src/app/audience/members.tsx:216-219`.
+public enum AudienceSort: String, CaseIterable, Sendable {
+    case recent
+    case tenure
+    case tier
+    case alpha
+
+    /// Toast copy shown after the header control cycles — mirrors RN's
+    /// `src/app/audience/members.tsx:221-224`.
+    public var label: String {
+        switch self {
+        case .recent: "Newest first"
+        case .tenure: "Longest-tenured first"
+        case .tier: "Highest tier first"
+        case .alpha: "Alphabetical"
+        }
+    }
+
+    /// Next entry in the cycle (wraps back to `.recent`).
+    public var next: AudienceSort {
+        let all = AudienceSort.allCases
+        let index = all.firstIndex(of: self) ?? 0
+        return all[(index + 1) % all.count]
+    }
+}
+
 // MARK: - Member action
 
 /// Owner-side actions on one member. Raw values match the backend
@@ -222,6 +253,25 @@ public struct AudienceTierGroup: Identifiable, Sendable {
     public var members: [AudienceMember]
     public var id: Int {
         rank
+    }
+}
+
+/// A destructive action (decline / remove) held open in its undo window.
+/// RN removes the row immediately, shows a 5-second "Tap to undo" toast,
+/// and only fires the `PATCH` once the window closes
+/// (`src/app/audience/members.tsx:95-121`).
+public struct PendingAudienceUndo: Sendable, Equatable, Identifiable {
+    public let membershipId: String
+    /// "Removed @jane · Tap to undo".
+    public let message: String
+
+    public var id: String {
+        membershipId
+    }
+
+    public init(membershipId: String, message: String) {
+        self.membershipId = membershipId
+        self.message = message
     }
 }
 

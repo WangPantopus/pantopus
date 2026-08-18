@@ -6,11 +6,13 @@ import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.GigsInBoundsResponse
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.models.listings.ListingsInBoundsResponse
+import app.pantopus.android.data.api.models.postsmap.PostsMapResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.data.postsmap.PostsMapRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -42,7 +44,7 @@ class ExploreMapViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm(): ExploreMapViewModel = ExploreMapViewModel(mockk(), mockk(), mockk())
+    private fun makeVm(): ExploreMapViewModel = ExploreMapViewModel(mockk(), mockk(), mockk(), mockk())
 
     private fun loaded(vm: ExploreMapViewModel): ExploreMapUiState.Loaded = vm.state.value as ExploreMapUiState.Loaded
 
@@ -208,7 +210,12 @@ class ExploreMapViewModelTest {
                     ),
                 )
 
-            val vm = ExploreMapViewModel(gigsRepo, listingsRepo, location)
+            val postsMapRepo: PostsMapRepository = mockk()
+            coEvery {
+                postsMapRepo.markers(any(), any(), any(), any(), any(), any(), any(), any())
+            } returns NetworkResult.Success(PostsMapResponse(markers = emptyList()))
+
+            val vm = ExploreMapViewModel(gigsRepo, listingsRepo, postsMapRepo, location)
             vm.load()
 
             val loaded = vm.state.value as ExploreMapUiState.Loaded

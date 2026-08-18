@@ -12,6 +12,7 @@ import app.pantopus.android.data.api.models.posts.PostReactionKind
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.posts.MatchedBusinessesRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.components.IdentityPillar
@@ -75,6 +76,7 @@ class PulsePostDetailViewModel
         private val repo: PostsRepository,
         private val authRepo: AuthRepository,
         private val postsRefresh: PulsePostsRefreshNotifier,
+        private val matchedBusinessesRepo: MatchedBusinessesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val postId: String =
@@ -84,6 +86,15 @@ class PulsePostDetailViewModel
 
         private val _state = MutableStateFlow<PulsePostDetailUiState>(PulsePostDetailUiState.Loading)
         val state: StateFlow<PulsePostDetailUiState> = _state.asStateFlow()
+
+        /**
+         * "Nearby Providers" — organically matched local businesses for this
+         * post's `service_category`. Empty when the post has no category, is
+         * older than the 30-day window, or nothing matched; the card is hidden
+         * in all three cases, exactly like RN.
+         */
+        private val _nearbyProviders = MutableStateFlow<List<NearbyProviderRow>>(emptyList())
+        val nearbyProviders: StateFlow<List<NearbyProviderRow>> = _nearbyProviders.asStateFlow()
 
         private val _composerText = MutableStateFlow("")
         val composerText: StateFlow<String> = _composerText.asStateFlow()
@@ -405,6 +416,25 @@ class PulsePostDetailViewModel
                     _state.value = PulsePostDetailUiState.Error(friendlyMessage(result.error))
                 }
             }
+        }
+
+        /**
+         * `GET /api/posts/:id/matched-businesses?cached=true`
+         * (`backend/routes/posts.js:2550`). Best-effort — a failure just hides
+         * the card rather than failing the post. Kicked from its own
+         * `LaunchedEffect` so the card never blocks (or fails) the post itself.
+         */
+        fun loadNearbyProviders() {
+            viewModelScope.launch { fetchNearbyProviders() }
+        }
+
+        private suspend fun fetchNearbyProviders() {
+            _nearbyProviders.value =
+                when (val result = matchedBusinessesRepo.matchedBusinesses(postId)) {
+                    is NetworkResult.Success ->
+                        result.data.businesses.mapNotNull { NearbyProviderFormat.row(it) }
+                    is NetworkResult.Failure -> emptyList()
+                }
         }
 
         private fun rebuildContent(post: PostDetailDto): PulsePostDetailContent {

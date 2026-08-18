@@ -174,7 +174,7 @@ private struct PulsingDot: View {
 #Preview("HoldStatusHero · 5 days") {
     HoldStatusHero(
         daysLeft: 5,
-        untilLabel: "Dec 12",
+        untilLabel: "Jun 9",
         stats: VacationHoldSampleData.activeHold.stats
     )
     .padding(Spacing.s3)

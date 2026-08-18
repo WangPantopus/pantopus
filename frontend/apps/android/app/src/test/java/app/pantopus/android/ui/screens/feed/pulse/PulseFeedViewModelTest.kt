@@ -7,16 +7,23 @@ import app.pantopus.android.data.api.models.feed.FeedPost
 import app.pantopus.android.data.api.models.feed.FeedPostCreator
 import app.pantopus.android.data.api.models.feed.FeedResponse
 import app.pantopus.android.data.api.models.posts.PostLikeResponse
+import app.pantopus.android.data.api.models.sports.ActiveSportsEventsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.feed.FeedActionsRepository
+import app.pantopus.android.data.feed.FeedModerationStore
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
+import app.pantopus.android.data.sports.SportsRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -31,6 +38,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PulseFeedViewModelTest {
     private val repo: PostsRepository = mockk()
+    private val feedActions: FeedActionsRepository = mockk(relaxed = true)
+    private val authRepo: AuthRepository =
+        mockk<AuthRepository>().also {
+            every { it.state } returns
+                MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
+        }
     private val locationProvider =
         object : LocationProvider {
             override fun cachedCoordinate(): UserCoordinate? = null
@@ -38,6 +51,13 @@ class PulseFeedViewModelTest {
             override suspend fun requestCurrent(timeoutMillis: Long): UserCoordinate? = null
         }
     private val postsRefresh = PulsePostsRefreshNotifier()
+
+    // Sports lane — only queried once the Sports topic is selected.
+    private val sportsRepo: SportsRepository =
+        mockk {
+            coEvery { activeEvents() } returns
+                NetworkResult.Success(ActiveSportsEventsResponse(primaryEvent = null, events = emptyList()))
+        }
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -99,7 +119,18 @@ class PulseFeedViewModelTest {
                 ),
         )
 
-    private fun makeVm(): PulseFeedViewModel = PulseFeedViewModel(repo, locationProvider, postsRefresh)
+    // A fresh moderation store per VM keeps mute/hide cases isolated — the
+    // production instance is a process singleton shared by every surface.
+    private fun makeVm(): PulseFeedViewModel =
+        PulseFeedViewModel(
+            repo,
+            feedActions,
+            authRepo,
+            locationProvider,
+            postsRefresh,
+            sportsRepo,
+            FeedModerationStore(),
+        )
 
     @Test fun load_with_posts_transitions_loaded() =
         runTest {

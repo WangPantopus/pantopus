@@ -146,14 +146,45 @@ sealed interface EditBusinessPageDescriptionState {
     data class Prompt(val prompt: EditBusinessPagePrompt) : EditBusinessPageDescriptionState
 }
 
-/** Address + map state. */
+/**
+ * Address + map state. The address travels as its component parts —
+ * [address] is the street line that maps 1:1 onto the backend
+ * `BusinessLocation.address` column, with [city] / [state] / [zip] in their
+ * own columns — so a save never folds the locality back into the street line.
+ */
 data class EditBusinessPageLocation(
+    /** Street line only — never the concatenated display address. */
     val address: EditBusinessPageField,
+    val city: EditBusinessPageField = EditBusinessPageField(original = "", current = ""),
+    val state: EditBusinessPageField = EditBusinessPageField(original = "", current = ""),
+    val zip: EditBusinessPageField = EditBusinessPageField(original = "", current = ""),
     val error: String? = null,
     val mapVerified: Boolean,
     val pinDirty: Boolean = false,
     val hideExactAddress: Boolean,
-)
+) {
+    /**
+     * `City, ST ZIP` — display-only projection of the locality parts. Never
+     * written back to the server.
+     */
+    val localityLabel: String
+        get() {
+            var label =
+                listOf(city.current, state.current)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .joinToString(", ")
+            val zipValue = zip.current.trim()
+            if (zipValue.isNotEmpty()) {
+                label = if (label.isEmpty()) zipValue else "$label $zipValue"
+            }
+            return label
+        }
+
+    /** True when any address component carries an unsaved edit. */
+    val hasAddressEdits: Boolean
+        get() = address.isDirty || city.isDirty || state.isDirty || zip.isDirty
+}
 
 /** Render-ready payload — mirrors the iOS struct field-by-field. */
 data class EditBusinessPageContent(
@@ -183,5 +214,27 @@ sealed interface EditBusinessPageUiState {
 
     data class Loaded(val content: EditBusinessPageContent) : EditBusinessPageUiState
 
+    data object Empty : EditBusinessPageUiState
+
     data class Error(val message: String) : EditBusinessPageUiState
+}
+
+/**
+ * Editable field keys for the A13.10 profile form. The address is split into
+ * its backend columns — [Address] is the street line only.
+ */
+enum class EditBusinessPageFieldKey {
+    Name,
+    Tagline,
+    Category,
+    Price,
+    Description,
+    Phone,
+    Email,
+    Website,
+    BookingLink,
+    Address,
+    City,
+    State,
+    Zip,
 }

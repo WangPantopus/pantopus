@@ -53,6 +53,26 @@ public final class GigDetailViewModel {
     /// Raw bids for the owner's interactive bids panel (status open).
     public private(set) var ownerBids: [GigBidDTO] = []
 
+    /// Ranking metadata keyed by bid id, populated only when the owner's
+    /// bids came from the v2 scored-offers endpoint
+    /// (`GET /api/v2/gigs/:gigId/offers`). Empty on the `/bids` fallback.
+    public private(set) var offerRankings: [String: GigOfferRanking] = [:]
+
+    /// True while the "Share live status" action is in flight — debounces
+    /// the overflow item.
+    public private(set) var isSharingLiveStatus = false
+
+    // MARK: - Viewer's own bid (bidder side)
+
+    /// The signed-in viewer's own bid on this gig, from
+    /// `GET /api/gigs/:id/my-bid`. `nil` for the poster, for signed-out
+    /// viewers, and for anyone who has not bid.
+    public private(set) var viewerBid: BidDTO?
+
+    /// True while an update / withdraw / counter-response is in flight —
+    /// debounces the "Your bid" panel buttons.
+    public private(set) var viewerBidActionInFlight = false
+
     /// Bid id with an owner action (accept / counter / reject) in flight.
     public private(set) var bidActionInFlight: String?
 
@@ -67,6 +87,17 @@ public final class GigDetailViewModel {
     /// worker reports an unresponsive owner), gated by
     /// `GET /:gigId/no-show-check`.
     public private(set) var noShowEligible: Bool = false
+
+    // MARK: - Urgent live fulfillment (RN `ActiveTaskPanel`)
+
+    /// Latest `GET /:gigId/active-status` payload for an urgent /
+    /// starts-asap task. `nil` hides the live stepper entirely (the
+    /// backend 400s the route on non-urgent gigs).
+    public private(set) var fulfillment: GigActiveStatusResponse?
+
+    /// True while an `on_the_way` / `arrived` / `in_progress` advance is
+    /// in flight — disables the stepper CTA.
+    public private(set) var fulfillmentActionInFlight: Bool = false
 
     // MARK: - Phase 5b — lifecycle completers
 
@@ -116,9 +147,46 @@ public final class GigDetailViewModel {
     public var answerDraftText = ""
     public private(set) var questionSubmitting = false
     public private(set) var answerSubmitting = false
+    /// Id of the question whose upvote / pin / delete round-trip is in
+    /// flight — disables that row's action strip.
+    public private(set) var questionActionInFlight: String?
 
     public var canAskQuestion: Bool {
         Self.currentSignedInUserId() != nil && !viewerIsOwner
+    }
+
+    /// Pinned answers render in their own block above the thread, exactly
+    /// like RN's `QASection` (`pinnedQuestions`).
+    public var pinnedQuestions: [GigQuestionDTO] {
+        questions.filter { ($0.isPinned ?? false) && $0.isAnswered }
+    }
+
+    /// Everything the pinned block doesn't already show.
+    public var unpinnedQuestions: [GigQuestionDTO] {
+        questions.filter { !(($0.isPinned ?? false) && $0.isAnswered) }
+    }
+
+    /// The viewer asked this question, so they may delete it (the poster
+    /// may delete any — `backend/routes/gigs.js:7638`).
+    public func viewerAskedQuestion(_ question: GigQuestionDTO) -> Bool {
+        guard let me = currentUserId, !me.isEmpty, let asker = question.asker?.id else { return false }
+        return asker == me
+    }
+
+    /// Delete gate — asker or gig poster.
+    public func canDeleteQuestion(_ question: GigQuestionDTO) -> Bool {
+        viewerIsOwner || viewerAskedQuestion(question)
+    }
+
+    /// Pin gate — poster only, and only once the question is answered
+    /// (an unanswered pin has nothing to surface).
+    public func canPinQuestion(_ question: GigQuestionDTO) -> Bool {
+        viewerIsOwner && question.isAnswered
+    }
+
+    /// Upvote gate — any signed-in viewer.
+    public var canUpvoteQuestion: Bool {
+        currentUserId != nil
     }
 
     private let gigId: String
@@ -189,11 +257,12 @@ public final class GigDetailViewModel {
                 signedIn: currentUserId != nil
             )
             activePhase = Self.activePhase(for: detail.gig)
+            syncWorkerReminderCooldown(from: detail.gig)
             var bids: [GigBidDTO] = []
             if viewerIsOwner {
-                if let bidsResponse: GigBidsResponse = try? await api.request(GigsEndpoints.bids(gigId: gigId)) {
-                    bids = bidsResponse.bids
-                }
+                bids = await fetchOwnerBids(gig: detail.gig)
+            } else {
+                offerRankings = [:]
             }
             ownerBids = viewerIsOwner ? bids : []
             // Phase 6b — reconcile the lock-screen Live Activity on every
@@ -211,15 +280,190 @@ public final class GigDetailViewModel {
                 canTip: canTip,
                 viewerUserId: currentUserId,
                 canInstantAccept: canInstantAccept,
-                suppressBidsModule: Self.ownerPanelHandlesBids(gig: detail.gig, viewerIsOwner: viewerIsOwner)
+                suppressBidsModule: Self.ownerPanelHandlesBids(gig: detail.gig, viewerIsOwner: viewerIsOwner),
+                viewerCanUpdateBid: viewerCanEditBid
             ))
             await loadQuestions()
+            // Bidder side — does the viewer already have a bid here? A
+            // best-effort follow-up like the lifecycle extras below; when
+            // one lands it re-projects so the dock flips "Place bid" →
+            // "Update bid" and the "Your bid" panel appears.
+            await loadViewerBid()
+            if viewerHasActiveBid {
+                state = .loaded(Self.project(
+                    gig: detail.gig,
+                    bids: bids,
+                    canMarkDelivered: canMarkDelivered,
+                    canTip: canTip,
+                    viewerUserId: currentUserId,
+                    canInstantAccept: canInstantAccept,
+                    suppressBidsModule: Self.ownerPanelHandlesBids(gig: detail.gig, viewerIsOwner: viewerIsOwner),
+                    viewerCanUpdateBid: viewerCanEditBid
+                ))
+            }
             await loadLifecycleExtras(gig: detail.gig)
         } catch {
             guard !silently else { return }
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load gig."
             state = .error(message: message)
         }
+    }
+
+    // MARK: - Owner bids (v2 scored offers, with a `/bids` fallback)
+
+    /// Engagement modes whose owner surface RN drives from the **v2
+    /// scored-offers** endpoint rather than the plain bids list
+    /// (`gig-v2/[id].tsx:105`).
+    static let scoredOfferModes: Set<String> = ["curated_offers", "quotes"]
+
+    /// True when this gig's owner surface should ask for ranked offers.
+    static func usesScoredOffers(gig: GigDTO) -> Bool {
+        scoredOfferModes.contains((gig.engagementMode ?? "").lowercased())
+    }
+
+    /// Owner bid list. For `curated_offers` / `quotes` gigs this first
+    /// tries `GET /api/v2/gigs/:gigId/offers` (ranked + trust capsules,
+    /// `offersV2.js:47`) and keeps the server's ordering; on **any**
+    /// failure — 403, 404, decode — it falls back to
+    /// `GET /api/gigs/:gigId/bids`, exactly like RN.
+    private func fetchOwnerBids(gig: GigDTO) async -> [GigBidDTO] {
+        if Self.usesScoredOffers(gig: gig),
+           let scored: GigScoredOffersResponse = try? await api.request(
+               GigsV2Endpoints.scoredOffers(gigId: gigId)
+           ) {
+            offerRankings = Dictionary(
+                uniqueKeysWithValues: scored.offers.map { offer in
+                    (
+                        offer.id,
+                        GigOfferRanking(
+                            matchScore: offer.matchScore,
+                            matchRank: offer.matchRank,
+                            isRecommended: offer.isRecommended ?? false,
+                            averageRating: offer.trustCapsule?.averageRating,
+                            reviewCount: offer.trustCapsule?.reviewCount,
+                            gigsCompleted: offer.trustCapsule?.gigsCompleted
+                        )
+                    )
+                }
+            )
+            return scored.offers.map(\.asBid)
+        }
+        offerRankings = [:]
+        guard let bidsResponse: GigBidsResponse = try? await api.request(GigsEndpoints.bids(gigId: gigId)) else {
+            return []
+        }
+        return bidsResponse.bids
+    }
+
+    // MARK: - Share live status
+
+    /// Poster or assigned helper on a live task can mint a public status
+    /// link (`gigsV2.js:244` gates on `user_id` / `accepted_by`; RN only
+    /// renders the affordance while the task is assigned / in progress —
+    /// `components/gig-detail-v2/ETATracker.tsx:57`).
+    public var canShareLiveStatus: Bool {
+        guard viewerIsOwner || viewerIsWorker, let gig = rawGig else { return false }
+        return ["assigned", "in_progress"].contains((gig.status ?? "").lowercased())
+    }
+
+    /// Result of minting a live-status link. The view copies `url` to the
+    /// pasteboard and toasts, mirroring RN's clipboard-only share.
+    public enum ShareLiveStatusOutcome: Sendable, Equatable {
+        case succeeded(url: String)
+        case failed(message: String)
+    }
+
+    /// `POST /api/gigs/:gigId/share-status` — mint (or re-mint) the
+    /// 24-hour public status link for this task.
+    public func shareLiveStatus() async -> ShareLiveStatusOutcome {
+        guard canShareLiveStatus else {
+            return .failed(message: "This task doesn't have a live status to share.")
+        }
+        guard !isSharingLiveStatus else { return .failed(message: "Still working on the last link…") }
+        isSharingLiveStatus = true
+        defer { isSharingLiveStatus = false }
+        do {
+            let response: GigShareStatusResponse = try await api.request(
+                GigsV2Endpoints.shareStatus(gigId: gigId)
+            )
+            return .succeeded(url: response.shareUrl)
+        } catch {
+            let message = (error as? APIError)?.errorDescription ?? "Couldn't create a status link."
+            return .failed(message: message)
+        }
+    }
+
+    // MARK: - Viewer's own bid
+
+    /// Load the signed-in viewer's own bid on this gig.
+    ///
+    /// `GET /api/gigs/:id/my-bid` (gigs.js:7882) is the source of truth for
+    /// *existence*, but its column list omits the counter fields, so a
+    /// `countered` bid is enriched from `GET /api/gigs/my-bids`
+    /// (gigs.js:1452) — which carries `counter_amount` / `counter_status`.
+    /// A *failed* my-bid call also falls back to `/my-bids` (mirrors RN
+    /// `BidPanel.fetchMyBid`, BidPanel.tsx:110); a successful `bid: null`
+    /// is authoritative, so the common "hasn't bid" case stays one request.
+    private func loadViewerBid() async {
+        guard currentUserId != nil, !viewerIsOwner else {
+            viewerBid = nil
+            return
+        }
+        var bid: BidDTO?
+        var resolved = false
+        do {
+            let response: GigMyBidResponse = try await api.request(GigViewerBidEndpoints.myBid(gigId: gigId))
+            bid = response.bid
+            resolved = true
+        } catch {
+            resolved = false
+        }
+        let needsCounterFields = (bid?.status ?? "").lowercased() == "countered"
+        if !resolved || needsCounterFields {
+            if let mine: MyBidsResponse = try? await api.request(OffersEndpoints.myBids(limit: Self.myBidsLookupLimit)),
+               let match = mine.bids.first(where: { $0.gigId == gigId }) {
+                bid = match
+            }
+        }
+        viewerBid = bid
+    }
+
+    /// Page size for the `/my-bids` enrichment fallback. Mirrors RN's
+    /// `getMyBids({ limit: 200 })` (BidPanel.tsx:111).
+    static let myBidsLookupLimit = 200
+
+    /// True when the viewer has a bid still live on this gig (`pending`,
+    /// `countered`, or `accepted`). Withdrawn / rejected / expired bids
+    /// leave the screen on its normal "Place bid" path.
+    public var viewerHasActiveBid: Bool {
+        guard let status = viewerBid?.status?.lowercased() else { return false }
+        return ViewerBidStatus.active.contains(status)
+    }
+
+    /// True when the viewer's bid can still be edited or withdrawn: gig
+    /// still `open` and the bid `pending` / `countered` — exactly the
+    /// backend's own preconditions (gigs.js:4166, gigs.js:5440).
+    public var viewerCanEditBid: Bool {
+        guard let gig = rawGig, (gig.status ?? "").lowercased() == "open" else { return false }
+        guard let status = viewerBid?.status?.lowercased() else { return false }
+        return ViewerBidStatus.mutable.contains(status)
+    }
+
+    /// True when the poster sent a counter-offer the viewer has not
+    /// answered yet — surfaces Accept / Decline instead of Update /
+    /// Withdraw.
+    public var viewerHasPendingCounter: Bool {
+        (viewerBid?.status ?? "").lowercased() == "countered"
+            && viewerBid?.counterStatus == "pending"
+            && viewerBid?.counterAmount != nil
+    }
+
+    /// The "Your bid" panel renders whenever a non-owner viewer has a live
+    /// bid on this gig. Suppressed once they became the assigned worker —
+    /// the active-task panel owns that surface (mirrors RN's `!isWorker`
+    /// guard, BidPanel.tsx:540).
+    public var showViewerBidPanel: Bool {
+        !viewerIsOwner && !viewerIsWorker && viewerHasActiveBid
     }
 
     /// Conditional follow-up fetches: either party's no-show eligibility
@@ -239,6 +483,7 @@ public final class GigDetailViewModel {
         }
         await loadPayment(gig: gig, status: status)
         await loadChangeOrders(status: status)
+        await loadFulfillment(gig: gig, status: status)
         if status == "completed", viewerIsOwner || viewerIsWorker, !reviewSubmitted {
             if let response: MyPendingReviewsResponse = try? await api.request(ReviewsEndpoints.myPending()) {
                 pendingReview = response.pending.first { $0.gigId == gigId }
@@ -247,6 +492,27 @@ public final class GigDetailViewModel {
                 if pendingReview == nil { reviewSubmitted = true }
             }
         }
+    }
+
+    /// Live fulfillment status for an urgent / starts-asap task, both
+    /// roles, while the task is assigned or in progress. The backend
+    /// 400s the route on non-urgent gigs and 403s non-participants, so a
+    /// failure just hides the stepper. Mirrors RN's
+    /// `ActiveTaskPanel` mount fetch (`ActiveTaskPanel.tsx:114`).
+    private func loadFulfillment(gig: GigDTO, status: String) async {
+        guard Self.gigUsesLiveFulfillment(gig: gig),
+              viewerIsOwner || viewerIsWorker,
+              ["assigned", "in_progress"].contains(status) else {
+            fulfillment = nil
+            return
+        }
+        fulfillment = try? await api.request(GigOwnerActionsEndpoints.activeStatus(gigId: gigId))
+    }
+
+    /// The backend's own gate on `/status` + `/active-status`:
+    /// `is_urgent || starts_asap` (`gigs.js:8703`).
+    static func gigUsesLiveFulfillment(gig: GigDTO) -> Bool {
+        gig.isUrgent == true || gig.startsAsap == true
     }
 
     /// Owner's Payment card data — fetched once a bid was accepted /
@@ -373,6 +639,112 @@ public final class GigDetailViewModel {
         return "Running late"
     }
 
+    // MARK: - "Remind worker" (RN `handleRemindWorker`)
+
+    /// Server-side cooldown between two reminders
+    /// (`GIG_START_REMINDER_COOLDOWN_MS`, gigs.js:48).
+    static let workerReminderCooldown: TimeInterval = 15 * 60
+
+    /// End of the local cooldown window. Seeded from the gig's
+    /// `last_worker_reminder_at` and refreshed from the POST's `sent_at`
+    /// (or a 429's `next_allowed_at`).
+    public private(set) var workerReminderCooldownEnds: Date?
+
+    /// "Remind worker" gate — poster, gig still `assigned`, a worker is
+    /// attached, and work hasn't started. Mirrors the route's
+    /// preconditions (`backend/routes/gigs.js:5753-5766`).
+    public var canRemindWorker: Bool {
+        guard viewerIsOwner, let gig = rawGig else { return false }
+        guard (gig.status ?? "").lowercased() == "assigned" else { return false }
+        guard !(gig.acceptedBy ?? "").isEmpty else { return false }
+        return (gig.startedAt ?? "").isEmpty
+    }
+
+    /// `"Sent · retry in 12m"` while the cooldown stands, else `nil`.
+    /// Mirrors RN's `formatCooldownRemaining`.
+    public var workerReminderCooldownLabel: String? {
+        guard let ends = workerReminderCooldownEnds else { return nil }
+        return Self.cooldownRemaining(until: ends, now: Date()).map { "Sent · retry in \($0)" }
+    }
+
+    /// `"12m"` / `"1h 5m"` / `"2h"` — `nil` once the window has passed.
+    static func cooldownRemaining(until end: Date, now: Date) -> String? {
+        let seconds = end.timeIntervalSince(now)
+        guard seconds > 0 else { return nil }
+        let totalMinutes = Int((seconds / 60).rounded(.up))
+        if totalMinutes < 60 { return "\(totalMinutes)m" }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+    }
+
+    /// Re-seed the cooldown from a freshly-loaded gig row.
+    func syncWorkerReminderCooldown(from gig: GigDTO) {
+        guard let sent = Self.parseTimestamp(gig.lastWorkerReminderAt) else {
+            workerReminderCooldownEnds = nil
+            return
+        }
+        let ends = sent.addingTimeInterval(Self.workerReminderCooldown)
+        workerReminderCooldownEnds = ends > Date() ? ends : nil
+    }
+
+    /// Poster nudges the assigned worker — `POST .../remind-worker`
+    /// (gigs.js:5734). A 429 carries `next_allowed_at`, which we adopt so
+    /// the button reports the real server window instead of guessing.
+    /// Returns the success/error string for the toast.
+    /// Outcome of a "Remind worker" nudge. Not `Result<String, String>` —
+    /// `String` does not conform to `Error`, so the failure payload needs its
+    /// own case. Both cases carry the copy the toast shows verbatim.
+    enum RemindWorkerOutcome {
+        case success(String)
+        case failure(String)
+    }
+
+    @discardableResult
+    func remindWorker() async -> RemindWorkerOutcome {
+        guard canRemindWorker else {
+            return .failure("You can only remind the worker before work starts.")
+        }
+        if let ends = workerReminderCooldownEnds,
+           let remaining = Self.cooldownRemaining(until: ends, now: Date()) {
+            return .failure("A reminder was already sent. Try again in \(remaining).")
+        }
+        do {
+            let response: GigStartReminderResponse = try await api.request(
+                GigExtrasEndpoints.remindWorker(gigId: gigId)
+            )
+            if let sent = Self.parseTimestamp(response.sentAt) {
+                workerReminderCooldownEnds = sent.addingTimeInterval(Self.workerReminderCooldown)
+            } else {
+                workerReminderCooldownEnds = Date().addingTimeInterval(Self.workerReminderCooldown)
+            }
+            await refreshSilently()
+            return .success(response.message ?? "Reminder sent to the worker.")
+        } catch {
+            if let next = Self.nextAllowedAt(from: error) {
+                workerReminderCooldownEnds = next
+            }
+            return .failure((error as? APIError)?.errorDescription ?? "Couldn't send the reminder.")
+        }
+    }
+
+    /// Pull `next_allowed_at` out of the rate-limit body a 429 carries.
+    static func nextAllowedAt(from error: any Error) -> Date? {
+        guard case let .clientError(_, message)? = error as? APIError,
+              let raw = message,
+              let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let iso = json["next_allowed_at"] as? String else { return nil }
+        return parseTimestamp(iso)
+    }
+
+    static func parseTimestamp(_ iso: String?) -> Date? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return withFraction.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+    }
+
     /// Payment card gate — owner only (the worker's payout view lives in
     /// the wallet); data presence implies the assigned+ fetch succeeded.
     public var showPaymentCard: Bool {
@@ -409,15 +781,62 @@ public final class GigDetailViewModel {
     }
 
     /// "Cancel task" overflow gate — the poster on a live gig.
+    ///
+    /// RN branches here (`gig/[id].tsx:412`): an **open** gig is *closed*
+    /// (`DELETE /api/gigs/:id`, the row disappears) while an assigned /
+    /// in-progress one is *cancelled* (`POST /cancel`, fees may apply).
+    /// `canCloseTask` covers the first branch, this one the second.
     public var canCancelTask: Bool {
         guard viewerIsOwner, let gig = rawGig else { return false }
-        return ["open", "assigned", "in_progress"].contains((gig.status ?? "").lowercased())
+        return ["assigned", "in_progress"].contains((gig.status ?? "").lowercased())
+    }
+
+    /// "Close task" overflow gate — the poster on a still-open gig. The
+    /// backend's `DELETE /api/gigs/:id` rejects any other status
+    /// ("Can only delete open gigs", `gigs.js:3755`).
+    public var canCloseTask: Bool {
+        guard viewerIsOwner, let gig = rawGig else { return false }
+        return (gig.status ?? "").lowercased() == "open"
+    }
+
+    /// "Replace worker" gate — the poster swaps the assigned worker out
+    /// before work starts. Mirrors `/reopen-bidding`'s preconditions
+    /// exactly (`backend/routes/gigs.js:4900-4914`): owner-only,
+    /// `assigned`, `started_at` still null. Unlike Cancel task this costs
+    /// no cancellation fee — it releases the hold and reopens bidding.
+    static func ownerCanReplaceWorker(gig: GigDTO, currentUserId: String?) -> Bool {
+        guard let me = currentUserId, !me.isEmpty, gig.userId == me else { return false }
+        guard (gig.status ?? "").lowercased() == "assigned" else { return false }
+        return (gig.startedAt ?? "").isEmpty
+    }
+
+    /// "Can't make it" gate — the assigned worker releases themselves
+    /// before work starts. Mirrors `/worker-release`'s preconditions
+    /// (`backend/routes/gigs.js:5972-5984`): caller is `accepted_by`,
+    /// `assigned`, `started_at` still null.
+    static func workerCanRelease(gig: GigDTO, currentUserId: String?) -> Bool {
+        guard let me = currentUserId, !me.isEmpty, gig.acceptedBy == me else { return false }
+        guard (gig.status ?? "").lowercased() == "assigned" else { return false }
+        return (gig.startedAt ?? "").isEmpty
+    }
+
+    /// "Replace worker" overflow gate for the current viewer.
+    public var canReplaceWorker: Bool {
+        guard let gig = rawGig else { return false }
+        return Self.ownerCanReplaceWorker(gig: gig, currentUserId: currentUserId)
+    }
+
+    /// "Can't make it" lifecycle gate for the current viewer.
+    public var canReleaseAssignment: Bool {
+        guard let gig = rawGig else { return false }
+        return Self.workerCanRelease(gig: gig, currentUserId: currentUserId)
     }
 
     /// Universal-link share URL — `DeepLinkRouter` resolves
-    /// `https://pantopus.app/gigs/<id>` back to this detail.
+    /// `https://pantopus.com/gigs/<id>` back to this detail. It has to be the
+    /// domain the app actually claims, or the shared link opens the browser.
     public var shareURL: URL {
-        URL(string: "https://pantopus.app/gigs/\(gigId)") ?? AppEnvironment.current.apiBaseURL
+        URL(string: "https://pantopus.com/gigs/\(gigId)") ?? AppEnvironment.current.apiBaseURL
     }
 
     /// The interactive owner bids panel renders below the modules while
@@ -430,6 +849,46 @@ public final class GigDetailViewModel {
     /// Active-task panel — assigned → confirmed window, participant only.
     public var showActivePanel: Bool {
         activePhase != nil && (viewerIsOwner || viewerIsWorker)
+    }
+
+    // MARK: - Urgent live fulfillment gates (RN `ActiveTaskPanel`)
+
+    /// Live stepper — an urgent / starts-asap task the viewer takes part
+    /// in, once `active-status` has answered.
+    public var showFulfillmentPanel: Bool {
+        fulfillment != nil && (viewerIsOwner || viewerIsWorker)
+    }
+
+    /// Current rung, or `nil` before the helper has said anything.
+    public var fulfillmentStatus: GigFulfillmentStatus? {
+        fulfillment?.status
+    }
+
+    /// "ETA: ~N min" strip — RN only shows it while the helper is en
+    /// route (`ActiveTaskPanel.tsx:197`).
+    public var fulfillmentEtaLabel: String? {
+        guard fulfillmentStatus == .onTheWay, let minutes = fulfillment?.helperEtaMinutes else { return nil }
+        return "ETA: ~\(minutes) min"
+    }
+
+    /// The next rung this viewer may set, with its CTA label. Worker:
+    /// nothing → `on_the_way` → `arrived`. Poster: `arrived` →
+    /// `in_progress` ("Confirm arrival"). Mirrors RN's status buttons
+    /// (`ActiveTaskPanel.tsx:280-326`).
+    public var nextFulfillmentAction: (status: GigFulfillmentStatus, label: String)? {
+        guard showFulfillmentPanel else { return nil }
+        let current = fulfillmentStatus
+        if viewerIsWorker {
+            switch current {
+            case .none: return (.onTheWay, "I'm on the way")
+            case .onTheWay: return (.arrived, "I've arrived")
+            default: return nil
+            }
+        }
+        if viewerIsOwner, current == .arrived || current == .pickedUp {
+            return (.inProgress, "Confirm arrival")
+        }
+        return nil
     }
 
     /// Review section — completed gig, viewer is a participant, and we
@@ -534,6 +993,92 @@ public final class GigDetailViewModel {
         }
     }
 
+    // MARK: - Viewer bid mutations (bidder side)
+
+    /// Update the viewer's existing bid — `PUT /api/gigs/:gigId/bids/:bidId`
+    /// (gigs.js:4143). Returns `true` so the bid sheet can dismiss.
+    @discardableResult
+    public func updateViewerBid(amount: Double, message: String?, proposedTime: String? = nil) async -> Bool {
+        guard let bidId = viewerBid?.id, !viewerBidActionInFlight else { return false }
+        viewerBidActionInFlight = true
+        defer { viewerBidActionInFlight = false }
+        do {
+            let _: PlaceBidResponse = try await api.request(
+                GigsEndpoints.updateBid(
+                    gigId: gigId,
+                    bidId: bidId,
+                    body: PlaceBidBody(bidAmount: amount, message: message, proposedTime: proposedTime)
+                )
+            )
+            await load()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Withdraw the viewer's bid — `DELETE /api/gigs/:gigId/bids/:bidId`
+    /// (gigs.js:5417). The backend soft-deletes to `withdrawn`, which drops
+    /// the panel and restores the "Place bid" dock on refresh. Returns an
+    /// error string for the toast, or `nil` on success.
+    @discardableResult
+    public func withdrawViewerBid(reason: WithdrawBidReason? = nil) async -> String? {
+        guard let bidId = viewerBid?.id else { return nil }
+        guard !viewerBidActionInFlight else { return nil }
+        viewerBidActionInFlight = true
+        defer { viewerBidActionInFlight = false }
+        do {
+            _ = try await api.request(
+                GigsEndpoints.withdrawBid(gigId: gigId, bidId: bidId, reason: reason),
+                as: EmptyResponse.self
+            )
+            viewerBid = nil
+            await load()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't withdraw your bid."
+        }
+    }
+
+    /// Accept the poster's counter-offer —
+    /// `POST .../bids/:bidId/counter/accept` (gigs.js:5191). The bid amount
+    /// becomes the counter amount and the bid reverts to `pending`.
+    @discardableResult
+    public func acceptViewerCounter() async -> String? {
+        await respondToViewerCounter(
+            endpointFor: { GigsEndpoints.acceptCounter(gigId: self.gigId, bidId: $0) },
+            failure: "Couldn't accept the counter-offer."
+        )
+    }
+
+    /// Decline the poster's counter-offer —
+    /// `POST .../bids/:bidId/counter/decline` (gigs.js:5267). The original
+    /// bid stands.
+    @discardableResult
+    public func declineViewerCounter() async -> String? {
+        await respondToViewerCounter(
+            endpointFor: { GigsEndpoints.declineCounter(gigId: self.gigId, bidId: $0) },
+            failure: "Couldn't decline the counter-offer."
+        )
+    }
+
+    private func respondToViewerCounter(
+        endpointFor: (String) -> Endpoint,
+        failure: String
+    ) async -> String? {
+        guard let bidId = viewerBid?.id, viewerHasPendingCounter else { return nil }
+        guard !viewerBidActionInFlight else { return nil }
+        viewerBidActionInFlight = true
+        defer { viewerBidActionInFlight = false }
+        do {
+            let _: PlaceBidResponse = try await api.request(endpointFor(bidId))
+            await load()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? failure
+        }
+    }
+
     // MARK: - Structured Q&A
 
     func loadQuestions() async {
@@ -598,6 +1143,66 @@ public final class GigDetailViewModel {
     func cancelAnswering() {
         answeringQuestionId = nil
         answerDraftText = ""
+    }
+
+    /// Toggle the viewer's upvote on a question
+    /// (`POST .../questions/:id/upvote`, gigs.js:7535). The backend owns
+    /// the count, so we refetch the thread rather than guessing locally.
+    /// Returns an error string for the toast, or `nil` on success.
+    @discardableResult
+    func toggleQuestionUpvote(questionId: String) async -> String? {
+        guard canUpvoteQuestion, questionActionInFlight == nil else { return nil }
+        questionActionInFlight = questionId
+        defer { questionActionInFlight = nil }
+        do {
+            _ = try await api.request(
+                GigExtrasEndpoints.upvoteQuestion(gigId: gigId, questionId: questionId),
+                as: GigQuestionUpvoteResponse.self
+            )
+            await loadQuestions()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't record your upvote."
+        }
+    }
+
+    /// Poster pins / unpins an answered question
+    /// (`POST .../questions/:id/pin`, gigs.js:7482).
+    @discardableResult
+    func toggleQuestionPin(questionId: String) async -> String? {
+        guard questionActionInFlight == nil else { return nil }
+        questionActionInFlight = questionId
+        defer { questionActionInFlight = nil }
+        do {
+            _ = try await api.request(
+                GigExtrasEndpoints.pinQuestion(gigId: gigId, questionId: questionId),
+                as: GigQuestionMutationResponse.self
+            )
+            await loadQuestions()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't update the pin."
+        }
+    }
+
+    /// Asker (or the poster) deletes a question
+    /// (`DELETE .../questions/:id`, gigs.js:7600).
+    @discardableResult
+    func deleteQuestion(questionId: String) async -> String? {
+        guard questionActionInFlight == nil else { return nil }
+        questionActionInFlight = questionId
+        defer { questionActionInFlight = nil }
+        do {
+            _ = try await api.request(
+                GigExtrasEndpoints.deleteQuestion(gigId: gigId, questionId: questionId),
+                as: GigQuestionDeleteResponse.self
+            )
+            if answeringQuestionId == questionId { cancelAnswering() }
+            await loadQuestions()
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Couldn't delete the question."
+        }
     }
 
     /// Opens (or creates) the gig chat room and returns a conversation
@@ -731,6 +1336,78 @@ public extension GigDetailViewModel {
             return nil
         } catch {
             return (error as? APIError)?.errorDescription ?? "Couldn't reject this bid."
+        }
+    }
+
+    /// Advance the urgent-task fulfillment status
+    /// (`POST /api/gigs/:gigId/status`). Role gating is enforced
+    /// server-side; the panel only ever offers the caller's own next
+    /// rung. Returns `nil` on success.
+    @discardableResult
+    func advanceFulfillment(to status: GigFulfillmentStatus) async -> String? {
+        guard !fulfillmentActionInFlight else { return nil }
+        fulfillmentActionInFlight = true
+        defer { fulfillmentActionInFlight = false }
+        do {
+            let response: GigFulfillmentStatusResponse = try await api.request(
+                GigOwnerActionsEndpoints.updateFulfillmentStatus(
+                    gigId: gigId,
+                    body: GigFulfillmentStatusBody(status: status)
+                )
+            )
+            fulfillment = GigActiveStatusResponse(
+                gigId: gigId,
+                gigStatus: rawGig?.status,
+                fulfillmentStatus: response.fulfillmentStatus ?? status.rawValue,
+                fulfillmentStatusUpdatedAt: fulfillment?.fulfillmentStatusUpdatedAt,
+                helperEtaMinutes: fulfillment?.helperEtaMinutes,
+                helperLocation: fulfillment?.helperLocation
+            )
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Failed to update status"
+        }
+    }
+
+    /// Poster withdraws the pending counter-offer they sent — the bid
+    /// reverts to its original amount and goes back to `pending`, so the
+    /// row flips from "Countered $X" back to Accept / Counter / Reject.
+    /// Mirrors RN `OffersPanel.handleWithdrawCounter`
+    /// (`OffersPanel.tsx:177`). Route `backend/routes/gigs.js:5342`.
+    @discardableResult
+    func withdrawCounter(bidId: String) async -> String? {
+        guard bidActionInFlight == nil else { return nil }
+        bidActionInFlight = bidId
+        defer { bidActionInFlight = nil }
+        do {
+            _ = try await api.request(
+                GigOwnerActionsEndpoints.withdrawCounter(gigId: gigId, bidId: bidId),
+                as: PlaceBidResponse.self
+            )
+            if let index = ownerBids.firstIndex(where: { $0.id == bidId }) {
+                ownerBids[index] = Self.bidCopy(of: ownerBids[index], status: "pending", clearCounter: true)
+            }
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Failed to withdraw counter"
+        }
+    }
+
+    /// Poster closes a **still-open** task: `DELETE /api/gigs/:id`
+    /// removes the row outright (the backend 400s any other status).
+    /// Mirrors RN's `handleCloseGig` open branch (`gig/[id].tsx:427`).
+    /// Returns `nil` on success, an error string otherwise.
+    @discardableResult
+    func closeGig() async -> String? {
+        guard canCloseTask else { return "This task can no longer be closed." }
+        do {
+            _ = try await api.request(
+                GigOwnerActionsEndpoints.deleteGig(id: gigId),
+                as: GigDeleteResponse.self
+            )
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "Failed to close gig."
         }
     }
 
@@ -930,6 +1607,59 @@ public extension GigDetailViewModel {
         }
     }
 
+    // MARK: - Pre-start release (reopen bidding / worker self-release)
+
+    /// Outcome of a release action, carrying the server's own
+    /// confirmation copy so the toast matches what actually happened.
+    enum ReleaseOutcome: Sendable, Equatable {
+        case succeeded(message: String)
+        case failed(message: String)
+    }
+
+    /// Poster's "Replace worker" — `POST /reopen-bidding`. Unassigns the
+    /// current worker, cancels the pre-capture payment hold, rejects
+    /// their accepted bid, and moves the gig back to `open`
+    /// (`backend/routes/gigs.js:4874`). Refreshes on success so the
+    /// lifecycle footer re-renders in the open/bidding state.
+    @discardableResult
+    func replaceWorker() async -> ReleaseOutcome {
+        guard canReplaceWorker else {
+            return .failed(message: "This task can't be reopened for bids right now.")
+        }
+        do {
+            let response: ReopenBiddingResponse = try await api.request(
+                GigReassignmentEndpoints.reopenBidding(gigId: gigId)
+            )
+            await refreshSilently()
+            return .succeeded(message: response.message ?? "Worker removed and bidding reopened")
+        } catch {
+            return .failed(
+                message: (error as? APIError)?.errorDescription ?? "Failed to replace worker"
+            )
+        }
+    }
+
+    /// Assigned worker's "Can't make it" — `POST /worker-release`.
+    /// Unassigns the viewer, releases the payment hold, reopens the task
+    /// for bids, and notifies the poster (`backend/routes/gigs.js:5954`).
+    @discardableResult
+    func releaseAssignment(note: String? = nil) async -> ReleaseOutcome {
+        guard canReleaseAssignment else {
+            return .failed(message: "You can't release this task right now.")
+        }
+        do {
+            let response: WorkerReleaseResponse = try await api.request(
+                GigReassignmentEndpoints.workerRelease(gigId: gigId, note: note)
+            )
+            await refreshSilently()
+            return .succeeded(message: response.message ?? "You have been released from this task")
+        } catch {
+            return .failed(
+                message: (error as? APIError)?.errorDescription ?? "Failed to release from task"
+            )
+        }
+    }
+
     /// Either party reports the other as a no-show (owner → worker,
     /// worker → unresponsive poster) — cancels the gig server-side.
     @discardableResult
@@ -1058,7 +1788,11 @@ public extension GigDetailViewModel {
         "gig:worker-ack",
         "gig:completion-update",
         "gig:payment-update",
-        "gig:rescheduled"
+        "gig:rescheduled",
+        // Urgent live fulfillment — `POST /:gigId/status` emits this into
+        // the same room (`gigs.js:8770`); the refetch pulls the new rung
+        // through `loadFulfillment`.
+        "gig_status_update"
     ]
 
     /// Join the `gig:<id>` room and refetch on any room event for this
@@ -1089,8 +1823,14 @@ public extension GigDetailViewModel {
     }
 
     /// Copy a bid with a new status (+ optional counter amount) for the
-    /// optimistic owner-panel updates.
-    internal static func bidCopy(of bid: GigBidDTO, status: String, counterAmount: Double? = nil) -> GigBidDTO {
+    /// optimistic owner-panel updates. `clearCounter` nulls the counter
+    /// columns the way `/counter/withdraw` does server-side.
+    internal static func bidCopy(
+        of bid: GigBidDTO,
+        status: String,
+        counterAmount: Double? = nil,
+        clearCounter: Bool = false
+    ) -> GigBidDTO {
         GigBidDTO(
             id: bid.id,
             userId: bid.userId,
@@ -1100,8 +1840,8 @@ public extension GigDetailViewModel {
             message: bid.message,
             createdAt: bid.createdAt,
             bidder: bid.bidder,
-            counterAmount: counterAmount ?? bid.counterAmount,
-            counterStatus: counterAmount != nil ? "pending" : bid.counterStatus
+            counterAmount: clearCounter ? nil : (counterAmount ?? bid.counterAmount),
+            counterStatus: clearCounter ? nil : (counterAmount != nil ? "pending" : bid.counterStatus)
         )
     }
 }
@@ -1119,7 +1859,8 @@ extension GigDetailViewModel {
         canTip: Bool = false,
         viewerUserId: String? = nil,
         canInstantAccept: Bool = false,
-        suppressBidsModule: Bool = false
+        suppressBidsModule: Bool = false,
+        viewerCanUpdateBid: Bool = false
     ) -> ContentDetailContent {
         shouldProjectTaskV2(gig: gig)
             ? projectTaskV2(
@@ -1129,14 +1870,16 @@ extension GigDetailViewModel {
                 canTip: canTip,
                 viewerUserId: viewerUserId,
                 canInstantAccept: canInstantAccept,
-                suppressBidsModule: suppressBidsModule
+                suppressBidsModule: suppressBidsModule,
+                viewerCanUpdateBid: viewerCanUpdateBid
             )
             : projectGigV1(
                 gig: gig,
                 bids: bids,
                 canTip: canTip,
                 viewerUserId: viewerUserId,
-                suppressBidsModule: suppressBidsModule
+                suppressBidsModule: suppressBidsModule,
+                viewerCanUpdateBid: viewerCanUpdateBid
             )
     }
 
@@ -1178,13 +1921,23 @@ extension GigDetailViewModel {
         primary: ContentDetailDockButton(label: "Send a tip", icon: .handCoins)
     )
 
+    /// The bidder's dock once they already have a live bid — "Place bid"
+    /// would re-POST and 409, so the primary becomes "Update bid" and the
+    /// "Your bid" panel below carries Withdraw / counter responses.
+    static let updateBidDock = ContentDetailDock(
+        secondary: ContentDetailDockButton(label: "Message", icon: .send),
+        primary: ContentDetailDockButton(label: "Update bid", icon: .pencil)
+    )
+
     /// V2 dock: tip (poster, completed) → mark-delivered (worker, in-progress)
-    /// → instant-accept (open `instant_accept` gig, non-owner) → place-bid.
+    /// → instant-accept (open `instant_accept` gig, non-owner) →
+    /// update-bid (viewer already bid) → place-bid.
     /// Factored out to keep `projectTaskV2` under the body-length limit.
     private static func taskV2Dock(
         canMarkDelivered: Bool,
         canTip: Bool,
-        canInstantAccept: Bool = false
+        canInstantAccept: Bool = false,
+        viewerCanUpdateBid: Bool = false
     ) -> ContentDetailDock {
         if canTip { return tipDock }
         if canMarkDelivered {
@@ -1199,6 +1952,7 @@ extension GigDetailViewModel {
                 primary: ContentDetailDockButton(label: "Accept this task", icon: .zap)
             )
         }
+        if viewerCanUpdateBid { return updateBidDock }
         return ContentDetailDock(
             secondary: ContentDetailDockButton(label: "Message", icon: .send),
             primary: ContentDetailDockButton(label: "Place bid")
@@ -1214,7 +1968,8 @@ extension GigDetailViewModel {
         canTip: Bool = false,
         viewerUserId: String? = nil,
         canInstantAccept: Bool = false,
-        suppressBidsModule: Bool = false
+        suppressBidsModule: Bool = false,
+        viewerCanUpdateBid: Bool = false
     ) -> ContentDetailContent {
         let category = GigsCategory.from(backendKey: gig.category)
         let bidCount = gig.bidCount ?? bids.count
@@ -1247,6 +2002,9 @@ extension GigDetailViewModel {
                 title: "By", icon: .calendar, label: formatScheduledStart(deadline)
             )))
         }
+        if let photos = photoStripModule(gig) {
+            modules.append(photos)
+        }
         modules.append(.capsuleRow(ContentDetailCapsuleRow(capsules: [
             ContentDetailPill(label: "Verified address", icon: .shieldCheck, tone: .info),
             ContentDetailPill(label: "Local Pantopus job", icon: .check, tone: .success)
@@ -1256,7 +2014,11 @@ extension GigDetailViewModel {
         if suppressBidsModule {
             // no-op — `gigDetail.bids` renders below the modules.
         } else if bidCount > 0, !bids.isEmpty {
-            modules.append(.bids(ContentDetailBidsModule(title: "\(bidCount) bids", bids: bids.map { projectBid($0) })))
+            modules.append(.bids(ContentDetailBidsModule(
+                title: "\(bidCount) bids",
+                sub: bidRangeSub(bids),
+                bids: bids.map { projectBid($0) }
+            )))
         } else {
             modules.append(.callout(ContentDetailCallout(
                 identifier: "be-first",
@@ -1279,7 +2041,8 @@ extension GigDetailViewModel {
         let dock = taskV2Dock(
             canMarkDelivered: canMarkDelivered,
             canTip: canTip,
-            canInstantAccept: canInstantAccept
+            canInstantAccept: canInstantAccept,
+            viewerCanUpdateBid: viewerCanUpdateBid
         )
         return ContentDetailContent(
             kind: .gig,
@@ -1291,6 +2054,38 @@ extension GigDetailViewModel {
             trustCapsules: [],
             dock: dock
         )
+    }
+
+    /// A09.1 "Photos · N" strip when the gig carries uploaded attachments.
+    /// Each tile renders the poster's real attachment; the deterministic
+    /// gradient keyed off the URL is the loading / failure fallback.
+    private static func photoStripModule(_ gig: GigDTO) -> ContentDetailModule? {
+        guard let attachments = gig.attachments, !attachments.isEmpty else { return nil }
+        return .photoStrip(ContentDetailPhotoStrip(
+            title: "Photos",
+            icon: .image,
+            countLabel: "\(attachments.count)",
+            tiles: attachments.map { url in
+                ContentDetailPhotoTile(
+                    id: url,
+                    gradient: ListingGradient.from(id: url),
+                    icon: .image,
+                    imageURL: URL(string: url)
+                )
+            }
+        ))
+    }
+
+    /// A09.1 bids subheader — "low $X · high $Y" once two or more live
+    /// bids carry amounts; nil otherwise.
+    private static func bidRangeSub(_ bids: [GigBidDTO]) -> String? {
+        let amounts = bids.compactMap { $0.bidAmount ?? $0.amount }
+        guard amounts.count >= 2, let low = amounts.min(), let high = amounts.max() else { return nil }
+        return "low \(bidAmountLabel(low)) · high \(bidAmountLabel(high))"
+    }
+
+    private static func bidAmountLabel(_ amount: Double) -> String {
+        amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
     }
 
     /// Pickup → drop-off two-stop card when both ends are known, else the
@@ -1353,7 +2148,8 @@ extension GigDetailViewModel {
         bids: [GigBidDTO],
         canTip: Bool = false,
         viewerUserId: String? = nil,
-        suppressBidsModule: Bool = false
+        suppressBidsModule: Bool = false,
+        viewerCanUpdateBid: Bool = false
     ) -> ContentDetailContent {
         let awarded = isAwarded(gig)
         let bidCount = gig.bidCount ?? bids.count
@@ -1408,17 +2204,28 @@ extension GigDetailViewModel {
             counterparty: posterCounterparty(gig: gig, viewerUserId: viewerUserId),
             modules: modules,
             trustCapsules: [],
-            dock: canTip
-                ? tipDock
-                : (awarded
-                    ? ContentDetailDock(
-                        secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                        primary: ContentDetailDockButton(label: "Bidding closed", icon: .lock, enabled: false)
-                    )
-                    : ContentDetailDock(
-                        secondary: ContentDetailDockButton(label: "Message", icon: .send),
-                        primary: ContentDetailDockButton(label: "Place bid")
-                    ))
+            dock: gigV1Dock(canTip: canTip, awarded: awarded, viewerCanUpdateBid: viewerCanUpdateBid)
+        )
+    }
+
+    /// V1 dock: tip → bidding-closed (awarded) → update-bid (viewer already
+    /// bid) → place-bid.
+    private static func gigV1Dock(
+        canTip: Bool,
+        awarded: Bool,
+        viewerCanUpdateBid: Bool
+    ) -> ContentDetailDock {
+        if canTip { return tipDock }
+        if awarded {
+            return ContentDetailDock(
+                secondary: ContentDetailDockButton(label: "Message", icon: .send),
+                primary: ContentDetailDockButton(label: "Bidding closed", icon: .lock, enabled: false)
+            )
+        }
+        if viewerCanUpdateBid { return updateBidDock }
+        return ContentDetailDock(
+            secondary: ContentDetailDockButton(label: "Message", icon: .send),
+            primary: ContentDetailDockButton(label: "Place bid")
         )
     }
 
@@ -1455,7 +2262,7 @@ extension GigDetailViewModel {
         let name = bid.bidder?.resolvedDisplayName ?? "Bidder"
         let initials = name.split(separator: " ").prefix(2).compactMap { $0.first.map(String.init) }.joined().uppercased()
         let amount = bid.bidAmount ?? bid.amount ?? 0
-        let amountLabel = amount.truncatingRemainder(dividingBy: 1) == 0 ? "$\(Int(amount))" : String(format: "$%.2f", amount)
+        let amountLabel = bidAmountLabel(amount)
         let won = acceptedBy != nil && bid.userId == acceptedBy
         let dimmed = acceptedBy != nil && !won
         return ContentDetailBidRow(

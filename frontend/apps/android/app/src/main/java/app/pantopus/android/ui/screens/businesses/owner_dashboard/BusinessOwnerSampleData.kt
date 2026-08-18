@@ -62,5 +62,6 @@ object BusinessOwnerSampleData {
                     ),
                 ),
             publicProfile = BusinessProfileSampleData.populated,
+            canPostAsBusiness = true,
         )
 }

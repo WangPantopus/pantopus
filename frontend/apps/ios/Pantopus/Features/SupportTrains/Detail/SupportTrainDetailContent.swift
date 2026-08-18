@@ -195,6 +195,15 @@ public struct SlotRowContent: Equatable, Sendable, Identifiable {
         }
     }
 
+    /// Backing slot id for `open` rows — the reserve sheet posts to
+    /// `POST /:id/slots/:slotId/reserve` with it.
+    public let slotId: String?
+    /// Backing reservation id for `mine` rows — drives leave / mark
+    /// delivered.
+    public let reservationId: String?
+    /// `reserved` / `delivered` / `confirmed` for `mine` rows.
+    public let reservationStatus: String?
+
     public init(
         id: String,
         dayLabel: String,
@@ -203,7 +212,10 @@ public struct SlotRowContent: Equatable, Sendable, Identifiable {
         author: SlotAuthor? = nil,
         title: String,
         subtitle: String? = nil,
-        mine: Bool = false
+        mine: Bool = false,
+        slotId: String? = nil,
+        reservationId: String? = nil,
+        reservationStatus: String? = nil
     ) {
         self.id = id
         self.dayLabel = dayLabel
@@ -213,6 +225,72 @@ public struct SlotRowContent: Equatable, Sendable, Identifiable {
         self.title = title
         self.subtitle = subtitle
         self.mine = mine
+        self.slotId = slotId
+        self.reservationId = reservationId
+        self.reservationStatus = reservationStatus
+    }
+
+    /// The helper can only leave / mark delivered while the reservation
+    /// is still `reserved` (`backend/routes/supportTrains.js:3013` +
+    /// l.3180 both 409 otherwise).
+    public var canLeaveSlot: Bool {
+        mine && reservationId != nil && (reservationStatus ?? "reserved") == "reserved"
+    }
+
+    public var canMarkDelivered: Bool {
+        canLeaveSlot
+    }
+}
+
+/// One pickable open slot inside the reserve sheet.
+public struct ReserveSlotOption: Equatable, Sendable, Identifiable, Hashable {
+    public let id: String
+    /// "Tuesday, June 3"
+    public let dateLabel: String
+    /// "Dinner" / "Groceries" …
+    public let slotLabel: String
+    /// Time window caption ("5:00 pm – 7:00 pm"), when the slot carries one.
+    public let windowLabel: String?
+
+    public init(id: String, dateLabel: String, slotLabel: String, windowLabel: String?) {
+        self.id = id
+        self.dateLabel = dateLabel
+        self.slotLabel = slotLabel
+        self.windowLabel = windowLabel
+    }
+}
+
+/// Everything the reserve sheet needs that isn't per-slot: which
+/// contribution lanes the train accepts plus the recipient's reminders.
+public struct ReserveSheetContext: Equatable, Sendable, Hashable {
+    public let enabledModes: [SupportTrainContributionMode]
+    public let restrictionChips: [String]
+    public let contactlessPreferred: Bool
+
+    public init(
+        enabledModes: [SupportTrainContributionMode],
+        restrictionChips: [String],
+        contactlessPreferred: Bool
+    ) {
+        self.enabledModes = enabledModes
+        self.restrictionChips = restrictionChips
+        self.contactlessPreferred = contactlessPreferred
+    }
+}
+
+/// The viewer's relationship to the train, straight off
+/// `viewer_level` + `viewer_support_train_role`
+/// (`backend/routes/supportTrains.js:3693`). Every affordance is gated
+/// on this so no one sees a button the server will reject.
+public enum SupportTrainViewerRole: String, Sendable, Hashable {
+    case primaryOrganizer
+    case coOrganizer
+    case recipient
+    case helper
+    case viewer
+
+    public var isOrganizer: Bool {
+        self == .primaryOrganizer || self == .coOrganizer
     }
 }
 
@@ -267,6 +345,17 @@ public struct SupportTrainDetailContent: Equatable, Sendable {
     /// Optional celebration banner — shown at the top of the body in
     /// the fully-covered variant.
     public let celebrationBanner: CelebrationBanner?
+    /// Open slots the viewer can still claim, in date order.
+    public let reserveOptions: [ReserveSlotOption]
+    /// Contribution lanes + recipient reminders for the reserve sheet.
+    public let reserveContext: ReserveSheetContext
+    /// Gate for every action affordance on this screen.
+    public let viewerRole: SupportTrainViewerRole
+    /// Exact address — present only when the server chose to send it
+    /// (organizer / recipient / a helper the organizer granted). Rendered
+    /// verbatim, never persisted.
+    public let exactAddress: String?
+    public let deliveryInstructions: String?
 
     public struct CelebrationBanner: Equatable, Sendable {
         public let title: String
@@ -290,7 +379,16 @@ public struct SupportTrainDetailContent: Equatable, Sendable {
         sections: [SlotSection],
         hostedBy: HostedByFooter,
         dock: SupportTrainDock,
-        celebrationBanner: CelebrationBanner? = nil
+        celebrationBanner: CelebrationBanner? = nil,
+        reserveOptions: [ReserveSlotOption] = [],
+        reserveContext: ReserveSheetContext = ReserveSheetContext(
+            enabledModes: SupportTrainContributionMode.allCases,
+            restrictionChips: [],
+            contactlessPreferred: false
+        ),
+        viewerRole: SupportTrainViewerRole = .viewer,
+        exactAddress: String? = nil,
+        deliveryInstructions: String? = nil
     ) {
         self.trainId = trainId
         self.recipient = recipient
@@ -300,5 +398,10 @@ public struct SupportTrainDetailContent: Equatable, Sendable {
         self.hostedBy = hostedBy
         self.dock = dock
         self.celebrationBanner = celebrationBanner
+        self.reserveOptions = reserveOptions
+        self.reserveContext = reserveContext
+        self.viewerRole = viewerRole
+        self.exactAddress = exactAddress
+        self.deliveryInstructions = deliveryInstructions
     }
 }

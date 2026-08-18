@@ -37,7 +37,13 @@ struct TodayDetailView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s0) {
-            TodayTopBar(dateLabel: topBarDate, onBack: onBack, onShare: onShare, onMore: onMore)
+            TodayTopBar(
+                title: viewModel.headerTitle,
+                dateLabel: topBarDate,
+                onBack: onBack,
+                onShare: onShare,
+                onMore: onMore
+            )
             content
         }
         .background(Theme.Color.appBg)
@@ -132,6 +138,7 @@ struct TodayDetailView: View {
 // MARK: - Top bar
 
 private struct TodayTopBar: View {
+    var title: String = "Today"
     let dateLabel: String?
     let onBack: () -> Void
     let onShare: () -> Void
@@ -150,10 +157,11 @@ private struct TodayTopBar: View {
             Spacer(minLength: Spacing.s0)
 
             VStack(spacing: 2) {
-                Text("Today")
+                Text(title)
                     .pantopusTextStyle(.small)
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.Color.appText)
+                    .accessibilityIdentifier("todayHeaderTitle")
                 if let dateLabel {
                     Text(dateLabel)
                         .pantopusTextStyle(.caption)

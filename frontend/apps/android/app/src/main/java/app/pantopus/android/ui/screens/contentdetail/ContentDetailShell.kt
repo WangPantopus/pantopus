@@ -928,13 +928,27 @@ private fun ModuleView(
                                     ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            PantopusIconImage(
-                                icon = tile.icon,
-                                contentDescription = null,
-                                size = Radii.xl3,
-                                strokeWidth = 1.8f,
-                                tint = Color.White.copy(alpha = 0.9f),
-                            )
+                            val fallback: @Composable () -> Unit = {
+                                PantopusIconImage(
+                                    icon = tile.icon,
+                                    contentDescription = null,
+                                    size = Radii.xl3,
+                                    strokeWidth = 1.8f,
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                )
+                            }
+                            if (tile.imageUrl.isNullOrBlank()) {
+                                fallback()
+                            } else {
+                                SubcomposeAsyncImage(
+                                    model = tile.imageUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    loading = { fallback() },
+                                    error = { fallback() },
+                                )
+                            }
                         }
                     }
                 }

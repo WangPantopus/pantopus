@@ -2,24 +2,34 @@
 //  PulseIntent.swift
 //  Pantopus
 //
-//  Six-way classification for Pulse posts. Drives the chip-row filter,
+//  Ten-way classification for Pulse posts. Drives the chip-row filter,
 //  the per-card colored chip, the reaction-verb set, and the compose
 //  FAB's pre-fill. The `all` case is a chip-row-only sentinel; real
-//  posts always resolve to one of the other five.
+//  posts always resolve to one of the other nine.
+//
+//  The chip set mirrors RN's `PLACE_POST_TYPES`
+//  (`src/constants/feed.ts:18-28`) 1:1 — `alert` / `deal` /
+//  `neighborhoodWin` / `visitorGuide` were previously collapsed into
+//  `announce`, which made those four lanes unreachable from the filter
+//  row.
 //
 
 import Foundation
 
-/// One of the six chip-row intents.
+/// One of the ten chip-row intents.
 public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
     case all
     case ask
     case recommend
     case event
     case lost
+    case alert
+    case deal
     case announce
+    case neighborhoodWin
+    case visitorGuide
 
-    /// Chip-row display label.
+    /// Chip-row display label — RN `PLACE_POST_TYPES` labels.
     public var label: String {
         switch self {
         case .all: "All"
@@ -27,7 +37,11 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
         case .recommend: "Recommend"
         case .event: "Event"
         case .lost: "Lost & Found"
+        case .alert: "Alerts"
+        case .deal: "Deals"
         case .announce: "Announce"
+        case .neighborhoodWin: "Wins"
+        case .visitorGuide: "Guide"
         }
     }
 
@@ -39,7 +53,11 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
         case .recommend: "Rec"
         case .event: "Event"
         case .lost: "Lost"
+        case .alert: "Alert"
+        case .deal: "Deal"
         case .announce: "Announce"
+        case .neighborhoodWin: "Win"
+        case .visitorGuide: "Guide"
         }
     }
 
@@ -52,7 +70,11 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
         case .recommend: "recommendation"
         case .event: "event"
         case .lost: "lost_found"
+        case .alert: "alert"
+        case .deal: "deal"
         case .announce: "local_update"
+        case .neighborhoodWin: "neighborhood_win"
+        case .visitorGuide: "visitor_guide"
         }
     }
 
@@ -65,7 +87,11 @@ public enum PulseIntent: String, CaseIterable, Sendable, Hashable {
         case "recommendation", "recommend": .recommend
         case "event": .event
         case "lost_found": .lost
-        case "local_update", "announcement", "heads_up", "neighborhood_win", "alert": .announce
+        case "alert", "safety_alert": .alert
+        case "deal": .deal
+        case "neighborhood_win": .neighborhoodWin
+        case "visitor_guide": .visitorGuide
+        case "local_update", "announcement", "heads_up": .announce
         default: .announce
         }
     }
@@ -80,7 +106,11 @@ public extension PulseIntent {
         case .recommend: .thumbsUp
         case .event: .calendar
         case .lost: .search
+        case .alert: .alertTriangle
+        case .deal: .tag
         case .announce: .megaphone
+        case .neighborhoodWin: .partyPopper
+        case .visitorGuide: .compass
         }
     }
 }
@@ -137,11 +167,21 @@ public extension PulseIntent {
                 PulseReaction(kind: .seen, icon: .eye, label: "seen", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .shared, icon: .share, label: "shared", count: secondaryCount, isInteractive: false)
             ]
-        case .announce:
+        case .announce, .alert:
             // A03 announce card: eye "seen" + heart.
             [
                 PulseReaction(kind: .seen, icon: .eye, label: "seen", count: helpfulCount, isInteractive: true),
                 PulseReaction(kind: .heart, icon: .heart, label: "", count: secondaryCount, isInteractive: false)
+            ]
+        case .neighborhoodWin:
+            [
+                PulseReaction(kind: .helpful, icon: .heart, label: "", count: helpfulCount, isInteractive: true),
+                PulseReaction(kind: .seen, icon: .eye, label: "seen", count: secondaryCount, isInteractive: false)
+            ]
+        case .deal, .visitorGuide:
+            [
+                PulseReaction(kind: .helpful, icon: .lightbulb, label: "helpful", count: helpfulCount, isInteractive: true),
+                PulseReaction(kind: .shared, icon: .share, label: "shared", count: secondaryCount, isInteractive: false)
             ]
         case .all:
             [

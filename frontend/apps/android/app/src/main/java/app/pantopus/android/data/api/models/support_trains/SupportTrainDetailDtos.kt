@@ -43,7 +43,27 @@ data class SupportTrainDetailDto(
     @Json(name = "viewer_support_train_role") val viewerSupportTrainRole: String? = null,
     @Json(name = "exact_address_shared") val exactAddressShared: Boolean? = null,
     @Json(name = "coarse_location") val coarseLocation: SupportTrainCoarseLocationDto? = null,
-)
+    /**
+     * Exact street address — only present when the server decides the
+     * viewer may see it (organizer / recipient / a helper the organizer
+     * granted, `backend/routes/supportTrains.js:3704`). Never derived or
+     * cached: after a reveal the screen re-fetches `GET /:id` so the
+     * privacy gate re-runs server-side.
+     */
+    val address: SupportTrainAddressDto? = null,
+    @Json(name = "delivery_instructions") val deliveryInstructions: String? = null,
+    @Json(name = "special_instructions") val specialInstructions: String? = null,
+    /** Organizer-only echo of the parent Activity's visibility. */
+    @Json(name = "activity_visibility") val activityVisibility: String? = null,
+) {
+    /** True for primary / co-organizer / recipient-delegate viewers. */
+    val viewerIsOrganizer: Boolean
+        get() = viewerLevel == "organizer"
+
+    /** Only the primary may unpublish / archive / delete / edit organizers. */
+    val viewerIsPrimaryOrganizer: Boolean
+        get() = viewerSupportTrainRole == "primary"
+}
 
 /** `support_modes` block — which contribution lanes the train accepts. */
 @JsonClass(generateAdapter = true)
@@ -103,13 +123,32 @@ data class SupportTrainUpdateDto(
     @Json(name = "created_at") val createdAt: String? = null,
 )
 
-/** One organizer row (primary / co_organizer / recipient_delegate). */
+/**
+ * One organizer row (primary / co_organizer / recipient_delegate).
+ *
+ * The detail handler re-shapes Supabase's `User:user_id` alias into a
+ * lowercase `user` object before responding
+ * (`backend/routes/supportTrains.js:3611`) — the capitalised key never
+ * reaches the client, so `user` is the wire name. [legacyUser] keeps
+ * older fixtures decoding.
+ */
 @JsonClass(generateAdapter = true)
 data class SupportTrainOrganizerDto(
     val id: String,
     val role: String? = null,
-    @Json(name = "User") val user: SupportTrainHelperDto? = null,
-)
+    @Json(name = "user") val user: SupportTrainHelperDto? = null,
+    @Json(name = "User") val legacyUser: SupportTrainHelperDto? = null,
+) {
+    /** Organizer account, whichever key it arrived under. */
+    val organizerUser: SupportTrainHelperDto?
+        get() = user ?: legacyUser
+
+    val isPrimary: Boolean
+        get() = role == "primary"
+
+    val displayName: String
+        get() = organizerUser?.name ?: organizerUser?.username ?: "Organizer"
+}
 
 /** Coarse (city/state) location surfaced to all viewers. */
 @JsonClass(generateAdapter = true)

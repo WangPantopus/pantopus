@@ -14,6 +14,10 @@ import SwiftUI
 struct PickCategorySearchStep: View {
     @Bindable var viewModel: CreateBusinessWizardViewModel
 
+    private var query: String {
+        viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         BusinessIdentityChip()
 
@@ -27,14 +31,14 @@ struct PickCategorySearchStep: View {
 
         SearchResultsHeader(
             matchCount: viewModel.searchHits.count,
-            query: viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            query: query
         )
 
         VStack(spacing: Spacing.s2) {
             ForEach(viewModel.searchHits) { hit in
                 SearchResultRow(
                     hit: hit,
-                    query: viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    query: query,
                     selected: viewModel.selectedCategoryId == hit.category
                 ) {
                     viewModel.selectSearchHit(hit)
@@ -43,11 +47,22 @@ struct PickCategorySearchStep: View {
             }
         }
 
-        AddCustomCategoryRow(
-            label: viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines),
-            isSubmitting: false
-        ) {
-            viewModel.submitCustomCategory()
+        if viewModel.searchHits.isEmpty, !query.isEmpty {
+            // No-match fallback from the design pack. Submitting is still
+            // logged-only — there is no POST /custom-categories to invent — so
+            // the row's subcopy promises exactly what happens.
+            AddCustomCategoryRow(
+                label: query,
+                isSubmitting: viewModel.isSubmittingCustom
+            ) {
+                viewModel.submitCustomCategory()
+            }
+        } else {
+            Text("Custom categories aren't available yet. Pick a listed category above.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("createBusinessCustomCategoryBlocked")
         }
 
         if let submitError = viewModel.submitError {
@@ -217,7 +232,7 @@ private struct AddCustomCategoryRow: View {
                     Text("Add \"\(label)\" as a custom category")
                         .pantopusTextStyle(.body)
                         .foregroundStyle(Theme.Color.businessDark)
-                    Text("We'll review it within a day · listings stay private until approved.")
+                    Text("We'll pass the request on — custom categories aren't live yet.")
                         .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -241,7 +256,10 @@ private struct AddCustomCategoryRow: View {
         .buttonStyle(.plain)
         .disabled(isSubmitting)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Add \(label) as a custom category. We'll review it within a day.")
+        .accessibilityLabel(
+            "Add \(label) as a custom category. " +
+                "We'll pass the request on — custom categories aren't live yet."
+        )
         .accessibilityIdentifier("createBusinessAddCustomCategory")
     }
 }

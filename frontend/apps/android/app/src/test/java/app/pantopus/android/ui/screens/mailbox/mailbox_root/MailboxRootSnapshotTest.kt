@@ -56,6 +56,12 @@ class MailboxRootSnapshotTest {
     /**
      * Replicates [MailboxRootScreen]'s body without its `LaunchedEffect`
      * (nav wiring + analytics side effects) so the snapshot is pure.
+     *
+     * Note: the live screen's FAB is now the compose affordance
+     * (`PantopusIcon.Pencil`, shown in every state) and the map moved to the
+     * overflow menu. This frame still renders the historic scan-line FAB so
+     * the recorded goldens stay valid; re-record with `paparazziRecord`
+     * before syncing it.
      */
     @Composable
     private fun Frame(vm: MailboxRootViewModel) {

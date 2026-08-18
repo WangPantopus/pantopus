@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.place.PlaceRepository
 import app.pantopus.android.ui.screens.place.PlaceDetailGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -54,7 +55,7 @@ class PlaceDetailViewModel
                 _state.value =
                     when (val result = repo.intelligence(homeId)) {
                         is NetworkResult.Success -> PlaceDetailUiState.Loaded(result.data)
-                        is NetworkResult.Failure -> PlaceDetailUiState.Error(result.error.message)
+                        is NetworkResult.Failure -> PlaceDetailUiState.Error(result.error.displayMessage("Couldn't load this place."))
                     }
             }
         }

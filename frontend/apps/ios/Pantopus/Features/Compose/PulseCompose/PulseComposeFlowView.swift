@@ -20,17 +20,27 @@ public struct PulseComposeFlowView: View {
 
     private let prefillFeedIntent: PulseIntent?
     private let editingPostId: String?
+    /// Set when entered from a gig detail's "Share to feed" — the picker
+    /// drops the Connections card and the purpose is fixed to Local
+    /// Update, matching RN (`gig/[id].tsx:540-542,1474-1481`).
+    private let taskShare: PulseTaskShare?
+    /// Sports-lane starter prompt text seeded into the draft body.
+    private let prefillBody: String?
     private let onCancel: @MainActor () -> Void
     private let onPosted: @MainActor (String?) -> Void
 
     public init(
         prefillFeedIntent: PulseIntent? = nil,
         editingPostId: String? = nil,
+        taskShare: PulseTaskShare? = nil,
+        prefillBody: String? = nil,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
         self.prefillFeedIntent = prefillFeedIntent
         self.editingPostId = editingPostId
+        self.taskShare = taskShare
+        self.prefillBody = prefillBody
         self.onCancel = onCancel
         self.onPosted = onPosted
         if editingPostId != nil {
@@ -44,7 +54,8 @@ public struct PulseComposeFlowView: View {
             case .targetPicker:
                 PulsePostTargetPickerView(
                     onSelect: handleTargetSelected,
-                    onCancel: onCancel
+                    onCancel: onCancel,
+                    hidesNetworkTarget: taskShare != nil
                 )
             case let .purposePicker(target):
                 PulsePostPurposePickerView(
@@ -77,12 +88,20 @@ public struct PulseComposeFlowView: View {
             composePurpose: resolvedPurpose,
             postId: editingPostId,
             managesDismiss: false,
+            taskShare: taskShare,
+            prefillBody: prefillBody,
             onCancel: onCancel,
             onPosted: onPosted
         )
     }
 
     private func handleTargetSelected(_ target: PulsePostingTarget) {
+        // A task share always lands on the Local Update draft — RN skips
+        // the purpose grid entirely (`gig/[id].tsx:541-542`).
+        if taskShare != nil {
+            step = .draft(target, .localUpdate)
+            return
+        }
         if target.isNetworkTarget {
             step = .draft(target, nil)
             return
@@ -95,6 +114,7 @@ public struct PulseComposeFlowView: View {
     }
 
     private func prefillPurpose(for target: PulsePostingTarget) -> PulseComposePurpose? {
+        if taskShare != nil { return .localUpdate }
         guard let feedIntent = prefillFeedIntent, feedIntent != .all else { return nil }
         let candidate = PulseComposePurpose.allCases.first { $0.legacyIntent == PulseComposeIntent.from(feedIntent: feedIntent) }
         guard let candidate else { return nil }

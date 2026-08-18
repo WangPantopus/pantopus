@@ -20,6 +20,7 @@ import app.pantopus.android.data.api.models.offers.UpdateBidBody
 import app.pantopus.android.data.api.models.offers.WithdrawBidReason
 import app.pantopus.android.data.api.models.reviews.CreateReviewBody
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.reviews.ReviewsRepository
@@ -343,7 +344,7 @@ class MyBidsViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = ListOfRowsUiState.Error(result.error.message)
+                            _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                         }
                     }
                 }

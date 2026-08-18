@@ -2,6 +2,7 @@
 
 package app.pantopus.android.data.api.models.businesses
 
+import app.pantopus.android.data.api.models.common.JsonValue
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -169,8 +170,22 @@ data class BusinessProfileDetailDto(
     @Json(name = "service_area") val serviceArea: BusinessServiceAreaDto? = null,
     @Json(name = "founding_badge") val foundingBadge: Boolean? = null,
     @Json(name = "is_published") val isPublished: Boolean? = null,
+    @Json(name = "published_at") val publishedAt: String? = null,
     @Json(name = "verification_status") val verificationStatus: String? = null,
     @Json(name = "primary_location") val primaryLocation: BusinessLocationDto? = null,
+    /**
+     * Social / booking links keyed by network name. Untyped for the same
+     * reason as [attributes] — `social_links` is user-writable jsonb, so a
+     * null or non-string member must not fail the whole decode. Callers
+     * coerce with `EditBusinessPageMapper.stringMap`.
+     */
+    @Json(name = "social_links") val socialLinks: JsonValue? = null,
+    /**
+     * Free-form profile attributes (e.g. `price_level`). Untyped because the
+     * jsonb column holds provider-shaped values — mirrors the iOS
+     * `[String: JSONValue]`.
+     */
+    val attributes: JsonValue? = null,
 )
 
 /**
@@ -228,6 +243,15 @@ data class BusinessCatalogItemDto(
     val currency: String? = null,
     @Json(name = "image_url") val imageUrl: String? = null,
     @Json(name = "is_featured") val isFeatured: Boolean? = null,
+)
+
+/**
+ * `GET /api/businesses/:businessId/catalog/items` envelope — the
+ * owner/staff catalog read. Route `backend/routes/businesses.js:2386`.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessCatalogItemsResponse(
+    val items: List<BusinessCatalogItemDto> = emptyList(),
 )
 
 /**
@@ -357,4 +381,188 @@ data class BusinessReviewRespondRequest(
 @JsonClass(generateAdapter = true)
 data class BusinessFollowResponse(
     val following: Boolean = true,
+)
+
+/**
+ * Body for `POST /api/businesses/:businessId/inbox/start`.
+ * Route `backend/routes/businesses.js:3939`.
+ */
+@JsonClass(generateAdapter = true)
+data class StartBusinessInquiryRequest(
+    val subject: String? = null,
+)
+
+/**
+ * Response from `POST /api/businesses/:businessId/inbox/start`.
+ * Backend returns camelCase (`roomId`, `existing`).
+ */
+@JsonClass(generateAdapter = true)
+data class StartBusinessInquiryResponse(
+    val roomId: String,
+    val existing: Boolean? = null,
+)
+
+/**
+ * `GET /api/businesses/:businessId/locations` response.
+ * Route `backend/routes/businesses.js:1742`.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessLocationsResponse(
+    val locations: List<BusinessLocationDto> = emptyList(),
+)
+
+// ---------------------------------------------------------------------------
+// Create business wizard (check-username + create-full)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /api/businesses/check-username` response.
+ * Route `backend/routes/businesses.js:358`.
+ */
+@JsonClass(generateAdapter = true)
+data class UsernameAvailabilityDto(
+    val available: Boolean,
+    /** `reserved` | `taken` | `invalid` | `error` when unavailable. */
+    val reason: String? = null,
+)
+
+/**
+ * Optional location block for `POST /api/businesses/create-full`.
+ * Route `backend/routes/businesses.js:554`.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateBusinessLocationPayload(
+    val address: String,
+    val city: String,
+    val state: String? = null,
+    val zipcode: String? = null,
+    val country: String = "US",
+)
+
+/**
+ * One hours row for `POST /api/businesses/create-full`.
+ * Route `backend/routes/businesses.js:554`.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateBusinessHoursPayload(
+    @Json(name = "day_of_week") val dayOfWeek: Int,
+    @Json(name = "open_time") val openTime: String? = null,
+    @Json(name = "close_time") val closeTime: String? = null,
+    @Json(name = "is_closed") val isClosed: Boolean = false,
+)
+
+/**
+ * Body for `POST /api/businesses/create-full`.
+ * Route `backend/routes/businesses.js:554`.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateBusinessFullRequest(
+    val name: String,
+    val username: String,
+    val email: String,
+    @Json(name = "business_type") val businessType: String? = null,
+    val categories: List<String>? = null,
+    val description: String? = null,
+    val location: CreateBusinessLocationPayload? = null,
+    val hours: List<CreateBusinessHoursPayload>? = null,
+)
+
+/**
+ * `POST /api/businesses/create-full` response.
+ * Route `backend/routes/businesses.js:554`.
+ */
+@JsonClass(generateAdapter = true)
+data class CreateBusinessFullResponse(
+    val message: String? = null,
+    val business: BusinessUserDto,
+    @Json(name = "location_id") val locationId: String? = null,
+)
+
+// ---------------------------------------------------------------------------
+// A13.10 — Edit business page mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * `PATCH /api/businesses/:businessId` body — `updateBusinessSchema`
+ * (`backend/routes/businesses.js:124`). Unspecified keys are left untouched,
+ * but `social_links` / `attributes` are jsonb columns the route *replaces*
+ * wholesale — send the whole merged object, never a single-key one.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateBusinessRequest(
+    val name: String? = null,
+    val tagline: String? = null,
+    val description: String? = null,
+    val categories: List<String>? = null,
+    @Json(name = "public_email") val publicEmail: String? = null,
+    @Json(name = "public_phone") val publicPhone: String? = null,
+    val website: String? = null,
+    @Json(name = "social_links") val socialLinks: Map<String, String>? = null,
+    /** Untyped so non-string attribute values round-trip unchanged. */
+    val attributes: JsonValue? = null,
+    @Json(name = "is_published") val isPublished: Boolean? = null,
+)
+
+/** Generic `{ message }` envelope from publish / update success paths. */
+@JsonClass(generateAdapter = true)
+data class BusinessMutationMessageResponse(
+    val message: String? = null,
+)
+
+/**
+ * One day row for `PUT …/hours` — `weeklyHoursSchema`
+ * (`backend/routes/businesses.js:207`).
+ */
+@JsonClass(generateAdapter = true)
+data class SetBusinessHoursDayRequest(
+    @Json(name = "day_of_week") val dayOfWeek: Int,
+    @Json(name = "open_time") val openTime: String? = null,
+    @Json(name = "close_time") val closeTime: String? = null,
+    @Json(name = "is_closed") val isClosed: Boolean,
+)
+
+/** Body for `PUT /api/businesses/:businessId/locations/:locationId/hours`. */
+@JsonClass(generateAdapter = true)
+data class SetBusinessHoursRequest(
+    val hours: List<SetBusinessHoursDayRequest>,
+)
+
+/** `GET/PUT …/hours` response envelope. */
+@JsonClass(generateAdapter = true)
+data class BusinessLocationHoursResponse(
+    val hours: List<BusinessHoursDto> = emptyList(),
+)
+
+/**
+ * `PATCH /api/businesses/:businessId/locations/:locationId` body —
+ * `updateLocationSchema` (`backend/routes/businesses.js:190`). `address` is
+ * the street line only; the locality lives in its own columns.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateBusinessLocationRequest(
+    val address: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val zipcode: String? = null,
+)
+
+/** Envelope for location PATCH. */
+@JsonClass(generateAdapter = true)
+data class BusinessLocationUpdateResponse(
+    val location: BusinessLocationDto? = null,
+)
+
+// Business media upload (A12.10 Create Business — logo)
+
+/**
+ * `POST /api/upload/business-media/:businessId?type=logo|banner` response
+ * (`backend/routes/upload.js:1797`). The server has already written the URL
+ * onto the business profile, so callers only need the echoed `url` to
+ * render the freshly-uploaded image.
+ */
+@JsonClass(generateAdapter = true)
+data class BusinessMediaUploadResponse(
+    val message: String? = null,
+    val url: String,
+    val key: String? = null,
 )

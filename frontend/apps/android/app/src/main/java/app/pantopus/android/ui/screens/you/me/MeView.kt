@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "LongParameterList", "MagicNumber", "PackageNaming")
 
 package app.pantopus.android.ui.screens.you.me
 
@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.api.models.users.InviteProgressDto
+import app.pantopus.android.data.api.models.users.MonthlyReceiptDto
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.identity.IdentityOption
 import app.pantopus.android.ui.screens.shared.identity.IdentitySwitcherPillRow
@@ -61,10 +64,16 @@ fun MeView(
     onAction: (MeActionTile) -> Unit = {},
     onSection: (MeSectionRow) -> Unit = {},
     onLogOut: () -> Unit = {},
+    /** True when opened from the `monthly_receipt` push — the receipt card
+     *  renders expanded (RN `/(tabs)/profile?tab=receipt`). */
+    expandMonthlyReceipt: Boolean = false,
     viewModel: MeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIdentity by viewModel.activeIdentity.collectAsStateWithLifecycle()
+    val monthlyReceipt by viewModel.monthlyReceipt.collectAsStateWithLifecycle()
+    val inviteProgress by viewModel.inviteProgress.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -90,6 +99,13 @@ fun MeView(
                             else -> viewModel.selectIdentity(MeIdentity.Personal)
                         }
                     },
+                    monthlyReceipt = monthlyReceipt,
+                    expandMonthlyReceipt = expandMonthlyReceipt,
+                    inviteProgress = inviteProgress,
+                    onShareReceipt = {
+                        viewModel.receiptShareMessage()?.let { shareText(context, it) }
+                    },
+                    onShareInvite = { shareText(context, viewModel.inviteShareMessage()) },
                 )
             }
         }
@@ -125,6 +141,11 @@ internal fun PopulatedFrame(
     onAction: (MeActionTile) -> Unit,
     onSection: (MeSectionRow) -> Unit,
     onDestructive: () -> Unit,
+    monthlyReceipt: MonthlyReceiptDto? = null,
+    expandMonthlyReceipt: Boolean = false,
+    inviteProgress: InviteProgressDto? = null,
+    onShareReceipt: () -> Unit = {},
+    onShareInvite: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -152,6 +173,31 @@ internal fun PopulatedFrame(
                     .padding(horizontal = Spacing.s4)
                     .padding(top = Spacing.s4),
         )
+        // Personal-only profile insight cards (RN parity — the
+        // `(tabs)/profile` screen renders both under the stats row).
+        if (active.identity == MeIdentity.Personal) {
+            monthlyReceipt?.let { receipt ->
+                MonthlyReceiptCard(
+                    receipt = receipt,
+                    startExpanded = expandMonthlyReceipt,
+                    onShare = onShareReceipt,
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Spacing.s4)
+                            .padding(top = Spacing.s4),
+                )
+            }
+            inviteProgress?.let { progress ->
+                InviteProgressCard(
+                    progress = progress,
+                    onShare = onShareInvite,
+                    modifier =
+                        Modifier
+                            .padding(horizontal = Spacing.s4)
+                            .padding(top = Spacing.s4),
+                )
+            }
+        }
         active.sections.forEach { section ->
             MeSectionGroup(
                 section = section,

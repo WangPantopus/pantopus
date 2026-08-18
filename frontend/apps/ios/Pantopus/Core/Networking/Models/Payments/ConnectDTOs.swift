@@ -43,12 +43,17 @@ public struct ConnectAccountDTO: Decodable, Sendable, Hashable {
     public let chargesEnabled: Bool
     public let payoutsEnabled: Bool
     public let detailsSubmitted: Bool
+    /// `StripeAccount.created_at` — when the seller first connected. The
+    /// handler returns the whole row (`stripe/stripeService.js:449`), so this
+    /// is real data; it dates the "Connected …" row on A14.6 Payments.
+    public let createdAt: String?
 
     private enum CodingKeys: String, CodingKey {
         case stripeAccountId = "stripe_account_id"
         case chargesEnabled = "charges_enabled"
         case payoutsEnabled = "payouts_enabled"
         case detailsSubmitted = "details_submitted"
+        case createdAt = "created_at"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -57,18 +62,21 @@ public struct ConnectAccountDTO: Decodable, Sendable, Hashable {
         chargesEnabled = (try? container.decodeIfPresent(Bool.self, forKey: .chargesEnabled)) ?? false
         payoutsEnabled = (try? container.decodeIfPresent(Bool.self, forKey: .payoutsEnabled)) ?? false
         detailsSubmitted = (try? container.decodeIfPresent(Bool.self, forKey: .detailsSubmitted)) ?? false
+        createdAt = try? container.decodeIfPresent(String.self, forKey: .createdAt)
     }
 
     public init(
         stripeAccountId: String? = nil,
         chargesEnabled: Bool = false,
         payoutsEnabled: Bool = false,
-        detailsSubmitted: Bool = false
+        detailsSubmitted: Bool = false,
+        createdAt: String? = nil
     ) {
         self.stripeAccountId = stripeAccountId
         self.chargesEnabled = chargesEnabled
         self.payoutsEnabled = payoutsEnabled
         self.detailsSubmitted = detailsSubmitted
+        self.createdAt = createdAt
     }
 }
 

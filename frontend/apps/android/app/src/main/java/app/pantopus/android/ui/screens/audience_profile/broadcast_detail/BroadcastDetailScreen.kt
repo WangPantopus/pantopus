@@ -56,8 +56,8 @@ fun BroadcastDetailScreen(
     onBack: () -> Unit = {},
     onOverflow: () -> Unit = {},
     onReply: () -> Unit = {},
-    onBoost: () -> Unit = {},
-    onPin: () -> Unit = {},
+    onBoost: (() -> Unit)? = null,
+    onPin: (() -> Unit)? = null,
     viewModel: BroadcastDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -216,8 +216,8 @@ private fun ErrorFrame(
 internal fun LoadedFrame(
     loaded: BroadcastDetailLoaded,
     onReply: () -> Unit,
-    onBoost: () -> Unit,
-    onPin: () -> Unit,
+    onBoost: (() -> Unit)?,
+    onPin: (() -> Unit)?,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize().testTag("broadcastDetailContent"),
@@ -703,8 +703,8 @@ private fun TierChip(
 @Composable
 private fun StickyFooter(
     onReply: () -> Unit,
-    onBoost: () -> Unit,
-    onPin: () -> Unit,
+    onBoost: (() -> Unit)?,
+    onPin: (() -> Unit)?,
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag("broadcastDetailFooter")) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
@@ -717,18 +717,22 @@ private fun StickyFooter(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            SecondaryFooterButton(
-                icon = PantopusIcon.Rocket,
-                label = "Boost",
-                onClick = onBoost,
-                modifier = Modifier.testTag("broadcastDetailBoost"),
-            )
-            SecondaryFooterButton(
-                icon = PantopusIcon.Pin,
-                label = "Pin",
-                onClick = onPin,
-                modifier = Modifier.testTag("broadcastDetailPin"),
-            )
+            onBoost?.let { boost ->
+                SecondaryFooterButton(
+                    icon = PantopusIcon.Rocket,
+                    label = "Boost",
+                    onClick = boost,
+                    modifier = Modifier.testTag("broadcastDetailBoost"),
+                )
+            }
+            onPin?.let { pin ->
+                SecondaryFooterButton(
+                    icon = PantopusIcon.Pin,
+                    label = "Pin",
+                    onClick = pin,
+                    modifier = Modifier.testTag("broadcastDetailPin"),
+                )
+            }
             Box(
                 modifier =
                     Modifier

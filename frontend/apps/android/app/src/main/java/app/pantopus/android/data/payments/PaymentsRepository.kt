@@ -5,6 +5,8 @@ import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
 import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodAckResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
+import app.pantopus.android.data.api.models.payments.PaymentsEarningsResponse
+import app.pantopus.android.data.api.models.payments.SpendingSummaryResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipRequest
 import app.pantopus.android.data.api.models.payments.TipResponse
@@ -37,6 +39,12 @@ class PaymentsRepository
         /** `POST /api/payments/tip/{paymentId}/refresh-status` — reconcile a tip. */
         suspend fun tipRefreshStatus(paymentId: String): NetworkResult<TipRefreshStatusResponse> =
             safeApiCall { api.tipRefreshStatus(paymentId) }
+
+        /** `GET /api/payments/earnings` — lifetime earned, integer cents. */
+        suspend fun earnings(): NetworkResult<PaymentsEarningsResponse> = safeApiCall { api.earnings() }
+
+        /** `GET /api/payments/spending` — lifetime spent, integer cents. */
+        suspend fun spending(): NetworkResult<SpendingSummaryResponse> = safeApiCall { api.spending() }
 
         /** `PUT /api/payments/methods/{id}/default`. */
         suspend fun setDefault(id: String): NetworkResult<PaymentMethodAckResponse> = safeApiCall { api.setDefault(id) }

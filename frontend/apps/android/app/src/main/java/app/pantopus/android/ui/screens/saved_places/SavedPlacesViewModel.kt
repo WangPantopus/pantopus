@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.saved_places.SavePlaceBody
 import app.pantopus.android.data.api.models.saved_places.SavedPlaceDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.saved_places.SavedPlacesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,7 +73,7 @@ class SavedPlacesViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = SavedPlacesUiState.Error(result.error.message)
+                            _state.value = SavedPlacesUiState.Error(result.error.displayMessage("Couldn't load saved places."))
                         } else {
                             _toast.value = SavedPlacesToast("Couldn't refresh.", isError = true)
                         }

@@ -121,7 +121,7 @@ class NotificationDispatcher
             val channel = channelFor(data["type"])
             val title = notificationTitle ?: data["title"]
             val body = notificationBody ?: data["body"]
-            var deepLink = data["link"] ?: data["deepLink"]
+            var deepLink = data["link"] ?: data["deepLink"] ?: briefingOrReceiptLink(data)
             // Chat pushes link to `/chat/<roomId>` with the sender name in
             // the title — forward it as a `name` query param so the
             // conversation header has a display name on cold-open
@@ -131,6 +131,39 @@ class NotificationDispatcher
             }
             return Routing(channel = channel, title = title, body = body, deepLink = deepLink)
         }
+
+        /**
+         * Morning/Evening Briefing and Monthly Receipt pushes ship no `link` —
+         * the briefing carries `{ type, route: "/hub/today", briefingKind,
+         * briefingDeliveryId }` (`backend/routes/internalBriefing.js:239`), and
+         * the receipt push is typed only. Compose the same paths RN's
+         * `resolveNotificationRoute` produces
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`)
+         * so the tap resolves the specific stored briefing / expands the card.
+         */
+        internal fun briefingOrReceiptLink(data: Map<String, String>): String? {
+            val type = data["type"].orEmpty().lowercase()
+            if (type == "monthly_receipt") return "/profile?tab=receipt"
+            if (type !in briefingTypes) return null
+            val kind =
+                if (type == "evening_briefing") {
+                    "evening"
+                } else {
+                    (data["briefingKind"] ?: data["briefing_kind"]).orEmpty().lowercase()
+                }
+            val deliveryId = data["briefingDeliveryId"] ?: data["briefing_delivery_id"]
+            val resolvedKind = if (kind == "evening") "evening" else "morning"
+            val suffix =
+                if (deliveryId.isNullOrBlank()) {
+                    ""
+                } else {
+                    "&deliveryId=${java.net.URLEncoder.encode(deliveryId, "UTF-8")}"
+                }
+            return "/hub-today?kind=$resolvedKind$suffix"
+        }
+
+        private val briefingTypes =
+            setOf("daily_briefing", "morning_briefing", "evening_briefing")
 
         /**
          * Map a backend notification `type` to one of the four channels.

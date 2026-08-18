@@ -21,7 +21,10 @@ public enum PostsEndpoints {
         postType: String? = nil,
         limit: Int = 20,
         cursorCreatedAt: String? = nil,
-        cursorId: String? = nil
+        cursorId: String? = nil,
+        topic: String? = nil,
+        sportsMode: String? = nil,
+        eventKey: String? = nil
     ) -> Endpoint {
         var query: [String: String] = [
             "surface": surface,
@@ -33,6 +36,12 @@ public enum PostsEndpoints {
         if let postType { query["postType"] = postType }
         if let cursorCreatedAt { query["cursorCreatedAt"] = cursorCreatedAt }
         if let cursorId { query["cursorId"] = cursorId }
+        // Topic lane params — validated at
+        // `backend/routes/posts.js:1478-1489`. `topic` is Place-only and
+        // `sportsMode` must be one of for_you|local|event|watch.
+        if let topic { query["topic"] = topic }
+        if let sportsMode { query["sportsMode"] = sportsMode }
+        if let eventKey { query["eventKey"] = eventKey }
         return Endpoint(method: .get, path: "/api/posts/feed", query: query)
     }
 

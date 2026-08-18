@@ -25,7 +25,11 @@ final class GigFilterSheetTests: XCTestCase {
 
     func testSectionsCoverEveryDimensionInOrder() {
         let ids = GigFilterCriteria().sections().map(\.id)
-        XCTAssertEqual(ids, ["category", "budget", "schedule", "openToBids", "postedWithin"])
+        // Wave B added the three RN chip dimensions.
+        XCTAssertEqual(ids, [
+            "category", "budget", "schedule", "openToBids", "postedWithin",
+            "distance", "deadline", "archetype"
+        ])
     }
 
     func testCategoryChipsExcludeAllSentinel() {

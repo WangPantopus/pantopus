@@ -9,6 +9,7 @@ import app.pantopus.android.ui.screens.status.StatusHalo
 import app.pantopus.android.ui.screens.status.StatusPillTone
 import app.pantopus.android.ui.screens.status.StatusStepState
 import app.pantopus.android.ui.screens.status.StatusTimelineStage
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
 import app.pantopus.android.ui.screens.status.StatusWaitingPill
 import app.pantopus.android.ui.theme.PantopusIcon
 
@@ -43,6 +44,81 @@ data class WaitingRoomInlineAction(
     val tone: WaitingRoomActionTone,
     val actionKey: String,
 )
+
+/**
+ * Non-content frame the room falls back to when there is nothing real to
+ * show: the claims fetch failed, no claim exists for this home, or the claim
+ * is no longer in review. Mirrors iOS `WaitingRoomNotice`.
+ *
+ * @param isRetry `true` → the CTA retries the fetch; `false` → it leaves the room.
+ */
+@Immutable
+data class WaitingRoomNotice(
+    val headline: String,
+    val body: String,
+    val ctaLabel: String,
+    val isRetry: Boolean,
+) {
+    companion object {
+        /**
+         * `GET /api/homes/my-ownership-claims` failed — never fall back to
+         * the seeded fixture, which would read as real claim data.
+         */
+        val LoadFailed =
+            WaitingRoomNotice(
+                headline = "Couldn't load your claim",
+                body = "We couldn't reach Pantopus. Check your connection and try again.",
+                ctaLabel = "Try again",
+                isRetry = true,
+            )
+
+        /** No claim row for this home — the manage actions would be no-ops. */
+        val NoClaim =
+            WaitingRoomNotice(
+                headline = "No claim in review",
+                body = "We couldn't find an ownership claim for this home.",
+                ctaLabel = "Back to home",
+                isRetry = false,
+            )
+
+        /**
+         * The claim exists but the backend already returned a terminal status
+         * (`approved` / `rejected` / `revoked`).
+         */
+        val ClaimDecided =
+            WaitingRoomNotice(
+                headline = "This claim isn't in review",
+                body = "Your ownership claim has been decided. Check My Claims for the outcome.",
+                ctaLabel = "Back to home",
+                isRetry = false,
+            )
+    }
+}
+
+/** Which frame the room is currently rendering. Mirrors iOS `WaitingRoomPhase`. */
+@Immutable
+sealed interface WaitingRoomPhase {
+    data object Loading : WaitingRoomPhase
+
+    data object Loaded : WaitingRoomPhase
+
+    data class Notice(val notice: WaitingRoomNotice) : WaitingRoomPhase
+
+    /**
+     * No ownership claim is in review but the caller's occupancy still
+     * isn't verified — render RN's Verification Center frame instead of
+     * the dead-end "No claim in review" notice
+     * (`src/app/homes/[id]/waiting-room.tsx:67-70`).
+     */
+    data class Verification(val content: HomeVerificationContent) : WaitingRoomPhase
+
+    /**
+     * The claim resolved in the claimant's favour — render the A18.2
+     * "You're the owner" frame instead of a dead-end notice. The payload is
+     * built from the real claim row, so every date it prints is API-sourced.
+     */
+    data class Approved(val content: StatusWaitingContent) : WaitingRoomPhase
+}
 
 /** Snapshot the `WaitingRoomScreen` renders. */
 @Immutable
@@ -86,7 +162,10 @@ data class WaitingRoomContent(
          * → Under review → Approved timeline with "Under review" current, and
          * the "within 24–48 hours" ETA pill.
          */
-        fun active(): WaitingRoomContent =
+        fun active(
+            address: String = SAMPLE_ADDRESS,
+            claimRef: String = SAMPLE_CLAIM_REF,
+        ): WaitingRoomContent =
             WaitingRoomContent(
                 title = ROOM_TITLE,
                 halo = StatusHalo(tone = HaloCircleTone.Info, icon = PantopusIcon.Hourglass, isPulsing = true),
@@ -94,8 +173,8 @@ data class WaitingRoomContent(
                 subcopy =
                     "Pantopus is checking your documents against county records. " +
                         "You'll get a push the moment we decide.",
-                address = SAMPLE_ADDRESS,
-                claimRef = SAMPLE_CLAIM_REF,
+                address = address,
+                claimRef = claimRef,
                 reviewerNote = null,
                 timeline =
                     listOf(
@@ -133,7 +212,10 @@ data class WaitingRoomContent(
          * respond within 7 days" ETA pill, and "Update evidence" promoted to
          * primary.
          */
-        fun moreInfoRequested(): WaitingRoomContent =
+        fun moreInfoRequested(
+            address: String = SAMPLE_ADDRESS,
+            claimRef: String = SAMPLE_CLAIM_REF,
+        ): WaitingRoomContent =
             WaitingRoomContent(
                 title = ROOM_TITLE,
                 halo = StatusHalo(tone = HaloCircleTone.Warning, icon = PantopusIcon.FileWarning),
@@ -141,8 +223,8 @@ data class WaitingRoomContent(
                 subcopy =
                     "Your utility bill is older than 90 days. " +
                         "Upload one from the last 60 days to continue the review.",
-                address = SAMPLE_ADDRESS,
-                claimRef = SAMPLE_CLAIM_REF,
+                address = address,
+                claimRef = claimRef,
                 reviewerNote =
                     WaitingRoomReviewerNote(
                         eyebrow = "Note from reviewer · Maya K.",

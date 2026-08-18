@@ -121,11 +121,17 @@ final class HouseholdTasksListViewModelTests: XCTestCase {
         let row = sections[0].rows[0]
         XCTAssertEqual(row.id, "t1")
         XCTAssertEqual(row.title, "Vacuum living room")
-        // Active trailing = circularAction (the round-checkbox).
-        guard case .circularAction = row.trailing else {
-            XCTFail("Expected circularAction trailing on Active tab, got \(row.trailing)")
+        // Active trailing = the checkbox + trash pair. RN puts a trash
+        // affordance on every task row, so the round-checkbox now shares
+        // the trailing with a destructive icon action.
+        guard case let .iconActions(primary, secondary) = row.trailing else {
+            XCTFail("Expected iconActions trailing on Active tab, got \(row.trailing)")
             return
         }
+        XCTAssertEqual(primary.icon, .circle)
+        XCTAssertEqual(primary.accessibilityLabel, "Mark done")
+        XCTAssertEqual(secondary.icon, .trash)
+        XCTAssertEqual(secondary.accessibilityLabel, "Delete task")
         // Unassigned → leading should be the category typeIcon (cleaning).
         guard case let .typeIcon(icon, _, _) = row.leading else {
             XCTFail("Expected typeIcon leading on unassigned row, got \(row.leading)")

@@ -35,12 +35,14 @@ final class WalletMappingTests: XCTestCase {
         amount: Int,
         status: String = "completed",
         description: String? = nil,
+        direction: String? = nil,
         createdAt: String? = "2026-06-03T14:14:00.000Z"
     ) -> WalletTransactionDTO {
         WalletTransactionDTO(
             id: id,
             type: type,
             amount: amount,
+            direction: direction,
             description: description,
             currency: "usd",
             status: status,

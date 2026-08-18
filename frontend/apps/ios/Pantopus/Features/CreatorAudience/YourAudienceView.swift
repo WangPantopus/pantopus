@@ -43,10 +43,30 @@ public struct YourAudienceView: View {
                 member: member,
                 onMessage: { viewModel.message(member) },
                 onChangeTier: { viewModel.changeTier(member) },
-                onRemove: { Task { await viewModel.remove(member) } }
+                onMute: { Task { await viewModel.mute(member) } },
+                onUnmute: { Task { await viewModel.unmute(member) } },
+                onRemove: { Task { await viewModel.remove(member) } },
+                onBlock: { viewModel.requestBlock(member) }
             )
-            .presentationDetents([.height(280)])
+            .presentationDetents([.height(460)])
         }
+        .alert(
+            "Block follower?",
+            isPresented: Binding(
+                get: { viewModel.blockTarget != nil },
+                set: { if !$0 { viewModel.blockTarget = nil } }
+            ),
+            presenting: viewModel.blockTarget
+        ) { member in
+            Button("Cancel", role: .cancel) { viewModel.blockTarget = nil }
+            Button("Block", role: .destructive) {
+                Task { await viewModel.confirmBlock(member) }
+            }
+            .accessibilityIdentifier("audienceBlockConfirm")
+        } message: { member in
+            Text(viewModel.blockConfirmationMessage(for: member))
+        }
+        .overlay(alignment: .bottom) { undoToastOverlay }
         .overlay(alignment: .bottom) { toastOverlay }
         .accessibilityIdentifier("audienceScreen")
     }
@@ -64,6 +84,18 @@ public struct YourAudienceView: View {
                 .accessibilityLabel("Back")
                 .accessibilityIdentifier("audienceBackButton")
                 Spacer()
+            }
+            HStack {
+                Spacer()
+                Button {
+                    Task { await viewModel.cycleSort() }
+                } label: {
+                    Icon(.arrowDownUp, size: 20, color: Theme.Color.appText)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Sort: \(viewModel.sort.label)")
+                .accessibilityIdentifier("audienceSortButton")
             }
             VStack(spacing: 1) {
                 Text("Your audience")
@@ -183,11 +215,36 @@ public struct YourAudienceView: View {
                         tierSection(group)
                     }
                 }
+                // Bottom sentinel — inside the LazyVStack it is only composed
+                // once the user reaches the end of the list, which is exactly
+                // RN's `onEndReached`.
+                if viewModel.hasMore {
+                    Color.clear
+                        .frame(height: 1)
+                        .task { await viewModel.loadMore() }
+                }
+                if viewModel.isLoadingMore {
+                    loadMoreFooter
+                }
                 Spacer(minLength: Spacing.s6)
             }
             .padding(.top, Spacing.s2)
             .padding(.bottom, Spacing.s4)
         }
+    }
+
+    /// Next-page indicator. RN renders the same footer under its
+    /// `onEndReached` loader (`src/app/audience/members.tsx:320-326`).
+    private var loadMoreFooter: some View {
+        HStack(spacing: Spacing.s2) {
+            Shimmer(height: 12, cornerRadius: Radii.xs).frame(width: 90)
+            Text("Loading more…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.s4)
+        .accessibilityIdentifier("audienceLoadingMore")
     }
 
     // MARK: - Pending section
@@ -538,8 +595,35 @@ public struct YourAudienceView: View {
 
     // MARK: - Toast
 
+    /// Destructive-action undo toast. The row is already gone; tapping the
+    /// toast puts it back and cancels the pending `PATCH`. The view-model
+    /// owns the 5-second window, so this overlay simply mirrors it.
+    @ViewBuilder private var undoToastOverlay: some View {
+        if let pending = viewModel.pendingUndo {
+            Button {
+                viewModel.undoPendingAction()
+            } label: {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.undo2, size: 15, color: Theme.Color.appTextInverse)
+                    Text(pending.message)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s3)
+                .background(Theme.Color.appText)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, Spacing.s8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .accessibilityIdentifier("audienceUndoToast")
+        }
+    }
+
     @ViewBuilder private var toastOverlay: some View {
-        if let toast = viewModel.toast {
+        if let toast = viewModel.toast, viewModel.pendingUndo == nil {
             Text(toast)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.Color.appTextInverse)

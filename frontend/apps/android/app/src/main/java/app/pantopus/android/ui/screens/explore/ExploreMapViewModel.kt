@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LongMethod", "CyclomaticComplexMethod")
 
 package app.pantopus.android.ui.screens.explore
 
@@ -6,11 +6,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.listings.ListingDto
+import app.pantopus.android.data.api.models.postsmap.PostsMapMarkerDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
+import app.pantopus.android.data.postsmap.PostsMapLayer
+import app.pantopus.android.data.postsmap.PostsMapRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,11 +32,16 @@ import kotlin.math.sqrt
  * Backs the A11.2 Explore map / P1-F.
  *
  * The production path fetches live discovery results for the viewport around
- * the user — `GET /api/gigs/in-bounds` (tasks) + `GET /api/listings/in-bounds`
- * (items) — and fans them into a homogeneous `List<ExploreEntity>`. Posts +
- * Spots have no in-bounds endpoint yet, so the live map surfaces Tasks +
- * Items; the type toggle still narrows the set client-side. Filtering, sort,
- * and clustering run locally over the fetched window (mirrors
+ * the user from three routes and fans them into a homogeneous
+ * `List<ExploreEntity>`:
+ *  - `GET /api/gigs/in-bounds` → Task (carries price + bid count)
+ *  - `GET /api/listings/in-bounds` → Item
+ *  - `GET /api/posts/map` with `layers=posts,businesses,homes` → Post / Spot /
+ *    Home (route `backend/routes/posts.js:1646`)
+ *
+ * Tasks stay on the gigs route rather than the map route's `tasks` layer
+ * because only the former carries price + bid count for the rail card.
+ * Filtering, sort, and clustering run locally over the fetched window (mirrors
  * `ExploreMapViewModel.swift`). Previews / snapshots / tests seed deterministic
  * content via `load(scenario)`.
  */
@@ -43,6 +51,7 @@ class ExploreMapViewModel
     constructor(
         private val gigsRepository: GigsRepository,
         private val listingsRepository: ListingsRepository,
+        private val postsMapRepository: PostsMapRepository,
         private val locationProvider: LocationProvider,
     ) : ViewModel() {
         private val _state = MutableStateFlow<ExploreMapUiState>(ExploreMapUiState.Loading)
@@ -114,15 +123,27 @@ class ExploreMapViewModel
                 viewModelScope.async {
                     listingsRepository.inBounds(south = minLat, west = minLon, north = maxLat, east = maxLon)
                 }
+            val markersDeferred =
+                viewModelScope.async {
+                    postsMapRepository.markers(
+                        south = minLat,
+                        west = minLon,
+                        north = maxLat,
+                        east = maxLon,
+                        layers = listOf(PostsMapLayer.Posts, PostsMapLayer.Businesses, PostsMapLayer.Homes),
+                    )
+                }
             val gigsResult = gigsDeferred.await()
             val listingsResult = listingsDeferred.await()
+            val markersResult = markersDeferred.await()
             val gigs = if (gigsResult is NetworkResult.Success) gigsResult.data.gigs else null
             val listings = if (listingsResult is NetworkResult.Success) listingsResult.data.listings else null
-            if (gigs == null && listings == null) {
+            val markers = if (markersResult is NetworkResult.Success) markersResult.data.markers else null
+            if (gigs == null && listings == null && markers == null) {
                 _state.value = ExploreMapUiState.Error("Couldn't load the map.")
                 return
             }
-            allEntities = project(gigs ?: emptyList(), listings ?: emptyList(), center)
+            allEntities = project(gigs ?: emptyList(), listings ?: emptyList(), markers ?: emptyList(), center)
             rebuild(selectedId = null)
         }
 
@@ -214,10 +235,14 @@ class ExploreMapViewModel
         }
 
         companion object {
-            /** Map live gigs + listings into the unified entity vocabulary. */
+            /**
+             * Map live gigs + listings + `/api/posts/map` markers into the
+             * unified entity vocabulary.
+             */
             fun project(
                 gigs: List<GigDto>,
                 listings: List<ListingDto>,
+                markers: List<PostsMapMarkerDto> = emptyList(),
                 anchor: UserCoordinate,
             ): List<ExploreEntity> {
                 val out = mutableListOf<ExploreEntity>()
@@ -271,7 +296,133 @@ class ExploreMapViewModel
                         ),
                     )
                 }
+                out += projectMarkers(markers, anchor)
                 return out
+            }
+
+            /**
+             * Fan `/api/posts/map` markers onto the entity vocabulary. Task /
+             * offer layers are skipped here — the gigs in-bounds route already
+             * supplies richer task rows and double-projecting would duplicate
+             * pins.
+             */
+            fun projectMarkers(
+                markers: List<PostsMapMarkerDto>,
+                anchor: UserCoordinate,
+            ): List<ExploreEntity> {
+                val out = mutableListOf<ExploreEntity>()
+                markers.forEach { marker ->
+                    val lat = marker.latitude ?: return@forEach
+                    val lon = marker.longitude ?: return@forEach
+                    val miles = distanceMiles(anchor, lat, lon)
+                    when (marker.layerType) {
+                        "post" -> {
+                            val replies = marker.commentCount ?: 0
+                            out.add(
+                                ExploreEntity(
+                                    id = marker.id,
+                                    kind = ExploreKind.Post,
+                                    state = ExploreEntityState.Confirmed,
+                                    latitude = lat,
+                                    longitude = lon,
+                                    title = marker.title ?: marker.content ?: "Neighborhood post",
+                                    metaLead = postMetaLead(marker),
+                                    distanceLabel = distanceLabel(miles),
+                                    distanceMiles = miles,
+                                    badge =
+                                        if (replies > 0) {
+                                            ExploreBadge("$replies replies", ExploreBadgeTone.Replies)
+                                        } else {
+                                            null
+                                        },
+                                    city = marker.locationName,
+                                    sourceId = marker.id,
+                                    verified = false,
+                                    openNow = true,
+                                ),
+                            )
+                        }
+                        "business" -> {
+                            out.add(
+                                ExploreEntity(
+                                    id = marker.id,
+                                    kind = ExploreKind.Spot,
+                                    state = ExploreEntityState.Confirmed,
+                                    latitude = lat,
+                                    longitude = lon,
+                                    title = marker.businessName ?: "Local business",
+                                    metaLead = marker.category ?: "Open",
+                                    distanceLabel = distanceLabel(miles),
+                                    distanceMiles = miles,
+                                    badge =
+                                        if (marker.isVerified == true) {
+                                            ExploreBadge("Verified", ExploreBadgeTone.Rating)
+                                        } else {
+                                            null
+                                        },
+                                    city = marker.address,
+                                    sourceId = marker.id,
+                                    verified = marker.isVerified == true,
+                                    openNow = true,
+                                ),
+                            )
+                        }
+                        "home" -> {
+                            val locality =
+                                listOfNotNull(marker.city, marker.state)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(", ")
+                            out.add(
+                                ExploreEntity(
+                                    id = marker.id,
+                                    kind = ExploreKind.Home,
+                                    state = ExploreEntityState.Confirmed,
+                                    latitude = lat,
+                                    longitude = lon,
+                                    title = marker.address ?: "Home",
+                                    metaLead =
+                                        marker.homeType
+                                            ?.replace('_', ' ')
+                                            ?.replaceFirstChar { it.uppercase() }
+                                            ?: "Home",
+                                    distanceLabel = distanceLabel(miles),
+                                    distanceMiles = miles,
+                                    badge = null,
+                                    city = locality.ifBlank { null },
+                                    stateName = marker.state,
+                                    sourceId = marker.id,
+                                    verified = false,
+                                    openNow = true,
+                                ),
+                            )
+                        }
+                        else -> Unit
+                    }
+                }
+                return out
+            }
+
+            /**
+             * Post rail-card lead — "Question · 2h ago" style, falling back to
+             * the post type when the timestamp is unusable.
+             */
+            private fun postMetaLead(marker: PostsMapMarkerDto): String {
+                val kind =
+                    (marker.postType ?: "post")
+                        .replace('_', ' ')
+                        .replaceFirstChar { it.uppercase() }
+                val createdAt = marker.createdAt ?: return kind
+                val instant =
+                    runCatching { java.time.Instant.parse(createdAt) }.getOrNull() ?: return kind
+                val minutes = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()
+                val ago =
+                    when {
+                        minutes < 1L -> "just now"
+                        minutes < 60L -> "${minutes}m ago"
+                        minutes < 60L * 24L -> "${minutes / 60L}h ago"
+                        else -> "${minutes / (60L * 24L)}d ago"
+                    }
+                return "$kind · $ago"
             }
 
             fun distanceMiles(

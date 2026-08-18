@@ -42,11 +42,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -54,6 +56,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,6 +68,10 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import coil.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 
@@ -82,19 +89,38 @@ fun ComposeBroadcastScreen(
 
     // Picker launcher lives on the screen (not the scaffold) so the
     // scaffold renders under Paparazzi without an ActivityResultRegistryOwner.
+    val scope = rememberCoroutineScope()
+    // Multi-select up to the remaining slots — RN parity
+    // (`pickPostMediaFromLibrary(9 - mediaFiles.length)`).
+    val remainingSlots = uiState.draft.remainingMediaSlots
     val photoPicker =
         rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.PickVisualMedia(),
-        ) { uri: Uri? ->
-            if (uri == null) return@rememberLauncherForActivityResult
-            val isVideo = context.contentResolver.getType(uri)?.startsWith("video") == true
-            viewModel.attachMedia(
-                ComposeMediaPreview(
-                    id = uri.toString(),
-                    kind = if (isVideo) ComposeMediaPreview.Kind.Video else ComposeMediaPreview.Kind.Image,
-                    caption = if (isVideo) "Video attached" else "Photo attached",
-                ),
-            )
+            // The contract is remembered once, so it carries the hard cap;
+            // the callback trims to whatever slots are free right now.
+            contract = ActivityResultContracts.PickMultipleVisualMedia(ComposeBroadcastDraft.MEDIA_LIMIT),
+        ) { uris: List<Uri> ->
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            scope.launch {
+                val picked =
+                    withContext(Dispatchers.IO) {
+                        uris.take(remainingSlots).mapNotNull { uri ->
+                            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                            val bytes =
+                                runCatching {
+                                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                                }.getOrNull() ?: return@mapNotNull null
+                            val isVideo = mime.startsWith("video")
+                            ComposeMediaPreview(
+                                id = uri.toString(),
+                                kind = if (isVideo) ComposeMediaPreview.Kind.Video else ComposeMediaPreview.Kind.Image,
+                                caption = if (isVideo) "Video attached" else "Photo attached",
+                                bytes = bytes,
+                                mimeType = mime,
+                            )
+                        }
+                    }
+                viewModel.attachMedia(picked)
+            }
         }
 
     ComposeBroadcastScaffold(
@@ -103,11 +129,13 @@ fun ComposeBroadcastScreen(
         onBodyChange = viewModel::updateBody,
         onAudienceSelected = viewModel::setAudience,
         onLaunchPhotoPicker = {
-            photoPicker.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-            )
+            if (remainingSlots > 0) {
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                )
+            }
         },
-        onRemoveMedia = viewModel::removeMedia,
+        onRemoveMedia = { id -> viewModel.removeMedia(id) },
         onScheduleConfirm = viewModel::schedule,
         onSendNow = viewModel::sendNow,
         onSaveDraft = viewModel::saveDraft,
@@ -127,7 +155,7 @@ internal fun ComposeBroadcastScaffold(
     onBodyChange: (String) -> Unit = {},
     onAudienceSelected: (BroadcastAudience) -> Unit = {},
     onLaunchPhotoPicker: () -> Unit = {},
-    onRemoveMedia: () -> Unit = {},
+    onRemoveMedia: (String) -> Unit = {},
     onScheduleConfirm: (Long) -> Unit = {},
     onSendNow: () -> Unit = {},
     onSaveDraft: () -> Unit = {},
@@ -294,7 +322,7 @@ private fun EditorCard(
     uiState: ComposeBroadcastUiState,
     onBodyChange: (String) -> Unit,
     onLaunchPhotoPicker: () -> Unit,
-    onRemoveMedia: () -> Unit,
+    onRemoveMedia: (String) -> Unit,
     onAudienceClick: () -> Unit,
 ) {
     Column(
@@ -310,7 +338,7 @@ private fun EditorCard(
     ) {
         PersonaRow(uiState.persona)
         BodyField(text = uiState.draft.body, onChange = onBodyChange)
-        uiState.draft.media?.let { MediaPreview(media = it, onRemove = onRemoveMedia) }
+        MediaGrid(media = uiState.draft.media, onRemove = onRemoveMedia)
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorderSubtle))
         CounterRow(
             uiState = uiState,
@@ -411,28 +439,77 @@ private fun BodyField(
 }
 
 @Composable
-private fun MediaPreview(
+private fun MediaGrid(
+    media: List<ComposeMediaPreview>,
+    onRemove: (String) -> Unit,
+) {
+    if (media.isEmpty()) return
+    if (media.size == 1) {
+        MediaTile(media = media.first(), height = 160.dp, onRemove = onRemove)
+        return
+    }
+    // Two or more attachments tile into a 3-up grid; one keeps the
+    // full-bleed preview the design shows.
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("composeBroadcastMediaGrid"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        media.chunked(GRID_COLUMNS).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                row.forEach { item ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        MediaTile(media = item, height = 92.dp, onRemove = onRemove)
+                    }
+                }
+                repeat(GRID_COLUMNS - row.size) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+private const val GRID_COLUMNS = 3
+
+@Composable
+private fun MediaTile(
     media: ComposeMediaPreview,
-    onRemove: () -> Unit,
+    height: Dp,
+    onRemove: (String) -> Unit,
 ) {
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(height)
                 .clip(RoundedCornerShape(Radii.lg))
                 .background(PantopusColors.appSurfaceSunken)
                 .testTag("composeBroadcastMediaPreview")
                 .semantics { contentDescription = media.caption?.let { "Attached media: $it" } ?: "Attached media" },
     ) {
-        PantopusIconImage(
-            icon = if (media.kind == ComposeMediaPreview.Kind.Video) PantopusIcon.Video else PantopusIcon.Image,
-            contentDescription = null,
-            size = 28.dp,
-            strokeWidth = 2f,
-            tint = PantopusColors.appTextMuted,
-            modifier = Modifier.align(Alignment.Center),
-        )
+        val bytes = media.bytes
+        if (bytes != null && media.kind == ComposeMediaPreview.Kind.Image) {
+            SubcomposeAsyncImage(
+                model = bytes,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {},
+                error = {},
+            )
+        } else {
+            PantopusIconImage(
+                icon = if (media.kind == ComposeMediaPreview.Kind.Video) PantopusIcon.Video else PantopusIcon.Image,
+                contentDescription = null,
+                size = 28.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextMuted,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
         Box(
             modifier =
                 Modifier
@@ -441,7 +518,7 @@ private fun MediaPreview(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(PantopusColors.appText.copy(alpha = 0.55f))
-                    .clickable(onClick = onRemove)
+                    .clickable { onRemove(media.id) }
                     .testTag("composeBroadcastRemoveMedia")
                     .semantics { contentDescription = "Remove media" },
             contentAlignment = Alignment.Center,
@@ -454,7 +531,8 @@ private fun MediaPreview(
                 tint = PantopusColors.appTextInverse,
             )
         }
-        media.caption?.let { caption ->
+        val caption = media.caption
+        if (caption != null && height > 120.dp) {
             Row(
                 modifier =
                     Modifier
@@ -495,14 +573,23 @@ private fun CounterRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
+        val attached = uiState.draft.media.size
+        val isFull = attached >= ComposeBroadcastDraft.MEDIA_LIMIT
         Box(
             modifier =
                 Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(Radii.md))
-                    .clickable(onClick = onLaunchPhotoPicker)
+                    .clickable(enabled = !isFull, onClick = onLaunchPhotoPicker)
                     .testTag("composeBroadcastAddMedia")
-                    .semantics { contentDescription = "Add photo or video" },
+                    .semantics {
+                        contentDescription =
+                            if (isFull) {
+                                "Attachment limit reached, 9 of 9"
+                            } else {
+                                "Add photos or videos, $attached of ${ComposeBroadcastDraft.MEDIA_LIMIT} attached"
+                            }
+                    },
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
@@ -510,7 +597,18 @@ private fun CounterRow(
                 contentDescription = null,
                 size = Radii.xl2,
                 strokeWidth = 2f,
-                tint = PantopusColors.appTextStrong,
+                tint = if (isFull) PantopusColors.appTextMuted else PantopusColors.appTextStrong,
+            )
+        }
+        // Counter appears only once a second item is attached, so the
+        // single-attachment frame the snapshot baselines pin is unchanged.
+        if (attached > 1) {
+            Text(
+                text = "$attached/${ComposeBroadcastDraft.MEDIA_LIMIT}",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextMuted,
+                modifier = Modifier.testTag("composeBroadcastMediaCount"),
             )
         }
         AudienceChip(

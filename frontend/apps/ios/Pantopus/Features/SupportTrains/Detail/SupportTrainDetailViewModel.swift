@@ -23,6 +23,8 @@
 //  built from `organizers`, and the recipient identity defaults to `.home`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 
@@ -38,6 +40,19 @@ public final class SupportTrainDetailViewModel {
     public typealias Resolver = @MainActor @Sendable (String) -> SupportTrainDetailContent?
 
     public private(set) var state: State = .loading
+
+    /// Set while a reserve / leave / deliver round-trip is in flight so
+    /// the affordances disable instead of double-firing.
+    public private(set) var isSubmitting = false
+    /// Transient confirmation copy ("You're signed up").
+    public var toast: String?
+    /// Last action failure, surfaced as an inline banner + alert.
+    public var actionError: String?
+    /// Slot the reserve sheet is open for. `nil` hides the sheet;
+    /// `.some(nil)` opens it on the slot-picker step.
+    public var reserveSelection: ReserveSheetSelection?
+    /// A signup landed while the sheet was up — refresh on dismissal.
+    private var pendingReserveRefresh = false
 
     private let trainId: String
     private let api: APIClient
@@ -121,6 +136,129 @@ public final class SupportTrainDetailViewModel {
         currentContent?.isFullyCovered ?? false
     }
 
+    // MARK: - Helper actions (S1)
+
+    /// Open the reserve sheet. Pass a slot id to skip the picker step.
+    public func startReserve(slotId: String? = nil) {
+        guard let content = currentContent, !content.reserveOptions.isEmpty else {
+            actionError = "There are no open dates left on this train."
+            return
+        }
+        let resolved = slotId.flatMap { candidate in
+            content.reserveOptions.first { $0.id == candidate }?.id
+        }
+        reserveSelection = ReserveSheetSelection(slotId: resolved)
+    }
+
+    /// Closes the sheet and — when a signup landed — refreshes the
+    /// screen. The refresh is deferred to dismissal on purpose: calling
+    /// `load()` while the sheet is up would blank `currentContent` for a
+    /// frame and tear down the sheet's success step.
+    public func dismissReserve() {
+        reserveSelection = nil
+        guard pendingReserveRefresh else { return }
+        pendingReserveRefresh = false
+        Task { await load() }
+    }
+
+    /// `POST /:id/slots/:slotId/reserve`. Returns an error message on
+    /// failure (the sheet renders it inline, matching RN's ReserveSheet
+    /// error box) and `nil` on success.
+    public func reserve(slotId: String, body: ReserveSlotBody) async -> String? {
+        guard !isSubmitting else { return nil }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await api.request(
+                SupportTrainActionsEndpoints.reserve(
+                    supportTrainId: trainId,
+                    slotId: slotId,
+                    body: body
+                ),
+                as: EmptyResponse.self
+            )
+            pendingReserveRefresh = true
+            toast = "You're signed up"
+            return nil
+        } catch {
+            return Self.reserveFailureMessage(for: error)
+        }
+    }
+
+    /// `POST /:id/reservations/:rid/cancel` with `helper_reason` — the
+    /// helper leaving their own slot (RN `handleLeaveSlot`).
+    public func leaveSlot(reservationId: String, reason: String?) async {
+        await perform(
+            SupportTrainActionsEndpoints.cancelReservation(
+                supportTrainId: trainId,
+                reservationId: reservationId,
+                body: CancelReservationBody(helperReason: reason?.isEmpty == true ? nil : reason)
+            ),
+            success: "Slot reopened",
+            failure: "Failed to leave this slot."
+        )
+    }
+
+    /// `POST /:id/reservations/:rid/deliver` — helper marks their own
+    /// contribution delivered.
+    public func markDelivered(reservationId: String) async {
+        await perform(
+            SupportTrainActionsEndpoints.markDelivered(
+                supportTrainId: trainId,
+                reservationId: reservationId
+            ),
+            success: "Marked delivered",
+            failure: "Failed to mark this as delivered."
+        )
+    }
+
+    /// `POST /:id/reservations/:rid/confirm` — recipient / organizer
+    /// confirms a delivered contribution.
+    public func confirmDelivery(reservationId: String) async {
+        await perform(
+            SupportTrainActionsEndpoints.confirmDelivery(
+                supportTrainId: trainId,
+                reservationId: reservationId
+            ),
+            success: "Delivery confirmed",
+            failure: "Failed to confirm this delivery."
+        )
+    }
+
+    private func perform(_ endpoint: Endpoint, success: String, failure: String) async {
+        guard !isSubmitting else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await api.request(endpoint, as: EmptyResponse.self)
+            await load()
+            toast = success
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? failure
+        }
+    }
+
+    public func acknowledgeToast() {
+        toast = nil
+    }
+
+    public func acknowledgeActionError() {
+        actionError = nil
+    }
+
+    /// RN maps the three reserve-specific 409 codes onto friendlier copy
+    /// (`components/support-trains/ReserveSheet.tsx:138`); mirror it.
+    nonisolated static func reserveFailureMessage(for error: any Error) -> String {
+        let raw = (error as? APIError)?.errorDescription ?? "\(error)"
+        if raw.contains("SLOT_FULL") || raw.contains("SLOT_NOT_OPEN") || raw.contains("no longer open") {
+            return "This slot was just filled. Please refresh and try another."
+        }
+        if raw.contains("ALREADY_RESERVED") || raw.contains("already have a reservation") {
+            return "You already have a reservation on this slot."
+        }
+        return raw.isEmpty ? "Failed to reserve. Please try again." : raw
+    }
+
     // MARK: - Default resolver
 
     /// Static offline resolver — returns the fully-covered fixture when the
@@ -167,6 +305,11 @@ extension SupportTrainDetailViewModel {
 
         let isFull = typeDates.isFullyCovered
 
+        let mineSlotIds = Set(reservations.compactMap(\.slotId))
+        let openSlots = slots
+            .filter { !$0.isCovered && ($0.status ?? "open") == "open" && !mineSlotIds.contains($0.id) }
+            .sorted { ($0.slotDate ?? "") < ($1.slotDate ?? "") }
+
         return SupportTrainDetailContent(
             trainId: dto.id,
             recipient: recipient(dto: dto, primaryName: primaryName),
@@ -180,8 +323,59 @@ extension SupportTrainDetailViewModel {
                     title: "Every slot is covered",
                     body: "Every slot is spoken for. Sign up as backup in case someone can't make it."
                 )
-                : nil
+                : nil,
+            reserveOptions: openSlots.map(reserveOption(for:)),
+            reserveContext: ReserveSheetContext(
+                enabledModes: enabledModes(dto.supportModes),
+                restrictionChips: (dto.dietaryRestrictions ?? []) + (dto.dietaryPreferences ?? []),
+                contactlessPreferred: dto.contactlessPreferred ?? false
+            ),
+            viewerRole: viewerRole(dto),
+            exactAddress: dto.address?.singleLineLabel.isEmpty == false
+                ? dto.address?.singleLineLabel
+                : nil,
+            deliveryInstructions: dto.deliveryInstructions
         )
+    }
+
+    /// `viewer_level` + `viewer_support_train_role` → the client-side
+    /// permission gate (`backend/routes/supportTrains.js:3693`).
+    nonisolated static func viewerRole(_ dto: SupportTrainDetailDTO) -> SupportTrainViewerRole {
+        switch dto.viewerSupportTrainRole {
+        case "primary": .primaryOrganizer
+        case "co_organizer", "recipient_delegate": .coOrganizer
+        case "recipient": .recipient
+        case "helper": .helper
+        default:
+            dto.viewerLevel == "organizer" ? .coOrganizer : .viewer
+        }
+    }
+
+    private nonisolated static func enabledModes(
+        _ modes: SupportTrainModesDTO?
+    ) -> [SupportTrainContributionMode] {
+        guard let modes else { return SupportTrainContributionMode.allCases }
+        var out: [SupportTrainContributionMode] = []
+        if modes.homeCookedMeals == true { out.append(.cook) }
+        if modes.takeout == true { out.append(.takeout) }
+        if modes.groceries == true { out.append(.groceries) }
+        return out
+    }
+
+    private nonisolated static func reserveOption(for slot: SupportTrainSlotDTO) -> ReserveSlotOption {
+        let date = parseSlotDate(slot.slotDate)
+        return ReserveSlotOption(
+            id: slot.id,
+            dateLabel: date.map { format($0, "EEEE, MMMM d") } ?? (slot.slotDate ?? ""),
+            slotLabel: slot.slotLabel ?? slot.supportMode?.capitalized ?? "Slot",
+            windowLabel: windowLabel(slot)
+        )
+    }
+
+    private nonisolated static func windowLabel(_ slot: SupportTrainSlotDTO) -> String? {
+        guard let start = slot.startTime, !start.isEmpty else { return nil }
+        guard let end = slot.endTime, !end.isEmpty else { return "\(shortTime(start))+" }
+        return "\(shortTime(start)) – \(shortTime(end))"
     }
 
     // MARK: Recipient / host
@@ -332,7 +526,8 @@ extension SupportTrainDetailViewModel {
             author: nil, // detail endpoint omits the per-slot helper
             title: covered ? label : "Open · \(label)",
             subtitle: dropWindow(slot.endTime),
-            mine: false
+            mine: false,
+            slotId: slot.id
         )
     }
 
@@ -353,7 +548,10 @@ extension SupportTrainDetailViewModel {
             author: SlotRowContent.SlotAuthor(initials: "YO", displayName: "You", tone: .primary),
             title: title,
             subtitle: arrivalLabel(reservation.estimatedArrivalAt) ?? reservation.noteToRecipient,
-            mine: true
+            mine: true,
+            slotId: reservation.slotId,
+            reservationId: reservation.id,
+            reservationStatus: reservation.status
         )
     }
 

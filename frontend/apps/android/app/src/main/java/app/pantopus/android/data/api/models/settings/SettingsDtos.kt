@@ -5,43 +5,54 @@ package app.pantopus.android.data.api.models.settings
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
-/** Envelope from `GET /api/privacy/settings`. */
+/** Envelope from `GET /api/privacy/settings` (`privacy.js:80`) and from
+ * `PATCH /api/privacy/settings` (`privacy.js:142`, which also carries a
+ * `message` we ignore). */
 @JsonClass(generateAdapter = true)
 data class PrivacySettingsResponse(
     val settings: PrivacySettingsDto,
 )
 
-/** One privacy-settings row. All fields are nullable so the backend
- * can roll out new keys without breaking older clients. */
+/** One `UserPrivacySettings` row. Columns per
+ * `supabase/migrations/20260301000001_identity_firewall_tables.sql:128`
+ * plus `findable_by_name` (migration 143). All fields are nullable so
+ * the backend can roll out new keys without breaking older clients. */
 @JsonClass(generateAdapter = true)
 data class PrivacySettingsDto(
     @Json(name = "user_id") val userId: String? = null,
+    /** `everyone` · `mutuals` · `nobody`. */
     @Json(name = "search_visibility") val searchVisibility: String? = null,
-    @Json(name = "address_precision") val addressPrecision: String? = null,
-    @Json(name = "hide_from_search") val hideFromSearch: Boolean? = null,
-    @Json(name = "show_online_status") val showOnlineStatus: Boolean? = null,
-    @Json(name = "show_last_active") val showLastActive: Boolean? = null,
-    @Json(name = "show_read_receipts") val showReadReceipts: Boolean? = null,
-    @Json(name = "share_home_check_ins") val shareHomeCheckIns: Boolean? = null,
-    @Json(name = "push_preferences") val pushPreferences: Map<String, Boolean>? = null,
-    @Json(name = "email_preferences") val emailPreferences: Map<String, Boolean>? = null,
-    @Json(name = "sms_preferences") val smsPreferences: Map<String, Boolean>? = null,
+    @Json(name = "findable_by_name") val findableByName: Boolean? = null,
+    @Json(name = "findable_by_email") val findableByEmail: Boolean? = null,
+    @Json(name = "findable_by_phone") val findableByPhone: Boolean? = null,
+    /** `public` · `followers` · `private`. */
+    @Json(name = "profile_default_visibility") val profileDefaultVisibility: String? = null,
+    @Json(name = "show_gig_history") val showGigHistory: String? = null,
+    @Json(name = "show_neighborhood") val showNeighborhood: String? = null,
+    @Json(name = "show_home_affiliation") val showHomeAffiliation: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
 )
 
-/** Partial-update body for `PATCH /api/privacy/settings`. */
+/**
+ * Partial-update body for `PATCH /api/privacy/settings`.
+ *
+ * The field list is exactly `updateSettingsSchema` at
+ * `backend/routes/privacy.js:28-37`. `middleware/validate.js:66` runs Joi
+ * with `allowUnknown = false`, so any key outside that schema is a 400 —
+ * do not add speculative fields. Nulls are omitted from the wire body by
+ * Moshi, and the schema requires at least one key.
+ */
 @JsonClass(generateAdapter = true)
 data class PrivacySettingsUpdate(
     @Json(name = "search_visibility") val searchVisibility: String? = null,
-    @Json(name = "address_precision") val addressPrecision: String? = null,
-    @Json(name = "hide_from_search") val hideFromSearch: Boolean? = null,
-    @Json(name = "show_online_status") val showOnlineStatus: Boolean? = null,
-    @Json(name = "show_last_active") val showLastActive: Boolean? = null,
-    @Json(name = "show_read_receipts") val showReadReceipts: Boolean? = null,
-    @Json(name = "share_home_check_ins") val shareHomeCheckIns: Boolean? = null,
-    @Json(name = "push_preferences") val pushPreferences: Map<String, Boolean>? = null,
-    @Json(name = "email_preferences") val emailPreferences: Map<String, Boolean>? = null,
-    @Json(name = "sms_preferences") val smsPreferences: Map<String, Boolean>? = null,
+    @Json(name = "findable_by_name") val findableByName: Boolean? = null,
+    @Json(name = "findable_by_email") val findableByEmail: Boolean? = null,
+    @Json(name = "findable_by_phone") val findableByPhone: Boolean? = null,
+    @Json(name = "profile_default_visibility") val profileDefaultVisibility: String? = null,
+    @Json(name = "show_gig_history") val showGigHistory: String? = null,
+    @Json(name = "show_neighborhood") val showNeighborhood: String? = null,
+    @Json(name = "show_home_affiliation") val showHomeAffiliation: String? = null,
 )
 
 /** Envelope from `GET /api/privacy/blocks`. */

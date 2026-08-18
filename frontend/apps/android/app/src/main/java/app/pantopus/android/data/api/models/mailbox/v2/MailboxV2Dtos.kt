@@ -91,6 +91,10 @@ data class MailboxV2Item(
     val subject: String? = null,
     /** Raw `Mail.content` column for the letter body. */
     val content: String? = null,
+    @Json(name = "action_required") val actionRequired: Boolean? = null,
+    @Json(name = "ack_required") val ackRequired: Boolean? = null,
+    val tags: List<String> = emptyList(),
+    val attachments: List<String>? = null,
 )
 
 /** `POST /api/mailbox/v2/item/:id/action` — route `backend/routes/mailboxV2.js:459`. */

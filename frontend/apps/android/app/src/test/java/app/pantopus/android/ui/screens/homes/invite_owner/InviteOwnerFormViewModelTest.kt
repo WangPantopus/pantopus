@@ -7,6 +7,7 @@ import app.pantopus.android.data.api.models.homes.InviteOwnerResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -164,6 +165,25 @@ class InviteOwnerFormViewModelTest {
             vm.submit()
             assertFalse(vm.state.value.shouldDismiss)
             assertEquals(true, vm.state.value.toast?.isError)
+        }
+
+    @Test fun fast_track_defaults_on_and_rides_the_invite_body() =
+        runTest(dispatcher) {
+            val vm = makeVm(homeId = "home-valid")
+            assertTrue(vm.state.value.fastTrack)
+            vm.submit()
+            advanceUntilIdle()
+            coVerify { homesRepo.inviteOwner("home-valid", match { it.fastTrack }) }
+        }
+
+    @Test fun fast_track_can_be_switched_off() =
+        runTest(dispatcher) {
+            val vm = makeVm(homeId = "home-valid")
+            vm.updateFastTrack(false)
+            assertFalse(vm.state.value.fastTrack)
+            vm.submit()
+            advanceUntilIdle()
+            coVerify { homesRepo.inviteOwner("home-valid", match { !it.fastTrack }) }
         }
 
     @Test fun submit_with_conflict_requires_resolution() =

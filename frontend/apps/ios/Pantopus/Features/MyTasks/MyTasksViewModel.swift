@@ -327,6 +327,17 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         }
     }
 
+    /// One-tap rebook from the "Rebook a favorite helper" rail. Opens the
+    /// composer for the completed task's category.
+    ///
+    /// RN additionally prefills the task *title*, which the native compose
+    /// route cannot carry — `HubRoute.composeGig` takes `category` only
+    /// (HubTabRoot.swift:213), and widening it would touch every existing
+    /// caller. Category prefill ships; title prefill is recorded as a gap.
+    public func rebook(_ gig: RebookableGigDTO) {
+        onRebook(gig)
+    }
+
     public var topBarAction: TopBarAction? {
         TopBarAction(
             icon: .filter,
@@ -398,6 +409,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
     private let onLeaveReview: @MainActor (MyGigDTO) -> Void
     private let onPostTask: @MainActor () -> Void
     private let onRepost: @MainActor (MyGigDTO) -> Void
+    private let onRebook: @MainActor (RebookableGigDTO) -> Void
     private let now: @Sendable () -> Date
 
     // MARK: - Local data
@@ -426,6 +438,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         onLeaveReview: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
         onPostTask: @escaping @MainActor () -> Void = {},
         onRepost: @escaping @MainActor (MyGigDTO) -> Void = { _ in },
+        onRebook: @escaping @MainActor (RebookableGigDTO) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.api = api
@@ -436,6 +449,7 @@ public final class MyTasksViewModel: ListOfRowsDataSource {
         self.onLeaveReview = onLeaveReview
         self.onPostTask = onPostTask
         self.onRepost = onRepost
+        self.onRebook = onRebook
         self.now = now
     }
 

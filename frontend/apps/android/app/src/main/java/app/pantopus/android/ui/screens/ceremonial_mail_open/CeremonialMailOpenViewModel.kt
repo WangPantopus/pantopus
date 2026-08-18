@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "ReturnCount")
 
 package app.pantopus.android.ui.screens.ceremonial_mail_open
 
@@ -109,9 +109,9 @@ class CeremonialMailOpenViewModel
                 // map — pull the ceremonial slots by key. The wider
                 // payload is intentionally untyped at the repo layer
                 // because each mail_type has a different shape.
-                val payload = item.objectPayload
+                val payload = composePayload(item.objectPayload)
 
-                fun payloadString(key: String): String? = payload?.get(key) as? String
+                fun payloadString(key: String): String? = payload[key] as? String
                 val stationery =
                     CeremonialMailStationeryTone.fromWire(payloadString("stationeryTheme")?.takeIf { it.isNotEmpty() })
                 val ink = CeremonialMailInkTone.fromWire(payloadString("inkSelection")?.takeIf { it.isNotEmpty() })
@@ -142,6 +142,30 @@ class CeremonialMailOpenViewModel
                     receivedAt = item.createdAt,
                     outcomeCtas = CeremonialMailLetter.defaultOutcomeCtas(),
                 )
+            }
+
+            /**
+             * Locate the compose metadata inside `object_payload`.
+             *
+             * `POST /api/mailbox/send` writes the object as
+             * `{ version, objectFormat, envelope, recipient, policy, body: {
+             * content, payload } }` (`backend/routes/mailbox.js:605-638`), so
+             * the ceremonial keys (`stationeryTheme`, `inkSelection`,
+             * `voicePostscriptUri`) live under `body.payload` — not at the top
+             * level. Older / hand-written objects put them under `payload` or
+             * at the root, so probe all three in the order RN does
+             * (`src/app/mailbox/detail.tsx:44`).
+             */
+            @Suppress("UNCHECKED_CAST")
+            internal fun composePayload(objectPayload: Map<String, Any?>?): Map<String, Any?> {
+                val root = objectPayload ?: return emptyMap()
+                val nested = root["payload"] as? Map<String, Any?>
+                if (nested != null && nested["stationeryTheme"] != null) return nested
+                val body = root["body"] as? Map<String, Any?>
+                val bodyPayload = body?.get("payload") as? Map<String, Any?>
+                if (bodyPayload != null) return bodyPayload
+                if (nested != null) return nested
+                return root
             }
 
             internal fun trustLabel(raw: String?): String? =

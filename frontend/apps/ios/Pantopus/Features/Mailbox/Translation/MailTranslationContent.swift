@@ -38,8 +38,12 @@ public struct TranslationLanguages: Sendable, Equatable {
     public let sourceCode: String
     /// Source long name, e.g. `Spanish (Mexico)`.
     public let sourceName: String
-    /// Detection confidence percentage, e.g. `98`.
-    public let confidence: Int
+    /// Detection confidence percentage, e.g. `98`. `nil` when the
+    /// translator doesn't report one — the backend's `/p3/translate`
+    /// route answers `{ translated_text, from_language, to_language,
+    /// cached }` with no confidence, so the badge drops the "N% match"
+    /// clause rather than inventing a number.
+    public let confidence: Int?
     /// Target display code, e.g. `EN`.
     public let targetCode: String
     /// Target long name, e.g. `English`.
@@ -48,7 +52,7 @@ public struct TranslationLanguages: Sendable, Equatable {
     public init(
         sourceCode: String,
         sourceName: String,
-        confidence: Int,
+        confidence: Int?,
         targetCode: String,
         targetName: String
     ) {
@@ -181,8 +185,9 @@ public struct MailTranslationContent: Sendable, Equatable {
     public let glossary: [TranslationGlossaryNote]
     public let sender: TranslationSender
     /// Sub-line under the confirmed banner, e.g.
-    /// "Marked trusted by you · May 28 · 2:40 PM".
-    public let confirmedStamp: String
+    /// "Marked trusted by you · May 28 · 2:40 PM". Stamped when the user
+    /// confirms, so it is `var`.
+    public var confirmedStamp: String
     public let elfMachine: TranslationElf
     public let elfConfirmed: TranslationElf
 

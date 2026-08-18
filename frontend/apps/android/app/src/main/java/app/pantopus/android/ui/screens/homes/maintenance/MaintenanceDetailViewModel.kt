@@ -10,6 +10,7 @@ import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.homes.MaintenanceTaskDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,7 +83,7 @@ class MaintenanceDetailViewModel
                             }
                     }
                     is NetworkResult.Failure ->
-                        _state.value = MaintenanceDetailUiState.Error(result.error.message)
+                        _state.value = MaintenanceDetailUiState.Error(result.error.displayMessage("Couldn't load this entry."))
                 }
             }
         }

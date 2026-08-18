@@ -157,7 +157,20 @@ public struct MarketplaceTabRoot: View {
                 )
             )
         case let .publicProfile(userId):
-            PublicProfileView(userId: userId, onBack: pop) { _ in }
+            PublicProfileView(
+                userId: userId,
+                onBack: pop,
+                onOpenGig: { gigId in
+                    // The Marketplace stack has no gig-detail route; hand
+                    // the public `/gig/:id` link to the router, which
+                    // switches to the Tasks tab and pushes it there
+                    // (`RootTabView.swift:149`, `TasksTabRoot.swift:100`).
+                    Task { @MainActor in DeepLinkRouter.shared.handle(path: "/gig/\(gigId)") }
+                },
+                onOpenProfile: { reviewerId in
+                    Task { @MainActor in path.append(.publicProfile(userId: reviewerId)) }
+                }
+            )
         case let .chatConversation(dest):
             ChatConversationView(
                 viewModel: ChatConversationViewModel(

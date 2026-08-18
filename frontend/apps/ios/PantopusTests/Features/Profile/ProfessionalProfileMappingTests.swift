@@ -101,7 +101,7 @@ final class ProfessionalProfileMappingTests: XCTestCase {
             "/api/professional/profile/me": [
                 .status(200, body: """
                 {"profile":{"headline":"Licensed Handyman","bio":"Trades.",\
-                "categories":["handyman","carpentry"],"is_public":true,"is_active":false,\
+                "categories":["handyman","carpentry"],"is_public":true,"is_active":true,\
                 "verification_status":"verified","service_area":{"city":"Elm Park","state":"NY"}}}
                 """)
             ],
@@ -132,5 +132,200 @@ final class ProfessionalProfileMappingTests: XCTestCase {
         guard case .error = vm.state else {
             return XCTFail("Expected error, got \(vm.state)")
         }
+    }
+
+    // MARK: - Create / enable / disable (T4)
+
+    func testNullProfileEntersCreateMode() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [.status(200, body: "{\"profile\":null}")]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        guard case let .create(draft) = vm.state else {
+            return XCTFail("Expected .create for a null profile, got \(vm.state)")
+        }
+        XCTAssertFalse(draft.isReEnable)
+        XCTAssertEqual(draft.ctaLabel, "Enable professional mode")
+        XCTAssertTrue(draft.isPublic)
+    }
+
+    func testNotFoundEntersCreateModeRatherThanError() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [.status(404, body: "{\"error\":\"not found\"}")]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        guard case .create = vm.state else {
+            return XCTFail("Expected .create on 404, got \(vm.state)")
+        }
+    }
+
+    func testInactiveProfileEntersReEnableModeSeededFromRecord() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [
+                .status(200, body: """
+                {"profile":{"headline":"Licensed Handyman","bio":"Trades.",\
+                "categories":["handyman"],"is_public":false,"is_active":false,\
+                "service_area":{"city":"Elm Park","state":"NY","radius_km":25},\
+                "pricing_meta":{"hourly_rate":85,"currency":"USD"}}}
+                """)
+            ]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        guard case let .create(draft) = vm.state else {
+            return XCTFail("Expected .create for a disabled profile, got \(vm.state)")
+        }
+        XCTAssertTrue(draft.isReEnable)
+        XCTAssertEqual(draft.ctaLabel, "Re-enable professional mode")
+        XCTAssertEqual(draft.headline, "Licensed Handyman")
+        XCTAssertEqual(draft.categories, ["handyman"])
+        XCTAssertEqual(draft.city, "Elm Park")
+        XCTAssertEqual(draft.radiusKm, "25")
+        XCTAssertEqual(draft.hourlyRate, "85")
+    }
+
+    func testEnablePostsProfileThenShowsEditor() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [.status(200, body: "{\"profile\":null}")],
+            "/api/professional/profile": [
+                .status(201, body: """
+                {"message":"Professional mode enabled",\
+                "profile":{"headline":"Handy","is_public":true,"is_active":true,"categories":["handyman"]}}
+                """)
+            ],
+            "/api/professional/verification/status": [
+                .status(200, body: "{\"tier\":0,\"status\":\"none\"}")
+            ]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        vm.updateDraftHeadline("Handy")
+        vm.toggleDraftCategory("handyman")
+        await vm.enable()
+        guard case let .verified(content) = vm.state else {
+            return XCTFail("Expected the editor after enabling, got \(vm.state)")
+        }
+        XCTAssertEqual(content.title.value, "Handy")
+        XCTAssertEqual(vm.toast?.text, "Professional mode enabled")
+    }
+
+    func testEnableFailureKeepsCreateModeAndSurfacesMessage() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [.status(200, body: "{\"profile\":null}")],
+            "/api/professional/profile": [
+                .status(400, body: "{\"error\":\"Professional profile already exists\"}")
+            ]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        await vm.enable()
+        guard case let .create(draft) = vm.state else {
+            return XCTFail("Expected to stay in .create after a failure, got \(vm.state)")
+        }
+        XCTAssertFalse(draft.isSubmitting)
+        XCTAssertEqual(draft.errorMessage, "Professional profile already exists")
+    }
+
+    func testDisableConfirmedDropsBackToReEnableMode() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [
+                .status(200, body: """
+                {"profile":{"headline":"Licensed Handyman","is_public":true,"is_active":true,\
+                "categories":["handyman"]}}
+                """),
+                // DELETE hits the same path.
+                .status(200, body: """
+                {"message":"Professional mode disabled",\
+                "profile":{"headline":"Licensed Handyman","is_public":false,"is_active":false,\
+                "categories":["handyman"]}}
+                """)
+            ],
+            "/api/professional/verification/status": [
+                .status(200, body: "{\"tier\":0,\"status\":\"none\"}")
+            ]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        vm.requestDisable()
+        XCTAssertTrue(vm.showsDisableConfirm, "Disable must go through a confirm")
+        await vm.disableConfirmed()
+        guard case let .create(draft) = vm.state else {
+            return XCTFail("Expected .create after disabling, got \(vm.state)")
+        }
+        XCTAssertTrue(draft.isReEnable)
+        XCTAssertEqual(vm.toast?.text, "Professional mode disabled")
+    }
+
+    // MARK: - Request bodies
+
+    func testEnableRequestOmitsBlankFieldsAndClampsRadius() throws {
+        let draft = ProfessionalEnableDraft(
+            headline: "  Handyman  ",
+            bio: "",
+            categories: ["handyman", "carpentry"],
+            city: "Elm Park",
+            state: "NY",
+            radiusKm: "",
+            hourlyRate: "85",
+            isPublic: false
+        )
+        let json = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(ProfessionalProfileViewModel.enableRequest(from: draft))
+        ) as? [String: Any]
+        XCTAssertEqual(json?["headline"] as? String, "Handyman")
+        XCTAssertNil(json?["bio"], "Blank optional fields are omitted, not sent as empty strings")
+        XCTAssertEqual(json?["categories"] as? [String], ["handyman", "carpentry"])
+        XCTAssertEqual(json?["is_public"] as? Bool, false)
+        let area = json?["service_area"] as? [String: Any]
+        XCTAssertEqual(area?["city"] as? String, "Elm Park")
+        XCTAssertEqual(area?["radius_km"] as? Int, 50)
+        let pricing = json?["pricing_meta"] as? [String: Any]
+        XCTAssertEqual(pricing?["hourly_rate"] as? Double, 85)
+        XCTAssertEqual(pricing?["currency"] as? String, "USD")
+    }
+
+    func testReEnableRequestSetsIsActiveTrue() throws {
+        let draft = ProfessionalEnableDraft(headline: "Handyman", isReEnable: true)
+        let json = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(ProfessionalProfileViewModel.updateRequest(from: draft))
+        ) as? [String: Any]
+        XCTAssertEqual(json?["is_active"] as? Bool, true)
+        XCTAssertEqual(json?["headline"] as? String, "Handyman")
+    }
+
+    func testCategorySelectionIsCappedAtFive() async {
+        SequencedURLProtocol.reset()
+        defer { SequencedURLProtocol.reset() }
+        let session = SequencedURLProtocol.makeSession(routeResponses: [
+            "/api/professional/profile/me": [.status(200, body: "{\"profile\":null}")]
+        ])
+        let vm = ProfessionalProfileViewModel(api: APIClient(session: session, retryPolicy: .none))
+        await vm.load()
+        for category in ProfessionalCategory.all.prefix(6) {
+            vm.toggleDraftCategory(category.key)
+        }
+        guard case let .create(draft) = vm.state else {
+            return XCTFail("Expected .create, got \(vm.state)")
+        }
+        XCTAssertEqual(draft.categories.count, ProfessionalCategory.selectionLimit)
+        vm.toggleDraftCategory(draft.categories[0])
+        guard case let .create(after) = vm.state else {
+            return XCTFail("Expected .create, got \(vm.state)")
+        }
+        XCTAssertEqual(after.categories.count, 4, "Toggling a selected chip removes it")
     }
 }

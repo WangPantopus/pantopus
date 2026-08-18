@@ -39,6 +39,8 @@ data class PendingItemDto(
 @JsonClass(generateAdapter = true)
 data class PendingMailDto(
     val subject: String? = null,
+    val content: String? = null,
+    @Json(name = "preview_text") val previewText: String? = null,
     @Json(name = "sender_display") val senderDisplay: String? = null,
     @Json(name = "sender_business_name") val senderBusinessName: String? = null,
     val category: String? = null,

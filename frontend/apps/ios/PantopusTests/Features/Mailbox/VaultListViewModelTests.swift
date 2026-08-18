@@ -7,6 +7,8 @@
 //  projection, and client-side query filtering.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -284,5 +286,73 @@ final class VaultListViewModelTests: XCTestCase {
         }
         XCTAssertEqual(sections.first?.rows.count, 1)
         XCTAssertEqual(sections.first?.rows.first?.id, "m1")
+    }
+
+    // MARK: - Server-side search (RN `vault.tsx:65` performSearch)
+
+    func testPerformSearchRendersServerResultsAcrossDrawers() async {
+        let searchBody = """
+        {"results":[
+          {
+            "id":"s1","drawer":"business","mail_type":"receipt",
+            "subject":"Costco statement","preview_text":"Your July statement",
+            "sender_display":"Costco Wholesale","created_at":"2026-05-15T12:00:00Z",
+            "_matchField":"sender","_matchExcerpt":"Costco Wholesale"
+          }
+        ],"total":1,"query":"Costco"}
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: searchBody)]
+        let vm = VaultListViewModel(api: makeAPI())
+        vm.query = "Costco"
+        await vm.performSearch()
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected loaded search results, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(sections.first?.header, "1 result · All drawers")
+        XCTAssertEqual(sections.first?.rows.map(\.id), ["s1"])
+        XCTAssertEqual(sections.first?.rows.first?.title, "Costco Wholesale")
+    }
+
+    func testPerformSearchWithNoResultsRendersNoMatchesEmpty() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"results\":[],\"total\":0,\"query\":\"zzz\"}")
+        ]
+        let vm = VaultListViewModel(api: makeAPI())
+        vm.query = "zzz"
+        await vm.performSearch()
+        guard case let .empty(content) = vm.state else {
+            XCTFail("Expected empty, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(content.headline, "No matches found")
+    }
+
+    func testPerformSearchFailureRendersErrorState() async {
+        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+        let vm = VaultListViewModel(api: makeAPI())
+        vm.query = "Costco"
+        await vm.performSearch()
+        guard case .error = vm.state else {
+            XCTFail("Expected error, got \(vm.state)")
+            return
+        }
+    }
+
+    func testShortQueryStaysOnTheClientSideFilter() {
+        let vm = VaultListViewModel(api: makeAPI())
+        vm.query = "c"
+        XCTAssertFalse(vm.isSearching)
+        vm.query = "co"
+        XCTAssertTrue(vm.isSearching)
+    }
+
+    // MARK: - Drawer tabs
+
+    func testDrawerTabsMirrorRNDrawerTabs() {
+        let vm = VaultListViewModel(api: makeAPI())
+        XCTAssertEqual(vm.tabs.map(\.id), ["personal", "home", "business"])
+        XCTAssertEqual(vm.tabs.map(\.label), ["Me", "Home", "Business"])
+        XCTAssertEqual(vm.selectedTab, "personal")
     }
 }

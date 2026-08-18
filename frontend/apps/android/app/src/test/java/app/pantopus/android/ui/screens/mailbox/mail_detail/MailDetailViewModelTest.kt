@@ -9,6 +9,8 @@ import app.pantopus.android.data.api.models.mailbox.MailDetailResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.mailbox.MailboxDocumentRepository
+import app.pantopus.android.data.mailbox.MailboxPackageRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -39,6 +41,8 @@ class MailDetailViewModelTest {
     private val repo: MailboxRepository = mockk()
     private val vaultRepo: MailboxVaultRepository = mockk(relaxed = true)
     private val gigsRepo: GigsRepository = mockk(relaxed = true)
+    private val packageRepo: MailboxPackageRepository = mockk(relaxed = true)
+    private val documentRepo: MailboxDocumentRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -91,6 +95,8 @@ class MailDetailViewModelTest {
             repo = repo,
             vaultRepo = vaultRepo,
             gigsRepo = gigsRepo,
+            packageRepo = packageRepo,
+            documentRepo = documentRepo,
             savedStateHandle = SavedStateHandle(mapOf(MAIL_DETAIL_MAIL_ID_KEY to "m1")),
         )
 
@@ -135,6 +141,47 @@ class MailDetailViewModelTest {
             val vm = makeVm()
             vm.load()
             assertTrue(vm.state.value is MailDetailUiState.Error)
+        }
+
+    /**
+     * Ceremonial mail (carrying `mail_extracted.stationeryTheme`) redirects
+     * out of the generic detail into the ceremonial open experience, and the
+     * plain layout never renders — mirrors RN `src/app/mailbox/detail.tsx:43-49`.
+     */
+    @Test
+    fun load_stationeryMail_redirectsToCeremonialOpen() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(
+                        mail =
+                            makeDetail(
+                                displayTitle = "A letter from Ada",
+                                content = "Dear you,",
+                            ).copy(mailExtracted = mapOf("stationeryTheme" to "linen")),
+                    ),
+                )
+            val vm = makeVm()
+            vm.load()
+
+            assertEquals("m1", vm.ceremonialRedirectMailId.value)
+            assertTrue(vm.state.value is MailDetailUiState.Loading)
+            vm.acknowledgeCeremonialRedirect()
+            assertNull(vm.ceremonialRedirectMailId.value)
+        }
+
+    @Test
+    fun load_withoutStationery_doesNotRedirect() =
+        runTest {
+            coEvery { repo.detail("m1") } returns
+                NetworkResult.Success(
+                    MailDetailResponse(mail = makeDetail(displayTitle = "Notice", content = "Body")),
+                )
+            val vm = makeVm()
+            vm.load()
+
+            assertNull(vm.ceremonialRedirectMailId.value)
+            assertTrue(vm.state.value is MailDetailUiState.Loaded)
         }
 
     // ─── Pure projection ──────────────────────────────────
