@@ -721,7 +721,9 @@ const registerSchema = Joi.object({
   state: Joi.string().min(2).max(50),
   zipcode: Joi.string().min(3).max(20),
   accountType: Joi.string().valid('individual', 'business').default('individual'),
-  invite_code: Joi.string().alphanum().min(6).max(12).optional(),
+  // Alphanumeric going forward; '-' and '_' stay accepted because codes minted
+  // before the generator was fixed are base64url and are already in circulation.
+  invite_code: Joi.string().pattern(/^[A-Za-z0-9_-]+$/).min(6).max(12).optional(),
 });
 
 const loginSchema = Joi.object({
@@ -2842,6 +2844,26 @@ router.get('/me/invite-progress', verifyToken, async (req, res) => {
   }
 });
 
+// Invite codes are redeemed through registerSchema, so they must survive its
+// character class. Draw from an explicit alphanumeric alphabet with rejection
+// sampling — 62 does not divide 256, so a plain modulo would bias the first
+// 8 characters of the alphabet.
+const INVITE_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const INVITE_CODE_LENGTH = 8;
+
+function generateInviteCode() {
+  const limit = 256 - (256 % INVITE_CODE_ALPHABET.length);
+  let code = '';
+  while (code.length < INVITE_CODE_LENGTH) {
+    for (const byte of crypto.randomBytes(INVITE_CODE_LENGTH)) {
+      if (byte >= limit) continue;
+      code += INVITE_CODE_ALPHABET[byte % INVITE_CODE_ALPHABET.length];
+      if (code.length === INVITE_CODE_LENGTH) break;
+    }
+  }
+  return code;
+}
+
 // ============================================================
 // GET /api/users/me/invite-code
 // Returns the user's stable invite code (creates one if needed)
@@ -2868,8 +2890,11 @@ router.get('/me/invite-code', verifyToken, async (req, res) => {
       });
     }
 
-    // Generate a new 8-char alphanumeric code
-    const invite_code = crypto.randomBytes(6).toString('base64url').slice(0, 8);
+    // Generate a new 8-char alphanumeric code.
+    // NOTE: base64url includes '-' and '_', which registerSchema's
+    // Joi.string().alphanum() rejects — an 8-char code drew a non-alphanumeric
+    // character ~22% of the time ((62/64)^8 = 0.776), and redeeming it 400'd.
+    const invite_code = generateInviteCode();
 
     const { error: insertErr } = await supabaseAdmin
       .from('UserReferral')
@@ -2882,7 +2907,7 @@ router.get('/me/invite-code', verifyToken, async (req, res) => {
     if (insertErr) {
       // Rare collision — retry once
       if (insertErr.code === '23505') {
-        const retry_code = crypto.randomBytes(6).toString('base64url').slice(0, 8);
+        const retry_code = generateInviteCode();
         const { error: retryErr } = await supabaseAdmin
           .from('UserReferral')
           .insert({

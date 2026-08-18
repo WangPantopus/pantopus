@@ -99,6 +99,30 @@ final class AuthManagerTests: XCTestCase {
         )
     }
 
+    func testSignInUnverifiedEmailMapsToVerifyMessage() async {
+        // The login handler's only 403 is the unverified-email refusal
+        // (`backend/routes/users.js:1526`). `APIClient` turns 403 into
+        // `.forbidden` before the generic 4xx case, discarding the body, so the
+        // mapping has to supply the copy. `LoginView.canResendVerification`
+        // reveals the resend link on any sign-in error mentioning "verify" —
+        // this asserts the link can actually appear.
+        stub(
+            "/api/users/login",
+            status: 403,
+            body: "{\"error\":\"Please verify your email before signing in.\",\"needsVerification\":true}"
+        )
+        let manager = makeManager()
+        await XCTAssertThrowsAsync(
+            { try await manager.signIn(email: "x@y.com", password: "right") },
+            expected: .serverError("Please verify your email before signing in.")
+        )
+        XCTAssertNotNil(
+            AuthError.serverError("Please verify your email before signing in.")
+                .errorDescription?.range(of: "verify", options: .caseInsensitive),
+            "The resend-verification link is gated on this copy containing \"verify\""
+        )
+    }
+
     // MARK: - Sign up
 
     func testSignUpSuccessReturnsRequiresVerification() async throws {
