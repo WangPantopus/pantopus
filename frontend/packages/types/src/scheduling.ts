@@ -176,6 +176,10 @@ export interface EventType extends EventTypeLocation, EventTypePricing {
   schedule_id: string | null;
   is_active: boolean;
   sort_order?: number | null;
+  /** Active assignee count, aggregated by GET /event-types for the list's
+   *  "N hosts" pill (design event-types-frames.jsx EventRow). Absent on
+   *  single-row responses. */
+  assignee_count?: number;
   created_at: string;
   updated_at: string;
 }

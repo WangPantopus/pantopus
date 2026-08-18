@@ -157,7 +157,11 @@ export default function EventTypeCard({
           {isTeam(et.assignment_mode) && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-app-surface-sunken px-1.5 py-0.5 text-[9.5px] font-bold text-app-text-secondary">
               <Users className="h-2.5 w-2.5" strokeWidth={2.4} aria-hidden />
-              Team
+              {/* "N hosts" per the design frame; "Team" only when the response
+                  predates the aggregated assignee_count (single-row fetches). */}
+              {typeof et.assignee_count === "number" && et.assignee_count > 0
+                ? `${et.assignee_count} ${et.assignee_count === 1 ? "host" : "hosts"}`
+                : "Team"}
             </span>
           )}
         </span>

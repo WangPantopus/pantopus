@@ -247,7 +247,23 @@ router.get('/event-types', withOwner('view'), asyncHandler(async (req, res) => {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
-  res.json({ eventTypes: data || [] });
+  const eventTypes = data || [];
+  // Hosts pill on list rows ("N hosts", design event-types-frames.jsx EventRow):
+  // one aggregate fetch across the whole page so clients never need an N+1.
+  if (eventTypes.length) {
+    const { data: assigneeRows, error: assigneeError } = await supabaseAdmin
+      .from('EventTypeAssignee')
+      .select('event_type_id')
+      .in('event_type_id', eventTypes.map((et) => et.id))
+      .eq('is_active', true);
+    if (assigneeError) throw assigneeError;
+    const counts = {};
+    for (const row of assigneeRows || []) {
+      counts[row.event_type_id] = (counts[row.event_type_id] || 0) + 1;
+    }
+    for (const et of eventTypes) et.assignee_count = counts[et.id] || 0;
+  }
+  res.json({ eventTypes });
 }));
 
 const eventTypeSchema = Joi.object({
