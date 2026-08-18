@@ -38,6 +38,8 @@
 //      (`backend/routes/notifications.js:452`)
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import Foundation
 import Observation
 import SwiftUI

@@ -30,16 +30,16 @@ public struct MyTasksView: View {
             }
         }
         .accessibilityIdentifier("my-tasks")
-            .sheet(isPresented: $bindable.isFilterPresented) {
-                ActivityFilterSheet(
-                    statusTitle: viewModel.statusFilterTitle,
-                    statusOptions: viewModel.statusFilterOptions,
-                    sortOptions: viewModel.sortFilterOptions,
-                    filter: viewModel.activityFilter,
-                    onApply: { viewModel.applyFilter($0) },
-                    onClose: { viewModel.isFilterPresented = false }
-                )
-            }
+        .sheet(isPresented: $bindable.isFilterPresented) {
+            ActivityFilterSheet(
+                statusTitle: viewModel.statusFilterTitle,
+                statusOptions: viewModel.statusFilterOptions,
+                sortOptions: viewModel.sortFilterOptions,
+                filter: viewModel.activityFilter,
+                onApply: { viewModel.applyFilter($0) },
+                onClose: { viewModel.isFilterPresented = false }
+            )
+        }
     }
 }
 

@@ -8,6 +8,8 @@
 //  `POST /:businessId/publish`.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 
 /// Editable field keys for the A13.10 profile form. The address is split
@@ -32,12 +34,12 @@ private let noAccessMessage = "You don't have access to edit this business."
 private let countryCodePrefix = "+1"
 
 /// Save aborted with a message the user should see verbatim.
-private struct SaveFailure: Error, Sendable {
+private struct SaveFailure: Error {
     let message: String
 }
 
 /// Why a save can't be attempted. `.address` also paints the field inline.
-private enum SaveBlock: Sendable {
+private enum SaveBlock {
     case toast(String)
     case address(String)
 
@@ -112,7 +114,7 @@ public final class EditBusinessPageViewModel {
                 return
             }
             let location = detail.profile?.primaryLocation
-                ?? detail.locations.first(where: { $0.isPrimary == true })
+                ?? detail.locations.first { $0.isPrimary == true }
                 ?? detail.locations.first
             primaryLocationId = location?.id
             loadedSocialLinks = EditBusinessPageMapper.stringMap(detail.profile?.socialLinks)
@@ -601,7 +603,9 @@ private extension EditBusinessPageBannerState {
         }
     }
 
-    var reverted: EditBusinessPageBannerState { cleaned }
+    var reverted: EditBusinessPageBannerState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageDescriptionState {
@@ -631,7 +635,9 @@ private extension EditBusinessPageHoursState {
         }
     }
 
-    var reverted: EditBusinessPageHoursState { cleaned }
+    var reverted: EditBusinessPageHoursState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageServicesState {
@@ -645,7 +651,9 @@ private extension EditBusinessPageServicesState {
         }
     }
 
-    var reverted: EditBusinessPageServicesState { cleaned }
+    var reverted: EditBusinessPageServicesState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageGalleryState {
@@ -658,7 +666,9 @@ private extension EditBusinessPageGalleryState {
         )
     }
 
-    var reverted: EditBusinessPageGalleryState { cleaned }
+    var reverted: EditBusinessPageGalleryState {
+        cleaned
+    }
 }
 
 private extension EditBusinessPageLocation {

@@ -8,6 +8,8 @@
 //  `extras: [String: JSONValue]` to avoid inventing field types.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 
 /// Stable fields from a Home row, the ones every downstream consumer needs.

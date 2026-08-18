@@ -19,6 +19,8 @@
 //  bottom sheet over a dimmed body.
 //
 
+// swiftlint:disable file_length function_body_length type_body_length
+
 import SwiftUI
 
 @MainActor

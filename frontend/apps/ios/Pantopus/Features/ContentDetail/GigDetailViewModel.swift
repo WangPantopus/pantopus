@@ -695,7 +695,7 @@ public final class GigDetailViewModel {
     /// Outcome of a "Remind worker" nudge. Not `Result<String, String>` —
     /// `String` does not conform to `Error`, so the failure payload needs its
     /// own case. Both cases carry the copy the toast shows verbatim.
-    enum RemindWorkerOutcome: Sendable {
+    enum RemindWorkerOutcome {
         case success(String)
         case failure(String)
     }
@@ -1610,7 +1610,7 @@ public extension GigDetailViewModel {
 
     /// Outcome of a release action, carrying the server's own
     /// confirmation copy so the toast matches what actually happened.
-    public enum ReleaseOutcome: Sendable, Equatable {
+    enum ReleaseOutcome: Sendable, Equatable {
         case succeeded(message: String)
         case failed(message: String)
     }

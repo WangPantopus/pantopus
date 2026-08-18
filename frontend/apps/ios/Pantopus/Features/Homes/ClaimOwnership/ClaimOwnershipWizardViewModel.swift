@@ -16,7 +16,7 @@
 //  - The evidence endpoint takes JSON `storage_ref`, not multipart.
 //    Real bytes go through `/api/files/upload` first.
 //
-// swiftlint:disable function_body_length
+// swiftlint:disable cyclomatic_complexity file_length function_body_length type_body_length
 
 import Foundation
 import Logging

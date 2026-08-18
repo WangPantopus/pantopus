@@ -73,12 +73,11 @@ public struct BusinessCatalogView: View {
                 isSaving: viewModel.isMutating,
                 onCancel: { editorTarget = nil },
                 onSave: { draft in
-                    let ok: Bool
-                    switch target {
+                    let ok: Bool = switch target {
                     case .create:
-                        ok = await viewModel.createItem(draft)
+                        await viewModel.createItem(draft)
                     case let .edit(row):
-                        ok = await viewModel.updateItem(id: row.id, draft: draft)
+                        await viewModel.updateItem(id: row.id, draft: draft)
                     }
                     if ok { editorTarget = nil }
                 }
@@ -155,7 +154,7 @@ public struct BusinessCatalogView: View {
     private var loadingLayout: some View {
         ScrollView {
             VStack(spacing: Spacing.s2) {
-                ForEach(0 ..< 5, id: \.self) { _ in
+                ForEach(0..<5, id: \.self) { _ in
                     Shimmer(height: 66, cornerRadius: Radii.lg)
                 }
             }

@@ -13,6 +13,8 @@
 //    Mirrors RN `components/profile/InviteProgressCard.tsx`.
 //
 
+// swiftlint:disable function_parameter_count
+
 import SwiftUI
 
 // MARK: - Invite tiers

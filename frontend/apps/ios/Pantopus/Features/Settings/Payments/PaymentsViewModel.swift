@@ -11,6 +11,8 @@
 //  drives previews + snapshot tests against the full design.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 
@@ -80,12 +82,12 @@ public final class PaymentsViewModel {
             // shouldn't sink the whole screen, so each degrades on its own
             // (the "couldn't load" activity row / an em-dash tile) while the
             // methods card still renders.
-            state = .loaded(
+            state = await .loaded(
                 Self.liveFrame(
                     methods: methods,
-                    activity: await fetchActivity(),
-                    earnings: await fetchEarnings(),
-                    connectAccount: await fetchConnectAccount()
+                    activity: fetchActivity(),
+                    earnings: fetchEarnings(),
+                    connectAccount: fetchConnectAccount()
                 )
             )
         } catch {

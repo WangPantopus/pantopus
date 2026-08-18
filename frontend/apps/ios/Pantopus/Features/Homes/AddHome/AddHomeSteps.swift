@@ -318,7 +318,7 @@ public func parseWifiQRPayload(_ raw: String) -> (ssid: String, password: String
         guard let separator = segment.firstIndex(of: ":"), separator != segment.startIndex else {
             continue
         }
-        let key = String(segment[segment.startIndex ..< separator])
+        let key = String(segment[segment.startIndex..<separator])
         let value = String(segment[segment.index(after: separator)...])
         if key == "S" { ssid = unescapeWifiQRValue(value) }
         if key == "P" { password = unescapeWifiQRValue(value) }

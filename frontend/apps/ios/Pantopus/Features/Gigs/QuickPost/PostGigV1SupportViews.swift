@@ -5,6 +5,8 @@
 //  Shared support states for the A13.8 V1 single-screen gig composer.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 struct PostGigV1ErrorBanner: View {

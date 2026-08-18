@@ -13,6 +13,8 @@
 //  Each Home Intelligence card owns its own state so one failing read
 //  can't blank the screen.
 //
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 

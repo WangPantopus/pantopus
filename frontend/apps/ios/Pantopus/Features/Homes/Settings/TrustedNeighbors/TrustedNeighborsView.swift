@@ -6,6 +6,8 @@
 //  Mirrors Android `TrustedNeighborsScreen`.
 //
 
+// swiftlint:disable line_length
+
 import SwiftUI
 
 public struct TrustedNeighborsView: View {

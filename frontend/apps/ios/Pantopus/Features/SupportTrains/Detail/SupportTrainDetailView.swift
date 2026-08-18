@@ -10,6 +10,8 @@
 //  `Send a card` / `Join as backup` pair (fully covered).
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 @MainActor

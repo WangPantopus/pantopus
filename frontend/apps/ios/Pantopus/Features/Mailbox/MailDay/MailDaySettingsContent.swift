@@ -24,7 +24,9 @@ public enum MailDaySoundType: String, Sendable, Hashable, CaseIterable, Identifi
     case soft
     case classic
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public static func fromRaw(_ raw: String?) -> MailDaySoundType {
         MailDaySoundType(rawValue: raw?.lowercased() ?? "") ?? .soft
@@ -53,7 +55,9 @@ public enum MailDaySettingKey: String, Sendable, Hashable, CaseIterable, Identif
     case interruptCertified
     case hapticsEnabled
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

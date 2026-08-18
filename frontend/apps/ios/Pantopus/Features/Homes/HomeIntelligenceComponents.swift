@@ -10,7 +10,7 @@
 //  Every card owns its four states (loading / loaded / empty / error) so
 //  a single failing read never blanks the dashboard.
 //
-// swiftlint:disable file_length
+// swiftlint:disable file_length large_tuple
 
 import SwiftUI
 

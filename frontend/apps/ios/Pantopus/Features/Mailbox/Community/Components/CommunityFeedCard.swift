@@ -75,10 +75,10 @@ struct CommunityFeedCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Spacing.s2)
-            Button(action: onFlag, label: {
+            Button(action: onFlag) {
                 Icon(.flag, size: 18, color: Theme.Color.appTextMuted)
                     .frame(width: 44, height: 44)
-            })
+            }
             .buttonStyle(.plain)
             .accessibilityLabel("Flag for review")
             .accessibilityIdentifier("communityMail_flag_\(item.id)")
@@ -160,14 +160,14 @@ struct CommunityFeedCard: View {
     // MARK: - RSVP
 
     private var rsvpButton: some View {
-        Button(action: onRsvp, label: {
+        Button(action: onRsvp) {
             Text("RSVP")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.Color.appTextInverse)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(Theme.Color.business)
                 .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        })
+        }
         .buttonStyle(.plain)
         .accessibilityIdentifier("communityMail_rsvp_\(item.id)")
     }

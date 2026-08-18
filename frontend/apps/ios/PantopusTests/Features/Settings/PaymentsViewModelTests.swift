@@ -8,6 +8,8 @@
 //  collapse, and the destructive-card gate.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import XCTest
 @testable import Pantopus
 

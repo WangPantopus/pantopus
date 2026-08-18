@@ -5,6 +5,8 @@
 //  Designed hub screen. Wires the 11 sections to `HubViewModel` state.
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import SwiftUI
 
 /// Designed hub screen.
@@ -51,9 +53,8 @@ struct HubView: View {
                     onBellTap: { onNavigate(.openNotifications) },
                     onAudienceTap: content.topBar.audienceUnreadCount > 0
                         ? { onNavigate(.openAudienceNotifications) }
-                        : nil,
-                    onMenuTap: { onNavigate(.openMenu) }
-                )
+                        : nil
+                ) { onNavigate(.openMenu) }
                 HubActionStrip(chips: content.actionChips) { onNavigate(.action($0)) }
                 if let density = content.neighborDensity {
                     HubNeighborDensitySection(content: density) {

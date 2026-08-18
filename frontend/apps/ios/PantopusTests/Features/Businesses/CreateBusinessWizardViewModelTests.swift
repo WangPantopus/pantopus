@@ -113,7 +113,7 @@ final class CreateBusinessWizardViewModelTests: XCTestCase {
     func testFieldSettersClampToCreateFullSchemaLimits() {
         let vm = makeVM()
         vm.setBusinessName(String(repeating: "a", count: 150))
-        vm.setDescription(String(repeating: "c", count: 2_500))
+        vm.setDescription(String(repeating: "c", count: 2500))
         XCTAssertEqual(vm.businessName.count, CreateBusinessFieldLimits.maxName)
         XCTAssertEqual(vm.descriptionText.count, CreateBusinessFieldLimits.maxDescription)
     }

@@ -184,7 +184,7 @@ public struct FanInboxView: View {
         .accessibilityIdentifier("fanInboxPersonaHeader")
     }
 
-    private func startCard(_ start: FanInboxStartContent) -> some View {
+    private func startCard(_: FanInboxStartContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Text("Start a conversation")
                 .font(.system(size: 15, weight: .bold))

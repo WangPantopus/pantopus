@@ -6,6 +6,8 @@
 //  `EditBusinessPageContent` for the A13.10 profile editor.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 
 enum EditBusinessPageMapper {
@@ -24,7 +26,7 @@ enum EditBusinessPageMapper {
         let business = detail.business
         let profile = detail.profile
         let location = profile?.primaryLocation
-            ?? detail.locations.first(where: { $0.isPrimary == true })
+            ?? detail.locations.first { $0.isPrimary == true }
             ?? detail.locations.first
 
         let name = business.name ?? ""
@@ -263,17 +265,16 @@ enum EditBusinessPageMapper {
     }
 
     static func hoursPayload(from state: EditBusinessPageHoursState) -> [SetBusinessHoursDayRequest]? {
-        let rows: [EditBusinessPageHoursRow]
-        switch state {
-        case let .rows(list, _): rows = list
-        case let .quickApply(list): rows = list
+        let rows: [EditBusinessPageHoursRow] = switch state {
+        case let .rows(list, _): list
+        case let .quickApply(list): list
         }
         guard rows.contains(where: \.isDirty) else { return nil }
 
         var payload: [SetBusinessHoursDayRequest] = []
         for (index, label) in dayLabels.enumerated() {
             guard let row = rows.first(where: { $0.dayLabel == label || $0.id == label.lowercased() })
-                    ?? rows.first(where: { $0.id == String(index) }) else {
+                ?? rows.first(where: { $0.id == String(index) }) else {
                 continue
             }
             switch row.state {
@@ -294,7 +295,7 @@ enum EditBusinessPageMapper {
 
     private static func mapHours(_ hours: [BusinessHoursDTO]) -> EditBusinessPageHoursState {
         guard !hours.isEmpty else {
-            return .quickApply(rows: dayLabels.enumerated().map { index, label in
+            return .quickApply(rows: dayLabels.map { label in
                 EditBusinessPageHoursRow(id: label.lowercased(), dayLabel: label, state: .notSet)
             })
         }
@@ -317,7 +318,8 @@ enum EditBusinessPageMapper {
             }
             return EditBusinessPageHoursRow(id: label.lowercased(), dayLabel: label, state: .notSet)
         }
-        if rows.allSatisfy({ if case .notSet = $0.state { return true }; return false }) {
+        if rows.allSatisfy({ if case .notSet = $0.state { return true }
+            return false }) {
             return .quickApply(rows: rows)
         }
         return .rows(rows: rows, footerHint: "Holiday hours can be added per date — neighbors see a banner.")
@@ -344,19 +346,17 @@ enum EditBusinessPageMapper {
     }
 
     private static func setupItems(from content: EditBusinessPageContent) -> [EditBusinessPageSetupItem] {
-        let description: String = {
-            switch content.description {
-            case let .field(field, _): return field.current
-            case .prompt: return ""
+        let description: String = switch content.description {
+        case let .field(field, _): field.current
+        case .prompt: ""
+        }
+        let hasHours: Bool = switch content.hours {
+        case let .rows(rows, _):
+            rows.contains { if case .open = $0.state { return true }
+                return false
             }
-        }()
-        let hasHours: Bool = {
-            switch content.hours {
-            case let .rows(rows, _):
-                return rows.contains { if case .open = $0.state { return true }; return false }
-            case .quickApply: return false
-            }
-        }()
+        case .quickApply: false
+        }
         let hasServices: Bool = {
             if case let .chips(chips) = content.services { return !chips.isEmpty }
             return false
@@ -433,9 +433,9 @@ enum EditBusinessPageMapper {
         }
         let elapsed = Date().timeIntervalSince(date)
         switch elapsed {
-        case ..<86_400: return "Published · today"
+        case ..<86400: return "Published · today"
         case ..<604_800:
-            let days = max(1, Int(elapsed / 86_400))
+            let days = max(1, Int(elapsed / 86400))
             return "Published · \(days) day\(days == 1 ? "" : "s") ago"
         default:
             let formatter = DateFormatter()

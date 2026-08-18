@@ -105,10 +105,9 @@ public struct BusinessPagesView: View {
         case let .error(message):
             ErrorState(
                 headline: "Couldn't load pages",
-                message: message,
-                onRetry: { await viewModel.refresh() }
-            )
-            .accessibilityIdentifier("businessPages.error")
+                message: message
+            ) { await viewModel.refresh() }
+                .accessibilityIdentifier("businessPages.error")
         case .empty:
             ScrollView {
                 VStack(spacing: Spacing.s4) {
@@ -262,7 +261,7 @@ public struct BusinessPagesView: View {
         }
     }
 
-    @ViewBuilder private func revisionPanel(pageId: String) -> some View {
+    private func revisionPanel(pageId: String) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             if viewModel.isLoadingRevisions {
                 Shimmer(height: 40, cornerRadius: Radii.sm)

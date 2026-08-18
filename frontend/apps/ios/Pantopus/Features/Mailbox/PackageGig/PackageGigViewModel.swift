@@ -26,7 +26,9 @@ import Observation
 public struct PackageGigAlert: Sendable, Hashable, Identifiable {
     public let title: String
     public let message: String
-    public var id: String { title + message }
+    public var id: String {
+        title + message
+    }
 
     public init(title: String, message: String) {
         self.title = title
@@ -97,7 +99,9 @@ public final class PackageGigViewModel {
             : "Delivery photo, tracking, and item details included"
     }
 
-    public var canSubmit: Bool { selectedType != nil && !isCreating }
+    public var canSubmit: Bool {
+        selectedType != nil && !isCreating
+    }
 
     // MARK: - Intents
 

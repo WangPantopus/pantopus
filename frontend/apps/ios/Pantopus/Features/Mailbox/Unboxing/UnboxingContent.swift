@@ -18,6 +18,8 @@
 //  viewfinder, filmstrip, and facts grid; this screen owns the data.
 //
 
+// swiftlint:disable function_body_length
+
 import SwiftUI
 
 // MARK: - Phase / state
@@ -313,7 +315,7 @@ public extension UnboxingContent {
             .filter { !$0.isEmpty }
         let title = [package.inferredItemName, sender]
             .compactMap { $0 }
-            .first(where: { !$0.isEmpty }) ?? "Your package"
+            .first { !$0.isEmpty } ?? "Your package"
 
         return UnboxingContent(
             category: "Unboxing",

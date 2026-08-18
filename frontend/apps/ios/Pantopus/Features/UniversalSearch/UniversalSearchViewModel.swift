@@ -100,7 +100,9 @@ public final class UniversalSearchViewModel {
     }
 
     /// Only the "All" tab renders section headers.
-    public var showsSectionHeaders: Bool { activeTab == .all }
+    public var showsSectionHeaders: Bool {
+        activeTab == .all
+    }
 
     // MARK: - Intent
 
@@ -167,7 +169,7 @@ public final class UniversalSearchViewModel {
 
     /// Outcome of one source. `unavailable` is reserved for a 404 on a
     /// feature-gated route — the surface simply doesn't exist here.
-    private enum SourceOutcome: Sendable {
+    private enum SourceOutcome {
         case results([UniversalSearchResult])
         case failed(message: String)
         case unavailable
@@ -205,12 +207,12 @@ public final class UniversalSearchViewModel {
         async let businessesOutcome = fetch(kind: .business, query: text, limit: limit)
         async let homesOutcome = fetch(kind: .home, query: text, limit: limit)
 
-        let outcomes: [(UniversalSearchKind, SourceOutcome)] = [
-            (.task, await tasksOutcome),
-            (.person, await peopleOutcome),
-            (.beacon, await beaconsOutcome),
-            (.business, await businessesOutcome),
-            (.home, await homesOutcome)
+        let outcomes: [(UniversalSearchKind, SourceOutcome)] = await [
+            (.task, tasksOutcome),
+            (.person, peopleOutcome),
+            (.beacon, beaconsOutcome),
+            (.business, businessesOutcome),
+            (.home, homesOutcome)
         ]
         guard !Task.isCancelled else { return }
 
@@ -252,13 +254,12 @@ public final class UniversalSearchViewModel {
         limit: Int
     ) async -> SourceOutcome {
         do {
-            let rows: [UniversalSearchResult]
-            switch kind {
-            case .task: rows = try await fetchTasks(query: text, limit: limit)
-            case .person: rows = try await fetchPeople(query: text, limit: limit)
-            case .beacon: rows = try await fetchBeacons(query: text, limit: limit)
-            case .business: rows = try await fetchBusinesses(query: text, limit: limit)
-            case .home: rows = try await fetchHomes(query: text, limit: limit)
+            let rows: [UniversalSearchResult] = switch kind {
+            case .task: try await fetchTasks(query: text, limit: limit)
+            case .person: try await fetchPeople(query: text, limit: limit)
+            case .beacon: try await fetchBeacons(query: text, limit: limit)
+            case .business: try await fetchBusinesses(query: text, limit: limit)
+            case .home: try await fetchHomes(query: text, limit: limit)
             }
             return .results(rows)
         } catch let error as APIError {

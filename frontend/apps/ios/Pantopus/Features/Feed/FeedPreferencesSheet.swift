@@ -318,5 +318,5 @@ public struct FeedPreferencesSheet: View {
 }
 
 #Preview {
-    FeedPreferencesSheet(onClose: {})
+    FeedPreferencesSheet {}
 }

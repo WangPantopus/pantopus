@@ -972,7 +972,7 @@ public struct YouTabRoot: View {
             )
         case .communityMail:
             CommunityMailView(
-                viewModel: CommunityMailViewModel(onBack: { Task { @MainActor in pop() } })
+                viewModel: CommunityMailViewModel { Task { @MainActor in pop() } }
             )
         case .homeRecords:
             HomeRecordsView(
@@ -1524,9 +1524,8 @@ public struct YouTabRoot: View {
             )
         case let .supportTrainDetail(supportTrainId):
             SupportTrainDetailView(
-                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
-                onBack: { Task { @MainActor in pop() } }
-            )
+                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId)
+            ) { Task { @MainActor in pop() } }
         case .searchSupportTrains:
             SupportTrainsSearchView(
                 viewModel: SupportTrainsSearchViewModel(
@@ -1797,9 +1796,8 @@ public struct YouTabRoot: View {
         case let .creatorInboxConversation(dest):
             PersonaDmThreadView(
                 personaId: dest.personaId,
-                threadId: dest.threadId,
-                onBack: { Task { @MainActor in pop() } }
-            )
+                threadId: dest.threadId
+            ) { Task { @MainActor in pop() } }
         case let .fanInbox(personaId):
             FanInboxView(
                 personaId: personaId,
@@ -2371,9 +2369,8 @@ public struct YouTabRoot: View {
             )
         case let .homeClaimReview(homeId):
             HomeClaimReviewView(
-                homeId: homeId,
-                onBack: { Task { @MainActor in pop() } }
-            )
+                homeId: homeId
+            ) { Task { @MainActor in pop() } }
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
         case let .publicProfile(userId):
@@ -2450,9 +2447,8 @@ public struct YouTabRoot: View {
             BusinessPageBlocksView(
                 businessId: businessId,
                 pageId: pageId,
-                pageTitle: pageTitle,
-                onBack: { Task { @MainActor in pop() } }
-            )
+                pageTitle: pageTitle
+            ) { Task { @MainActor in pop() } }
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
                 viewModel: PrivacyHandshakeViewModel(

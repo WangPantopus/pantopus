@@ -9,6 +9,8 @@
 //  destructive card at the bottom. T6.2b re-skin.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 /// Render-only Me tab.
@@ -122,23 +124,21 @@ public struct MeView: View {
                     if let receipt = viewModel.monthlyReceipt {
                         MonthlyReceiptCard(
                             receipt: receipt,
-                            startExpanded: viewModel.expandMonthlyReceipt,
-                            onShare: {
-                                if let message = viewModel.receiptShareMessage {
-                                    systemSheet = .share(items: [message])
-                                }
+                            startExpanded: viewModel.expandMonthlyReceipt
+                        ) {
+                            if let message = viewModel.receiptShareMessage {
+                                systemSheet = .share(items: [message])
                             }
-                        )
+                        }
                         .padding(.horizontal, Spacing.s4)
                         .padding(.top, Spacing.s4)
                     }
                     if let progress = viewModel.inviteProgress {
                         InviteProgressCard(
-                            progress: progress,
-                            onShare: { systemSheet = .share(items: [viewModel.inviteShareMessage]) }
-                        )
-                        .padding(.horizontal, Spacing.s4)
-                        .padding(.top, Spacing.s4)
+                            progress: progress
+                        ) { systemSheet = .share(items: [viewModel.inviteShareMessage]) }
+                            .padding(.horizontal, Spacing.s4)
+                            .padding(.top, Spacing.s4)
                     }
                 }
                 ForEach(active.sections) { section in

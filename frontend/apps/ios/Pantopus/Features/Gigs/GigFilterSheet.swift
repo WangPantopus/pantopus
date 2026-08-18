@@ -162,7 +162,7 @@ public enum GigDeadlineFilter: String, CaseIterable, Sendable, Hashable, Identif
         }
         let dayStart = calendar.date(byAdding: .day, value: dayOffset, to: startOfToday) ?? startOfToday
         // End of that day (23:59:59.999).
-        return dayStart.addingTimeInterval(86_400 - 0.001)
+        return dayStart.addingTimeInterval(86400 - 0.001)
     }
 }
 

@@ -19,6 +19,8 @@
 //  down once a second.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 public struct MailDayView: View {
@@ -47,20 +49,20 @@ public struct MailDayView: View {
                 body(for: viewModel.state)
             }
         }
-            .background(Theme.Color.appBg)
-            .overlay(alignment: .bottom) { settingsToastOverlay }
-            .task { await viewModel.load() }
-            .task {
-                // 5-second undo chip on the latest reviewed row counts down
-                // once a second until it clears. `tickUndo` is a no-op when
-                // there's no active countdown.
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                    viewModel.tickUndo()
-                }
+        .background(Theme.Color.appBg)
+        .overlay(alignment: .bottom) { settingsToastOverlay }
+        .task { await viewModel.load() }
+        .task {
+            // 5-second undo chip on the latest reviewed row counts down
+            // once a second until it clears. `tickUndo` is a no-op when
+            // there's no active countdown.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                viewModel.tickUndo()
             }
-            .accessibilityIdentifier("mailDay")
-            .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        }
+        .accessibilityIdentifier("mailDay")
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
     }
 
     @ViewBuilder
@@ -136,9 +138,8 @@ public struct MailDayView: View {
                 dateLabel: content.dateLabel,
                 streakDays: content.streakDays,
                 done: viewModel.done,
-                total: viewModel.total,
-                onOpenSettings: { Task { await viewModel.openSettings() } }
-            )
+                total: viewModel.total
+            ) { Task { await viewModel.openSettings() } }
             ScanMoreCard(lastScanLabel: content.lastScanLabel) {
                 viewModel.requestScan()
             }

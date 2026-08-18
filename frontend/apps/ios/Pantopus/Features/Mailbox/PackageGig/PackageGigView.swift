@@ -20,6 +20,8 @@
 //  Mirrors `PackageGigScreen.kt` on Android.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct PackageGigView: View {
@@ -372,9 +374,9 @@ public struct PackageGigView: View {
 
     // MARK: - Section shell
 
-    private func section<Content: View>(
+    private func section(
         label: String,
-        @ViewBuilder body: () -> Content
+        @ViewBuilder body: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 2) {
             Text(label)

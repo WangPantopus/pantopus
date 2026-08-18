@@ -7,7 +7,7 @@
 //  / `ChatSystemPillContent` live in the view-model.
 //
 
-// swiftlint:disable enum_case_associated_values_count
+// swiftlint:disable enum_case_associated_values_count file_length
 
 import Foundation
 

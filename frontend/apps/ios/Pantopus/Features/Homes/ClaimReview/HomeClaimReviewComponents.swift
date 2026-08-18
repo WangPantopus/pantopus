@@ -8,6 +8,8 @@
 //  Claim" verdict palette (green accept / red reject / amber flag).
 //
 
+// swiftlint:disable file_length function_parameter_count
+
 import SwiftUI
 
 // MARK: - Tab strip

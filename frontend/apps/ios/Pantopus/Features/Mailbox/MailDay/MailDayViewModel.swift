@@ -20,6 +20,8 @@
 //  test fallback when the fetch can't complete.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 

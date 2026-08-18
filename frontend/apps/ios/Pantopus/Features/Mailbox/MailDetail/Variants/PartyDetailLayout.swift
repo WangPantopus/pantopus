@@ -13,7 +13,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable multiline_function_chains multiple_closures_with_trailing_closure
 
 @MainActor
 struct PartyDetailLayout: View {
@@ -256,10 +256,10 @@ private struct EventDetailsCard: View {
     }
 }
 
-// Abstract mini-map preview (party.jsx PartyMap): four street-grid
-// blocks (one park-green) split by white roads, tiny house dots, and
-// a drop pin near the venue corner. Purely decorative — geometry
-// mirrors the design's 64×64 SVG.
+/// Abstract mini-map preview (party.jsx PartyMap): four street-grid
+/// blocks (one park-green) split by white roads, tiny house dots, and
+/// a drop pin near the venue corner. Purely decorative — geometry
+/// mirrors the design's 64×64 SVG.
 private struct PartyMap: View {
     var body: some View {
         ZStack {
@@ -305,8 +305,8 @@ private struct PartyMap: View {
     }
 }
 
-// Teardrop map pin — rounded square with one sharp corner, rotated so
-// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+/// Teardrop map pin — rounded square with one sharp corner, rotated so
+/// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
 private struct PartyMapPinDrop: View {
     var body: some View {
         teardrop

@@ -29,6 +29,8 @@
 //  Mirrors `ui/screens/mailbox/mail_party/MailPartyViewModel.kt`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 

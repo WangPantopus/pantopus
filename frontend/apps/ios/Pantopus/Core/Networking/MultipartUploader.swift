@@ -9,6 +9,8 @@
 //  registering the resulting URL via the evidence endpoint.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Logging
 

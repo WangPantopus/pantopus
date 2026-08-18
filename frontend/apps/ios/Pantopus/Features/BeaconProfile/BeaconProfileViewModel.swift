@@ -23,7 +23,7 @@ import Foundation
 import Logging
 import Observation
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 /// Which Beacon, and from whose vantage point.
 public enum BeaconProfileMode: Sendable, Equatable, Hashable {

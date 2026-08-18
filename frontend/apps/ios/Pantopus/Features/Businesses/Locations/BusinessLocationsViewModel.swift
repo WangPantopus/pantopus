@@ -13,15 +13,23 @@ import Observation
 @Observable
 @MainActor
 public final class BusinessLocationsViewModel: ListOfRowsDataSource {
-    public var title: String { "Locations & Hours" }
+    public var title: String {
+        "Locations & Hours"
+    }
 
-    public var topBarAction: TopBarAction? { nil }
+    public var topBarAction: TopBarAction? {
+        nil
+    }
 
-    public var tabs: [ListOfRowsTab] { [] }
+    public var tabs: [ListOfRowsTab] {
+        []
+    }
 
     public var selectedTab: String = ""
 
-    public var fab: FABAction? { nil }
+    public var fab: FABAction? {
+        nil
+    }
 
     public private(set) var state: ListOfRowsState = .loading
 

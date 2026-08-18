@@ -1,3 +1,5 @@
+// swiftlint:disable file_length
+
 import LocalAuthentication
 import Observation
 import SwiftUI
@@ -189,12 +191,11 @@ public final class AppLockManager {
         guard didEnterBackground else { return }
         didEnterBackground = false
         guard userID != nil, preferenceEnabled else { return }
-        let elapsedMs: Int
-        if let userID,
-           let backgroundAt = defaults.object(forKey: key("backgroundAt", userID)) as? TimeInterval {
-            elapsedMs = Int(max(0, Date().timeIntervalSince1970 - backgroundAt) * 1_000)
+        let elapsedMs: Int = if let userID,
+                                let backgroundAt = defaults.object(forKey: key("backgroundAt", userID)) as? TimeInterval {
+            Int(max(0, Date().timeIntervalSince1970 - backgroundAt) * 1000)
         } else {
-            elapsedMs = 0
+            0
         }
         if elapsedMs >= lockAfterMs {
             isLocked = true

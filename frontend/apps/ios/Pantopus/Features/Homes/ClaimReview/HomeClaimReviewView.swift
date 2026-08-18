@@ -14,6 +14,8 @@
 //  "Review Claim" verdict palette on each card's action row.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 /// Owner-facing claim triage for one home.

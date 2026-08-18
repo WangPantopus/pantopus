@@ -17,6 +17,8 @@
 //  Mirrors RN `src/app/homes/[id]/owners/review-claim.tsx`.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 import SwiftUI

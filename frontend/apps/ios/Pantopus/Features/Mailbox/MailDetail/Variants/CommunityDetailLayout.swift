@@ -586,9 +586,9 @@ private struct DateChip: View {
     }
 }
 
-// Abstract mini-map preview (community.jsx MiniMap): park block +
-// crossing paths + tree dots under a centered drop pin. Purely
-// decorative — geometry mirrors the design's 52×56 SVG.
+/// Abstract mini-map preview (community.jsx MiniMap): park block +
+/// crossing paths + tree dots under a centered drop pin. Purely
+/// decorative — geometry mirrors the design's 52×56 SVG.
 private struct MiniMap: View {
     let accent: Color
 
@@ -626,8 +626,8 @@ private struct MiniMap: View {
     }
 }
 
-// Teardrop map pin — rounded square with one sharp corner, rotated so
-// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
+/// Teardrop map pin — rounded square with one sharp corner, rotated so
+/// the point faces down (JSX `borderRadius: '50% 50% 50% 0'` trick).
 private struct MapPinDrop: View {
     let accent: Color
     let size: CGFloat

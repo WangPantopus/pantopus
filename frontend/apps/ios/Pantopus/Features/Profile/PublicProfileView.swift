@@ -19,6 +19,8 @@
 //      with an intent chip), incl. the full empty-state card.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 /// Public profile entry point.

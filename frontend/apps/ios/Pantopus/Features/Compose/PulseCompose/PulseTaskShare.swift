@@ -21,7 +21,9 @@ public struct PulseTaskShare: Identifiable, Sendable, Hashable {
     /// Prefills the composer's Body field.
     public let body: String
 
-    public var id: String { taskId }
+    public var id: String {
+        taskId
+    }
 
     public init(taskId: String, title: String, body: String) {
         self.taskId = taskId
@@ -32,7 +34,7 @@ public struct PulseTaskShare: Identifiable, Sendable, Hashable {
     /// RN's body template (`gig/[id].tsx:539-551`): lead-in, budget,
     /// a 220-character description summary, and the task link.
     public static func composeBody(
-        title: String,
+        title _: String,
         price: Double?,
         description: String?,
         shareURL: String

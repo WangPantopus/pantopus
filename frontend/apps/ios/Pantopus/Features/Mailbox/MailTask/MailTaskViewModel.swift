@@ -148,7 +148,7 @@ public final class MailTaskViewModel {
               let option = content.snoozeOptions.first(where: { $0.id == optionId }) else { return }
         toast = "Snoozed · \(option.label)"
         guard seed == nil else { return }
-        let due = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86_400))
+        let due = ISO8601DateFormatter().string(from: Date().addingTimeInterval(86400))
         Task {
             let result = await client.perform(
                 MailboxV2Endpoints.updateP3Task(

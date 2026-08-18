@@ -56,7 +56,9 @@ final class NotificationSettingsViewModelTests: XCTestCase {
         locationMode: String = "primary_home",
         timezone: String = "America/Los_Angeles"
     ) -> String {
-        func quoted(_ value: String?) -> String { value.map { "\"\($0)\"" } ?? "null" }
+        func quoted(_ value: String?) -> String {
+            value.map { "\"\($0)\"" } ?? "null"
+        }
         return """
         {"preferences":{
           "user_id":"u_1",

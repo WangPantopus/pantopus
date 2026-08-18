@@ -6,6 +6,8 @@
 //  login / logout / session restore.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Logging
 
@@ -512,5 +514,4 @@ final class AuthManager {
         logger.warning("Handling 401 after failed refresh — signing out")
         await signOut()
     }
-
 }

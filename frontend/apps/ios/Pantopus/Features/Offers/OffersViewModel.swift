@@ -26,7 +26,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length function_parameter_count type_body_length
 
 /// Stable tab ids — public so the screen + tests address them without
 /// stringly-typed call sites.
@@ -629,16 +629,14 @@ public final class OffersViewModel: ListOfRowsDataSource {
                     title: "Reject",
                     icon: .x,
                     variant: .destructive,
-                    identifier: "offers.\(dto.id).reject",
-                    handler: { if !isBusy { onReject() } }
-                ),
+                    identifier: "offers.\(dto.id).reject"
+                ) { if !isBusy { onReject() } },
                 RowFooterAction(
                     title: "Accept",
                     icon: .check,
                     variant: .primary,
-                    identifier: "offers.\(dto.id).accept",
-                    handler: { if !isBusy { onAccept() } }
-                )
+                    identifier: "offers.\(dto.id).accept"
+                ) { if !isBusy { onAccept() } }
             ])
         case .sent:
             guard status == "pending" || status == "countered" else { return nil }
@@ -647,9 +645,8 @@ public final class OffersViewModel: ListOfRowsDataSource {
                     title: "Withdraw",
                     icon: .x,
                     variant: .destructive,
-                    identifier: "offers.\(dto.id).withdraw",
-                    handler: { if !isBusy { onWithdraw() } }
-                )
+                    identifier: "offers.\(dto.id).withdraw"
+                ) { if !isBusy { onWithdraw() } }
             ])
         }
     }

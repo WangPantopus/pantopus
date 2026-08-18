@@ -240,13 +240,12 @@ public final class BusinessPaymentsViewModel {
         guard let account else {
             return BusinessPaymentsContent(stage: .notConnected, chargesEnabled: false, payoutsEnabled: false)
         }
-        let stage: BusinessPayoutStage
-        if account.chargesEnabled, account.payoutsEnabled {
-            stage = .onboarded
+        let stage: BusinessPayoutStage = if account.chargesEnabled, account.payoutsEnabled {
+            .onboarded
         } else if !account.detailsSubmitted {
-            stage = .setupIncomplete
+            .setupIncomplete
         } else {
-            stage = .verifying
+            .verifying
         }
         return BusinessPaymentsContent(
             stage: stage,

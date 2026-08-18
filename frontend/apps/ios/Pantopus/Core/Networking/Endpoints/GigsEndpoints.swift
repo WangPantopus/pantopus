@@ -8,7 +8,7 @@
 //  report / cancellation preview).
 //
 
-// swiftlint:disable file_length
+// swiftlint:disable cyclomatic_complexity file_length
 
 import Foundation
 

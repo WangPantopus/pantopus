@@ -9,7 +9,7 @@
 //  Mirrors RN `src/components/business/tabs/LegalTab.tsx` and Android
 //  `BusinessLegalScreen.kt`.
 //
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -234,7 +234,7 @@ public struct BusinessLegalView: View {
         .accessibilityIdentifier("businessLegal.evidence.\(row.id)")
     }
 
-    @ViewBuilder private var selfAttestBlock: some View {
+    private var selfAttestBlock: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             Toggle(isOn: $viewModel.addressConfirmed) {
                 Text("I confirm this business's registered address on Pantopus is correct.")

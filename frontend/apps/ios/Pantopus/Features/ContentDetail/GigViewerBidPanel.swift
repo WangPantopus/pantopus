@@ -152,10 +152,10 @@ struct GigViewerBidPanel: View {
             .font(.system(size: 12.5, weight: .semibold))
             .foregroundStyle(Theme.Color.primary700)
             .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Spacing.s2)
-        .background(Theme.Color.primary50)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        .accessibilityIdentifier("gigDetail.yourBid.counterCallout")
+            .padding(Spacing.s2)
+            .background(Theme.Color.primary50)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .accessibilityIdentifier("gigDetail.yourBid.counterCallout")
     }
 
     private var counterActions: some View {

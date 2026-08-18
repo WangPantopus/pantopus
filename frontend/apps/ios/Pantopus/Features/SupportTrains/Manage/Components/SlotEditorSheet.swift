@@ -201,7 +201,7 @@ public struct SlotEditorSheet: View {
             slotLabel: "Dinner",
             supportMode: "meal",
             startTime: Date(),
-            endTime: Date().addingTimeInterval(7_200)
+            endTime: Date().addingTimeInterval(7200)
         ),
         onSave: { _ in },
         onCancel: {}

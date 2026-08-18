@@ -96,9 +96,8 @@ public struct BusinessOwnerView: View {
                     intent: .announce,
                     identity: .business,
                     businessAuthorId: businessId,
-                    managesDismiss: true,
-                    onPosted: { _ in Task { await viewModel.refresh() } }
-                )
+                    managesDismiss: true
+                ) { _ in Task { await viewModel.refresh() } }
             }
     }
 

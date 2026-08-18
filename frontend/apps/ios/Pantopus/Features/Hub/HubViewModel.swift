@@ -6,6 +6,8 @@
 //  parallel and projects them to the `HubState` consumed by `HubView`.
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 

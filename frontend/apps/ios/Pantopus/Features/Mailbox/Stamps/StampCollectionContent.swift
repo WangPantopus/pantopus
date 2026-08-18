@@ -31,7 +31,9 @@ public enum StampsViewMode: String, Sendable, Hashable, CaseIterable, Identifiab
     case stamps
     case themes
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Screen title for this mode — RN `stamps.tsx:100-102`.
     public var title: String {

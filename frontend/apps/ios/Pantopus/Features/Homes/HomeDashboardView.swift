@@ -6,6 +6,8 @@
 //  body + FAB CTA.
 //
 
+// swiftlint:disable function_body_length type_body_length
+
 import SwiftUI
 
 /// Home Dashboard screen wired to `GET /api/homes/:id` (with public-profile fallback).
@@ -297,13 +299,11 @@ struct HomeDashboardView: View {
             onRetry: { Task { await viewModel.generateChecklist() } }
         )
         PropertyValueCard(
-            state: viewModel.propertyValue,
-            onRetry: { Task { await viewModel.retryPropertyValue() } }
-        )
+            state: viewModel.propertyValue
+        ) { Task { await viewModel.retryPropertyValue() } }
         BillTrendsCard(
-            state: viewModel.billTrends,
-            onRetry: { Task { await viewModel.retryBillTrends() } }
-        )
+            state: viewModel.billTrends
+        ) { Task { await viewModel.retryBillTrends() } }
     }
 
     /// Security-banner CTA routing. Mirrors RN's

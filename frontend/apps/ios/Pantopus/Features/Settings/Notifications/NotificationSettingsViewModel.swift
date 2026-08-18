@@ -166,7 +166,9 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
 
     /// Apply locally, re-project, and (re)arm the debounce timer.
     private func enqueue(_ patch: [String: JSONValue]) {
-        for (key, value) in patch { pendingPatch[key] = value }
+        for (key, value) in patch {
+            pendingPatch[key] = value
+        }
         state = .loaded(groups())
         saveTask?.cancel()
         let delay = saveDebounce

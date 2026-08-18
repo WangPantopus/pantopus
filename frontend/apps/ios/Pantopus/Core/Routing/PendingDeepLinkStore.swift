@@ -20,7 +20,9 @@ enum PendingDeepLinkStore {
     /// 24 hours — matches the product TTL for deferred post-login replay.
     private static let ttlMs: Int64 = 24 * 60 * 60 * 1000
 
-    private static var defaults: UserDefaults { .standard }
+    private static var defaults: UserDefaults {
+        .standard
+    }
 
     /// Persist a normalized `pantopus://…` / `https://…` path for later replay.
     static func stash(_ path: String) {

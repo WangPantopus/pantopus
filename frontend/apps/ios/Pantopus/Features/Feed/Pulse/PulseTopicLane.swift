@@ -22,7 +22,9 @@ import SwiftUI
 public enum PulseTopic: String, CaseIterable, Sendable, Hashable, Identifiable {
     case sports
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Chip label — RN `PLACE_TOPICS`.
     public var label: String {
@@ -38,7 +40,9 @@ public enum PulseTopic: String, CaseIterable, Sendable, Hashable, Identifiable {
     }
 
     /// `topic` query value on `GET /api/posts/feed`.
-    public var queryValue: String { rawValue }
+    public var queryValue: String {
+        rawValue
+    }
 }
 
 // MARK: - Sports mode
@@ -52,7 +56,9 @@ public enum PulseSportsMode: String, CaseIterable, Sendable, Hashable, Identifia
     case event
     case watch
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Default chip label. The `event` chip is relabelled at runtime with
     /// the primary active event's short label.

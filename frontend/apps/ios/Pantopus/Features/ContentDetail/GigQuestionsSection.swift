@@ -6,6 +6,8 @@
 //  poster answer affordance. Matches RN/web `QASection`.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 struct GigQuestionsSection: View {

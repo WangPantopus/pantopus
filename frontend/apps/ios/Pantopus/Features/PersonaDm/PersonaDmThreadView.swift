@@ -163,7 +163,6 @@ public struct PersonaDmThreadView: View {
 
     // MARK: - Thread body
 
-    @ViewBuilder
     private func thread(_ loaded: PersonaDmThreadLoaded, messages: [PersonaDmMessageContent]) -> some View {
         VStack(spacing: Spacing.s0) {
             if let banner = loaded.policyBanner {

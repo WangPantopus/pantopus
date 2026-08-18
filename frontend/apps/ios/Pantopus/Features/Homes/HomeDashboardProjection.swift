@@ -227,9 +227,8 @@ public enum HomeDashboardProjection {
                 guard let id = member.user?.id ?? member.userId else { return nil }
                 guard let name = firstNonEmpty(member.user?.name, member.user?.username) else { return nil }
                 return (id, name)
-            },
-            uniquingKeysWith: { first, _ in first }
-        )
+            }
+        ) { first, _ in first }
 
         return dashboard.recentActivity.enumerated().map { index, entry in
             let actorName = entry.actorUserId.flatMap { namesByUserId[$0] }

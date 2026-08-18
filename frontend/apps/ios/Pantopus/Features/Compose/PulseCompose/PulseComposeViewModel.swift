@@ -7,7 +7,7 @@
 //  drives the `POST /api/posts` submit. Field shape mirrors
 //  `createPostSchema` at `backend/routes/posts.js:196-300`.
 //
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length function_body_length type_body_length
 
 import Foundation
 import Observation

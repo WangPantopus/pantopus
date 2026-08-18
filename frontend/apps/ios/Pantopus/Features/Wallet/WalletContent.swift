@@ -112,7 +112,10 @@ public struct WalletPayoutMethod: Equatable, Sendable {
 /// renders `charges_enabled` and `payouts_enabled` as separate tiles
 /// instead of collapsing the account to a single boolean.
 public struct WalletPayoutCapability: Identifiable, Equatable, Sendable {
-    public var id: String { key }
+    public var id: String {
+        key
+    }
+
     /// Stable key used for the accessibility identifier / Android test tag —
     /// `cardPayments` / `payouts`.
     public let key: String

@@ -28,9 +28,8 @@ public struct StampsView: View {
             StampsNav { viewModel.tapBack() }
             StampsModeHeader(
                 mode: viewModel.mode,
-                progressLabel: progressLabel,
-                onToggle: { viewModel.toggleMode() }
-            )
+                progressLabel: progressLabel
+            ) { viewModel.toggleMode() }
             stateBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -682,7 +681,6 @@ private struct StampCollectionSection: View {
         .accessibilityIdentifier("stamps_collection_loading")
     }
 
-    @ViewBuilder
     private func loaded(_ content: StampCollectionContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             if content.earned.isEmpty {

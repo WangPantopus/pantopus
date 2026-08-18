@@ -19,7 +19,9 @@ public struct ProfessionalCategory: Sendable, Hashable, Identifiable {
     public let key: String
     public let label: String
 
-    public var id: String { key }
+    public var id: String {
+        key
+    }
 
     public init(key: String, label: String) {
         self.key = key

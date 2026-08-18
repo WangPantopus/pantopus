@@ -7,6 +7,8 @@
 //  Uses the FormShell archetype with its new `bottomActionLabel` slot.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 struct SignUpView: View {

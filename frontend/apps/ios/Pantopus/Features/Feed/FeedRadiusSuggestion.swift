@@ -75,7 +75,9 @@ struct FeedRadiusSuggestionBanner: View {
     let onApply: () -> Void
     let onDismiss: () -> Void
 
-    private var isExpand: Bool { suggestion.direction == .expand }
+    private var isExpand: Bool {
+        suggestion.direction == .expand
+    }
 
     var body: some View {
         HStack(spacing: Spacing.s2) {

@@ -2,7 +2,7 @@
 //  EmergencyInfoViewModel.swift
 //  Pantopus
 //
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 //  T6.4b / P17 — Backs `EmergencyInfoView`. Fetches
 //  `GET /api/homes/:id/emergencies` (route `backend/routes/home.js:5406`)

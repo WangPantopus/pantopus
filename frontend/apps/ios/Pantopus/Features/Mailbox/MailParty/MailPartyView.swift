@@ -15,7 +15,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable type_body_length
 
 @MainActor
 struct MailPartyView: View {
@@ -426,7 +426,7 @@ struct MailPartyView: View {
     private var skeleton: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             Shimmer(width: 160, height: 14, cornerRadius: Radii.xs)
-            ForEach(0 ..< 3, id: \.self) { _ in
+            ForEach(0..<3, id: \.self) { _ in
                 Shimmer(height: 84, cornerRadius: Radii.lg)
             }
         }

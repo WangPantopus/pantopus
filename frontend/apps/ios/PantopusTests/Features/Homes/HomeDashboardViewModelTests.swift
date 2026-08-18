@@ -11,6 +11,8 @@
 //  route rather than by FIFO sequence.
 //
 
+// swiftlint:disable multiline_literal_brackets type_body_length
+
 import XCTest
 @testable import Pantopus
 

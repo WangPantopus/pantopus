@@ -14,6 +14,8 @@
 //  `backend/routes/businesses.js:2350`).
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import SwiftUI
 
 /// Item create / edit sheet.

@@ -314,7 +314,7 @@ private struct PublicRecordsCard: View {
 private struct PublicRecordsSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            ForEach(0 ..< 4, id: \.self) { index in
+            ForEach(0..<4, id: \.self) { index in
                 RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
                     .fill(Theme.Color.appSurfaceSunken)
                     .frame(height: 12)
@@ -390,7 +390,7 @@ struct AddHomeTextField: View {
     private var field: some View {
         if isMultiline {
             TextField(placeholder, text: $text, axis: .vertical)
-                .lineLimit(3 ... 6)
+                .lineLimit(3...6)
                 .font(Theme.Font.role(.small))
                 .foregroundStyle(Theme.Color.appText)
                 .accessibilityIdentifier(identifier)

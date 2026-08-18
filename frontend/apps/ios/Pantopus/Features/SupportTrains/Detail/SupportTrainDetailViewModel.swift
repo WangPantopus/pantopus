@@ -23,6 +23,8 @@
 //  built from `organizers`, and the recipient identity defaults to `.home`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 
@@ -340,12 +342,12 @@ extension SupportTrainDetailViewModel {
     /// permission gate (`backend/routes/supportTrains.js:3693`).
     nonisolated static func viewerRole(_ dto: SupportTrainDetailDTO) -> SupportTrainViewerRole {
         switch dto.viewerSupportTrainRole {
-        case "primary": return .primaryOrganizer
-        case "co_organizer", "recipient_delegate": return .coOrganizer
-        case "recipient": return .recipient
-        case "helper": return .helper
+        case "primary": .primaryOrganizer
+        case "co_organizer", "recipient_delegate": .coOrganizer
+        case "recipient": .recipient
+        case "helper": .helper
         default:
-            return dto.viewerLevel == "organizer" ? .coOrganizer : .viewer
+            dto.viewerLevel == "organizer" ? .coOrganizer : .viewer
         }
     }
 

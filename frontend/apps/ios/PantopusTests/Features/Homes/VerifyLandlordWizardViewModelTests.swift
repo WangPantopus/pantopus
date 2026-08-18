@@ -190,12 +190,11 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
         form.messageToLandlord = "Hi, I'm the new tenant."
         let vm = makeVM(
             homeId: "home-1",
-            form: form,
-            approvalRequester: { request in
-                captured = request
-                return .success(Self.stubLease)
-            }
-        )
+            form: form
+        ) { request in
+            captured = request
+            return .success(Self.stubLease)
+        }
         vm.primaryTapped() // start -> details
         await vm.submit()
         XCTAssertEqual(vm.currentStep, .sent)
@@ -235,16 +234,15 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
 
     func testSubmitSurfacesExistingPendingRequest() async {
         let vm = makeVM(
-            form: VerifyLandlordSampleData.populatedForm,
-            approvalRequester: { _ in
-                .failure(
-                    APIError.clientError(
-                        status: 409,
-                        message: "{\"error\":\"You already have a pending request for this home\"}"
-                    )
+            form: VerifyLandlordSampleData.populatedForm
+        ) { _ in
+            .failure(
+                APIError.clientError(
+                    status: 409,
+                    message: "{\"error\":\"You already have a pending request for this home\"}"
                 )
-            }
-        )
+            )
+        }
         vm.primaryTapped()
         await vm.submit()
         XCTAssertEqual(vm.currentStep, .sent)
@@ -254,16 +252,15 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
 
     func testSubmitSurfacesExistingActiveLease() async {
         let vm = makeVM(
-            form: VerifyLandlordSampleData.populatedForm,
-            approvalRequester: { _ in
-                .failure(
-                    APIError.clientError(
-                        status: 409,
-                        message: "{\"error\":\"You already have an active lease at this home\"}"
-                    )
+            form: VerifyLandlordSampleData.populatedForm
+        ) { _ in
+            .failure(
+                APIError.clientError(
+                    status: 409,
+                    message: "{\"error\":\"You already have an active lease at this home\"}"
                 )
-            }
-        )
+            )
+        }
         vm.primaryTapped()
         await vm.submit()
         XCTAssertEqual(vm.currentStep, .sent)
@@ -273,9 +270,8 @@ final class VerifyLandlordWizardViewModelTests: XCTestCase {
     func testSentStepSecondaryStartsPostcardFallback() async {
         let vm = makeVM(
             homeId: "home-9",
-            form: VerifyLandlordSampleData.populatedForm,
-            postcardRequester: { .success(()) }
-        )
+            form: VerifyLandlordSampleData.populatedForm
+        ) { .success(()) }
         vm.primaryTapped()
         await vm.submit()
         XCTAssertEqual(vm.currentStep, .sent)

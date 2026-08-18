@@ -8,6 +8,8 @@
 //  snapshots render without a view-model.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 // MARK: - Shared chrome
@@ -15,9 +17,9 @@ import SwiftUI
 @MainActor
 struct ManageSectionHeader: View {
     let title: String
-    var actionTitle: String? = nil
-    var actionIdentifier: String? = nil
-    var onAction: (@MainActor () -> Void)? = nil
+    var actionTitle: String?
+    var actionIdentifier: String?
+    var onAction: (@MainActor () -> Void)?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {

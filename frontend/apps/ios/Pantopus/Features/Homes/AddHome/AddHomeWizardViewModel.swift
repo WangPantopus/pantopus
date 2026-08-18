@@ -354,14 +354,37 @@ final class AddHomeWizardViewModel: WizardModel {
 
     // MARK: - Details step (RN `DetailsStep.tsx`)
 
-    func updateNickname(_ value: String) { form.details.nickname = value }
-    func selectHomeType(_ value: AddHomeHomeType) { form.details.homeType = value }
-    func updateBedrooms(_ value: String) { form.details.bedrooms = digitsOnly(value) }
-    func updateBathrooms(_ value: String) { form.details.bathrooms = decimalOnly(value) }
-    func updateSqFt(_ value: String) { form.details.sqFt = digitsOnly(value) }
-    func updateLotSqFt(_ value: String) { form.details.lotSqFt = digitsOnly(value) }
-    func updateYearBuilt(_ value: String) { form.details.yearBuilt = digitsOnly(value) }
-    func updateDescription(_ value: String) { form.details.description = value }
+    func updateNickname(_ value: String) {
+        form.details.nickname = value
+    }
+
+    func selectHomeType(_ value: AddHomeHomeType) {
+        form.details.homeType = value
+    }
+
+    func updateBedrooms(_ value: String) {
+        form.details.bedrooms = digitsOnly(value)
+    }
+
+    func updateBathrooms(_ value: String) {
+        form.details.bathrooms = decimalOnly(value)
+    }
+
+    func updateSqFt(_ value: String) {
+        form.details.sqFt = digitsOnly(value)
+    }
+
+    func updateLotSqFt(_ value: String) {
+        form.details.lotSqFt = digitsOnly(value)
+    }
+
+    func updateYearBuilt(_ value: String) {
+        form.details.yearBuilt = digitsOnly(value)
+    }
+
+    func updateDescription(_ value: String) {
+        form.details.description = value
+    }
 
     private func digitsOnly(_ value: String) -> String {
         value.filter(\.isNumber)

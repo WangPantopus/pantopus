@@ -12,6 +12,8 @@
 //  front of `DELETE /api/users/account`.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -203,8 +205,11 @@ final class PrivacyViewModelTests: XCTestCase {
     func testSelectingSearchVisibilityPatchesAndAdoptsServerValue() async {
         SequencedURLProtocol.routeResponses["/api/privacy/settings"] = [
             .status(200, body: settingsBody("everyone", false)),
-            .status(200, body: "{\"message\":\"Privacy settings updated\","
-                + "\"settings\":{\"search_visibility\":\"nobody\",\"findable_by_name\":false}}")
+            .status(
+                200,
+                body: "{\"message\":\"Privacy settings updated\","
+                    + "\"settings\":{\"search_visibility\":\"nobody\",\"findable_by_name\":false}}"
+            )
         ]
         let vm = makeViewModel()
         _ = await loadedGroups(vm)
@@ -313,8 +318,11 @@ final class PrivacyViewModelTests: XCTestCase {
     func testBlockingConflictSurfacesTheServerMessage() async {
         stubSettings()
         SequencedURLProtocol.routeResponses["/api/users/account"] = [
-            .status(409, body: "{\"error\":\"Cannot delete account while you have gigs in progress. "
-                + "Please complete or cancel them first.\",\"activeGigCount\":2}")
+            .status(
+                409,
+                body: "{\"error\":\"Cannot delete account while you have gigs in progress. "
+                    + "Please complete or cancel them first.\",\"activeGigCount\":2}"
+            )
         ]
         let vm = makeViewModel()
         _ = await loadedGroups(vm)

@@ -32,7 +32,9 @@ public struct PackageGigOption: Sendable, Hashable, Identifiable {
     /// in transit (`gig.tsx:38-40` filters on `preDelivery`).
     public let availablePreDelivery: Bool
 
-    public var id: String { type.rawValue }
+    public var id: String {
+        type.rawValue
+    }
 
     /// Declaration order matches RN's `GIG_OPTIONS`.
     public static let all: [PackageGigOption] = [

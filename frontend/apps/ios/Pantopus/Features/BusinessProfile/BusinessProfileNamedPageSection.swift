@@ -57,7 +57,7 @@ struct BusinessProfileNamedPageSection: View {
         }
     }
 
-    @ViewBuilder private func section(
+    private func section(
         title: String,
         @ViewBuilder inner: () -> some View
     ) -> some View {

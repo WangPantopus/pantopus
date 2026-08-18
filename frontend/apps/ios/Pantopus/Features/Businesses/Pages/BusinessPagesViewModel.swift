@@ -32,7 +32,9 @@ public struct BusinessPageRow: Sendable, Hashable, Identifiable {
         publishedRevision > 0 ? "v\(publishedRevision)" : "Unpublished"
     }
 
-    public var isPublished: Bool { publishedRevision > 0 }
+    public var isPublished: Bool {
+        publishedRevision > 0
+    }
 }
 
 /// One revision-history entry.

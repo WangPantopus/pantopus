@@ -277,29 +277,25 @@ public struct EditBusinessPageLoadedView: View {
                     label: "Name",
                     required: true,
                     field: content.name,
-                    state: .valid,
-                    onChange: { onFieldChange(.name, $0) }
-                )
+                    state: .valid
+                ) { onFieldChange(.name, $0) }
                 BizField(
                     label: "Tagline",
                     hint: "Shows in search and on map pins",
-                    field: content.tagline,
-                    onChange: { onFieldChange(.tagline, $0) }
-                )
+                    field: content.tagline
+                ) { onFieldChange(.tagline, $0) }
                 HStack(spacing: Spacing.s3) {
                     BizField(
                         label: "Category",
                         required: content.categoryRequired,
                         field: content.category,
-                        trailing: .chevron,
-                        onChange: { onFieldChange(.category, $0) }
-                    )
+                        trailing: .chevron
+                    ) { onFieldChange(.category, $0) }
                     BizField(
                         label: "Price",
-                        field: content.price,
-                        onChange: { onFieldChange(.price, $0) }
-                    )
-                    .frame(width: 110)
+                        field: content.price
+                    ) { onFieldChange(.price, $0) }
+                        .frame(width: 110)
                 }
             }
         }
@@ -317,9 +313,8 @@ public struct EditBusinessPageLoadedView: View {
                     )
                     BizTextarea(
                         field: field,
-                        charLimit: limit,
-                        onChange: { onFieldChange(.description, $0) }
-                    )
+                        charLimit: limit
+                    ) { onFieldChange(.description, $0) }
                 }
             case let .prompt(prompt):
                 PromptBlock(prompt: prompt, onTap: onBeginDescription)
@@ -363,29 +358,25 @@ public struct EditBusinessPageLoadedView: View {
                     label: "Phone",
                     field: content.phone,
                     state: .valid,
-                    leading: "+1",
-                    onChange: { onFieldChange(.phone, $0) }
-                )
+                    leading: "+1"
+                ) { onFieldChange(.phone, $0) }
                 BizField(
                     label: "Email",
                     field: content.email,
-                    state: .valid,
-                    onChange: { onFieldChange(.email, $0) }
-                )
+                    state: .valid
+                ) { onFieldChange(.email, $0) }
                 BizField(
                     label: "Website",
                     field: content.website,
-                    leading: "https://",
-                    onChange: { onFieldChange(.website, $0) }
-                )
+                    leading: "https://"
+                ) { onFieldChange(.website, $0) }
                 if let booking = content.bookingLink {
                     BizField(
                         label: "Booking link",
                         hint: "Public on profile",
                         field: booking,
-                        leading: "https://",
-                        onChange: { onFieldChange(.bookingLink, $0) }
-                    )
+                        leading: "https://"
+                    ) { onFieldChange(.bookingLink, $0) }
                 }
             }
         }
@@ -400,32 +391,28 @@ public struct EditBusinessPageLoadedView: View {
                     field: content.location.address,
                     state: content.location.error.map { .error($0) } ?? .valid,
                     trailing: .mapPin,
-                    identifier: "editBusinessPage.field.address",
-                    onChange: { onFieldChange(.address, $0) }
-                )
+                    identifier: "editBusinessPage.field.address"
+                ) { onFieldChange(.address, $0) }
                 BizField(
                     label: "City",
                     required: true,
                     field: content.location.city,
                     state: .valid,
-                    identifier: "editBusinessPage.field.city",
-                    onChange: { onFieldChange(.city, $0) }
-                )
+                    identifier: "editBusinessPage.field.city"
+                ) { onFieldChange(.city, $0) }
                 HStack(spacing: Spacing.s3) {
                     BizField(
                         label: "State",
                         field: content.location.state,
-                        identifier: "editBusinessPage.field.state",
-                        onChange: { onFieldChange(.state, $0) }
-                    )
+                        identifier: "editBusinessPage.field.state"
+                    ) { onFieldChange(.state, $0) }
                     BizField(
                         label: "ZIP code",
                         field: content.location.zip,
                         keyboardType: .numberPad,
-                        identifier: "editBusinessPage.field.zip",
-                        onChange: { onFieldChange(.zip, $0) }
-                    )
-                    .frame(width: 110)
+                        identifier: "editBusinessPage.field.zip"
+                    ) { onFieldChange(.zip, $0) }
+                        .frame(width: 110)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     BizLabel(label: "Map", hint: "Drag the pin to refine")

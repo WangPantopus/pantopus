@@ -171,6 +171,7 @@ public final class PulseFeedViewModel {
         if case let .signedIn(user) = AuthManager.shared.state { return user.id }
         return nil
     }
+
     private var resolvedLatitude: Double?
     private var resolvedLongitude: Double?
     private var loadedItems: [FeedPostDTO] = []
@@ -204,7 +205,7 @@ public final class PulseFeedViewModel {
         self.latitude = latitude
         self.longitude = longitude
         self.locationProvider = locationProvider
-        self.explicitViewerId = viewerId
+        explicitViewerId = viewerId
         self.moderation = moderation
     }
 

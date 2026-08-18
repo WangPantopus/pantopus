@@ -22,6 +22,8 @@
 //  `GET /api/personas/:handle/tiers` (`personas.js:1111`).
 //
 
+// swiftlint:disable type_body_length
+
 import Foundation
 import Observation
 

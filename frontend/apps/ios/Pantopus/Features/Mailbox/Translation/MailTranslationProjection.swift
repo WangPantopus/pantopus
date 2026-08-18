@@ -123,7 +123,7 @@ public enum MailTranslationProjection {
         let right = paragraphs(from: translated)
         let count = max(left.count, right.count)
         guard count > 0 else { return [] }
-        return (0 ..< count).map { index in
+        return (0..<count).map { index in
             TranslationParagraph(
                 id: index,
                 original: index < left.count ? left[index] : "",
@@ -148,11 +148,10 @@ public enum MailTranslationProjection {
             ?? detail.item.senderBusinessName
             ?? detail.item.senderAddress
             ?? "Unknown sender"
-        let meta: String
-        if let username = detail.sender?.username, !username.isEmpty {
-            meta = "@\(username)"
+        let meta: String = if let username = detail.sender?.username, !username.isEmpty {
+            "@\(username)"
         } else {
-            meta = detail.item.senderAddress ?? ""
+            detail.item.senderAddress ?? ""
         }
         return TranslationSender(
             initials: initials(for: name),

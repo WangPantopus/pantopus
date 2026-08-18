@@ -31,7 +31,9 @@ public enum CommunityFeedFilter: String, CaseIterable, Hashable, Sendable, Ident
     case localBusiness = "local_business"
     case buildingAnnouncement = "building_announcement"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -117,7 +119,9 @@ public enum CommunityReactionType: String, CaseIterable, Hashable, Sendable, Ide
     case concerned
     case thumbsUp = "thumbs_up"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

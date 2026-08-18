@@ -62,7 +62,7 @@ public struct WalletActivityListView: View {
         case .loading:
             ScrollView {
                 VStack(spacing: Spacing.s3) {
-                    ForEach(0 ..< 6, id: \.self) { _ in FeedSkeletonCard() }
+                    ForEach(0..<6, id: \.self) { _ in FeedSkeletonCard() }
                 }
                 .padding(Spacing.s4)
             }

@@ -333,7 +333,6 @@ final class AuthManagerTests: XCTestCase {
             XCTFail("Expected .signedOut after refresh failure, got \(manager.state)")
         }
     }
-
 }
 
 // MARK: - Async throws helper

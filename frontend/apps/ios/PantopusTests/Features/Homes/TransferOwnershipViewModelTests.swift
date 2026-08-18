@@ -105,12 +105,11 @@ final class TransferOwnershipViewModelTests: XCTestCase {
     func test_successful_authentication_commits_the_typed_email() async {
         let recorder = EmailRecorder()
         let viewModel = makeArmedViewModel(
-            biometricResult: .success(()),
-            executor: { email in
-                recorder.value = email
-                return "Transfer initiated."
-            }
-        )
+            biometricResult: .success(())
+        ) { email in
+            recorder.value = email
+            return "Transfer initiated."
+        }
         viewModel.presentConfirmSheet()
         await viewModel.authenticateAndCommit()
         XCTAssertEqual(recorder.value, "buyer@example.com")
@@ -122,9 +121,8 @@ final class TransferOwnershipViewModelTests: XCTestCase {
 
     func test_transfer_failure_surfaces_inline_error() async {
         let viewModel = makeArmedViewModel(
-            biometricResult: .success(()),
-            executor: { _ in throw StubError() }
-        )
+            biometricResult: .success(())
+        ) { _ in throw StubError() }
         viewModel.presentConfirmSheet()
         await viewModel.authenticateAndCommit()
         XCTAssertEqual(viewModel.sheetPhase, .visible)

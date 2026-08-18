@@ -144,7 +144,9 @@ public struct AssetDetectionDTO: Decodable, Sendable, Hashable, Identifiable {
     public let sourceField: String?
 
     /// Detections have no server id — the source mail is the natural key.
-    public var id: String { sourceMailId }
+    public var id: String {
+        sourceMailId
+    }
 
     private enum CodingKeys: String, CodingKey {
         case confidence
@@ -195,7 +197,9 @@ public struct AssetSuggestionDTO: Decodable, Sendable, Hashable, Identifiable {
     public let mail: AssetLinkedMailDTO
     public let detections: [AssetDetectionDTO]?
 
-    public var id: String { mail.id }
+    public var id: String {
+        mail.id
+    }
 }
 
 /// Envelope for `GET /api/mailbox/v2/p3/records/suggestions` —

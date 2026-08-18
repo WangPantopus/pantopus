@@ -14,7 +14,7 @@
 import PhotosUI
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 // MARK: - Portfolio
 
@@ -232,7 +232,7 @@ private struct PortfolioCard: View {
         .pantopusShadow(.sm)
     }
 
-    @ViewBuilder private var thumbnail: some View {
+    private var thumbnail: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
                 .fill(Theme.Color.appSurfaceSunken)
@@ -335,7 +335,7 @@ private struct AddPortfolioItemSheet: View {
         }
     }
 
-    @ViewBuilder private var picker: some View {
+    private var picker: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .fill(Theme.Color.appSurfaceSunken)

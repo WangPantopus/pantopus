@@ -12,6 +12,8 @@
 //  so Pulse and Explore render one pin vocabulary.
 //
 
+// swiftlint:disable line_length type_body_length
+
 import CoreLocation
 import MapKit
 import SwiftUI
@@ -151,7 +153,7 @@ struct FeedMapView: View {
         .accessibilityIdentifier("pulseMapSearchThisArea")
     }
 
-    @ViewBuilder private var overlays: some View {
+    private var overlays: some View {
         VStack(spacing: Spacing.s0) {
             Spacer(minLength: Spacing.s0)
             HStack {

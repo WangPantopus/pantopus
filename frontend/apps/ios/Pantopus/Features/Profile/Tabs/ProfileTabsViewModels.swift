@@ -17,6 +17,8 @@
 //  requires. Mirrored on Android by `ProfileTabsViewModels.kt`.
 //
 
+// swiftlint:disable file_length function_parameter_count
+
 import Foundation
 import Logging
 import Observation
@@ -372,7 +374,7 @@ public final class ProfileGigsViewModel {
             id: gig.id,
             title: gig.title,
             summary: gig.description?.isEmpty == false ? gig.description : nil,
-            price: Self.formatPrice(gig.price),
+            price: formatPrice(gig.price),
             category: gig.category?.isEmpty == false ? gig.category : nil,
             status: (gig.status?.isEmpty == false ? gig.status : nil) ?? "unknown"
         )

@@ -38,7 +38,7 @@ public struct GigDetailView: View {
     // Phase 5b — lifecycle completers
     @State private var showRunningLateSheet = false
     @State private var showChangeOrderSheet = false
-    // Phase 6b — reschedule (cancel sheet's "Reschedule instead" path)
+    /// Phase 6b — reschedule (cancel sheet's "Reschedule instead" path)
     @State private var showRescheduleSheet = false
     // Pre-start release confirms — poster "Replace worker"
     // (`/reopen-bidding`) and worker "Can't make it" (`/worker-release`).
@@ -276,15 +276,14 @@ public struct GigDetailView: View {
                     status: viewModel.fulfillmentStatus,
                     etaLabel: viewModel.fulfillmentEtaLabel,
                     nextAction: viewModel.nextFulfillmentAction,
-                    isBusy: viewModel.fulfillmentActionInFlight,
-                    onAdvance: { status in
-                        Task {
-                            await runToasting(success: "Status updated.") {
-                                await viewModel.advanceFulfillment(to: status)
-                            }
+                    isBusy: viewModel.fulfillmentActionInFlight
+                ) { status in
+                    Task {
+                        await runToasting(success: "Status updated.") {
+                            await viewModel.advanceFulfillment(to: status)
                         }
                     }
-                )
+                }
             }
             // Bidder side — "Your bid" with Update / Withdraw and, while a
             // counter-offer is live, Accept / Decline.

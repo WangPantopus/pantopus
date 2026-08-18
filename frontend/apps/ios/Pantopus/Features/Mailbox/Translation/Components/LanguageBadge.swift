@@ -63,13 +63,12 @@ struct LanguageBadge: View {
     }
 
     private var accessibilityText: String {
-        let detail: String
-        if confirmed {
-            detail = "Confirmed translation"
+        let detail: String = if confirmed {
+            "Confirmed translation"
         } else if let confidence = languages.confidence {
-            detail = "Auto-detected, \(confidence) percent match"
+            "Auto-detected, \(confidence) percent match"
         } else {
-            detail = "Auto-detected"
+            "Auto-detected"
         }
         return "\(languages.sourceName) to \(languages.targetName). \(detail)"
     }

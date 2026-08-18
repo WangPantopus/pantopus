@@ -7,6 +7,8 @@
 //  projection, and client-side query filtering.
 //
 
+// swiftlint:disable type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -337,7 +339,7 @@ final class VaultListViewModelTests: XCTestCase {
         }
     }
 
-    func testShortQueryStaysOnTheClientSideFilter() async {
+    func testShortQueryStaysOnTheClientSideFilter() {
         let vm = VaultListViewModel(api: makeAPI())
         vm.query = "c"
         XCTAssertFalse(vm.isSearching)

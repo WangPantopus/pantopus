@@ -15,6 +15,8 @@
 //    drops the screen back into the re-enable form.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 public struct ProfessionalProfileView: View {

@@ -10,7 +10,7 @@
 
 import SwiftUI
 
-// swiftlint:disable file_length type_body_length
+// swiftlint:disable file_length
 
 /// Which overflow actions a single Pulse card offers this viewer, and
 /// which of them are already applied. Mirrors RN's per-card gating in
@@ -72,10 +72,14 @@ public struct PulsePostActions: Sendable, Hashable {
 
     /// Report is offered to everyone except the author (RN
     /// `PostCard.tsx:507`).
-    public var canReport: Bool { !isOwner && !isSeeded }
+    public var canReport: Bool {
+        !isOwner && !isSeeded
+    }
 
     /// Delete is author-only (RN `PostCard.tsx:516`).
-    public var canDelete: Bool { isOwner && !isSeeded }
+    public var canDelete: Bool {
+        isOwner && !isSeeded
+    }
 
     /// Muting needs a resolvable entity and never applies to your own post.
     public var canMuteAuthor: Bool {

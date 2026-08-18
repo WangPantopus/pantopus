@@ -58,10 +58,10 @@ final class MailTranslationProjectionTests: XCTestCase {
     // MARK: - Projection
 
     func testProjectionRendersTranslatedTextAndDetectedLanguage() throws {
-        let content = MailTranslationProjection.project(
+        let content = try MailTranslationProjection.project(
             mailId: "m1",
-            detail: try decodeDetail(),
-            translation: try decodeTranslation(),
+            detail: decodeDetail(),
+            translation: decodeTranslation(),
             now: Date(timeIntervalSince1970: 1_778_000_000)
         )
         XCTAssertEqual(content.languages.sourceCode, "ES")
@@ -106,7 +106,7 @@ final class MailTranslationProjectionTests: XCTestCase {
 
     // MARK: - Load
 
-    func testLoadFetchesDetailThenTranslation() async throws {
+    func testLoadFetchesDetailThenTranslation() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.detailBody),
             .status(200, body: Self.translateBody)

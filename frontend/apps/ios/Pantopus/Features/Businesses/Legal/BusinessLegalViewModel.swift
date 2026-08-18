@@ -64,7 +64,9 @@ public enum BusinessEvidenceType: String, CaseIterable, Sendable, Hashable, Iden
     case einVerification = "ein_verification"
     case taxExemptLetter = "tax_exempt_letter"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

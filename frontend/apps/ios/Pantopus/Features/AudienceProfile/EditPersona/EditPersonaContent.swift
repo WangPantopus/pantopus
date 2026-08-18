@@ -83,7 +83,9 @@ public struct PersonaCategoryOption: Sendable, Hashable, Identifiable {
     public let isSensitive: Bool
     public let requirements: [String]
 
-    public var id: String { value }
+    public var id: String {
+        value
+    }
 
     public init(
         value: String,
@@ -125,7 +127,9 @@ public enum PersonaAudienceLabel: String, Sendable, Hashable, CaseIterable, Iden
     case customers
     case patients
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -147,7 +151,9 @@ public enum PersonaAudienceMode: String, Sendable, Hashable, CaseIterable, Ident
     case open
     case approvalRequired = "approval_required"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

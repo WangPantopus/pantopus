@@ -82,7 +82,9 @@ public enum PostGigV1CancellationPolicy: String, CaseIterable, Identifiable, Sen
     case standard
     case strict
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

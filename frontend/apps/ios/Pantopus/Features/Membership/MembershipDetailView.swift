@@ -530,7 +530,7 @@ public struct MembershipDetailView: View {
         .accessibilityIdentifier("membershipDetailInboxCard")
     }
 
-    private func scheduledChangeBanner(_ loaded: MembershipDetailContent) -> some View {
+    private func scheduledChangeBanner(_: MembershipDetailContent) -> some View {
         HStack(alignment: .top, spacing: Spacing.s2) {
             Icon(.calendarClock, size: 15, color: Theme.Color.primary700)
             Text("A tier change is scheduled — it takes effect at the end of this period.")

@@ -14,6 +14,8 @@
 //  so the screen plugs into the shared `ListOfRowsView` shell.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 import SwiftUI
@@ -175,7 +177,9 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     }
 
     /// The drawer the folder pane is scoped to. Driven by the tab strip.
-    private var drawer: String { selectedTab }
+    private var drawer: String {
+        selectedTab
+    }
 
     // MARK: - Load
 

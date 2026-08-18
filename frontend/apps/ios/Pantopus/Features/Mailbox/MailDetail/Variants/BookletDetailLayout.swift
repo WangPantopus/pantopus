@@ -170,7 +170,7 @@ struct BookletDetailLayout: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("mailDetail_booklet_saveToVault")
                 HStack(spacing: Spacing.s2) {
-                    secondary(icon: .share, label: "Share", action: {})
+                    secondary(icon: .share, label: "Share") {}
                     secondary(
                         icon: .download,
                         label: "PDF",
@@ -178,7 +178,7 @@ struct BookletDetailLayout: View {
                         isDisabled: downloadInFlight,
                         action: onDownloadPDF
                     )
-                    secondary(icon: .archive, label: "Archive", action: {})
+                    secondary(icon: .archive, label: "Archive") {}
                 }
             }
         }

@@ -19,6 +19,8 @@
 //  archetype. Mirrors `MailTaskListScreen.kt` on Android.
 //
 
+// swiftlint:disable function_body_length type_body_length
+
 import SwiftUI
 
 public struct MailTaskListView: View {
@@ -448,9 +450,9 @@ public struct MailTaskListView: View {
         .accessibilityIdentifier("mailTaskList_priority_\(priority.rawValue)")
     }
 
-    private func section<Content: View>(
+    private func section(
         label: String,
-        @ViewBuilder body: () -> Content
+        @ViewBuilder body: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 2) {
             Text(label)

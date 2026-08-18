@@ -23,7 +23,9 @@ public struct PersonaPublicLinkDTO: Codable, Sendable, Hashable, Identifiable {
     public let label: String
     public let url: String
 
-    public var id: String { "\(label)|\(url)" }
+    public var id: String {
+        "\(label)|\(url)"
+    }
 
     public init(label: String, url: String) {
         self.label = label
@@ -97,7 +99,9 @@ public struct PersonaCategoryPolicyDTO: Decodable, Sendable, Hashable, Identifia
     public let requirements: [String]?
     public let defaultAudienceMode: String?
 
-    public var id: String { category }
+    public var id: String {
+        category
+    }
 }
 
 // MARK: - POST /api/upload/persona-media/:personaId

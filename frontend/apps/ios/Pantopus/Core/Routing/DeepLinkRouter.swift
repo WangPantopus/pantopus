@@ -263,9 +263,9 @@ final class DeepLinkRouter {
     private static func routingKind(of destination: Destination) -> RoutingKind {
         switch destination {
         case .unknown:
-            return .discard
+            .discard
         case .resetPassword, .verifyEmail:
-            return .authOwned
+            .authOwned
         case .joinInvite:
             // RN sends a signed-out `/join/:code` straight to the register
             // form with the code pre-filled — it never parks the link for
@@ -275,9 +275,9 @@ final class DeepLinkRouter {
             // `src/app/join/[code].tsx:20`). Classifying it auth-owned keeps
             // it in memory so `LoginView` can push Sign-up with the code,
             // while a signed-in viewer still gets the token-accept sheet.
-            return .authOwned
+            .authOwned
         default:
-            return .content
+            .content
         }
     }
 

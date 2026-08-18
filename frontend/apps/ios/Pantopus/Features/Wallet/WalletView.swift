@@ -14,7 +14,7 @@
 //  re-verify CTA in the payout method card).
 //
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 import SwiftUI
 

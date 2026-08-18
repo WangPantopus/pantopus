@@ -138,7 +138,9 @@ public struct FeedMapLoaded: Sendable, Hashable {
         self.nearestActivityCenter = nearestActivityCenter
     }
 
-    public var isEmpty: Bool { entities.isEmpty }
+    public var isEmpty: Bool {
+        entities.isEmpty
+    }
 }
 
 /// Pulse map-mode view model.

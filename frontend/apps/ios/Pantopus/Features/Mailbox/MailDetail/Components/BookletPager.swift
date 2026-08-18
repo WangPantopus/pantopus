@@ -357,10 +357,10 @@ private struct ThumbnailCell: View {
     }
 }
 
-// OCR transcript card (booklet.jsx OCRCard): scan chip + "Text from this
-// page" header with the OCR confidence pill, the per-page transcript
-// (first line = overline, second = title, rest = body), and inert
-// Copy / Translate / Read aloud actions.
+/// OCR transcript card (booklet.jsx OCRCard): scan chip + "Text from this
+/// page" header with the OCR confidence pill, the per-page transcript
+/// (first line = overline, second = title, rest = body), and inert
+/// Copy / Translate / Read aloud actions.
 private struct BookletOCRCard: View {
     let text: String
 
@@ -410,8 +410,8 @@ private struct BookletOCRCard: View {
         }
     }
 
-    // Transcript lines map onto the JSX kinds by position: line 0 is the
-    // overline, line 1 the title, the remainder body copy.
+    /// Transcript lines map onto the JSX kinds by position: line 0 is the
+    /// overline, line 1 the title, the remainder body copy.
     private var transcript: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(text.components(separatedBy: "\n").enumerated()), id: \.offset) { idx, line in

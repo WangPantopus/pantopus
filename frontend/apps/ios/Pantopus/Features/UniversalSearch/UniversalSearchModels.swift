@@ -160,7 +160,9 @@ public struct UniversalSearchSection: Sendable, Hashable, Identifiable {
     public let kind: UniversalSearchKind
     public let results: [UniversalSearchResult]
 
-    public var id: String { kind.rawValue }
+    public var id: String {
+        kind.rawValue
+    }
 
     public init(kind: UniversalSearchKind, results: [UniversalSearchResult]) {
         self.kind = kind

@@ -43,7 +43,9 @@ public struct LockedStampDTO: Decodable, Sendable, Hashable, Identifiable {
     public let progress: Int?
     public let target: Int?
 
-    public var id: String { stampType }
+    public var id: String {
+        stampType
+    }
 
     private enum CodingKeys: String, CodingKey {
         case stampType = "stamp_type"

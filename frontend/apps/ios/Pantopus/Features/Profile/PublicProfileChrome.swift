@@ -15,6 +15,8 @@
 //  All colors come from the token set — never raw hex.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 // MARK: - Banner

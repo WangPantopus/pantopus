@@ -19,7 +19,7 @@
 //  matches the doc's four-state rule: loading / populated / hold / error.
 //
 
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 
 import Foundation
 import Observation
@@ -289,7 +289,7 @@ public final class WalletViewModel {
     /// `String` does not conform to `Error`, so the failure payload needs its
     /// own case, matching `GigDetailViewModel.RemindWorkerOutcome`. The failure
     /// string is the inline copy the field shows verbatim.
-    enum WithdrawAmount: Sendable, Equatable {
+    enum WithdrawAmount: Equatable {
         case success(Int)
         case failure(String)
     }
@@ -444,9 +444,9 @@ public final class WalletViewModel {
     /// fee type) as money coming in.
     static func direction(for transaction: WalletTransactionDTO) -> ActivityDirection {
         switch transaction.direction?.lowercased() {
-        case "debit": return .out
-        case "credit": return .in
-        default: return direction(for: transaction.type)
+        case "debit": .out
+        case "credit": .in
+        default: direction(for: transaction.type)
         }
     }
 

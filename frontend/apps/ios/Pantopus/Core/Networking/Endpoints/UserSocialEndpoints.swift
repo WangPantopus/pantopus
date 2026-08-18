@@ -62,7 +62,9 @@ public enum UserSocialEndpoints {
     /// a path segment — RN's `normalizeUsername`.
     public static func normalizeHandle(_ value: String) -> String {
         var trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        while trimmed.hasPrefix("@") { trimmed.removeFirst() }
+        while trimmed.hasPrefix("@") {
+            trimmed.removeFirst()
+        }
         return trimmed
     }
 

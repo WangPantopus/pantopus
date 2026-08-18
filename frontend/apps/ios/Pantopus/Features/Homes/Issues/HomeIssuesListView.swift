@@ -35,13 +35,10 @@ public struct HomeIssuesListView: View {
             }
             .sheet(isPresented: $reportingIssue) {
                 ReportIssueFormView(
-                    viewModel: ReportIssueFormViewModel(
-                        submit: { title, description in
-                            await viewModel.createIssue(title: title, description: description)
-                        }
-                    ),
-                    onClose: { reportingIssue = false }
-                )
+                    viewModel: ReportIssueFormViewModel { title, description in
+                        await viewModel.createIssue(title: title, description: description)
+                    }
+                ) { reportingIssue = false }
             }
             .alert(
                 "Dismiss issue?",

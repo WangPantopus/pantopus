@@ -20,7 +20,9 @@ public enum GigsFeedScope: String, CaseIterable, Sendable, Hashable, Identifiabl
     /// Nearby Support Trains only.
     case supportTrains = "support_trains"
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {

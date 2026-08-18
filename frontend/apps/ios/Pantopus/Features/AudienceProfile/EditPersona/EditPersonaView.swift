@@ -135,16 +135,14 @@ public struct EditPersonaView: View {
                     imageData: viewModel.form.bannerPick?.data,
                     remoteURL: viewModel.form.bannerURL,
                     selection: $bannerSelection,
-                    hasPick: viewModel.form.bannerPick != nil,
-                    onRemove: { viewModel.removeBannerPick() }
-                )
+                    hasPick: viewModel.form.bannerPick != nil
+                ) { viewModel.removeBannerPick() }
                 PersonaAvatarPicker(
                     imageData: viewModel.form.avatarPick?.data,
                     remoteURL: viewModel.form.avatarURL,
                     selection: $avatarSelection,
-                    hasPick: viewModel.form.avatarPick != nil,
-                    onRemove: { viewModel.removeAvatarPick() }
-                )
+                    hasPick: viewModel.form.avatarPick != nil
+                ) { viewModel.removeAvatarPick() }
             }
         }
     }
@@ -297,13 +295,12 @@ public struct EditPersonaView: View {
             isEnabled: viewModel.isValid && !viewModel.isSaving,
             statusMessage: viewModel.statusMessage,
             errorMessage: viewModel.saveError,
-            onDiscard: onClose,
-            onSave: {
-                Task {
-                    if await viewModel.save() != nil { showsSavedPrompt = true }
-                }
+            onDiscard: onClose
+        ) {
+            Task {
+                if await viewModel.save() != nil { showsSavedPrompt = true }
             }
-        )
+        }
     }
 
     // MARK: - Picker plumbing

@@ -1652,9 +1652,9 @@ public struct HubTabRoot: View {
                 onOpenDocuments: { push(.homeDocs(homeId: homeId)) }
             )
         case let .trustedNeighbors(homeId):
-            TrustedNeighborsView(onBack: { pop() })
+            TrustedNeighborsView { pop() }
         case let .homeNotifications(homeId):
-            HomeNotificationsView(homeId: homeId, onBack: { pop() })
+            HomeNotificationsView(homeId: homeId) { pop() }
         case let .propertyCorrection(homeId):
             PropertyCorrectionView(homeId: homeId) { pop() }
         case let .claimOwnership(homeId):
@@ -1844,9 +1844,8 @@ public struct HubTabRoot: View {
             BusinessPageBlocksView(
                 businessId: businessId,
                 pageId: pageId,
-                pageTitle: pageTitle,
-                onBack: { Task { @MainActor in pop() } }
-            )
+                pageTitle: pageTitle
+            ) { Task { @MainActor in pop() } }
         case let .editBusinessPage(businessId):
             EditBusinessPageView(
                 businessId: businessId,
@@ -2687,7 +2686,7 @@ public struct HubTabRoot: View {
                 )
             )
         case .communityMail:
-            CommunityMailView(viewModel: CommunityMailViewModel(onBack: { pop() }))
+            CommunityMailView(viewModel: CommunityMailViewModel { pop() })
         case .homeRecords:
             HomeRecordsView(
                 viewModel: HomeRecordsViewModel(

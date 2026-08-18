@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable cyclomatic_complexity multiple_closures_with_trailing_closure type_body_length
 
 /// Typed routes within the Tasks tab's NavigationStack.
 public enum TasksRoute: Hashable {
@@ -178,7 +178,10 @@ public struct TasksTabRoot: View {
     /// "My Support Trains" quick link under the feed-scope chips.
     private func supportTrainsDestination() -> some View {
         SupportTrainsView(
+            // Keep the explicit `onOpenTrain:` label — as a trailing closure this
+            // resolves to the zero-argument initializer instead.
             viewModel: SupportTrainsViewModel(
+                // swiftlint:disable:next trailing_closure
                 onOpenTrain: { trainId in
                     Task { @MainActor in path.append(.supportTrainDetail(supportTrainId: trainId)) }
                 }
@@ -190,13 +193,12 @@ public struct TasksTabRoot: View {
     private func supportTrainDetailDestination(supportTrainId: String) -> some View {
         SupportTrainDetailView(
             viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
-            onBack: pop,
-            onShare: {
-                systemSheet = .share(
-                    items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
-                )
-            }
-        )
+            onBack: pop
+        ) {
+            systemSheet = .share(
+                items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
+            )
+        }
     }
 
     private func composeGigDestination(category: String) -> some View {

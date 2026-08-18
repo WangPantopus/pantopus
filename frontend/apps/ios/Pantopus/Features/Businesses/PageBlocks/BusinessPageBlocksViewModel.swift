@@ -122,11 +122,18 @@ public final class BusinessPageBlocksViewModel {
         state = .loaded(blocks: blocks)
     }
 
-    public func moveUp(_ index: Int) { move(from: index, to: index - 1) }
-    public func moveDown(_ index: Int) { move(from: index, to: index + 1) }
+    public func moveUp(_ index: Int) {
+        move(from: index, to: index - 1)
+    }
+
+    public func moveDown(_ index: Int) {
+        move(from: index, to: index + 1)
+    }
 
     private func renumber() {
-        for index in blocks.indices { blocks[index].sortOrder = index }
+        for index in blocks.indices {
+            blocks[index].sortOrder = index
+        }
     }
 
     // MARK: - Save / publish

@@ -6,6 +6,8 @@
 //  `src/components/business/blocks/BlockEditor.tsx` and `BlockTypePicker.tsx`.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 // MARK: - Type picker

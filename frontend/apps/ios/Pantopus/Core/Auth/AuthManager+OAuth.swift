@@ -91,7 +91,7 @@ extension AuthManager {
     private static func oauthNonceMatches(_ url: URL, expected: String) -> Bool {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let presented = components?.queryItems?
-            .first(where: { $0.name == AuthEndpoints.oauthNonceParam })?.value
+            .first { $0.name == AuthEndpoints.oauthNonceParam }?.value
         guard let presented, !presented.isEmpty, !expected.isEmpty else { return false }
         return constantTimeEquals(expected, presented)
     }

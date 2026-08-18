@@ -96,7 +96,7 @@ struct PayoutAccountCard: View {
         .accessibilityHidden(true)
     }
 
-    @ViewBuilder private var action: some View {
+    private var action: some View {
         Button(action: onAction) {
             HStack(spacing: Spacing.s1) {
                 Icon(

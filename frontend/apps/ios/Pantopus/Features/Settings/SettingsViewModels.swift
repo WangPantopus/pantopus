@@ -99,13 +99,12 @@ public final class SettingsIndexViewModel: GroupedListDataSource {
     }
 
     private func accountGroup() -> GroupedListGroup {
-        let verificationChip: RowControl
-        if verified == true {
-            verificationChip = .chipStatus(label: "Verified", tone: .success, includesChevron: true)
+        let verificationChip: RowControl = if verified == true {
+            .chipStatus(label: "Verified", tone: .success, includesChevron: true)
         } else if verified == false {
-            verificationChip = .chipStatus(label: "Unverified", tone: .warning, includesChevron: true)
+            .chipStatus(label: "Unverified", tone: .warning, includesChevron: true)
         } else {
-            verificationChip = .chevron
+            .chevron
         }
         return GroupedListGroup(
             id: "account",

@@ -12,6 +12,8 @@
 //  Mirrors `ui/screens/mailbox/home_records/HomeRecordsScreen.kt`.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 public struct HomeRecordsView: View {
@@ -286,7 +288,6 @@ public struct HomeRecordsView: View {
         }
     }
 
-    @ViewBuilder
     private var linkedMailCard: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             switch viewModel.detailState {
@@ -447,7 +448,6 @@ public struct HomeRecordsView: View {
 
     // MARK: - Undo / toast
 
-    @ViewBuilder
     private var bottomOverlay: some View {
         VStack(spacing: Spacing.s2) {
             if let undo = viewModel.undoableLink {

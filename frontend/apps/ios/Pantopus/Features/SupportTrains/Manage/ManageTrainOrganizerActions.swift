@@ -13,6 +13,8 @@
 //  so no one sees a button the server will 403.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 
 // MARK: - Row models
@@ -47,13 +49,21 @@ public struct ManageHelperRow: Sendable, Hashable, Identifiable {
 
     /// Only `reserved` signups can be pulled off a slot
     /// (`backend/routes/supportTrains.js:3013`).
-    public var canRemove: Bool { status == "reserved" }
+    public var canRemove: Bool {
+        status == "reserved"
+    }
+
     /// `POST …/confirm` requires the reservation to be `delivered`
     /// (`backend/routes/supportTrains.js:3255`).
-    public var canConfirm: Bool { status == "delivered" }
+    public var canConfirm: Bool {
+        status == "delivered"
+    }
+
     /// The reveal route 409s on canceled reservations
     /// (`backend/routes/supportTrains.js:2800`).
-    public var canShareAddress: Bool { status != "canceled" && !exactAddressShared }
+    public var canShareAddress: Bool {
+        status != "canceled" && !exactAddressShared
+    }
 }
 
 /// One editable date on the Manage screen.
@@ -147,8 +157,13 @@ public struct ManageSlotEditorState: Sendable, Hashable, Identifiable {
         self.endTime = endTime
     }
 
-    public var id: String { slotId ?? "new-slot" }
-    public var isEditing: Bool { slotId != nil }
+    public var id: String {
+        slotId ?? "new-slot"
+    }
+
+    public var isEditing: Bool {
+        slotId != nil
+    }
 
     /// `slot_label` enum from `customSlotSchema`
     /// (`backend/routes/supportTrains.js:405`).
@@ -181,15 +196,17 @@ public struct ManageDestructiveConfirm: Sendable, Hashable, Identifiable {
         self.confirmLabel = confirmLabel
     }
 
-    public var id: String { "\(kind)" }
+    public var id: String {
+        "\(kind)"
+    }
 }
 
 // MARK: - Actions
 
-extension ManageTrainViewModel {
+public extension ManageTrainViewModel {
     /// Fan-out for the organizer-only feeds. Failures degrade to empty
     /// sections instead of blowing up the whole screen.
-    func loadOrganizerSurfaces() async {
+    internal func loadOrganizerSurfaces() async {
         let reservations = try? await api.request(
             SupportTrainsEndpoints.reservations(supportTrainId: supportTrainId),
             as: SupportTrainReservationsResponse.self
@@ -211,7 +228,7 @@ extension ManageTrainViewModel {
 
     // MARK: Lifecycle
 
-    public func pauseTrain() async {
+    func pauseTrain() async {
         await run(
             SupportTrainActionsEndpoints.pause(supportTrainId: supportTrainId),
             success: "Train paused",
@@ -219,7 +236,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func resumeTrain() async {
+    func resumeTrain() async {
         await run(
             SupportTrainActionsEndpoints.resume(supportTrainId: supportTrainId),
             success: "Train resumed",
@@ -227,7 +244,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func unpublishTrain() async {
+    func unpublishTrain() async {
         await run(
             SupportTrainActionsEndpoints.unpublish(supportTrainId: supportTrainId),
             success: "Back to draft",
@@ -235,7 +252,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func archiveTrain() async {
+    func archiveTrain() async {
         await run(
             SupportTrainActionsEndpoints.archive(supportTrainId: supportTrainId),
             success: "Train archived",
@@ -246,7 +263,7 @@ extension ManageTrainViewModel {
     /// `DELETE /:id`. Primary only; the backend 409s once helpers have
     /// committed or contributions exist, and that message is surfaced
     /// verbatim.
-    public func deleteTrain() async {
+    func deleteTrain() async {
         guard !isSubmitting else { return }
         setSubmitting(true)
         defer { setSubmitting(false) }
@@ -264,7 +281,7 @@ extension ManageTrainViewModel {
 
     // MARK: Co-organizers
 
-    public func addOrganizer() async {
+    func addOrganizer() async {
         let userId = newOrganizerUserId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userId.isEmpty else { return }
         newOrganizerUserId = ""
@@ -278,7 +295,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func removeOrganizer(userId: String) async {
+    func removeOrganizer(userId: String) async {
         await run(
             SupportTrainActionsEndpoints.removeOrganizer(
                 supportTrainId: supportTrainId,
@@ -291,10 +308,10 @@ extension ManageTrainViewModel {
 
     // MARK: Slots
 
-    public func startAddSlot() {
+    func startAddSlot() {
         slotEditor = ManageSlotEditorState(
             slotId: nil,
-            slotDate: Date().addingTimeInterval(86_400),
+            slotDate: Date().addingTimeInterval(86400),
             slotLabel: "Dinner",
             supportMode: "meal",
             startTime: Self.defaultClock(hour: 17),
@@ -302,7 +319,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func startEditSlot(_ row: ManageSlotRow) {
+    func startEditSlot(_ row: ManageSlotRow) {
         slotEditor = ManageSlotEditorState(
             slotId: row.id,
             slotDate: Self.slotDate(from: row.slotDate) ?? Date(),
@@ -313,13 +330,13 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func dismissSlotEditor() {
+    func dismissSlotEditor() {
         slotEditor = nil
     }
 
     /// `POST /:id/slots` when adding, `PATCH /:id/slots/:slotId` when
     /// editing. Times are sent as `HH:mm` per both Joi schemas.
-    public func saveSlot(_ editor: ManageSlotEditorState) async {
+    func saveSlot(_ editor: ManageSlotEditorState) async {
         slotEditor = nil
         let date = Self.isoDateString(editor.slotDate)
         let start = Self.clockString(editor.startTime)
@@ -360,7 +377,7 @@ extension ManageTrainViewModel {
 
     /// Removing a date is `PATCH … { status: "canceled" }` — the same
     /// call RN makes (`support-trains/[id]/manage.tsx:302`).
-    public func cancelSlot(slotId: String) async {
+    func cancelSlot(slotId: String) async {
         await run(
             SupportTrainActionsEndpoints.updateSlot(
                 supportTrainId: supportTrainId,
@@ -376,7 +393,7 @@ extension ManageTrainViewModel {
 
     /// Organizer-side cancel — sends `organizer_reason` so the helper
     /// gets the "why" in their notification.
-    public func removeHelper(reservationId: String, reason: String?) async {
+    func removeHelper(reservationId: String, reason: String?) async {
         let trimmed = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
         await run(
             SupportTrainActionsEndpoints.cancelReservation(
@@ -394,7 +411,7 @@ extension ManageTrainViewModel {
     /// Share the exact address with one helper (or email a guest signup).
     /// The address itself never comes back in this response — the reload
     /// re-runs the server-side privacy gate.
-    public func shareExactAddress(reservationId: String) async {
+    func shareExactAddress(reservationId: String) async {
         await run(
             SupportTrainActionsEndpoints.revealAddress(
                 supportTrainId: supportTrainId,
@@ -405,7 +422,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func confirmDelivery(reservationId: String) async {
+    func confirmDelivery(reservationId: String) async {
         await run(
             SupportTrainActionsEndpoints.confirmDelivery(
                 supportTrainId: supportTrainId,
@@ -418,7 +435,7 @@ extension ManageTrainViewModel {
 
     // MARK: Nudge
 
-    public func draftNudge() async {
+    func draftNudge() async {
         guard !isSubmitting else { return }
         setSubmitting(true)
         defer { setSubmitting(false) }
@@ -432,7 +449,7 @@ extension ManageTrainViewModel {
         }
     }
 
-    public func sendNudge() async {
+    func sendNudge() async {
         let message = (nudgeDraft ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, !isSubmitting else { return }
         setSubmitting(true)
@@ -452,13 +469,13 @@ extension ManageTrainViewModel {
         }
     }
 
-    public func discardNudge() {
+    func discardNudge() {
         nudgeDraft = nil
     }
 
     // MARK: Gift fund
 
-    public func enableFund(goalDollars: Int?) async {
+    func enableFund(goalDollars: Int?) async {
         let goalCents = goalDollars.map { $0 * 100 }
         await run(
             SupportTrainActionsEndpoints.enableFund(
@@ -470,7 +487,7 @@ extension ManageTrainViewModel {
         )
     }
 
-    public func disableFund() async {
+    func disableFund() async {
         await run(
             SupportTrainActionsEndpoints.disableFund(supportTrainId: supportTrainId),
             success: "Gift fund disabled",
@@ -480,18 +497,18 @@ extension ManageTrainViewModel {
 
     // MARK: Confirms
 
-    public func requestConfirm(_ confirm: ManageDestructiveConfirm) {
+    func requestConfirm(_ confirm: ManageDestructiveConfirm) {
         pendingConfirm = confirm
     }
 
-    public func dismissConfirm() {
+    func dismissConfirm() {
         pendingConfirm = nil
     }
 
     /// Run one confirmed destructive action. The view passes the `kind`
     /// captured at tap time — SwiftUI clears `pendingConfirm` through the
     /// alert binding before the task starts.
-    public func perform(_ kind: ManageDestructiveConfirm.Kind) async {
+    func perform(_ kind: ManageDestructiveConfirm.Kind) async {
         pendingConfirm = nil
         switch kind {
         case .unpublishTrain: await unpublishTrain()
@@ -504,7 +521,7 @@ extension ManageTrainViewModel {
         }
     }
 
-    public func acknowledgeActionError() {
+    func acknowledgeActionError() {
         actionError = nil
     }
 
@@ -525,7 +542,7 @@ extension ManageTrainViewModel {
 
     // MARK: - Projection helpers
 
-    nonisolated static func helperRows(
+    internal nonisolated static func helperRows(
         _ reservations: [SupportTrainReservationDTO],
         slots: [ManageSlotRow]
     ) -> [ManageHelperRow] {
@@ -548,7 +565,7 @@ extension ManageTrainViewModel {
         }
     }
 
-    nonisolated static func organizerRows(
+    internal nonisolated static func organizerRows(
         _ organizers: [SupportTrainOrganizerRowDTO]
     ) -> [ManageOrganizerRow] {
         organizers.map { organizer in
@@ -562,7 +579,7 @@ extension ManageTrainViewModel {
         }
     }
 
-    nonisolated static func slotRows(_ slots: [SupportTrainSlotDTO]) -> [ManageSlotRow] {
+    internal nonisolated static func slotRows(_ slots: [SupportTrainSlotDTO]) -> [ManageSlotRow] {
         slots
             .filter { ($0.status ?? "open") != "canceled" }
             .map { slot in
@@ -599,7 +616,7 @@ extension ManageTrainViewModel {
 
     // MARK: - Date helpers
 
-    nonisolated static func slotDate(from value: String?) -> Date? {
+    internal nonisolated static func slotDate(from value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -608,7 +625,7 @@ extension ManageTrainViewModel {
         return formatter.date(from: String(value.prefix(10)))
     }
 
-    nonisolated static func isoDateString(_ date: Date) -> String {
+    internal nonisolated static func isoDateString(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "UTC")
@@ -616,7 +633,7 @@ extension ManageTrainViewModel {
         return formatter.string(from: date)
     }
 
-    nonisolated static func longDateLabel(_ date: Date) -> String {
+    internal nonisolated static func longDateLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "UTC")
@@ -624,7 +641,7 @@ extension ManageTrainViewModel {
         return formatter.string(from: date)
     }
 
-    nonisolated static func clock(from value: String?) -> Date? {
+    internal nonisolated static func clock(from value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -636,14 +653,14 @@ extension ManageTrainViewModel {
     }
 
     /// `HH:mm` — the shape both slot schemas validate.
-    nonisolated static func clockString(_ date: Date) -> String {
+    internal nonisolated static func clockString(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
 
-    nonisolated static func defaultClock(hour: Int) -> Date {
+    internal nonisolated static func defaultClock(hour: Int) -> Date {
         var components = DateComponents()
         components.hour = hour
         components.minute = 0

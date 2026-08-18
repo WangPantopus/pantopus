@@ -346,8 +346,8 @@ final class ContentDetailProjectionTests: XCTestCase {
         status: String = "sent",
         paidAt: String? = nil,
         dueDate: String? = "2025-12-18T17:00:00.000Z",
-        subtotalCents: Int = 35_400,
-        totalCents: Int = 35_400
+        subtotalCents: Int = 35400,
+        totalCents: Int = 35400
     ) -> BusinessInvoiceDTO {
         BusinessInvoiceDTO(
             id: "7f3c1a24-1111-4000-8000-000000000001",
@@ -393,7 +393,7 @@ final class ContentDetailProjectionTests: XCTestCase {
 
     func testInvoiceSubtotalRowAppearsOnlyWhenItDiffersFromTotal() {
         let content = InvoiceDetailViewModel.project(
-            makeInvoice(subtotalCents: 35_400, totalCents: 30_000)
+            makeInvoice(subtotalCents: 35400, totalCents: 30000)
         )
         let items = content.modules.compactMap { mod -> ContentDetailLineItems? in
             if case let .lineItems(m) = mod { return m } else { return nil }

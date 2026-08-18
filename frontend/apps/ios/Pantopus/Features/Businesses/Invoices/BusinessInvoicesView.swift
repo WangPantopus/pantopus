@@ -10,7 +10,6 @@
 //  Mirrors RN `src/components/business/tabs/InvoicesTab.tsx` and Android
 //  `BusinessInvoicesScreen.kt`.
 //
-// swiftlint:disable file_length
 
 import SwiftUI
 
@@ -334,10 +333,10 @@ public struct BusinessInvoicesView: View {
                         status: "sent",
                         memo: "Deep clean, 2 bedrooms",
                         lineItems: [
-                            BusinessInvoiceRow.LineItem(id: 0, title: "Deep clean ×2", amountLabel: "$180.00"),
+                            BusinessInvoiceRow.LineItem(id: 0, title: "Deep clean ×2", amountLabel: "$180.00")
                         ],
                         canVoid: true
-                    ),
+                    )
                 ]
             )
         )

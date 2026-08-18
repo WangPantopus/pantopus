@@ -121,22 +121,22 @@ public struct NotificationPreferencesDTO: Decodable, Sendable, Hashable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            dailyBriefingEnabled: try container.decodeIfPresent(Bool.self, forKey: .dailyBriefingEnabled) ?? false,
-            dailyBriefingTimeLocal: try container.decodeIfPresent(String.self, forKey: .dailyBriefingTimeLocal)
+        try self.init(
+            dailyBriefingEnabled: container.decodeIfPresent(Bool.self, forKey: .dailyBriefingEnabled) ?? false,
+            dailyBriefingTimeLocal: container.decodeIfPresent(String.self, forKey: .dailyBriefingTimeLocal)
                 ?? "07:30",
-            dailyBriefingTimezone: try container.decodeIfPresent(String.self, forKey: .dailyBriefingTimezone),
-            eveningBriefingEnabled: try container.decodeIfPresent(Bool.self, forKey: .eveningBriefingEnabled) ?? true,
-            eveningBriefingTimeLocal: try container.decodeIfPresent(String.self, forKey: .eveningBriefingTimeLocal)
+            dailyBriefingTimezone: container.decodeIfPresent(String.self, forKey: .dailyBriefingTimezone),
+            eveningBriefingEnabled: container.decodeIfPresent(Bool.self, forKey: .eveningBriefingEnabled) ?? true,
+            eveningBriefingTimeLocal: container.decodeIfPresent(String.self, forKey: .eveningBriefingTimeLocal)
                 ?? "18:00",
-            weatherAlertsEnabled: try container.decodeIfPresent(Bool.self, forKey: .weatherAlertsEnabled) ?? true,
-            aqiAlertsEnabled: try container.decodeIfPresent(Bool.self, forKey: .aqiAlertsEnabled) ?? true,
-            mailSummaryEnabled: try container.decodeIfPresent(Bool.self, forKey: .mailSummaryEnabled) ?? true,
-            gigUpdatesEnabled: try container.decodeIfPresent(Bool.self, forKey: .gigUpdatesEnabled) ?? true,
-            homeRemindersEnabled: try container.decodeIfPresent(Bool.self, forKey: .homeRemindersEnabled) ?? true,
-            quietHoursStartLocal: try container.decodeIfPresent(String.self, forKey: .quietHoursStartLocal),
-            quietHoursEndLocal: try container.decodeIfPresent(String.self, forKey: .quietHoursEndLocal),
-            locationMode: try container.decodeIfPresent(String.self, forKey: .locationMode)
+            weatherAlertsEnabled: container.decodeIfPresent(Bool.self, forKey: .weatherAlertsEnabled) ?? true,
+            aqiAlertsEnabled: container.decodeIfPresent(Bool.self, forKey: .aqiAlertsEnabled) ?? true,
+            mailSummaryEnabled: container.decodeIfPresent(Bool.self, forKey: .mailSummaryEnabled) ?? true,
+            gigUpdatesEnabled: container.decodeIfPresent(Bool.self, forKey: .gigUpdatesEnabled) ?? true,
+            homeRemindersEnabled: container.decodeIfPresent(Bool.self, forKey: .homeRemindersEnabled) ?? true,
+            quietHoursStartLocal: container.decodeIfPresent(String.self, forKey: .quietHoursStartLocal),
+            quietHoursEndLocal: container.decodeIfPresent(String.self, forKey: .quietHoursEndLocal),
+            locationMode: container.decodeIfPresent(String.self, forKey: .locationMode)
                 ?? BriefingLocationMode.primaryHome.rawValue
         )
     }

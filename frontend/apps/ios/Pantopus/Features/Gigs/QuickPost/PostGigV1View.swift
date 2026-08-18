@@ -161,9 +161,8 @@ public struct PostGigV1View: View {
         // touch every column the PATCH schema accepts (`gigs.js:642`).
         FormFieldGroup("More details") {
             PostGigV1DeadlineField(
-                deadline: viewModel.state.form.deadline,
-                onChange: { viewModel.updateDeadline($0) }
-            )
+                deadline: viewModel.state.form.deadline
+            ) { viewModel.updateDeadline($0) }
 
             PantopusTextField(
                 "Estimated duration (hours)",

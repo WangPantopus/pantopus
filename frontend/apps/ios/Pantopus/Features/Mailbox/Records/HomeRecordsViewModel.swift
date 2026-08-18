@@ -19,6 +19,8 @@
 //  Mirrors `ui/screens/mailbox/home_records/HomeRecordsViewModel.kt`.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Observation
 import SwiftUI

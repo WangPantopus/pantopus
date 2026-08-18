@@ -5,6 +5,8 @@
 //  Supporting views for the Home Dashboard content surface.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 /// Home security-state banner — `claim_window` / `review_required` /

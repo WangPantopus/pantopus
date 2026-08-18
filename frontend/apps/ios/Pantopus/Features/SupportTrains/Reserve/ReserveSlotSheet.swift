@@ -9,6 +9,8 @@
 //  `POST /api/activities/support-trains/:id/slots/:slotId/reserve`.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 /// Sheet presentation payload. `slotId` is pre-filled when the user
@@ -20,7 +22,9 @@ public struct ReserveSheetSelection: Identifiable, Hashable, Sendable {
         self.slotId = slotId
     }
 
-    public var id: String { slotId ?? "picker" }
+    public var id: String {
+        slotId ?? "picker"
+    }
 }
 
 @MainActor
@@ -297,7 +301,6 @@ public struct ReserveSlotSheet: View {
 
     // MARK: - Footer
 
-    @ViewBuilder
     private var footer: some View {
         VStack(spacing: Spacing.s0) {
             Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)

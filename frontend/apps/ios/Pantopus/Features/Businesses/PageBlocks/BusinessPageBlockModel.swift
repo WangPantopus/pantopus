@@ -13,6 +13,8 @@
 //  understand.
 //
 
+// swiftlint:disable cyclomatic_complexity file_length function_body_length
+
 import Foundation
 
 // MARK: - Kind
@@ -84,7 +86,7 @@ public enum BusinessPageBlockKind: Sendable, Hashable {
     /// Order of the "Add block" picker — matches RN's registry order.
     public static let pickable: [BusinessPageBlockKind] = [
         .hero, .text, .gallery, .catalogGrid, .hours, .locationsMap, .cta,
-        .faq, .reviews, .stats, .team, .contactForm, .embed, .postsFeed, .divider,
+        .faq, .reviews, .stats, .team, .contactForm, .embed, .postsFeed, .divider
     ]
 }
 
@@ -125,7 +127,7 @@ public enum BusinessPageBlockRegistry {
                 defaultData: [
                     "heading": .string("Gallery"),
                     "images": .array([]),
-                    "image_count": .number(6),
+                    "image_count": .number(6)
                 ]
             )
         case .catalogGrid:
@@ -136,7 +138,7 @@ public enum BusinessPageBlockRegistry {
                 defaultData: [
                     "heading": .string("Our Services"),
                     "filter_kind": .string(""),
-                    "max_items": .number(8),
+                    "max_items": .number(8)
                 ]
             )
         case .hours:
@@ -162,8 +164,8 @@ public enum BusinessPageBlockRegistry {
                     "heading": .string("Ready to get started?"),
                     "subhead": .string(""),
                     "buttons": .array([
-                        .object(["label": .string("Contact Us"), "action": .string("message")]),
-                    ]),
+                        .object(["label": .string("Contact Us"), "action": .string("message")])
+                    ])
                 ]
             )
         case .faq:
@@ -173,7 +175,7 @@ public enum BusinessPageBlockRegistry {
                 summary: "Frequently asked questions",
                 defaultData: [
                     "heading": .string("FAQ"),
-                    "items": .array([.object(["q": .string(""), "a": .string("")])]),
+                    "items": .array([.object(["q": .string(""), "a": .string("")])])
                 ]
             )
         case .reviews:
@@ -190,8 +192,8 @@ public enum BusinessPageBlockRegistry {
                 summary: "Key numbers and statistics",
                 defaultData: [
                     "stats": .array([
-                        .object(["label": .string("Customers"), "value": .string("1,000+")]),
-                    ]),
+                        .object(["label": .string("Customers"), "value": .string("1,000+")])
+                    ])
                 ]
             )
         case .team:
@@ -301,7 +303,9 @@ public struct BusinessPageBlock: Sendable, Hashable, Identifiable {
     public var showUntil: String?
     public var isVisible: Bool
 
-    public var id: String { localId }
+    public var id: String {
+        localId
+    }
 
     public init(
         serverId: String?,
@@ -375,14 +379,37 @@ public struct BusinessPageBlock: Sendable, Hashable, Identifiable {
 
     // MARK: Typed reads over the raw `data` map
 
-    public var heading: String { string("heading") }
-    public var headline: String { string("headline") }
-    public var subhead: String { string("subhead") }
-    public var body: String { string("body") }
-    public var url: String { string("url") }
-    public var filterKind: String { string("filter_kind") }
-    public var imageCount: Int { int("image_count") ?? 6 }
-    public var maxItems: Int { int("max_items") ?? 8 }
+    public var heading: String {
+        string("heading")
+    }
+
+    public var headline: String {
+        string("headline")
+    }
+
+    public var subhead: String {
+        string("subhead")
+    }
+
+    public var body: String {
+        string("body")
+    }
+
+    public var url: String {
+        string("url")
+    }
+
+    public var filterKind: String {
+        string("filter_kind")
+    }
+
+    public var imageCount: Int {
+        int("image_count") ?? 6
+    }
+
+    public var maxItems: Int {
+        int("max_items") ?? 8
+    }
 
     /// `[{ label, action }]` used by hero (`cta`) and CTA (`buttons`).
     public func buttonList(key: String) -> [BusinessPageBlockButton] {
@@ -448,7 +475,9 @@ public struct BusinessPageBlock: Sendable, Hashable, Identifiable {
         }
     }
 
-    private func string(_ key: String) -> String { data[key]?.stringValue ?? "" }
+    private func string(_ key: String) -> String {
+        data[key]?.stringValue ?? ""
+    }
 
     private func int(_ key: String) -> Int? {
         if let number = data[key]?.numberValue { return Int(number) }
@@ -511,7 +540,7 @@ public enum BusinessPageBlockOptions {
         ("product", "Products"),
         ("menu_item", "Menu Items"),
         ("class", "Classes"),
-        ("rental", "Rentals"),
+        ("rental", "Rentals")
     ]
 
     public static let ctaActions: [(key: String, label: String)] = [
@@ -519,20 +548,20 @@ public enum BusinessPageBlockOptions {
         ("call", "Call"),
         ("directions", "Get Directions"),
         ("link", "Open Link"),
-        ("book", "Book Now"),
+        ("book", "Book Now")
     ]
 
     public static let padding: [(key: String, label: String)] = [
         ("none", "None"),
         ("small", "Small"),
         ("default", "Default"),
-        ("large", "Large"),
+        ("large", "Large")
     ]
 
     public static let background: [(key: String, label: String)] = [
         ("default", "White"),
         ("gray", "Gray"),
         ("brand", "Brand"),
-        ("transparent", "Transparent"),
+        ("transparent", "Transparent")
     ]
 }

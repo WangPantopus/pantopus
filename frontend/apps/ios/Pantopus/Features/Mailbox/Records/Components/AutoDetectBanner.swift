@@ -38,7 +38,7 @@ struct AutoDetectBanner: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Spacing.s2)
-            Button(action: onReview, label: {
+            Button(action: onReview) {
                 Text("Review")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Color.appTextInverse)
@@ -46,7 +46,7 @@ struct AutoDetectBanner: View {
                     .padding(.vertical, 7)
                     .background(Theme.Color.warning)
                     .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-            })
+            }
             .buttonStyle(.plain)
             .accessibilityIdentifier("homeRecords_autoDetect_review")
         }
@@ -57,7 +57,7 @@ struct AutoDetectBanner: View {
     }
 
     private var scanButton: some View {
-        Button(action: onScan, label: {
+        Button(action: onScan) {
             HStack(spacing: Spacing.s2) {
                 if isScanning {
                     ProgressView()
@@ -75,7 +75,7 @@ struct AutoDetectBanner: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Theme.Color.warningBg)
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-        })
+        }
         .buttonStyle(.plain)
         .disabled(isScanning)
         .accessibilityIdentifier("homeRecords_autoDetect_scan")

@@ -697,7 +697,9 @@ private struct DeliveryModuleFields: View {
 private struct ProServiceModuleFields: View {
     @Bindable var viewModel: GigComposeViewModel
 
-    private var details: GigProServiceDetails? { viewModel.form.proServiceDetails }
+    private var details: GigProServiceDetails? {
+        viewModel.form.proServiceDetails
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {

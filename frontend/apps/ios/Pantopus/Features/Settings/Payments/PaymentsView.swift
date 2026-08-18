@@ -13,6 +13,8 @@
 //  Wallet surface, where Stripe Connect onboarding/dashboard live.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 public struct PaymentsView: View {

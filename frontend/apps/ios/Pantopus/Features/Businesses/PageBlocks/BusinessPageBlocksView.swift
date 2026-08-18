@@ -8,6 +8,8 @@
 //  `…/revisions`. Mirrors RN `src/app/businesses/[id]/page-editor.tsx`.
 //
 
+// swiftlint:disable type_body_length
+
 import SwiftUI
 
 /// Block builder for one custom business page.
@@ -125,10 +127,9 @@ public struct BusinessPageBlocksView: View {
         case let .error(message):
             ErrorState(
                 headline: "Couldn't load this page",
-                message: message,
-                onRetry: { await viewModel.refresh() }
-            )
-            .accessibilityIdentifier("businessPageBlocks.error")
+                message: message
+            ) { await viewModel.refresh() }
+                .accessibilityIdentifier("businessPageBlocks.error")
         case .loaded:
             if viewModel.isPreviewing {
                 previewBody
@@ -360,7 +361,9 @@ public struct BusinessPageBlocksView: View {
     private struct EditingTarget: Identifiable {
         let index: Int
         let block: BusinessPageBlock
-        var id: String { block.localId }
+        var id: String {
+            block.localId
+        }
     }
 
     private var editingBinding: Binding<EditingTarget?> {

@@ -110,9 +110,8 @@ public struct ClaimOwnershipWizardView: View {
             ClaimStartStep(
                 content: viewModel.startContent,
                 showsAskVerifiedOwner: viewModel.showsAskVerifiedOwner,
-                selectedMethod: viewModel.selectedStartMethod,
-                onSelectMethod: { viewModel.selectStartMethod($0) }
-            )
+                selectedMethod: viewModel.selectedStartMethod
+            ) { viewModel.selectStartMethod($0) }
         case .upload:
             ClaimUploadStep(viewModel: viewModel)
         case .success:

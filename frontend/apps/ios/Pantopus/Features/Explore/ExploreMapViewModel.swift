@@ -18,6 +18,8 @@
 //  deterministic content via `init(scenario:)`, bypassing the network.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import CoreLocation
 import Foundation
 import Observation

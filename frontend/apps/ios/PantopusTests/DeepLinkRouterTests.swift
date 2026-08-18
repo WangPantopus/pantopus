@@ -13,11 +13,11 @@ import XCTest
 
 @MainActor
 final class DeepLinkRouterTests: XCTestCase {
-    // WS1.4 gated `.content` destinations behind the session check: signed-out
-    // links are stashed for post-login replay instead of published to
-    // `pending`. These cases describe a signed-in user's routing, so bind the
-    // seam rather than depending on whatever session the test host happens to
-    // hold. Mirrors Android `DeepLinkRouterTest.setUp`.
+    /// WS1.4 gated `.content` destinations behind the session check: signed-out
+    /// links are stashed for post-login replay instead of published to
+    /// `pending`. These cases describe a signed-in user's routing, so bind the
+    /// seam rather than depending on whatever session the test host happens to
+    /// hold. Mirrors Android `DeepLinkRouterTest.setUp`.
     override func setUp() {
         super.setUp()
         DeepLinkRouter.bindSignedInProvider { true }

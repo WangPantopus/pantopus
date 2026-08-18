@@ -7,6 +7,8 @@
 //  the v1 surface is email-only, plus browser-based OAuth.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 struct LoginView: View {

@@ -329,8 +329,8 @@ public final class PublicProfileViewModel {
         currentUserId: String? = PublicProfileViewModel.signedInUserId(),
         client: APIClient = .shared
     ) {
-        self.routeIdentifier = userId
-        self.resolvedUserId = userId
+        routeIdentifier = userId
+        resolvedUserId = userId
         self.currentUserId = currentUserId
         self.client = client
     }

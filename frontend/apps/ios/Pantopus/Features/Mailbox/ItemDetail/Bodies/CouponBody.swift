@@ -5,6 +5,8 @@
 //  Concrete body for the A17.5 Coupon mailbox category.
 //
 
+// swiftlint:disable file_length multiline_function_chains
+
 import SwiftUI
 import UIKit
 
@@ -313,10 +315,10 @@ private struct RibbonFact: View {
     }
 }
 
-// Wallet-pass preview shown once the coupon is redeemed/added
-// (coupon.jsx WalletPreview): "In your wallet" header with the Active
-// dot, a pass-styled tile (brand chip + headline + code/expiry
-// columns), and the reminder / at-arrival helper chips.
+/// Wallet-pass preview shown once the coupon is redeemed/added
+/// (coupon.jsx WalletPreview): "In your wallet" header with the Active
+/// dot, a pass-styled tile (brand chip + headline + code/expiry
+/// columns), and the reminder / at-arrival helper chips.
 private struct WalletPreviewCard: View {
     let merchant: String
     let headline: String
@@ -470,10 +472,10 @@ private struct WalletPreviewCard: View {
     }
 }
 
-// Similar-offers rail (coupon.jsx SimilarOffers): header + horizontal
-// strip of mini ticket cards. Decorative — driven by
-// `MailItemSampleData.couponSimilarOffers` until the rail gets a
-// backend feed.
+/// Similar-offers rail (coupon.jsx SimilarOffers): header + horizontal
+/// strip of mini ticket cards. Decorative — driven by
+/// `MailItemSampleData.couponSimilarOffers` until the rail gets a
+/// backend feed.
 private struct SimilarOffersRail: View {
     let offers: [MailItemSampleData.SimilarOffer]
 
@@ -535,8 +537,8 @@ private struct MiniCouponCard: View {
         .accessibilityIdentifier("couponSimilarOffer_\(offer.id)")
     }
 
-    // Per-card tone/tint pairs from the design's SIMILAR palette,
-    // mapped onto tokens: sky, magic violet, home green, error red.
+    /// Per-card tone/tint pairs from the design's SIMILAR palette,
+    /// mapped onto tokens: sky, magic violet, home green, error red.
     private var palette: [(tone: Color, tint: Color)] {
         [
             (Theme.Color.primary900, Theme.Color.primary100),
@@ -546,8 +548,13 @@ private struct MiniCouponCard: View {
         ]
     }
 
-    private var tone: Color { palette[paletteIndex % palette.count].tone }
-    private var tint: Color { palette[paletteIndex % palette.count].tint }
+    private var tone: Color {
+        palette[paletteIndex % palette.count].tone
+    }
+
+    private var tint: Color {
+        palette[paletteIndex % palette.count].tint
+    }
 
     private var tintPanel: some View {
         VStack(alignment: .leading, spacing: Spacing.s2 + 2) {

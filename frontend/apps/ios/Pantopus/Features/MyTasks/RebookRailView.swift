@@ -113,8 +113,8 @@ public struct RebookRailView: View {
     @State private var viewModel: RebookRailViewModel
     private let onRebook: @MainActor (RebookableGigDTO) -> Void
 
-    // Not `public`: the default argument constructs a `RebookRailViewModel`,
-    // whose init is internal because it takes an internal `APIClient`.
+    /// Not `public`: the default argument constructs a `RebookRailViewModel`,
+    /// whose init is internal because it takes an internal `APIClient`.
     init(
         viewModel: RebookRailViewModel = RebookRailViewModel(),
         onRebook: @escaping @MainActor (RebookableGigDTO) -> Void

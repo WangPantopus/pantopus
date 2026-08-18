@@ -175,9 +175,11 @@ public extension HomeVerificationContent {
         case .pendingDoc:
             StatusHalo(tone: .warning, icon: .fileText)
         case .provisional:
-            isInChallengeWindow
-                ? StatusHalo(tone: .info, icon: .clock, isPulsing: true)
-                : StatusHalo(tone: .warning, icon: .shield)
+            if isInChallengeWindow {
+                StatusHalo(tone: .info, icon: .clock, isPulsing: true)
+            } else {
+                StatusHalo(tone: .warning, icon: .shield)
+            }
         case .suspendedChallenged:
             StatusHalo(tone: .warning, icon: .alertCircle)
         case .unverified:

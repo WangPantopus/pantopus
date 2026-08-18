@@ -5,7 +5,7 @@
 //  `body_reactions` slot for the Pulse post detail. Body copy → media
 //  grid → reactions bar → inline composer → flattened comment thread.
 //
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 import SwiftUI
 

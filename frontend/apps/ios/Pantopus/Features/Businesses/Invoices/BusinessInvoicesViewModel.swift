@@ -21,7 +21,9 @@ public enum BusinessInvoiceFilter: String, CaseIterable, Sendable, Hashable, Ide
     case overdue
     case void
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Value sent as `?status=`; `nil` for "All".
     public var queryValue: String? {
@@ -91,7 +93,9 @@ public struct BusinessInvoiceRow: Sendable, Hashable, Identifiable {
         self.canVoid = canVoid
     }
 
-    public var statusLabel: String { status.uppercased() }
+    public var statusLabel: String {
+        status.uppercased()
+    }
 }
 
 /// Render state for the Invoices screen.
@@ -403,5 +407,7 @@ public final class BusinessInvoicesViewModel {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

@@ -15,7 +15,7 @@ struct AssetLinkCard: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap, label: {
+        Button(action: onTap) {
             HStack(spacing: Spacing.s3) {
                 ZStack {
                     RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
@@ -58,7 +58,7 @@ struct AssetLinkCard: View {
                 RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                     .stroke(Theme.Color.appBorder, lineWidth: 1)
             )
-        })
+        }
         .buttonStyle(.plain)
         .accessibilityIdentifier("homeRecords_asset_\(asset.id)")
         .accessibilityLabel("\(asset.name). Warranty \(asset.warranty.label). \(mailCountLabel)")
@@ -87,10 +87,9 @@ struct AssetLinkCard: View {
             purchasedLabel: "Mar 4, 2024",
             warranty: .expiringSoon,
             linkedMailCount: 3
-        ),
-        onTap: {}
-    )
-    .padding(Spacing.s4)
-    .background(Theme.Color.appBg)
+        )
+    ) {}
+        .padding(Spacing.s4)
+        .background(Theme.Color.appBg)
 }
 #endif

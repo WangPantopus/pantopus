@@ -25,6 +25,8 @@
 //  gig — all three are real writes.
 //
 
+// swiftlint:disable file_length
+
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -329,7 +331,7 @@ public struct UnboxingView: View {
         }
     }
 
-    private func shelfChrome<Content: View>(@ViewBuilder _ body: () -> Content) -> some View {
+    private func shelfChrome(@ViewBuilder _ body: () -> some View) -> some View {
         body()
             .padding(.horizontal, Spacing.s4)
             .padding(.top, Spacing.s3)

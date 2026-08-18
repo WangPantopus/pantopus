@@ -21,8 +21,14 @@ public final class HomeNotificationsViewModel: GroupedListDataSource {
     public static let unavailableCaption =
         "Per-home notification routing isn't live yet — these switches don't change what you receive."
 
-    public var title: String { "Home notifications" }
-    public var footerCaption: String? { Self.unavailableCaption }
+    public var title: String {
+        "Home notifications"
+    }
+
+    public var footerCaption: String? {
+        Self.unavailableCaption
+    }
+
     public private(set) var state: GroupedListState = .loading
 
     private var toggles: [String: Bool] = [

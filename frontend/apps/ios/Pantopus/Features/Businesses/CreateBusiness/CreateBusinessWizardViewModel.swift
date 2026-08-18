@@ -10,6 +10,8 @@
 //  endpoint exists — do not invent POST /custom-categories.
 //
 
+// swiftlint:disable file_length
+
 import Foundation
 import Logging
 import Observation
@@ -21,7 +23,7 @@ import Observation
 enum CreateBusinessFieldLimits {
     static let maxName = 100
     static let maxUsername = 40
-    static let maxDescription = 2_000
+    static let maxDescription = 2000
 }
 
 /// View model backing `CreateBusinessWizardView`.
@@ -374,14 +376,14 @@ final class CreateBusinessWizardViewModel: WizardModel {
             let result: UsernameAvailabilityDTO = try await api.request(
                 BusinessesEndpoints.checkUsername(username: username)
             )
-            guard self.cleanedUsername == username else { return }
+            guard cleanedUsername == username else { return }
             if result.available {
                 usernameStatus = .available
             } else {
                 usernameStatus = .unavailable(reason: result.reason)
             }
         } catch {
-            guard self.cleanedUsername == username else { return }
+            guard cleanedUsername == username else { return }
             usernameStatus = .idle
         }
     }
@@ -532,11 +534,11 @@ final class CreateBusinessWizardViewModel: WizardModel {
     private func usernameUnavailableMessage(_ reason: String?) -> String {
         switch reason {
         case "reserved":
-            return "This username is reserved. Please choose a different one."
+            "This username is reserved. Please choose a different one."
         case "taken":
-            return "This username is already taken."
+            "This username is already taken."
         default:
-            return "Please choose a valid username."
+            "Please choose a valid username."
         }
     }
 

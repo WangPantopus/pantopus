@@ -7,6 +7,8 @@
 //  survives process death (acceptance criterion #5).
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 /// Pushed onto the Hub stack from the MyHomes FAB / empty-CTA. On

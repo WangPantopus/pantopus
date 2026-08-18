@@ -380,5 +380,7 @@ struct FeedLocationSwitcherSheet: View {
 
 extension FeedLocationOption.Kind {
     /// Section order rendered by the switcher.
-    static var allSections: [FeedLocationOption.Kind] { [.home, .savedPlace, .recent] }
+    static var allSections: [FeedLocationOption.Kind] {
+        [.home, .savedPlace, .recent]
+    }
 }

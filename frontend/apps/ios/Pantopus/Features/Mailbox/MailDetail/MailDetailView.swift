@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-// swiftlint:disable trailing_closure
+// swiftlint:disable trailing_closure type_body_length
 
 public struct MailDetailView: View {
     @State private var viewModel: MailDetailViewModel

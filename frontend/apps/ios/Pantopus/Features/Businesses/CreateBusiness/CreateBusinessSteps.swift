@@ -175,7 +175,9 @@ public struct BusinessHoursDay: Sendable, Equatable, Identifiable, Hashable {
     public var closeTime: String
     public var isClosed: Bool
 
-    public var id: Int { dayOfWeek }
+    public var id: Int {
+        dayOfWeek
+    }
 
     public static let shortLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 

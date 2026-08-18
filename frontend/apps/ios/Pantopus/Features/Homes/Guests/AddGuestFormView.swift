@@ -7,6 +7,8 @@
 //  shared `FormShell` archetype with a sticky "Send pass" CTA.
 //
 
+// swiftlint:disable multiple_closures_with_trailing_closure
+
 import SwiftUI
 
 public struct AddGuestFormView: View {

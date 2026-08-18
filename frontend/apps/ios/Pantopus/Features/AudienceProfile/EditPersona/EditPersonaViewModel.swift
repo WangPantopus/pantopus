@@ -208,12 +208,11 @@ public final class EditPersonaViewModel {
         savePhase = .profile
         let personaId: String
         do {
-            let endpoint: Endpoint
-            switch mode {
+            let endpoint: Endpoint = switch mode {
             case .create:
-                endpoint = PersonaEditEndpoints.create(form.wireBody)
+                PersonaEditEndpoints.create(form.wireBody)
             case let .edit(existingId):
-                endpoint = PersonaEditEndpoints.update(personaId: existingId, body: form.wireBody)
+                PersonaEditEndpoints.update(personaId: existingId, body: form.wireBody)
             }
             let response: PersonaWriteResponse = try await api.request(endpoint)
             guard let persona = response.persona else {

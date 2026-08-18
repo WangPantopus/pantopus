@@ -240,7 +240,9 @@ public struct GigsFeedNearbyTrainDTO: Decodable, Sendable, Hashable, Identifiabl
     public let city: String?
     public let state: String?
 
-    public var id: String { supportTrainId }
+    public var id: String {
+        supportTrainId
+    }
 
     enum CodingKeys: String, CodingKey {
         case title, status, city, state

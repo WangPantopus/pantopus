@@ -94,7 +94,7 @@ struct MailRoutingQueueView: View {
             Shimmer(width: 200, height: 22, cornerRadius: Radii.xs)
             Shimmer(height: 76, cornerRadius: Radii.lg)
             Shimmer(height: 64, cornerRadius: Radii.lg)
-            ForEach(0 ..< 3, id: \.self) { _ in
+            ForEach(0..<3, id: \.self) { _ in
                 Shimmer(height: 62, cornerRadius: Radii.lg)
             }
         }

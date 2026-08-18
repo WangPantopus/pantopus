@@ -9,6 +9,8 @@
 //  key off `persona.id` per the backend routes.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import SwiftUI
 
 @Observable

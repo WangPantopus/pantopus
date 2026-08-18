@@ -102,7 +102,6 @@ public struct ReportIssueFormView: View {
 
 #Preview {
     ReportIssueFormView(
-        viewModel: ReportIssueFormViewModel(submit: { _, _ in true }),
-        onClose: {}
-    )
+        viewModel: ReportIssueFormViewModel { _, _ in true }
+    ) {}
 }

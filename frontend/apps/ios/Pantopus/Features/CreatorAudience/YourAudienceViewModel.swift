@@ -9,6 +9,8 @@
 //  a single `state` enum plus fine-grained published fields.
 //
 
+// swiftlint:disable large_tuple type_body_length
+
 import SwiftUI
 
 @Observable

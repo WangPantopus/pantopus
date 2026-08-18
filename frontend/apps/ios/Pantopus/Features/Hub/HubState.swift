@@ -308,7 +308,9 @@ public enum HubDiscoveryFilter: String, Sendable, Hashable, CaseIterable, Identi
     case businesses
     case posts
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Tab label — RN labels the `gigs` filter "Tasks".
     public var label: String {
@@ -321,7 +323,9 @@ public enum HubDiscoveryFilter: String, Sendable, Hashable, CaseIterable, Identi
     }
 
     /// Value sent as `?filter=`.
-    public var queryValue: String { rawValue }
+    public var queryValue: String {
+        rawValue
+    }
 }
 
 /// Discovery rail card.

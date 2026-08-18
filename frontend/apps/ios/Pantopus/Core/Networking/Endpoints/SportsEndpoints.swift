@@ -29,7 +29,9 @@ public struct ActiveSportsEventDTO: Decodable, Sendable, Hashable, Identifiable 
     public let endsAt: String?
     public let priority: Int?
 
-    public var id: String { eventKey }
+    public var id: String {
+        eventKey
+    }
 
     /// Chip label — short label first, then the full display name.
     public var chipLabel: String? {
