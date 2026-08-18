@@ -40,8 +40,15 @@ public struct MailDayView: View {
     }
 
     public var body: some View {
-        body(for: viewModel.state)
+        Group {
+            if viewModel.isShowingSettings {
+                settingsShell
+            } else {
+                body(for: viewModel.state)
+            }
+        }
             .background(Theme.Color.appBg)
+            .overlay(alignment: .bottom) { settingsToastOverlay }
             .task { await viewModel.load() }
             .task {
                 // 5-second undo chip on the latest reviewed row counts down
@@ -100,18 +107,22 @@ public struct MailDayView: View {
     // MARK: - Shell
 
     private func shell(
-        isPopulated _: Bool,
+        isPopulated: Bool,
         @ViewBuilder body: () -> some View,
         stickyBottom: (() -> AnyView)?
     ) -> some View {
+        // The populated frame reaches settings through the day-header gear;
+        // the other frames have no header card, so the shell's top-right
+        // action carries it (FormShell hides that action whenever a sticky
+        // bottom bar is supplied, which only the populated frame has).
         FormShell(
             title: "My Mail Day",
             leading: .back,
-            rightActionLabel: nil,
+            rightActionLabel: isPopulated ? nil : "Settings",
             isValid: true,
             isDirty: false,
             onClose: onClose,
-            onCommit: {},
+            onCommit: { Task { await viewModel.openSettings() } },
             content: { body() },
             stickyBottom: stickyBottom
         )
@@ -125,7 +136,8 @@ public struct MailDayView: View {
                 dateLabel: content.dateLabel,
                 streakDays: content.streakDays,
                 done: viewModel.done,
-                total: viewModel.total
+                total: viewModel.total,
+                onOpenSettings: { Task { await viewModel.openSettings() } }
             )
             ScanMoreCard(lastScanLabel: content.lastScanLabel) {
                 viewModel.requestScan()
@@ -237,6 +249,176 @@ public struct MailDayView: View {
         .padding(.bottom, Spacing.s5)
     }
 
+    // MARK: - Settings sub-view (gear from the day header)
+
+    /// The settings frame reuses the Form shell with its own title and a
+    /// back control that returns to the triage body — RN swaps the view
+    /// the same way (`src/app/mailbox/mailday.tsx:77-189`).
+    private var settingsShell: some View {
+        FormShell(
+            title: "Mail Day Settings",
+            leading: .back,
+            rightActionLabel: nil,
+            isValid: true,
+            isDirty: false,
+            isSaving: viewModel.settingsSaving,
+            onClose: { viewModel.closeSettings() },
+            onCommit: {},
+            content: { settingsBody }
+        )
+        .accessibilityIdentifier("mailDaySettings")
+    }
+
+    @ViewBuilder
+    private var settingsBody: some View {
+        switch viewModel.settings {
+        case .loading:
+            VStack(spacing: Spacing.s3) {
+                Shimmer(width: nil, height: 120, cornerRadius: Radii.lg)
+                Shimmer(width: nil, height: 210, cornerRadius: Radii.lg)
+                Shimmer(width: nil, height: 150, cornerRadius: Radii.lg)
+                Shimmer(width: nil, height: 120, cornerRadius: Radii.lg)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s4)
+            .accessibilityIdentifier("mailDaySettingsLoading")
+        case let .loaded(form):
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                deliveryTimeCard(form)
+                switchCard(
+                    title: "Include in Mail Day",
+                    keys: MailDaySettingKey.includeGroup,
+                    form: form
+                )
+                switchCard(
+                    title: "Always interrupt (instant)",
+                    keys: MailDaySettingKey.interruptGroup,
+                    form: form
+                )
+                soundCard(form)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+            .padding(.bottom, Spacing.s10)
+            .accessibilityIdentifier("mailDaySettingsLoaded")
+        case let .error(message):
+            ErrorState(headline: "Couldn't load your settings", message: message) {
+                await viewModel.loadSettings()
+            }
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .accessibilityIdentifier("mailDaySettingsError")
+        }
+    }
+
+    private func deliveryTimeCard(_ form: MailDaySettingsForm) -> some View {
+        MailDaySettingsCard(title: "Delivery time") {
+            HStack(spacing: Spacing.s2) {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.clock, size: 16, strokeWidth: 2.2, color: Theme.Color.primary600)
+                    Text(form.deliveryTime)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 10)
+                .background(Theme.Color.appSurfaceSunken)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(Theme.Color.appBorder, lineWidth: 1.5)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                Spacer(minLength: Spacing.s0)
+                Text(form.timezone)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .padding(.bottom, Spacing.s2)
+            settingsSwitchRow(.enabled, form: form, showsDivider: false)
+        }
+    }
+
+    private func switchCard(
+        title: String,
+        keys: [MailDaySettingKey],
+        form: MailDaySettingsForm
+    ) -> some View {
+        MailDaySettingsCard(title: title) {
+            ForEach(Array(keys.enumerated()), id: \.element.id) { index, key in
+                settingsSwitchRow(key, form: form, showsDivider: index < keys.count - 1)
+            }
+        }
+    }
+
+    private func soundCard(_ form: MailDaySettingsForm) -> some View {
+        MailDaySettingsCard(title: "Sound") {
+            HStack(spacing: Spacing.s2) {
+                ForEach(MailDaySoundType.allCases) { sound in
+                    let active = form.soundType == sound
+                    Button {
+                        Task { await viewModel.setSoundType(sound) }
+                    } label: {
+                        Text(sound.label)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                active ? Theme.Color.appTextInverse : Theme.Color.appTextSecondary
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(active ? Theme.Color.appText : Theme.Color.appSurfaceSunken)
+                            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(active ? [.isSelected] : [])
+                    .accessibilityIdentifier("mailDaySettingsSound_\(sound.rawValue)")
+                }
+            }
+            .padding(.bottom, Spacing.s2)
+            settingsSwitchRow(.hapticsEnabled, form: form, showsDivider: false)
+        }
+    }
+
+    private func settingsSwitchRow(
+        _ key: MailDaySettingKey,
+        form: MailDaySettingsForm,
+        showsDivider: Bool
+    ) -> some View {
+        VStack(spacing: Spacing.s0) {
+            Toggle(isOn: Binding(
+                get: { form.value(for: key) },
+                set: { newValue in Task { await viewModel.setSetting(key, to: newValue) } }
+            )) {
+                Text(key.label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.Color.appText)
+            }
+            .tint(Theme.Color.primary600)
+            .padding(.vertical, 7)
+            .accessibilityIdentifier("mailDaySettingsToggle_\(key.rawValue)")
+            if showsDivider {
+                Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var settingsToastOverlay: some View {
+        if let toast = viewModel.settingsToast {
+            Text(toast)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s2)
+                .background(Theme.Color.appText.opacity(0.9))
+                .clipShape(Capsule())
+                .padding(.bottom, Spacing.s10)
+                .accessibilityIdentifier("mailDaySettingsToast")
+                .task {
+                    try? await Task.sleep(nanoseconds: 2_200_000_000)
+                    viewModel.consumeSettingsToast()
+                }
+        }
+    }
+
     // MARK: - Loading / error bodies
 
     private var loadingBody: some View {
@@ -279,6 +461,34 @@ public struct MailDayView: View {
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s10)
         .accessibilityIdentifier("mailDayError")
+    }
+}
+
+// MARK: - Settings card chrome
+
+/// Uppercase overline + a bordered white card — the settings-frame unit
+/// (RN's `styles.section` + `styles.sectionLabel`).
+private struct MailDaySettingsCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .padding(.bottom, 10)
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
     }
 }
 

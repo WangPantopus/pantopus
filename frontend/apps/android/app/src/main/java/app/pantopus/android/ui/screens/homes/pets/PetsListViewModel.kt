@@ -20,6 +20,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.RowTemplate
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailImage
 import app.pantopus.android.ui.screens.shared.list_of_rows.ThumbnailSize
+import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PetSpecies
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -223,6 +224,32 @@ class PetsListViewModel
                                 foreground = palette.chipForeground,
                             ),
                     ),
+                chips = vetChips(pet),
+            )
+        }
+
+        /**
+         * Vet contact pill under the row body — RN's expanded pet card
+         * (`src/app/homes/[id]/pets.tsx:133 + 155-160`) joins `vet_name`
+         * and `vet_phone` with "·" behind a medkit icon.
+         */
+        private fun vetChips(pet: PetDto): List<RowChip>? {
+            val parts =
+                listOfNotNull(
+                    pet.vetName?.takeIf { it.isNotBlank() },
+                    pet.vetPhone?.takeIf { it.isNotBlank() },
+                )
+            if (parts.isEmpty()) return null
+            return listOf(
+                RowChip(
+                    text = parts.joinToString(" · "),
+                    icon = PantopusIcon.Stethoscope,
+                    tint =
+                        RowChip.Tint.Custom(
+                            background = PantopusColors.appSurfaceSunken,
+                            foreground = PantopusColors.appTextSecondary,
+                        ),
+                ),
             )
         }
 

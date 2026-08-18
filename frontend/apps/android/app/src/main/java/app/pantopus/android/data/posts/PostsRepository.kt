@@ -41,6 +41,9 @@ class PostsRepository
             limit: Int = 20,
             cursorCreatedAt: String? = null,
             cursorId: String? = null,
+            topic: String? = null,
+            sportsMode: String? = null,
+            eventKey: String? = null,
         ): NetworkResult<FeedResponse> =
             safeApiCall {
                 api.feed(
@@ -51,6 +54,9 @@ class PostsRepository
                     limit = limit,
                     cursorCreatedAt = cursorCreatedAt,
                     cursorId = cursorId,
+                    topic = topic,
+                    sportsMode = sportsMode,
+                    eventKey = eventKey,
                 )
             }
 

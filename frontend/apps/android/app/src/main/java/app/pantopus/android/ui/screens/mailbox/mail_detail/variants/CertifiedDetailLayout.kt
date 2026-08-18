@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -76,6 +77,9 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+/** Dimmed opacity for a secondary tile whose action is in flight. */
+private const val DISABLED_TILE_ALPHA = 0.6f
+
 /**
  * T6.5c (P21) — Certified (A17.3) variant layout. Adds the stamp +
  * chain-of-custody timeline + combined sender/carrier card on top of
@@ -96,6 +100,16 @@ fun CertifiedDetailLayout(
     // certified notice. Null hides the affordance (e.g. snapshot
     // fixtures), so existing call sites compile unchanged.
     onOpenExtractedTask: (() -> Unit)? = null,
+    // A17.3 — fetches the legal delivery proof
+    // (`GET …/p2/certified/:mailId/proof`). RN only offers this once the
+    // item is acknowledged (`src/app/mailbox/certified.tsx:200`), which
+    // matches the route's own 400 gate.
+    onDownloadProof: () -> Unit = {},
+    // `true` once the proof has been fetched — the tile flips to "Saved"
+    // (RN's `✓ Saved`).
+    proofSaved: Boolean = false,
+    // `true` while the proof fetch is in flight.
+    proofInFlight: Boolean = false,
 ) {
     val shouldShowConfirmGate =
         content.readStatusLabel.lowercase() == "unread" &&
@@ -145,6 +159,9 @@ fun CertifiedDetailLayout(
                             onAcknowledge()
                         }
                     },
+                    onDownloadProof = onDownloadProof,
+                    proofSaved = proofSaved,
+                    proofInFlight = proofInFlight,
                 )
             },
         )
@@ -782,6 +799,9 @@ private fun ActionsRow(
     isArchived: Boolean,
     ackInFlight: Boolean,
     onAcknowledge: () -> Unit,
+    onDownloadProof: () -> Unit,
+    proofSaved: Boolean,
+    proofInFlight: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         AcknowledgeButton(
@@ -808,6 +828,15 @@ private fun ActionsRow(
                 icon = PantopusIcon.Archive,
                 label = "Archive",
                 modifier = Modifier.weight(1f),
+            )
+        }
+        // A17.3 — the legal delivery proof only exists after the
+        // acknowledgement is on file, so the tile appears with it.
+        if (isAcknowledged) {
+            ProofTile(
+                proofSaved = proofSaved,
+                proofInFlight = proofInFlight,
+                onDownloadProof = onDownloadProof,
             )
         }
         Text(
@@ -869,6 +898,49 @@ private fun AcknowledgeButton(
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = fg,
+        )
+    }
+}
+
+/** "⬇ Proof" → "✓ Saved" (RN `src/app/mailbox/certified.tsx:200-207`). */
+@Composable
+private fun ProofTile(
+    proofSaved: Boolean,
+    proofInFlight: Boolean,
+    onDownloadProof: () -> Unit,
+) {
+    val background = if (proofSaved) PantopusColors.successBg else PantopusColors.appSurface
+    val border = if (proofSaved) PantopusColors.successLight else PantopusColors.appBorder
+    val foreground = if (proofSaved) PantopusColors.success else PantopusColors.appText
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(background)
+                .border(1.dp, border, RoundedCornerShape(Radii.lg))
+                .clickable(enabled = !proofInFlight && !proofSaved) { onDownloadProof() }
+                .alpha(if (proofInFlight) DISABLED_TILE_ALPHA else 1f)
+                .padding(horizontal = Spacing.s2, vertical = 11.dp)
+                .testTag("mailDetail_certified_proof")
+                .semantics {
+                    contentDescription =
+                        if (proofSaved) "Delivery proof saved" else "Download delivery proof"
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = if (proofSaved) PantopusIcon.BadgeCheck else PantopusIcon.Download,
+            contentDescription = null,
+            size = 15.dp,
+            tint = if (proofSaved) PantopusColors.success else PantopusColors.primary600,
+        )
+        Text(
+            text = if (proofSaved) "Saved" else "Proof",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = foreground,
         )
     }
 }

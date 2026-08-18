@@ -9,7 +9,12 @@
 //  Steps:
 //    1. Species — picker over PetSpecies cases.
 //    2. Basics — name (required) + breed (optional).
-//    3. Details — photo URL (optional) + notes (optional).
+//    3. Details — photo URL, vet name, vet phone, notes (all optional).
+//
+//  The vet pair mirrors RN's "Vet name / phone" field
+//  (`src/app/homes/[id]/pets.tsx:108`) split across the two columns the
+//  backend actually stores (`vet_name` / `vet_phone`,
+//  `createPetSchema` at `backend/routes/home.js:6978-6979`).
 //
 //  On the last step, the primary CTA POSTs `/api/homes/:id/pets` (or
 //  PUTs `/api/homes/:id/pets/:petId` in edit mode) and emits the
@@ -38,7 +43,7 @@ public enum AddPetStep: Int, CaseIterable, Sendable, Equatable {
         switch self {
         case .species: "Sets the icon and chip colour we'll use across the home."
         case .basics: "Name is required. Breed is optional and shows under the name."
-        case .details: "Notes show in the row preview so sitters see the most important info first."
+        case .details: "Vet contact and notes show on the row so sitters see the most important info first."
         }
     }
 
@@ -54,6 +59,8 @@ public struct AddPetForm: Sendable, Equatable {
     public var name: String
     public var breed: String
     public var photoUrl: String
+    public var vetName: String
+    public var vetPhone: String
     public var notes: String
 
     public init(
@@ -61,12 +68,16 @@ public struct AddPetForm: Sendable, Equatable {
         name: String = "",
         breed: String = "",
         photoUrl: String = "",
+        vetName: String = "",
+        vetPhone: String = "",
         notes: String = ""
     ) {
         self.species = species
         self.name = name
         self.breed = breed
         self.photoUrl = photoUrl
+        self.vetName = vetName
+        self.vetPhone = vetPhone
         self.notes = notes
     }
 }
@@ -90,6 +101,13 @@ final class AddPetWizardViewModel: WizardModel {
     /// Set after a successful submit; the view reads this and dismisses.
     var pendingEvent: AddPetEvent?
 
+    /// `createPetSchema`'s `vet_name: Joi.string().max(200)`
+    /// (`backend/routes/home.js:6978`).
+    static let vetNameMaxLength = 200
+    /// `createPetSchema`'s `vet_phone: Joi.string().max(30)`
+    /// (`backend/routes/home.js:6979`).
+    static let vetPhoneMaxLength = 30
+
     private let homeId: String
     /// Non-nil = edit mode; the submit calls PUT instead of POST.
     private let editingId: String?
@@ -106,6 +124,8 @@ final class AddPetWizardViewModel: WizardModel {
                 name: existing.name,
                 breed: existing.breed ?? "",
                 photoUrl: existing.photoUrl ?? "",
+                vetName: existing.vetName ?? "",
+                vetPhone: existing.vetPhone ?? "",
                 notes: existing.notes ?? ""
             )
         } else {
@@ -211,6 +231,14 @@ final class AddPetWizardViewModel: WizardModel {
         form.photoUrl = value
     }
 
+    func setVetName(_ value: String) {
+        form.vetName = String(value.prefix(Self.vetNameMaxLength))
+    }
+
+    func setVetPhone(_ value: String) {
+        form.vetPhone = String(value.prefix(Self.vetPhoneMaxLength))
+    }
+
     func setNotes(_ value: String) {
         form.notes = value
     }
@@ -224,6 +252,8 @@ final class AddPetWizardViewModel: WizardModel {
         let trimmedName = form.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedBreed = form.breed.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPhoto = form.photoUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedVetName = form.vetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedVetPhone = form.vetPhone.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNotes = form.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             let response: PetResponse
@@ -232,6 +262,8 @@ final class AddPetWizardViewModel: WizardModel {
                     name: trimmedName,
                     species: form.species.rawValue,
                     breed: trimmedBreed.isEmpty ? nil : trimmedBreed,
+                    vetName: trimmedVetName.isEmpty ? nil : trimmedVetName,
+                    vetPhone: trimmedVetPhone.isEmpty ? nil : trimmedVetPhone,
                     photoUrl: trimmedPhoto.isEmpty ? nil : trimmedPhoto,
                     notes: trimmedNotes.isEmpty ? nil : trimmedNotes
                 )
@@ -243,6 +275,8 @@ final class AddPetWizardViewModel: WizardModel {
                     name: trimmedName,
                     species: form.species.rawValue,
                     breed: trimmedBreed.isEmpty ? nil : trimmedBreed,
+                    vetName: trimmedVetName.isEmpty ? nil : trimmedVetName,
+                    vetPhone: trimmedVetPhone.isEmpty ? nil : trimmedVetPhone,
                     photoUrl: trimmedPhoto.isEmpty ? nil : trimmedPhoto,
                     notes: trimmedNotes.isEmpty ? nil : trimmedNotes
                 )

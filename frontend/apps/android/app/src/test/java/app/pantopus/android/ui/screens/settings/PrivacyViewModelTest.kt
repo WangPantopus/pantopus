@@ -3,21 +3,38 @@
 package app.pantopus.android.ui.screens.settings
 
 import app.pantopus.android.core.security.AppLockManager
+import app.pantopus.android.data.account.AccountDeletionRepository
+import app.pantopus.android.data.api.models.settings.PrivacySettingsDto
+import app.pantopus.android.data.api.models.settings.PrivacySettingsResponse
+import app.pantopus.android.data.api.models.settings.PrivacySettingsUpdate
+import app.pantopus.android.data.api.net.NetworkError
+import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.privacy.PrivacyRepository
 import app.pantopus.android.ui.components.FuzzStop
+import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListBanner
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListGroup
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
 import app.pantopus.android.ui.screens.shared.grouped_list.RowControl
 import app.pantopus.android.ui.theme.PantopusIcon
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -25,13 +42,43 @@ import org.junit.Test
  * stealth frames, the RadioCard / fuzz / activity / data projection,
  * the stealth banner, optimistic radio / toggle / fuzz mutations, and
  * the helper-line parity contract (mirrored on iOS).
+ *
+ * T1 adds the backend-backed surfaces: the search-privacy card wired to
+ * `GET/PATCH /api/privacy/settings`, and the delete-account gate in front
+ * of `DELETE /api/users/account`.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PrivacyViewModelTest {
-    @Test fun populated_produces_seven_groups_in_design_order() {
-        val groups = privacyVm().loadedGroups()
+    private val privacy: PrivacyRepository = mockk()
+    private val accountDeletion: AccountDeletionRepository = mockk()
+
+    @Before fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        coEvery { privacy.settings() } returns NetworkResult.Success(settingsResponse())
+    }
+
+    @After fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun settingsResponse(
+        searchVisibility: String = "everyone",
+        findableByName: Boolean = false,
+    ) = PrivacySettingsResponse(
+        settings =
+            PrivacySettingsDto(
+                userId = "u1",
+                searchVisibility = searchVisibility,
+                findableByName = findableByName,
+            ),
+    )
+
+    @Test fun populated_produces_eight_groups_in_design_order() {
+        val vm = privacyVm().apply { load() }
         assertEquals(
             listOf(
                 "biometricSecurity",
+                "searchPrivacy",
                 "visibility",
                 "address",
                 "fuzz",
@@ -39,9 +86,8 @@ class PrivacyViewModelTest {
                 "data",
                 "delete",
             ),
-            groups.map { it.id },
+            vm.groups().map { it.id },
         )
-        val vm = privacyVm().apply { load() }
         assertNull(vm.banner.value)
     }
 
@@ -102,6 +148,107 @@ class PrivacyViewModelTest {
         vm.load()
         vm.onSetFuzz(PrivacyCatalog.FUZZ, FuzzStop.Exact)
         assertEquals(FuzzStop.Exact, vm.groups().group("fuzz")?.fuzz?.stop)
+    }
+
+    // ---- Search privacy (GET / PATCH /api/privacy/settings) ----
+
+    @Test fun search_privacy_card_reflects_loaded_settings() {
+        coEvery { privacy.settings() } returns
+            NetworkResult.Success(settingsResponse("mutuals", findableByName = true))
+        val card = privacyVm().loadedGroups().group("searchPrivacy")
+        assertEquals(
+            listOf(
+                "searchVisibility.everyone",
+                "searchVisibility.mutuals",
+                "searchVisibility.nobody",
+                "findableByName",
+            ),
+            card?.rows?.map { it.id },
+        )
+        assertEquals("searchVisibility.mutuals", selectedRadioId(card))
+        val toggle = card?.rows?.first { it.id == "findableByName" }?.control
+        assertTrue(toggle is RowControl.Toggle && toggle.isOn)
+        assertEquals("Only connected people can find your profile in search.", card?.helper)
+        assertEquals(
+            "search-visibility-everyone",
+            card?.rows?.first { it.id == "searchVisibility.everyone" }?.testTag,
+        )
+        assertEquals(
+            "findable-by-name-switch",
+            card?.rows?.first { it.id == "findableByName" }?.testTag,
+        )
+    }
+
+    @Test fun selecting_search_visibility_patches_and_adopts_server_value() {
+        coEvery { privacy.updateSettings(any()) } returns
+            NetworkResult.Success(settingsResponse("nobody"))
+        val vm = privacyVm()
+        vm.load()
+        vm.onRadio("searchVisibility.nobody")
+        assertEquals("searchVisibility.nobody", selectedRadioId(vm.groups().group("searchPrivacy")))
+        assertEquals("Search privacy updated.", vm.toast.value?.text)
+        coVerify { privacy.updateSettings(PrivacySettingsUpdate(searchVisibility = "nobody")) }
+    }
+
+    @Test fun failed_search_visibility_patch_rolls_back() {
+        coEvery { privacy.updateSettings(any()) } returns
+            NetworkResult.Failure(NetworkError.Server(500, null))
+        val vm = privacyVm()
+        vm.load()
+        vm.onRadio("searchVisibility.nobody")
+        assertEquals("searchVisibility.everyone", selectedRadioId(vm.groups().group("searchPrivacy")))
+        assertEquals(ToastKind.Error, vm.toast.value?.kind)
+    }
+
+    @Test fun failed_findable_by_name_patch_rolls_back() {
+        coEvery { privacy.updateSettings(any()) } returns
+            NetworkResult.Failure(NetworkError.Server(500, null))
+        val vm = privacyVm()
+        vm.load()
+        vm.onToggle("findableByName", isOn = true)
+        val toggle = vm.groups().group("searchPrivacy")?.rows?.first { it.id == "findableByName" }?.control
+        assertTrue(toggle is RowControl.Toggle && !toggle.isOn)
+        assertEquals(ToastKind.Error, vm.toast.value?.kind)
+    }
+
+    @Test fun search_privacy_load_failure_keeps_screen_and_swaps_helper() {
+        coEvery { privacy.settings() } returns NetworkResult.Failure(NetworkError.Server(500, null))
+        val groups = privacyVm().loadedGroups()
+        assertEquals("a failed settings fetch must not blank the screen", 8, groups.size)
+        assertEquals(
+            "Search privacy could not load. Pull to refresh before changing this setting.",
+            groups.group("searchPrivacy")?.helper,
+        )
+    }
+
+    // ---- Delete account (DELETE /api/users/account) ----
+
+    @Test fun tapping_delete_row_opens_the_confirm_sheet() {
+        val vm = privacyVm()
+        vm.load()
+        assertFalse(vm.deleteSheetVisible.value)
+        vm.onTapRow("deleteAccount")
+        assertTrue(vm.deleteSheetVisible.value)
+    }
+
+    @Test fun no_host_activity_means_no_delete() {
+        val vm = privacyVm()
+        vm.load()
+        vm.onTapRow("deleteAccount")
+        vm.confirmDeleteAccount(hostActivity = null)
+        assertNotNull(vm.deleteAccountError.value)
+        assertTrue(vm.deleteSheetVisible.value)
+        coVerify(exactly = 0) { accountDeletion.deleteAccount() }
+    }
+
+    @Test fun dismiss_clears_the_error_and_closes_the_sheet() {
+        val vm = privacyVm()
+        vm.load()
+        vm.onTapRow("deleteAccount")
+        vm.confirmDeleteAccount(hostActivity = null)
+        vm.dismissDeleteSheet()
+        assertFalse(vm.deleteSheetVisible.value)
+        assertNull(vm.deleteAccountError.value)
     }
 
     @Test fun stealth_shows_banner_and_strictest_controls() {
@@ -175,7 +322,7 @@ class PrivacyViewModelTest {
             mockk<AuthRepository>(relaxed = true) {
                 every { state } returns MutableStateFlow(AuthRepository.State.SignedOut)
             }
-        return PrivacySettingsViewModel(appLock, auth)
+        return PrivacySettingsViewModel(appLock, auth, privacy, accountDeletion)
     }
 
     private fun PrivacySettingsViewModel.loadedGroups(): List<GroupedListGroup> {

@@ -8,11 +8,24 @@
 import SwiftUI
 
 extension EditProfileView {
+    /// A13.9 §① — avatar + "Change photo". The photo does not ride the
+    /// PATCH body; it has its own multipart route
+    /// (`POST /api/upload/profile-picture`), so the block sits above the
+    /// field groups rather than inside one.
+    var avatarSection: some View {
+        EditProfileAvatarBlock(
+            avatarURL: viewModel.avatarURL,
+            initial: viewModel.avatarInitial,
+            state: viewModel.avatarState,
+            onPicked: { data, filename, mimeType in
+                Task { await viewModel.uploadAvatar(data: data, filename: filename, mimeType: mimeType) }
+            },
+            onDismissError: { viewModel.dismissAvatarError() }
+        )
+        .padding(.bottom, Spacing.s2)
+    }
+
     var aboutSection: some View {
-        // Note: the design also calls for an avatar upload (tap to
-        // replace). `updateProfileSchema` exposes no avatar field, so
-        // the affordance is intentionally omitted until the backend
-        // accepts an avatar key on PATCH /api/users/profile.
         FormFieldGroup("About") {
             textField(.firstName, label: "First name")
             textField(.middleName, label: "Middle name (optional)")
@@ -76,15 +89,61 @@ extension EditProfileView {
     }
 
     var visibilitySection: some View {
-        // Note: the design splits visibility into a
-        // `profile_visibility_public` boolean and a
-        // `show_in_neighbor_discovery` toggle. The schema only has the
-        // 3-way `profileVisibility` enum today (public / registered /
-        // private) and no neighbor-discovery key, so we render the
-        // enum picker and omit the toggle until the backend adds it.
+        // Note: the design also calls for a `show_in_neighbor_discovery`
+        // toggle. That key isn't in `updateProfileSchema` today, so it
+        // stays omitted; the 3-way `profileVisibility` enum and the two
+        // contact-visibility booleans below are the schema's full set
+        // (`backend/routes/users.js:797-800`).
         FormFieldGroup("Visibility") {
             visibilityPicker
+            contactVisibilityToggle(
+                .showEmail,
+                label: "Show Email on Profile",
+                subtitle: "Neighbors viewing your profile can see your email address."
+            )
+            contactVisibilityToggle(
+                .showPhone,
+                label: "Show Phone on Profile",
+                subtitle: "Neighbors viewing your profile can see your phone number."
+            )
         }
+    }
+
+    /// Boolean row backed by a `"true"` / `"false"` `FormFieldState`, so it
+    /// flows through the same dirty / discard / PATCH machinery as every
+    /// other field. Mirrors RN `settings.tsx:236`.
+    @ViewBuilder
+    func contactVisibilityToggle(
+        _ key: EditProfileField,
+        label: String,
+        subtitle: String
+    ) -> some View {
+        let snapshot = viewModel.fields[key] ?? FormFieldState(id: key.rawValue, originalValue: "false")
+        let isOn = snapshot.value == "true"
+        HStack(spacing: Spacing.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                EditProfileFieldLabel(label, dirty: snapshot.isDirty)
+                Text(subtitle)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+            Spacer(minLength: Spacing.s0)
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { isOn },
+                    set: { viewModel.update(key, to: $0 ? "true" : "false") }
+                )
+            )
+            .labelsHidden()
+            .tint(Theme.Color.primary600)
+            .accessibilityIdentifier("field_\(key.rawValue)")
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(label), \(isOn ? "on" : "off")")
     }
 
     @ViewBuilder

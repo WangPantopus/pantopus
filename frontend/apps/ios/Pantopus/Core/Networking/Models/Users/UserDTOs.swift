@@ -126,6 +126,12 @@ public struct UserProfile: Decodable, Sendable, Hashable, Identifiable {
     public let gigsPosted: Int?
     public let gigsCompleted: Int?
     public let profileVisibility: String?
+    /// `User.show_email` — surface the account email on the public profile.
+    /// The route echoes it both camelCase and snake_case
+    /// (`backend/routes/users.js:2024`); we decode the camelCase key.
+    public let showEmail: Bool?
+    /// `User.show_phone` — same contract (`backend/routes/users.js:2026`).
+    public let showPhone: Bool?
     public let createdAt: String
     public let updatedAt: String
 
@@ -141,7 +147,7 @@ public struct UserProfile: Decodable, Sendable, Hashable, Identifiable {
         case averageRating = "average_rating"
         case gigsPosted = "gigs_posted"
         case gigsCompleted = "gigs_completed"
-        case profileVisibility, createdAt, updatedAt
+        case profileVisibility, showEmail, showPhone, createdAt, updatedAt
     }
 }
 
@@ -172,6 +178,12 @@ public struct ProfileUpdateRequest: Encodable, Sendable, Hashable {
     public var bio: String?
     public var tagline: String?
     public var profileVisibility: String?
+    /// `showEmail` / `showPhone` — the two contact-visibility booleans the
+    /// PATCH handler maps onto `show_email` / `show_phone`
+    /// (`backend/routes/users.js:2076-2083`). The Joi schema accepts both
+    /// camelCase and snake_case (`users.js:797-800`); we send camelCase.
+    public var showEmail: Bool?
+    public var showPhone: Bool?
     public var website: String?
     public var linkedin: String?
     public var twitter: String?
@@ -191,6 +203,8 @@ public struct ProfileUpdateRequest: Encodable, Sendable, Hashable {
         bio: String? = nil,
         tagline: String? = nil,
         profileVisibility: String? = nil,
+        showEmail: Bool? = nil,
+        showPhone: Bool? = nil,
         website: String? = nil,
         linkedin: String? = nil,
         twitter: String? = nil,
@@ -209,6 +223,8 @@ public struct ProfileUpdateRequest: Encodable, Sendable, Hashable {
         self.bio = bio
         self.tagline = tagline
         self.profileVisibility = profileVisibility
+        self.showEmail = showEmail
+        self.showPhone = showPhone
         self.website = website
         self.linkedin = linkedin
         self.twitter = twitter

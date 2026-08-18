@@ -48,6 +48,24 @@ struct LoginView: View {
                             .accessibilityIdentifier("loginErrorBanner")
                     }
 
+                    if let info = viewModel.infoMessage {
+                        HStack(alignment: .top, spacing: Spacing.s2) {
+                            Icon(.mail, size: 16, color: Theme.Color.primary600)
+                            Text(info)
+                                .pantopusTextStyle(.small)
+                                .foregroundStyle(Theme.Color.appText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: Spacing.s0)
+                        }
+                        .padding(Spacing.s3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.Color.primary100)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                        .padding(.horizontal, Spacing.s5)
+                        .padding(.bottom, Spacing.s3)
+                        .accessibilityIdentifier("loginInfoBanner")
+                    }
+
                     OAuthButtonGroup(
                         isLoading: viewModel.isLoading,
                         onGoogle: { signIn(with: .google) },
@@ -55,6 +73,12 @@ struct LoginView: View {
                         googleIdentifier: "loginGoogleButton",
                         appleIdentifier: "loginAppleButton"
                     )
+                    .padding(.horizontal, Spacing.s5)
+                    .padding(.bottom, Spacing.s3)
+
+                    AuthOAuthTermsLine(identifier: "loginLegalTermsLine") { document in
+                        path.append(.legal(document))
+                    }
                     .padding(.horizontal, Spacing.s5)
                     .padding(.bottom, Spacing.s5)
 
@@ -110,12 +134,39 @@ struct LoginView: View {
                     .accessibilityIdentifier("loginSubmitButton")
                     .accessibilityLabel(viewModel.isLoading ? "Signing in" : "Log in")
 
+                    // Unverified sign-in is a dead end without this: the
+                    // backend 403s with "Please verify your email before
+                    // signing in." (`backend/routes/users.js:1528`) and RN
+                    // reveals the same link on that error
+                    // (`(auth)/login.tsx:190`).
+                    if viewModel.canResendVerification {
+                        Button {
+                            resendVerification()
+                        } label: {
+                            Text(
+                                viewModel.isResendingVerification
+                                    ? "Sending verification…"
+                                    : "Resend verification email"
+                            )
+                            .pantopusTextStyle(.small)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.Color.primary600)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isResendingVerification || viewModel.isLoading)
+                        .padding(.horizontal, Spacing.s5)
+                        .padding(.top, Spacing.s2)
+                        .accessibilityIdentifier("loginResendVerificationButton")
+                        .accessibilityLabel("Resend verification email")
+                    }
+
                     HStack(spacing: Spacing.s1) {
                         Text("New to Pantopus?")
                             .pantopusTextStyle(.small)
                             .foregroundStyle(Theme.Color.appTextSecondary)
                         Button {
-                            path.append(.signUp)
+                            path.append(.signUp(inviteCode: nil))
                         } label: {
                             Text("Create account")
                                 .pantopusTextStyle(.small)
@@ -139,9 +190,16 @@ struct LoginView: View {
                 switch route {
                 case .login:
                     EmptyView()
-                case .signUp:
+                case let .legal(document):
+                    LegalContentView(document: document) {
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                    .navigationBarBackButtonHidden(true)
+                case let .signUp(inviteCode):
                     SignUpView(
+                        inviteCode: inviteCode,
                         onClose: { if !path.isEmpty { path.removeLast() } },
+                        onOpenLegal: { document in path.append(.legal(document)) },
                         onSuccess: { email in
                             // Backend hard-gates login on email_confirmed_at
                             // today (see docs/mobile/auth-backend-contracts.md
@@ -173,7 +231,7 @@ struct LoginView: View {
                             // an email. The backend's email-change flow is
                             // documented in `docs/mobile/auth-backend-contracts.md`
                             // §2; today we restart signup with the new value.
-                            path = [.signUp]
+                            path = [.signUp(inviteCode: nil)]
                         }
                     )
                 case let .verifyEmailLanding(token, email):
@@ -183,7 +241,7 @@ struct LoginView: View {
                         // No session after verification (backend revokes it),
                         // so Continue drops back to login to sign in.
                         onContinue: { path = [] },
-                        onUseDifferentEmail: { path = [.signUp] }
+                        onUseDifferentEmail: { path = [.signUp(inviteCode: nil)] }
                     )
                 case let .error(authError):
                     AuthErrorView(
@@ -197,10 +255,10 @@ struct LoginView: View {
         }
     }
 
-    /// Pulls the `auth/reset-password` / `auth/verify-email` destinations
-    /// off `DeepLinkRouter` and pushes the matching `AuthRoute` onto the
-    /// stack. Anything else stays pending for the signed-in router to
-    /// consume after sign-in. Idempotent on re-entry.
+    /// Pulls the `auth/reset-password` / `auth/verify-email` / `join/:code`
+    /// destinations off `DeepLinkRouter` and pushes the matching `AuthRoute`
+    /// onto the stack. Anything else stays pending for the signed-in router
+    /// to consume after sign-in. Idempotent on re-entry.
     private func consumeAuthDeepLinkIfNeeded() {
         guard let pending = deepLink.pending else { return }
         switch pending {
@@ -213,6 +271,13 @@ struct LoginView: View {
             // surface (which sign-up reaches with token == nil).
             _ = deepLink.consume()
             path = [.verifyEmailLanding(token: token, email: email)]
+        case let .joinInvite(code):
+            // A referral link opened by a signed-out visitor. RN replaces the
+            // login redirect with `/(auth)/register?invite_code=CODE`
+            // (`src/app/_layout.tsx:76`), so land straight on Create account
+            // with the code carried into the form.
+            _ = deepLink.consume()
+            path = [.signUp(inviteCode: code)]
         default:
             break
         }
@@ -224,6 +289,10 @@ struct LoginView: View {
 
     private func signIn(with provider: OAuthProvider) {
         Task { await viewModel.signIn(with: provider, using: auth) }
+    }
+
+    private func resendVerification() {
+        Task { await viewModel.resendVerification(using: auth) }
     }
 }
 
@@ -400,9 +469,50 @@ final class LoginViewModel {
     /// headline + body rather than a single string. Older callers can read
     /// `errorMessage?.errorDescription` for the legacy stringy form.
     private(set) var errorMessage: AuthError?
+    /// Neutral confirmation shown after a successful resend — the backend's
+    /// anti-enumeration message (`backend/routes/users.js:3060`).
+    private(set) var infoMessage: String?
+    /// True while `POST /api/users/resend-verification` is in flight.
+    private(set) var isResendingVerification: Bool = false
 
     var canSubmit: Bool {
         !isLoading && AuthValidation.email(email) == nil && password.count >= 6
+    }
+
+    /// The backend blocks an unverified sign-in with 403 "Please verify your
+    /// email before signing in." (`backend/routes/users.js:1528`), which maps
+    /// to `.serverError(_)`. RN reveals its resend link on the same signal —
+    /// any login error whose copy mentions "verify"
+    /// (`pantopus/frontend/apps/mobile/src/app/(auth)/login.tsx:58`).
+    var canResendVerification: Bool {
+        guard let description = errorMessage?.errorDescription else { return false }
+        return description.range(of: "verify", options: .caseInsensitive) != nil
+    }
+
+    /// `POST /api/users/resend-verification` (route
+    /// `backend/routes/users.js:3049`) — mirrors RN
+    /// `login.tsx:60`. Requires an email in the field; the response is
+    /// always the same generic message whether or not the account exists.
+    func resendVerification(using auth: AuthManager) async {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = .serverError("Enter your email first to resend verification.")
+            return
+        }
+        guard !isResendingVerification else { return }
+        isResendingVerification = true
+        infoMessage = nil
+        defer { isResendingVerification = false }
+        do {
+            try await auth.resendVerification(email: trimmed.lowercased())
+            infoMessage = "If that email exists, a verification email has been sent."
+        } catch let error as AuthError {
+            errorMessage = error
+            Observability.shared.capture(error)
+        } catch {
+            errorMessage = .serverError("Could not resend verification email.")
+            Observability.shared.capture(error)
+        }
     }
 
     var emailFieldState: PantopusFieldState {
@@ -455,6 +565,9 @@ final class LoginViewModel {
     func clearError() {
         if errorMessage != nil {
             errorMessage = nil
+        }
+        if infoMessage != nil {
+            infoMessage = nil
         }
     }
 }

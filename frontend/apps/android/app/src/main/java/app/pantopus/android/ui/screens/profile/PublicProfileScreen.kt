@@ -31,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.BeaconIdentity
 import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.GhostButton
+import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
@@ -78,6 +80,9 @@ fun PublicProfileScreen(
     val connectState by viewModel.connectState.collectAsStateWithLifecycle()
     val showHandshake by viewModel.showFollowHandshake.collectAsStateWithLifecycle()
     val handshakeTier by viewModel.handshakePreselectedTierRank.collectAsStateWithLifecycle()
+    val isFollowing by viewModel.isFollowing.collectAsStateWithLifecycle()
+    val isFollowInFlight by viewModel.isFollowInFlight.collectAsStateWithLifecycle()
+    val canFollow by viewModel.canFollow.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
     val reportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showReportSheet by remember { mutableStateOf(false) }
@@ -125,6 +130,13 @@ fun PublicProfileScreen(
                         onMessage = { onOpenMessages(content.profile) },
                         onConnect = { viewModel.connect() },
                         onOverflow = { viewModel.setShowOverflow(true) },
+                        follow =
+                            ProfileFollowState(
+                                canFollow = canFollow,
+                                isFollowing = isFollowing,
+                                isInFlight = isFollowInFlight,
+                            ),
+                        onFollow = { viewModel.follow() },
                     )
                 } else {
                     PublicProfileLoadedFrame(
@@ -133,6 +145,12 @@ fun PublicProfileScreen(
                         connectState = connectState,
                         onBack = onBack,
                         onSelectTab = { viewModel.selectTab(it) },
+                        follow =
+                            ProfileFollowState(
+                                canFollow = canFollow,
+                                isFollowing = isFollowing,
+                                isInFlight = isFollowInFlight,
+                            ),
                         onFollow = { viewModel.follow() },
                         onMessage = { onOpenMessages(content.profile) },
                         onConnect = { viewModel.connect() },
@@ -199,14 +217,24 @@ fun PublicProfileScreen(
 }
 
 /**
+ * T3 — render state for the plain Follow / Following control. A Beacon
+ * (persona with a resolvable handle) still hands the tap to the privacy
+ * handshake wizard, which owns its own in-flight pose; everyone else
+ * toggles `api/users/:id/follow` and uses [isInFlight].
+ */
+internal data class ProfileFollowState(
+    val canFollow: Boolean = false,
+    val isFollowing: Boolean = false,
+    val isInFlight: Boolean = false,
+)
+
+/**
  * P6.5 — Kind-aware loaded frame, exposed as `internal` so Paparazzi
  * snapshot tests can render the populated view without spinning up a
  * Hilt VM.
  *
- * There is no `followState`: the persona Follow button hands off to the
- * privacy-handshake wizard, which owns the request and its in-flight /
- * succeeded poses. Only [connectState] resolves on this screen (it drives
- * the local profile's Connect → Requested flip), and iOS
+ * [connectState] drives the local profile's Connect → Requested flip and
+ * [follow] drives the Follow → Following flip; iOS
  * `PublicProfileView.identityActions` renders exactly the same pair.
  */
 @Composable
@@ -221,6 +249,7 @@ internal fun PublicProfileLoadedFrame(
     onConnect: () -> Unit,
     onOverflow: () -> Unit,
     onUnlock: (PublicProfilePost) -> Unit,
+    follow: ProfileFollowState = ProfileFollowState(),
     onOpenInsights: () -> Unit = {},
     onEditPersona: () -> Unit = {},
     onComposeBroadcast: () -> Unit = {},
@@ -278,11 +307,20 @@ internal fun PublicProfileLoadedFrame(
                                     actionLabel = "Share profile",
                                     onClick = onOverflow,
                                 )
-                                BeaconHeaderPrimaryButton(
-                                    title = "Follow",
-                                    icon = PantopusIcon.Plus,
-                                    onClick = onFollow,
-                                )
+                                if (follow.isFollowing) {
+                                    BeaconHeaderGhostButton(
+                                        icon = PantopusIcon.Check,
+                                        actionLabel = "Following. Tap to unfollow",
+                                        onClick = onFollow,
+                                        title = "Following",
+                                    )
+                                } else {
+                                    BeaconHeaderPrimaryButton(
+                                        title = "Follow",
+                                        icon = PantopusIcon.Plus,
+                                        onClick = onFollow,
+                                    )
+                                }
                             }
                         } else {
                             val requested = connectState is PublicProfileActionState.Succeeded
@@ -350,6 +388,8 @@ internal fun LocalProfileLoadedFrame(
     onMessage: () -> Unit,
     onConnect: () -> Unit,
     onOverflow: () -> Unit,
+    follow: ProfileFollowState = ProfileFollowState(),
+    onFollow: () -> Unit = {},
 ) {
     ContentDetailShell(
         title = null,
@@ -401,6 +441,11 @@ internal fun LocalProfileLoadedFrame(
         },
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4)) {
+                ProfileFollowRow(
+                    follow = follow,
+                    onFollow = onFollow,
+                    modifier = Modifier.padding(horizontal = Spacing.s4),
+                )
                 Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
                     LocalProfileTabStrip(
                         postCount = content.posts.size.takeIf { it > 0 },
@@ -425,6 +470,42 @@ internal fun LocalProfileLoadedFrame(
             }
         },
     )
+}
+
+/**
+ * T3 — plain Follow / Following for an ordinary neighbour.
+ *
+ * The A21.2 Local header is spec'd at exactly two buttons (Connect +
+ * Message — `beacon-primitives.jsx:268-272`), so the follow control lives
+ * directly beneath the identity block, the same slot RN puts its action
+ * row in (`src/app/user/[id].tsx:522-569`). Hidden on your own profile and
+ * when signed out. Mirrors iOS `PublicProfileView.followRow`.
+ */
+@Composable
+private fun ProfileFollowRow(
+    follow: ProfileFollowState,
+    onFollow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (follow.canFollow) {
+        Box(modifier = modifier.testTag("publicProfileFollowButton")) {
+            if (follow.isFollowing) {
+                GhostButton(
+                    title = "Following",
+                    onClick = onFollow,
+                    isLoading = follow.isInFlight,
+                    isEnabled = !follow.isInFlight,
+                )
+            } else {
+                PrimaryButton(
+                    title = "Follow",
+                    onClick = onFollow,
+                    isLoading = follow.isInFlight,
+                    isEnabled = !follow.isInFlight,
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -4,13 +4,17 @@ package app.pantopus.android.ui.screens.contentdetail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import app.pantopus.android.data.api.models.payments.CreatePaymentIntentRequest
-import app.pantopus.android.data.api.models.payments.PaymentIntentSheetParamsDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoiceDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoiceLineItemDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoicePartyDto
+import app.pantopus.android.data.api.models.businesses.BusinessInvoiceResponse
+import app.pantopus.android.data.api.models.businesses.PayInvoiceResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.payments.PaymentsRepository
+import app.pantopus.android.data.businesses.BusinessInvoicesRepository
 import app.pantopus.android.ui.screens.settings.payments.CheckoutOutcome
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,19 +24,22 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * Mirrors iOS `InvoiceCheckoutTests`. Covers the Block 3B pay step: create the
- * PaymentIntent (`POST /api/payments/intent`) → present PaymentSheet → map the
- * outcome and re-read server state. The Stripe SDK is exercised in the screen,
- * so here we assert the VM's event emission + outcome handling.
+ * Mirrors iOS `InvoiceCheckoutTests`. Covers the real invoice flow: read the
+ * invoice from `GET api/businesses/invoices/{id}`, create the PaymentIntent
+ * via `.../pay`, present PaymentSheet (exercised in the screen), then confirm
+ * and re-read server state.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InvoiceDetailViewModelTest {
-    private lateinit var repository: PaymentsRepository
+    private lateinit var repository: BusinessInvoicesRepository
+
+    private val invoiceId = "7f3c1a24-1111-4000-8000-000000000001"
 
     @Before
     fun setUp() {
@@ -45,46 +52,71 @@ class InvoiceDetailViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm(withCheckout: Boolean = false) =
+    private fun invoiceDto(
+        status: String = "sent",
+        paidAt: String? = null,
+    ) = BusinessInvoiceDto(
+        id = invoiceId,
+        lineItems = listOf(BusinessInvoiceLineItemDto(description = "Install labor", amountCents = 6500, quantity = 2)),
+        subtotalCents = 13_000,
+        feeCents = 390,
+        totalCents = 13_000,
+        currency = "usd",
+        status = status,
+        dueDate = "2025-12-18T17:00:00.000Z",
+        createdAt = "2025-12-04T17:00:00.000Z",
+        paidAt = paidAt,
+        business = BusinessInvoicePartyDto(id = "b1", name = "Brightside Outdoor"),
+    )
+
+    private fun vm() =
         InvoiceDetailViewModel(
-            savedStateHandle =
-                SavedStateHandle(
-                    buildMap {
-                        put(InvoiceDetailViewModel.INVOICE_ID_KEY, "inv-1")
-                        if (withCheckout) {
-                            put(InvoiceDetailViewModel.LISTING_ID_KEY, "listing-1")
-                            put(InvoiceDetailViewModel.OFFER_ID_KEY, "offer-1")
-                        }
-                    },
-                ),
-            paymentsRepository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(InvoiceDetailViewModel.INVOICE_ID_KEY to invoiceId)),
+            invoicesRepository = repository,
         )
 
-    private val sheetParams =
-        PaymentIntentSheetParamsDto(
+    private val payResponse =
+        PayInvoiceResponse(
             clientSecret = "pi_secret_1",
             paymentIntentId = "pi_1",
-            customer = "cus_1",
-            ephemeralKey = "ek_1",
-            publishableKey = "pk_test",
+            paymentId = "pay_1",
+            amountCents = 13_000,
+            feeCents = 390,
         )
 
+    /** The invoice is read from the backend — never from a fixture. */
     @Test
-    fun load_projects_due_fixture() =
+    fun load_renders_the_server_invoice() =
         runTest {
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto()))
             val vm = vm()
             vm.load()
             val content = (vm.state.value as ContentDetailUiState.Loaded).content
             assertEquals(ContentDetailKind.Invoice, content.kind)
-            assertEquals("Pay $642.85", content.dock.primary.label)
+            assertEquals("$130.00", content.hero.priceLine)
+            assertEquals("Pay $130.00", content.dock.primary.label)
+        }
+
+    @Test
+    fun load_failure_surfaces_error_frame() =
+        runTest {
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Failure(NetworkError.Server(404, "Invoice not found"))
+            val vm = vm()
+            vm.load()
+            assertTrue(vm.state.value is ContentDetailUiState.Error)
         }
 
     // checkout.paymentSheet — pay() creates the intent and asks the screen to present.
     @Test
     fun pay_success_emits_present_checkout_event() =
         runTest {
-            coEvery { repository.createPaymentIntent(any()) } returns NetworkResult.Success(sheetParams)
-            val vm = vm(withCheckout = true)
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto()))
+            coEvery { repository.payInvoice(invoiceId) } returns NetworkResult.Success(payResponse)
+            val vm = vm()
+            vm.load()
             vm.events.test {
                 vm.pay()
                 val event = awaitItem()
@@ -95,48 +127,51 @@ class InvoiceDetailViewModelTest {
             assertEquals(InvoicePaymentStatus.Paying, vm.paymentStatus.value)
         }
 
+    // /pay fails → declined, no sheet.
     @Test
-    fun pay_passes_order_reference_to_backend() =
+    fun pay_failure_marks_declined() =
         runTest {
-            val slot = mutableListOf<CreatePaymentIntentRequest>()
-            coEvery { repository.createPaymentIntent(capture(slot)) } returns NetworkResult.Success(sheetParams)
-            val vm = vm(withCheckout = true)
-            vm.pay()
-            assertEquals("listing-1", slot.first().listingId)
-            assertEquals("offer-1", slot.first().offerId)
-            assertEquals(null, slot.first().gigId)
-        }
-
-    @Test
-    fun pay_without_order_reference_declines_without_intent() =
-        runTest {
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto()))
+            coEvery { repository.payInvoice(invoiceId) } returns
+                NetworkResult.Failure(NetworkError.Server(400, "This invoice has already been paid"))
             val vm = vm()
-            vm.pay()
-            assertEquals(
-                InvoicePaymentStatus.Declined("This invoice can't be paid yet."),
-                vm.paymentStatus.value,
-            )
-        }
-
-    // Intent creation fails → declined, no sheet.
-    @Test
-    fun pay_intent_failure_marks_declined() =
-        runTest {
-            coEvery { repository.createPaymentIntent(any()) } returns
-                NetworkResult.Failure(NetworkError.Server(500, "boom"))
-            val vm = vm(withCheckout = true)
+            vm.load()
             vm.pay()
             assertTrue(vm.paymentStatus.value is InvoicePaymentStatus.Declined)
         }
 
-    // checkout.paySuccess — completed sheet re-reads server state.
+    /** A paid invoice never re-runs checkout. */
     @Test
-    fun outcome_paid_refreshes_and_marks_paid() =
+    fun paid_invoice_refuses_to_pay_again() =
         runTest {
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto(status = "paid", paidAt = "2025-12-14T17:00:00.000Z")))
+            val vm = vm()
+            vm.load()
+            vm.pay()
+            assertEquals(
+                InvoicePaymentStatus.Declined("This invoice has already been paid."),
+                vm.paymentStatus.value,
+            )
+            coVerify(exactly = 0) { repository.payInvoice(any()) }
+        }
+
+    // checkout.paySuccess — a completed sheet confirms with the backend, then re-reads.
+    @Test
+    fun outcome_paid_confirms_and_refreshes() =
+        runTest {
+            coEvery { repository.invoice(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto(status = "paid", paidAt = "2025-12-14T17:00:00.000Z")))
+            coEvery { repository.confirmInvoicePayment(invoiceId) } returns
+                NetworkResult.Success(BusinessInvoiceResponse(invoiceDto(status = "paid", paidAt = "2025-12-14T17:00:00.000Z")))
             val vm = vm()
             vm.onCheckoutOutcome(CheckoutOutcome.Paid)
             assertEquals(InvoicePaymentStatus.Paid, vm.paymentStatus.value)
-            assertTrue(vm.state.value is ContentDetailUiState.Loaded)
+            coVerify(exactly = 1) { repository.confirmInvoicePayment(invoiceId) }
+            val content = (vm.state.value as ContentDetailUiState.Loaded).content
+            assertEquals("Paid in full", content.dock.primary.label)
+            assertFalse(content.dock.primary.enabled)
         }
 
     // checkout.cancel

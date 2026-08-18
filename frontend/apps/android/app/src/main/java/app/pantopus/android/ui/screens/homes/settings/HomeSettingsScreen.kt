@@ -4,7 +4,9 @@ package app.pantopus.android.ui.screens.homes.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,12 +26,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.PantopusFieldState
+import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListCallbacks
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListScreen
 import app.pantopus.android.ui.screens.shared.grouped_list.RowControl
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
@@ -48,6 +53,7 @@ fun HomeSettingsScreen(
     val navigation by viewModel.navigation.collectAsStateWithLifecycle()
     val identity by viewModel.identity.collectAsStateWithLifecycle()
     val footerCaption by viewModel.footerCaption.collectAsStateWithLifecycle()
+    val rename by viewModel.rename.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(navigation) {
@@ -67,17 +73,35 @@ fun HomeSettingsScreen(
                 onTapRow = viewModel::onRow,
                 onRetry = viewModel::refresh,
             ),
-        header = { HomeSettingsIdentityCard(identity = identity) },
+        header = {
+            HomeSettingsIdentityCard(
+                identity = identity,
+                rename = rename,
+                onBeginRename = viewModel::beginRenaming,
+                onRenameDraftChange = viewModel::updateRenameDraft,
+                onSaveRename = viewModel::saveRenaming,
+                onCancelRename = viewModel::cancelRenaming,
+            )
+        },
     )
 }
 
 /**
  * Identity strip rendered at the top of the per-home Settings list.
  * Holds the home name plus the "HOME" identity chip and the
- * address-verified (or amber `VERIFYING`) chip.
+ * address-verified (or amber `VERIFYING`) chip. When the viewer holds
+ * `home.edit`, the name swaps for RN's inline nickname editor
+ * (`src/app/homes/[id]/settings/index.tsx:89-108`).
  */
 @Composable
-fun HomeSettingsIdentityCard(identity: HomeSettingsSampleData.Identity) {
+fun HomeSettingsIdentityCard(
+    identity: HomeSettingsSampleData.Identity,
+    rename: HomeRenameState = HomeRenameState(),
+    onBeginRename: () -> Unit = {},
+    onRenameDraftChange: (String) -> Unit = {},
+    onSaveRename: () -> Unit = {},
+    onCancelRename: () -> Unit = {},
+) {
     Column(
         modifier =
             Modifier
@@ -89,19 +113,103 @@ fun HomeSettingsIdentityCard(identity: HomeSettingsSampleData.Identity) {
                 .testTag("homeSettingsIdentityCard"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        Text(
-            text = identity.homeName,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.appText,
-            modifier = Modifier.testTag("homeSettingsIdentityName"),
-        )
+        if (rename.isRenaming) {
+            RenameEditor(
+                rename = rename,
+                onDraftChange = onRenameDraftChange,
+                onSave = onSaveRename,
+                onCancel = onCancelRename,
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                Text(
+                    text = identity.homeName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.testTag("homeSettingsIdentityName"),
+                )
+                if (rename.canEdit) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.sm))
+                                .clickable(onClick = onBeginRename)
+                                .padding(Spacing.s1)
+                                .testTag("homeSettingsRenameButton"),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Edit2,
+                            contentDescription = "Rename home",
+                            size = 15.dp,
+                            tint = PantopusColors.appTextMuted,
+                        )
+                    }
+                }
+            }
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
             IdentityChip()
             AddressChip(label = identity.addressChipLabel, tone = identity.addressChipTone)
+        }
+    }
+}
+
+/** RN's inline nickname editor: field + Save + Cancel. */
+@Composable
+private fun RenameEditor(
+    rename: HomeRenameState,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("homeSettingsRenameEditor"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusTextField(
+            label = "Home name",
+            value = rename.draft,
+            onValueChange = onDraftChange,
+            placeholder = "14 Elm Park Lane",
+            state =
+                rename.error?.let { PantopusFieldState.Error(it) }
+                    ?: PantopusFieldState.Default,
+            fieldTestTag = "homeSettingsRenameField",
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Text(
+                text = if (rename.isSaving) "Saving…" else "Save",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextInverse,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.primary600)
+                        .clickable(enabled = !rename.isSaving, onClick = onSave)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("homeSettingsRenameSave"),
+            )
+            Text(
+                text = "Cancel",
+                style = PantopusTextStyle.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .clickable(enabled = !rename.isSaving, onClick = onCancel)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("homeSettingsRenameCancel"),
+            )
         }
     }
 }

@@ -11,7 +11,7 @@
 
 import SwiftUI
 
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 @MainActor
 struct GenericMailDetailLayout: View {
@@ -23,6 +23,15 @@ struct GenericMailDetailLayout: View {
     let onSaveToVault: @MainActor () -> Void
     /// When set, the overflow menu gains a "Translate" action (A17.13).
     var onTranslate: (@MainActor @Sendable () -> Void)?
+    /// A17.12 — when set, the overflow surfaces "Create task", which opens
+    /// the Mail-tasks screen in its create frame for this mail.
+    var onCreateTask: (@MainActor @Sendable () -> Void)?
+    /// A17.1 — per-category ACTIONS row (RN `CATEGORY_ACTIONS`). Empty
+    /// hides the section.
+    var categoryActions: [MailCategoryAction] = []
+    /// Tile currently POSTing to `/item/:id/action`.
+    var categoryActionInFlight: MailCategoryAction?
+    var onCategoryAction: (@MainActor (MailCategoryAction) -> Void)?
 
     var body: some View {
         MailItemDetailShell(
@@ -61,6 +70,9 @@ struct GenericMailDetailLayout: View {
                 ActionsRow(
                     content: content,
                     ackInFlight: ackInFlight,
+                    categoryActions: categoryActions,
+                    categoryActionInFlight: categoryActionInFlight,
+                    onCategoryAction: onCategoryAction,
                     onAck: onAcknowledge,
                     onMove: onSaveToVault
                 )
@@ -119,6 +131,13 @@ struct GenericMailDetailLayout: View {
             items.append(
                 MailOverflowItem(id: "translate", icon: .globe, label: "Translate") { @Sendable in
                     Task { @MainActor in onTranslate() }
+                }
+            )
+        }
+        if let onCreateTask {
+            items.append(
+                MailOverflowItem(id: "createTask", icon: .listChecks, label: "Create task") { @Sendable in
+                    Task { @MainActor in onCreateTask() }
                 }
             )
         }
@@ -483,6 +502,9 @@ private struct BodyCard: View {
 private struct ActionsRow: View {
     let content: MailDetailContent
     let ackInFlight: Bool
+    let categoryActions: [MailCategoryAction]
+    let categoryActionInFlight: MailCategoryAction?
+    let onCategoryAction: (@MainActor (MailCategoryAction) -> Void)?
     let onAck: @MainActor () -> Void
     let onMove: @MainActor () -> Void
 
@@ -491,8 +513,55 @@ private struct ActionsRow: View {
             if content.ackRequired || content.isAcknowledged {
                 acknowledgeButton
             }
+            if !categoryActions.isEmpty, onCategoryAction != nil {
+                categoryActionsSection
+            }
             secondaryRow
         }
+    }
+
+    /// A17.1 — the per-category row RN renders under an "ACTIONS"
+    /// overline: first tile filled with the category accent, the rest
+    /// outlined, wrapping (`detail.tsx:188-208`).
+    private var categoryActionsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("ACTIONS")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .accessibilityAddTraits(.isHeader)
+            MailActionsFlowLayout(spacing: Spacing.s2) {
+                ForEach(Array(categoryActions.enumerated()), id: \.element.id) { index, action in
+                    categoryActionTile(action, isPrimary: index == 0)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, Spacing.s1)
+        .accessibilityIdentifier("mailDetail_categoryActions")
+    }
+
+    private func categoryActionTile(_ action: MailCategoryAction, isPrimary: Bool) -> some View {
+        let isBusy = categoryActionInFlight == action
+        let foreground: Color = isPrimary ? Theme.Color.appTextInverse : Theme.Color.appText
+        return Button(action: { onCategoryAction?(action) }) {
+            HStack(spacing: Spacing.s2) {
+                Icon(action.icon, size: 14, color: foreground)
+                Text(action.label)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(foreground)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 10)
+            .background(isPrimary ? content.category.accent : Theme.Color.appSurfaceSunken)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .opacity(isBusy ? 0.5 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(categoryActionInFlight != nil)
+        .accessibilityLabel(action.label)
+        .accessibilityIdentifier("mailDetail_categoryAction_\(action.rawValue)")
     }
 
     private var acknowledgeButton: some View {
@@ -563,5 +632,58 @@ private struct ActionsRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel(label)
         .accessibilityIdentifier("mailDetail_action_\(id)")
+    }
+}
+
+// MARK: - Flow layout for the wrapping ACTIONS row
+
+/// Minimal flow layout — wraps children left-to-right and starts a new
+/// line when the next tile would overflow the available width. Mirrors
+/// RN's `actionsRow` (`flexWrap: 'wrap'`, `gap: 8`).
+private struct MailActionsFlowLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxRowWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                maxRowWidth = max(maxRowWidth, x - spacing)
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        maxRowWidth = max(maxRowWidth, x - spacing)
+        return CGSize(width: maxRowWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache _: inout ()
+    ) {
+        let maxWidth = proposal.width ?? bounds.width
+        var x: CGFloat = bounds.minX
+        var y: CGFloat = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.minX + maxWidth, x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }

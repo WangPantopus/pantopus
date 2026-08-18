@@ -172,6 +172,10 @@ public final class BeaconProfileViewModel {
     private let mode: BeaconProfileMode
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.BeaconProfile")
+    /// Broadcast ids already reported as read this session, so a pull-to-
+    /// refresh doesn't double-count. RN keeps the same `Set` in a ref
+    /// (`src/app/persona/[personaHandle]/index.tsx:61`).
+    private var markedBroadcastIds: Set<String> = []
 
     init(mode: BeaconProfileMode, client: APIClient = .shared) {
         self.mode = mode
@@ -217,6 +221,7 @@ public final class BeaconProfileViewModel {
             let tiers = await loadTiers(handle: loadedHandle)
 
             state = .loaded(build(persona: persona, channel: envelope.channel, posts: posts, tiers: tiers))
+            markBroadcastsRead(posts, viewer: persona.viewer)
         } catch let error as APIError {
             logger.warning("Beacon load failed: \(error)")
             state = .error(message: friendlyMessage(for: error))
@@ -267,6 +272,44 @@ public final class BeaconProfileViewModel {
         } catch {
             logger.debug("Beacon tiers load failed: \(error)")
             return []
+        }
+    }
+
+    // MARK: - Read receipts
+
+    /// Report every broadcast the viewer just saw as read. Fire-and-forget:
+    /// the increment feeds the creator's read-count analytics, so a failure
+    /// must never surface to the fan. The owner's own views are skipped
+    /// (the backend ignores them anyway) and a locked / tier-gated row is
+    /// skipped because the viewer never actually read it.
+    ///
+    /// Mirrors RN `markBroadcastPostsRead`
+    /// (`src/app/persona/[personaHandle]/index.tsx:63-72`).
+    private func markBroadcastsRead(_ posts: [BeaconPostDTO], viewer: BeaconViewerDTO?) {
+        guard !isOwner, !(viewer?.isOwner ?? false) else { return }
+        let eligible = posts.filter { post in
+            guard let channelId = post.broadcastChannelId, !channelId.isEmpty else { return false }
+            guard post.locked != true else { return false }
+            return !markedBroadcastIds.contains(post.id)
+        }
+        guard !eligible.isEmpty else { return }
+        for post in eligible {
+            markedBroadcastIds.insert(post.id)
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            for post in eligible {
+                do {
+                    _ = try await client.request(
+                        BroadcastReadEndpoints.markRead(messageId: post.id),
+                        as: EmptyResponse.self
+                    )
+                } catch {
+                    // Let a later visit retry this one.
+                    markedBroadcastIds.remove(post.id)
+                    logger.debug("Broadcast read receipt failed for \(post.id): \(error)")
+                }
+            }
         }
     }
 

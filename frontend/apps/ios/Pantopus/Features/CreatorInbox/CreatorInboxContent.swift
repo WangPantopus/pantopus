@@ -49,12 +49,19 @@ public struct CreatorInboxRowContent: Sendable, Hashable, Identifiable {
     public let unread: Bool
     public let flagged: Bool
     public let verifiedLocal: Bool
-    /// Counterparty user id used to construct the conversation push —
-    /// preferred over `membershipId` when the server emits it.
+    /// Counterparty user id, when the serializer happens to emit one.
+    /// **Never** used as a routing key for the DM thread — persona DMs
+    /// carry no user id by design (`backend/routes/personaDms.js:12`), so
+    /// the row routes on `id` (the `PersonaDmThread` id) instead.
     public let counterpartyUserId: String?
     /// Optional persona-chip label when the inbox spans multiple
     /// personas (e.g. `"@mariak"` / `"@bakery"`). `nil` hides the chip.
     public let personaChip: String?
+    /// Persona that owns this thread — the `:id` path segment of every
+    /// `/api/personas/:id/dms/...` call made from the thread surface.
+    public let personaId: String
+    /// `PersonaMembership` id the thread hangs off. Display/audit only.
+    public let membershipId: String?
 
     public init(
         id: String,
@@ -70,7 +77,9 @@ public struct CreatorInboxRowContent: Sendable, Hashable, Identifiable {
         flagged: Bool,
         verifiedLocal: Bool,
         counterpartyUserId: String?,
-        personaChip: String?
+        personaChip: String?,
+        personaId: String = "",
+        membershipId: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -86,6 +95,8 @@ public struct CreatorInboxRowContent: Sendable, Hashable, Identifiable {
         self.verifiedLocal = verifiedLocal
         self.counterpartyUserId = counterpartyUserId
         self.personaChip = personaChip
+        self.personaId = personaId
+        self.membershipId = membershipId
     }
 }
 
@@ -153,11 +164,16 @@ public struct CreatorInboxLoaded: Sendable, Hashable {
     }
 }
 
-/// Routing payload for the Creator Inbox -> conversation push. Carries
-/// the counterparty data needed to construct `ChatConversationViewModel`
-/// without re-fetching the row from the inbox VM.
-public struct CreatorInboxConversationDestination: Hashable, Sendable {
-    public let userId: String
+/// Routing payload for the Creator Inbox → persona-DM thread push.
+///
+/// Persona DMs are addressed by **thread id**, never by a user id: the DM
+/// serializer deliberately omits both parties' `user_id`
+/// (`backend/routes/personaDms.js:56`). The previous
+/// `counterpartyUserId ?? row.id` fallback therefore pushed a membership
+/// id into the generic chat surface as if it were a user id.
+public struct CreatorInboxThreadDestination: Hashable, Sendable {
+    public let personaId: String
+    public let threadId: String
     public let displayName: String
     public let initials: String
     public let verified: Bool
@@ -165,14 +181,16 @@ public struct CreatorInboxConversationDestination: Hashable, Sendable {
     public let tierRank: Int
 
     public init(
-        userId: String,
+        personaId: String,
+        threadId: String,
         displayName: String,
         initials: String,
         verified: Bool,
         tierName: String,
         tierRank: Int
     ) {
-        self.userId = userId
+        self.personaId = personaId
+        self.threadId = threadId
         self.displayName = displayName
         self.initials = initials
         self.verified = verified

@@ -105,6 +105,13 @@ final class AuthManager {
     private(set) var state: State = .unknown
     private(set) var accessToken: String?
 
+    /// When the user last signed in *interactively* (email/password or OAuth)
+    /// — never stamped by a silent keychain restore. The post-login app-lock
+    /// offer keys off this so it is made once per real sign-in and never on a
+    /// cold launch into an existing session. Mirrors RN
+    /// `AuthContext.lastInteractiveSignInAt` (`AuthContext.tsx:28`).
+    private(set) var lastInteractiveSignInAt: Date?
+
     let store: any SecureStore
     let apiClient: APIClient
     private let logger = Logger(label: "app.pantopus.ios.AuthManager")
@@ -185,6 +192,29 @@ final class AuthManager {
         }
     }
 
+    /// Re-fetch `GET /api/users/profile` and re-publish the session user so
+    /// a mutation made elsewhere (avatar upload, profile PATCH) shows up
+    /// app-wide immediately. Mirrors RN's `AuthContext.refreshUser()`.
+    ///
+    /// Deliberately does not run the `finishSignedIn` side effects — the
+    /// socket is already connected and analytics already identified. A
+    /// failure is swallowed: the caller has surfaced its own error and a
+    /// stale avatar beats dropping the session.
+    @discardableResult
+    func refreshCurrentUser() async -> UserDTO? {
+        guard case .signedIn = state else { return nil }
+        do {
+            let response: ProfileResponse = try await apiClient.request(UsersEndpoints.profile())
+            let user = UserDTO(from: response.user)
+            persistCachedUser(user)
+            state = .signedIn(user)
+            return user
+        } catch {
+            logger.debug("Session user refresh failed: \(error)")
+            return nil
+        }
+    }
+
     /// Apply the side effects of a confirmed signed-in session: publish
     /// state, identify analytics, and (re)connect the realtime socket.
     private func finishSignedIn(_ user: UserDTO, token: String) {
@@ -235,6 +265,9 @@ final class AuthManager {
 
         let user = UserDTO(from: response.user)
         persistCachedUser(user)
+        // Both interactive entry points (email/password + OAuth callback)
+        // funnel through here; `restoreSession()` deliberately does not.
+        lastInteractiveSignInAt = Date()
         finishSignedIn(user, token: access)
         Observability.shared.track("auth.signed_in")
         logger.info("Signed in", metadata: ["userId": .string(response.user.id)])
@@ -456,10 +489,14 @@ final class AuthManager {
         try? store.delete(SecureStoreKey.userId)
         try? store.delete(SecureStoreKey.cachedUser)
         accessToken = nil
+        lastInteractiveSignInAt = nil
         state = .signedOut
         // Workstream 1.4 — never resume a prior user's deferred destination.
         PendingDeepLinkStore.clear()
         DeepLinkRouter.shared.clearPending()
+        // One account's client-side mutes / hides must never filter the
+        // next account's feed (RN drops the provider state on sign-out).
+        FeedModerationStore.shared.clear()
         guard hadSession else { return }
         SocketClient.shared.disconnect()
         Observability.shared.identify(userId: nil)

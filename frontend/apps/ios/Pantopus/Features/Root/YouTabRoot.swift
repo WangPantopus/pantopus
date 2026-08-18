@@ -42,9 +42,17 @@ public enum YouRoute: Hashable {
     case legal
     case legalContent(LegalDocument)
     case addHome
+    /// A12.1 — "Find or Add Home" discovery. Mirrors RN
+    /// `src/app/homes/find.tsx`.
+    case findHome
     case myClaims
     case claimStatus(claimId: String)
     case claimOwnership(homeId: String)
+    /// Residency-verification variant of the evidence flow. Sends
+    /// `claim_type: 'resident'` and offers the lease / utility-bill /
+    /// tax-bill document set (RN
+    /// `homes/[id]/claim-owner/evidence.tsx?verificationType=residency`).
+    case verifyResidency(homeId: String)
     /// T5.2.4 — cross-listing Offers (incoming + outgoing).
     case offers
     /// T5.3.1 — My bids. The "me.bids" action tile pushes here.
@@ -82,6 +90,9 @@ public enum YouRoute: Hashable {
     /// P2.6 — Start-a-Support-Train wizard (organizer compose flow).
     /// Pushed when the Support Trains FAB / empty-state CTA fires.
     case startSupportTrain
+    /// A nearby Support Train tapped in the Tasks feed's merged
+    /// "All" / "Support Trains" scope.
+    case supportTrainDetail(supportTrainId: String)
     /// T6.6c (P26.5) — Review signups (organizer-only) for one Support
     /// Train. Pushed from a Support Trains row tap.
     case reviewSignups(supportTrainId: String)
@@ -113,6 +124,10 @@ public enum YouRoute: Hashable {
     /// `BusinessProfileView` overflow when the viewer owns the business
     /// and from the `pantopus://businesses/:id/page-editor` deep link.
     case editBusinessPage(businessId: String)
+    /// C4 — the custom Pages CMS index for a business.
+    case businessPages(businessId: String)
+    /// C4 — the block builder for one custom page.
+    case businessPageBlocks(businessId: String, pageId: String, pageTitle: String)
     /// Legacy waitlist route — forwards to the Create Business wizard.
     case businessWaitlist
     /// A12.10 — Create Business wizard. Reached from the My Businesses
@@ -154,9 +169,13 @@ public enum YouRoute: Hashable {
     /// Audience Profile Threads tab "View all messages" CTA also lands
     /// here.
     case creatorInbox
-    /// P1.2 — Conversation push from a Creator Inbox row tap. Reuses
-    /// the existing `ChatConversationView` shell in `.person` mode.
-    case creatorInboxConversation(CreatorInboxConversationDestination)
+    /// C5 — Persona DM thread push from a Creator Inbox row tap. Persona
+    /// DMs are a distinct surface from generic chat: addressed by thread
+    /// id, with no counterparty user id on the wire.
+    case creatorInboxConversation(CreatorInboxThreadDestination)
+    /// C5 — Fan-side persona inbox for one persona (A15.5). Reached from
+    /// the membership screen's "Open inbox" CTA.
+    case fanInbox(personaId: String)
     /// T5.2.2 — Bills. The home-context "me.bills" action tile + Activity
     /// row push here with the primary home id resolved by the VM.
     case homeBills(homeId: String)
@@ -236,6 +255,10 @@ public enum YouRoute: Hashable {
     /// T6.3b / P10 — Maintenance. The home-context "me.maintenance"
     /// action tile pushes here.
     case homeMaintenance(homeId: String)
+    /// Per-home **issue tracker** (`HomeIssue`). A different backend
+    /// collection from `.homeMaintenance` (maintenance tasks) — this is
+    /// the surface RN calls "Maintenance" (`homes/[id]/maintenance.tsx`).
+    case homeIssues(homeId: String)
     /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
     /// FAB; on success the host pops back and refreshes the list.
     case logMaintenance(homeId: String)
@@ -249,6 +272,14 @@ public enum YouRoute: Hashable {
     /// Household-section row pushes here with the primary home id
     /// resolved by `MeViewModel.homeSections(...)`.
     case homeOwners(homeId: String)
+    /// H5 — Transfer Ownership form. Pushed from the sticky
+    /// "Transfer Ownership" action on the Owners list (RN parity:
+    /// `src/app/homes/[id]/owners/index.tsx:116-123`).
+    case transferOwnership(homeId: String)
+    /// H6 — per-home **owner** claim review (ownership + residency
+    /// claims on this home). Pushed from the Owners list top-bar gavel.
+    /// Distinct from the admin `reviewClaims` queue in `HubRoute`.
+    case homeClaimReview(homeId: String)
     /// T6.3a / P9 — Members. The home-context "me.members" action tile +
     /// "Household" section row both push here with the resolved home id.
     case homeMembers(homeId: String)
@@ -291,16 +322,37 @@ public enum YouRoute: Hashable {
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
     case mailTask(taskId: String)
+    /// A17.12 (list) — every mail-linked task. When `mailId` is non-nil the
+    /// screen opens in its create frame for that mail.
+    case mailTaskList(mailId: String?, mailSubject: String?, mailSender: String?)
     /// A17.13 — Auto-translated mail view. `pantopus://mailbox/translation?id=`.
     case mailTranslation(mailId: String)
     /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
     case unboxing(mailId: String?)
+    /// A17.8 → "Ask a Neighbor" — package-help gig created from a mailbox
+    /// package. `pantopus://mailbox/gig?id=&mode=pre|post`.
+    case packageGig(mailId: String, isPreDelivery: Bool)
+    /// A17.4 — Community mail feed (neighborhood / civic). Reached from
+    /// the Mailbox root overflow menu.
+    case communityMail
+    /// Home Records — the linked-asset hub. Reached from the Mailbox
+    /// root overflow menu.
+    case homeRecords
     /// A10.11 — Earn dashboard (Wallet sibling). `pantopus://mailbox/earn`.
     case earn
     /// A10.7 — Business owner view. `pantopus://businesses/:id`.
     case businessOwner(businessId: String)
     /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
     case businessTeam(businessId: String)
+    /// C3 — Business Stripe Connect payouts.
+    /// `pantopus://businesses/:id/payments`.
+    case businessPaymentsOwner(businessId: String)
+    /// C3 — Business invoicing (list / create / void).
+    /// `pantopus://businesses/:id/invoices`.
+    case businessInvoicesOwner(businessId: String)
+    /// C3 — Business legal record + verification.
+    /// `pantopus://businesses/:id/legal`.
+    case businessLegal(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
     case viewAs
     /// A18.4 — Persistent "waiting for approval" room.
@@ -308,10 +360,26 @@ public enum YouRoute: Hashable {
     case waitingRoom(homeId: String)
     /// Cancel ownership claim from waiting room / home settings.
     case cancelClaim(homeId: String)
+    /// A12 — Landlord-verification wizard. Reached from the waiting
+    /// room's Verification Center action cards.
+    case verifyLandlord(homeId: String)
+    /// A12.7 — Postcard verification / code entry. Reached from the
+    /// waiting room's Verification Center action cards.
+    case postcardVerification(homeId: String)
+    /// "This isn't my home" — the Leave home confirm, which owns
+    /// `POST /api/homes/:id/move-out`.
+    case leaveHome(homeId: String)
+    /// Four-moment Ceremonial Mail compose wizard. Production entry point
+    /// is the Mailbox root's compose FAB.
+    case ceremonialMail
+    /// Ceremonial open experience for a letter carrying a stationery
+    /// theme. Reached by redirect from the generic mail detail.
+    case ceremonialMailOpen(mailId: String)
+    /// Disambiguation queue behind the Mailbox root's
+    /// "N items need routing" banner.
+    case mailRoutingQueue
     #if DEBUG
     case statusWaiting
-    case ceremonialMail
-    case ceremonialMailOpen(mailId: String)
     #endif
 }
 
@@ -367,11 +435,18 @@ public struct YouTabRoot: View {
         return ""
     }
 
-    public init() {}
+    /// True when opened from the `monthly_receipt` push — the Monthly
+    /// Receipt card renders expanded (RN `/(tabs)/profile?tab=receipt`).
+    private let expandMonthlyReceipt: Bool
+
+    public init(expandMonthlyReceipt: Bool = false) {
+        self.expandMonthlyReceipt = expandMonthlyReceipt
+    }
 
     public var body: some View {
         NavigationStack(path: navigationPathBinding) {
             MeView(
+                expandMonthlyReceipt: expandMonthlyReceipt,
                 onAction: { tile in handleAction(tile) },
                 onSection: { row in handleSection(row) },
                 onLogOut: { showsSignOutConfirm = true }
@@ -771,7 +846,7 @@ public struct YouTabRoot: View {
     }
 
     @MainActor
-    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId _: String) {
         switch nav {
         case .notifications:
             path.append(.settings)
@@ -787,6 +862,17 @@ public struct YouTabRoot: View {
             path.append(.claimOwnership(homeId: id))
         case let .cancelClaim(id):
             path.append(.cancelClaim(homeId: id))
+        // Verification Center action cards.
+        case let .verifyPostcard(id):
+            path.append(.postcardVerification(homeId: id))
+        case let .uploadProof(id):
+            path.append(.verifyResidency(homeId: id))
+        case let .landlordVerification(id):
+            path.append(.verifyLandlord(homeId: id))
+        case let .leaveHome(id):
+            path.append(.leaveHome(homeId: id))
+        case .requestHelp:
+            path.append(.helpCenter)
         }
     }
 
@@ -870,7 +956,27 @@ public struct YouTabRoot: View {
                     onOpenEarn: { path.append(.earn) },
                     onOpenVacationHold: { path.append(.vacationHold) },
                     onOpenStamps: { path.append(.stamps) },
-                    onOpenUnboxing: { path.append(.unboxing(mailId: nil)) }
+                    onOpenUnboxing: { path.append(.unboxing(mailId: nil)) },
+                    onOpenCompose: { path.append(.ceremonialMail) },
+                    onOpenRoutingQueue: { path.append(.mailRoutingQueue) },
+                    onOpenCommunity: { path.append(.communityMail) },
+                    onOpenRecords: { path.append(.homeRecords) },
+                    onOpenMailTasks: {
+                        path.append(.mailTaskList(mailId: nil, mailSubject: nil, mailSender: nil))
+                    }
+                )
+            )
+        case .communityMail:
+            CommunityMailView(
+                viewModel: CommunityMailViewModel(onBack: { Task { @MainActor in pop() } })
+            )
+        case .homeRecords:
+            HomeRecordsView(
+                viewModel: HomeRecordsViewModel(
+                    onBack: { Task { @MainActor in pop() } },
+                    onOpenMail: { mailId in
+                        Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                    }
                 )
             )
         case .mailboxMap:
@@ -915,6 +1021,30 @@ public struct YouTabRoot: View {
                     // A17.12 — the certified-notice "view task" affordance
                     // opens the mail-derived task keyed by its source mail.
                     Task { @MainActor in path.append(.mailTask(taskId: sourceMailId)) }
+                },
+                onOpenCeremonialMail: { ceremonialId in
+                    // Replace (not push) so Back returns to the Mailbox,
+                    // matching RN's `router.replace`.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(.ceremonialMailOpen(mailId: ceremonialId))
+                    }
+                },
+                onCreateTask: {
+                    // A17.12 — RN's "Create Task" in the detail MORE row
+                    // (`src/app/mailbox/detail.tsx:221-227`).
+                    Task { @MainActor in
+                        path.append(.mailTaskList(mailId: mailId, mailSubject: nil, mailSender: nil))
+                    }
+                },
+                onOpenUnboxing: {
+                    Task { @MainActor in path.append(.unboxing(mailId: mailId)) }
+                },
+                onAskNeighbor: { isPreDelivery in
+                    // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                    Task { @MainActor in
+                        path.append(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
+                    }
                 }
             )
         case .settings:
@@ -935,9 +1065,9 @@ public struct YouTabRoot: View {
         case .helpCenter:
             HelpCenterView { Task { @MainActor in pop() } }
         case .privacySettings:
-            GroupedListView(
-                dataSource: PrivacySettingsViewModel()
-            ) { Task { @MainActor in pop() } }
+            // `PrivacyView` (not a bare `GroupedListView`) — it hosts the
+            // account-delete confirm sheet the destructive row opens.
+            PrivacyView(viewModel: PrivacySettingsViewModel()) { Task { @MainActor in pop() } }
         case .legal:
             LegalIndexView(
                 onBack: { Task { @MainActor in pop() } },
@@ -948,10 +1078,28 @@ public struct YouTabRoot: View {
                 if !path.isEmpty { path.removeLast() }
             }
         case .addHome:
-            AddHomeWizardView { homeId in
-                path.removeAll { $0 == .addHome }
-                path.append(.homeDashboard(homeId: homeId))
-            }
+            AddHomeWizardView(
+                onOpenHomeDashboard: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.homeDashboard(homeId: homeId))
+                },
+                onOpenClaimOwnership: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.claimOwnership(homeId: homeId))
+                },
+                onOpenWaitingRoom: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.waitingRoom(homeId: homeId))
+                }
+            )
+        case .findHome:
+            FindHomeView(
+                onBack: { if !path.isEmpty { path.removeLast() } },
+                onOpenClaimOwnership: { homeId in
+                    Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
+                },
+                onOpenAddHome: { Task { @MainActor in path.append(.addHome) } }
+            )
         case .myClaims:
             MyClaimsListView(
                 viewModel: MyClaimsListViewModel(
@@ -990,6 +1138,35 @@ public struct YouTabRoot: View {
                         return false
                     }
                     path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
+                }
+            )
+        case let .verifyResidency(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                verificationType: .residency,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
                 }
             )
         // Wave A — pre-staged placeholder destinations. When an A.x screen
@@ -1006,25 +1183,31 @@ public struct YouTabRoot: View {
                 onOpenPersona: {
                     Task { @MainActor in path.append(.placeholder(label: "Creator profile")) }
                 },
-                onChangeTier: {
-                    Task { @MainActor in path.append(.placeholder(label: "Change tier")) }
-                },
                 onUpdatePayment: {
                     Task { @MainActor in path.append(.placeholder(label: "Update payment")) }
                 },
                 onCancel: {
                     Task { @MainActor in path.append(.placeholder(label: "Membership cancelled")) }
                 },
-                onRequestRefund: {
-                    Task { @MainActor in path.append(.placeholder(label: "Request refund")) }
+                // Change tier + refund request are real in-screen flows now
+                // (tier picker sheet / refund sheet), not placeholder pushes.
+                onOpenInbox: { resolvedPersonaId in
+                    Task { @MainActor in
+                        path.append(
+                            .fanInbox(personaId: resolvedPersonaId.isEmpty ? personaId : resolvedPersonaId)
+                        )
+                    }
                 }
             )
         case .professionalProfile:
             ProfessionalProfileView { Task { @MainActor in pop() } }
-        case let .editPersona(personaId):
-            EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
-                if !path.isEmpty { path.removeLast() }
-            }
+        case .editPersona:
+            // The editor resolves the signed-in user's Beacon itself via
+            // GET /api/personas/me, so the route payload is advisory only.
+            EditPersonaView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onViewBeacon: { handle in Task { @MainActor in path.append(.beaconProfile(handle: handle)) } }
+            )
         case let .composeBroadcast(personaId):
             ComposeBroadcastView(
                 viewModel: .live(personaId: personaId) {
@@ -1178,6 +1361,10 @@ public struct YouTabRoot: View {
                 },
                 onEdit: { id in
                     Task { @MainActor in path.append(.editPost(postId: id)) }
+                },
+                onOpenBusiness: { username in
+                    // "Nearby Providers" row → `/business/:username`.
+                    Task { @MainActor in path.append(.businessProfile(businessId: username)) }
                 }
             )
         case .myBids:
@@ -1224,7 +1411,12 @@ public struct YouTabRoot: View {
                 onOpenSearch: {
                     Task { @MainActor in path.append(.gigSearch) }
                 },
-                onBack: { Task { @MainActor in pop() } }
+                onBack: { Task { @MainActor in pop() } },
+                onOpenSupportTrain: { trainId in
+                    Task { @MainActor in path.append(.supportTrainDetail(supportTrainId: trainId)) }
+                },
+                onOpenMyTasks: { Task { @MainActor in path.append(.myTasks) } },
+                onOpenMySupportTrains: { Task { @MainActor in path.append(.supportTrains) } }
             )
         case .gigSearch:
             GigSearchView(
@@ -1326,6 +1518,11 @@ public struct YouTabRoot: View {
                     }
                 )
             )
+        case let .supportTrainDetail(supportTrainId):
+            SupportTrainDetailView(
+                viewModel: SupportTrainDetailViewModel(trainId: supportTrainId),
+                onBack: { Task { @MainActor in pop() } }
+            )
         case .searchSupportTrains:
             SupportTrainsSearchView(
                 viewModel: SupportTrainsSearchViewModel(
@@ -1358,10 +1555,20 @@ public struct YouTabRoot: View {
                             items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onConfirm: { _ in
-                        // POST `/api/support-trains/:id/reservations/:id/confirm`
-                        // wiring lands with the editor surface — the VM's
-                        // optimistic patch is the visible feedback today.
+                    onConfirm: { reservationId in
+                        // S1 — the optimistic row flip is paired with the
+                        // real `POST …/reservations/:reservationId/confirm`
+                        // (`backend/routes/supportTrains.js:3214`), matching
+                        // the same route in `HubTabRoot`.
+                        Task { @MainActor in
+                            _ = try? await APIClient.shared.request(
+                                SupportTrainActionsEndpoints.confirmDelivery(
+                                    supportTrainId: supportTrainId,
+                                    reservationId: reservationId
+                                ),
+                                as: EmptyResponse.self
+                            )
+                        }
                     },
                     onMessage: { _ in
                         Task { @MainActor in path.append(.placeholder(label: "Message helper")) }
@@ -1447,7 +1654,7 @@ public struct YouTabRoot: View {
                     Task { @MainActor in path.append(.composeBroadcast(personaId: personaId)) }
                 },
                 onOpenEditPersona: {
-                    Task { @MainActor in path.append(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    Task { @MainActor in path.append(.editPersona(personaId: "")) }
                 },
                 onOpenFollowing: {
                     Task { @MainActor in path.append(.following) }
@@ -1508,6 +1715,12 @@ public struct YouTabRoot: View {
                         case .item: path.append(.listingDetail(listingId: entity.id))
                         case .post: path.append(.pulsePost(postId: entity.id))
                         case .spot: path.append(.businessProfile(businessId: entity.id))
+                        // `homes` markers are neighborhood addresses, not homes
+                        // the viewer owns — the backend has no viewer-facing
+                        // detail route for someone else's home, so the tap
+                        // selects the pin and the rail card carries the
+                        // address + locality. Mirrors HubTabRoot.swift:2499.
+                        case .home: break
                         }
                     }
                 },
@@ -1556,8 +1769,11 @@ public struct YouTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenThread: { row in
                     Task { @MainActor in
-                        let dest = CreatorInboxConversationDestination(
-                            userId: row.counterpartyUserId ?? row.id,
+                        // The row id IS the PersonaDmThread id — persona DMs
+                        // carry no counterparty user id to fall back to.
+                        let dest = CreatorInboxThreadDestination(
+                            personaId: row.personaId,
+                            threadId: row.id,
                             displayName: row.displayName.isEmpty ? row.handle : row.displayName,
                             initials: row.initials,
                             verified: row.verifiedLocal,
@@ -1575,24 +1791,20 @@ public struct YouTabRoot: View {
                 }
             )
         case let .creatorInboxConversation(dest):
-            ChatConversationView(
-                viewModel: ChatConversationViewModel(
-                    mode: .person(otherUserId: dest.userId),
-                    counterparty: .person(
-                        name: dest.displayName,
-                        initials: dest.initials,
-                        locality: nil,
-                        verified: dest.verified,
-                        online: false
-                    ),
-                    currentUserId: currentUserId ?? ""
-                ),
-                mode: .creatorThread,
-                creatorContext: .defaults(fanTierName: dest.tierName, fanTierRank: dest.tierRank),
-                onOpenAudienceProfile: {
-                    path.append(.audienceProfile)
-                },
+            PersonaDmThreadView(
+                personaId: dest.personaId,
+                threadId: dest.threadId,
                 onBack: { Task { @MainActor in pop() } }
+            )
+        case let .fanInbox(personaId):
+            FanInboxView(
+                personaId: personaId,
+                onBack: { Task { @MainActor in pop() } },
+                onChangeTier: {
+                    Task { @MainActor in
+                        pop()
+                    }
+                }
             )
         case let .chatConversation(dest):
             ChatConversationView(
@@ -1919,6 +2131,15 @@ public struct YouTabRoot: View {
                     },
                     onAddHome: {
                         Task { @MainActor in path.append(.addHome) }
+                    },
+                    onFindHome: {
+                        Task { @MainActor in path.append(.findHome) }
+                    },
+                    onUploadOwnershipEvidence: { homeId in
+                        Task { @MainActor in path.append(.claimOwnership(homeId: homeId)) }
+                    },
+                    onVerifyResidency: { homeId in
+                        Task { @MainActor in path.append(.verifyResidency(homeId: homeId)) }
                     }
                 )
             )
@@ -1960,8 +2181,8 @@ public struct YouTabRoot: View {
                     // returns to My Businesses, not the success step.
                     path.removeAll { route in
                         switch route {
-                        case .createBusiness, .businessWaitlist: return true
-                        default: return false
+                        case .createBusiness, .businessWaitlist: true
+                        default: false
                         }
                     }
                     path.append(.businessOwner(businessId: businessId))
@@ -2009,6 +2230,24 @@ public struct YouTabRoot: View {
                 },
                 onOpenMembers: { membersHomeId in
                     Task { @MainActor in path.append(.homeMembers(homeId: membersHomeId)) }
+                },
+                onHireHelp: { _ in
+                    // H1 — "Hire" on a seasonal-checklist item opens the
+                    // gig composer. The You-tab route carries no category
+                    // preselection, so the wizard starts on category pick.
+                    Task { @MainActor in path.append(.composeTask) }
+                },
+                onAddTask: { id in
+                    Task { @MainActor in path.append(.addHouseholdTask(homeId: id)) }
+                },
+                onTrackBill: { id in
+                    Task { @MainActor in path.append(.addBill(homeId: id)) }
+                },
+                onTrackPackage: { id in
+                    Task { @MainActor in path.append(.logPackage(homeId: id)) }
+                },
+                onSendMail: { _ in
+                    Task { @MainActor in path.append(.ceremonialMail) }
                 }
             )
         case let .homeTasks(homeId):
@@ -2056,9 +2295,14 @@ public struct YouTabRoot: View {
                     },
                     onAddTask: {
                         Task { @MainActor in path.append(.logMaintenance(homeId: homeId)) }
+                    },
+                    onOpenIssues: {
+                        Task { @MainActor in path.append(.homeIssues(homeId: homeId)) }
                     }
                 )
             )
+        case let .homeIssues(homeId):
+            HomeIssuesListView(homeId: homeId)
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
@@ -2101,7 +2345,30 @@ public struct YouTabRoot: View {
             }()
             OwnersListView(
                 homeId: homeId,
-                currentUserId: currentUserId
+                currentUserId: currentUserId,
+                onOpenClaimReview: {
+                    Task { @MainActor in path.append(.homeClaimReview(homeId: homeId)) }
+                },
+                onOpenTransfer: {
+                    Task { @MainActor in path.append(.transferOwnership(homeId: homeId)) }
+                }
+            )
+        case let .transferOwnership(homeId):
+            let signedInUser: UserDTO? = {
+                if case let .signedIn(user) = auth.state { return user }
+                return nil
+            }()
+            TransferOwnershipView(
+                viewModel: TransferOwnershipViewModel(
+                    homeId: homeId,
+                    currentUserId: signedInUser?.id,
+                    currentUserName: signedInUser?.displayName ?? signedInUser?.username
+                )
+            )
+        case let .homeClaimReview(homeId):
+            HomeClaimReviewView(
+                homeId: homeId,
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .homeMembers(homeId):
             MembersListView(homeId: homeId)
@@ -2155,6 +2422,27 @@ public struct YouTabRoot: View {
                     }
                 }
             )
+        case let .businessPages(businessId):
+            BusinessPagesView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenPage: { row in
+                    Task { @MainActor in
+                        path.append(.businessPageBlocks(
+                            businessId: businessId,
+                            pageId: row.id,
+                            pageTitle: row.title
+                        ))
+                    }
+                }
+            )
+        case let .businessPageBlocks(businessId, pageId, pageTitle):
+            BusinessPageBlocksView(
+                businessId: businessId,
+                pageId: pageId,
+                pageTitle: pageTitle,
+                onBack: { Task { @MainActor in pop() } }
+            )
         case let .privacyHandshake(personaHandle):
             PrivacyHandshakeWizardView(
                 viewModel: PrivacyHandshakeViewModel(
@@ -2179,23 +2467,59 @@ public struct YouTabRoot: View {
                     onBack: { Task { @MainActor in pop() } }
                 )
             )
+        case let .mailTaskList(mailId, mailSubject, mailSender):
+            // A17.12 (list) — every mail-linked task, plus the
+            // create-from-mail form when the route carries a mail id.
+            MailTaskListView(
+                viewModel: MailTaskListViewModel(
+                    mailId: mailId,
+                    mailSubject: mailSubject,
+                    mailSender: mailSender,
+                    onOpenTask: { taskId in
+                        Task { @MainActor in path.append(.mailTask(taskId: taskId)) }
+                    },
+                    onBack: { Task { @MainActor in pop() } },
+                    onPostAsNeighborTask: { sourceMailId in
+                        // A17.8 — RN's "Post as Neighbor Task Instead"
+                        // (`mailbox/tasks.tsx:236`) always escalates in
+                        // post-delivery mode.
+                        Task { @MainActor in
+                            path.append(.packageGig(mailId: sourceMailId, isPreDelivery: false))
+                        }
+                    }
+                )
+            )
         case let .mailTranslation(mailId):
             MailTranslationView(
                 mailId: mailId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onReply: { _ in Task { @MainActor in path.append(.placeholder(label: "Reply in English")) } }
             )
-        case .unboxing:
-            // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-            // (OCR / classification / vault upload are out of scope), so the
-            // `mailId` payload is unused today; it rides the route for when a
-            // real originating-mail fetch lands.
+        case let .unboxing(mailId):
+            // A17.14 — the capture flow loads the real `MailPackage` row for
+            // `mailId` and every action writes to `/api/mailbox/v2/p2`.
+            // Without a mail id there is nothing to persist, and the screen
+            // says so rather than projecting a fixture.
             let openDrawer: @MainActor () -> Void = {
                 Task { @MainActor in path.append(.placeholder(label: "Home drawer")) }
             }
             UnboxingView(
-                viewModel: UnboxingViewModel(onOpenDrawer: openDrawer)
+                viewModel: UnboxingViewModel(mailId: mailId, onOpenDrawer: openDrawer)
             ) { Task { @MainActor in pop() } }
+        case let .packageGig(mailId, isPreDelivery):
+            // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+            // `POST /api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+            // into the created gig, matching RN `mailbox/gig.tsx`.
+            PackageGigView(
+                viewModel: PackageGigViewModel(
+                    mailId: mailId,
+                    isPreDelivery: isPreDelivery,
+                    onBack: { Task { @MainActor in pop() } },
+                    onOpenGig: { gigId in
+                        Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                    }
+                )
+            )
         case .earn:
             EarnView(
                 onBack: { Task { @MainActor in pop() } },
@@ -2216,10 +2540,40 @@ public struct YouTabRoot: View {
                 onEditPage: { Task { @MainActor in path.append(.editBusinessPage(businessId: businessId)) } },
                 onOpenInsights: { Task { @MainActor in path.append(.placeholder(label: "Insights")) } },
                 onOpenSettings: { Task { @MainActor in path.append(.placeholder(label: "Business settings")) } },
-                onOpenTeam: { Task { @MainActor in path.append(.businessTeam(businessId: businessId)) } }
+                onOpenTeam: { Task { @MainActor in path.append(.businessTeam(businessId: businessId)) } },
+                onOpenPages: { Task { @MainActor in path.append(.businessPages(businessId: businessId)) } },
+                onOpenPayments: {
+                    Task { @MainActor in path.append(.businessPaymentsOwner(businessId: businessId)) }
+                },
+                onOpenInvoices: {
+                    Task { @MainActor in path.append(.businessInvoicesOwner(businessId: businessId)) }
+                },
+                onOpenLegal: {
+                    Task { @MainActor in path.append(.businessLegal(businessId: businessId)) }
+                },
+                onOpenChatRoom: { roomId, name, _ in
+                    Task { @MainActor in
+                        path.append(.chatConversation(InboxConversationDestination(
+                            mode: .room(id: roomId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
+                onOpenPost: { postId in
+                    Task { @MainActor in path.append(.pulsePost(postId: postId)) }
+                }
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)
+        case let .businessPaymentsOwner(businessId):
+            BusinessPaymentsView(businessId: businessId)
+        case let .businessInvoicesOwner(businessId):
+            BusinessInvoicesView(businessId: businessId)
+        case let .businessLegal(businessId):
+            BusinessLegalView(businessId: businessId)
         case .viewAs:
             ViewAsView(
                 onBack: { Task { @MainActor in pop() } },
@@ -2238,12 +2592,46 @@ public struct YouTabRoot: View {
                 onBack: { pop() },
                 onCancelled: { pop() }
             )
-        #if DEBUG
-        case .statusWaiting:
-            StatusWaitingView(
-                content: .claimSubmitted(homeName: "412 Elm St"),
-                onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
-                onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
+        case let .verifyLandlord(homeId):
+            VerifyLandlordWizardView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onOpenPostcardVerification: { resolvedHomeId in
+                    // Replace the wizard with the postcard tracker so
+                    // Back returns to the waiting room, not the wizard.
+                    path.removeAll { route in
+                        if case .verifyLandlord = route { return true }
+                        return false
+                    }
+                    path.append(.postcardVerification(homeId: resolvedHomeId))
+                }
+            )
+        case let .postcardVerification(homeId):
+            PostcardVerificationView(
+                homeId: homeId,
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onVerified: { _ in
+                    // Pop the tracker — the room refreshes its
+                    // verification status on next appearance.
+                    if !path.isEmpty { path.removeLast() }
+                }
+            )
+        case let .leaveHome(homeId):
+            LeaveHomeView(
+                viewModel: LeaveHomeViewModel(homeId: homeId),
+                onBack: { pop() },
+                onLeft: {
+                    // Move-out revokes membership, so the waiting room
+                    // and dashboard for this home now 403 — drop both.
+                    path.removeAll { route in
+                        switch route {
+                        case let .leaveHome(id) where id == homeId: true
+                        case let .waitingRoom(id) where id == homeId: true
+                        case let .homeDashboard(id) where id == homeId: true
+                        default: false
+                        }
+                    }
+                }
             )
         case .ceremonialMail:
             CeremonialMailWizardView(
@@ -2255,6 +2643,15 @@ public struct YouTabRoot: View {
                 viewModel: CeremonialMailOpenViewModel(mailId: mailId),
                 onBack: { Task { @MainActor in pop() } },
                 onWriteBack: { _ in path.append(.ceremonialMail) }
+            )
+        case .mailRoutingQueue:
+            MailRoutingQueueView { Task { @MainActor in pop() } }
+        #if DEBUG
+        case .statusWaiting:
+            StatusWaitingView(
+                content: .claimSubmitted(homeName: "412 Elm St"),
+                onPrimary: { _ in if !path.isEmpty { path.removeLast() } },
+                onSecondary: { _ in if !path.isEmpty { path.removeLast() } }
             )
         #endif
         }

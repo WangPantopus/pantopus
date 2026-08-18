@@ -46,11 +46,35 @@ public struct MailboxRootView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        viewModel.openMap()
+                    } label: {
+                        Label("Find a mailbox", systemImage: "map")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.map")
+                    Button {
                         viewModel.openUnboxing()
                     } label: {
                         Label("Scan an item", systemImage: "camera.viewfinder")
                     }
                     .accessibilityIdentifier("mailboxRootSettings.scanUnboxing")
+                    Button {
+                        viewModel.openMailTasks()
+                    } label: {
+                        Label("Mail tasks", systemImage: "checklist")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.mailTasks")
+                    Button {
+                        viewModel.openCommunity()
+                    } label: {
+                        Label("Community mail", systemImage: "megaphone")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.community")
+                    Button {
+                        viewModel.openRecords()
+                    } label: {
+                        Label("Home records", systemImage: "house")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.homeRecords")
                     Button {
                         viewModel.openStamps()
                     } label: {

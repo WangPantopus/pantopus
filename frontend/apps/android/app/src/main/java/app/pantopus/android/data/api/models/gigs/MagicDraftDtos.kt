@@ -80,6 +80,22 @@ data class MagicDraftDto(
     @Json(name = "remote_details") val remoteDetails: RemoteDetailsDto? = null,
     @Json(name = "urgent_details") val urgentDetails: UrgentDetailsDto? = null,
     @Json(name = "event_details") val eventDetails: EventDetailsDto? = null,
+    // delivery_errand + pro_service_quote module fields. These are FLAT
+    // gig columns, not JSONB (`backend/routes/gigs.js:481-486` and
+    // `:499-505`); `magicTaskService.js:460-480` normalises the AI's
+    // `pickup_location_text` into `pickup_address` so the Fill-gaps step
+    // can prefill both editors.
+    @Json(name = "pickup_address") val pickupAddress: String? = null,
+    @Json(name = "pickup_notes") val pickupNotes: String? = null,
+    @Json(name = "dropoff_address") val dropoffAddress: String? = null,
+    @Json(name = "dropoff_notes") val dropoffNotes: String? = null,
+    @Json(name = "delivery_proof_required") val deliveryProofRequired: Boolean? = null,
+    @Json(name = "requires_license") val requiresLicense: Boolean? = null,
+    @Json(name = "license_type") val licenseType: String? = null,
+    @Json(name = "requires_insurance") val requiresInsurance: Boolean? = null,
+    @Json(name = "scope_description") val scopeDescription: String? = null,
+    @Json(name = "deposit_required") val depositRequired: Boolean? = null,
+    @Json(name = "deposit_amount") val depositAmount: Double? = null,
 )
 
 /** One delivery-errand list item. Fields are camelCase on the wire. */

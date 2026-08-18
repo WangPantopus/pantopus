@@ -1,6 +1,5 @@
 package app.pantopus.android.data.api.services
 
-import app.pantopus.android.data.api.models.common.JsonValue
 import app.pantopus.android.data.api.models.homes.CastVoteRequest
 import app.pantopus.android.data.api.models.homes.CastVoteResponse
 import app.pantopus.android.data.api.models.homes.CheckAddressRequest
@@ -43,6 +42,7 @@ import app.pantopus.android.data.api.models.homes.MyOwnershipClaimsResponse
 import app.pantopus.android.data.api.models.homes.OwnersResponse
 import app.pantopus.android.data.api.models.homes.PropertyDetailsResponse
 import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsResponse
 import app.pantopus.android.data.api.models.homes.RemoveOwnerResponse
 import app.pantopus.android.data.api.models.homes.SubmitClaimRequest
 import app.pantopus.android.data.api.models.homes.SubmitClaimResponse
@@ -97,12 +97,15 @@ interface HomesApi {
 
     /**
      * `POST /api/homes/property-suggestions` — route `backend/routes/home.js:540`.
-     * Returns an ATTOM-provided bundle whose shape is provider-defined.
+     * Tiered property hints (ATTOM → heuristics → optional LLM) that
+     * pre-fill the Add-Home wizard's Details block. The nested
+     * `attom_property_detail` bundle stays untyped — its shape is
+     * provider-defined.
      */
     @POST("api/homes/property-suggestions")
     suspend fun propertySuggestions(
         @Body body: PropertySuggestionsRequest,
-    ): JsonValue
+    ): PropertySuggestionsResponse
 
     /** `POST /api/homes/check-address` — route `backend/routes/home.js:555`. */
     @POST("api/homes/check-address")

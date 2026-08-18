@@ -16,7 +16,33 @@ final class HubViewModel {
     /// Current state observed by `HubView`.
     private(set) var state: HubState = .skeleton
 
-    private let api: APIClient
+    /// `private(set)` confines the setter to this file, so extensions in
+    /// sibling files (`HubViewModel+StatusStrip.swift`) mutate state through
+    /// here rather than by widening the property's access level.
+    func applyState(_ next: HubState) {
+        state = next
+    }
+
+    /// Active Discover filter tab. Drives the `filter` query param on
+    /// `GET /api/hub/discovery` — RN `(tabs)/index.tsx:138`.
+    private(set) var discoveryFilter: HubDiscoveryFilter = .gigs
+
+    /// True while a filter-tab refetch is in flight (rail shows its
+    /// skeleton instead of stale rows).
+    private(set) var discoveryLoading = false
+
+    /// Status-strip pills the viewer dismissed this session. RN keeps the
+    /// same session-scoped `Set<string>` — nothing is persisted server
+    /// side (`(tabs)/index.tsx:319-321`). Module-internal so the
+    /// status-strip extension in `HubViewModel+StatusStrip.swift` can
+    /// mutate it.
+    var dismissedStatusIds: Set<String> = []
+
+    let api: APIClient
+    /// Home the density milestone dismissal is recorded against, and the
+    /// raw density count used to resolve which milestone was crossed.
+    var densityHomeId: String?
+    var densityCount = 0
     private let bannerDismissedKey = "hub.setupBanner.dismissed"
     private var bannerDismissed: Bool {
         get { UserDefaults.standard.bool(forKey: bannerDismissedKey) }
@@ -46,6 +72,8 @@ final class HubViewModel {
             content = HubState.PopulatedContent(
                 topBar: content.topBar,
                 actionChips: content.actionChips,
+                statusItems: content.statusItems,
+                neighborDensity: content.neighborDensity,
                 setupBanner: nil,
                 today: content.today,
                 pillars: content.pillars,
@@ -54,6 +82,62 @@ final class HubViewModel {
                 activity: content.activity
             )
             state = .populated(content)
+        }
+    }
+
+    /// Discover filter-tab tap. Refetches only
+    /// `GET /api/hub/discovery?filter=…` and swaps the rail's rows in
+    /// place — the rest of the hub stays put (RN keeps the hub query and
+    /// the discovery query separate, `(tabs)/index.tsx:332`).
+    func selectDiscoveryFilter(_ filter: HubDiscoveryFilter) async {
+        guard filter != discoveryFilter else { return }
+        discoveryFilter = filter
+        await refreshDiscovery()
+    }
+
+    /// Re-request the Discover rail for the active filter.
+    func refreshDiscovery() async {
+        discoveryLoading = true
+        defer { discoveryLoading = false }
+        let filter = discoveryFilter.queryValue
+        let response: HubDiscoveryResponse? = await optional {
+            try await self.api.request(HubEndpoints.discovery(filter: filter, limit: 10))
+        }
+        applyDiscovery(response?.items.prefix(10).map(Self.projectDiscovery(_:)) ?? [])
+    }
+
+    /// Swap the discovery rows into whichever content state is showing.
+    private func applyDiscovery(_ cards: [DiscoveryCardContent]) {
+        switch state {
+        case let .populated(content):
+            state = .populated(HubState.PopulatedContent(
+                topBar: content.topBar,
+                actionChips: content.actionChips,
+                statusItems: content.statusItems,
+                neighborDensity: content.neighborDensity,
+                setupBanner: content.setupBanner,
+                today: content.today,
+                pillars: content.pillars,
+                discovery: cards,
+                jumpBackIn: content.jumpBackIn,
+                activity: content.activity
+            ))
+        case let .firstRun(content):
+            state = .firstRun(HubState.FirstRunContent(
+                greeting: content.greeting,
+                name: content.name,
+                avatarInitials: content.avatarInitials,
+                identity: content.identity,
+                ringProgress: content.ringProgress,
+                profileCompleteness: content.profileCompleteness,
+                stepsDone: content.stepsDone,
+                stepsTotal: content.stepsTotal,
+                steps: content.steps,
+                pillars: content.pillars,
+                discovery: cards
+            ))
+        case .skeleton, .error:
+            break
         }
     }
 
@@ -73,12 +157,32 @@ final class HubViewModel {
         async let todayTask: HubTodayResponse? = optional {
             try await self.api.request(HubEndpoints.today())
         }
+        let filter = discoveryFilter.queryValue
         async let discoveryTask: HubDiscoveryResponse? = optional {
-            try await self.api.request(HubEndpoints.discovery(filter: "gigs", limit: 10))
+            try await self.api.request(HubEndpoints.discovery(filter: filter, limit: 10))
         }
         let today = await todayTask
         let discovery = await discoveryTask
-        applyResults(hub: hub, today: today, discovery: discovery)
+        // S5 — per-firewall unread split powers the megaphone shortcut
+        // into the Beacon notification zone. Sequenced (not raced) after
+        // the companions so a stubbed test sequence stays predictable;
+        // optional so its failure never blanks the hub.
+        let unread: NotificationUnreadCountResponse? = await optional {
+            try await self.api.request(NotificationsEndpoints.unreadCount)
+        }
+        // Rebookable helpers feed the "Jump back in" rail (RN
+        // `(tabs)/index.tsx:344-358`). Optional so an empty / failing
+        // gigs call never blanks the hub.
+        let rebookable: RebookableGigsResponse? = await optional {
+            try await self.api.request(GigExtrasEndpoints.rebookable())
+        }
+        applyResults(
+            hub: hub,
+            today: today,
+            discovery: discovery,
+            audienceUnread: unread?.byContext?.audience ?? 0,
+            rebookable: rebookable?.rebookable ?? []
+        )
     }
 
     /// Run a throwing async request and swallow its failure, returning nil.
@@ -90,7 +194,9 @@ final class HubViewModel {
     private func applyResults(
         hub: HubResponse,
         today: HubTodayResponse?,
-        discovery: HubDiscoveryResponse?
+        discovery: HubDiscoveryResponse?,
+        audienceUnread: Int = 0,
+        rebookable: [RebookableGigDTO] = []
     ) {
         let todaySummary = Self.projectToday(today)
         let identity = Self.primaryIdentity(for: hub)
@@ -126,6 +232,22 @@ final class HubViewModel {
                 ? SetupBannerContent()
                 : nil
 
+        let primaryHome = hub.homes.first(where: \.isPrimary) ?? hub.homes.first
+        densityHomeId = primaryHome?.id
+        densityCount = hub.neighborDensity?.count ?? 0
+        // RN gates the block on "has a home AND (count > 0 OR a
+        // milestone)" — `(tabs)/index.tsx:405-407`.
+        let density: NeighborDensityContent? = {
+            guard primaryHome != nil, let raw = hub.neighborDensity else { return nil }
+            guard raw.count >= 1 || raw.milestone != nil else { return nil }
+            return NeighborDensityContent(
+                count: raw.count,
+                radiusMiles: raw.radiusMiles,
+                milestone: raw.milestone,
+                homeId: primaryHome?.id
+            )
+        }()
+
         state = .populated(
             HubState.PopulatedContent(
                 topBar: TopBarContent(
@@ -134,29 +256,19 @@ final class HubViewModel {
                     avatarInitials: Self.initials(from: hub.user.name),
                     identity: identity,
                     ringProgress: hub.setup.profileCompleteness.score,
-                    unreadCount: hub.statusItems.count
+                    unreadCount: hub.statusItems.count,
+                    audienceUnreadCount: audienceUnread
                 ),
                 actionChips: Self.defaultActionChips(),
+                statusItems: hub.statusItems
+                    .filter { !dismissedStatusIds.contains($0.id) }
+                    .map(Self.projectStatusItem(_:)),
+                neighborDensity: density,
                 setupBanner: banner,
                 today: todaySummary,
                 pillars: Self.pillars(from: hub, setupMode: false),
                 discovery: discoveryCards,
-                jumpBackIn: hub.jumpBackIn.prefix(2).enumerated().map { index, raw in
-                    JumpBackItem(
-                        id: raw.title,
-                        title: raw.title,
-                        icon: Self.icon(from: raw.icon),
-                        route: raw.route,
-                        tint: Self.tint(forRoute: raw.route),
-                        // Backend doesn't carry kicker / progress for jump
-                        // tiles yet — first slot reads "In progress",
-                        // second reads "Draft" so the design's two-card
-                        // visual lands without a backend change.
-                        kicker: index == 0 ? "In progress" : "Draft",
-                        progressLabel: nil,
-                        progressFraction: nil
-                    )
-                },
+                jumpBackIn: Self.jumpBackItems(hub: hub, rebookable: rebookable),
                 activity: hub.activity.prefix(3).map {
                     ActivityEntry(
                         id: $0.id,
@@ -302,7 +414,7 @@ final class HubViewModel {
     /// Maps a `/app/…` jump route to the pillar tint that owns it. Falls
     /// back to `.personal` for routes that don't carry a pillar (the
     /// design's default).
-    private static func tint(forRoute route: String) -> IdentityPillar {
+    static func tint(forRoute route: String) -> IdentityPillar {
         switch true {
         case route.contains("gigs"), route.contains("post"): .personal
         case route.contains("marketplace"), route.contains("listings"): .business
@@ -336,7 +448,7 @@ final class HubViewModel {
         }
     }
 
-    private static func icon(from raw: String) -> PantopusIcon {
+    static func icon(from raw: String) -> PantopusIcon {
         PantopusIcon.allCases.first { $0.rawValue == raw } ?? .arrowLeft
     }
 

@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.core.routing.DeepLinkRouter
 import app.pantopus.android.core.routing.PendingDeepLinkStore
 import app.pantopus.android.core.security.AppLockHost
+import app.pantopus.android.core.security.AppLockSetupPromptDialog
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.ui.screens.RootViewModel
 import app.pantopus.android.ui.screens.auth.AuthNavHost
@@ -36,6 +37,7 @@ import app.pantopus.android.ui.theme.PantopusColors
 @Composable
 fun PantopusNavHost(viewModel: RootViewModel = hiltViewModel()) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
+    val lastInteractiveSignInAt by viewModel.lastInteractiveSignInAt.collectAsStateWithLifecycle()
     var previousAuth by remember { mutableStateOf<AuthRepository.State?>(null) }
 
     LaunchedEffect(authState) {
@@ -67,6 +69,13 @@ fun PantopusNavHost(viewModel: RootViewModel = hiltViewModel()) {
                     onSignOut = { viewModel.signOutFromAppLock() },
                 ) {
                     RootTabScreen()
+                    // One-time post-login offer to turn app lock on (RN
+                    // `AppLockSetupPromptLayer`, `src/app/_layout.tsx:132`).
+                    AppLockSetupPromptDialog(
+                        manager = viewModel.appLockManager,
+                        isSignedIn = true,
+                        lastInteractiveSignInAt = lastInteractiveSignInAt,
+                    )
                 }
         }
     }

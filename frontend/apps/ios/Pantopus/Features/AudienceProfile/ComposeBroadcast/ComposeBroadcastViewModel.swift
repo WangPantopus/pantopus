@@ -49,6 +49,7 @@ public final class ComposeBroadcastViewModel {
     private var audienceReach: [BroadcastAudience: Int]
     private let onSent: @MainActor () -> Void
     private let api: APIClient
+    private let uploader: MultipartUploader
 
     /// The persona's broadcast channel id, resolved by `load()`; the send
     /// path needs it. Nil until `load()` resolves it.
@@ -68,6 +69,7 @@ public final class ComposeBroadcastViewModel {
         scheduledAt: Date? = nil,
         maxCharacterCount: Int = 1000,
         api: APIClient = .shared,
+        uploader: MultipartUploader = .shared,
         onSent: @escaping @MainActor () -> Void = {},
         performSend: @escaping @MainActor (ComposeBroadcastDraft, Date?) async throws -> Void = { _, _ in }
     ) {
@@ -79,6 +81,7 @@ public final class ComposeBroadcastViewModel {
         self.scheduledAt = scheduledAt
         self.maxCharacterCount = maxCharacterCount
         self.api = api
+        self.uploader = uploader
         self.onSent = onSent
         self.performSend = performSend
         lastSavedDraft = draft
@@ -128,20 +131,64 @@ public final class ComposeBroadcastViewModel {
     }
 
     /// The real publish call, invoked through `performSend` by `.live`.
+    ///
+    /// Two legs, mirroring RN `broadcast.tsx:118-145`:
+    ///   1. `POST /api/broadcast/channels/:id/messages` creates the
+    ///      broadcast — which is a `Post` row.
+    ///   2. `POST /api/upload/post-media/:messageId` attaches the picked
+    ///      files (field `files`, ≤9) to that row. The upload route is the
+    ///      only way regular media reaches a post, and it needs the id the
+    ///      first leg returns.
+    ///
+    /// A failed upload does **not** unpublish the broadcast; it surfaces
+    /// RN's "your update was posted, but some media failed" warning.
     func publish(_ draft: ComposeBroadcastDraft) async throws {
         guard let channelId else {
             throw ComposeBroadcastError(message: "Your broadcast channel isn't ready yet. Try again in a moment.")
         }
+        let trimmed = draft.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = draft.media.compactMap(\.uploadFile)
+        // `createBroadcastMessageSchema` rejects a payload with neither text
+        // nor already-hosted media, and locally-picked files can only be
+        // attached after the post exists — so text is required when the
+        // only media is local.
+        guard !trimmed.isEmpty || !preUploadedMedia(for: draft).isEmpty else {
+            throw ComposeBroadcastError(message: "Add a message to go with your media.")
+        }
         let wire = Self.wire(for: draft.audience)
         let body = PublishUpdateBody(
-            body: draft.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            body: trimmed,
             visibility: wire.visibility,
-            targetTierRank: wire.rank
+            targetTierRank: wire.rank,
+            media: preUploadedMedia(for: draft)
         )
-        _ = try await api.request(
-            AudienceProfileEndpoints.publishUpdate(channelId: channelId, body: body),
-            as: PublishUpdateResponse.self
+        let response: PublishUpdateResponse = try await api.request(
+            AudienceProfileEndpoints.publishUpdate(channelId: channelId, body: body)
         )
+
+        guard !files.isEmpty else { return }
+        guard let messageId = response.message?.id else {
+            throw ComposeBroadcastError(
+                message: "Your update was posted, but some media failed to upload."
+            )
+        }
+        do {
+            _ = try await uploader.uploadPostMedia(postId: messageId, files: files)
+        } catch {
+            throw ComposeBroadcastError(
+                message: "Your update was posted, but some media failed to upload."
+            )
+        }
+    }
+
+    /// Attachments that are already hosted — they ride the publish body's
+    /// `media[]` field (`backend/routes/broadcastChannels.js:113`) rather
+    /// than the post-media upload leg.
+    private func preUploadedMedia(for draft: ComposeBroadcastDraft) -> [BroadcastMediaPayload] {
+        draft.media.compactMap { item in
+            guard let url = item.remoteURL, !url.isEmpty else { return nil }
+            return BroadcastMediaPayload(url: url, type: item.kind.rawValue)
+        }
     }
 
     // MARK: - Derived state
@@ -211,14 +258,33 @@ public final class ComposeBroadcastViewModel {
         recoverFromError()
     }
 
+    /// Append one attachment, respecting the nine-item cap.
     public func attachMedia(_ media: ComposeMediaPreview) {
-        draft.media = media
+        attachMedia([media])
+    }
+
+    /// Append a multi-select batch, truncated to the remaining slots —
+    /// RN parity (`broadcast.tsx:92` `appendMediaFiles`).
+    public func attachMedia(_ items: [ComposeMediaPreview]) {
+        guard !items.isEmpty else { return }
+        draft.media = Array((draft.media + items).prefix(ComposeBroadcastDraft.mediaLimit))
         recoverFromError()
     }
 
-    public func removeMedia() {
-        draft.media = nil
+    public func removeMedia(id: String) {
+        draft.media.removeAll { $0.id == id }
         recoverFromError()
+    }
+
+    /// Clear every attachment.
+    public func removeMedia() {
+        draft.media = []
+        recoverFromError()
+    }
+
+    /// How many more attachments the composer will accept.
+    public var remainingMediaSlots: Int {
+        draft.remainingMediaSlots
     }
 
     public func schedule(at date: Date) {

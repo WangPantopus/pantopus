@@ -4,7 +4,185 @@
 > Android implementations. Generated 2026-08-06. **Separate axis from the design audit** — this asks
 > only: *what can a user do in RN that they cannot do natively?*
 
-## Headline
+---
+
+## CURRENT BRANCH HANDOFF — 119/150 committed; Wave D is dirty and red (2026-08-13)
+
+### What this branch is trying to finish
+
+Branch `claude/rn-parity-high-severity-fixes` is the implementation branch for this audit. The goal is
+to close the 150 RN → native functional gaps on **both iOS and Android**, using:
+
+- React Native as the behaviour oracle;
+- the attached A-series designs as the layout oracle; and
+- `backend/app.js` plus the mounted router as the endpoint-contract oracle.
+
+This is a functional-parity pass, not a visual redesign. Marketplace/Listings, styling/copy-only
+differences, dead RN code and debug-only screens remain outside this audit's scope. A finding is not
+closed merely because a view or endpoint helper exists: both platforms need live data, the production
+entry point/call site, honest loading/empty/error/populated states, and the relevant compile/test gate.
+
+### Where the branch actually is
+
+| Pass | Findings | Current state |
+|---|---:|---|
+| High severity | 64 / 64 | Committed in six waves; full verification recorded below |
+| Medium/low Wave A — homes | 18 / 18 | Committed as `b0c18b60`; both compile gates green |
+| Medium/low Wave B — mailbox + gigs | 18 / 23 | Partial wave committed as `28cf1ca9`; five findings explicitly deferred |
+| Medium/low Wave C — tabs/social + creator/business | 19 / 19 | Committed as `9b23bb6f`; both compile gates green |
+| Medium/low Wave D — auth/settings + money | 0 / 26 accepted | Large uncommitted worktree; both compile gates currently fail |
+| **Committed/accepted total** | **119 / 150** | **31 findings are not yet accepted** |
+
+The formal count remains 119 because Wave D has not passed a gate or landed. Static inspection of the
+Wave D worktree found **19 findings with an implementation present on both platforms**, **six incomplete
+findings** listed below, and one finding (`recentLocations`) that appears to have been satisfied already
+by Wave C's viewing-location work but was never reclassified in the tracker. Treat those 19 as
+*implementation candidates*, not completed findings, until the wave compiles, is audited and is
+committed.
+
+The pre-handoff product worktree must be preserved: it contains 72 modified tracked files (4,154
+insertions / 311 deletions) and 21 untracked files; this handoff note is one additional tracked change.
+The untracked set includes new production/test sources as well as the Wave-B recovery workflow. Do not
+reset or clean this tree.
+
+### First blockers on resume — current Wave D does not compile
+
+`bash docs/_parity-work/gate.sh both` was rerun on 2026-08-13. `git diff --check` is clean, but both
+platform gates are red:
+
+- **iOS:** Xcode stops before compiling sources because two source files have the basename
+  `EarningsDTOs.swift`: the new
+  `Core/Networking/Models/Payments/EarningsDTOs.swift` and the existing
+  `Core/Networking/Models/Mailbox/EarningsDTOs.swift`. Rename the new payments DTO file to a unique
+  basename, regenerate the project through the normal `make build` path, then continue compiling; there
+  may be further errors hidden behind this first failure.
+- **Android:** `BeaconIdentityBlock.kt:379` cannot resolve `alpha` / `DISABLED_ALPHA`.
+  `WalletScreen.kt` also lacks resolvable imports/references for `rememberCoroutineScope`,
+  `rememberSensitiveActionGuard`, `SensitiveScreenGuard`, `PullToRefreshBox`, `verifyIdentity`,
+  `AppLockManager`, `BasicTextField`, `KeyboardOptions`, `KeyboardType`, `TextStyle`, `SolidColor` and
+  the decoration-box `inner` lambda. These are compile failures, not test failures; fix the imports and
+  any remaining symbol/API mismatch, then rerun the gate.
+
+No Wave D unit-test result is valid while the main targets do not compile. The iOS 3,139 / Android
+3,264 green suite counts below describe the completed **high-severity** pass, not the current worktree.
+Waves A–C record compile success in their commits, but no full post-medium/low suite run is documented.
+
+### Six Wave D findings are still incomplete
+
+These are incomplete even before considering the red compile gates:
+
+1. **Portfolio tab + add/delete:** iOS has new DTO/endpoint/view/view-model files, but the new
+   `ProfilePortfolioSection` has no production call site; Android has no equivalent endpoint or
+   public-profile implementation.
+2. **Edit general profile skills:** iOS declares `ProfileTabsEndpoints.updateSkills`, but it has zero
+   call sites; Android has no matching `PUT /api/users/skills` wiring. The professional-category editor
+   in this worktree is a different finding and does not close this one.
+3. **Public-profile Gigs tab:** iOS defines `ProfileGigsSection`, but it is not mounted; Android has no
+   equivalent implementation.
+4. **Public-profile gig Reviews tab:** iOS defines `ProfileGigReviewsSection`, but it is not mounted;
+   Android has no equivalent implementation.
+5. **Generate bio with AI:** no Edit Profile call to `POST /api/ai/draft/post` exists on either native
+   platform.
+6. **Earnings & Spending summary:** iOS has a live implementation candidate for
+   `GET /api/payments/earnings` and `/api/payments/spending` (currently also the source of the duplicate
+   filename build stop); Android has neither route wired into the payments surface.
+
+The endpoint cross-platform sweep corroborates the one-platform gaps: the new portfolio, profile-review,
+skills, earnings and spending paths appear iOS-only. Its Swift interpolation normalisation also emits
+some noisy false positives, so use those rows as prompts for manual inspection rather than as the final
+verdict.
+
+### Five Wave B findings have never landed
+
+The partial Wave B commit intentionally deferred these on both platforms:
+
+- Family Mail Party (start/join/discover/reactions/assign/solo-decline);
+- real machine translation in place of the hard-coded translation fixture, with retry;
+- package-help request form tied to the mail item and created gig;
+- time-limited gig live-status share link; and
+- v2 scored offers for curated/quotes gigs, with fallback to plain bids.
+
+The recovery workflow is already written at `docs/_parity-work/wf-med-brem.js`, but it is currently
+**untracked**. Preserve it, and re-read the files before running it because Wave B's partial work already
+changed the same mailbox/gigs folders.
+
+### Recommended completion order
+
+1. Preserve the existing dirty tree and repair the Wave D iOS/Android compile blockers.
+2. Complete the six Wave D gaps above, including mounting the iOS tab sections and implementing their
+   Android counterparts. Confirm every new endpoint against the actual backend mount table.
+3. Run the Wave D platform audits, then `gate.sh both`; after it is green, run the affected tests and the
+   two full native unit suites before committing Wave D.
+4. Land the five-item Wave B remainder using `wf-med-brem.js`, compile-gate both platforms, audit and
+   commit it separately.
+5. Run the final branch checks: full iOS and Android unit suites, SwiftLint, `verifyPantopusIcons`, route
+   reachability, endpoint parity and a per-finding review of all 86 medium/low items. The existing
+   `reachability.sh` diffs `master...HEAD`, so it will not see Wave D's uncommitted changes until they
+   are committed. `endpoint-parity.sh` was written for the 64 high findings; extend the manual checklist
+   to cover the medium/low endpoints rather than assuming that script covers them.
+6. Reconcile the `recentLocations` overlap, update the accepted count and this status block only after
+   the corresponding work is committed and verified.
+
+Working instructions and recovery helpers live in `docs/_parity-work/BRIEF.md`,
+`docs/_parity-work/BRIEF-MEDIUM.md`, `docs/_parity-work/gate.sh`,
+`docs/_parity-work/reachability.sh`, `docs/_parity-work/xplatform.sh` and
+`docs/_parity-work/endpoint-parity.sh`.
+
+---
+
+## STATUS — all 64 high-severity findings closed (2026-08-11)
+
+Branch `claude/rn-parity-high-severity-fixes`. Every high finding below was implemented on **both**
+platforms, in six waves, each compile-gated before the next started:
+
+| Wave | Cluster | Findings | Commit |
+|---|---|---|---|
+| 1 | homes-a + homes-b | 16 | `81d4f6d0` |
+| 2 | mailbox | 10 | `ebbb1c07` |
+| 3 | gigs + money | 10 | `8fcb7ae0` |
+| 4 | tabs-social | 10 | `d59be020` |
+| 5 | auth-settings | 7 | `27a6a0e3` |
+| 6 | creator-biz | 11 | `c44bb907` |
+
+**Verification performed:** iOS `make build` and Android `:app:compileDebugKotlin` green after every
+wave; SwiftLint clean; `verifyPantopusIcons` clean; **both unit suites green — iOS 3139 tests, Android
+3264 tests, zero failures**; all 33 new Android routes confirmed to have both a `composable(...)`
+registration *and* a production navigation call site; every endpoint the findings required confirmed
+present on both platforms.
+
+**Bugs found in existing code while doing this** (not in the original audit):
+
+- Every Support Train endpoint targeted `/api/support-trains/*`, which does not exist — the router
+  mounts at `/api/activities/support-trains` (`backend/app.js:404`). All nine pre-existing helpers were
+  hitting 404s on both platforms.
+- The privacy DTOs carried fields absent from the route's Joi schema, and that validator runs
+  `allowUnknown: false` — every `PATCH /api/privacy/settings` would have 400'd.
+- `CeremonialMailOpen` read `stationeryTheme` from the wrong level of `object_payload`, so theme / ink /
+  voice always fell back to defaults.
+- Two Support Train DTOs decoded a capitalised Supabase alias instead of the lowercase `user` object the
+  handlers actually return.
+- The **iOS test target was not compiling** — a test used `httpBodyData()` without declaring the
+  `fileprivate` copy each test file carries — so the entire iOS unit suite had been silently not
+  running. Fixed; it now runs and passes.
+
+**Known caveats, stated plainly:**
+
+- `verifyPantopusTokens` is red, but it was already red on `master` (406 distinct violations there). This
+  branch adds ~24 more, all `size = N.dp` on `PantopusIconImage`, matching the pervasive codebase idiom —
+  there is no icon-size token to use instead. Not fixed, to avoid making new code inconsistent with old.
+- Waves 3 and 5 lost their adversarial audit agents to session limits, and the final adversarial review
+  wave failed outright for the same reason. The mechanical verification above was run by hand instead;
+  a full per-finding adversarial re-verify has **not** been done.
+- `BusinessInvoicesEndpoints.receivedInvoices` (the paged list) is declared on both platforms with no UI
+  caller yet — symmetric across platforms, and groundwork for a received-invoices list.
+
+The detailed medium (73) and low (13) entries below retain the original audit wording. Their current
+branch status is tracked in the handoff block above; do not infer completion from an endpoint/helper or
+screen existing without its opposite-platform implementation, production call site and verification.
+
+---
+
+## Headline (original audit, 2026-08-06)
 
 **142 RN routes reviewed. 38 fully migrated. 150 gaps (64 high / 73 medium / 13 low).**
 

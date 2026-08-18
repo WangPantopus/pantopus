@@ -58,6 +58,7 @@ import app.pantopus.android.data.auth.OAuthBrowserCommand
 import app.pantopus.android.data.auth.OAuthProvider
 import app.pantopus.android.data.auth.OAuthSessionStore
 import app.pantopus.android.ui.screens.auth.sign_up.ErrorBanner
+import app.pantopus.android.ui.screens.settings.legal.LegalDocument
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -75,8 +76,11 @@ object LoginScreenTags {
     const val ERROR_MESSAGE = "loginErrorMessage"
     const val FORGOT_PASSWORD_LINK = "loginForgotPasswordLink"
     const val CREATE_ACCOUNT_LINK = "loginCreateAccountLink"
+    const val RESEND_VERIFICATION_BUTTON = "loginResendVerificationButton"
+    const val INFO_BANNER = "loginInfoBanner"
     const val GOOGLE_BUTTON = "loginGoogleButton"
     const val APPLE_BUTTON = "loginAppleButton"
+    const val LEGAL_TERMS_LINE = "loginLegalTermsLine"
 }
 
 /**
@@ -87,6 +91,7 @@ object LoginScreenTags {
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
+    onOpenLegal: (LegalDocument) -> Unit = {},
     onNavigateToSignUp: () -> Unit = {},
     onNavigateToForgotPassword: () -> Unit = {},
     onNavigateToVerifyEmail: () -> Unit = {},
@@ -173,12 +178,46 @@ fun LoginScreen(
             Box(modifier = Modifier.height(Spacing.s3))
         }
 
+        state.infoMessage?.let { info ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.primary100)
+                        .padding(Spacing.s3)
+                        .testTag(LoginScreenTags.INFO_BANNER)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Mail,
+                    contentDescription = null,
+                    size = Radii.xl,
+                    tint = PantopusColors.primary600,
+                )
+                Text(
+                    text = info,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                )
+            }
+            Box(modifier = Modifier.height(Spacing.s3))
+        }
+
         OAuthButtonGroup(
             isLoading = state.isLoading,
             onGoogle = { viewModel.signInWithOAuth(OAuthProvider.Google) },
             onApple = { viewModel.signInWithOAuth(OAuthProvider.Apple) },
             googleTag = LoginScreenTags.GOOGLE_BUTTON,
             appleTag = LoginScreenTags.APPLE_BUTTON,
+        )
+        Box(modifier = Modifier.height(Spacing.s3))
+
+        AuthOAuthTermsLine(
+            testTag = LoginScreenTags.LEGAL_TERMS_LINE,
+            onOpenLegal = onOpenLegal,
         )
         Box(modifier = Modifier.height(Spacing.s5))
 
@@ -235,6 +274,37 @@ fun LoginScreen(
                         tint = PantopusColors.appTextInverse,
                     )
                 }
+            }
+        }
+
+        // Unverified sign-in is a dead end without this: the backend 403s
+        // with "Please verify your email before signing in."
+        // (`backend/routes/users.js:1528`) and RN reveals the same link on
+        // that error (`(auth)/login.tsx:190`).
+        if (state.canResendVerification) {
+            Box(modifier = Modifier.height(Spacing.s2))
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .clickable(
+                            enabled = !state.isResendingVerification && !state.isLoading,
+                            onClick = viewModel::resendVerification,
+                        ).testTag(LoginScreenTags.RESEND_VERIFICATION_BUTTON)
+                        .semantics { contentDescription = "Resend verification email" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text =
+                        if (state.isResendingVerification) {
+                            "Sending verification…"
+                        } else {
+                            "Resend verification email"
+                        },
+                    style = PantopusTextStyle.small.copy(fontWeight = FontWeight.SemiBold),
+                    color = PantopusColors.primary600,
+                )
             }
         }
 

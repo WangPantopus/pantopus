@@ -88,6 +88,25 @@ public struct PublicProfileView: View {
         .sheet(isPresented: $showReportSheet) {
             reportSheet
         }
+        // RN gates the same `DELETE /api/relationships/:id` behind a
+        // "Disconnect · Remove this connection?" alert
+        // (`src/app/connections.tsx:69-77`), so tapping "Connected" here
+        // confirms before it removes the edge.
+        .confirmationDialog(
+            disconnectTitle,
+            isPresented: Binding(
+                get: { viewModel.showDisconnectConfirm },
+                set: { viewModel.showDisconnectConfirm = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                Task { await viewModel.disconnect() }
+            }
+            Button("Cancel", role: .cancel) { viewModel.cancelDisconnect() }
+        } message: {
+            Text("Remove this connection?")
+        }
         .sheet(
             isPresented: Binding(
                 get: { viewModel.showFollowHandshake },
@@ -113,6 +132,14 @@ public struct PublicProfileView: View {
         )
         .accessibilityIdentifier("publicProfile")
         .task { await viewModel.load() }
+    }
+
+    /// Names the neighbor being disconnected, per the destructive-confirm
+    /// rule. Falls back to the generic title before the profile resolves.
+    private var disconnectTitle: String {
+        guard case let .loaded(payload) = viewModel.state else { return "Disconnect" }
+        let name = payload.header.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Disconnect" : "Disconnect from \(name)"
     }
 
     @ViewBuilder private var reportSheet: some View {
@@ -193,6 +220,8 @@ public struct PublicProfileView: View {
             },
             body: {
                 VStack(alignment: .leading, spacing: Spacing.s4) {
+                    followRow
+
                     LocalProfileTabStrip(
                         postCount: payload.posts.isEmpty ? nil : payload.posts.count,
                         selected: viewModel.selectedLocalTab
@@ -291,6 +320,48 @@ public struct PublicProfileView: View {
         )
     }
 
+    /// T3 — plain Follow / Following for an ordinary neighbor.
+    ///
+    /// The A21.2 Local header is spec'd at exactly two buttons (Connect +
+    /// Message), so the follow control lives here, directly beneath the
+    /// identity block — the same slot RN puts its action row in
+    /// (`src/app/user/[id].tsx:522-569`). Hidden on your own profile and
+    /// when signed out, matching RN.
+    @ViewBuilder private var followRow: some View {
+        if viewModel.canFollow {
+            Group {
+                if viewModel.isFollowing {
+                    GhostButton(
+                        title: "Following",
+                        isLoading: viewModel.isFollowInFlight,
+                        isEnabled: !viewModel.isFollowInFlight
+                    ) {
+                        await viewModel.toggleFollow()
+                    }
+                } else {
+                    PrimaryButton(
+                        title: "Follow",
+                        isLoading: viewModel.isFollowInFlight,
+                        isEnabled: !viewModel.isFollowInFlight
+                    ) {
+                        await viewModel.toggleFollow()
+                    }
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("publicProfileFollowButton")
+        }
+    }
+
+    /// Glyph paired with the Connect control's current label.
+    private var connectIcon: PantopusIcon {
+        switch viewModel.connection {
+        case .connected: .check
+        case .pendingSent: .clock
+        default: .userPlus
+        }
+    }
+
     /// Kind-aware action buttons rendered top-right inside the
     /// `BeaconIdentityBlock` (replacing the former sticky footer).
     @ViewBuilder
@@ -308,17 +379,38 @@ public struct PublicProfileView: View {
                 BeaconHeaderGhostButton(icon: .share, accessibilityLabel: "Share profile") {
                     viewModel.showOverflow = true
                 }
-                BeaconHeaderPrimaryButton(title: "Follow", icon: .plus) {
-                    viewModel.follow()
+                if viewModel.isFollowing {
+                    BeaconHeaderGhostButton(
+                        title: "Following",
+                        icon: .check,
+                        accessibilityLabel: "Following. Tap to unfollow"
+                    ) {
+                        viewModel.follow()
+                    }
+                    .accessibilityIdentifier("publicProfileFollowButton")
+                } else {
+                    BeaconHeaderPrimaryButton(title: "Follow", icon: .plus) {
+                        viewModel.follow()
+                    }
+                    .accessibilityIdentifier("publicProfileFollowButton")
                 }
             }
         case .local:
-            BeaconHeaderGhostButton(
-                title: viewModel.connectState == .succeeded ? "Requested" : "Connect",
-                icon: .userPlus,
-                accessibilityLabel: viewModel.connectState == .succeeded ? "Requested" : "Connect"
-            ) {
-                Task { await viewModel.connect() }
+            // The Connect control reads the real edge from
+            // `GET /api/users/:id/relationship`: Connect → Requested →
+            // Accept → Connected, and disappears once the viewer has
+            // blocked this neighbor (RN `src/app/user/[id].tsx:391-398,523`).
+            if viewModel.showsConnectAction {
+                BeaconHeaderGhostButton(
+                    title: viewModel.connectLabel,
+                    icon: connectIcon,
+                    accessibilityLabel: viewModel.connection.accessibilityLabel
+                ) {
+                    Task { await viewModel.connect() }
+                }
+                .disabled(!viewModel.isConnectEnabled)
+                .opacity(viewModel.isConnectEnabled ? 1 : 0.7)
+                .accessibilityIdentifier("publicProfileConnectCta")
             }
             BeaconHeaderPrimaryButton(title: "Message", icon: .messageSquare) {
                 onOpenMessages(payload.profile)

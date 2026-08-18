@@ -23,8 +23,35 @@ public struct NotificationsView: View {
     }
 
     public var body: some View {
-        ListOfRowsView(dataSource: viewModel)
-            .accessibilityIdentifier("notifications")
+        ListOfRowsView(dataSource: viewModel) {
+            if viewModel.showsZoneStrip {
+                NotificationsZoneStrip(
+                    zones: viewModel.zoneOptions,
+                    selected: viewModel.zone
+                ) { zone in
+                    viewModel.selectZone(zone)
+                }
+            }
+        }
+        .accessibilityIdentifier("notifications")
+        .confirmationDialog(
+            "Delete notification?",
+            isPresented: Binding(
+                get: { viewModel.pendingDelete != nil },
+                set: { presented in if !presented { viewModel.cancelDelete() } }
+            ),
+            titleVisibility: .visible,
+            presenting: viewModel.pendingDelete
+        ) { _ in
+            Button("Delete", role: .destructive) {
+                Task { @MainActor in await viewModel.confirmDelete() }
+            }
+            .accessibilityIdentifier("notifications.deleteConfirm")
+            Button("Cancel", role: .cancel) { viewModel.cancelDelete() }
+                .accessibilityIdentifier("notifications.deleteCancel")
+        } message: { request in
+            Text("\u{201C}\(request.title)\u{201D} will be removed from your notifications.")
+        }
     }
 }
 

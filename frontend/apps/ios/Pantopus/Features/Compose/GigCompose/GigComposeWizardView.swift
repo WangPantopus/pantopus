@@ -391,9 +391,12 @@ private struct ModuleGroupFields: View {
         case .event:
             EventModuleFields(viewModel: viewModel)
                 .accessibilityIdentifier("gigCompose.module.event")
-        case .items:
-            ItemsModuleFields(viewModel: viewModel)
-                .accessibilityIdentifier("gigCompose.module.items")
+        case .delivery:
+            DeliveryModuleFields(viewModel: viewModel)
+                .accessibilityIdentifier("gigCompose.module.delivery")
+        case .proService:
+            ProServiceModuleFields(viewModel: viewModel)
+                .accessibilityIdentifier("gigCompose.module.proService")
         case nil:
             EmptyView()
         }
@@ -620,6 +623,191 @@ private struct EventModuleFields: View {
             var details = form.eventDetails ?? GigEventDetails()
             mutate(&details)
             form.eventDetails = details
+        }
+    }
+}
+
+/// delivery_errand — pickup → drop-off route (flat `pickup_*` /
+/// `dropoff_*` gig columns), the shopping list, and the proof-photo
+/// toggle. Mirrors RN's `DeliveryModule.tsx`.
+private struct DeliveryModuleFields: View {
+    @Bindable var viewModel: GigComposeViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            SectionOverline("DELIVERY DETAILS")
+            PantopusTextField(
+                "Pickup address",
+                text: field(get: { $0?.pickupAddress }, set: { $0.pickupAddress = $1 }),
+                placeholder: "Pickup address",
+                identifier: "gigCompose.module.delivery.pickupAddress"
+            )
+            PantopusTextField(
+                "Pickup notes (optional)",
+                text: field(get: { $0?.pickupNotes }, set: { $0.pickupNotes = $1 }),
+                placeholder: "e.g. Ask for John at the counter",
+                identifier: "gigCompose.module.delivery.pickupNotes"
+            )
+            PantopusTextField(
+                "Drop-off address",
+                text: field(get: { $0?.dropoffAddress }, set: { $0.dropoffAddress = $1 }),
+                placeholder: "Drop-off address (defaults to your home)",
+                identifier: "gigCompose.module.delivery.dropoffAddress"
+            )
+            PantopusTextField(
+                "Drop-off notes (optional)",
+                text: field(get: { $0?.dropoffNotes }, set: { $0.dropoffNotes = $1 }),
+                placeholder: "e.g. Leave on the front porch",
+                identifier: "gigCompose.module.delivery.dropoffNotes"
+            )
+            ModuleToggleRow(
+                title: "Require delivery proof photo",
+                isOn: viewModel.form.deliveryDetails?.proofRequired ?? false,
+                identifier: "gigCompose.module.delivery.proof"
+            ) { value in
+                update { $0.proofRequired = value }
+            }
+            ItemsModuleFields(viewModel: viewModel)
+                .accessibilityIdentifier("gigCompose.module.items")
+        }
+    }
+
+    private func field(
+        get: @escaping (GigDeliveryDetails?) -> String?,
+        set: @escaping (inout GigDeliveryDetails, String) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: { get(viewModel.form.deliveryDetails) ?? "" },
+            set: { newValue in update { set(&$0, newValue) } }
+        )
+    }
+
+    private func update(_ mutate: (inout GigDeliveryDetails) -> Void) {
+        viewModel.updateForm { form in
+            var details = form.deliveryDetails ?? GigDeliveryDetails()
+            mutate(&details)
+            form.deliveryDetails = details
+        }
+    }
+}
+
+/// pro_service_quote — licence / insurance / scope / deposit. Mirrors
+/// RN's `ProServicesModule.tsx`; the deposit amount is required once
+/// the toggle is on (gate lives on `hasValidModules`).
+private struct ProServiceModuleFields: View {
+    @Bindable var viewModel: GigComposeViewModel
+
+    private var details: GigProServiceDetails? { viewModel.form.proServiceDetails }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            SectionOverline("PROFESSIONAL REQUIREMENTS")
+            ModuleToggleRow(
+                title: "Requires license",
+                isOn: details?.requiresLicense ?? false,
+                identifier: "gigCompose.module.pro.license"
+            ) { value in
+                update { $0.requiresLicense = value }
+            }
+            if details?.requiresLicense == true {
+                PantopusTextField(
+                    "License type",
+                    text: field(get: { $0?.licenseType }, set: { $0.licenseType = $1 }),
+                    placeholder: "e.g. Licensed Plumber",
+                    identifier: "gigCompose.module.pro.licenseType"
+                )
+            }
+            ModuleToggleRow(
+                title: "Requires insurance",
+                isOn: details?.requiresInsurance ?? false,
+                identifier: "gigCompose.module.pro.insurance"
+            ) { value in
+                update { $0.requiresInsurance = value }
+            }
+            ModuleMultilineField(
+                label: "Scope of work",
+                placeholder: "Describe the scope of work needed…",
+                text: field(get: { $0?.scopeDescription }, set: { $0.scopeDescription = $1 }),
+                identifier: "gigCompose.module.pro.scope"
+            )
+            ModuleToggleRow(
+                title: "Require deposit",
+                isOn: details?.depositRequired ?? false,
+                identifier: "gigCompose.module.pro.deposit"
+            ) { value in
+                update { $0.depositRequired = value }
+            }
+            if details?.depositRequired == true {
+                PantopusTextField(
+                    "Deposit amount ($)",
+                    text: field(get: { $0?.depositAmount }, set: { $0.depositAmount = $1 }),
+                    placeholder: "0",
+                    state: details?.isDepositAmountMissing == true
+                        ? .error("Enter a deposit amount, or turn the deposit off.")
+                        : .default,
+                    keyboardType: .decimalPad,
+                    identifier: "gigCompose.module.pro.depositAmount"
+                )
+            }
+        }
+    }
+
+    private func field(
+        get: @escaping (GigProServiceDetails?) -> String?,
+        set: @escaping (inout GigProServiceDetails, String) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: { get(viewModel.form.proServiceDetails) ?? "" },
+            set: { newValue in update { set(&$0, newValue) } }
+        )
+    }
+
+    private func update(_ mutate: (inout GigProServiceDetails) -> Void) {
+        viewModel.updateForm { form in
+            var details = form.proServiceDetails ?? GigProServiceDetails()
+            mutate(&details)
+            form.proServiceDetails = details
+        }
+    }
+}
+
+/// Multi-line module input — same chrome as `DescriptionField` but with
+/// a caller-supplied label / placeholder / identifier.
+private struct ModuleMultilineField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+    let identifier: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text(label)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .pantopusTextStyle(.body)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.top, Spacing.s3)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $text)
+                    .font(Theme.Font.body)
+                    .foregroundStyle(Theme.Color.appText)
+                    .frame(minHeight: 80)
+                    .scrollContentBackground(.hidden)
+                    .padding(Spacing.s2)
+                    .accessibilityIdentifier(identifier)
+                    .accessibilityLabel(label)
+            }
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
         }
     }
 }

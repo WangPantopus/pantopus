@@ -19,7 +19,13 @@ import kotlin.math.abs
  * per-type badge.
  */
 
-/** The four discovery entity kinds the Explore map mixes. */
+/**
+ * The discovery entity kinds the Explore map mixes.
+ *
+ * `Task` / `Item` come from the gig + listing in-bounds routes; `Post`,
+ * `Spot` (business), and `Home` come from the multi-layer viewport route
+ * `GET /api/posts/map` — route `backend/routes/posts.js:1646`.
+ */
 enum class ExploreKind(
     val key: String,
     val pluralLabel: String,
@@ -29,12 +35,13 @@ enum class ExploreKind(
     Item("item", "Items", "Item"),
     Post("post", "Posts", "Post"),
     Spot("spot", "Spots", "Spot"),
+    Home("home", "Homes", "Home"),
     ;
 
     /**
      * Accent color — design palette mapped to existing tokens: task →
      * gigs orange, item → business violet, post → primary-500 sky, spot
-     * → home green. (No new tokens introduced.)
+     * → home green, home → home-dark green. (No new tokens introduced.)
      */
     val color: Color
         get() =
@@ -43,6 +50,7 @@ enum class ExploreKind(
                 Item -> PantopusColors.business
                 Post -> PantopusColors.primary500
                 Spot -> PantopusColors.home
+                Home -> PantopusColors.homeDark
             }
 
     /** White glyph rendered inside the pin + on the rail-card tile. */
@@ -53,6 +61,7 @@ enum class ExploreKind(
                 Item -> PantopusIcon.Tag
                 Post -> PantopusIcon.MessageCircle
                 Spot -> PantopusIcon.Building2
+                Home -> PantopusIcon.Home
             }
 
     /** Items render as a rounded square; the others as discs. */

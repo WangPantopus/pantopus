@@ -191,8 +191,27 @@ final class PetsListViewModel: ListOfRowsDataSource {
                     background: palette.chipBackground,
                     foreground: palette.chipForeground
                 )
-            )
+            ),
+            chips: Self.vetChips(for: pet)
         )
+    }
+
+    /// Vet contact pill under the row body — RN's expanded pet card
+    /// (`src/app/homes/[id]/pets.tsx:133 + 155-160`) joins `vet_name`
+    /// and `vet_phone` with "·" behind a medkit icon.
+    private static func vetChips(for pet: PetDTO) -> [RowChip]? {
+        let parts = [pet.vetName?.nilIfEmpty, pet.vetPhone?.nilIfEmpty].compactMap { $0 }
+        guard !parts.isEmpty else { return nil }
+        return [
+            RowChip(
+                text: parts.joined(separator: " · "),
+                icon: .stethoscope,
+                tint: .custom(
+                    background: Theme.Color.appSurfaceSunken,
+                    foreground: Theme.Color.appTextSecondary
+                )
+            )
+        ]
     }
 }
 

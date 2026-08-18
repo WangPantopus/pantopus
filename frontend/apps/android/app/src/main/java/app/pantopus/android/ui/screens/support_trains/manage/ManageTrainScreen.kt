@@ -20,7 +20,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,10 +41,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainViewerRole
 import app.pantopus.android.ui.screens.support_trains.manage.components.CloseTrainSheet
 import app.pantopus.android.ui.screens.support_trains.manage.components.MANAGE_TRAIN_CLOSE_SHEET_SCRIM_TAG
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageDatesSection
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageFundSection
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageHelpersSection
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageLifecycleSection
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageNudgeSection
+import app.pantopus.android.ui.screens.support_trains.manage.components.ManageOrganizersSection
 import app.pantopus.android.ui.screens.support_trains.manage.components.OrganizeSection
 import app.pantopus.android.ui.screens.support_trains.manage.components.SendUpdateForm
+import app.pantopus.android.ui.screens.support_trains.manage.components.SlotEditorSheet
 import app.pantopus.android.ui.screens.support_trains.manage.components.SlotPreview
 import app.pantopus.android.ui.screens.support_trains.manage.components.StatCellContent
 import app.pantopus.android.ui.screens.support_trains.manage.components.StatCellRow
@@ -72,6 +85,7 @@ const val MANAGE_TRAIN_RETRY_TAG: String = "manageTrainRetry"
  * Tapping the destructive `Close train` row presents the
  * [CloseTrainSheet] over a dimmed body.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageTrainScreen(
     onBack: () -> Unit,
@@ -123,6 +137,54 @@ fun ManageTrainScreen(
         state.toast?.let { toast ->
             ToastChip(text = toast)
         }
+    }
+
+    state.slotEditor?.let { editor ->
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissSlotEditor() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = PantopusColors.appBg,
+        ) {
+            SlotEditorSheet(
+                editor = editor,
+                isSubmitting = state.isSubmitting,
+                onSave = { viewModel.saveSlot(it) },
+                onCancel = { viewModel.dismissSlotEditor() },
+            )
+        }
+    }
+
+    state.pendingConfirm?.let { confirm ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissConfirm() },
+            title = { Text(confirm.title) },
+            text = { Text(confirm.message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.performConfirm(confirm.kind) }) {
+                    Text(confirm.confirmLabel, color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissConfirm() }) { Text("Cancel") }
+            },
+            modifier = Modifier.testTag("manageTrainConfirmDialog"),
+        )
+    }
+
+    state.actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.acknowledgeActionError() },
+            title = { Text("Something went wrong") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.acknowledgeActionError() }) { Text("OK") }
+            },
+            modifier = Modifier.testTag("manageTrainErrorDialog"),
+        )
+    }
+
+    LaunchedEffect(state.didDeleteTrain) {
+        if (state.didDeleteTrain) onBack()
     }
 }
 
@@ -340,10 +402,50 @@ private fun LoadedBody(
                     }
                 },
             )
+
+            OrganizerControls(content = content, ui = ui, viewModel = viewModel)
+
             SectionOverline("Wind down")
             WindDownSection(
                 row = content.closeRow,
                 onTap = { viewModel.showCloseSheet() },
+            )
+            ManageLifecycleSection(
+                status = content.status,
+                viewerRole = content.viewerRole,
+                isBusy = ui.isSubmitting,
+                onPause = { viewModel.pauseTrain() },
+                onResume = { viewModel.resumeTrain() },
+                onUnpublish = {
+                    viewModel.requestConfirm(
+                        ManageDestructiveConfirm(
+                            kind = ManageConfirmKind.UnpublishTrain,
+                            title = "Unpublish this train?",
+                            message = "${content.title} goes back to draft and neighbors stop seeing it.",
+                            confirmLabel = "Unpublish",
+                        ),
+                    )
+                },
+                onArchive = {
+                    viewModel.requestConfirm(
+                        ManageDestructiveConfirm(
+                            kind = ManageConfirmKind.ArchiveTrain,
+                            title = "Archive this train?",
+                            message = "${content.title} moves out of your active list.",
+                            confirmLabel = "Archive",
+                        ),
+                    )
+                },
+                onDelete = {
+                    viewModel.requestConfirm(
+                        ManageDestructiveConfirm(
+                            kind = ManageConfirmKind.DeleteTrain,
+                            title = "Delete ${content.title}?",
+                            message = "This permanently deletes the train, its dates, updates and invites.",
+                            confirmLabel = "Delete",
+                        ),
+                    )
+                },
             )
         }
         StickyCTA(
@@ -352,6 +454,102 @@ private fun LoadedBody(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+/**
+ * S1 — dates / helpers / co-organizers / nudge / gift fund. Every block
+ * is gated on the viewer's organizer tier so no one sees a control the
+ * backend would 403.
+ */
+@Composable
+private fun OrganizerControls(
+    content: ManageTrainContent,
+    ui: ManageTrainUiState,
+    viewModel: ManageTrainViewModel,
+) {
+    ManageDatesSection(
+        rows = ui.slotRows,
+        isBusy = ui.isSubmitting,
+        onAdd = { viewModel.startAddSlot() },
+        onEdit = { viewModel.startEditSlot(it) },
+        onRemove = { row ->
+            viewModel.requestConfirm(
+                ManageDestructiveConfirm(
+                    kind = ManageConfirmKind.CancelSlot(row.id),
+                    title = "Remove date",
+                    message = "Remove ${row.dateLabel} from this Support Train?",
+                    confirmLabel = "Remove",
+                ),
+            )
+        },
+    )
+
+    ManageHelpersSection(
+        rows = ui.helperRows,
+        isBusy = ui.isSubmitting,
+        onShareAddress = { viewModel.shareExactAddress(it.id) },
+        onConfirm = { viewModel.confirmDelivery(it.id) },
+        onRemove = { row ->
+            viewModel.requestConfirm(
+                ManageDestructiveConfirm(
+                    kind = ManageConfirmKind.RemoveHelper(row.id),
+                    title = "Remove helper from slot?",
+                    message =
+                        "Reopen ${row.slotLabel.ifBlank { "this date" }} for someone else?",
+                    confirmLabel = "Remove",
+                ),
+            )
+        },
+    )
+
+    ManageOrganizersSection(
+        rows = ui.organizerRows,
+        canEdit = content.viewerRole == SupportTrainViewerRole.PRIMARY_ORGANIZER,
+        isBusy = ui.isSubmitting,
+        newOrganizerUserId = ui.newOrganizerUserId,
+        onUserIdChange = { viewModel.updateNewOrganizerUserId(it) },
+        onAdd = { viewModel.addOrganizer() },
+        onRemove = { row ->
+            val userId = row.userId ?: return@ManageOrganizersSection
+            viewModel.requestConfirm(
+                ManageDestructiveConfirm(
+                    kind = ManageConfirmKind.RemoveOrganizer(userId),
+                    title = "Remove organizer",
+                    message = "Remove ${row.name} as a co-organizer?",
+                    confirmLabel = "Remove",
+                ),
+            )
+        },
+    )
+
+    ManageNudgeSection(
+        openSlotCount = content.slotsOpen,
+        draft = ui.nudgeDraft,
+        isBusy = ui.isSubmitting,
+        onDraft = { viewModel.draftNudge() },
+        onEditDraft = { viewModel.updateNudgeDraft(it) },
+        onSend = { viewModel.sendNudge() },
+        onDiscard = { viewModel.discardNudge() },
+    )
+
+    ManageFundSection(
+        fund = ui.fund,
+        canDisable = content.viewerRole == SupportTrainViewerRole.PRIMARY_ORGANIZER,
+        isBusy = ui.isSubmitting,
+        goalDollars = ui.fundGoalDollars,
+        onGoalChange = { viewModel.updateFundGoal(it) },
+        onEnable = { viewModel.enableFund() },
+        onDisable = {
+            viewModel.requestConfirm(
+                ManageDestructiveConfirm(
+                    kind = ManageConfirmKind.DisableFund,
+                    title = "Disable the gift fund?",
+                    message = "Neighbors won't be able to chip in money any more.",
+                    confirmLabel = "Disable",
+                ),
+            )
+        },
+    )
 }
 
 @Composable

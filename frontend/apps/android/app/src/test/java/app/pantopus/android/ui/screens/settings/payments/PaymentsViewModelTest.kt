@@ -4,11 +4,17 @@ package app.pantopus.android.ui.screens.settings.payments
 
 import app.cash.turbine.test
 import app.pantopus.android.data.api.models.payments.AddCardSheetParamsDto
+import app.pantopus.android.data.api.models.payments.PaymentHistoryEntryDto
+import app.pantopus.android.data.api.models.payments.PaymentHistoryGigDto
+import app.pantopus.android.data.api.models.payments.PaymentHistoryPartyDto
+import app.pantopus.android.data.api.models.payments.PaymentHistoryResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodAckResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.connect.ConnectRepository
+import app.pantopus.android.data.payments.PaymentHistoryRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -35,11 +41,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class PaymentsViewModelTest {
     private lateinit var repository: PaymentsRepository
+    private lateinit var historyRepository: PaymentHistoryRepository
+    private lateinit var connectRepository: ConnectRepository
 
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         repository = mockk(relaxed = true)
+        historyRepository = mockk(relaxed = true)
+        connectRepository = mockk(relaxed = true)
+        // Every live load reads the history feed right after the methods list.
+        coEvery { historyRepository.history(any(), any()) } returns
+            NetworkResult.Success(PaymentHistoryResponse(transactions = emptyList(), total = 0))
+        // No connected account by default → the not-connected Payouts scaffold.
+        coEvery { connectRepository.accountStatus() } returns
+            NetworkResult.Failure(NetworkError.NotFound)
     }
 
     @After
@@ -47,7 +63,7 @@ class PaymentsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vm() = PaymentsViewModel(repository)
+    private fun vm() = PaymentsViewModel(repository, historyRepository, connectRepository)
 
     private fun cardDto(
         id: String,
@@ -161,6 +177,102 @@ class PaymentsViewModelTest {
             // Live frame never fabricates a balance — Payouts/Connect land in 3C.
             assertNull(content.balance)
             assertTrue(content.payouts.stripe.trailing is PaymentsRowTrailing.CtaChip)
+        }
+
+    /**
+     * The Activity card renders the real history feed — type, status,
+     * counterparty and signed amounts.
+     */
+    @Test
+    fun live_load_projects_transaction_history() =
+        runTest {
+            coEvery { repository.paymentMethods() } returns NetworkResult.Success(PaymentMethodsResponse(emptyList()))
+            coEvery { historyRepository.history(any(), any()) } returns
+                NetworkResult.Success(
+                    PaymentHistoryResponse(
+                        transactions =
+                            listOf(
+                                PaymentHistoryEntryDto(
+                                    id = "p1",
+                                    entryType = "payment",
+                                    amountCents = 12_000,
+                                    direction = "credit",
+                                    status = "succeeded",
+                                    paymentType = "gig_payment",
+                                    createdAt = "2026-03-04T17:00:00.000Z",
+                                    gig = PaymentHistoryGigDto(id = "g1", title = "Gutter cleaning"),
+                                    payer = PaymentHistoryPartyDto(id = "u2", name = "Ana Ruiz"),
+                                    isSender = false,
+                                ),
+                                PaymentHistoryEntryDto(
+                                    id = "p2",
+                                    entryType = "payment",
+                                    amountCents = 2_500,
+                                    direction = "debit",
+                                    status = "succeeded",
+                                    paymentType = "tip",
+                                    createdAt = "2026-03-02T17:00:00.000Z",
+                                    payee = PaymentHistoryPartyDto(id = "u3", name = "Sam Cole"),
+                                    isSender = true,
+                                ),
+                                PaymentHistoryEntryDto(
+                                    id = "payout_1",
+                                    entryType = "payout",
+                                    amountCents = 40_000,
+                                    direction = "debit",
+                                    status = "paid",
+                                    destinationLast4 = "6789",
+                                    createdAt = "2026-03-01T17:00:00.000Z",
+                                ),
+                            ),
+                        total = 3,
+                    ),
+                )
+            val vm = vm()
+            vm.load()
+            val rows = ((vm.state.value as PaymentsUiState.Loaded).content.activity as PaymentsActivity.Transactions).rows
+
+            assertEquals(3, rows.size)
+            assertEquals("Gutter cleaning", rows[0].title)
+            assertEquals(PaymentsTransaction.Kind.Received, rows[0].kind)
+            assertEquals("+$120.00", rows[0].amount)
+            assertFalse(rows[0].isOutgoing)
+            assertTrue(rows[0].meta.contains("from Ana Ruiz"))
+            assertTrue(rows[0].meta.contains("Succeeded"))
+            assertEquals(PaymentsTransaction.Kind.Tip, rows[1].kind)
+            assertEquals("-$25.00", rows[1].amount)
+            assertTrue(rows[1].meta.contains("to Sam Cole"))
+            assertEquals(PaymentsTransaction.Kind.Payout, rows[2].kind)
+            assertEquals("Payout to bank ••••6789", rows[2].title)
+            assertEquals("-$400.00", rows[2].amount)
+        }
+
+    /** A user with no payments keeps the genuine empty state. */
+    @Test
+    fun live_load_empty_history_keeps_empty_state() =
+        runTest {
+            coEvery { repository.paymentMethods() } returns NetworkResult.Success(PaymentMethodsResponse(emptyList()))
+            val vm = vm()
+            vm.load()
+            val activity = (vm.state.value as PaymentsUiState.Loaded).content.activity as PaymentsActivity.Empty
+            assertEquals("No transactions yet", activity.title)
+        }
+
+    /** A history failure must not sink the screen — methods still render. */
+    @Test
+    fun history_failure_keeps_methods_usable() =
+        runTest {
+            coEvery { repository.paymentMethods() } returns
+                NetworkResult.Success(
+                    PaymentMethodsResponse(listOf(cardDto("pm_1", "visa", "4242", isDefault = true))),
+                )
+            coEvery { historyRepository.history(any(), any()) } returns
+                NetworkResult.Failure(NetworkError.Server(500, "boom"))
+            val vm = vm()
+            vm.load()
+            val content = (vm.state.value as PaymentsUiState.Loaded).content
+            assertEquals(1, content.methods.size)
+            assertEquals("Couldn't load transactions", (content.activity as PaymentsActivity.Empty).title)
         }
 
     @Test

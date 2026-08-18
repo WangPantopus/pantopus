@@ -54,7 +54,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
 
     private func stub(_ body: String) {
         SequencedURLProtocol.routeResponses = [
-            "/api/support-trains/st1/reservations": [.status(200, body: body)]
+            "/api/activities/support-trains/st1/reservations": [.status(200, body: body)]
         ]
     }
 
@@ -140,7 +140,7 @@ final class ReviewSignupsViewModelTests: XCTestCase {
 
     func testLoadFailureTransitionsToError() async {
         SequencedURLProtocol.routeResponses = [
-            "/api/support-trains/st1/reservations": [.status(500, body: "{}")]
+            "/api/activities/support-trains/st1/reservations": [.status(500, body: "{}")]
         ]
         let vm = makeVM()
         await vm.load()

@@ -42,9 +42,27 @@ class LoginViewModel
              * headline + body. `null` when no error is currently surfaced.
              */
             val errorMessage: AuthError? = null,
+            /**
+             * Neutral confirmation shown after a successful resend — the
+             * backend's anti-enumeration copy (`backend/routes/users.js:3060`).
+             */
+            val infoMessage: String? = null,
+            /** True while `POST /api/users/resend-verification` is in flight. */
+            val isResendingVerification: Boolean = false,
         ) {
             val canSubmit: Boolean
                 get() = !isLoading && AuthValidation.email(email) == null && password.length >= 6
+
+            /**
+             * The backend blocks an unverified sign-in with 403 "Please verify
+             * your email before signing in." (`backend/routes/users.js:1528`),
+             * which [mapLoginError] turns into `AuthError.ServerError`. RN
+             * reveals its resend link on the same signal — any login error
+             * whose copy mentions "verify"
+             * (`pantopus/frontend/apps/mobile/src/app/(auth)/login.tsx:58`).
+             */
+            val canResendVerification: Boolean
+                get() = errorMessage?.message?.contains("verify", ignoreCase = true) == true
         }
 
         private val _uiState = MutableStateFlow(UiState())
@@ -69,11 +87,55 @@ class LoginViewModel
         private var hostLeftForeground: Boolean = false
         private var cancelJob: Job? = null
 
-        fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
+        fun onEmailChange(value: String) =
+            _uiState.update { it.copy(email = value, errorMessage = null, infoMessage = null) }
 
-        fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
+        fun onPasswordChange(value: String) =
+            _uiState.update { it.copy(password = value, errorMessage = null, infoMessage = null) }
 
-        fun clearError() = _uiState.update { it.copy(errorMessage = null) }
+        fun clearError() = _uiState.update { it.copy(errorMessage = null, infoMessage = null) }
+
+        /**
+         * `POST /api/users/resend-verification` (route
+         * `backend/routes/users.js:3049`) — mirrors RN
+         * `(auth)/login.tsx:60`. Requires an email in the field; the response
+         * is always the same generic message whether or not the account
+         * exists, so the confirmation copy is anti-enumeration safe.
+         */
+        fun resendVerification() {
+            val snapshot = _uiState.value
+            if (snapshot.isResendingVerification) return
+            val email = snapshot.email.trim()
+            if (email.isEmpty()) {
+                _uiState.update {
+                    it.copy(errorMessage = AuthError.ServerError("Enter your email first to resend verification."))
+                }
+                return
+            }
+            _uiState.update { it.copy(isResendingVerification = true, infoMessage = null) }
+            viewModelScope.launch {
+                try {
+                    authRepository.resendVerification(email.lowercase())
+                    _uiState.update {
+                        it.copy(
+                            isResendingVerification = false,
+                            infoMessage = "If that email exists, a verification email has been sent.",
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    _uiState.update {
+                        it.copy(
+                            isResendingVerification = false,
+                            errorMessage =
+                                (t as? AuthError)
+                                    ?: AuthError.ServerError("Could not resend verification email."),
+                        )
+                    }
+                }
+            }
+        }
 
         fun signIn() {
             val snapshot = _uiState.value

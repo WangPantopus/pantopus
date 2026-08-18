@@ -9,8 +9,10 @@ import app.pantopus.android.data.api.models.users.SocialLinks
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.data.upload.UploadRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -41,6 +43,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditProfileViewModelTest {
     private val repo: ProfileRepository = mockk()
+    private val uploads: UploadRepository = mockk(relaxed = true)
+    private val authRepository: AuthRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor = mockk()
     private val isOnline = MutableStateFlow(true)
 
@@ -54,7 +58,7 @@ class EditProfileViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(): EditProfileViewModel = EditProfileViewModel(repo, networkMonitor)
+    private fun viewModel(): EditProfileViewModel = EditProfileViewModel(repo, uploads, authRepository, networkMonitor)
 
     private fun seededProfile(): UserProfile =
         UserProfile(

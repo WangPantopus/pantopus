@@ -76,7 +76,22 @@ class PrivacySnapshotTest {
                         app.pantopus.android.data.auth.AuthRepository.State.SignedOut,
                     )
             }
-        return PrivacySettingsViewModel(appLock, auth)
+        val privacy =
+            io.mockk.mockk<app.pantopus.android.data.privacy.PrivacyRepository>(relaxed = true) {
+                io.mockk.coEvery { settings() } returns
+                    app.pantopus.android.data.api.net.NetworkResult.Success(
+                        app.pantopus.android.data.api.models.settings.PrivacySettingsResponse(
+                            settings =
+                                app.pantopus.android.data.api.models.settings.PrivacySettingsDto(
+                                    searchVisibility = "everyone",
+                                    findableByName = false,
+                                ),
+                        ),
+                    )
+            }
+        val accountDeletion =
+            io.mockk.mockk<app.pantopus.android.data.account.AccountDeletionRepository>(relaxed = true)
+        return PrivacySettingsViewModel(appLock, auth, privacy, accountDeletion)
     }
 
     @Composable

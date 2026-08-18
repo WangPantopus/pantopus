@@ -30,10 +30,35 @@ data class NotificationsListResponse(
     val hasMore: Boolean? = null,
 )
 
-/** `GET /api/notifications/unread-count` envelope — route `backend/routes/notifications.js:160`. */
+/**
+ * Per-firewall unread breakdown returned by
+ * `GET /api/notifications/unread-count`
+ * (`backend/routes/notifications.js:187-193`).
+ */
+@JsonClass(generateAdapter = true)
+data class NotificationContextCounts(
+    val personal: Int = 0,
+    val audience: Int = 0,
+    val platform: Int = 0,
+)
+
+/** `GET /api/notifications/unread-count` envelope — route `backend/routes/notifications.js:161`. */
 @JsonClass(generateAdapter = true)
 data class NotificationUnreadCountResponse(
     val count: Int,
+    /** P2.3 split — null on deployments that only returned `count`. */
+    val byContext: NotificationContextCounts? = null,
+)
+
+/**
+ * `POST /api/notifications/read-all` body. The handler accepts
+ * `context` / `contexts` / `firewall`; we always send the plural form so
+ * the Personal zone (`personal` + `platform`) sweeps in one call — see
+ * `backend/routes/notifications.js:26-29`.
+ */
+@JsonClass(generateAdapter = true)
+data class MarkAllNotificationsReadBody(
+    val contexts: List<String>,
 )
 
 /** Echo of a write call (`/read` / `/read-all`). Both `ok` and `count` are optional on success. */

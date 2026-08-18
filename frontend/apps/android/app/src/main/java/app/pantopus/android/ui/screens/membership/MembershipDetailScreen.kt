@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +37,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,15 +58,22 @@ fun MembershipDetailScreen(
     onBack: () -> Unit = {},
     onShare: () -> Unit = {},
     onOpenPersona: () -> Unit = {},
-    onChangeTier: () -> Unit = {},
     onUpdatePayment: () -> Unit = {},
     onCancel: () -> Unit = {},
-    onRequestRefund: () -> Unit = {},
+    onOpenInbox: (String) -> Unit = {},
     viewModel: MembershipDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val actionError by viewModel.actionError.collectAsStateWithLifecycle()
     val isCancelling by viewModel.isCancelling.collectAsStateWithLifecycle()
+    val isTierPickerOpen by viewModel.isTierPickerOpen.collectAsStateWithLifecycle()
+    val tierOptions by viewModel.tierOptions.collectAsStateWithLifecycle()
+    val isChangingTier by viewModel.isChangingTier.collectAsStateWithLifecycle()
+    val tierChangeConfirmation by viewModel.tierChangeConfirmation.collectAsStateWithLifecycle()
+    val isRefundSheetOpen by viewModel.isRefundSheetOpen.collectAsStateWithLifecycle()
+    val isRequestingRefund by viewModel.isRequestingRefund.collectAsStateWithLifecycle()
+    val refundConfirmation by viewModel.refundConfirmation.collectAsStateWithLifecycle()
+    val refundError by viewModel.refundError.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
 
     Column(
@@ -83,28 +93,52 @@ fun MembershipDetailScreen(
                     content = current.content,
                     slaMissed = false,
                     onOpenPersona = onOpenPersona,
-                    onChangeTier = onChangeTier,
+                    onChangeTier = viewModel::presentTierPicker,
                     onUpdatePayment = onUpdatePayment,
                     onCancel = { viewModel.cancel(onCancelled = onCancel) },
-                    onRequestRefund = onRequestRefund,
+                    onRequestRefund = viewModel::presentRefundSheet,
+                    onOpenInbox = onOpenInbox,
                     onDismissSla = viewModel::dismissSlaAlert,
                     isCancelling = isCancelling,
                     actionError = actionError,
+                    tierChangeConfirmation = tierChangeConfirmation,
+                    refundConfirmation = refundConfirmation,
                 )
             is MembershipDetailUiState.SlaMissed ->
                 MembershipLoadedContent(
                     content = current.content,
                     slaMissed = true,
                     onOpenPersona = onOpenPersona,
-                    onChangeTier = onChangeTier,
+                    onChangeTier = viewModel::presentTierPicker,
                     onUpdatePayment = onUpdatePayment,
                     onCancel = { viewModel.cancel(onCancelled = onCancel) },
-                    onRequestRefund = onRequestRefund,
+                    onRequestRefund = viewModel::presentRefundSheet,
+                    onOpenInbox = onOpenInbox,
                     onDismissSla = viewModel::dismissSlaAlert,
                     isCancelling = isCancelling,
                     actionError = actionError,
+                    tierChangeConfirmation = tierChangeConfirmation,
+                    refundConfirmation = refundConfirmation,
                 )
         }
+    }
+
+    if (isTierPickerOpen) {
+        TierPickerSheet(
+            options = tierOptions,
+            isChanging = isChangingTier,
+            error = actionError,
+            onPick = viewModel::changeTier,
+            onDismiss = viewModel::dismissTierPicker,
+        )
+    }
+    if (isRefundSheetOpen) {
+        RefundRequestSheet(
+            isSubmitting = isRequestingRefund,
+            error = refundError,
+            onSubmit = viewModel::requestRefund,
+            onDismiss = viewModel::dismissRefundSheet,
+        )
     }
 }
 
@@ -247,9 +281,12 @@ internal fun MembershipLoadedContent(
     onUpdatePayment: () -> Unit = {},
     onCancel: () -> Unit = {},
     onRequestRefund: () -> Unit = {},
+    onOpenInbox: (String) -> Unit = {},
     onDismissSla: () -> Unit = {},
     isCancelling: Boolean = false,
     actionError: String? = null,
+    tierChangeConfirmation: String? = null,
+    refundConfirmation: String? = null,
 ) {
     Column(
         modifier =
@@ -281,10 +318,365 @@ internal fun MembershipLoadedContent(
         LabeledSection(title = "What you get") {
             BenefitsCard(benefits = content.benefits)
         }
-        ChangeTierButton(onClick = onChangeTier)
-        CancelBlock(onCancel = onCancel, isCancelling = isCancelling, actionError = actionError)
+        LabeledSection(title = "Messages") {
+            InboxCard(content = content, onOpenInbox = onOpenInbox)
+        }
+        if (content.hasScheduledTierChange) {
+            ScheduledChangeBanner()
+        }
+        tierChangeConfirmation?.let {
+            InlineNotice(text = it, testTagValue = "membershipDetailTierChangeConfirmation")
+        }
+        refundConfirmation?.let {
+            InlineNotice(text = it, testTagValue = "membershipDetailRefundConfirmation")
+        }
+        if (!content.isTerminal) {
+            ChangeTierButton(onClick = onChangeTier)
+            CancelBlock(onCancel = onCancel, isCancelling = isCancelling, actionError = actionError)
+        }
+        RequestRefundLink(onClick = onRequestRefund)
         PolicyFootnote(text = content.policyFootnote)
         Spacer(modifier = Modifier.height(Spacing.s2))
+    }
+}
+
+// MARK: - Inbox card (RN "Open inbox" + quota footnote)
+
+@Composable
+private fun InboxCard(
+    content: MembershipDetailContent,
+    onOpenInbox: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .padding(Spacing.s3)
+                .testTag("membershipDetailInboxCard"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "Inbox",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = "DM the creator. Each new thread uses one of your monthly message credits.",
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.primary600)
+                    .clickable(enabled = content.personaId.isNotEmpty()) { onOpenInbox(content.personaId) }
+                    .padding(horizontal = Spacing.s4, vertical = Spacing.s3)
+                    .testTag("membershipDetailOpenInbox"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MessageSquare,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+            Text(
+                text = "Open inbox",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
+        Text(
+            text = content.inbox.footnote,
+            fontSize = 10.5.sp,
+            color = PantopusColors.appTextMuted,
+            modifier = Modifier.testTag("membershipDetailInboxQuota"),
+        )
+    }
+}
+
+@Composable
+private fun ScheduledChangeBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .border(1.dp, PantopusColors.infoLight, RoundedCornerShape(Radii.md))
+                .background(PantopusColors.infoBg)
+                .padding(Spacing.s3)
+                .testTag("membershipDetailScheduledChange"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CalendarClock,
+            contentDescription = null,
+            size = 15.dp,
+            tint = PantopusColors.primary700,
+        )
+        Text(
+            text = "A tier change is scheduled — it takes effect at the end of this period.",
+            fontSize = 12.sp,
+            color = PantopusColors.primary700,
+        )
+    }
+}
+
+@Composable
+private fun InlineNotice(
+    text: String,
+    testTagValue: String,
+) {
+    Text(
+        text = text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        color = PantopusColors.success,
+        modifier = Modifier.fillMaxWidth().testTag(testTagValue),
+    )
+}
+
+@Composable
+private fun RequestRefundLink(onClick: () -> Unit) {
+    Text(
+        text = "Reply window missed? Request a refund",
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        color = PantopusColors.appTextSecondary,
+        textDecoration = TextDecoration.Underline,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.s3)
+                .testTag("membershipDetailRequestRefund"),
+    )
+}
+
+// MARK: - Change-tier picker
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TierPickerSheet(
+    options: List<MembershipTierOption>,
+    isChanging: Boolean,
+    error: String?,
+    onPick: (MembershipTierOption) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = PantopusColors.appSurface,
+        modifier = Modifier.testTag("membershipTierPicker"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s5),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Text(
+                text = "Change tier",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = "Upgrades start right away. Downgrades take effect at the end of this period.",
+                fontSize = 12.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            error?.let {
+                Text(
+                    text = it,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.error,
+                    modifier = Modifier.testTag("membershipTierPickerError"),
+                )
+            }
+            if (options.isEmpty()) {
+                Text(
+                    text = "This creator publishes a single tier right now.",
+                    fontSize = 13.sp,
+                    color = PantopusColors.appTextSecondary,
+                    modifier = Modifier.testTag("membershipTierPickerEmpty"),
+                )
+            } else {
+                options.forEach { option ->
+                    TierOptionRow(option = option, isChanging = isChanging, onPick = onPick)
+                }
+            }
+            Text(
+                text = "Cancel",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = Spacing.s3)
+                        .testTag("membershipTierPickerDismiss"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TierOptionRow(
+    option: MembershipTierOption,
+    isChanging: Boolean,
+    onPick: (MembershipTierOption) -> Unit,
+) {
+    val isUpgrade = option.direction == MembershipTierDirection.Upgrade
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                .background(PantopusColors.appSurface)
+                .clickable(enabled = !isChanging) { onPick(option) }
+                .padding(Spacing.s3)
+                .semantics {
+                    contentDescription =
+                        "${option.direction.label} to ${option.name}, ${option.priceLabel}. " +
+                            option.direction.timingNote
+                }.testTag("membershipTierOption_${option.rank}"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = option.name,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(text = option.priceLabel, fontSize = 12.sp, color = PantopusColors.appTextSecondary)
+            Text(
+                text = option.direction.timingNote,
+                fontSize = 11.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            PantopusIconImage(
+                icon = if (isUpgrade) PantopusIcon.TrendingUp else PantopusIcon.TrendingDown,
+                contentDescription = null,
+                size = 15.dp,
+                tint = if (isUpgrade) PantopusColors.success else PantopusColors.warning,
+            )
+            Text(
+                text = option.direction.label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isUpgrade) PantopusColors.success else PantopusColors.warning,
+            )
+        }
+    }
+}
+
+// MARK: - Refund request
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefundRequestSheet(
+    isSubmitting: Boolean,
+    error: String?,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = PantopusColors.appSurface,
+        modifier = Modifier.testTag("membershipRefundSheet"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s5),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            Text(
+                text = "Request a refund",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text =
+                    "If the creator missed the reply window they committed to, the unused " +
+                        "portion of this period is refunded to your card and your membership is " +
+                        "cancelled at the end of the period — you keep access until then.",
+                fontSize = 13.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radii.md))
+                        .background(PantopusColors.infoBg)
+                        .padding(Spacing.s3)
+                        .testTag("membershipDetailRefundReason"),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalAlignment = Alignment.Top,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Info,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = PantopusColors.primary700,
+                )
+                Text(
+                    text = "Reason: the creator missed their reply-policy window.",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.primary700,
+                )
+            }
+            error?.let {
+                Text(
+                    text = it,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PantopusColors.error,
+                    modifier = Modifier.testTag("membershipDetailRefundError"),
+                )
+            }
+            PrimaryButton(
+                title = "Request refund",
+                onClick = onSubmit,
+                isLoading = isSubmitting,
+                isEnabled = !isSubmitting,
+                modifier = Modifier.fillMaxWidth().testTag("membershipDetailRefundSubmit"),
+            )
+            Text(
+                text = "Not now",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = Spacing.s3)
+                        .testTag("membershipDetailRefundDismiss"),
+            )
+        }
     }
 }
 

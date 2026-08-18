@@ -18,7 +18,20 @@ data class FeedPost(
     @Json(name = "created_at") val createdAt: String,
     @Json(name = "like_count") val likeCount: Int = 0,
     @Json(name = "comment_count") val commentCount: Int = 0,
+    @Json(name = "share_count") val shareCount: Int = 0,
     @Json(name = "userHasLiked") val userHasLiked: Boolean = false,
+    @Json(name = "userHasSaved") val userHasSaved: Boolean = false,
+    @Json(name = "userHasReposted") val userHasReposted: Boolean = false,
+    /** Lifecycle state — `open` / `solved` (`backend/services/feedService.js:234`). */
+    val state: String? = null,
+    /**
+     * True for cold-start neighborhood facts injected by the feed handler
+     * (`backend/routes/posts.js:84`). Those rows are dismissable, never
+     * reportable.
+     */
+    @Json(name = "is_seeded") val isSeeded: Boolean = false,
+    /** Set when the post was authored as a business (`feedService.js:115`). */
+    @Json(name = "business_author_id") val businessAuthorId: String? = null,
     @Json(name = "location_name") val locationName: String? = null,
     @Json(name = "event_date") val eventDate: String? = null,
     @Json(name = "event_venue") val eventVenue: String? = null,

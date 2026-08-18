@@ -13,14 +13,8 @@ public enum HomeDashboardSampleData {
     public static let emptyHomeId = "sample-home-empty"
     public static let needsAttentionHomeId = "sample-home-needs-attention"
 
-    public static let tabs: [GridTabsTab] = [
-        GridTabsTab(id: "overview", label: "Overview"),
-        GridTabsTab(id: "tasks", label: "Tasks"),
-        GridTabsTab(id: "bills", label: "Bills"),
-        GridTabsTab(id: "packages", label: "Packages"),
-        GridTabsTab(id: "members", label: "Members"),
-        GridTabsTab(id: "ownership", label: "Ownership")
-    ]
+    /// Static chrome, not a fixture — owned by `HomeDashboardProjection`.
+    public static let tabs: [GridTabsTab] = HomeDashboardProjection.tabs
 
     public static let populatedQuickActions: [QuickActionTile] = [
         QuickActionTile(id: "view_tasks", label: "Tasks", icon: .listChecks, tone: .warning, badge: "7"),

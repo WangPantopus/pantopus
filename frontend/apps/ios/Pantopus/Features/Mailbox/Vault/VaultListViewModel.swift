@@ -36,8 +36,22 @@ public final class VaultListViewModel: ListOfRowsDataSource {
         nil
     }
 
-    public let tabs: [ListOfRowsTab] = []
-    public var selectedTab: String = ""
+    /// RN's `DRAWER_TABS` (`src/app/mailbox/vault.tsx:12`) — the vault is
+    /// drawer-scoped and the strip switches which drawer's folders load.
+    public let tabs: [ListOfRowsTab] = [
+        ListOfRowsTab(id: "personal", label: "Me"),
+        ListOfRowsTab(id: "home", label: "Home"),
+        ListOfRowsTab(id: "business", label: "Business")
+    ]
+
+    public var selectedTab: String = "personal" {
+        didSet {
+            guard oldValue != selectedTab else { return }
+            allRows = []
+            phase = .loading
+            Task { @MainActor [weak self] in await self?.fetch() }
+        }
+    }
 
     public var fab: FABAction? {
         FABAction(
@@ -54,6 +68,27 @@ public final class VaultListViewModel: ListOfRowsDataSource {
         switch phase {
         case .loading:
             return .loading
+        case let .searchLoaded(results, total):
+            guard !results.isEmpty else {
+                return .empty(
+                    ListOfRowsState.EmptyContent(
+                        icon: .search,
+                        headline: "No matches found",
+                        subcopy: "Nothing in your archive matches that. Try a sender name, an amount "
+                            + "like $87, or a month like March 2025."
+                    )
+                )
+            }
+            return .loaded(
+                sections: [
+                    RowSection(
+                        id: "vaultSearch",
+                        header: "\(total) result\(total == 1 ? "" : "s") · All drawers",
+                        rows: results.map(searchRow(for:))
+                    )
+                ],
+                hasMore: false
+            )
         case let .loaded(rows, _):
             guard !rows.isEmpty else {
                 return .empty(
@@ -79,11 +114,15 @@ public final class VaultListViewModel: ListOfRowsDataSource {
 
     public var searchBar: SearchBarConfig? {
         SearchBarConfig(
-            placeholder: "Search vault",
-            text: query
-        ) { @Sendable text in
-            Task { @MainActor in self.onQueryChange(text) }
-        }
+            placeholder: "Search sender, amount, date…",
+            text: query,
+            onChange: { @Sendable text in
+                Task { @MainActor in self.onQueryChange(text) }
+            },
+            onSubmit: { @Sendable in
+                Task { @MainActor in await self.performSearch() }
+            }
+        )
     }
 
     // MARK: - Internal state
@@ -93,10 +132,21 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     private enum Phase {
         case loading
         case loaded(rows: [VaultListRow], total: Int)
+        /// Server-side search results (`GET …/vault/search`) — replaces the
+        /// folder view for as long as the query is ≥ 2 characters.
+        case searchLoaded(results: [VaultSearchResultDTO], total: Int)
         case error(message: String)
     }
 
+    /// RN debounces the search field by 300 ms
+    /// (`src/app/mailbox/vault.tsx:56`).
+    private static let searchDebounceNanos: UInt64 = 300_000_000
+    /// RN only searches once the trimmed query is longer than one
+    /// character (`src/app/mailbox/vault.tsx:55`).
+    private static let minimumSearchLength = 2
+
     private var phase: Phase = .loading
+    private var searchTask: Task<Void, Never>?
     /// Unfiltered union of every row fetched on the last load. The
     /// `phase`'s rows are the post-filter view.
     private var allRows: [VaultListRow] = []
@@ -104,7 +154,6 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     public var query: String = ""
 
     private let api: APIClient
-    private let drawer: String
     private let onOpenItem: (String) -> Void
     private let onAddTapped: () -> Void
     private let onOpenMailbox: () -> Void
@@ -117,11 +166,16 @@ public final class VaultListViewModel: ListOfRowsDataSource {
         onOpenMailbox: @escaping () -> Void = {}
     ) {
         self.api = api
-        self.drawer = drawer
         self.onOpenItem = onOpenItem
         self.onAddTapped = onAddTapped
         self.onOpenMailbox = onOpenMailbox
+        // Assigned after the stored callbacks so the `didSet` refetch —
+        // which only fires on a *change* — never runs during init.
+        selectedTab = drawer
     }
+
+    /// The drawer the folder pane is scoped to. Driven by the tab strip.
+    private var drawer: String { selectedTab }
 
     // MARK: - Load
 
@@ -132,14 +186,67 @@ public final class VaultListViewModel: ListOfRowsDataSource {
     }
 
     public func refresh() async {
+        if isSearching {
+            await performSearch()
+            return
+        }
         await fetch()
     }
 
     public func loadMoreIfNeeded() async {} // Pagination handled per folder; not yet exposed in UI.
 
+    /// `true` once the trimmed query clears RN's two-character threshold —
+    /// the point at which the vault stops filtering the fetched folder rows
+    /// and starts asking the server to search the whole archive.
+    public var isSearching: Bool {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).count >= Self.minimumSearchLength
+    }
+
     public func onQueryChange(_ text: String) {
         query = text
+        searchTask?.cancel()
+        guard isSearching else {
+            // Below the threshold we're back on the folder view — drop any
+            // stale server results and re-apply the local filter.
+            if case .searchLoaded = phase {
+                phase = .loaded(rows: Self.filter(rows: allRows, query: query), total: allRows.count)
+            } else {
+                recomputeFromCache()
+            }
+            return
+        }
+        // Narrow the already-fetched rows straight away so the field feels
+        // live, then let the debounced server search replace them.
         recomputeFromCache()
+        searchTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.searchDebounceNanos)
+            guard !Task.isCancelled else { return }
+            await self?.performSearch()
+        }
+    }
+
+    /// `GET /api/mailbox/v2/p2/vault/search` — searches every drawer, not
+    /// just the rows the folder pane already fetched.
+    public func performSearch() async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= Self.minimumSearchLength else { return }
+        do {
+            let response: VaultSearchResponse = try await api.request(
+                MailboxVaultEndpoints.search(query: trimmed)
+            )
+            // A slower in-flight search must not clobber a newer query.
+            guard query.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed else { return }
+            phase = .searchLoaded(
+                results: response.results,
+                total: response.total ?? response.results.count
+            )
+        } catch {
+            guard query.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed else { return }
+            phase = .error(
+                message: (error as? APIError)?.errorDescription
+                    ?? "Couldn't search your vault."
+            )
+        }
     }
 
     /// Public so tests can inject decoded payloads without standing
@@ -257,6 +364,42 @@ public final class VaultListViewModel: ListOfRowsDataSource {
             onTap: { @Sendable in Task { @MainActor in self.onOpenItem(itemId) } },
             onSecondary: { @Sendable in Task { @MainActor in self.onOpenItem(itemId) } },
             chips: folderChip.map { [$0] }
+        )
+    }
+
+    /// Row projection for a server-side search hit. Mirrors RN's result
+    /// card (`src/app/mailbox/vault.tsx:134`): sender + date on the top
+    /// line, preview underneath, and a drawer chip plus a "→ subject"
+    /// matched-field chip.
+    private func searchRow(for result: VaultSearchResultDTO) -> RowModel {
+        let mailType = MailboxVaultMailType.fromRaw(result.mailType ?? result.type)
+        var chips: [RowChip] = []
+        if let drawer = result.drawer, !drawer.isEmpty {
+            chips.append(RowChip(text: drawer.capitalized, tint: .status(.neutral)))
+        }
+        if let matchField = result.matchField, !matchField.isEmpty {
+            chips.append(RowChip(text: "→ \(matchField)", tint: .status(.success)))
+        }
+        let title = result.senderDisplay
+            ?? result.senderBusinessName
+            ?? result.subject
+            ?? "Saved mail"
+        let preview = result.matchExcerpt?.isEmpty == false
+            ? result.matchExcerpt
+            : (result.previewText ?? result.subject)
+        let subtitle = [preview, VaultListRow.savedAtLabel(result.createdAt)]
+            .compactMap { $0?.isEmpty == false ? $0 : nil }
+            .joined(separator: " · ")
+        let itemId = result.id
+        return RowModel(
+            id: itemId,
+            title: title,
+            subtitle: subtitle.isEmpty ? nil : subtitle,
+            template: .fileChevron,
+            leading: .icon(mailType.icon, tint: mailType.accent),
+            trailing: .chevron,
+            onTap: { @Sendable in Task { @MainActor in self.onOpenItem(itemId) } },
+            chips: chips.isEmpty ? nil : chips
         )
     }
 }

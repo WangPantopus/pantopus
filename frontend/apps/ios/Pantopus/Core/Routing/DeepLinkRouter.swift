@@ -69,6 +69,12 @@ final class DeepLinkRouter {
         /// Public business profile reached from a share / push.
         /// `pantopus://businesses/:id`.
         case businessProfile(businessId: String)
+        /// C4 — `pantopus://b/:username/:slug` (and
+        /// `pantopus://business/:username?pageSlug=…`): the public profile
+        /// with one named custom page opened. RN redirects the short link to
+        /// `/business/:username?pageSlug=slug`; dropping the slug here would
+        /// silently land the user on the plain profile.
+        case businessPage(businessId: String, pageSlug: String)
         /// `pantopus://auth/reset-password?token=…` — surfaces the hashed
         /// recovery token from the password-reset email. Carries the raw
         /// token; the caller invokes `AuthManager.resetPassword` on submit.
@@ -107,6 +113,10 @@ final class DeepLinkRouter {
         /// `pantopus://mailbox/unboxing` — A17.14 scan-first capture flow. The
         /// optional `?id=` seeds the originating mail item when present.
         case unboxing(mailId: String?)
+        /// `pantopus://mailbox/gig?id=&mode=pre|post` — A17.8 → "Ask a
+        /// Neighbor" package-help gig. `id` is the source mail item; `mode`
+        /// defaults to post-delivery, matching RN's `gig.tsx` param default.
+        case packageGig(mailId: String, isPreDelivery: Bool)
         /// `pantopus://mailbox/earn` — A10.11 Earn dashboard (Wallet sibling).
         case earn
         /// `pantopus://businesses/:id` — A10.7 Business owner view. The public
@@ -116,6 +126,19 @@ final class DeepLinkRouter {
         case viewAs
         /// `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room.
         case waitingRoom(id: String)
+        /// `pantopus://hub-today?deliveryId=&kind=morning|evening` — the Hub
+        /// "Today" briefing opened from a Morning/Evening Briefing push. The
+        /// notification's metadata carries `briefing_delivery_id` +
+        /// `briefing_kind`; with an id the screen resolves that stored
+        /// delivery rather than only the live `/api/hub/today` snapshot.
+        /// Mirrors RN `resolveNotificationRoute`'s `/hub-today?…` target
+        /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`).
+        case hubToday(briefingDeliveryId: String?, kind: String?)
+        /// `pantopus://profile?tab=receipt` — the profile tab with the Monthly
+        /// Receipt card auto-expanded, the target RN resolves for a
+        /// `monthly_receipt` notification
+        /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:29`).
+        case monthlyReceipt
         case unknown(URL)
     }
 
@@ -123,7 +146,8 @@ final class DeepLinkRouter {
     private enum RoutingKind {
         /// OAuth callback / `.unknown` — never stash, never park as content.
         case discard
-        /// `reset-password` / `verify-email` — auth stack owns these; never persist.
+        /// `reset-password` / `verify-email` / `join/:code` — the auth stack
+        /// owns these; never persist.
         case authOwned
         /// Content destinations. When signed out, persist for post-login replay.
         case content
@@ -242,9 +266,49 @@ final class DeepLinkRouter {
             return .discard
         case .resetPassword, .verifyEmail:
             return .authOwned
+        case .joinInvite:
+            // RN sends a signed-out `/join/:code` straight to the register
+            // form with the code pre-filled — it never parks the link for
+            // post-login replay, because the code is only meaningful while
+            // the account is still being created
+            // (`pantopus/frontend/apps/mobile/src/app/_layout.tsx:76`,
+            // `src/app/join/[code].tsx:20`). Classifying it auth-owned keeps
+            // it in memory so `LoginView` can push Sign-up with the code,
+            // while a signed-in viewer still gets the token-accept sheet.
+            return .authOwned
         default:
             return .content
         }
+    }
+
+    /// Morning/Evening Briefing and Monthly Receipt pushes ship no `link` —
+    /// the briefing carries `{ type, route: "/hub/today", briefingKind,
+    /// briefingDeliveryId }` (`backend/routes/internalBriefing.js:239`), and
+    /// the receipt push is typed only. Compose the same paths RN's
+    /// `resolveNotificationRoute` produces
+    /// (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`)
+    /// so the tap resolves the specific stored briefing / expands the card.
+    ///
+    /// `nonisolated` + `[AnyHashable: Any]` in, `String?` out — the caller
+    /// (`AppDelegate`) never smuggles the non-Sendable payload across actors.
+    nonisolated static func pushFallbackPath(userInfo: [AnyHashable: Any]) -> String? {
+        let type = (userInfo["type"] as? String ?? "").lowercased()
+        if type == "monthly_receipt" { return "/profile?tab=receipt" }
+        let briefingTypes: Set<String> = ["daily_briefing", "morning_briefing", "evening_briefing"]
+        guard briefingTypes.contains(type) else { return nil }
+        let rawKind = type == "evening_briefing"
+            ? "evening"
+            : ((userInfo["briefingKind"] as? String)
+                ?? (userInfo["briefing_kind"] as? String)
+                ?? "").lowercased()
+        let kind = rawKind == "evening" ? "evening" : "morning"
+        let deliveryId = (userInfo["briefingDeliveryId"] as? String)
+            ?? (userInfo["briefing_delivery_id"] as? String)
+        guard let deliveryId, !deliveryId.isEmpty else { return "/hub-today?kind=\(kind)" }
+        let encoded = deliveryId.addingPercentEncoding(
+            withAllowedCharacters: .urlQueryAllowed
+        ) ?? deliveryId
+        return "/hub-today?kind=\(kind)&deliveryId=\(encoded)"
     }
 
     static func normalizeIncoming(_ path: String) -> String {
@@ -328,7 +392,11 @@ final class DeepLinkRouter {
             return businessesDestination(url: url, segments: segments)
         case "business":
             // Singular `business/:username` is the A10.6 public profile.
+            // `?pageSlug=` is RN's redirect target for `/b/:username/:slug`.
             guard let id = segments.dropFirst().first else { return .unknown(url) }
+            if let slug = queryValue("pageSlug", in: comps), !slug.isEmpty {
+                return .businessPage(businessId: id, pageSlug: slug)
+            }
             return .businessProfile(businessId: id)
         case "identity":
             // `pantopus://identity/preview` — A18.5 "View as" preview.
@@ -342,8 +410,15 @@ final class DeepLinkRouter {
             if let id = segments.dropFirst().first { return .user(id: id) }
             return .unknown(url)
         case "b":
-            // Public business short link `pantopus://b/:username`.
-            guard let id = segments.dropFirst().first else { return .unknown(url) }
+            // Public business short link `pantopus://b/:username` and its
+            // named-page variant `pantopus://b/:username/:slug`. RN redirects
+            // the latter to `/business/:username?pageSlug=slug`, so the slug
+            // has to survive the parse (C4).
+            let businessSegments = Array(segments.dropFirst())
+            guard let id = businessSegments.first else { return .unknown(url) }
+            if let slug = businessSegments.dropFirst().first, !slug.isEmpty {
+                return .businessPage(businessId: id, pageSlug: slug)
+            }
             return .businessProfile(businessId: id)
         case "persona":
             // `pantopus://persona/:handle` is the public Beacon profile — the
@@ -354,6 +429,19 @@ final class DeepLinkRouter {
             // RN `/join/:code` → register-with-invite. Root presents the same
             // token-accept surface it uses for `.invite`.
             if let code = segments.dropFirst().first, !code.isEmpty { return .joinInvite(code: code) }
+            return .unknown(url)
+        case "hub-today", "hub_today", "today":
+            // `?deliveryId=` + `?kind=` ride the Morning/Evening Briefing push.
+            return .hubToday(
+                briefingDeliveryId: queryValue("deliveryId", in: comps)
+                    ?? queryValue("briefing_delivery_id", in: comps),
+                kind: queryValue("kind", in: comps)
+                    ?? queryValue("briefing_kind", in: comps)
+            )
+        case "profile":
+            // Only `?tab=receipt` is deep-linkable today (the monthly-receipt
+            // push). A bare `pantopus://profile` falls through to `.unknown`.
+            if tabQuery?.lowercased() == "receipt" { return .monthlyReceipt }
             return .unknown(url)
         case "connections":
             return .connections
@@ -471,10 +559,21 @@ final class DeepLinkRouter {
         case "stamps": .stamps
         case "earn": .earn
         case "unboxing": .unboxing(mailId: idQuery)
+        case "gig": packageGigDestination(url: url, idQuery: idQuery)
         case "translation": .mailTranslation(mailId: idQuery ?? "")
         case "tasks": mailTaskDestination(url: url, segments: segments)
         default: .unknown(url)
         }
+    }
+
+    /// `pantopus://mailbox/gig?id=&mode=pre|post` — A17.8 "Ask a Neighbor".
+    /// Without a source mail id the package-gig form has nothing to pre-fill,
+    /// so the link falls through to `.unknown`.
+    private func packageGigDestination(url: URL, idQuery: String?) -> Destination {
+        guard let mailId = idQuery, !mailId.isEmpty else { return .unknown(url) }
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let mode = queryValue("mode", in: comps)?.lowercased()
+        return .packageGig(mailId: mailId, isPreDelivery: mode == "pre")
     }
 
     /// `pantopus://mailbox/tasks/:id` — A17.12 mail-derived task detail. The

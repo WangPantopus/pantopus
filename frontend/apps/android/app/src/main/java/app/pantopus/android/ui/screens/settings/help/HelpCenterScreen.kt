@@ -177,8 +177,10 @@ private val Sections =
                     Item(
                         question = "How do I delete my account?",
                         answer =
-                            "Email support@pantopus.app with the subject \"Delete my account\". " +
-                                "We'll confirm and schedule the deletion within 30 days, per our Privacy policy.",
+                            "Go to Settings → Privacy → Delete account. " +
+                                "You'll confirm in the app and verify your identity, then your account and its " +
+                                "data are removed. Finish or cancel any gigs in progress and resolve pending " +
+                                "payments first — those block deletion.",
                     ),
                 ),
         ),

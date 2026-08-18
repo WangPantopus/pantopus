@@ -292,6 +292,63 @@ public struct HubTodayPayload: Decodable, Sendable, Hashable {
     }
 }
 
+// MARK: - Briefing delivery (GET /api/hub/briefings/:id — backend/routes/hub.js:612)
+
+/// `GET /api/hub/briefings/:id` envelope — `{ briefing: … }`.
+public struct BriefingDeliveryResponse: Decodable, Sendable, Hashable {
+    public let briefing: BriefingDeliveryDTO
+}
+
+/// One stored Morning/Evening Briefing delivery. Selected columns are listed
+/// verbatim at `backend/routes/hub.js:622`; `signals_snapshot` is a jsonb
+/// array whose element shape matches `HubTodayPayload.TodaySignalDTO`.
+public struct BriefingDeliveryDTO: Decodable, Sendable, Hashable {
+    public let id: String
+    public let briefingDateLocal: String?
+    /// `morning` | `evening`.
+    public let briefingKind: String?
+    public let summaryText: String?
+    public let signalsSnapshot: [HubTodayPayload.TodaySignalDTO]?
+    public let locationGeohash: String?
+    public let compositionMode: String?
+    public let status: String?
+    public let deliveredAt: String?
+    public let createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case briefingDateLocal = "briefing_date_local"
+        case briefingKind = "briefing_kind"
+        case summaryText = "summary_text"
+        case signalsSnapshot = "signals_snapshot"
+        case locationGeohash = "location_geohash"
+        case compositionMode = "composition_mode"
+        case status
+        case deliveredAt = "delivered_at"
+        case createdAt = "created_at"
+    }
+
+    /// `signals_snapshot` is untyped jsonb written by the briefing composer,
+    /// so a shape drift there must not take the whole briefing down —
+    /// it decodes leniently and degrades to `nil`.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        briefingDateLocal = try container.decodeIfPresent(String.self, forKey: .briefingDateLocal)
+        briefingKind = try container.decodeIfPresent(String.self, forKey: .briefingKind)
+        summaryText = try container.decodeIfPresent(String.self, forKey: .summaryText)
+        signalsSnapshot = try? container.decodeIfPresent(
+            [HubTodayPayload.TodaySignalDTO].self,
+            forKey: .signalsSnapshot
+        )
+        locationGeohash = try container.decodeIfPresent(String.self, forKey: .locationGeohash)
+        compositionMode = try container.decodeIfPresent(String.self, forKey: .compositionMode)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        deliveredAt = try container.decodeIfPresent(String.self, forKey: .deliveredAt)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+    }
+}
+
 // MARK: - Hub Discovery (GET /api/hub/discovery — backend/routes/hub.js:757)
 
 /// `GET /api/hub/discovery` response envelope.

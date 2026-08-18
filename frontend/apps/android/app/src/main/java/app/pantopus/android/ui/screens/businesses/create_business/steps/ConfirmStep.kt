@@ -23,8 +23,21 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 fun ConfirmStep(state: CreateBusinessUiState) {
     BusinessIdentityChip()
     HeadlineBlock("Confirm and create")
-    SubcopyBlock("Review the details below, then create your business.")
+    SubcopyBlock(
+        "Publish takes your business live. Save as draft keeps it hidden until you're ready.",
+    )
     ReviewSummaryBlock(rows = summaryRows(state))
+    state.logoUploadWarning?.let { warning ->
+        Text(
+            text = warning,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.warning,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("createBusinessLogoWarning"),
+        )
+    }
     state.submitError?.let { error ->
         Text(
             text = error,
@@ -61,6 +74,11 @@ private fun summaryRows(state: CreateBusinessUiState): List<ReviewSummaryRow> {
         ReviewSummaryRow(
             "Hours",
             if (state.hasLocation && !state.hoursSkipped) "Weekday defaults" else "Not set",
+        )
+    rows +=
+        ReviewSummaryRow(
+            "Logo",
+            if (state.logoPick != null && !state.logoSkipped) "Selected" else "Not set",
         )
     return rows
 }

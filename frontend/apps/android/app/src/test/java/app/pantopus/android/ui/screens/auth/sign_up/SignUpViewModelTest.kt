@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.auth.sign_up
 
+import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.auth.AuthenticatedUser
 import app.pantopus.android.data.auth.AccountType
 import app.pantopus.android.data.auth.AuthError
@@ -35,7 +36,32 @@ class SignUpViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun buildVm(repo: AuthRepository = mockk(relaxed = true)): SignUpViewModel = SignUpViewModel(repo)
+    private fun buildVm(
+        repo: AuthRepository = mockk(relaxed = true),
+        inviteCode: String? = null,
+    ): SignUpViewModel =
+        SignUpViewModel(
+            repo,
+            SavedStateHandle(
+                buildMap { inviteCode?.let { put(SignUpViewModel.INVITE_CODE_KEY, it) } },
+            ),
+        )
+
+    // MARK: - Invite-code deep link (`pantopus://join/:code`)
+
+    @Test
+    fun `invite code nav arg pre-fills the field`() {
+        val vm = buildVm(inviteCode = "NB7Q2X")
+        assertEquals("NB7Q2X", vm.uiState.value.inviteCode)
+        assertTrue(vm.arrivedByInvite)
+    }
+
+    @Test
+    fun `no invite code nav arg leaves the field empty`() {
+        val vm = buildVm()
+        assertEquals("", vm.uiState.value.inviteCode)
+        assertFalse(vm.arrivedByInvite)
+    }
 
     // MARK: - Validation rules (one test per rule)
 

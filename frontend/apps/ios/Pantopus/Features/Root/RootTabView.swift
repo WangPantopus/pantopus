@@ -68,6 +68,10 @@ public struct RootTabView: View {
     @State private var router = DeepLinkRouter.shared
     @State private var pendingInviteToken: String?
     @State private var showProfile = false
+    /// Set by the `monthly_receipt` push deep link so the profile opens with
+    /// the Monthly Receipt card already expanded (RN parity —
+    /// `/(tabs)/profile?tab=receipt`).
+    @State private var expandMonthlyReceipt = false
 
     public init() {}
 
@@ -110,7 +114,7 @@ public struct RootTabView: View {
             consumeInviteDeepLinkIfNeeded(pending: router.pending)
         }
         .fullScreenCover(isPresented: $showProfile) {
-            YouTabRoot()
+            YouTabRoot(expandMonthlyReceipt: expandMonthlyReceipt)
         }
         .fullScreenCover(
             item: Binding<InviteSheetToken?>(
@@ -151,13 +155,23 @@ public struct RootTabView: View {
              .homeDetail, .homeDashboard, .homeMemberRequests,
              .homeOwnersTransfer,
              .verifyLandlord, .postcardVerification,
-             .notifications, .createBusiness, .businessProfile, .editBusinessPage,
+             .notifications, .createBusiness, .businessProfile, .businessPage,
+             .editBusinessPage,
              .vacationHold, .wallet, .mailDay, .paymentsSettings,
              // B1.6 — batch-2 routing seam destinations all resolve inside the
              // Hub tab's stack (deep links open them on the placeholder).
-             .stamps, .mailTask, .mailTranslation, .unboxing, .earn,
-             .businessOwner, .viewAs, .waitingRoom:
+             .stamps, .mailTask, .mailTranslation, .unboxing, .packageGig, .earn,
+             .businessOwner, .viewAs, .waitingRoom,
+             // Morning/Evening Briefing push — the Today briefing lives in
+             // the Hub tab's stack.
+             .hubToday:
             model.selected = .home
+        case .monthlyReceipt:
+            // `monthly_receipt` push — open the profile cover with the
+            // receipt card expanded.
+            expandMonthlyReceipt = true
+            showProfile = true
+            _ = router.consume()
         case .conversation:
             model.selected = .messages
         case .home:

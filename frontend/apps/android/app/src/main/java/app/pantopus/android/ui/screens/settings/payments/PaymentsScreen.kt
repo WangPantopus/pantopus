@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod", "FunctionNaming")
+@file:Suppress(
+    "MagicNumber",
+    "LongMethod",
+    "PackageNaming",
+    "CyclomaticComplexMethod",
+    "FunctionNaming",
+    "TooManyFunctions",
+)
 
 package app.pantopus.android.ui.screens.settings.payments
 
@@ -20,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -40,6 +48,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -154,6 +163,11 @@ internal fun PaymentsScreenContent(
     actions: PaymentsScreenActions,
 ) {
     var selectedMethod by remember { mutableStateOf<PaymentMethod?>(null) }
+    // Removing a card detaches it from the Stripe customer and cannot be
+    // undone, so the DELETE is gated behind a destructive confirmation naming
+    // the card — mirroring RN's Alert (`PaymentMethodsTab.tsx:48-69`) and the
+    // iOS `confirmationDialog`.
+    var pendingRemoval by remember { mutableStateOf<PaymentMethod?>(null) }
 
     Column(
         modifier =
@@ -185,10 +199,83 @@ internal fun PaymentsScreenContent(
         MethodActionSheet(
             method = method,
             onSetDefault = actions.onSetDefault,
-            onRemove = actions.onRemove,
+            onRemove = { pendingRemoval = method },
             onDismiss = { selectedMethod = null },
         )
     }
+
+    pendingRemoval?.let { method ->
+        RemoveMethodDialog(
+            method = method,
+            onConfirm = {
+                actions.onRemove(method.id)
+                pendingRemoval = null
+            },
+            onDismiss = { pendingRemoval = null },
+        )
+    }
+}
+
+/**
+ * Destructive confirmation before `DELETE api/payments/methods/{id}`. Copy
+ * mirrors RN's Alert — "Remove Card" / "Are you sure you want to remove the
+ * card ending in 4421?" (`PaymentMethodsTab.tsx:50-53`).
+ */
+@Composable
+private fun RemoveMethodDialog(
+    method: PaymentMethod,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val subject =
+        method.last4?.takeIf { it.isNotEmpty() }?.let { "the card ending in $it" }
+            ?: method.label
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = PantopusColors.appSurface,
+        title = {
+            Text(
+                text = "Remove card",
+                color = PantopusColors.appText,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Text(
+                text = "Are you sure you want to remove $subject?",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 14.sp,
+            )
+        },
+        confirmButton = {
+            Text(
+                text = "Remove",
+                color = PantopusColors.error,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onConfirm)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveConfirm"),
+            )
+        },
+        dismissButton = {
+            Text(
+                text = "Cancel",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier =
+                    Modifier
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                        .testTag("paymentsRemoveCancel"),
+            )
+        },
+        modifier = Modifier.testTag("paymentsRemoveConfirmDialog"),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -196,7 +283,7 @@ internal fun PaymentsScreenContent(
 private fun MethodActionSheet(
     method: PaymentMethod,
     onSetDefault: (String) -> Unit,
-    onRemove: (String) -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -235,7 +322,9 @@ private fun MethodActionSheet(
                 color = PantopusColors.error,
                 testTag = "paymentsRow_${method.id}_remove",
                 onClick = {
-                    onRemove(method.id)
+                    // Hands off to the destructive confirmation — the DELETE
+                    // only fires once the user confirms.
+                    onRemove()
                     onDismiss()
                 },
             )
@@ -501,8 +590,91 @@ private fun ActivityCard(
                         Divider()
                     }
                 }
+            is PaymentsActivity.Transactions ->
+                activity.rows.forEachIndexed { index, transaction ->
+                    TransactionRow(transaction = transaction)
+                    if (index < activity.rows.size - 1) {
+                        Divider()
+                    }
+                }
             is PaymentsActivity.Empty -> ActivityEmptyRow(title = activity.title, body = activity.body)
         }
+    }
+}
+
+/**
+ * One row of the real transaction-history feed
+ * (`GET api/payments/history`). Icon + tint mirror RN's `HistoryTab`: tips
+ * get the star, payouts the primary arrow disc, money-out red, money-in green.
+ */
+@Composable
+private fun TransactionRow(transaction: PaymentsTransaction) {
+    val tint =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusColors.warning
+            PaymentsTransaction.Kind.Payout -> PantopusColors.primary600
+            PaymentsTransaction.Kind.Sent -> PantopusColors.error
+            PaymentsTransaction.Kind.Received -> PantopusColors.success
+        }
+    val icon =
+        when (transaction.kind) {
+            PaymentsTransaction.Kind.Tip -> PantopusIcon.Star
+            PaymentsTransaction.Kind.Payout -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Sent -> PantopusIcon.ArrowUp
+            PaymentsTransaction.Kind.Received -> PantopusIcon.ArrowDown
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag("paymentsTransaction_${transaction.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 16.dp,
+                strokeWidth = 2.2f,
+                tint = tint,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = transaction.title,
+                color = PantopusColors.appText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (transaction.meta.isNotEmpty()) {
+                Text(
+                    text = transaction.meta,
+                    color = PantopusColors.appTextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        Text(
+            text = transaction.amount,
+            color = if (transaction.isOutgoing) PantopusColors.error else PantopusColors.success,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

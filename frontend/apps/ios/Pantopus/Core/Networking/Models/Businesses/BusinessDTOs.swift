@@ -917,3 +917,22 @@ public struct UpdateBusinessLocationRequest: Encodable, Sendable {
         case address, city, state, zipcode
     }
 }
+
+// MARK: - Business media upload (A12.10 Create Business — logo)
+
+/// Which slot a business-media upload fills. Matches the route's
+/// `type` query param (`backend/routes/upload.js:1683`).
+public enum BusinessMediaKind: String, Sendable, Hashable {
+    case logo
+    case banner
+}
+
+/// `POST /api/upload/business-media/:businessId?type=logo|banner` response
+/// (`backend/routes/upload.js:1797`). The server has already written the
+/// URL onto the business profile, so callers only need the echoed `url`
+/// to render the freshly-uploaded image.
+public struct BusinessMediaUploadResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let url: String
+    public let key: String?
+}

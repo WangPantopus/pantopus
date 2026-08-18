@@ -21,6 +21,9 @@ import SwiftUI
 public struct WalletView: View {
     @State private var viewModel: WalletViewModel
     @State private var showWithdrawSheet = false
+    /// Raw decimal-pad text for the partial-withdrawal field. Empty means
+    /// "the whole available balance", which is what the screen did before.
+    @State private var withdrawAmount = ""
     @State private var toast: ToastMessage?
     private let onBack: () -> Void
     private let onOpenHistory: () -> Void
@@ -42,6 +45,16 @@ public struct WalletView: View {
     }
 
     public var body: some View {
+        // Money surface — RN wraps this route in `SensitiveScreenGuard`
+        // (`app/wallet.tsx:195`), so the device credential is checked before
+        // any balance is composed. A 5-minute grace means walking Wallet →
+        // Payments doesn't prompt twice.
+        SensitiveScreenGuard(reason: "Verify to access your Wallet", onRejected: onBack) {
+            guardedBody
+        }
+    }
+
+    private var guardedBody: some View {
         VStack(spacing: Spacing.s0) {
             WalletTopBar(onBack: onBack, onOpenHistory: onOpenHistory)
             content
@@ -83,6 +96,25 @@ public struct WalletView: View {
                         .padding(.bottom, Spacing.s3)
                 }
                 heroSection(content)
+                if let breakdown = content.pendingBreakdown {
+                    // RN splits the escrow total into "In review" /
+                    // "Releasing soon" (`WalletTab.tsx:161-173`); the hero's
+                    // single Pending figure can't say which is which.
+                    section(overline: "Pending release") {
+                        PendingReleaseCard(breakdown: breakdown)
+                    }
+                }
+                if content.hasLifetimeTotals {
+                    // `GET /api/wallet` returns lifetime_received /
+                    // lifetime_withdrawals alongside the balance; RN shows both
+                    // beside it (`WalletTab.tsx:150-159`).
+                    section(overline: "Lifetime") {
+                        LifetimeTotalsCard(
+                            earned: content.lifetimeEarned,
+                            withdrawn: content.lifetimeWithdrawn
+                        )
+                    }
+                }
                 section(overline: "Recent activity", action: "See all", onAction: onSeeAllActivity) {
                     ActivityList(items: content.activity)
                 }
@@ -93,6 +125,21 @@ public struct WalletView: View {
                             onManage: { Task { await viewModel.openDashboard() } },
                             onReverify: { Task { await viewModel.setupPayouts() } }
                         )
+                    }
+                } else if let payoutAccount = content.payoutAccount {
+                    // Live path: Stripe gives us no bank detail for an Express
+                    // account, so the connected *account* is what we render —
+                    // and it carries the only reachable "Open Stripe Dashboard".
+                    section(overline: "Payout account") {
+                        PayoutAccountCard(account: payoutAccount) {
+                            Task {
+                                if payoutAccount.warn {
+                                    await viewModel.setupPayouts()
+                                } else {
+                                    await viewModel.openDashboard()
+                                }
+                            }
+                        }
                     }
                 }
                 if let taxDocs = content.taxDocs {
@@ -106,6 +153,10 @@ public struct WalletView: View {
             .padding(.top, Spacing.s3)
             .padding(.bottom, Spacing.s2)
         }
+        // RN keeps a `RefreshControl` on the wallet route (`app/wallet.tsx:50`)
+        // — without it the balance can only be re-read by leaving and
+        // re-entering the screen.
+        .refreshable { await viewModel.refresh() }
         .background(Theme.Color.appBg)
     }
 
@@ -198,6 +249,24 @@ public struct WalletView: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("wallet.connectStatus")
+                } else if content.frozen {
+                    // `Wallet.frozen` — the server answers this withdraw with
+                    // 403 "Wallet is frozen", so the CTA must not look live.
+                    WithdrawLockedCTA(amount: content.available)
+                    Text("Your wallet is frozen. Contact support to release your funds.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("wallet.frozenNote")
+                } else if !content.hasBalance {
+                    WithdrawLockedCTA(amount: content.available)
+                    Text("No funds to withdraw yet.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("wallet.noFundsNote")
                 } else {
                     WithdrawCTA(amount: content.available) { showWithdrawSheet = true }
                 }
@@ -213,7 +282,7 @@ public struct WalletView: View {
     /// sticky bottom bar. Hold-state needs more headroom for the
     /// footnote.
     private func bottomBarReservedHeight(for content: WalletContent) -> CGFloat {
-        (content.isOnHold || !content.payoutsEnabled) ? 120 : 96
+        content.canWithdraw ? 96 : 120
     }
 
     private var loadingShell: some View {
@@ -258,13 +327,53 @@ public struct WalletView: View {
             Text("Withdraw to your bank")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.Color.appText)
-            Text("$\(currentAvailable) transfers to your bank account. "
-                + "Funds arrive in 2–3 business days.")
+            Text("Funds arrive in 2–3 business days. "
+                + "Available to withdraw: $\(currentAvailable).")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
+            // RN gives the user a decimal-pad amount field and posts *that*
+            // amount (`components/payments/WalletTab.tsx:193`) — leaving it
+            // blank keeps the whole-balance shortcut.
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                HStack(spacing: Spacing.s2) {
+                    Text("$")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    TextField("Amount", text: $withdrawAmount)
+                        .keyboardType(.decimalPad)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                        .onChange(of: withdrawAmount) { _, _ in viewModel.clearWithdrawError() }
+                        .accessibilityIdentifier("wallet.withdrawAmountField")
+                    Button("Max") { withdrawAmount = currentAvailable }
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.Color.primary600)
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("wallet.withdrawMaxBtn")
+                }
+                .padding(.horizontal, Spacing.s3)
+                .frame(height: 48)
+                .background(Theme.Color.appSurfaceSunken)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .stroke(
+                            viewModel.withdrawError == nil
+                                ? Theme.Color.appBorder
+                                : Theme.Color.error,
+                            lineWidth: 1
+                        )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                if let error = viewModel.withdrawError {
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Color.error)
+                        .accessibilityIdentifier("wallet.withdrawAmountError")
+                }
+            }
             Button {
-                Task { await viewModel.withdraw() }
+                Task { await confirmWithdraw() }
             } label: {
                 Text(viewModel.action == .withdrawing ? "Processing…" : "Confirm withdrawal")
                     .font(.system(size: 14, weight: .bold))
@@ -284,8 +393,25 @@ public struct WalletView: View {
         }
         .padding(Spacing.s5)
         .frame(maxWidth: .infinity)
-        .presentationDetents([.height(280)])
+        .presentationDetents([.height(400)])
         .accessibilityIdentifier("wallet.withdrawSheet")
+    }
+
+    /// RN re-verifies identity at the moment of withdrawal, on top of the
+    /// screen guard (`components/payments/WalletTab.tsx:88`). The prompt has
+    /// to be raised from the view layer — Android needs the host Activity,
+    /// and this keeps both platforms symmetric.
+    private func confirmWithdraw() async {
+        let trimmed = withdrawAmount.trimmingCharacters(in: .whitespaces)
+        switch await AppLockManager.shared.verifySensitiveAction(reason: "Approve wallet withdrawal") {
+        case .verified:
+            await viewModel.withdraw(amountText: trimmed.isEmpty ? nil : trimmed)
+            if viewModel.withdrawError == nil { withdrawAmount = "" }
+        case .cancelled:
+            break
+        case let .failed(message):
+            toast = ToastMessage(text: message, kind: .error)
+        }
     }
 
     // MARK: - Result toast

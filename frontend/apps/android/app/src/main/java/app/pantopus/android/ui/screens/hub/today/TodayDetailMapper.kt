@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.hub.today
 
+import app.pantopus.android.data.api.models.hub.BriefingDeliveryDto
 import app.pantopus.android.data.api.models.hub.HubTodayPayload
 import app.pantopus.android.data.api.models.hub.TodayAlertDto
 import app.pantopus.android.data.api.models.hub.TodayAqiDto
@@ -23,23 +24,34 @@ import kotlin.math.roundToInt
  */
 @Suppress("TooManyFunctions")
 object TodayDetailMapper {
+    /**
+     * When [briefing] is present (a push tap carrying
+     * `metadata.briefing_delivery_id`), its stored `summary_text` and
+     * `signals_snapshot` take precedence over the live Today snapshot — the
+     * same precedence RN applies in `hub-today.tsx:87`.
+     */
     fun fromPayload(
-        payload: HubTodayPayload,
+        payload: HubTodayPayload?,
+        briefing: BriefingDeliveryDto? = null,
         now: Instant = Instant.now(),
         base: TodayDetailContent = TodaySampleData.populated,
     ): TodayDetailContent {
-        val alerts = payload.alerts ?: emptyList()
+        val alerts = payload?.alerts ?: emptyList()
         val hasAlert = alerts.isNotEmpty()
-        val signals = (payload.signals ?: emptyList()).map { signal(it) }
-        val label = payload.location?.label ?: "Today"
+        val storedSignals = briefing?.signalsSnapshot ?: emptyList()
+        val signals =
+            (if (storedSignals.isEmpty()) (payload?.signals ?: emptyList()) else storedSignals)
+                .map { signal(it) }
+        val label = payload?.location?.label ?: "Today"
+        val storedSummary = briefing?.summaryText?.takeIf { it.isNotEmpty() }
         return TodayDetailContent(
             kicker = if (hasAlert) "$label · Advisory" else label,
-            dateLabel = dateLabel(now, payload.location?.timezone),
-            temperature = temperature(payload.weather),
-            condition = payload.weather?.conditionLabel ?: payload.summary ?: "—",
-            highLowFeels = highLow(payload.weather),
-            glyph = glyph(payload.weather, hasAlert),
-            chips = listOfNotNull(aqiChip(payload.aqi)),
+            dateLabel = dateLabel(now, payload?.location?.timezone),
+            temperature = temperature(payload?.weather),
+            condition = storedSummary ?: payload?.weather?.conditionLabel ?: payload?.summary ?: "—",
+            highLowFeels = highLow(payload?.weather),
+            glyph = glyph(payload?.weather, hasAlert),
+            chips = listOfNotNull(aqiChip(payload?.aqi)),
             ribbon = if (hasAlert) ribbon(alerts.first()) else null,
             sunSky = base.sunSky,
             signalsTitle = if (signals.isEmpty()) "Signals" else "Signals · ${signals.size} today",

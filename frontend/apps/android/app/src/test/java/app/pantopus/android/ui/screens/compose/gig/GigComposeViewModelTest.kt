@@ -915,4 +915,78 @@ class GigComposeViewModelTest {
         assertEquals("biz9", restored.state.value.form.beneficiaryUserId)
         assertEquals("Brick & Mortar", restored.state.value.form.beneficiaryLabel)
     }
+
+    // MARK: - G2 delivery / pro-service module fields
+
+    /** Review-ready form seeded straight onto the pure body builder. */
+    private fun reviewReadyForm(archetype: String) =
+        GigComposeFormState(
+            step = GigComposeStep.Review.ordinal0,
+            taskArchetype = archetype,
+            category = GigComposeCategory.Handyman,
+            title = "Hang 3 shelves in the living room",
+            description = "Need three IKEA Lack shelves mounted on drywall. Studs marked.",
+            budgetType = GigComposeBudgetType.Fixed,
+            budgetMin = "60",
+            scheduleType = GigComposeScheduleType.OneTime,
+            scheduledStartISO = Instant.now().plusSeconds(86_400).toString(),
+            locationMode = GigComposeLocationMode.YourAddress,
+        )
+
+    @Test
+    fun delivery_module_fields_ride_the_magic_post_draft() {
+        val form =
+            reviewReadyForm("delivery_errand").copy(
+                deliveryDetails =
+                    GigDeliveryDetails(
+                        pickupAddress = "  12 Market St  ",
+                        pickupNotes = "Ask for John",
+                        dropoffAddress = "48 Rose Court",
+                        dropoffNotes = "",
+                        proofRequired = true,
+                    ),
+            )
+        val draft = GigComposeViewModel.bodyFromForm(form)?.draft
+        assertEquals("12 Market St", draft?.pickupAddress)
+        assertEquals("Ask for John", draft?.pickupNotes)
+        assertEquals("48 Rose Court", draft?.dropoffAddress)
+        assertNull(draft?.dropoffNotes)
+        assertEquals(true, draft?.deliveryProofRequired)
+        assertNull(draft?.requiresLicense)
+    }
+
+    @Test
+    fun pro_service_module_fields_ride_the_magic_post_draft() {
+        val form =
+            reviewReadyForm("pro_service_quote").copy(
+                proServiceDetails =
+                    GigProServiceDetails(
+                        requiresLicense = true,
+                        licenseType = "Licensed Plumber",
+                        requiresInsurance = true,
+                        scopeDescription = "Replace the water heater",
+                        depositRequired = true,
+                        depositAmount = "150",
+                    ),
+            )
+        val draft = GigComposeViewModel.bodyFromForm(form)?.draft
+        assertEquals(true, draft?.requiresLicense)
+        assertEquals("Licensed Plumber", draft?.licenseType)
+        assertEquals(true, draft?.requiresInsurance)
+        assertEquals("Replace the water heater", draft?.scopeDescription)
+        assertEquals(true, draft?.depositRequired)
+        assertEquals(150.0, draft?.depositAmount ?: 0.0, 0.0)
+        assertNull(draft?.pickupAddress)
+    }
+
+    @Test
+    fun deposit_toggle_without_amount_blocks_posting() {
+        val form =
+            reviewReadyForm("pro_service_quote").copy(
+                proServiceDetails = GigProServiceDetails(depositRequired = true),
+            )
+        assertNull(GigComposeViewModel.bodyFromForm(form))
+        val filled = form.copy(proServiceDetails = GigProServiceDetails(depositRequired = true, depositAmount = "75"))
+        assertNotNull(GigComposeViewModel.bodyFromForm(filled))
+    }
 }

@@ -10,6 +10,8 @@ import app.pantopus.android.data.api.models.mailbox.v2.CommunityRsvpStatus
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.mailbox.MailboxDocumentRepository
+import app.pantopus.android.data.mailbox.MailboxPackageRepository
 import app.pantopus.android.data.mailbox.MailboxRepository
 import app.pantopus.android.data.mailbox.MailboxVaultRepository
 import app.pantopus.android.ui.screens.mailbox.item_detail.MailItemCategory
@@ -43,6 +45,8 @@ class MailDetailVariantsTest {
     private val repo: MailboxRepository = mockk()
     private val vaultRepo: MailboxVaultRepository = mockk(relaxed = true)
     private val gigsRepo: GigsRepository = mockk(relaxed = true)
+    private val packageRepo: MailboxPackageRepository = mockk(relaxed = true)
+    private val documentRepo: MailboxDocumentRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -59,6 +63,8 @@ class MailDetailVariantsTest {
             repo = repo,
             vaultRepo = vaultRepo,
             gigsRepo = gigsRepo,
+            packageRepo = packageRepo,
+            documentRepo = documentRepo,
             savedStateHandle = SavedStateHandle(mapOf(MAIL_DETAIL_MAIL_ID_KEY to "m1")),
         )
 

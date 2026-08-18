@@ -59,7 +59,26 @@ sealed interface RowControl {
         val locked: Set<ChannelGlyph>,
     ) : RowControl
 
+    /**
+     * A14.5 Notifications — a horizontally scrolling strip of
+     * single-select value chips rendered under the row label (e.g. the
+     * briefing send-time options). [selected] is the active option's raw
+     * value, which is also what gets sent to the backend.
+     */
+    @Immutable
+    data class Chips(
+        val options: List<String>,
+        val selected: String,
+    ) : RowControl
+
     enum class ChipTone { Success, Info, Neutral, Warning }
+
+    /**
+     * Controls that own the taps inside their own sub-elements — the
+     * shell must not put a row-level click on top of them.
+     */
+    val ownsInnerTaps: Boolean
+        get() = this is ChannelTriad || this is Chips
 }
 
 /** One row in a group. */

@@ -14,6 +14,7 @@
 // swiftlint:disable file_length type_body_length
 
 import SwiftUI
+import UIKit
 
 public struct GigDetailView: View {
     @State private var viewModel: GigDetailViewModel
@@ -25,6 +26,10 @@ public struct GigDetailView: View {
     // Phase 5 — lifecycle sheets
     @State private var counterTarget: GigCounterSheetTarget?
     @State private var rejectCandidate: GigBidDTO?
+    /// Bid whose pending counter-offer the poster is about to withdraw.
+    @State private var withdrawCounterCandidate: GigBidDTO?
+    /// Poster's "Close Gig" confirm on a still-open task.
+    @State private var showCloseTaskConfirm = false
     @State private var showReportSheet = false
     @State private var showCancelSheet = false
     @State private var cancelPreview: GigCancellationPreview?
@@ -35,6 +40,12 @@ public struct GigDetailView: View {
     @State private var showChangeOrderSheet = false
     // Phase 6b — reschedule (cancel sheet's "Reschedule instead" path)
     @State private var showRescheduleSheet = false
+    // Pre-start release confirms — poster "Replace worker"
+    // (`/reopen-bidding`) and worker "Can't make it" (`/worker-release`).
+    @State private var showReplaceWorkerConfirm = false
+    @State private var showCantMakeItConfirm = false
+    /// Non-nil while the "Share to feed" composer is presented.
+    @State private var shareToFeedTarget: PulseTaskShare?
     private let onBack: @MainActor () -> Void
     private let onOpenChat: (@MainActor (InboxConversationDestination) -> Void)?
 
@@ -72,13 +83,25 @@ public struct GigDetailView: View {
             EditBidSheetView(
                 target: target,
                 onSubmit: { draft in
-                    let ok = await viewModel.placeBid(
-                        amount: draft.amount,
-                        message: draft.message,
-                        proposedTime: draft.proposedTime
-                    )
+                    // `target.bidId != nil` ⇒ the viewer already has a bid
+                    // here, so this is a PUT update rather than a new POST.
+                    let ok = target.isEditing
+                        ? await viewModel.updateViewerBid(
+                            amount: draft.amount,
+                            message: draft.message,
+                            proposedTime: draft.proposedTime
+                        )
+                        : await viewModel.placeBid(
+                            amount: draft.amount,
+                            message: draft.message,
+                            proposedTime: draft.proposedTime
+                        )
                     if ok {
-                        toast = ToastMessage(text: "Bid submitted.", kind: .success)
+                        bidSheetTarget = nil
+                        toast = ToastMessage(
+                            text: target.isEditing ? "Bid updated." : "Bid submitted.",
+                            kind: .success
+                        )
                     }
                     return ok
                 },
@@ -122,9 +145,112 @@ public struct GigDetailView: View {
         } message: {
             Text("The bidder is notified and can't be selected afterwards.")
         }
+        // RN copy verbatim (`OffersPanel.tsx:178`).
+        .confirmationDialog(
+            "Withdraw counter-offer?",
+            isPresented: Binding(
+                get: { withdrawCounterCandidate != nil },
+                set: { if !$0 { withdrawCounterCandidate = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Withdraw", role: .destructive) { confirmWithdrawCounter() }
+            Button("Keep counter", role: .cancel) { withdrawCounterCandidate = nil }
+        } message: {
+            Text("The bid will revert to its original amount.")
+        }
+        // RN copy verbatim (`gig/[id].tsx:414`).
+        .confirmationDialog(
+            "Close Gig",
+            isPresented: $showCloseTaskConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Close Gig", role: .destructive) { confirmCloseTask() }
+            Button("Keep Open", role: .cancel) { showCloseTaskConfirm = false }
+        } message: {
+            Text("Are you sure you want to close this gig? It will be removed and this cannot be undone.")
+        }
+        .confirmationDialog(
+            "Replace Worker",
+            isPresented: $showReplaceWorkerConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Replace Worker", role: .destructive) {
+                Task { await runRelease { await viewModel.replaceWorker() } }
+            }
+            Button("Keep worker", role: .cancel) { showReplaceWorkerConfirm = false }
+        } message: {
+            Text(
+                "This will unassign the current worker, release any payment hold, "
+                    + "and reopen the task for bids. Use this only before work starts."
+            )
+        }
+        .confirmationDialog(
+            "Can't Make It",
+            isPresented: $showCantMakeItConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("I Can't Make It", role: .destructive) {
+                Task { await runRelease { await viewModel.releaseAssignment() } }
+            }
+            Button("Stay on the task", role: .cancel) { showCantMakeItConfirm = false }
+        } message: {
+            Text(
+                "This will unassign you from the task and reopen it for new bids. "
+                    + "Any payment hold will be released."
+            )
+        }
         .overlay(alignment: .bottom) { toastOverlay }
         .overlay(alignment: .top) { tipMarkers }
         .onChange(of: viewModel.tipStatus) { _, status in handleTip(status) }
+        // "Share this task to the feed" — RN opens the same
+        // PostTargetPicker + composer the Pulse tab uses, prefilled with
+        // the task and carrying `refTaskId` (`gig/[id].tsx:1474-1481`).
+        .fullScreenCover(item: $shareToFeedTarget) { share in
+            PulseComposeFlowView(
+                taskShare: share,
+                onCancel: { shareToFeedTarget = nil },
+                onPosted: { _ in
+                    shareToFeedTarget = nil
+                    toast = ToastMessage(text: "Shared to the feed.", kind: .success)
+                }
+            )
+        }
+    }
+
+    // MARK: - Share live status / share to feed
+
+    /// Mint a 24h public status link and copy it to the pasteboard.
+    /// Mirrors RN's `ETATracker` "Share Status" button, which copies and
+    /// never opens the system share sheet.
+    private func shareLiveStatus() {
+        Task {
+            switch await viewModel.shareLiveStatus() {
+            case let .succeeded(url):
+                UIPasteboard.general.string = url
+                toast = ToastMessage(
+                    text: "Live status link copied — it expires in 24 hours.",
+                    kind: .success
+                )
+            case let .failed(message):
+                toast = ToastMessage(text: message, kind: .error)
+            }
+        }
+    }
+
+    /// Open the Pulse composer prefilled with this task.
+    private func presentShareToFeed() {
+        guard let gig = viewModel.rawGig else { return }
+        shareToFeedTarget = PulseTaskShare(
+            taskId: gig.id,
+            title: gig.title,
+            body: PulseTaskShare.composeBody(
+                title: gig.title,
+                price: gig.price,
+                description: gig.description,
+                shareURL: viewModel.shareURL.absoluteString
+            )
+        )
     }
 
     // MARK: - Lifecycle footer (Phase 5 / 5b)
@@ -139,7 +265,36 @@ public struct GigDetailView: View {
                     inFlightBidId: viewModel.bidActionInFlight,
                     onAccept: { bid in Task { await acceptBid(bid) } },
                     onCounter: { bid in counterTarget = GigCounterSheetTarget(id: bid.id, bid: bid) },
-                    onReject: { bid in rejectCandidate = bid }
+                    onReject: { bid in rejectCandidate = bid },
+                    onWithdrawCounter: { bid in withdrawCounterCandidate = bid },
+                    rankings: viewModel.offerRankings
+                )
+            }
+            // Urgent / starts-asap live stepper (RN `ActiveTaskPanel`).
+            if viewModel.showFulfillmentPanel {
+                GigFulfillmentPanel(
+                    status: viewModel.fulfillmentStatus,
+                    etaLabel: viewModel.fulfillmentEtaLabel,
+                    nextAction: viewModel.nextFulfillmentAction,
+                    isBusy: viewModel.fulfillmentActionInFlight,
+                    onAdvance: { status in
+                        Task {
+                            await runToasting(success: "Status updated.") {
+                                await viewModel.advanceFulfillment(to: status)
+                            }
+                        }
+                    }
+                )
+            }
+            // Bidder side — "Your bid" with Update / Withdraw and, while a
+            // counter-offer is live, Accept / Decline.
+            if viewModel.showViewerBidPanel {
+                GigViewerBidPanel(
+                    viewModel: viewModel,
+                    onEditBid: { presentUpdateBidSheet() },
+                    onToast: { message, isError in
+                        toast = ToastMessage(text: message, kind: isError ? .error : .success)
+                    }
                 )
             }
             if let phase = viewModel.activePhase, viewModel.showActivePanel {
@@ -151,6 +306,9 @@ public struct GigDetailView: View {
                     noShowEligible: viewModel.noShowEligible,
                     runningLateLabel: viewModel.runningLateLabel,
                     canReportRunningLate: viewModel.canReportRunningLate,
+                    canReleaseAssignment: viewModel.canReleaseAssignment,
+                    canRemindWorker: viewModel.canRemindWorker,
+                    reminderCooldownEnds: viewModel.workerReminderCooldownEnds,
                     onWorkerAck: {
                         Task { await runToasting(success: "Told the poster you're on it.") { await viewModel.sendWorkerAck() } }
                     },
@@ -161,7 +319,9 @@ public struct GigDetailView: View {
                         Task { await runToasting(success: "Completion confirmed.") { await viewModel.confirmCompletion() } }
                     },
                     onReportNoShow: { showNoShowSheet = true },
-                    onRunningLate: { showRunningLateSheet = true }
+                    onRunningLate: { showRunningLateSheet = true },
+                    onCantMakeIt: { showCantMakeItConfirm = true },
+                    onRemindWorker: { Task { await remindWorker() } }
                 )
             }
             if viewModel.showChangesSection {
@@ -197,6 +357,19 @@ public struct GigDetailView: View {
         }
     }
 
+    /// Run a pre-start release action (`/reopen-bidding`,
+    /// `/worker-release`), toasting the server's own confirmation copy.
+    /// The VM refreshes on success, so the lifecycle footer re-renders in
+    /// the reopened state without extra work here.
+    private func runRelease(_ action: () async -> GigDetailViewModel.ReleaseOutcome) async {
+        switch await action() {
+        case let .succeeded(message):
+            toast = ToastMessage(text: message, kind: .success)
+        case let .failed(message):
+            toast = ToastMessage(text: message, kind: .error)
+        }
+    }
+
     /// Run a `String?`-error VM action, toasting either way.
     private func runToasting(success: String, _ action: () async -> String?) async {
         if let error = await action() {
@@ -217,10 +390,44 @@ public struct GigDetailView: View {
         }
     }
 
+    /// Poster's "Remind worker" nudge. The server owns the cooldown, so
+    /// both outcomes are toasted verbatim from the view-model.
+    private func remindWorker() async {
+        switch await viewModel.remindWorker() {
+        case let .success(message):
+            toast = ToastMessage(text: message, kind: .success)
+        case let .failure(message):
+            toast = ToastMessage(text: message, kind: .error)
+        }
+    }
+
     private func confirmReject() {
         guard let bid = rejectCandidate else { return }
         rejectCandidate = nil
         Task { await runToasting(success: "Bid rejected.") { await viewModel.rejectBid(bidId: bid.id) } }
+    }
+
+    private func confirmWithdrawCounter() {
+        guard let bid = withdrawCounterCandidate else { return }
+        withdrawCounterCandidate = nil
+        Task {
+            await runToasting(success: "Counter-offer withdrawn.") {
+                await viewModel.withdrawCounter(bidId: bid.id)
+            }
+        }
+    }
+
+    /// RN pops back to the tasks tab once the gig row is gone
+    /// (`gig/[id].tsx:430`).
+    private func confirmCloseTask() {
+        showCloseTaskConfirm = false
+        Task {
+            if let error = await viewModel.closeGig() {
+                toast = ToastMessage(text: error, kind: .error)
+            } else {
+                onBack()
+            }
+        }
     }
 
     private func presentReviewSheet() {
@@ -277,10 +484,55 @@ public struct GigDetailView: View {
     private var overflowItems: [ContentDetailOverflowItem] {
         guard case .loaded = viewModel.state else { return [] }
         var items = [
+            ContentDetailOverflowItem(
+                label: "Share to feed",
+                icon: .megaphone,
+                identifier: "gigDetail.shareToFeed"
+            ) {
+                presentShareToFeed()
+            },
             ContentDetailOverflowItem(label: "Report task", icon: .flag, identifier: "gigDetail.report") {
                 showReportSheet = true
             }
         ]
+        if viewModel.canShareLiveStatus {
+            items.insert(
+                ContentDetailOverflowItem(
+                    label: "Share live status",
+                    icon: .navigation,
+                    identifier: "gigDetail.shareLiveStatus"
+                ) {
+                    shareLiveStatus()
+                },
+                at: 0
+            )
+        }
+        if viewModel.canReplaceWorker {
+            items.append(
+                ContentDetailOverflowItem(
+                    label: "Replace worker",
+                    icon: .refreshCw,
+                    identifier: "gigDetail.replaceWorker",
+                    role: .destructive
+                ) {
+                    showReplaceWorkerConfirm = true
+                }
+            )
+        }
+        // RN branches on status: an open gig is *closed* (deleted, no
+        // fee), anything live is *cancelled* (`gig/[id].tsx:412`).
+        if viewModel.canCloseTask {
+            items.append(
+                ContentDetailOverflowItem(
+                    label: "Close task",
+                    icon: .trash2,
+                    identifier: "gigDetail.close",
+                    role: .destructive
+                ) {
+                    showCloseTaskConfirm = true
+                }
+            )
+        }
         if viewModel.canCancelTask {
             items.append(
                 ContentDetailOverflowItem(
@@ -435,7 +687,8 @@ public struct GigDetailView: View {
     /// Dock primary routes to: the tip sheet when the poster can tip a
     /// completed gig (Block 3D); the Delivery Proof sheet for the assigned
     /// worker on an in-progress task; instant accept on `instant_accept`
-    /// open gigs; otherwise the bid sheet.
+    /// open gigs; the *update*-bid sheet when the viewer already bid;
+    /// otherwise the place-bid sheet.
     private func presentPrimaryAction() {
         if viewModel.canTip {
             tipCustomAmountText = ""
@@ -444,6 +697,8 @@ public struct GigDetailView: View {
             presentDeliveryProof()
         } else if viewModel.canInstantAccept {
             Task { await runToasting(success: "You're on the task — it's yours.") { await viewModel.instantAccept() } }
+        } else if viewModel.viewerCanEditBid {
+            presentUpdateBidSheet()
         } else {
             presentBidSheet()
         }
@@ -456,6 +711,21 @@ public struct GigDetailView: View {
             gigId: gig.id,
             gigTitle: gig.title,
             bidId: nil
+        )
+    }
+
+    /// The same sheet in edit mode, pre-filled with the viewer's live bid.
+    /// `bidId != nil` flips the submit path to `PUT .../bids/:bidId`.
+    private func presentUpdateBidSheet() {
+        guard let gig = viewModel.rawGig, let bid = viewModel.viewerBid else { return }
+        bidSheetTarget = EditBidSheetTarget(
+            id: "edit-bid-\(bid.id)",
+            gigId: gig.id,
+            gigTitle: gig.title,
+            bidId: bid.id,
+            initialAmount: bid.bidAmount,
+            initialMessage: bid.message,
+            initialProposedTime: bid.proposedTime
         )
     }
 

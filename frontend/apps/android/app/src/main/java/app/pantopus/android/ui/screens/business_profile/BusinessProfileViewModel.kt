@@ -8,8 +8,10 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.businesses.BusinessHoursDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPagesRepository
 import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.profile.ProfileRepository
+import app.pantopus.android.ui.screens.businesses.page_blocks.BusinessPageBlock
 import app.pantopus.android.ui.screens.contentdetail.GigOpenChatEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -27,6 +29,41 @@ import javax.inject.Inject
 /** Nav-arg key for the business UUID. */
 const val BUSINESS_PROFILE_BUSINESS_ID_KEY = "businessId"
 
+/** RN's copy when the named page can't be resolved at all. */
+private const val PAGE_MISSING_MESSAGE = "This business page does not exist or is not published."
+
+/** RN's copy when the page resolves but has no published blocks. */
+private const val PAGE_EMPTY_MESSAGE = "This business page has no published content yet."
+
+/**
+ * C4 — optional nav-arg carrying the slug from `pantopus://b/:username/:slug`
+ * (RN's `?pageSlug=`). Present only on the named-page route.
+ */
+const val BUSINESS_PROFILE_PAGE_SLUG_KEY = "pageSlug"
+
+/**
+ * C4 — state of the named custom page the deep link asked for. [None] when
+ * the profile was opened without a slug.
+ */
+sealed interface BusinessProfileNamedPageState {
+    data object None : BusinessProfileNamedPageState
+
+    data class Loading(
+        val title: String,
+    ) : BusinessProfileNamedPageState
+
+    data class Loaded(
+        val title: String,
+        val description: String?,
+        val blocks: List<BusinessPageBlock>,
+    ) : BusinessProfileNamedPageState
+
+    data class Failed(
+        val title: String,
+        val message: String,
+    ) : BusinessProfileNamedPageState
+}
+
 /** View-model for the single-scroll Business Profile screen (A10.6). The
  *  projection lives in [BusinessProfileMapper] so the owner dashboard can
  *  reuse it verbatim. */
@@ -36,12 +73,24 @@ class BusinessProfileViewModel
     constructor(
         private val businesses: BusinessesRepository,
         private val profiles: ProfileRepository,
+        private val businessPages: BusinessPagesRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val businessId: String =
             requireNotNull(savedStateHandle[BUSINESS_PROFILE_BUSINESS_ID_KEY]) {
                 "BusinessProfileViewModel requires a '$BUSINESS_PROFILE_BUSINESS_ID_KEY' nav arg."
             }
+
+        /** C4 — slug from `pantopus://b/:username/:slug`, when present. */
+        private val pageSlug: String? =
+            savedStateHandle.get<String>(BUSINESS_PROFILE_PAGE_SLUG_KEY)?.takeIf { it.isNotBlank() }
+
+        private val _namedPage =
+            MutableStateFlow<BusinessProfileNamedPageState>(
+                pageSlug?.let { BusinessProfileNamedPageState.Loading(it) }
+                    ?: BusinessProfileNamedPageState.None,
+            )
+        val namedPage: StateFlow<BusinessProfileNamedPageState> = _namedPage.asStateFlow()
 
         private val _state = MutableStateFlow<BusinessProfileUiState>(BusinessProfileUiState.Loading)
         val state: StateFlow<BusinessProfileUiState> = _state.asStateFlow()
@@ -156,6 +205,7 @@ class BusinessProfileViewModel
                             BusinessProfileUiState.Loaded(
                                 BusinessProfileMapper.build(payload, publicResponse, reviewsResponse),
                             )
+                        loadNamedPage(payload.business.username)
                     }
                 }
                 is NetworkResult.Failure -> {
@@ -164,6 +214,49 @@ class BusinessProfileViewModel
                         else -> _state.value = BusinessProfileUiState.Error(friendlyMessage(detail.error))
                     }
                 }
+            }
+        }
+
+        /**
+         * C4 — resolves `GET /api/b/:username/:slug` so the named custom page
+         * opens with its published blocks. Mirrors RN
+         * `src/app/business/[username].tsx`'s `fetchPublicPage`, including the
+         * two failure copies.
+         */
+        private suspend fun loadNamedPage(username: String?) {
+            val slug = pageSlug ?: run {
+                _namedPage.value = BusinessProfileNamedPageState.None
+                return
+            }
+            // `pantopus://b/:username/:slug` routes the *username* through as
+            // the id, so it is the right fallback when the detail read has no
+            // handle of its own.
+            val handle = username?.takeIf { it.isNotBlank() } ?: businessId
+            if (handle.isBlank()) {
+                _namedPage.value =
+                    BusinessProfileNamedPageState.Failed(slug, PAGE_MISSING_MESSAGE)
+                return
+            }
+            _namedPage.value = BusinessProfileNamedPageState.Loading(slug)
+            when (val result = businessPages.publicPage(handle, slug)) {
+                is NetworkResult.Success -> {
+                    val page = result.data.currentPage
+                    _namedPage.value =
+                        if (page == null) {
+                            BusinessProfileNamedPageState.Failed(slug, PAGE_EMPTY_MESSAGE)
+                        } else {
+                            BusinessProfileNamedPageState.Loaded(
+                                title = page.title ?: slug,
+                                description = page.description,
+                                blocks =
+                                    page.blocks.orEmpty().mapIndexed { index, dto ->
+                                        BusinessPageBlock.from(dto, index)
+                                    },
+                            )
+                        }
+                }
+                is NetworkResult.Failure ->
+                    _namedPage.value = BusinessProfileNamedPageState.Failed(slug, PAGE_MISSING_MESSAGE)
             }
         }
 

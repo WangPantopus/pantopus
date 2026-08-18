@@ -88,6 +88,7 @@ fun WaitingRoomRoute(
         onPrimary = viewModel::handlePrimary,
         onSecondary = viewModel::handleSecondary,
         onRetry = viewModel::refresh,
+        onVerificationAction = viewModel::handleVerificationAction,
     )
 }
 
@@ -113,6 +114,7 @@ fun WaitingRoomScreen(
     onPrimary: (StatusCta) -> Unit = {},
     onSecondary: (StatusCta) -> Unit = {},
     onRetry: () -> Unit = {},
+    onVerificationAction: (HomeVerificationAction) -> Unit = {},
 ) {
     Column(
         modifier =
@@ -121,9 +123,25 @@ fun WaitingRoomScreen(
                 .background(PantopusColors.appBg)
                 .testTag("waitingRoom"),
     ) {
-        TopBarWaitingRoom(title = content.title, onBack = onBack, onBell = onBell)
+        val title =
+            if (phase is WaitingRoomPhase.Verification) {
+                HomeVerificationContent.SCREEN_TITLE
+            } else {
+                content.title
+            }
+        TopBarWaitingRoom(title = title, onBack = onBack, onBell = onBell)
         when (phase) {
             is WaitingRoomPhase.Loading -> LoadingFrame(modifier = Modifier.weight(1f))
+            is WaitingRoomPhase.Verification ->
+                // RN's Verification Center — served on the same route when
+                // the caller has no claim in review but their occupancy
+                // still isn't verified.
+                HomeVerificationFrame(
+                    content = phase.content,
+                    modifier = Modifier.weight(1f),
+                    onAction = onVerificationAction,
+                    onDone = onBack,
+                )
             is WaitingRoomPhase.Notice ->
                 NoticeFrame(
                     notice = phase.notice,
@@ -274,6 +292,181 @@ private fun NoticeFrame(
                 color = PantopusColors.appTextInverse,
             )
         }
+    }
+}
+
+/**
+ * RN's Verification Center frame — halo + headline/body + optional date
+ * card + full-width action cards + a ghost "Done"
+ * (`src/app/homes/[id]/waiting-room.tsx:83-225`). Mirrors iOS
+ * `HomeVerificationFrame`.
+ */
+@Composable
+private fun HomeVerificationFrame(
+    content: HomeVerificationContent,
+    modifier: Modifier = Modifier,
+    onAction: (HomeVerificationAction) -> Unit = {},
+    onDone: () -> Unit = {},
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.s5, vertical = Spacing.s4)
+                .testTag("waitingRoomVerification"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.s5),
+    ) {
+        HaloCircle(
+            tone = content.halo.tone,
+            icon = content.halo.icon,
+            isPulsing = content.halo.isPulsing,
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = content.headline,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() }.testTag("verificationHeadline"),
+            )
+            Text(
+                text = content.body,
+                fontSize = 14.sp,
+                color = PantopusColors.appTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 320.dp).testTag("verificationBody"),
+            )
+        }
+        content.countdown?.let { CountdownCard(it) }
+        Column(
+            modifier = Modifier.fillMaxWidth().testTag("verificationActions"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2 + 2.dp),
+        ) {
+            content.actions.forEach { action ->
+                VerificationActionCard(action = action, onTap = { onAction(action) })
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .border(1.dp, PantopusColors.appBorderStrong, RoundedCornerShape(Radii.lg))
+                    .clickable(onClick = onDone)
+                    .testTag("verificationDone"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = content.doneLabel,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        Spacer(modifier = Modifier.height(Spacing.s4))
+    }
+}
+
+@Composable
+private fun CountdownCard(countdown: HomeVerificationCountdown) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(14.dp)
+                .testTag("verificationCountdown"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = countdown.icon,
+            contentDescription = null,
+            size = 20.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.primary600,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = countdown.label,
+                fontSize = 13.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            Text(
+                text = countdown.value,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VerificationActionCard(
+    action: HomeVerificationAction,
+    onTap: () -> Unit,
+) {
+    val palette =
+        when (action.tone) {
+            WaitingRoomActionTone.Standard -> ActionPalette(PantopusColors.appText, PantopusColors.appBorder)
+            WaitingRoomActionTone.Primary -> ActionPalette(PantopusColors.primary700, PantopusColors.primary200)
+            WaitingRoomActionTone.Danger -> ActionPalette(PantopusColors.error, PantopusColors.errorLight)
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, palette.border, RoundedCornerShape(Radii.lg))
+                .clickable(onClick = onTap)
+                .padding(14.dp)
+                .testTag("verificationAction_${action.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = action.icon,
+            contentDescription = null,
+            size = 22.dp,
+            strokeWidth = 2.2f,
+            tint = palette.fg,
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = action.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = palette.fg,
+            )
+            action.subtitle?.let {
+                Text(
+                    text = it,
+                    fontSize = 13.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+        }
+        PantopusIconImage(
+            icon = PantopusIcon.ChevronRight,
+            contentDescription = null,
+            size = 18.dp,
+            strokeWidth = 2.2f,
+            tint = PantopusColors.appTextMuted,
+        )
     }
 }
 

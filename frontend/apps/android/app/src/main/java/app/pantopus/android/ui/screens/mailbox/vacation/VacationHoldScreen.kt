@@ -21,12 +21,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +58,9 @@ import app.pantopus.android.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+/** Toast dwell time — matches iOS `VacationHoldView`'s 1.8s banner. */
+private const val TOAST_MILLIS = 1_800L
 
 /**
  * A14.8 — Vacation Hold screen. Mirrors
@@ -81,6 +89,20 @@ fun VacationHoldScreen(
     onEditEmergency: () -> Unit = {},
 ) {
     val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
+
+    /**
+     * A14.8 — "End hold early" is destructive (the backend marks the hold
+     * `cancelled` and clears `User.vacation_mode`), so it confirms first.
+     */
+    var showEndHoldConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(TOAST_MILLIS)
+            viewModel.consumeToast()
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.load(seed)
@@ -95,24 +117,82 @@ fun VacationHoldScreen(
         Analytics.track(AnalyticsEvent.ScreenVacationHoldViewed(modeTag))
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PantopusColors.appBg)
-                .testTag("vacationHold"),
-    ) {
-        TopBar(viewModel = viewModel, mode = mode)
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = Spacing.s6),
+                    .background(PantopusColors.appBg)
+                    .testTag("vacationHold"),
         ) {
-            when (val m = mode) {
-                is VacationHoldMode.Scheduling -> SchedulingBody(viewModel = viewModel, draft = m.draft)
-                is VacationHoldMode.Active -> ActiveBody(viewModel = viewModel, hold = m.hold)
+            TopBar(viewModel = viewModel, mode = mode)
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = Spacing.s6),
+            ) {
+                when (val m = mode) {
+                    is VacationHoldMode.Scheduling -> SchedulingBody(viewModel = viewModel, draft = m.draft)
+                    is VacationHoldMode.Active ->
+                        ActiveBody(
+                            viewModel = viewModel,
+                            hold = m.hold,
+                            onEndHold = { showEndHoldConfirm = true },
+                        )
+                }
+            }
+        }
+
+        if (showEndHoldConfirm) {
+            AlertDialog(
+                onDismissRequest = { showEndHoldConfirm = false },
+                title = { Text(text = "End your vacation hold?") },
+                text = {
+                    Text(
+                        text = "Mail and packages resume delivery right away.",
+                        fontSize = 13.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showEndHoldConfirm = false
+                            viewModel.endHoldEarly()
+                        },
+                        modifier = Modifier.testTag("vacationHoldEndConfirm"),
+                    ) {
+                        Text(text = "End hold", color = PantopusColors.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEndHoldConfirm = false }) {
+                        Text(text = "Keep holding", color = PantopusColors.appTextSecondary)
+                    }
+                },
+            )
+        }
+
+        if (toast != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.s10),
+            ) {
+                Text(
+                    text = toast.orEmpty(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextInverse,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.appText.copy(alpha = 0.9f))
+                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+                )
             }
         }
     }
@@ -322,6 +402,7 @@ private fun SchedulingBody(
 private fun ActiveBody(
     viewModel: VacationHoldViewModel,
     hold: VacationActiveHold,
+    onEndHold: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -381,7 +462,7 @@ private fun ActiveBody(
             VacationDestructiveRow(
                 label = "End hold early",
                 sub = "Mail resumes tomorrow morning",
-                onTap = { viewModel.endHoldEarly() },
+                onTap = onEndHold,
                 tag = "vacationHoldEndEarly",
             )
         }

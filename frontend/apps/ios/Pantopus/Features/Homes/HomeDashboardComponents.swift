@@ -7,6 +7,69 @@
 
 import SwiftUI
 
+/// Home security-state banner — `claim_window` / `review_required` /
+/// `disputed` / `frozen`. Rendered at the very top of the dashboard,
+/// above the claim / attention banners, mirroring RN's
+/// `HomeStatusBanner` (`src/components/HomeStatusBanner.tsx`) which sits
+/// directly under the header at `src/app/homes/[id]/index.tsx:211`.
+struct HomeSecurityStatusBanner: View {
+    let content: HomeSecurityBannerContent
+    let onCTA: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s2) {
+                Icon(content.icon, size: 20, color: tint)
+                Text(content.title)
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.bold)
+                    .foregroundStyle(tint)
+            }
+            Text(content.body)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let ctaLabel = content.ctaLabel {
+                Button(action: onCTA) {
+                    Text(ctaLabel)
+                        .pantopusTextStyle(.small)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(tint)
+                        .padding(.horizontal, Spacing.s3)
+                        .padding(.vertical, Spacing.s2)
+                        .background(tint.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("homeDashboard_securityBannerCTA")
+            }
+        }
+        .padding(Spacing.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(tint.opacity(0.4), lineWidth: 1)
+        )
+        .accessibilityIdentifier("homeDashboard_securityBanner")
+    }
+
+    /// Severity tint per state — the same ramp RN encodes in
+    /// `STATUS_BANNER` (`src/constants/ownershipCopy.ts`), expressed in
+    /// tokens rather than hex.
+    private var tint: Color {
+        switch content.state {
+        case .claimWindow: Theme.Color.warning
+        case .reviewRequired: Theme.Color.primary600
+        case .disputed: Theme.Color.warning
+        case .frozen: Theme.Color.error
+        case .normal, .frozenSilent: Theme.Color.appTextSecondary
+        }
+    }
+}
+
 /// Inline banner shown above the grid-tabs body when the signed-in user
 /// is not yet a verified owner of this home.
 struct ClaimOwnershipBanner: View {
@@ -218,26 +281,34 @@ struct HomeOverviewSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             DashboardCard(title: "Upcoming", action: "See all", accent: Theme.Color.warning) {
-                VStack(spacing: Spacing.s0) {
-                    ForEach(content.overview.upcoming) { item in
-                        TimelineRow(item: item)
-                        if item.id != content.overview.upcoming.last?.id {
-                            Rectangle()
-                                .fill(Theme.Color.appBorderSubtle)
-                                .frame(height: 1)
+                if content.overview.upcoming.isEmpty {
+                    OverviewEmptyRow(text: "Nothing due today. You're all clear.")
+                } else {
+                    VStack(spacing: Spacing.s0) {
+                        ForEach(content.overview.upcoming) { item in
+                            TimelineRow(item: item)
+                            if item.id != content.overview.upcoming.last?.id {
+                                Rectangle()
+                                    .fill(Theme.Color.appBorderSubtle)
+                                    .frame(height: 1)
+                            }
                         }
                     }
                 }
             }
 
             DashboardCard(title: "Recent activity", action: "See all") {
-                VStack(spacing: Spacing.s0) {
-                    ForEach(content.overview.activity) { item in
-                        ActivityRow(item: item)
-                        if item.id != content.overview.activity.last?.id {
-                            Rectangle()
-                                .fill(Theme.Color.appBorderSubtle)
-                                .frame(height: 1)
+                if content.overview.activity.isEmpty {
+                    OverviewEmptyRow(text: "No household activity yet.")
+                } else {
+                    VStack(spacing: Spacing.s0) {
+                        ForEach(content.overview.activity) { item in
+                            ActivityRow(item: item)
+                            if item.id != content.overview.activity.last?.id {
+                                Rectangle()
+                                    .fill(Theme.Color.appBorderSubtle)
+                                    .frame(height: 1)
+                            }
                         }
                     }
                 }
@@ -262,7 +333,8 @@ struct HomeOverviewSection: View {
     }
 }
 
-private struct DashboardCard<Content: View>: View {
+/// Shared card chrome for the Overview + Home Intelligence sections.
+struct DashboardCard<Content: View>: View {
     let title: String
     var action: String?
     var accent: Color?
@@ -314,6 +386,18 @@ private struct DashboardCard<Content: View>: View {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
+    }
+}
+
+private struct OverviewEmptyRow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .pantopusTextStyle(.caption)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Spacing.s3)
     }
 }
 

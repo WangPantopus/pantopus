@@ -217,7 +217,15 @@ final class ClaimOwnershipWizardViewModelTests: XCTestCase {
         vm.picked(.ownership, file: ClaimPickedFile(filename: "deed.pdf", mimeType: "application/pdf", data: Data([2])))
         await vm.submit()
         XCTAssertEqual(vm.currentStep, .upload)
-        XCTAssertEqual(vm.submitError, "We're already working on a claim for this home.")
+        // A nil claim id on the opaque-handshake path means a duplicate already
+        // exists — the same user-visible outcome as a 409. It now raises the
+        // blocked prompt (which offers "Search homes", matching RN's
+        // `claim-owner/evidence.tsx:194-212`) rather than a bare error string.
+        XCTAssertNil(vm.submitError)
+        XCTAssertEqual(
+            vm.blockedByOtherClaimPrompt?.contains("verification is already in progress"),
+            true
+        )
     }
 
     func testBackOnUploadReturnsToStart() {

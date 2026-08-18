@@ -2,14 +2,18 @@
 //  MailTranslationViewModel.swift
 //  Pantopus
 //
-//  A17.13 — Translation view-model. Drives the four DoD states off the
-//  sample letter, owns the machine → confirmed transition (optimistic,
-//  rolls back on failure), the `ViewToggle` selection, and the stubbed
-//  "Listen" affordance.
+//  A17.13 — Translation view-model. Fetches a real machine translation
+//  and drives the four DoD states off it, owns the machine → confirmed
+//  transition (optimistic, rolls back on failure), the `ViewToggle`
+//  selection, and the read-aloud affordance.
 //
-//  Translation/TTS are sample-driven (B2.3 out-of-scope) — the confirm
-//  call hits the real `MailboxEndpoints.translate` helper so the wiring
-//  exists, but a failure simply rolls the optimistic flip back.
+//  `load()` reads both halves of the screen:
+//   · `GET /api/mailbox/:id`              — the original letter + sender
+//   · `POST /api/mailbox/v2/p3/translate` — the translated text, the
+//     detected source language, the target, and whether it was cached
+//
+//  A failure on either leg lands in `.error(message:)`, which the view
+//  renders with a Retry wired to `refresh()`.
 //
 
 import AVFoundation
@@ -28,6 +32,7 @@ public final class MailTranslationViewModel {
     private let mailId: String
     private let api: APIClient
     private let seedConfirmed: Bool
+    private let now: @Sendable () -> Date
     /// Retained for the lifetime of the screen — a synthesizer created as a
     /// local temporary deallocates the moment `listen` returns, which cancels
     /// (or never starts) playback.
@@ -36,23 +41,47 @@ public final class MailTranslationViewModel {
     init(
         mailId: String,
         api: APIClient = .shared,
-        seedConfirmed: Bool = false
+        seedConfirmed: Bool = false,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.mailId = mailId
         self.api = api
         self.seedConfirmed = seedConfirmed
+        self.now = now
     }
 
-    /// Load the (sample) translation. Real MT lands behind this seam later;
-    /// today the projection is deterministic so previews + snapshots are
-    /// stable. Still routed through a `do/catch` so the error state is real.
+    /// Fetch the mail item and its machine translation, then project them
+    /// into the screen content. Both legs are awaited — the side-by-side
+    /// view needs the original as much as the translation — so either
+    /// failing lands in `.error(message:)` with a Retry.
     public func load() async {
         state = .loading
-        let content = seedConfirmed
-            ? MailTranslationSampleData.confirmedLetter(mailId: mailId)
-            : MailTranslationSampleData.letter(mailId: mailId)
-        if Task.isCancelled { return }
-        state = .loaded(content)
+        do {
+            let detail: MailDetailResponse = try await api.request(
+                MailboxEndpoints.detail(mailId: mailId)
+            )
+            let translation: TranslationResultDTO = try await api.request(
+                MailboxV2Endpoints.translate(mailId: mailId)
+            )
+            if Task.isCancelled { return }
+            var content = MailTranslationProjection.project(
+                mailId: mailId,
+                detail: detail.mail,
+                translation: translation,
+                now: now()
+            )
+            if seedConfirmed {
+                content.confirmed = true
+                content.viewMode = .translated
+            }
+            state = .loaded(content)
+        } catch {
+            if Task.isCancelled { return }
+            state = .error(
+                message: (error as? APIError)?.errorDescription
+                    ?? "We couldn't translate this letter. Check your connection and try again."
+            )
+        }
     }
 
     public func refresh() async {
@@ -76,6 +105,7 @@ public final class MailTranslationViewModel {
         let previous = content
         content.confirmed = true
         content.viewMode = .translated
+        content.confirmedStamp = MailTranslationProjection.confirmedStamp(now: now())
         state = .loaded(content)
         do {
             // The translate endpoint doubles as the "confirm/trust" write

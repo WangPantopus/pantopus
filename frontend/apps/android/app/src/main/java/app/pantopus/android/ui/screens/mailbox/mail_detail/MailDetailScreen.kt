@@ -67,6 +67,22 @@ fun MailDetailScreen(
     // notices only). Receives the mail id so the host can resolve the
     // task. Null hides the affordance.
     onOpenExtractedTask: ((String) -> Unit)? = null,
+    // Mail carrying a stationery theme belongs in the ceremonial open
+    // experience, not here. When set, the host *replaces* this screen with
+    // `CeremonialMailOpenScreen` — mirroring RN's `router.replace` in
+    // `src/app/mailbox/detail.tsx:43-49`.
+    onOpenCeremonialMail: ((String) -> Unit)? = null,
+    // A17.12 — opens the Mail-tasks screen in its create frame for this
+    // mail (`POST api/mailbox/v2/p3/tasks/from-mail`). Mirrors RN's
+    // "Create Task" affordance in `src/app/mailbox/detail.tsx:221-227`.
+    onCreateTask: ((String) -> Unit)? = null,
+    // A17.14 — opens the Unboxing flow for this package. Mirrors RN's
+    // "Virtual Unboxing" CTA in `src/app/mailbox/package.tsx:183`.
+    onOpenUnboxing: ((String) -> Unit)? = null,
+    // A17.8 → "Ask a Neighbor". Opens the package-gig form for this package;
+    // the flag mirrors RN's `?mode=pre|post`
+    // (`src/app/mailbox/package.tsx:196-204`).
+    onAskNeighbor: ((String, Boolean) -> Unit)? = null,
     viewModel: MailDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -78,8 +94,14 @@ fun MailDetailScreen(
     val partyRsvpInFlight by viewModel.partyRsvpInFlight.collectAsStateWithLifecycle()
     val recordsFileInFlight by viewModel.recordsFileInFlight.collectAsStateWithLifecycle()
     val saveToVaultInFlight by viewModel.saveToVaultInFlight.collectAsStateWithLifecycle()
+    val bookletDownloadInFlight by viewModel.bookletDownloadInFlight.collectAsStateWithLifecycle()
+    val certifiedProofInFlight by viewModel.certifiedProofInFlight.collectAsStateWithLifecycle()
+    val certifiedProofSaved by viewModel.certifiedProofSaved.collectAsStateWithLifecycle()
     val showsSaveToVault by viewModel.showsSaveToVaultPicker.collectAsStateWithLifecycle()
     val vaultFolders by viewModel.saveToVaultFolders.collectAsStateWithLifecycle()
+    val categoryActionInFlight by viewModel.categoryActionInFlight.collectAsStateWithLifecycle()
+    val pendingDestructiveAction by viewModel.pendingDestructiveAction.collectAsStateWithLifecycle()
+    val ceremonialRedirectMailId by viewModel.ceremonialRedirectMailId.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val paymentSheet =
         rememberPaymentSheet { result ->
@@ -87,6 +109,13 @@ fun MailDetailScreen(
         }
 
     LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(ceremonialRedirectMailId) {
+        val redirect = ceremonialRedirectMailId
+        if (redirect != null && onOpenCeremonialMail != null) {
+            viewModel.acknowledgeCeremonialRedirect()
+            onOpenCeremonialMail(redirect)
+        }
+    }
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -137,11 +166,32 @@ fun MailDetailScreen(
                     onFileRecord = viewModel::fileRecordToVault,
                     onOpenSenderProfile = onOpenSenderProfile,
                     onSaveToVault = viewModel::openSaveToVaultPicker,
+                    categoryActionInFlight = categoryActionInFlight,
+                    onCategoryAction = viewModel::tapCategoryAction,
                     onTranslate = onTranslate,
                     onOpenExtractedTask =
                         onOpenExtractedTask?.let { open ->
                             { open(current.content.mailId) }
                         },
+                    onCreateTask =
+                        onCreateTask?.let { open ->
+                            { open(current.content.mailId) }
+                        },
+                    onOpenUnboxing =
+                        onOpenUnboxing?.let { open ->
+                            { open(current.content.mailId) }
+                        },
+                    onAskNeighbor =
+                        onAskNeighbor?.let { open ->
+                            { isPreDelivery: Boolean -> open(current.content.mailId, isPreDelivery) }
+                        },
+                    onShareEta = viewModel::sharePackageEta,
+                    onReportIssue = viewModel::reportPackageIssue,
+                    onDownloadBookletPdf = viewModel::downloadBookletPdf,
+                    bookletDownloadInFlight = bookletDownloadInFlight,
+                    onDownloadCertifiedProof = viewModel::downloadCertifiedProof,
+                    certifiedProofSaved = certifiedProofSaved,
+                    certifiedProofInFlight = certifiedProofInFlight,
                 )
             is MailDetailUiState.Error ->
                 ErrorLayout(message = current.message, onBack = onBack, onRetry = viewModel::refresh)
@@ -176,6 +226,39 @@ fun MailDetailScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { viewModel.dismissSaveToVaultPicker() }) {
+                        Text(text = "Cancel", color = PantopusColors.appTextSecondary)
+                    }
+                },
+            )
+        }
+        pendingDestructiveAction?.let { pending ->
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissDestructiveAction() },
+                title = {
+                    Text(
+                        text =
+                            (state as? MailDetailUiState.Loaded)
+                                ?.let { "Dismiss \"${it.content.title}\"?" }
+                                ?: "Dismiss this mail?",
+                    )
+                },
+                text = {
+                    Text(
+                        text = "It moves out of your mailbox and stops showing up in this drawer.",
+                        fontSize = 13.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { viewModel.performCategoryAction(pending) },
+                        modifier = Modifier.testTag("mailDetail_categoryActionConfirm"),
+                    ) {
+                        Text(text = pending.label, color = PantopusColors.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissDestructiveAction() }) {
                         Text(text = "Cancel", color = PantopusColors.appTextSecondary)
                     }
                 },
@@ -227,8 +310,20 @@ private fun LoadedLayout(
     onFileRecord: () -> Unit,
     onOpenSenderProfile: (String) -> Unit,
     onSaveToVault: () -> Unit,
+    categoryActionInFlight: MailCategoryAction? = null,
+    onCategoryAction: ((MailCategoryAction) -> Unit)? = null,
     onTranslate: (() -> Unit)? = null,
     onOpenExtractedTask: (() -> Unit)? = null,
+    onCreateTask: (() -> Unit)? = null,
+    onOpenUnboxing: (() -> Unit)? = null,
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
+    onShareEta: () -> Unit = {},
+    onReportIssue: () -> Unit = {},
+    onDownloadBookletPdf: () -> Unit = {},
+    bookletDownloadInFlight: Boolean = false,
+    onDownloadCertifiedProof: () -> Unit = {},
+    certifiedProofSaved: Boolean = false,
+    certifiedProofInFlight: Boolean = false,
 ) {
     // Dispatch to ceremonial variant layouts when the projected content
     // carries decoded payloads. Every variant composes the shared
@@ -251,6 +346,8 @@ private fun LoadedLayout(
                 onBack = onBack,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
+                onDownloadPdf = onDownloadBookletPdf,
+                downloadInFlight = bookletDownloadInFlight,
             )
         content.category == MailItemCategory.Certified && certified != null ->
             CertifiedDetailLayout(
@@ -262,6 +359,9 @@ private fun LoadedLayout(
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
                 onOpenExtractedTask = onOpenExtractedTask,
+                onDownloadProof = onDownloadCertifiedProof,
+                proofSaved = certifiedProofSaved,
+                proofInFlight = certifiedProofInFlight,
             )
         content.category == MailItemCategory.Community && community != null ->
             CommunityDetailLayout(
@@ -312,6 +412,10 @@ private fun LoadedLayout(
                 onAcknowledgeDelivery = onAcknowledge,
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
+                onOpenUnboxing = onOpenUnboxing,
+                onAskNeighbor = onAskNeighbor,
+                onShareEta = onShareEta,
+                onReportIssue = onReportIssue,
             )
         content.category == MailItemCategory.Party && party != null ->
             PartyDetailLayout(
@@ -344,6 +448,14 @@ private fun LoadedLayout(
                 onOpenSenderProfile = onOpenSenderProfile,
                 onSaveToVault = onSaveToVault,
                 onTranslate = onTranslate,
+                onCreateTask = onCreateTask,
+                categoryActions =
+                    MailCategoryActions.actions(
+                        rawCategory = content.mailCategoryKey,
+                        isSenderUnknown = content.isSenderUnknown,
+                    ),
+                categoryActionInFlight = categoryActionInFlight,
+                onCategoryAction = onCategoryAction,
             )
     }
 }

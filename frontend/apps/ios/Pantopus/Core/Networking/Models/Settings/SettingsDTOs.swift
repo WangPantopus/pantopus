@@ -9,38 +9,44 @@
 
 import Foundation
 
-/// Envelope from `GET /api/privacy/settings`.
+/// Envelope from `GET /api/privacy/settings` (`privacy.js:80`) and from
+/// `PATCH /api/privacy/settings` (`privacy.js:142`, which also carries a
+/// `message` we ignore).
 public struct PrivacySettingsResponse: Decodable, Sendable {
     public let settings: PrivacySettings
 }
 
-/// One privacy-settings row.
+/// One `UserPrivacySettings` row. Columns per
+/// `supabase/migrations/20260301000001_identity_firewall_tables.sql:128`
+/// plus `findable_by_name` (migration `143_user_privacy_findable_by_name`).
+/// Every field is Optional so the backend can add columns without
+/// breaking older clients.
 public struct PrivacySettings: Decodable, Sendable, Hashable {
     public let userId: String?
+    /// `everyone` · `mutuals` · `nobody`.
     public let searchVisibility: String?
-    public let addressPrecision: String?
-    public let hideFromSearch: Bool?
-    public let showOnlineStatus: Bool?
-    public let showLastActive: Bool?
-    public let showReadReceipts: Bool?
-    public let shareHomeCheckIns: Bool?
-    public let pushPreferences: [String: Bool]?
-    public let emailPreferences: [String: Bool]?
-    public let smsPreferences: [String: Bool]?
+    public let findableByName: Bool?
+    public let findableByEmail: Bool?
+    public let findableByPhone: Bool?
+    /// `public` · `followers` · `private`.
+    public let profileDefaultVisibility: String?
+    public let showGigHistory: String?
+    public let showNeighborhood: String?
+    public let showHomeAffiliation: String?
+    public let createdAt: String?
     public let updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case searchVisibility = "search_visibility"
-        case addressPrecision = "address_precision"
-        case hideFromSearch = "hide_from_search"
-        case showOnlineStatus = "show_online_status"
-        case showLastActive = "show_last_active"
-        case showReadReceipts = "show_read_receipts"
-        case shareHomeCheckIns = "share_home_check_ins"
-        case pushPreferences = "push_preferences"
-        case emailPreferences = "email_preferences"
-        case smsPreferences = "sms_preferences"
+        case findableByName = "findable_by_name"
+        case findableByEmail = "findable_by_email"
+        case findableByPhone = "findable_by_phone"
+        case profileDefaultVisibility = "profile_default_visibility"
+        case showGigHistory = "show_gig_history"
+        case showNeighborhood = "show_neighborhood"
+        case showHomeAffiliation = "show_home_affiliation"
+        case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
 }

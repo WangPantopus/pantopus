@@ -18,7 +18,16 @@ public enum HubRoute: Hashable {
     /// T6.5e (P19.5) Mailbox Vault — saved mail list. Personal pillar.
     case mailboxVault
     case addHome
+    /// A12.1 — "Find or Add Home" discovery. Search public-preview
+    /// homes, start a claim on one, add a missing address, or paste an
+    /// invite code. Mirrors RN `src/app/homes/find.tsx`.
+    case findHome
     case claimOwnership(homeId: String)
+    /// Residency-verification variant of the evidence flow. Sends
+    /// `claim_type: 'resident'` and offers the lease / utility-bill /
+    /// tax-bill document set (RN
+    /// `homes/[id]/claim-owner/evidence.tsx?verificationType=residency`).
+    case verifyResidency(homeId: String)
     /// A12.5 / A12.6 — Verify landlord wizard. Pushed when the
     /// dashboard's ownership claim resolves to the "verify via
     /// landlord" branch (rental detected, owner-claim path not
@@ -68,6 +77,10 @@ public enum HubRoute: Hashable {
     case editHouseholdTask(homeId: String, taskId: String)
     /// Maintenance sub-screen for a specific home (T6.3b / P10).
     case homeMaintenance(homeId: String)
+    /// Per-home **issue tracker** (`HomeIssue`). A different backend
+    /// collection from `.homeMaintenance` (maintenance tasks) — this is
+    /// the surface RN calls "Maintenance" (`homes/[id]/maintenance.tsx`).
+    case homeIssues(homeId: String)
     /// P2.9 — Log a maintenance entry. Pushed from the Maintenance list
     /// FAB; on success the host pops back and refreshes the list.
     case logMaintenance(homeId: String)
@@ -85,6 +98,10 @@ public enum HubRoute: Hashable {
     /// A14.2 (P5.1) — Per-home Security toggles. Reached from the
     /// per-home Settings `Privacy` row.
     case homeSecurity(homeId: String)
+    /// A14.2 (policy variant) — per-home ownership security policy
+    /// (`GET/PATCH /api/homes/:id/security`). Reached from the per-home
+    /// Settings `Ownership & Security` row.
+    case homeOwnershipSecurity(homeId: String)
     /// Leave this home (`POST /api/homes/:id/move-out`).
     case leaveHome(homeId: String)
     /// Cancel ownership claim (`DELETE …/ownership-claims/:claimId`).
@@ -107,6 +124,15 @@ public enum HubRoute: Hashable {
     /// `BusinessProfileView`'s overflow when the viewer owns the business
     /// and from the `pantopus://businesses/:id/page-editor` deep link.
     case editBusinessPage(businessId: String)
+    /// C4 — the custom Pages CMS index (create / delete a page, revision
+    /// history, restore). Distinct from `editBusinessPage`, which edits
+    /// business *profile* fields.
+    case businessPages(businessId: String)
+    /// C4 — the block builder for one custom page.
+    case businessPageBlocks(businessId: String, pageId: String, pageTitle: String)
+    /// C4 — the public profile opened on a named custom page, reached from
+    /// `pantopus://b/:username/:slug`.
+    case businessProfilePage(businessId: String, pageSlug: String)
     /// A12.10 — Create Business wizard. Reached from the My Businesses
     /// FAB / empty-state CTA and from the `pantopus://businesses/new`
     /// deep link.
@@ -173,6 +199,11 @@ public enum HubRoute: Hashable {
     case gigsFeed
     /// Gig Search (P4.4). Pushed from the Gigs feed search bar.
     case gigSearch
+    /// S2 — Universal search (All / Tasks / People / Beacons /
+    /// Businesses / Homes). Pushed from the navigation drawer's
+    /// "Search" row; gig-only search stays reachable from its Tasks tab
+    /// and from the Gigs feed search bar.
+    case universalSearch
     /// Gig detail target — placeholder until the Transactional Detail (T2.6) ships.
     case gigDetail(gigId: String)
     /// Map+List Hybrid opened from the Gigs feed map-toggle. Carries the
@@ -199,6 +230,12 @@ public enum HubRoute: Hashable {
     case invoiceDetail(invoiceId: String)
     /// Bell icon target. Replaced by the real notifications screen in T4.1.
     case notifications
+    /// S5 — Notifications scoped to one identity-firewall zone. Pushed by
+    /// the Hub megaphone with `context: "audience"` so the Beacon stream
+    /// opens directly (RN `?context=audience`,
+    /// `pantopus/frontend/apps/mobile/src/app/(tabs)/index.tsx:534`).
+    /// Values must be a `NotificationsZone` raw value.
+    case notificationsZone(context: String)
     /// Connections center (T5.2.3). Reached from the You / Me action grid
     /// or via the `pantopus://connections` deep link.
     case connections
@@ -292,11 +329,20 @@ public enum HubRoute: Hashable {
     case placeholder(label: String)
     /// A10.3 — Full "Today" briefing (weather, air, daylight, signals).
     /// Pushed when the Hub's Today card is tapped.
-    case todayDetail
+    ///
+    /// `briefingDeliveryId` / `briefingKind` are non-nil only when the screen
+    /// was opened from a Morning/Evening Briefing push, whose metadata carries
+    /// `briefing_delivery_id` + `briefing_kind`. With an id the screen resolves
+    /// that stored delivery (`GET /api/hub/briefings/:id`) instead of showing
+    /// only the live `/api/hub/today` snapshot.
+    case todayDetail(briefingDeliveryId: String?, briefingKind: String?)
     /// A.4 — Property details for a home.
     case propertyDetails(homeId: String)
     /// A.3 — Add a guest to a home.
     case addGuest(homeId: String)
+    /// A13.6 — Guest-pass management for a home (Active / Past passes,
+    /// revoke). Pushed from Home settings → "Invite link".
+    case guestPasses(homeId: String)
     /// A13.4 — Transfer ownership form. Pushed from the Owners list
     /// "Transfer" action and from `pantopus://homes/:id/owners/transfer`
     /// deep links. The form owns its own Face ID bottom-sheet confirm so
@@ -339,6 +385,14 @@ public enum HubRoute: Hashable {
     /// A14.8 — Vacation hold (scheduling + active variants). Reached
     /// from the Mailbox root top-bar settings menu.
     case vacationHold
+    /// Four-moment Ceremonial Mail compose wizard — Mailbox root FAB.
+    case ceremonialMail
+    /// Ceremonial open experience for stationery-carrying letters.
+    /// Reached by redirect from the generic mail detail.
+    case ceremonialMailOpen(mailId: String)
+    /// Disambiguation queue behind the Mailbox root's
+    /// "N items need routing" banner.
+    case mailRoutingQueue
     /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
     /// Pushed from the Mailbox root header CTA + the
     /// `pantopus://mailbox/mailday` deep link.
@@ -356,16 +410,37 @@ public enum HubRoute: Hashable {
     case stamps
     /// A17.12 — Mail-derived task detail. `pantopus://mailbox/tasks/:id`.
     case mailTask(taskId: String)
+    /// A17.12 (list) — every mail-linked task. When `mailId` is non-nil the
+    /// screen opens in its create frame for that mail.
+    case mailTaskList(mailId: String?, mailSubject: String?, mailSender: String?)
     /// A17.13 — Auto-translated mail view. `pantopus://mailbox/translation?id=`.
     case mailTranslation(mailId: String)
     /// A17.14 — Scan-first capture (unboxing) flow. `pantopus://mailbox/unboxing`.
     case unboxing(mailId: String?)
+    /// A17.8 → "Ask a Neighbor" — package-help gig created from a mailbox
+    /// package. `pantopus://mailbox/gig?id=&mode=pre|post`.
+    case packageGig(mailId: String, isPreDelivery: Bool)
+    /// A17.4 — Community mail feed (neighborhood / civic). Reached from
+    /// the Mailbox root overflow menu.
+    case communityMail
+    /// Home Records — the linked-asset hub. Reached from the Mailbox
+    /// root overflow menu.
+    case homeRecords
     /// A10.11 — Earn dashboard (Wallet sibling). `pantopus://mailbox/earn`.
     case earn
     /// A10.7 — Business owner view. `pantopus://businesses/:id`.
     case businessOwner(businessId: String)
     /// B2C — Business team & roles management. `pantopus://businesses/:id/team`.
     case businessTeam(businessId: String)
+    /// C3 — Business Stripe Connect payouts.
+    /// `pantopus://businesses/:id/payments`.
+    case businessPaymentsOwner(businessId: String)
+    /// C3 — Business invoicing (list / create / void).
+    /// `pantopus://businesses/:id/invoices`.
+    case businessInvoicesOwner(businessId: String)
+    /// C3 — Business legal record + verification.
+    /// `pantopus://businesses/:id/legal`.
+    case businessLegal(businessId: String)
     /// Locations & Hours list MVP. `pantopus://businesses/:id/locations`.
     case businessLocations(businessId: String)
     /// A18.5 — "View as" identity preview. `pantopus://identity/preview`.
@@ -470,10 +545,14 @@ public struct HubTabRoot: View {
             path.append(.trustedNeighbors(homeId: homeId))
         case .security:
             path.append(.homeSecurity(homeId: homeId))
+        case .ownershipSecurity:
+            path.append(.homeOwnershipSecurity(homeId: homeId))
         case .people:
             path.append(.homeMembers(homeId: homeId))
         case .inviteLink:
-            modalRoute = HubModalRoute(route: .addGuest(homeId: homeId))
+            // A13.6 — the guest-pass manager (Active / Past + revoke).
+            // The Add Guest form is reachable from its FAB.
+            path.append(.guestPasses(homeId: homeId))
         case .homeNotifications:
             path.append(.homeNotifications(homeId: homeId))
         case .leaveHome:
@@ -484,7 +563,7 @@ public struct HubTabRoot: View {
     }
 
     @MainActor
-    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId: String) {
+    private func handleWaitingRoomNav(_ nav: WaitingRoomNav, homeId _: String) {
         switch nav {
         case .notifications:
             path.append(.notifications)
@@ -500,6 +579,17 @@ public struct HubTabRoot: View {
             path.append(.claimOwnership(homeId: id))
         case let .cancelClaim(id):
             path.append(.cancelClaim(homeId: id))
+        // Verification Center action cards.
+        case let .verifyPostcard(id):
+            path.append(.postcardVerification(homeId: id))
+        case let .uploadProof(id):
+            path.append(.verifyResidency(homeId: id))
+        case let .landlordVerification(id):
+            path.append(.verifyLandlord(homeId: id))
+        case let .leaveHome(id):
+            path.append(.leaveHome(homeId: id))
+        case .requestHelp:
+            path.append(.helpCenter)
         }
     }
 
@@ -596,7 +686,7 @@ public struct HubTabRoot: View {
         case .mailbox: return .mailboxRoot
         case .profileAndPrivacy: return .privacySettings
         case .beaconUpdates: return .beaconsFeed
-        case .search: return .gigSearch
+        case .search: return .universalSearch
         case .discoverNeighbors: return .discoverHub
         case .myBeacon: return .myBeacon
         case .myListings: return .marketplace
@@ -612,7 +702,7 @@ public struct HubTabRoot: View {
         case .homeProperty: return .propertyDetails(homeId: homeId)
         case .homeOverview: return .homeDashboard(homeId: homeId)
         case .homeTasks: return .homeTasks(homeId: homeId)
-        case .homeIssues: return .homeMaintenance(homeId: homeId)
+        case .homeIssues: return .homeIssues(homeId: homeId)
         case .homeBills: return .homeBills(homeId: homeId)
         case .homeMembers: return .homeMembers(homeId: homeId)
         case .homeMailbox: return .mailboxRoot
@@ -626,13 +716,35 @@ public struct HubTabRoot: View {
         case .businessProfileRow: return .businessProfile(businessId: businessId)
         case .businessLocations: return .businessLocations(businessId: businessId)
         case .businessCatalog: return .placeholder(label: "Catalog")
-        case .businessPages: return .editBusinessPage(businessId: businessId)
+        // C4 — the drawer's "Pages" row now opens the custom-pages CMS, not
+        // the profile-field editor it used to alias.
+        case .businessPages: return .businessPages(businessId: businessId)
         case .businessPostTask: return .quickPostGig(category: GigsCategory.all.rawValue)
         case .businessChat: return .placeholder(label: "Business Chat")
         case .businessTeam: return .businessTeam(businessId: businessId)
         case .businessReviews: return .placeholder(label: "Reviews")
-        case .businessPayments: return .paymentsSettings
+        // C3 — the business drawer's Payments row belongs on the business's
+        // own Stripe Connect surface, not on the personal payout settings.
+        case .businessPayments: return .businessPaymentsOwner(businessId: businessId)
         case .businessSettings: return .placeholder(label: "Business Settings")
+        }
+    }
+
+    /// S2 — maps a universal-search result onto the route that opens it.
+    /// Mirrors Android `routeForUniversalSearch(...)` in
+    /// `RootTabScreen.kt`.
+    static func route(forUniversalSearch destination: UniversalSearchDestination) -> HubRoute {
+        switch destination {
+        case let .task(gigId): .gigDetail(gigId: gigId)
+        case let .person(userId): .publicProfile(userId: userId)
+        case let .beacon(handle): .beaconProfile(handle: handle)
+        case let .business(businessId): .businessProfile(businessId: businessId)
+        // Home rows come from `/api/homes/discover`, which only returns
+        // `public_preview` homes the viewer may not belong to. The home
+        // dashboard falls back to the public profile for non-members
+        // (`HomeDashboardViewModel.fetchPublicProfile`), so it is the
+        // correct landing surface for both cases.
+        case let .home(homeId): .homeDashboard(homeId: homeId)
         }
     }
 
@@ -699,6 +811,11 @@ public struct HubTabRoot: View {
         case .discoverHub:
             path.append(.discoverHub)
             _ = router.consume()
+        case let .hubToday(briefingDeliveryId, kind):
+            // Morning/Evening Briefing push → the stored delivery, not just
+            // the live `/api/hub/today` snapshot.
+            path.append(.todayDetail(briefingDeliveryId: briefingDeliveryId, briefingKind: kind))
+            _ = router.consume()
         case .wallet:
             path.append(.wallet)
             _ = router.consume()
@@ -747,6 +864,11 @@ public struct HubTabRoot: View {
         case let .businessProfile(businessId):
             path.append(.businessProfile(businessId: businessId))
             _ = router.consume()
+        case let .businessPage(businessId, pageSlug):
+            // C4 — `pantopus://b/:username/:slug` keeps the slug so the named
+            // custom page opens, matching RN's `?pageSlug=` redirect.
+            path.append(.businessProfilePage(businessId: businessId, pageSlug: pageSlug))
+            _ = router.consume()
         case let .editBusinessPage(businessId):
             path.append(.editBusinessPage(businessId: businessId))
             _ = router.consume()
@@ -769,6 +891,10 @@ public struct HubTabRoot: View {
         case let .unboxing(mailId):
             path.append(.mailboxRoot)
             path.append(.unboxing(mailId: mailId))
+            _ = router.consume()
+        case let .packageGig(mailId, isPreDelivery):
+            path.append(.mailboxRoot)
+            path.append(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
             _ = router.consume()
         case .earn:
             path.append(.mailboxRoot)
@@ -795,6 +921,8 @@ public struct HubTabRoot: View {
         HubView { intent in
             switch intent {
             case .openNotifications: path.append(.notifications)
+            case .openAudienceNotifications:
+                path.append(.notificationsZone(context: NotificationsZone.audience.rawValue))
             case .openMenu: showNavDrawer = true
             case .startVerification: path.append(.addHome)
             case .action(.addHome): path.append(.addHome)
@@ -808,15 +936,32 @@ public struct HubTabRoot: View {
             case .openProfile: onOpenProfile()
             case let .openDiscovery(item): path.append(Self.route(forDiscovery: item))
             case .openDiscoverHub: path.append(.discoverHub)
+            case .openExploreMap: path.append(.explore)
+            case .openFindBusinesses: path.append(.discoverBusinesses)
             case let .jumpBackIn(item):
                 if item.route.hasPrefix("/app/chat") {
                     rootTabs.selected = .messages
                 } else {
                     path.append(Self.route(forJumpBackIn: item))
                 }
+            case let .statusItem(item):
+                // `statusItems[].route` uses the same canonical web paths
+                // as `jumpBackIn[].route`, so they share one resolver.
+                if item.route.hasPrefix("/app/chat") {
+                    rootTabs.selected = .messages
+                } else {
+                    path.append(Self.route(
+                        forJumpBackIn: JumpBackItem(
+                            id: item.id,
+                            title: item.title,
+                            icon: item.icon,
+                            route: item.route
+                        )
+                    ))
+                }
             // `openToday` taps the weather/today card → full Today briefing
             // (A10.3 — weather, air, daylight, and neighbourhood signals).
-            case .openToday: path.append(.todayDetail)
+            case .openToday: path.append(.todayDetail(briefingDeliveryId: nil, briefingKind: nil))
             case .openRecentActivity: path.append(.recentActivity)
             }
         }
@@ -940,7 +1085,14 @@ public struct HubTabRoot: View {
             MyHomesListView(
                 viewModel: MyHomesListViewModel(
                     onOpenHome: { homeId in Task { @MainActor in push(.homeDashboard(homeId: homeId)) } },
-                    onAddHome: { Task { @MainActor in push(.addHome) } }
+                    onAddHome: { Task { @MainActor in push(.addHome) } },
+                    onFindHome: { Task { @MainActor in push(.findHome) } },
+                    onUploadOwnershipEvidence: { homeId in
+                        Task { @MainActor in push(.claimOwnership(homeId: homeId)) }
+                    },
+                    onVerifyResidency: { homeId in
+                        Task { @MainActor in push(.verifyResidency(homeId: homeId)) }
+                    }
                 )
             )
         case .myBusinesses:
@@ -1035,6 +1187,23 @@ public struct HubTabRoot: View {
                 },
                 onOpenSettings: { id in
                     Task { @MainActor in push(.homeSettings(homeId: id)) }
+                },
+                onHireHelp: { categoryKey in
+                    // H1 — "Hire" on a seasonal-checklist item opens the
+                    // gig composer pre-filtered to the item's category.
+                    Task { @MainActor in push(.composeGig(category: categoryKey)) }
+                },
+                onAddTask: { id in
+                    Task { @MainActor in push(.addHouseholdTask(homeId: id)) }
+                },
+                onTrackBill: { id in
+                    Task { @MainActor in push(.addBill(homeId: id)) }
+                },
+                onTrackPackage: { id in
+                    Task { @MainActor in push(.logPackage(homeId: id)) }
+                },
+                onSendMail: { _ in
+                    Task { @MainActor in push(.ceremonialMail) }
                 }
             )
         case let .homeMaintenance(homeId):
@@ -1048,9 +1217,14 @@ public struct HubTabRoot: View {
                     },
                     onAddTask: {
                         Task { @MainActor in push(.logMaintenance(homeId: homeId)) }
+                    },
+                    onOpenIssues: {
+                        Task { @MainActor in push(.homeIssues(homeId: homeId)) }
                     }
                 )
             )
+        case let .homeIssues(homeId):
+            HomeIssuesListView(homeId: homeId)
         case let .logMaintenance(homeId):
             LogMaintenanceFormView(
                 viewModel: LogMaintenanceFormViewModel(homeId: homeId),
@@ -1438,6 +1612,12 @@ public struct HubTabRoot: View {
             HomeSecurityView(viewModel: HomeSecurityViewModel(homeId: homeId)) {
                 pop()
             }
+        case let .homeOwnershipSecurity(homeId):
+            HomeOwnershipSecurityView(
+                viewModel: HomeOwnershipSecurityViewModel(homeId: homeId)
+            ) {
+                pop()
+            }
         case let .leaveHome(homeId):
             LeaveHomeView(
                 viewModel: LeaveHomeViewModel(homeId: homeId),
@@ -1447,10 +1627,11 @@ public struct HubTabRoot: View {
                     // home now 403s — drop it along with the settings stack.
                     path.removeAll { route in
                         switch route {
-                        case .leaveHome(let id) where id == homeId: true
-                        case .homeSettings(let id) where id == homeId: true
-                        case .homeSecurity(let id) where id == homeId: true
-                        case .homeDashboard(let id) where id == homeId: true
+                        case let .leaveHome(id) where id == homeId: true
+                        case let .homeSettings(id) where id == homeId: true
+                        case let .homeSecurity(id) where id == homeId: true
+                        case let .homeOwnershipSecurity(id) where id == homeId: true
+                        case let .homeDashboard(id) where id == homeId: true
                         default: false
                         }
                     }
@@ -1485,6 +1666,35 @@ public struct HubTabRoot: View {
                         return false
                     }
                     path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .claimOwnership = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
+                }
+            )
+        case let .verifyResidency(homeId):
+            ClaimOwnershipWizardView(
+                homeId: homeId,
+                verificationType: .residency,
+                onClose: {
+                    if !path.isEmpty { path.removeLast() }
+                },
+                onOpenClaimsList: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.myClaims)
+                },
+                onOpenFindHome: {
+                    path.removeAll { route in
+                        if case .verifyResidency = route { return true }
+                        return false
+                    }
+                    path.append(.findHome)
                 }
             )
         case let .verifyLandlord(homeId):
@@ -1533,6 +1743,30 @@ public struct HubTabRoot: View {
                     // A17.12 — the certified-notice "view task" affordance
                     // opens the mail-derived task keyed by its source mail.
                     Task { @MainActor in push(.mailTask(taskId: sourceMailId)) }
+                },
+                onOpenCeremonialMail: { ceremonialId in
+                    // Replace (not push) so Back returns to the Mailbox,
+                    // matching RN's `router.replace`.
+                    Task { @MainActor in
+                        if !path.isEmpty { path.removeLast() }
+                        push(.ceremonialMailOpen(mailId: ceremonialId))
+                    }
+                },
+                onCreateTask: {
+                    // A17.12 — RN's "Create Task" in the detail MORE row
+                    // (`src/app/mailbox/detail.tsx:221-227`).
+                    Task { @MainActor in
+                        push(.mailTaskList(mailId: mailId, mailSubject: nil, mailSender: nil))
+                    }
+                },
+                onOpenUnboxing: {
+                    Task { @MainActor in push(.unboxing(mailId: mailId)) }
+                },
+                onAskNeighbor: { isPreDelivery in
+                    // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                    Task { @MainActor in
+                        push(.packageGig(mailId: mailId, isPreDelivery: isPreDelivery))
+                    }
                 }
             )
         case let .publicProfile(userId):
@@ -1554,6 +1788,7 @@ public struct HubTabRoot: View {
         case let .businessProfile(businessId):
             BusinessProfileDestination(
                 businessId: businessId,
+                pageSlug: nil,
                 onBack: { Task { @MainActor in pop() } },
                 onOpenMessages: { destination in
                     Task { @MainActor in push(.chatConversation(destination)) }
@@ -1565,6 +1800,43 @@ public struct HubTabRoot: View {
                 },
                 onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
                 onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .businessProfilePage(businessId, pageSlug):
+            BusinessProfileDestination(
+                businessId: businessId,
+                pageSlug: pageSlug,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenMessages: { destination in
+                    Task { @MainActor in push(.chatConversation(destination)) }
+                },
+                onShare: {
+                    systemSheet = .share(
+                        items: ["Check out this business on Pantopus — \(InviteLinks.downloadURLString)"]
+                    )
+                },
+                onOpenReport: { Task { @MainActor in push(.placeholder(label: "Report business")) } },
+                onEdit: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } }
+            )
+        case let .businessPages(businessId):
+            BusinessPagesView(
+                businessId: businessId,
+                onBack: { Task { @MainActor in pop() } },
+                onOpenPage: { row in
+                    Task { @MainActor in
+                        push(.businessPageBlocks(
+                            businessId: businessId,
+                            pageId: row.id,
+                            pageTitle: row.title
+                        ))
+                    }
+                }
+            )
+        case let .businessPageBlocks(businessId, pageId, pageTitle):
+            BusinessPageBlocksView(
+                businessId: businessId,
+                pageId: pageId,
+                pageTitle: pageTitle,
+                onBack: { Task { @MainActor in pop() } }
             )
         case let .editBusinessPage(businessId):
             EditBusinessPageView(
@@ -1601,6 +1873,10 @@ public struct HubTabRoot: View {
                 },
                 onEdit: { id in
                     Task { @MainActor in push(.editPost(postId: id)) }
+                },
+                onOpenBusiness: { username in
+                    // "Nearby Providers" row → `/business/:username`.
+                    Task { @MainActor in push(.businessProfile(businessId: username)) }
                 }
             )
         case .mailboxVault:
@@ -1675,7 +1951,9 @@ public struct HubTabRoot: View {
                 },
                 onOpenInsights: { Task { @MainActor in push(.beaconInsights) } },
                 onCreateBeacon: {
-                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    // Empty id = "create" — the editor resolves the real
+                    // Beacon (or an empty create form) from GET /api/personas/me.
+                    Task { @MainActor in push(.editPersona(personaId: "")) }
                 },
                 onOpenLink: { url in UIApplication.shared.open(url) }
             )
@@ -1685,10 +1963,13 @@ public struct HubTabRoot: View {
                 onBack: { Task { @MainActor in pop() } },
                 onOpenLink: { url in UIApplication.shared.open(url) }
             )
-        case let .editPersona(personaId):
-            EditPersonaView(viewModel: EditPersonaViewModel(personaId: personaId)) {
-                if !path.isEmpty { path.removeLast() }
-            }
+        case .editPersona:
+            // The editor resolves the signed-in user's Beacon itself via
+            // GET /api/personas/me, so the route payload is advisory only.
+            EditPersonaView(
+                onClose: { if !path.isEmpty { path.removeLast() } },
+                onViewBeacon: { handle in Task { @MainActor in push(.beaconProfile(handle: handle)) } }
+            )
         case let .composeBroadcast(personaId):
             ComposeBroadcastView(
                 viewModel: .live(personaId: personaId) {
@@ -1704,7 +1985,7 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.composeBroadcast(personaId: personaId)) }
                 },
                 onOpenEditPersona: {
-                    Task { @MainActor in push(.editPersona(personaId: EditPersonaSampleData.personaId)) }
+                    Task { @MainActor in push(.editPersona(personaId: "")) }
                 },
                 onOpenBeacons: { Task { @MainActor in push(.beaconsFeed) } }
             )
@@ -1732,13 +2013,26 @@ public struct HubTabRoot: View {
                     Task { @MainActor in push(.tasksMap(categoryKey: category.rawValue)) }
                 },
                 onOpenSearch: { Task { @MainActor in push(.gigSearch) } },
-                onBack: pop
+                onBack: pop,
+                onOpenSupportTrain: { trainId in
+                    Task { @MainActor in push(.supportTrainDetail(supportTrainId: trainId)) }
+                },
+                onOpenMyTasks: { Task { @MainActor in push(.myTasks) } },
+                onOpenMySupportTrains: { Task { @MainActor in push(.supportTrains) } }
             )
         case .gigSearch:
             GigSearchView(
                 onOpenGig: { gigId in
                     Task { @MainActor in push(.gigDetail(gigId: gigId)) }
                 },
+                onBack: pop
+            )
+        case .universalSearch:
+            UniversalSearchView(
+                onOpen: { destination in
+                    Task { @MainActor in push(Self.route(forUniversalSearch: destination)) }
+                },
+                onBrowseNearbyBusinesses: { Task { @MainActor in push(.discoverBusinesses) } },
                 onBack: pop
             )
         case let .gigDetail(gigId):
@@ -1881,6 +2175,10 @@ public struct HubTabRoot: View {
             NotificationsView(
                 viewModel: NotificationsViewModel()
             ) { Task { @MainActor in pop() } }
+        case let .notificationsZone(context):
+            NotificationsView(
+                viewModel: NotificationsViewModel(initialContext: context)
+            ) { Task { @MainActor in pop() } }
         case .connections:
             ConnectionsView(
                 viewModel: ConnectionsViewModel(
@@ -1957,12 +2255,9 @@ public struct HubTabRoot: View {
                     )
                 },
                 onSignUp: {
-                    // Slot claim sheet wiring lands with the
-                    // editor surface in P3.7 follow-up — keep the
-                    // affordance visible per the design contract.
-                    Task { @MainActor in
-                        push(.placeholder(label: "Claim a slot"))
-                    }
+                    // S1 — the reserve sheet is owned by the detail
+                    // screen itself (`ReserveSlotSheet`), which posts
+                    // `POST …/slots/:slotId/reserve`. Nothing to push.
                 },
                 onEditSlot: { _ in
                     Task { @MainActor in
@@ -1994,10 +2289,19 @@ public struct HubTabRoot: View {
                             items: ["Join my support train on Pantopus — \(InviteLinks.downloadURLString)"]
                         )
                     },
-                    onConfirm: { _ in
-                        // POST `/api/support-trains/:id/reservations/:reservationId/confirm`
-                        // wiring lands with the editor surface; the VM's
-                        // optimistic patch is the user-facing feedback today.
+                    onConfirm: { reservationId in
+                        // S1 — the optimistic row flip is paired with the
+                        // real `POST …/reservations/:reservationId/confirm`
+                        // (`backend/routes/supportTrains.js:3214`).
+                        Task { @MainActor in
+                            _ = try? await APIClient.shared.request(
+                                SupportTrainActionsEndpoints.confirmDelivery(
+                                    supportTrainId: supportTrainId,
+                                    reservationId: reservationId
+                                ),
+                                as: EmptyResponse.self
+                            )
+                        }
                     },
                     onMessage: { _ in
                         Task { @MainActor in push(.placeholder(label: "Message helper")) }
@@ -2251,8 +2555,12 @@ public struct HubTabRoot: View {
             NotYetAvailableView(tabName: label, icon: .info)
         // Wave A — pre-staged placeholder destinations. When an A.x screen
         // ships, swap its single line below for the real view.
-        case .todayDetail:
+        case let .todayDetail(briefingDeliveryId, briefingKind):
             TodayDetailView(
+                viewModel: TodayDetailViewModel(
+                    briefingDeliveryId: briefingDeliveryId,
+                    requestedKind: briefingKind
+                ),
                 onBack: pop,
                 onShare: {
                     systemSheet = .share(items: ["Today's Pantopus briefing — \(InviteLinks.downloadURLString)"])
@@ -2275,9 +2583,23 @@ public struct HubTabRoot: View {
             AddGuestFormView(
                 viewModel: AddGuestFormViewModel(homeId: homeId)
             )
+        case let .guestPasses(homeId):
+            // A13.6 — Guest-pass manager. The FAB pushes the Add Guest
+            // form; popping back re-fetches so the new pass appears.
+            GuestPassesListView(homeId: homeId) {
+                Task { @MainActor in push(.addGuest(homeId: homeId)) }
+            }
         case let .transferOwnership(homeId):
+            let transferUser: UserDTO? = {
+                if case let .signedIn(user) = auth.state { return user }
+                return nil
+            }()
             TransferOwnershipView(
-                viewModel: TransferOwnershipViewModel(homeId: homeId)
+                viewModel: TransferOwnershipViewModel(
+                    homeId: homeId,
+                    currentUserId: transferUser?.id,
+                    currentUserName: transferUser?.displayName ?? transferUser?.username
+                )
             )
         case let .tasksMap(categoryKey):
             TasksMapView(
@@ -2302,6 +2624,12 @@ public struct HubTabRoot: View {
                         case .item: push(.listingDetail(listingId: entity.id))
                         case .post: push(.pulsePost(postId: entity.id))
                         case .spot: push(.businessProfile(businessId: entity.id))
+                        // `homes` markers are neighborhood addresses, not
+                        // homes the viewer owns — the backend has no
+                        // viewer-facing detail route for someone else's
+                        // home, so the tap selects the pin and the rail
+                        // card carries the address + locality.
+                        case .home: break
                         }
                     }
                 },
@@ -2338,9 +2666,40 @@ public struct HubTabRoot: View {
                     onOpenEarn: { push(.earn) },
                     onOpenVacationHold: { push(.vacationHold) },
                     onOpenStamps: { push(.stamps) },
-                    onOpenUnboxing: { push(.unboxing(mailId: nil)) }
+                    onOpenUnboxing: { push(.unboxing(mailId: nil)) },
+                    onOpenCompose: { push(.ceremonialMail) },
+                    onOpenRoutingQueue: { push(.mailRoutingQueue) },
+                    onOpenCommunity: { push(.communityMail) },
+                    onOpenRecords: { push(.homeRecords) },
+                    onOpenMailTasks: {
+                        push(.mailTaskList(mailId: nil, mailSubject: nil, mailSender: nil))
+                    }
                 )
             )
+        case .communityMail:
+            CommunityMailView(viewModel: CommunityMailViewModel(onBack: { pop() }))
+        case .homeRecords:
+            HomeRecordsView(
+                viewModel: HomeRecordsViewModel(
+                    onBack: { pop() },
+                    onOpenMail: { mailId in
+                        Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                    }
+                )
+            )
+        case .ceremonialMail:
+            CeremonialMailWizardView(
+                onDismiss: { Task { @MainActor in pop() } },
+                onOpenMail: { _ in Task { @MainActor in pop() } }
+            )
+        case let .ceremonialMailOpen(mailId):
+            CeremonialMailOpenView(
+                viewModel: CeremonialMailOpenViewModel(mailId: mailId),
+                onBack: { Task { @MainActor in pop() } },
+                onWriteBack: { _ in Task { @MainActor in push(.ceremonialMail) } }
+            )
+        case .mailRoutingQueue:
+            MailRoutingQueueView { Task { @MainActor in pop() } }
         case .mailboxMap:
             MailboxMapView { pop() }
         case .vacationHold:
@@ -2386,23 +2745,59 @@ public struct HubTabRoot: View {
                     onBack: { if !path.isEmpty { path.removeLast() } }
                 )
             )
+        case let .mailTaskList(mailId, mailSubject, mailSender):
+            // A17.12 (list) — every mail-linked task, plus the
+            // create-from-mail form when the route carries a mail id.
+            MailTaskListView(
+                viewModel: MailTaskListViewModel(
+                    mailId: mailId,
+                    mailSubject: mailSubject,
+                    mailSender: mailSender,
+                    onOpenTask: { taskId in
+                        Task { @MainActor in push(.mailTask(taskId: taskId)) }
+                    },
+                    onBack: { if !path.isEmpty { path.removeLast() } },
+                    onPostAsNeighborTask: { sourceMailId in
+                        // A17.8 — RN's "Post as Neighbor Task Instead"
+                        // (`mailbox/tasks.tsx:236`) always escalates in
+                        // post-delivery mode.
+                        Task { @MainActor in
+                            push(.packageGig(mailId: sourceMailId, isPreDelivery: false))
+                        }
+                    }
+                )
+            )
         case let .mailTranslation(mailId):
             MailTranslationView(
                 mailId: mailId,
                 onBack: { if !path.isEmpty { path.removeLast() } },
                 onReply: { _ in Task { @MainActor in push(.placeholder(label: "Reply in English")) } }
             )
-        case .unboxing:
-            // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-            // (OCR / classification / vault upload are out of scope), so the
-            // `mailId` payload is unused today; it rides the route for when a
-            // real originating-mail fetch lands.
+        case let .unboxing(mailId):
+            // A17.14 — the capture flow loads the real `MailPackage` row for
+            // `mailId` and every action writes to `/api/mailbox/v2/p2`.
+            // Without a mail id there is nothing to persist, and the screen
+            // says so rather than projecting a fixture.
             let openDrawer: @MainActor () -> Void = {
-                Task { @MainActor in push(.placeholder(label: "Home drawer")) }
+                Task { @MainActor in push(.mailboxVault) }
             }
             UnboxingView(
-                viewModel: UnboxingViewModel(onOpenDrawer: openDrawer)
+                viewModel: UnboxingViewModel(mailId: mailId, onOpenDrawer: openDrawer)
             ) { if !path.isEmpty { path.removeLast() } }
+        case let .packageGig(mailId, isPreDelivery):
+            // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+            // `POST /api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+            // into the created gig, matching RN `mailbox/gig.tsx`.
+            PackageGigView(
+                viewModel: PackageGigViewModel(
+                    mailId: mailId,
+                    isPreDelivery: isPreDelivery,
+                    onBack: { if !path.isEmpty { path.removeLast() } },
+                    onOpenGig: { gigId in
+                        Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                    }
+                )
+            )
         case .earn:
             EarnView(
                 onBack: pop,
@@ -2423,10 +2818,32 @@ public struct HubTabRoot: View {
                 onEditPage: { Task { @MainActor in push(.editBusinessPage(businessId: businessId)) } },
                 onOpenInsights: { Task { @MainActor in push(.placeholder(label: "Insights")) } },
                 onOpenSettings: { Task { @MainActor in push(.placeholder(label: "Business settings")) } },
-                onOpenTeam: { Task { @MainActor in push(.businessTeam(businessId: businessId)) } }
+                onOpenTeam: { Task { @MainActor in push(.businessTeam(businessId: businessId)) } },
+                onOpenPages: { Task { @MainActor in push(.businessPages(businessId: businessId)) } },
+                onOpenPayments: { Task { @MainActor in push(.businessPaymentsOwner(businessId: businessId)) } },
+                onOpenInvoices: { Task { @MainActor in push(.businessInvoicesOwner(businessId: businessId)) } },
+                onOpenLegal: { Task { @MainActor in push(.businessLegal(businessId: businessId)) } },
+                onOpenChatRoom: { roomId, name, _ in
+                    Task { @MainActor in
+                        push(.chatConversation(InboxConversationDestination(
+                            mode: .room(id: roomId),
+                            displayName: name,
+                            initials: Self.initials(from: name),
+                            identityKind: nil,
+                            verified: false
+                        )))
+                    }
+                },
+                onOpenPost: { postId in Task { @MainActor in push(.pulsePost(postId: postId)) } }
             )
         case let .businessTeam(businessId):
             BusinessTeamView(businessId: businessId)
+        case let .businessPaymentsOwner(businessId):
+            BusinessPaymentsView(businessId: businessId)
+        case let .businessInvoicesOwner(businessId):
+            BusinessInvoicesView(businessId: businessId)
+        case let .businessLegal(businessId):
+            BusinessLegalView(businessId: businessId)
         case let .businessLocations(businessId):
             BusinessLocationsView(businessId: businessId)
         case .viewAs:
@@ -2444,12 +2861,30 @@ public struct HubTabRoot: View {
                 onNav: { nav in handleWaitingRoomNav(nav, homeId: homeId) }
             )
         case .addHome:
-            AddHomeWizardView { homeId in
-                // Replace the wizard with the dashboard so Back goes to
-                // MyHomes, not the success screen.
-                path.removeAll { $0 == .addHome }
-                path.append(.homeDashboard(homeId: homeId))
-            }
+            AddHomeWizardView(
+                onOpenHomeDashboard: { homeId in
+                    // Replace the wizard with the dashboard so Back goes to
+                    // MyHomes, not the success screen.
+                    path.removeAll { $0 == .addHome }
+                    path.append(.homeDashboard(homeId: homeId))
+                },
+                onOpenClaimOwnership: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.claimOwnership(homeId: homeId))
+                },
+                onOpenWaitingRoom: { homeId in
+                    path.removeAll { $0 == .addHome }
+                    path.append(.waitingRoom(homeId: homeId))
+                }
+            )
+        case .findHome:
+            FindHomeView(
+                onBack: { pop() },
+                onOpenClaimOwnership: { homeId in
+                    Task { @MainActor in push(.claimOwnership(homeId: homeId)) }
+                },
+                onOpenAddHome: { Task { @MainActor in push(.addHome) } }
+            )
         case let .placeDashboard(homeId):
             PlaceDashboardView(
                 viewModel: PlaceDashboardViewModel(
@@ -2625,6 +3060,9 @@ extension HubRoute: Identifiable {
 @MainActor
 private struct BusinessProfileDestination: View {
     let businessId: String
+    /// C4 — non-nil when the `pantopus://b/:username/:slug` link named a
+    /// custom page; the profile then loads that page's published blocks.
+    var pageSlug: String?
     let onBack: @MainActor () -> Void
     let onOpenMessages: @MainActor (InboxConversationDestination) -> Void
     let onShare: @MainActor () -> Void
@@ -2636,6 +3074,7 @@ private struct BusinessProfileDestination: View {
     var body: some View {
         BusinessProfileView(
             businessId: businessId,
+            pageSlug: pageSlug,
             onBack: onBack,
             onOpenMessages: onOpenMessages,
             onShare: onShare,

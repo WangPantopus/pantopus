@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
+@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "LongParameterList")
 
 package app.pantopus.android.ui.screens.homes.pets
 
@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -154,8 +155,12 @@ fun AddPetWizardSheet(
                     AddPetStep.Details ->
                         DetailsStep(
                             photoUrl = state.form.photoUrl,
+                            vetName = state.form.vetName,
+                            vetPhone = state.form.vetPhone,
                             notes = state.form.notes,
                             onPhoto = viewModel::setPhotoUrl,
+                            onVetName = viewModel::setVetName,
+                            onVetPhone = viewModel::setVetPhone,
                             onNotes = viewModel::setNotes,
                         )
                 }
@@ -268,8 +273,12 @@ private fun BasicsStep(
 @Composable
 private fun DetailsStep(
     photoUrl: String,
+    vetName: String,
+    vetPhone: String,
     notes: String,
     onPhoto: (String) -> Unit,
+    onVetName: (String) -> Unit,
+    onVetPhone: (String) -> Unit,
     onNotes: (String) -> Unit,
 ) {
     HeadlineBlock(AddPetStep.Details.title)
@@ -281,6 +290,21 @@ private fun DetailsStep(
             onValueChange = onPhoto,
             placeholder = "https://…/mango.jpg",
             fieldTestTag = "addPet_photoUrl",
+        )
+        PantopusTextField(
+            label = "Vet name (optional)",
+            value = vetName,
+            onValueChange = onVetName,
+            placeholder = "Bay Area Animal Hospital",
+            fieldTestTag = "addPet_vetName",
+        )
+        PantopusTextField(
+            label = "Vet phone (optional)",
+            value = vetPhone,
+            onValueChange = onVetPhone,
+            placeholder = "(415) 555-0142",
+            keyboardType = KeyboardType.Phone,
+            fieldTestTag = "addPet_vetPhone",
         )
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             Text(

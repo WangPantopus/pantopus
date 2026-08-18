@@ -48,6 +48,17 @@ public struct SupportTrainDetailDTO: Decodable, Sendable {
     public let viewerSupportTrainRole: String?
     public let exactAddressShared: Bool?
     public let coarseLocation: SupportTrainCoarseLocationDTO?
+    /// Exact street address — **only present when the server decides the
+    /// viewer may see it** (organizer / recipient / a helper the organizer
+    /// granted, `backend/routes/supportTrains.js:3704`). Never derived or
+    /// cached client-side: when a reveal succeeds the screen re-fetches
+    /// `GET /:id` and re-reads this field.
+    public let address: SupportTrainAddressDTO?
+    public let deliveryInstructions: String?
+    public let specialInstructions: String?
+    /// Organizer-only echo of the parent Activity's visibility
+    /// (`backend/routes/supportTrains.js:3699`).
+    public let activityVisibility: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, story, status, slots, updates, organizers
@@ -67,6 +78,60 @@ public struct SupportTrainDetailDTO: Decodable, Sendable {
         case viewerSupportTrainRole = "viewer_support_train_role"
         case exactAddressShared = "exact_address_shared"
         case coarseLocation = "coarse_location"
+        case address
+        case deliveryInstructions = "delivery_instructions"
+        case specialInstructions = "special_instructions"
+        case activityVisibility = "activity_visibility"
+    }
+
+    /// `primary` / `co_organizer` / `recipient_delegate` hold organizer
+    /// powers; the backend gates every management route on exactly this
+    /// set (`backend/middleware/supportTrainPermissions.js:51`).
+    public var viewerIsOrganizer: Bool {
+        viewerLevel == "organizer"
+    }
+
+    /// Only the primary organizer may unpublish / archive / delete the
+    /// train or edit the co-organizer roster.
+    public var viewerIsPrimaryOrganizer: Bool {
+        viewerSupportTrainRole == "primary"
+    }
+}
+
+/// Exact delivery address (`backend/routes/supportTrains.js:3727`).
+public struct SupportTrainAddressDTO: Decodable, Sendable, Hashable {
+    public let address: String?
+    public let unitNumber: String?
+    public let city: String?
+    public let state: String?
+    public let zipCode: String?
+
+    public init(
+        address: String?,
+        unitNumber: String?,
+        city: String?,
+        state: String?,
+        zipCode: String?
+    ) {
+        self.address = address
+        self.unitNumber = unitNumber
+        self.city = city
+        self.state = state
+        self.zipCode = zipCode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case address, city, state
+        case unitNumber = "unit_number"
+        case zipCode = "zip_code"
+    }
+
+    /// Single-line label used by the "Open in Maps" affordance. Mirrors
+    /// RN's `exactAddressLabel` (`src/app/support-trains/[id].tsx:413`).
+    public var singleLineLabel: String {
+        let first = [address, unitNumber].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        let second = [city, state, zipCode].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+        return [first, second].filter { !$0.isEmpty }.joined(separator: ", ")
     }
 }
 
@@ -168,14 +233,44 @@ public struct SupportTrainUpdateDTO: Decodable, Sendable, Identifiable, Hashable
 }
 
 /// One organizer row (primary / co_organizer / recipient_delegate).
+///
+/// The detail handler re-shapes Supabase's `User:user_id` alias into a
+/// lowercase `user` object before responding
+/// (`backend/routes/supportTrains.js:3611`), so `user` is the wire key.
+/// The capitalised `User` alias is still accepted for older fixtures.
 public struct SupportTrainOrganizerDTO: Decodable, Sendable, Identifiable, Hashable {
     public let id: String
     public let role: String?
     public let user: SupportTrainHelperDTO?
 
+    public init(id: String, role: String?, user: SupportTrainHelperDTO?) {
+        self.id = id
+        self.role = role
+        self.user = user
+    }
+
     enum CodingKeys: String, CodingKey {
-        case id, role
-        case user = "User"
+        case id, role, user
+        case legacyUser = "User"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        role = try container.decodeIfPresent(String.self, forKey: .role)
+        let lowercase = try container.decodeIfPresent(SupportTrainHelperDTO.self, forKey: .user)
+        user = try lowercase
+            ?? container.decodeIfPresent(SupportTrainHelperDTO.self, forKey: .legacyUser)
+    }
+
+    /// `primary` organizers cannot be removed from the roster
+    /// (`backend/routes/supportTrains.js:1102`).
+    public var isPrimary: Bool {
+        role == "primary"
+    }
+
+    public var displayName: String {
+        user?.name ?? user?.username ?? "Organizer"
     }
 }
 

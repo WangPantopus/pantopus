@@ -25,11 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +72,8 @@ fun ProfessionalProfileScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val showsDisableConfirm by viewModel.showsDisableConfirm.collectAsStateWithLifecycle()
+    val isDisabling by viewModel.isDisabling.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -89,12 +93,28 @@ fun ProfessionalProfileScreen(
     ) {
         when (val current = state) {
             ProfessionalProfileUiState.Loading -> ProfessionalProfileSkeleton()
+            is ProfessionalProfileUiState.Create ->
+                ProfessionalEnableForm(
+                    draft = current.draft,
+                    onBack = onBack,
+                    onEnable = viewModel::enable,
+                    onHeadlineChange = viewModel::updateDraftHeadline,
+                    onBioChange = viewModel::updateDraftBio,
+                    onToggleCategory = viewModel::toggleDraftCategory,
+                    onCityChange = viewModel::updateDraftCity,
+                    onStateChange = viewModel::updateDraftState,
+                    onRadiusChange = viewModel::updateDraftRadius,
+                    onHourlyRateChange = viewModel::updateDraftHourlyRate,
+                    onPublicChange = viewModel::setDraftPublic,
+                )
             is ProfessionalProfileUiState.Verified ->
                 ProfessionalProfileLoaded(
                     content = current.content,
                     mode = ProStickyMode.Saved,
                     dirtyCount = 0,
                     pendingCount = current.content.pendingCount,
+                    isDisabling = isDisabling,
+                    onDisable = viewModel::requestDisable,
                     onBack = onBack,
                     onDiscard = viewModel::discard,
                     onSaveSubmit = viewModel::saveAndSubmit,
@@ -106,6 +126,12 @@ fun ProfessionalProfileScreen(
                     onRemoveCertification = viewModel::removeCertification,
                     onAddPortfolioLink = viewModel::addPortfolioLink,
                     onVisibilityChange = viewModel::setVisibility,
+                    onToggleCategory = viewModel::toggleCategory,
+                    onServiceCityChange = viewModel::updateServiceCity,
+                    onServiceStateChange = viewModel::updateServiceState,
+                    onServiceRadiusChange = viewModel::updateServiceRadius,
+                    onHourlyRateChange = viewModel::updateHourlyRate,
+                    onStartVerification = { viewModel.startVerification() },
                 )
             is ProfessionalProfileUiState.Pending ->
                 ProfessionalProfileLoaded(
@@ -113,6 +139,8 @@ fun ProfessionalProfileScreen(
                     mode = ProStickyMode.PendingSave,
                     dirtyCount = current.dirtyCount,
                     pendingCount = current.pendingCount,
+                    isDisabling = isDisabling,
+                    onDisable = viewModel::requestDisable,
                     onBack = onBack,
                     onDiscard = viewModel::discard,
                     onSaveSubmit = viewModel::saveAndSubmit,
@@ -124,6 +152,12 @@ fun ProfessionalProfileScreen(
                     onRemoveCertification = viewModel::removeCertification,
                     onAddPortfolioLink = viewModel::addPortfolioLink,
                     onVisibilityChange = viewModel::setVisibility,
+                    onToggleCategory = viewModel::toggleCategory,
+                    onServiceCityChange = viewModel::updateServiceCity,
+                    onServiceStateChange = viewModel::updateServiceState,
+                    onServiceRadiusChange = viewModel::updateServiceRadius,
+                    onHourlyRateChange = viewModel::updateHourlyRate,
+                    onStartVerification = { viewModel.startVerification() },
                 )
             is ProfessionalProfileUiState.Error ->
                 EmptyState(
@@ -147,6 +181,23 @@ fun ProfessionalProfileScreen(
             )
         }
     }
+
+    if (showsDisableConfirm) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDisableConfirm,
+            title = { Text("Disable professional mode?") },
+            text = { Text("Your profile will no longer be visible to the public.") },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::disableConfirmed,
+                    modifier = Modifier.testTag("proDisableConfirmButton"),
+                ) { Text("Disable") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDisableConfirm) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 internal enum class ProStickyMode { Saved, PendingSave }
@@ -157,6 +208,8 @@ internal fun ProfessionalProfileLoaded(
     mode: ProStickyMode,
     dirtyCount: Int,
     pendingCount: Int,
+    isDisabling: Boolean,
+    onDisable: () -> Unit,
     onBack: () -> Unit,
     onDiscard: () -> Unit,
     onSaveSubmit: () -> Unit,
@@ -168,6 +221,12 @@ internal fun ProfessionalProfileLoaded(
     onRemoveCertification: (String) -> Unit,
     onAddPortfolioLink: () -> Unit,
     onVisibilityChange: (String, Boolean) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onServiceCityChange: (String) -> Unit,
+    onServiceStateChange: (String) -> Unit,
+    onServiceRadiusChange: (String) -> Unit,
+    onHourlyRateChange: (String) -> Unit,
+    onStartVerification: () -> Unit,
 ) {
     FormShell(
         title = "Professional profile",
@@ -198,13 +257,83 @@ internal fun ProfessionalProfileLoaded(
             onAddSkill = onAddSkill,
             onRemoveSkill = onRemoveSkill,
         )
+        CategoriesSection(content = content, onToggleCategory = onToggleCategory)
+        ServiceAreaSection(
+            content = content,
+            onServiceCityChange = onServiceCityChange,
+            onServiceStateChange = onServiceStateChange,
+            onServiceRadiusChange = onServiceRadiusChange,
+            onHourlyRateChange = onHourlyRateChange,
+        )
         CertificationsSection(
             content = content,
             onAddCertification = onAddCertification,
             onRemoveCertification = onRemoveCertification,
         )
         PortfolioSection(content = content, onAddPortfolioLink = onAddPortfolioLink)
+        VerificationSection(content = content, onStartVerification = onStartVerification)
         VisibilitySection(content = content, onVisibilityChange = onVisibilityChange)
+        DisableSection(isDisabling = isDisabling, onDisable = onDisable)
+    }
+}
+
+/**
+ * RN's destructive "Disable" action (`professional.tsx:410`). Soft disable —
+ * `DELETE api/professional/profile/me` keeps the record, so the screen falls
+ * back to the re-enable form.
+ */
+@Composable
+private fun DisableSection(
+    isDisabling: Boolean,
+    onDisable: () -> Unit,
+) {
+    ProSection("Professional mode") {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.error.copy(alpha = 0.4f), RoundedCornerShape(Radii.lg))
+                    .clickable(enabled = !isDisabling, onClick = onDisable)
+                    .padding(Spacing.s3)
+                    .testTag("proDisableButton")
+                    .semantics {
+                        contentDescription = "Disable professional mode. Your profile will no longer be visible to the public"
+                        role = Role.Button
+                    },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Disable professional mode",
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.error,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Your profile will no longer be visible to the public.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            if (isDisabling) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    color = PantopusColors.error,
+                    modifier = Modifier.size(18.dp),
+                )
+            } else {
+                PantopusIconImage(
+                    icon = PantopusIcon.CircleSlash,
+                    contentDescription = null,
+                    size = 18.dp,
+                    tint = PantopusColors.error,
+                )
+            }
+        }
     }
 }
 
@@ -344,6 +473,184 @@ private fun SkillsSection(
     }
 }
 
+/**
+ * `categories[]` on `PATCH api/professional/profile/me`
+ * (`professional.js:190`). Server enum + 5-item cap (`professional.js:45`);
+ * mirrors RN's chip picker (`professional.tsx:494`).
+ */
+@Composable
+private fun CategoriesSection(
+    content: ProfessionalProfileContent,
+    onToggleCategory: (String) -> Unit,
+) {
+    ProSection("Categories") {
+        ProFieldLabel(
+            text = "Up to ${ProfessionalCategory.SELECTION_LIMIT}",
+            dirty = content.categoriesAreDirty,
+        )
+        FlowRow(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
+                    .padding(Spacing.s2)
+                    .testTag("proEditCategoryPicker"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            ProfessionalCategory.all.forEach { category ->
+                val isOn = content.categories.contains(category.key)
+                ProCategoryChip(
+                    label = category.label,
+                    isOn = isOn,
+                    isDisabled = !isOn && !content.canSelectMoreCategories,
+                    testTag = "proEditCategoryChip_${category.key}",
+                    onClick = { onToggleCategory(category.key) },
+                )
+            }
+        }
+        Text(
+            text = "Used to rank you in search and on the pro map.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
+}
+
+/**
+ * `service_area.city/state/radius_km` + `pricing_meta.hourly_rate`
+ * (`professional.js:47` and `:54`) — RN's editor writes the same four values
+ * (`professional.tsx:123`).
+ */
+@Composable
+private fun ServiceAreaSection(
+    content: ProfessionalProfileContent,
+    onServiceCityChange: (String) -> Unit,
+    onServiceStateChange: (String) -> Unit,
+    onServiceRadiusChange: (String) -> Unit,
+    onHourlyRateChange: (String) -> Unit,
+) {
+    ProSection("Service area & pricing") {
+        ProTextInput(
+            label = "City",
+            optional = true,
+            value = content.serviceCity.value,
+            placeholder = "City",
+            testTag = "proServiceCityField",
+            onValueChange = onServiceCityChange,
+        )
+        ProTextInput(
+            label = "State",
+            optional = true,
+            value = content.serviceState.value,
+            placeholder = "State",
+            testTag = "proServiceStateField",
+            onValueChange = onServiceStateChange,
+        )
+        ProTextInput(
+            label = "Radius (km)",
+            optional = true,
+            value = content.serviceRadiusKm.value,
+            placeholder = "50",
+            keyboardType = KeyboardType.Number,
+            testTag = "proServiceRadiusField",
+            onValueChange = onServiceRadiusChange,
+        )
+        ProTextInput(
+            label = "Hourly rate (USD)",
+            optional = true,
+            value = content.hourlyRate.value,
+            placeholder = "0",
+            keyboardType = KeyboardType.Decimal,
+            testTag = "proHourlyRateField",
+            onValueChange = onHourlyRateChange,
+        )
+    }
+}
+
+/**
+ * Verification status + RN's "Start verification" CTA
+ * (`professional.tsx:377-400`) — `POST api/professional/verification/start`
+ * (`professional.js:310`).
+ */
+@Composable
+private fun VerificationSection(
+    content: ProfessionalProfileContent,
+    onStartVerification: () -> Unit,
+) {
+    val tone = content.verification.status.tone
+    ProSection("Verification") {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                    .padding(Spacing.s3),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                modifier =
+                    Modifier
+                        .testTag("proVerificationStatus")
+                        .semantics { contentDescription = content.verification.summary },
+            ) {
+                PantopusIconImage(
+                    icon = tone.icon,
+                    contentDescription = null,
+                    size = 16.dp,
+                    tint = tone.foreground,
+                )
+                Text(
+                    text = content.verification.summary,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.appText,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (content.verification.canStart) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.business)
+                            .clickable(
+                                enabled = !content.verification.isStarting,
+                                onClick = onStartVerification,
+                            ).testTag("proStartVerificationButton")
+                            .semantics {
+                                contentDescription = "Start verification"
+                                role = Role.Button
+                            },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (content.verification.isStarting) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            color = PantopusColors.appTextInverse,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    } else {
+                        Text(
+                            text = "Start verification",
+                            style = PantopusTextStyle.small,
+                            color = PantopusColors.appTextInverse,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun CertificationsSection(
     content: ProfessionalProfileContent,
@@ -398,7 +705,7 @@ private fun VisibilitySection(
 }
 
 @Composable
-private fun ProSection(
+internal fun ProSection(
     overline: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -421,7 +728,7 @@ private fun ProSection(
 }
 
 @Composable
-private fun ProFieldLabel(
+internal fun ProFieldLabel(
     text: String,
     required: Boolean = false,
     optional: Boolean = false,
@@ -445,7 +752,7 @@ private fun ProFieldLabel(
 }
 
 @Composable
-private fun ProTextInput(
+internal fun ProTextInput(
     label: String,
     value: String,
     placeholder: String,
@@ -858,7 +1165,7 @@ private fun AddLinkRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun VisRow(
+internal fun VisRow(
     row: VisibilityRow,
     onToggle: (Boolean) -> Unit,
 ) {

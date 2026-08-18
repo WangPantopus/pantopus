@@ -2,9 +2,15 @@
 //  PublicProfileViewModel.swift
 //  Pantopus
 //
-//  Loads `GET /api/users/id/:id` and projects it onto the
-//  `StatsTabsBody` content model. Tab state lives in the VM so
-//  switching doesn't re-fetch.
+//  Loads the public profile and projects it onto the `StatsTabsBody`
+//  content model. Tab state lives in the VM so switching doesn't refetch.
+//
+//  T3 — the route param may be a UUID *or* a handle (`pantopus://u/mariak`,
+//  `https://pantopus.com/u/mariak`). We branch exactly like RN
+//  (`src/app/user/[id].tsx:27,53-58`): UUIDs go to `GET /api/users/id/:id`,
+//  handles to `GET /api/users/username/:username`. Both routes return the
+//  same body, and every follow-up call (relationship, follow, connect,
+//  block, posts) uses the *resolved* `profile.id`, never the raw param.
 //
 //  P6.5 — Persona vs Local chrome. The VM derives the profile kind
 //  from the loaded DTO's metadata so the screen can swap banner color,
@@ -192,6 +198,53 @@ public enum PublicProfileActionState: Sendable, Equatable {
     case failed(message: String)
 }
 
+/// The viewer↔profile connection edge, as reported by
+/// `GET /api/users/:id/relationship`
+/// (`backend/routes/users.js:3685` → `visibilityPolicy.getRelationshipStatus`,
+/// `backend/utils/visibilityPolicy.js:37`). Drives the Connect control's
+/// label and what tapping it does — RN's `connectionState`
+/// (`pantopus/frontend/apps/mobile/src/app/user/[id].tsx:80,203-221,392`).
+public enum ProfileConnection: String, Sendable, Equatable, Hashable, CaseIterable {
+    case none
+    case pendingSent = "pending_sent"
+    case pendingReceived = "pending_received"
+    case connected
+    case blocked
+
+    /// Decode the server's string, defaulting anything unrecognised to
+    /// `.none` — same fallback RN applies (`rel.relationship || 'none'`).
+    public init(apiValue: String?) {
+        self = ProfileConnection(rawValue: (apiValue ?? "").lowercased()) ?? .none
+    }
+
+    /// Connect-button copy. Mirrors RN `getConnectLabel`
+    /// (`src/app/user/[id].tsx:391-398`).
+    public var label: String {
+        switch self {
+        case .connected: "Connected"
+        case .pendingSent: "Requested"
+        case .pendingReceived: "Accept"
+        case .none, .blocked: "Connect"
+        }
+    }
+
+    /// RN disables the button only while a request is outstanding
+    /// (`disabled={actionLoading || connectionState === 'pending_sent'}`).
+    public var isActionable: Bool {
+        self != .pendingSent
+    }
+
+    /// VoiceOver copy — mirrored as the Android `contentDescription`.
+    public var accessibilityLabel: String {
+        switch self {
+        case .connected: "Connected. Tap to remove this connection"
+        case .pendingSent: "Connection requested"
+        case .pendingReceived: "Accept connection request"
+        case .none, .blocked: "Connect"
+        }
+    }
+}
+
 /// View-model for the public profile screen.
 @MainActor
 @Observable
@@ -215,6 +268,18 @@ public final class PublicProfileViewModel {
     /// `succeeded` after a successful `POST /api/relationships/requests`.
     public private(set) var connectState: PublicProfileActionState = .idle
 
+    /// The existing connection edge, seeded by
+    /// `GET /api/users/:id/relationship` on load and kept current after
+    /// every connect / accept / disconnect. Without it the Connect control
+    /// is one-way; with it the button reads Connect / Requested / Accept /
+    /// Connected exactly like RN.
+    public private(set) var connection: ProfileConnection = .none
+
+    /// Drives the "Remove connection?" confirm. RN's Connections centre
+    /// gates the same `DELETE /api/relationships/:id` behind an alert
+    /// (`src/app/connections.tsx:69-77`).
+    public var showDisconnectConfirm: Bool = false
+
     /// Block action state — surfaces toast on success or failure of
     /// `POST /api/users/:userId/block`.
     public private(set) var blockState: PublicProfileActionState = .idle
@@ -229,7 +294,21 @@ public final class PublicProfileViewModel {
     /// Transient toast surface used for action feedback.
     public var toastMessage: String?
 
-    private let userId: String
+    /// T3 — plain follow graph (`/api/users/:id/follow`), distinct from the
+    /// persona privacy handshake. `true` once the viewer follows this user.
+    public private(set) var isFollowing: Bool = false
+    /// In-flight guard for the follow/unfollow toggle.
+    public private(set) var isFollowInFlight: Bool = false
+    /// `true` when a Follow affordance should render at all — someone else's
+    /// profile, viewed by a signed-in user. Mirrors RN, which hides the whole
+    /// action row on your own profile (`src/app/user/[id].tsx:522`).
+    public private(set) var canFollow: Bool = false
+
+    /// The raw route param — may be a UUID or a `@handle`.
+    private let routeIdentifier: String
+    /// The resolved `User.id`, known only after the profile loads. Every
+    /// user-scoped mutation must use this, never `routeIdentifier`.
+    private var resolvedUserId: String
     private let currentUserId: String?
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.PublicProfile")
@@ -239,7 +318,8 @@ public final class PublicProfileViewModel {
         currentUserId: String? = PublicProfileViewModel.signedInUserId(),
         client: APIClient = .shared
     ) {
-        self.userId = userId
+        self.routeIdentifier = userId
+        self.resolvedUserId = userId
         self.currentUserId = currentUserId
         self.client = client
     }
@@ -263,18 +343,60 @@ public final class PublicProfileViewModel {
         await fetch()
     }
 
-    /// Send a connection request. Wraps
-    /// `POST /api/relationships/requests` (relationships.js:67).
+    // MARK: - Connect control (relationship-aware)
+
+    /// Copy on the Connect affordance for the current edge.
+    public var connectLabel: String {
+        connection.label
+    }
+
+    /// The control is hidden entirely on your own profile, for a signed-out
+    /// viewer, and once the edge is `blocked` — RN drops the whole action
+    /// row in those cases (`src/app/user/[id].tsx:522-523`).
+    public var showsConnectAction: Bool {
+        canFollow && connection != .blocked
+    }
+
+    /// Tapping is a no-op while a request is outstanding or in flight.
+    public var isConnectEnabled: Bool {
+        connection.isActionable && connectState != .inFlight
+    }
+
+    /// The Connect affordance. What it does depends on the edge the server
+    /// reported, mirroring RN's `handleConnect`
+    /// (`src/app/user/[id].tsx:201-224`):
+    ///
+    /// - `none` → `POST /api/relationships/requests`
+    /// - `pending_received` → resolve the inbound row, then
+    ///   `POST /api/relationships/:id/accept`
+    /// - `connected` → raise the disconnect confirm (RN's Connections
+    ///   centre alert), which then calls `DELETE /api/relationships/:id`
+    /// - `pending_sent` / `blocked` → inert
     public func connect() async {
-        guard connectState != .inFlight, connectState != .succeeded else { return }
+        guard connectState != .inFlight else { return }
+        switch connection {
+        case .none:
+            await sendConnectionRequest()
+        case .pendingReceived:
+            await acceptConnectionRequest()
+        case .connected:
+            showDisconnectConfirm = true
+        case .pendingSent, .blocked:
+            return
+        }
+    }
+
+    /// `POST /api/relationships/requests` (relationships.js:67).
+    private func sendConnectionRequest() async {
         connectState = .inFlight
-        let body = ConnectionRequestBody(addresseeId: userId)
+        let body = ConnectionRequestBody(addresseeId: resolvedUserId)
         do {
             _ = try await client.request(
                 RelationshipsEndpoints.sendRequest(body: body),
                 as: ConnectionRequestResponse.self
             )
             connectState = .succeeded
+            connection = .pendingSent
             toastMessage = "Connection request sent"
         } catch let error as APIError {
             let message = friendlyMessage(for: error)
@@ -288,15 +410,102 @@ public final class PublicProfileViewModel {
         }
     }
 
-    /// Persona follow — opens the privacy handshake wizard (Stripe
-    /// Checkout for paid tiers), mirroring BeaconProfile / RN follow.
+    /// Accept the inbound request. The relationship id isn't on the
+    /// profile payload, so resolve it from
+    /// `GET /api/relationships/requests/pending` (relationships.js:669)
+    /// first — exactly what RN does before calling accept.
+    private func acceptConnectionRequest() async {
+        connectState = .inFlight
+        do {
+            let pending = try await client.request(
+                RelationshipsEndpoints.pending,
+                as: PendingRequestsResponse.self
+            )
+            guard let match = pending.requests.first(where: { $0.requester?.id == resolvedUserId }) else {
+                connectState = .idle
+                // The row moved (withdrawn / already handled) — re-read the
+                // edge rather than leaving the button lying.
+                await loadRelationship(id: resolvedUserId)
+                toastMessage = "That request is no longer pending."
+                return
+            }
+            _ = try await client.request(
+                RelationshipsEndpoints.accept(id: match.id),
+                as: RelationshipActionEcho.self
+            )
+            connectState = .succeeded
+            connection = .connected
+            toastMessage = "Connected"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            connectState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Accept failed: \(error)")
+        } catch {
+            connectState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't accept that request"
+            logger.warning("Accept failed: \(error)")
+        }
+    }
+
+    /// Confirmed disconnect. Resolves the accepted row from
+    /// `GET /api/relationships?status=accepted` (relationships.js:622) and
+    /// deletes it (`DELETE /api/relationships/:id`, relationships.js:578).
+    public func disconnect() async {
+        showDisconnectConfirm = false
+        guard connection == .connected, connectState != .inFlight else { return }
+        connectState = .inFlight
+        do {
+            let list = try await client.request(
+                RelationshipsEndpoints.list(status: "accepted"),
+                as: RelationshipsListResponse.self
+            )
+            guard let match = list.relationships.first(where: { $0.otherUser?.id == resolvedUserId }) else {
+                connectState = .idle
+                await loadRelationship(id: resolvedUserId)
+                toastMessage = "You're not connected to this neighbor."
+                return
+            }
+            _ = try await client.request(
+                ConnectionsEndpoints.disconnect(id: match.id),
+                as: RelationshipActionEcho.self
+            )
+            connectState = .idle
+            connection = .none
+            toastMessage = "Connection removed"
+        } catch let error as APIError {
+            let message = friendlyMessage(for: error)
+            connectState = .failed(message: message)
+            toastMessage = message
+            logger.warning("Disconnect failed: \(error)")
+        } catch {
+            connectState = .failed(message: "Something went wrong")
+            toastMessage = "Couldn't remove that connection"
+            logger.warning("Disconnect failed: \(error)")
+        }
+    }
+
+    /// Dismiss the confirm without disconnecting.
+    public func cancelDisconnect() {
+        showDisconnectConfirm = false
+    }
+
+    /// Follow entry point behind every Follow affordance.
+    ///
+    /// A Beacon (persona with a resolvable handle) keeps the privacy
+    /// handshake wizard — that flow owns tier selection and Stripe
+    /// Checkout. Everyone else (ordinary neighbours, personas with no
+    /// Beacon bridge) now takes the plain `/api/users/:id/follow` path
+    /// instead of the old dead-end toast. Mirrors RN, whose profile screen
+    /// only ever calls `followUser`/`unfollowUser`
+    /// (`src/app/user/[id].tsx:184-199`).
     public func follow() {
-        guard canOpenHandshake else {
-            toastMessage = Self.handshakeUnavailableMessage
+        if canOpenHandshake {
+            handshakePreselectedTierRank = nil
+            showFollowHandshake = true
             return
         }
-        handshakePreselectedTierRank = nil
-        showFollowHandshake = true
+        Task { await toggleFollow() }
     }
 
     /// Unlock a tier-gated broadcast on a Persona profile.
@@ -339,10 +548,14 @@ public final class PublicProfileViewModel {
         blockState = .inFlight
         do {
             _ = try await client.request(
-                BlocksEndpoints.block(userId: userId),
+                BlocksEndpoints.block(userId: resolvedUserId),
                 as: EmptyResponse.self
             )
             blockState = .succeeded
+            // RN flips `connectionState` to 'blocked' on the same success,
+            // which is what drops the Connect / Follow row
+            // (`src/app/user/[id].tsx:322`).
+            connection = .blocked
             toastMessage = "User blocked"
         } catch let error as APIError {
             let message = friendlyMessage(for: error)
@@ -358,10 +571,8 @@ public final class PublicProfileViewModel {
 
     private func fetch() async {
         do {
-            let profile = try await client.request(
-                PublicProfileEndpoints.profile(id: userId),
-                as: PublicProfile.self
-            )
+            let profile = try await client.request(profileEndpoint, as: PublicProfile.self)
+            resolvedUserId = profile.id
             let kind = derivedKind(from: profile)
             // A21.2 — the Local archetype renders a real neighbourhood post
             // feed, so pull the author's posts the way the RN `PostsTab`
@@ -371,12 +582,96 @@ public final class PublicProfileViewModel {
             // card would invent a visibility chip the API never sent.
             let posts = kind == .local ? await loadUserPosts(id: profile.id) : []
             state = .loaded(build(from: profile, kind: kind, posts: posts))
+            await loadRelationship(id: profile.id)
         } catch let error as APIError {
             logger.warning("Profile load failed: \(error)")
             state = .error(message: friendlyMessage(for: error))
         } catch {
             logger.warning("Profile load failed: \(error)")
             state = .error(message: "Something went wrong")
+        }
+    }
+
+    /// UUIDs resolve by id; handles resolve by username. Mirrors RN's
+    /// `fetchPublicProfileByIdentifier` (`src/app/user/[id].tsx:53-58`).
+    private var profileEndpoint: Endpoint {
+        let identifier = routeIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        if UserSocialEndpoints.isUUID(identifier) {
+            return PublicProfileEndpoints.profile(id: identifier)
+        }
+        return UserSocialEndpoints.profileByUsername(
+            UserSocialEndpoints.normalizeHandle(identifier)
+        )
+    }
+
+    /// `GET /api/users/:id/relationship` — seeds the Follow and Connect
+    /// poses. Requires auth, so a signed-out viewer just gets the resting
+    /// state (and no Follow affordance).
+    private func loadRelationship(id: String) async {
+        canFollow = currentUserId != nil && currentUserId != id
+        guard canFollow else {
+            isFollowing = false
+            return
+        }
+        do {
+            let relationship = try await client.request(
+                UserSocialEndpoints.relationship(userId: id),
+                as: UserRelationshipResponse.self
+            )
+            isFollowing = relationship.following ?? false
+            connection = ProfileConnection(apiValue: relationship.relationship)
+            switch connection {
+            case .pendingSent, .connected:
+                connectState = .succeeded
+            case .none, .pendingReceived, .blocked:
+                connectState = .idle
+            }
+        } catch {
+            logger.debug("Relationship load failed: \(error)")
+        }
+    }
+
+    /// T3 — plain follow / unfollow for an ordinary neighbor.
+    /// `POST` / `DELETE /api/users/:id/follow`
+    /// (`backend/routes/users.js:3520` / `:3593`). Awaited, not optimistic,
+    /// so a rejected follow (blocked, curator account) can't leave the
+    /// button lying — same as RN's `handleFollow`
+    /// (`src/app/user/[id].tsx:184-199`).
+    public func toggleFollow() async {
+        guard canFollow, !isFollowInFlight else { return }
+        isFollowInFlight = true
+        defer { isFollowInFlight = false }
+        let wasFollowing = isFollowing
+        do {
+            let endpoint = wasFollowing
+                ? UserSocialEndpoints.unfollow(userId: resolvedUserId)
+                : UserSocialEndpoints.follow(userId: resolvedUserId)
+            let response = try await client.request(endpoint, as: UserFollowResponse.self)
+            isFollowing = response.following ?? !wasFollowing
+            toastMessage = isFollowing ? "Following" : "Unfollowed"
+        } catch let error as APIError {
+            logger.warning("Follow toggle failed: \(error)")
+            toastMessage = followFailureMessage(for: error, wasFollowing: wasFollowing)
+        } catch {
+            logger.warning("Follow toggle failed: \(error)")
+            toastMessage = wasFollowing ? "Couldn't unfollow." : "Couldn't follow."
+        }
+    }
+
+    private func followFailureMessage(for error: APIError, wasFollowing: Bool) -> String {
+        let fallback = wasFollowing ? "Couldn't unfollow." : "Couldn't follow."
+        switch error {
+        case .clientError:
+            // The backend sends readable copy here ("You are already
+            // following this user", "Cannot follow curator accounts") and
+            // `APIError.errorDescription` already unwraps `{error: …}`.
+            return error.errorDescription ?? fallback
+        case .forbidden:
+            return "You can't follow this profile."
+        case .transport:
+            return "Check your connection and try again."
+        default:
+            return fallback
         }
     }
 

@@ -33,6 +33,7 @@ struct VerifyDetailsStep: View {
         BusinessInfoCard(viewModel: viewModel)
         LeaseUploadCard(viewModel: viewModel)
         PropertyManagerCard(viewModel: viewModel)
+        TenancyCard(viewModel: viewModel)
 
         VerifyEncryptionFootnote()
     }
@@ -164,6 +165,85 @@ private struct PropertyManagerCard: View {
     }
 }
 
+/// A12.6 "Your tenancy" — the two fields the backend actually persists
+/// on `POST /api/v1/tenant/request-approval` (`start_at` + `message`).
+private struct TenancyCard: View {
+    @Bindable var viewModel: VerifyLandlordWizardViewModel
+
+    var body: some View {
+        VerifyLandlordCard {
+            VerifyLandlordSectionHeader(
+                overline: "Your tenancy",
+                title: "When did you move in?",
+                subtitle: "Optional, but it helps your landlord process the request faster."
+            )
+            VerifyLandlordField(
+                label: "Move-in date",
+                value: viewModel.form.moveInDate,
+                placeholder: "YYYY-MM-DD",
+                icon: .calendar,
+                keyboard: .numbersAndPunctuation,
+                optional: true,
+                hint: "When did you move in, or plan to?",
+                error: viewModel.errors?.moveInDate,
+                onChange: viewModel.setMoveInDate
+            )
+            VerifyLandlordMessageField(
+                value: viewModel.form.messageToLandlord,
+                onChange: viewModel.setMessageToLandlord
+            )
+        }
+    }
+}
+
+/// Multiline note forwarded to the landlord as the request `message`.
+private struct VerifyLandlordMessageField: View {
+    let value: String
+    let onChange: (String) -> Void
+
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            HStack(spacing: Spacing.s1) {
+                Text("Message to landlord")
+                    .pantopusTextStyle(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appTextStrong)
+                Text("· optional")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextMuted)
+            }
+            TextEditor(text: Binding(
+                get: { value },
+                set: { onChange($0) }
+            ))
+            .focused($isFocused)
+            .font(Theme.Font.body)
+            .foregroundStyle(Theme.Color.appText)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 96)
+            .padding(.horizontal, Spacing.s2)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(
+                        isFocused ? Theme.Color.primary600 : Theme.Color.appBorder,
+                        lineWidth: isFocused ? 1.5 : 1
+                    )
+            }
+            .accessibilityIdentifier("verifyLandlordMessageField")
+            Text("\(value.count)/\(VerifyLandlordForm.messageMaxLength)")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .accessibilityIdentifier("verifyLandlordMessageCount")
+        }
+    }
+}
+
 // MARK: - Atoms
 
 /// White surface card with rounded corners + 1pt border + soft shadow.
@@ -218,7 +298,7 @@ private struct VerifyLandlordSectionHeader: View {
 /// header's right slot.
 private struct BusinessBadge: View {
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.s1) {
             Icon(.building2, size: 9, color: Theme.Color.business)
             Text("BUSINESS")
                 .pantopusTextStyle(.overline)
@@ -250,7 +330,7 @@ private struct VerifyLandlordField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
             HStack(alignment: .firstTextBaseline) {
-                HStack(spacing: 4) {
+                HStack(spacing: Spacing.s1) {
                     Text(label)
                         .pantopusTextStyle(.caption)
                         .fontWeight(.semibold)

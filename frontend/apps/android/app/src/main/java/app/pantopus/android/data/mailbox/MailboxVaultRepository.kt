@@ -6,6 +6,7 @@ import app.pantopus.android.data.api.models.mailbox.vault.FileToVaultResponse
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderItemsResponse
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFolderResponse
 import app.pantopus.android.data.api.models.mailbox.vault.VaultFoldersResponse
+import app.pantopus.android.data.api.models.mailbox.vault.VaultSearchResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.MailboxVaultApi
@@ -41,4 +42,15 @@ class MailboxVaultRepository
             mailId: String,
             folderId: String,
         ): NetworkResult<FileToVaultResponse> = safeApiCall { api.file(FileToVaultRequest(mailId, folderId)) }
+
+        /**
+         * `GET /api/mailbox/v2/p2/vault/search`. A `null` [drawer] searches
+         * every drawer, which is what the Vault search field does.
+         */
+        suspend fun search(
+            query: String,
+            drawer: String? = null,
+            limit: Int = 20,
+            offset: Int = 0,
+        ): NetworkResult<VaultSearchResponse> = safeApiCall { api.search(query, drawer, null, limit, offset) }
     }

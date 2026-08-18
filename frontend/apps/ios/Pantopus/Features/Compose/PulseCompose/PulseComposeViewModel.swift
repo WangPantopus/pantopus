@@ -61,14 +61,17 @@ public enum PulseComposeIntent: String, CaseIterable, Sendable, Hashable {
     }
 
     /// Bridges `PulseIntent` (the feed enum) into the compose subset.
-    /// `.all` falls back to `.ask`.
+    /// `.all` falls back to `.ask`. The four read-only lanes added for
+    /// the RN chip-row parity pass (`alert` / `deal` / `neighborhoodWin`
+    /// / `visitorGuide`) have no dedicated compose form yet, so they
+    /// pre-fill the generic Announce composer.
     public static func from(feedIntent: PulseIntent) -> PulseComposeIntent {
         switch feedIntent {
         case .all, .ask: .ask
-        case .recommend: .recommend
+        case .recommend, .visitorGuide: .recommend
         case .event: .event
         case .lost: .lost
-        case .announce: .announce
+        case .announce, .alert, .deal, .neighborhoodWin: .announce
         }
     }
 
@@ -272,6 +275,25 @@ public final class PulseComposeViewModel {
     /// Place-eligibility warning surfaced as a banner on the draft step.
     public private(set) var eligibilityWarning: String?
 
+    // MARK: - Pre-post safety precheck (`POST /api/posts/precheck`)
+
+    /// Soft nudge from the precheck's first suggestion / flag. Rendered
+    /// as a dismissible amber banner (RN `PostComposerModal.tsx:645`).
+    public var precheckNudge: String?
+
+    /// Cooldown copy when the viewer is rate-limited or restricted.
+    /// Non-nil blocks submit (RN gates on `canPost`).
+    public private(set) var precheckCooldown: String?
+
+    /// True when the backend classified this as a visitor post — the
+    /// composer shows the visitor-badge banner (RN
+    /// `PostComposerModal.tsx:631`).
+    public private(set) var isVisitorPost = false
+
+    /// Guards the per-draft single run. Reset whenever the body changes,
+    /// mirroring RN's `precheckDone` flag.
+    private var precheckDone = false
+
     /// Announce audience chip selection.
     public var announceAudience: PulseAnnounceAudience = .neighbors
 
@@ -331,16 +353,32 @@ public final class PulseComposeViewModel {
     /// Step 2 purpose — nil for connections-only posts.
     public let composePurpose: PulseComposePurpose?
 
+    /// C2 — when non-nil the create submit goes to
+    /// `POST /api/businesses/:businessId/posts` instead of `POST /api/posts`,
+    /// so the row lands with `business_author_id` set. Set by the Business
+    /// owner dashboard's "Post as this business" FAB; the backend gates it
+    /// on `profile.edit` (owner / admin / editor).
+    public let businessAuthorId: String?
+
+    /// Set when composing from a gig detail's "Share to feed": prefills
+    /// title + body and rides `refTaskId` on `POST /api/posts`.
+    public let taskShare: PulseTaskShare?
+
     init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
         postingTarget: PulsePostingTarget? = nil,
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
+        businessAuthorId: String? = nil,
+        taskShare: PulseTaskShare? = nil,
+        prefillBody: String? = nil,
         api: APIClient = .shared,
         multipartUploader: MultipartUploader = .shared,
         locationProvider: any LocationProviding = DeviceLocationProvider.shared
     ) {
+        self.taskShare = taskShare
+        self.businessAuthorId = businessAuthorId
         self.locationProvider = locationProvider
         activeIntent = composePurpose?.legacyIntent ?? intent
         self.postingTarget = postingTarget
@@ -358,6 +396,26 @@ public final class PulseComposeViewModel {
         for field in PulseComposeField.allCases {
             fields[field] = FormFieldState(id: field.rawValue, originalValue: "")
         }
+        // Task share — seed title + body as *current* values (not
+        // originals) so the form reads dirty and the CTA is live at once,
+        // matching RN's prefilled composer.
+        if let taskShare {
+            for (field, value) in [
+                (PulseComposeField.title, taskShare.title),
+                (PulseComposeField.body, taskShare.body)
+            ] where !value.isEmpty {
+                var snapshot = fields[field] ?? FormFieldState(id: field.rawValue, originalValue: "")
+                snapshot.value = value
+                fields[field] = snapshot
+            }
+        }
+        // Sports-lane starter prompts open the composer with the body
+        // pre-filled — RN `FeedScreen.tsx:296` (`setComposeText`).
+        if let prefillBody, !prefillBody.isEmpty, taskShare == nil {
+            var snapshot = fields[.body] ?? FormFieldState(id: PulseComposeField.body.rawValue, originalValue: "")
+            snapshot.value = prefillBody
+            fields[.body] = snapshot
+        }
         baselineIdentity = self.identity
         baselineVisibility = visibility
     }
@@ -372,9 +430,11 @@ public final class PulseComposeViewModel {
         editingPostId != nil
     }
 
-    /// Top-bar title — "Edit post" in edit mode, "New post" otherwise.
+    /// Top-bar title — "Edit post" in edit mode, "Post as business" when
+    /// composing from the Business owner dashboard, "New post" otherwise.
     public var displayTitle: String {
-        isEditing ? "Edit post" : "New post"
+        if isEditing { return "Edit post" }
+        return businessAuthorId == nil ? "New post" : "Post as business"
     }
 
     /// Right-action label — "Save" in edit mode, intent-driven otherwise.
@@ -392,10 +452,14 @@ public final class PulseComposeViewModel {
 
     public func update(_ field: PulseComposeField, to value: String) {
         guard var snapshot = fields[field] else { return }
+        let changed = snapshot.value != value
         snapshot.value = value
         snapshot.touched = true
         snapshot.error = validator(for: field).validate(value)
         fields[field] = snapshot
+        // RN re-arms the precheck whenever the body text changes
+        // (`PostComposerModal.tsx:789`).
+        if field == .body, changed { precheckDone = false }
     }
 
     /// Switch active intent without losing draft text — only refreshes
@@ -615,6 +679,7 @@ public final class PulseComposeViewModel {
             Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .error))
             return false
         }
+        if isBlockedByPrecheck() { return false }
         state = .submitting
         if editingPostId == nil {
             await refreshGPSFixIfNeeded()
@@ -627,6 +692,13 @@ public final class PulseComposeViewModel {
                     PostsEndpoints.updatePost(id: editingPostId, body: request)
                 )
                 postId = response.postId ?? editingPostId
+            } else if let businessAuthorId {
+                // C2 — "Post as this business": same body, business route.
+                let request = buildRequest()
+                let response: PostCreateResponse = try await api.request(
+                    BusinessPostsEndpoints.createPost(businessId: businessAuthorId, body: request)
+                )
+                postId = response.postId
             } else {
                 let request = buildRequest()
                 let response: PostCreateResponse = try await api.request(
@@ -891,7 +963,11 @@ public final class PulseComposeViewModel {
                 purpose: purposeTag
             )
         }
-        return mergeTargetContext(into: base)
+        // "Share to feed" — carry the referenced task through so the post
+        // lands with `ref_task_id` and renders a "View task" ref card.
+        var request = mergeTargetContext(into: base)
+        request.refTaskId = taskShare?.taskId
+        return request
     }
 
     private func isoTimestamp(from date: Date) -> String {
@@ -994,6 +1070,71 @@ public final class PulseComposeViewModel {
     }
 
     // MARK: - Place eligibility
+
+    // MARK: - Pre-post safety precheck
+
+    /// Run `POST /api/posts/precheck` against the current draft and
+    /// project the response onto the three banners RN renders: the
+    /// cooldown block, the visitor badge, and the soft nudge.
+    ///
+    /// Mirrors RN `usePostComposer.ts:176-190` — Place surface only,
+    /// skipped while the body is empty, and run at most once per draft
+    /// revision. Transport failures are swallowed: the backend itself
+    /// fails open, so a precheck must never be the reason a post can't
+    /// be sent.
+    public func runPrecheck() async {
+        guard !isEditing else { return }
+        guard postingTarget?.isPlaceTarget ?? true else { return }
+        let body = trimmedValue(.body)
+        guard !body.isEmpty, !precheckDone else { return }
+        let coords = precheckCoordinates()
+        do {
+            let response: PostPrecheckResponse = try await api.request(
+                PostPrecheckEndpoints.precheck(
+                    body: PostPrecheckRequest(
+                        content: body,
+                        postType: activeIntent.postType,
+                        purpose: activeIntent.purpose,
+                        surface: "place",
+                        latitude: coords.latitude,
+                        longitude: coords.longitude
+                    )
+                )
+            )
+            precheckDone = true
+            if response.isVisitor == true { isVisitorPost = true }
+            precheckNudge = response.primaryNudge
+            precheckCooldown = (response.canPost == false)
+                ? (response.cooldown?.reason.map { "You have a posting restriction: \($0)" }
+                    ?? "You have a posting restriction right now.")
+                : nil
+        } catch {
+            // Fail open — never block the composer on a precheck error.
+            precheckDone = true
+        }
+    }
+
+    /// The precheck runs on body blur (RN `PostComposerModal.tsx:801`).
+    /// When it came back with a live posting restriction the draft is
+    /// refused here instead of round-tripping into a server rejection.
+    private func isBlockedByPrecheck() -> Bool {
+        guard let cooldown = precheckCooldown else { return false }
+        toast = ToastMessage(text: cooldown, kind: .error)
+        Analytics.track(.formPulseComposeSubmit(intent: activeIntent.rawValue, result: .error))
+        return true
+    }
+
+    /// Coordinates handed to the precheck's visitor heuristic. Prefers
+    /// the posting target, then the last GPS fix.
+    private func precheckCoordinates() -> (latitude: Double?, longitude: Double?) {
+        if let target = postingTarget, let lat = target.latitude, let lon = target.longitude {
+            return (lat, lon)
+        }
+        if let fix = freshGPSFix {
+            return (fix.latitude, fix.longitude)
+        }
+        return (nil, nil)
+    }
 
     /// Check whether the signed-in user can post to the selected place.
     /// Surfaces a warning banner instead of letting the submit 403.

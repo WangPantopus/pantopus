@@ -7,12 +7,14 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.GigDto
 import app.pantopus.android.data.api.models.gigs.GigSavedSearchDto
 import app.pantopus.android.data.api.models.gigs.GigsBrowseResponse
+import app.pantopus.android.data.api.models.gigs.GigsFeedNearbyTrainDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.gigs.GigDraftQueue
 import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.gigs.GigsV2Repository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.data.realtime.SocketManager
@@ -55,12 +57,30 @@ class GigsFeedViewModel
         private val draftQueue: GigDraftQueue,
         private val widgetSnapshots: WidgetSnapshotStore,
         private val networkMonitor: NetworkMonitor,
+        /** Nearby Support Trains for the All / Support Trains scopes. */
+        private val gigsV2Repo: GigsV2Repository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<GigsFeedUiState>(GigsFeedUiState.Loading)
         val state: StateFlow<GigsFeedUiState> = _state.asStateFlow()
 
         private val _activeCategory = MutableStateFlow(GigsCategory.All)
         val activeCategory: StateFlow<GigsCategory> = _activeCategory.asStateFlow()
+
+        /**
+         * Feed-scope segment (All / Tasks / Support Trains). Defaults to
+         * `Tasks` so the sectioned browse surface stays the landing frame;
+         * `All` mixes nearby Support Trains into the flat list and
+         * `SupportTrains` shows them alone (RN `gigs.tsx:126`).
+         */
+        private val _feedScope = MutableStateFlow(GigsFeedScope.Tasks)
+        val feedScope: StateFlow<GigsFeedScope> = _feedScope.asStateFlow()
+
+        /**
+         * Merged, newest-first render rows: gig cards plus (in the scopes
+         * that include them) nearby Support Train rows.
+         */
+        private val _feedRows = MutableStateFlow<List<GigsFeedRow>>(emptyList())
+        val feedRows: StateFlow<List<GigsFeedRow>> = _feedRows.asStateFlow()
 
         private val _activeSort = MutableStateFlow(GigsSort.Newest)
         val activeSort: StateFlow<GigsSort> = _activeSort.asStateFlow()
@@ -91,6 +111,19 @@ class GigsFeedViewModel
         private val _draftBanner = MutableStateFlow<GigsDraftBanner?>(null)
         val draftBanner: StateFlow<GigsDraftBanner?> = _draftBanner.asStateFlow()
 
+        /**
+         * Flat-list pagination — true when `GET /api/gigs` says another
+         * page exists after the loaded window. Derived from the server
+         * response (`pagination.hasMore` / `total`), never guessed when
+         * the backend told us. Always false in browse mode.
+         */
+        private val _hasMore = MutableStateFlow(false)
+        val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
+        /** Flat-list pagination — true while the next page is in flight. */
+        private val _loadingMore = MutableStateFlow(false)
+        val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
+
         /** P6c — serialises banner "Post now" taps. */
         private var draftPosting = false
 
@@ -113,6 +146,9 @@ class GigsFeedViewModel
         private var radiusMiles: Double = RADIUS_LADDER_MILES.first()
         private var loading = false
 
+        /** Offset the next [loadMore] page starts at (rows already loaded). */
+        private var nextOffset = 0
+
         /** P1.B — banner dismissed for this session (VM lifetime). */
         private var radiusSuggestionDismissed = false
 
@@ -124,6 +160,12 @@ class GigsFeedViewModel
         /** Last fetched gigs, kept so a filter change re-derives the
          * visible rows client-side without a refetch. */
         private var loadedGigs: List<GigDto> = emptyList()
+
+        /** Last fetched nearby Support Trains (All / Support Trains scopes). */
+        private var loadedTrains: List<SupportTrainRowContent> = emptyList()
+
+        /** `published_at` epoch seconds per train id, for the merged sort. */
+        private var trainSortKeys: Map<String, Long> = emptyMap()
 
         /** P1.D — original index + row of in-flight dismissals, for undo. */
         private val pendingDismissals = mutableMapOf<String, Pair<Int, GigDto>>()
@@ -149,6 +191,22 @@ class GigsFeedViewModel
         }
 
         fun refresh() = fetch()
+
+        /** Feed-scope chip tap. Re-selecting the active scope is a no-op. */
+        fun selectScope(scope: GigsFeedScope) {
+            if (_feedScope.value == scope) return
+            _feedScope.value = scope
+            if (!scope.includesGigs) {
+                loadedGigs = emptyList()
+                _hasMore.value = false
+                nextOffset = 0
+            }
+            if (!scope.includesSupportTrains) {
+                loadedTrains = emptyList()
+                trainSortKeys = emptyMap()
+            }
+            fetch()
+        }
 
         fun selectCategory(category: GigsCategory) {
             val reEntersBrowse = category == GigsCategory.All && browseExited
@@ -502,9 +560,14 @@ class GigsFeedViewModel
 
         // MARK: - Fetch
 
-        /** Browse mode: "All" scope, no structured filters, no See-all override. */
+        /**
+         * Browse mode: the Tasks-only feed scope, "All" category, no
+         * structured filters, no See-all override. RN gates the section
+         * feed the same way (`gigs.tsx:292-298`).
+         */
         private fun isBrowseMode(): Boolean =
-            _activeCategory.value == GigsCategory.All &&
+            _feedScope.value == GigsFeedScope.Tasks &&
+                _activeCategory.value == GigsCategory.All &&
                 _activeFilterCount.value == 0 &&
                 !browseExited
 
@@ -522,13 +585,53 @@ class GigsFeedViewModel
             viewModelScope.launch {
                 try {
                     ensureLocation()
-                    if (browse && latitude != null && longitude != null) {
-                        fetchBrowse()
-                    } else {
-                        fetchFlat()
+                    fetchNearbySupportTrains()
+                    when {
+                        browse && latitude != null && longitude != null -> fetchBrowse()
+                        _feedScope.value.includesGigs -> fetchFlat()
+                        else -> {
+                            // Support-Trains-only scope: no gig request at all.
+                            _hasMore.value = false
+                            nextOffset = 0
+                            rebuild()
+                        }
                     }
                 } finally {
                     loading = false
+                }
+            }
+        }
+
+        /**
+         * Nearby Support Trains for the scopes that show them. Best-effort:
+         * a failure just leaves the train rows empty (RN swallows it too,
+         * `gigs.tsx:234-238`).
+         */
+        private suspend fun fetchNearbySupportTrains() {
+            val lat = latitude
+            val lng = longitude
+            if (!_feedScope.value.includesSupportTrains || lat == null || lng == null) {
+                loadedTrains = emptyList()
+                trainSortKeys = emptyMap()
+                return
+            }
+            when (
+                val result =
+                    gigsV2Repo.nearbySupportTrains(
+                        latitude = lat,
+                        longitude = lng,
+                        radiusMeters = radiusMiles * METERS_PER_MILE,
+                        limit = GigsV2Repository.DEFAULT_NEARBY_LIMIT,
+                    )
+            ) {
+                is NetworkResult.Success -> {
+                    val trains = result.data.supportTrains
+                    loadedTrains = trains.map { projectSupportTrain(it) }
+                    trainSortKeys = trains.associate { it.supportTrainId to epochSeconds(it.publishedAt) }
+                }
+                is NetworkResult.Failure -> {
+                    loadedTrains = emptyList()
+                    trainSortKeys = emptyMap()
                 }
             }
         }
@@ -549,6 +652,12 @@ class GigsFeedViewModel
             val lng = longitude ?: return fetchFlat()
             // The radius ladder is a flat-list concept — drop any stale banner.
             _radiusSuggestion.value = null
+            // The sectioned frame renders its own rows.
+            _feedRows.value = emptyList()
+            // Browse is a fixed sectioned surface — the backend caps each
+            // section server-side, so there is nothing to page through.
+            _hasMore.value = false
+            nextOffset = 0
             when (val result = repo.browse(lat, lng)) {
                 is NetworkResult.Success -> {
                     val content = projectBrowse(result.data)
@@ -569,7 +678,15 @@ class GigsFeedViewModel
             }
         }
 
-        private suspend fun fetchFlat() {
+        /**
+         * One page of `GET /api/gigs`. [append] `false` replaces the loaded
+         * window (first page / refresh); `true` is the infinite-scroll
+         * continuation and never downgrades the screen to `Error`.
+         */
+        private suspend fun fetchFlat(
+            offset: Int = 0,
+            append: Boolean = false,
+        ) {
             val category = _activeCategory.value
             val sort = _activeSort.value
             val criteria = _filters.value
@@ -581,6 +698,8 @@ class GigsFeedViewModel
                         latitude = latitude,
                         longitude = longitude,
                         radiusMiles = radiusMiles,
+                        limit = PAGE_SIZE,
+                        offset = offset,
                         minPrice =
                             criteria.budgetLower
                                 .toDouble()
@@ -592,19 +711,65 @@ class GigsFeedViewModel
                                 .takeIf { criteria.budgetUpper < GigFilterCriteria.BUDGET_MAX },
                         scheduleType = criteria.schedules.singleOrNull()?.backendValue,
                         payType = if (criteria.openToBids) OFFERS_PAY_TYPE else null,
+                        includeRemote = criteria.serverIncludeRemote,
+                        deadline = criteria.serverDeadline,
+                        maxDistanceMeters = criteria.serverMaxDistanceMeters,
+                        taskArchetype = criteria.serverTaskArchetype,
                     )
             ) {
                 is NetworkResult.Success -> {
-                    loadedGigs = result.data.gigs
-                    pendingDismissals.clear()
-                    pendingCategoryHides.clear()
+                    loadedGigs =
+                        if (append) {
+                            val seen = loadedGigs.mapTo(mutableSetOf()) { it.id }
+                            loadedGigs + result.data.gigs.filterNot { it.id in seen }
+                        } else {
+                            result.data.gigs
+                        }
+                    if (!append) {
+                        pendingDismissals.clear()
+                        pendingCategoryHides.clear()
+                    }
+                    _hasMore.value = result.data.hasMorePages(offset = offset, limit = PAGE_SIZE)
+                    nextOffset = offset + result.data.gigs.size
                     rebuild()
-                    updateRadiusSuggestion()
+                    // The radius ladder reacts to the first page only — a
+                    // thin page 3 says nothing about the search width.
+                    if (!append) updateRadiusSuggestion()
                     // P6c — refresh the home-screen widget snapshot.
-                    writeWidgetSnapshot(result.data.gigs)
+                    writeWidgetSnapshot(loadedGigs)
                 }
                 is NetworkResult.Failure -> {
-                    _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
+                    if (append) {
+                        // Keep the rows already on screen; stop the footer
+                        // retrying in a loop and surface what happened.
+                        _hasMore.value = false
+                        _toast.value =
+                            GigsFeedToast(
+                                text = result.error.displayMessage("Couldn't load more tasks."),
+                                isError = true,
+                            )
+                    } else {
+                        _state.value = GigsFeedUiState.Error(result.error.displayMessage("Couldn't load Gigs."))
+                    }
+                }
+            }
+        }
+
+        /**
+         * Infinite scroll — appends the next [PAGE_SIZE] window once the
+         * list footer scrolls into view. No-op in browse mode, while
+         * another fetch is running, or once the server says there is
+         * nothing left.
+         */
+        fun loadMore() {
+            if (loading || _loadingMore.value || !_hasMore.value) return
+            if (_state.value !is GigsFeedUiState.Loaded) return
+            _loadingMore.value = true
+            viewModelScope.launch {
+                try {
+                    fetchFlat(offset = nextOffset, append = true)
+                } finally {
+                    _loadingMore.value = false
                 }
             }
         }
@@ -643,8 +808,18 @@ class GigsFeedViewModel
         private fun rebuild() {
             val now = Instant.now().epochSecond
             val visible = loadedGigs.filter { _filters.value.matches(it, now) }
+            val rows =
+                (
+                    visible.map { gig ->
+                        GigsFeedRow.Gig(projectCard(gig), epochSeconds(gig.createdAt))
+                    } +
+                        loadedTrains.map { train ->
+                            GigsFeedRow.SupportTrain(train, trainSortKeys[train.id] ?: 0L)
+                        }
+                ).sortedByDescending { it.sortKey }
+            _feedRows.value = rows
             _state.value =
-                if (visible.isEmpty()) {
+                if (rows.isEmpty()) {
                     GigsFeedUiState.Empty(radiusMiles = radiusMiles)
                 } else {
                     GigsFeedUiState.Loaded(rows = visible.map { projectCard(it) })
@@ -722,7 +897,56 @@ class GigsFeedViewModel
             /** P1.F — vertical sections cap at three rows. */
             internal const val VERTICAL_SECTION_LIMIT = 3
 
+            /**
+             * Rows requested per `GET /api/gigs` page. Mirrors iOS
+             * `GigsFeedViewModel.pageSize`.
+             */
+            internal const val PAGE_SIZE = 20
+
             private const val METERS_PER_MILE = 1_609.344
+
+            /** Metres in a mile as RN's SupportTrainRow rounds it. */
+            private const val SUPPORT_TRAIN_METERS_PER_MILE = 1609.0
+
+            /**
+             * ISO-8601 timestamp → epoch seconds for the merged-row sort.
+             * Rows without a parseable timestamp sink to the bottom.
+             */
+            internal fun epochSeconds(timestamp: String?): Long {
+                if (timestamp.isNullOrBlank()) return 0L
+                return runCatching { Instant.parse(timestamp).epochSecond }.getOrElse { 0L }
+            }
+
+            /**
+             * Nearby-RPC row → render content. Mirrors RN
+             * `components/gig-browse/SupportTrainRow.tsx`.
+             */
+            internal fun projectSupportTrain(dto: GigsFeedNearbyTrainDto): SupportTrainRowContent {
+                val distance = dto.distanceMeters?.let { supportTrainDistanceLabel(it) }
+                val age = ageLabel(dto.publishedAt)?.let { "$it ago" }
+                val city = dto.city?.takeIf { it.isNotBlank() }
+                val state = dto.state?.takeIf { it.isNotBlank() }
+                val area =
+                    when {
+                        city != null && state != null -> "$city, $state"
+                        else -> city ?: state
+                    }
+                val open = dto.openSlotsCount ?: 0
+                val slots = if (open > 0) "$open open slot${if (open == 1) "" else "s"}" else "View schedule"
+                return SupportTrainRowContent(
+                    id = dto.supportTrainId,
+                    title = dto.title?.trim()?.takeIf { it.isNotEmpty() } ?: "Support Train",
+                    metaLine = listOfNotNull(distance, age).joinToString(" · "),
+                    subtitle = area?.let { "$it · $slots" } ?: slots,
+                )
+            }
+
+            /** Metres → "820m" / "1.2mi" (RN `formatDistanceMeters`). */
+            internal fun supportTrainDistanceLabel(meters: Double): String? {
+                if (!meters.isFinite()) return null
+                if (meters < SUPPORT_TRAIN_METERS_PER_MILE) return "${kotlin.math.round(meters).toInt()}m"
+                return String.format(Locale.US, "%.1fmi", meters / SUPPORT_TRAIN_METERS_PER_MILE)
+            }
 
             /**
              * `GigDto` → render-only [GigCardContent]. Exposed on the

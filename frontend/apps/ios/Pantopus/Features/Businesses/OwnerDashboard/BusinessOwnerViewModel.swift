@@ -27,11 +27,22 @@ import Observation
 public final class BusinessOwnerViewModel {
     /// Render state.
     public private(set) var state: BusinessOwnerState = .loading
+    /// Transient confirmation / error copy for the founding-offer claim.
+    /// RN raises an `Alert`; native surfaces the same strings in a toast.
+    public var toast: String?
 
     private let businessId: String
     private let injectedContent: BusinessOwnerContent?
     private let client: APIClient
+    private let defaults: UserDefaults
     private let logger = Logger(label: "app.pantopus.ios.BusinessOwner")
+
+    /// Per-business dismissal flag for the founding banner. Mirrors RN's
+    /// `AsyncStorage` key `pantopus_founding_dismissed_<businessId>`
+    /// (`src/app/businesses/[id]/index.tsx:109`).
+    private var foundingDismissedKey: String {
+        "business.foundingBanner.dismissed.\(businessId)"
+    }
 
     /// - Parameters:
     ///   - businessId: The owned business id.
@@ -49,10 +60,12 @@ public final class BusinessOwnerViewModel {
     init(
         businessId: String,
         client: APIClient,
-        content: BusinessOwnerContent? = nil
+        content: BusinessOwnerContent? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.businessId = businessId
         self.client = client
+        self.defaults = defaults
         injectedContent = content
     }
 
@@ -102,6 +115,78 @@ public final class BusinessOwnerViewModel {
                 }
             }
         }
+    }
+
+    // MARK: - Founding offer
+
+    /// Dismiss the founding banner for this business — persisted so it
+    /// stays hidden across launches (RN writes the same per-business flag
+    /// to `AsyncStorage`).
+    public func dismissFoundingBanner() {
+        defaults.set(true, forKey: foundingDismissedKey)
+        guard case let .loaded(content) = state else { return }
+        state = .loaded(content.withFoundingOffer(nil))
+    }
+
+    /// Claim a numbered founding slot. On success RN alerts
+    /// "You claimed founding slot #N!", hides the banner, and refreshes the
+    /// dashboard so the founding badge appears.
+    public func claimFoundingOffer() async {
+        guard case let .loaded(content) = state,
+              let offer = content.foundingOffer,
+              !offer.isClaiming else { return }
+        state = .loaded(
+            content.withFoundingOffer(
+                OwnerFoundingOffer(slotsRemaining: offer.slotsRemaining, isClaiming: true)
+            )
+        )
+        do {
+            let claim: FoundingSlotClaimDTO = try await client.request(
+                BusinessFoundingEndpoints.claimFoundingOffer(businessId: businessId)
+            )
+            if let number = claim.slotNumber {
+                toast = "You claimed founding slot #\(number)!"
+            } else {
+                toast = claim.message ?? "You claimed a founding slot!"
+            }
+            // The banner is gone for good once claimed — persist so a
+            // refresh race can't bring it back.
+            defaults.set(true, forKey: foundingDismissedKey)
+            await refresh()
+        } catch {
+            logger.warning("Founding claim failed: \(error)")
+            toast = (error as? APIError)?.errorDescription ?? "Failed to claim founding offer"
+            if case let .loaded(current) = state {
+                state = .loaded(
+                    current.withFoundingOffer(
+                        OwnerFoundingOffer(slotsRemaining: offer.slotsRemaining, isClaiming: false)
+                    )
+                )
+            }
+        }
+    }
+
+    /// `GET /founding-offer/status`, gated on the dismissal flag. Returns
+    /// `nil` (no banner) when dismissed, when the offer is over, or when
+    /// this business already holds a slot — RN's exact three-way gate.
+    private func loadFoundingOffer() async -> OwnerFoundingOffer? {
+        guard !defaults.bool(forKey: foundingDismissedKey) else { return nil }
+        guard let status = try? await client.request(
+            BusinessFoundingEndpoints.foundingOfferStatus,
+            as: FoundingOfferStatusDTO.self
+        ) else { return nil }
+        return Self.foundingOffer(from: status, businessId: businessId)
+    }
+
+    /// Pure projection of the status payload (exposed for unit tests).
+    static func foundingOffer(
+        from status: FoundingOfferStatusDTO,
+        businessId: String
+    ) -> OwnerFoundingOffer? {
+        let alreadyClaimed = (status.userBusinesses ?? []).contains { $0.businessUserId == businessId }
+        let remaining = status.slotsRemaining ?? 0
+        guard status.isOfferActive == true, !alreadyClaimed, remaining > 0 else { return nil }
+        return OwnerFoundingOffer(slotsRemaining: remaining)
     }
 
     // MARK: - Fetch
@@ -159,13 +244,17 @@ public final class BusinessOwnerViewModel {
             BusinessesEndpoints.reviews(businessId: businessId),
             as: BusinessOwnerReviewsResponse.self
         )
+        // 4. Founding-offer banner (best-effort; RN fetches it on the same
+        //    dashboard load and hides the banner on any failure).
+        let founding = await loadFoundingOffer()
 
         state = .loaded(
             makeContent(
                 publicProfile: publicProfile,
                 dashboard: dashboard,
                 insights: insights,
-                reviews: reviewsResponse?.reviews ?? []
+                reviews: reviewsResponse?.reviews ?? [],
+                foundingOffer: founding
             )
         )
     }
@@ -179,7 +268,8 @@ public final class BusinessOwnerViewModel {
         publicProfile: BusinessProfileContent,
         dashboard: BusinessDashboardResponse,
         insights: BusinessInsightsResponse?,
-        reviews: [BusinessOwnerReviewDTO]
+        reviews: [BusinessOwnerReviewDTO],
+        foundingOffer: OwnerFoundingOffer? = nil
     ) -> BusinessOwnerContent {
         let isLive = dashboard.profile?.isPublished ?? false
         let mappedReviews = reviews.map(ownerReview)
@@ -192,8 +282,17 @@ public final class BusinessOwnerViewModel {
             profileStrength: profileStrength(from: dashboard.onboarding),
             reviewsToReplyLabel: pending > 0 ? "\(pending) to reply" : nil,
             reviews: mappedReviews,
-            publicProfile: publicProfile
+            publicProfile: publicProfile,
+            canPostAsBusiness: canPost(dashboard.access?.roleBase),
+            foundingOffer: foundingOffer
         )
+    }
+
+    /// RN gate: `access.role_base && ['owner','admin','editor'].includes(...)`
+    /// (`src/app/businesses/[id]/index.tsx:67`).
+    private func canPost(_ roleBase: String?) -> Bool {
+        guard let roleBase, !roleBase.isEmpty else { return false }
+        return BusinessOwnerContent.postingRoles.contains(roleBase)
     }
 
     private func insightTiles(from insights: BusinessInsightsResponse?) -> [OwnerInsightTile] {

@@ -15,6 +15,9 @@ struct GigQuestionsSection: View {
     private let maxQuestionLength = 1000
     private let maxAnswerLength = 2000
 
+    /// Set while the destructive confirm for a question is on screen.
+    @State private var pendingDelete: GigQuestionDTO?
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             header
@@ -26,6 +29,37 @@ struct GigQuestionsSection: View {
         .padding(.horizontal, Spacing.s5)
         .padding(.top, 22)
         .accessibilityIdentifier("gigQuestionsSection")
+        .confirmationDialog(
+            "Delete question",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                guard let target = pendingDelete else { return }
+                pendingDelete = nil
+                Task {
+                    if let message = await viewModel.deleteQuestion(questionId: target.id) {
+                        onError?(message)
+                    }
+                }
+            }
+            .accessibilityIdentifier("gigQuestionsDeleteConfirm")
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text(deleteConfirmMessage)
+        }
+    }
+
+    /// Mirrors RN's `confirm({ title: 'Delete Question', … })` but names
+    /// the question being removed, per the native destructive-copy rule.
+    private var deleteConfirmMessage: String {
+        guard let question = pendingDelete else { return "Are you sure?" }
+        let trimmed = question.question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview = trimmed.count > 60 ? String(trimmed.prefix(60)) + "…" : trimmed
+        return "\u{201C}\(preview)\u{201D} will be removed for everyone. This can't be undone."
     }
 
     private var header: some View {
@@ -135,25 +169,78 @@ struct GigQuestionsSection: View {
                 .accessibilityIdentifier("gigQuestionsEmpty")
         } else {
             VStack(spacing: Spacing.s3) {
-                ForEach(viewModel.questions) { question in
+                ForEach(viewModel.pinnedQuestions) { question in
+                    pinnedCard(question)
+                }
+                ForEach(viewModel.unpinnedQuestions) { question in
                     questionRow(question)
                 }
             }
         }
     }
 
-    private func questionRow(_ question: GigQuestionDTO) -> some View {
+    /// Pinned answers get their own highlighted card above the thread —
+    /// mirrors RN `QASection`'s `pinnedQuestions` block.
+    private func pinnedCard(_ question: GigQuestionDTO) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s2) {
-            Text(question.question)
+            HStack(spacing: 6) {
+                Icon(.pin, size: 12, strokeWidth: 2.4, color: Theme.Color.primary600)
+                Text("Pinned answer")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary600)
+                Spacer()
+                if viewModel.canPinQuestion(question) {
+                    actionLink(
+                        "Unpin",
+                        tint: Theme.Color.primary600,
+                        identifier: "gigQuestion.\(question.id).unpin",
+                        enabled: viewModel.questionActionInFlight == nil
+                    ) {
+                        Task {
+                            if let message = await viewModel.toggleQuestionPin(questionId: question.id) {
+                                onError?(message)
+                            }
+                        }
+                    }
+                }
+            }
+            Text("Q: \(question.question)")
                 .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(Theme.Color.appText)
-            metaRow(question)
             if let answer = question.answer, !answer.isEmpty {
-                answerBlock(question, answer: answer)
+                Text("A: \(answer)")
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(Theme.Color.appTextStrong)
             }
-            if viewModel.viewerIsOwner, !question.isAnswered {
-                ownerAnswerControls(question)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.personalBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.primary600.opacity(0.35), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("gigQuestionPinned.\(question.id)")
+    }
+
+    private func questionRow(_ question: GigQuestionDTO) -> some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            upvoteColumn(question)
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text(question.question)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                metaRow(question)
+                if let answer = question.answer, !answer.isEmpty {
+                    answerBlock(question, answer: answer)
+                }
+                if viewModel.viewerIsOwner, !question.isAnswered {
+                    ownerAnswerControls(question)
+                }
+                actionsRow(question)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(Spacing.s3)
         .background(Theme.Color.appSurface)
@@ -163,6 +250,86 @@ struct GigQuestionsSection: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("gigQuestion.\(question.id)")
+    }
+
+    /// Chevron + count column on the leading edge — tapping toggles the
+    /// viewer's upvote (`POST .../questions/:id/upvote`).
+    private func upvoteColumn(_ question: GigQuestionDTO) -> some View {
+        Button {
+            Task {
+                if let message = await viewModel.toggleQuestionUpvote(questionId: question.id) {
+                    onError?(message)
+                }
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Icon(.chevronUp, size: 18, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                Text("\(question.upvoteCount ?? 0)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(minWidth: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.canUpvoteQuestion || viewModel.questionActionInFlight != nil)
+        .accessibilityLabel("Upvote question")
+        .accessibilityIdentifier("gigQuestion.\(question.id).upvote")
+    }
+
+    /// Pin/Unpin (poster, answered) + Delete (asker or poster). The
+    /// "Answer" affordance stays in `ownerAnswerControls`, matching RN.
+    @ViewBuilder private func actionsRow(_ question: GigQuestionDTO) -> some View {
+        let canPin = viewModel.canPinQuestion(question)
+        let canDelete = viewModel.canDeleteQuestion(question)
+        if canPin || canDelete {
+            HStack(spacing: Spacing.s4) {
+                if canPin {
+                    actionLink(
+                        (question.isPinned ?? false) ? "Unpin" : "Pin",
+                        tint: Theme.Color.primary600,
+                        identifier: "gigQuestion.\(question.id).pin",
+                        enabled: viewModel.questionActionInFlight == nil
+                    ) {
+                        Task {
+                            if let message = await viewModel.toggleQuestionPin(questionId: question.id) {
+                                onError?(message)
+                            }
+                        }
+                    }
+                }
+                if canDelete {
+                    actionLink(
+                        "Delete",
+                        tint: Theme.Color.error,
+                        identifier: "gigQuestion.\(question.id).delete",
+                        enabled: viewModel.questionActionInFlight == nil
+                    ) {
+                        pendingDelete = question
+                    }
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private func actionLink(
+        _ title: String,
+        tint: Color,
+        identifier: String,
+        enabled: Bool,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(enabled ? tint : Theme.Color.appTextMuted)
+                .frame(minHeight: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityIdentifier(identifier)
     }
 
     private func metaRow(_ question: GigQuestionDTO) -> some View {

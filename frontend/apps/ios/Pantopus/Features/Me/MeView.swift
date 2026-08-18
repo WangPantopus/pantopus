@@ -14,17 +14,22 @@ import SwiftUI
 /// Render-only Me tab.
 public struct MeView: View {
     @State private var viewModel: MeViewModel
+    /// Share sheet for the Monthly Receipt / invite CTAs.
+    @State private var systemSheet: SystemSheetRequest?
     private let onAction: @MainActor (MeActionTile) -> Void
     private let onSection: @MainActor (MeSectionRow) -> Void
     private let onLogOut: @MainActor () -> Void
 
     init(
-        viewModel: MeViewModel = MeViewModel(),
+        viewModel: MeViewModel? = nil,
+        expandMonthlyReceipt: Bool = false,
         onAction: @escaping @MainActor (MeActionTile) -> Void = { _ in },
         onSection: @escaping @MainActor (MeSectionRow) -> Void = { _ in },
         onLogOut: @escaping @MainActor () -> Void = {}
     ) {
-        _viewModel = State(initialValue: viewModel)
+        _viewModel = State(
+            initialValue: viewModel ?? MeViewModel(expandMonthlyReceipt: expandMonthlyReceipt)
+        )
         self.onAction = onAction
         self.onSection = onSection
         self.onLogOut = onLogOut
@@ -34,6 +39,7 @@ public struct MeView: View {
         content
             .background(Theme.Color.appBg)
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+            .sheet(item: $systemSheet) { request in request.makeView() }
             .task { await viewModel.load() }
             .overlay(alignment: .bottom) {
                 if let toast = viewModel.toastMessage {
@@ -110,6 +116,31 @@ public struct MeView: View {
                 )
                 .padding(.horizontal, Spacing.s4)
                 .padding(.top, Spacing.s4)
+                // Personal-only profile insight cards (RN parity — the
+                // `(tabs)/profile` screen renders both under the stats row).
+                if active.identity == .personal {
+                    if let receipt = viewModel.monthlyReceipt {
+                        MonthlyReceiptCard(
+                            receipt: receipt,
+                            startExpanded: viewModel.expandMonthlyReceipt,
+                            onShare: {
+                                if let message = viewModel.receiptShareMessage {
+                                    systemSheet = .share(items: [message])
+                                }
+                            }
+                        )
+                        .padding(.horizontal, Spacing.s4)
+                        .padding(.top, Spacing.s4)
+                    }
+                    if let progress = viewModel.inviteProgress {
+                        InviteProgressCard(
+                            progress: progress,
+                            onShare: { systemSheet = .share(items: [viewModel.inviteShareMessage]) }
+                        )
+                        .padding(.horizontal, Spacing.s4)
+                        .padding(.top, Spacing.s4)
+                    }
+                }
                 ForEach(active.sections) { section in
                     MeSectionGroup(section: section, onTap: onSection)
                         .padding(.horizontal, Spacing.s4)

@@ -48,17 +48,29 @@ struct LanguageBadge: View {
                     .foregroundStyle(Theme.Color.appTextSecondary)
             } else {
                 Icon(.scanLine, size: 12, color: Theme.Color.appTextSecondary)
-                Text("Auto-detected · \(languages.confidence)% match")
+                Text(detectionText)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
         }
     }
 
+    /// The translator only reports a confidence on surfaces that measure
+    /// one; without it the badge says "Auto-detected" and stops there.
+    private var detectionText: String {
+        guard let confidence = languages.confidence else { return "Auto-detected" }
+        return "Auto-detected · \(confidence)% match"
+    }
+
     private var accessibilityText: String {
-        let detail = confirmed
-            ? "Confirmed translation"
-            : "Auto-detected, \(languages.confidence) percent match"
+        let detail: String
+        if confirmed {
+            detail = "Confirmed translation"
+        } else if let confidence = languages.confidence {
+            detail = "Auto-detected, \(confidence) percent match"
+        } else {
+            detail = "Auto-detected"
+        }
         return "\(languages.sourceName) to \(languages.targetName). \(detail)"
     }
 }

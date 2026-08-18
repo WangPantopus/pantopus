@@ -6,18 +6,22 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.PollDto
+import app.pantopus.android.data.api.models.homes.UpdatePollRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
+import app.pantopus.android.ui.screens.shared.list_of_rows.CompactButtonVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowFooter
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowFooterAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
@@ -74,6 +78,24 @@ data class PollsBannerSummary(
     val hasContent: Boolean get() = totalActive > 0
 }
 
+/**
+ * One-shot event the screen turns into a confirm dialog. The VM never
+ * presents UI itself — same contract as `MyHomesListEvent`.
+ */
+sealed interface PollsListEvent {
+    /** "Close" tapped on an active poll card. */
+    data class ConfirmClose(
+        val pollId: String,
+        val title: String,
+    ) : PollsListEvent
+
+    /** "Delete" tapped on an active poll card. */
+    data class ConfirmDelete(
+        val pollId: String,
+        val title: String,
+    ) : PollsListEvent
+}
+
 /** Nav arg key for the Polls list route. */
 const val POLLS_HOME_ID_KEY = "homeId"
 
@@ -123,6 +145,21 @@ class PollsListViewModel
 
         private val _banner = MutableStateFlow<BannerConfig?>(null)
         val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
+
+        /**
+         * Set when a card's Close / Delete footer button fires. The
+         * screen drains it into an `AlertDialog` and calls
+         * [acknowledgeEvent].
+         */
+        private val _pendingEvent = MutableStateFlow<PollsListEvent?>(null)
+        val pendingEvent: StateFlow<PollsListEvent?> = _pendingEvent.asStateFlow()
+
+        /** Surfaced by the screen when a close / delete fails. */
+        private val _actionError = MutableStateFlow<String?>(null)
+        val actionError: StateFlow<String?> = _actionError.asStateFlow()
+
+        /** Poll id whose mutation is in flight — repeat taps are ignored. */
+        private var mutatingPollId: String? = null
 
         private var polls: List<PollDto>? = null
         private var onOpenPoll: (String) -> Unit = {}
@@ -179,6 +216,81 @@ class PollsListViewModel
         fun currentBannerSummary(): PollsBannerSummary {
             val loaded = polls ?: return PollsBannerSummary(0, 0)
             return summarize(loaded, viewerId, clock())
+        }
+
+        /**
+         * "Close" tapped — hand the confirm to the screen. RN raises the
+         * same prompt from the active poll card
+         * (`src/app/homes/[id]/polls.tsx:75-83`).
+         */
+        fun requestClose(pollId: String) {
+            val poll = polls?.firstOrNull { it.id == pollId } ?: return
+            _pendingEvent.value = PollsListEvent.ConfirmClose(pollId, poll.title)
+        }
+
+        /**
+         * "Delete" tapped — hand the confirm to the screen
+         * (`src/app/homes/[id]/polls.tsx:85-93`).
+         */
+        fun requestDelete(pollId: String) {
+            val poll = polls?.firstOrNull { it.id == pollId } ?: return
+            _pendingEvent.value = PollsListEvent.ConfirmDelete(pollId, poll.title)
+        }
+
+        /** Clears [pendingEvent] once the screen has opened its dialog. */
+        fun acknowledgeEvent() {
+            _pendingEvent.value = null
+        }
+
+        /** Clears the mutation-failure alert. */
+        fun clearActionError() {
+            _actionError.value = null
+        }
+
+        /**
+         * Close a poll to further votes — `PUT /api/homes/:id/polls/:pollId`
+         * with `status = "closed"` (route `backend/routes/home.js:7381`;
+         * `updatePollSchema` accepts `open / closed / canceled`).
+         */
+        fun closePoll(pollId: String) {
+            mutate(pollId, "closed", "Couldn't close that poll. Try again.")
+        }
+
+        /**
+         * Retire a poll — same route with `status = "canceled"`, the
+         * schema's removal value. The backend exposes no DELETE for
+         * polls, so this is the strongest retire the API offers; a
+         * canceled poll drops out of the Active tab just like a closed
+         * one.
+         */
+        fun deletePoll(pollId: String) {
+            mutate(pollId, "canceled", "Couldn't delete that poll. Try again.")
+        }
+
+        private fun mutate(
+            pollId: String,
+            status: String,
+            failureCopy: String,
+        ) {
+            if (mutatingPollId != null) return
+            mutatingPollId = pollId
+            viewModelScope.launch {
+                val result =
+                    repo.updateHomePoll(
+                        homeId = homeId,
+                        pollId = pollId,
+                        request = UpdatePollRequest(status = status),
+                    )
+                mutatingPollId = null
+                when (result) {
+                    // RN re-fetches after the mutation rather than
+                    // patching locally, so vote counts stay
+                    // server-authoritative.
+                    is NetworkResult.Success -> refresh()
+                    is NetworkResult.Failure ->
+                        _actionError.value = result.error.displayMessage(failureCopy)
+                }
+            }
         }
 
         private fun applySuccess(loaded: List<PollDto>) {
@@ -276,6 +388,39 @@ class PollsListViewModel
                 chips = chips,
                 timeMeta = projection.timeMeta,
                 highlight = if (projection.chipStatus == PollChipStatus.Closed) RowHighlight.Muted else null,
+                footer = footerFor(projection, poll.id),
+            )
+        }
+
+        /**
+         * RN renders a Close + Delete action strip under every **active**
+         * poll card (`src/app/homes/[id]/polls.tsx:198-209`); closed
+         * polls carry no actions. Rendered here as the shell's
+         * [RowFooter].
+         */
+        private fun footerFor(
+            projection: PollRowProjection,
+            pollId: String,
+        ): RowFooter? {
+            if (projection.chipStatus == PollChipStatus.Closed) return null
+            return RowFooter(
+                actions =
+                    listOf(
+                        RowFooterAction(
+                            title = "Close",
+                            icon = PantopusIcon.Lock,
+                            variant = CompactButtonVariant.Ghost,
+                            testTag = "polls.row_$pollId.close",
+                            onClick = { requestClose(pollId) },
+                        ),
+                        RowFooterAction(
+                            title = "Delete",
+                            icon = PantopusIcon.Trash,
+                            variant = CompactButtonVariant.Destructive,
+                            testTag = "polls.row_$pollId.delete",
+                            onClick = { requestDelete(pollId) },
+                        ),
+                    ),
             )
         }
 

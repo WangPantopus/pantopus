@@ -12,11 +12,14 @@ import app.pantopus.android.data.api.models.businesses.CreateBusinessLocationPay
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.businesses.BusinessesRepository
+import app.pantopus.android.data.upload.UploadFile
+import app.pantopus.android.data.upload.UploadRepository
 import app.pantopus.android.ui.screens.auth.AuthValidation
 import app.pantopus.android.ui.screens.shared.wizard.WizardChrome
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
 import app.pantopus.android.ui.screens.shared.wizard.WizardModel
 import app.pantopus.android.ui.screens.shared.wizard.WizardProgressLabel
+import app.pantopus.android.ui.screens.shared.wizard.WizardSecondaryCta
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -68,6 +71,16 @@ data class CreateBusinessUiState(
     val locationSkipped: Boolean = false,
     val hoursSkipped: Boolean = false,
     val hours: List<BusinessHoursDay> = BusinessHoursDay.defaultWeek(),
+    // Logo — uploaded after create-full, which is the first point a
+    // business id exists (the upload route is keyed by it).
+    val logoPick: CreateBusinessLogoPick? = null,
+    val logoSkipped: Boolean = false,
+    /**
+     * Set when create succeeded but the logo upload didn't. RN swallows the
+     * same failure ("Non-critical — user can upload from dashboard"); we
+     * surface it as a banner instead of silently dropping the image.
+     */
+    val logoUploadWarning: String? = null,
 ) {
     val isSearchActive: Boolean
         get() = searchText.trim().isNotEmpty()
@@ -117,6 +130,7 @@ open class CreateBusinessWizardViewModel
     @Inject
     constructor(
         private val businessesRepository: BusinessesRepository,
+        private val uploadRepository: UploadRepository,
     ) : ViewModel(),
         WizardModel {
         private val _state = MutableStateFlow(CreateBusinessUiState())
@@ -161,8 +175,18 @@ open class CreateBusinessWizardViewModel
                     if (!validateLocation()) return
                     transitionTo(CreateBusinessStep.Confirm)
                 }
-                CreateBusinessStep.Confirm -> createBusiness()
+                CreateBusinessStep.Confirm -> createBusiness(publish = true)
             }
+        }
+
+        /**
+         * Confirm step's ghost CTA — creates the business but leaves it
+         * unpublished, matching RN's "Save as Draft"
+         * (`src/app/businesses/new.tsx:273-320`).
+         */
+        override fun onSecondary() {
+            if (_state.value.currentStep != CreateBusinessStep.Confirm) return
+            createBusiness(publish = false)
         }
 
         // MARK: - Selection
@@ -262,6 +286,32 @@ open class CreateBusinessWizardViewModel
             _state.update { it.copy(hoursSkipped = false) }
         }
 
+        // MARK: - Logo
+
+        /**
+         * Stash a picked logo. It can only be uploaded once the business
+         * exists (the route is keyed by business id), so it rides along until
+         * create-full returns — same ordering as RN
+         * (`src/app/businesses/new.tsx:223-230`).
+         */
+        fun setLogoPick(pick: CreateBusinessLogoPick) {
+            _state.update {
+                it.copy(logoPick = pick, logoSkipped = false, logoUploadWarning = null)
+            }
+        }
+
+        fun clearLogoPick() {
+            _state.update { it.copy(logoPick = null) }
+        }
+
+        fun skipLogo() {
+            _state.update { it.copy(logoSkipped = true, logoPick = null) }
+        }
+
+        fun unskipLogo() {
+            _state.update { it.copy(logoSkipped = false) }
+        }
+
         fun toggleDayClosed(dayOfWeek: Int) {
             _state.update { state ->
                 state.copy(
@@ -341,7 +391,7 @@ open class CreateBusinessWizardViewModel
             return true
         }
 
-        private fun createBusiness() {
+        private fun createBusiness(publish: Boolean) {
             if (_state.value.isCreating) return
             if (!validateBasicInfo()) return
             val category = _state.value.selectedCategory
@@ -353,7 +403,7 @@ open class CreateBusinessWizardViewModel
             }
 
             viewModelScope.launch {
-                _state.update { it.copy(isCreating = true, submitError = null) }
+                _state.update { it.copy(isCreating = true, submitError = null, logoUploadWarning = null) }
                 val state = _state.value
                 val location =
                     if (state.hasLocation) {
@@ -393,9 +443,12 @@ open class CreateBusinessWizardViewModel
                     )
                 when (val result = businessesRepository.createBusinessFull(body)) {
                     is NetworkResult.Success -> {
+                        val businessId = result.data.business.id
+                        uploadLogoIfNeeded(businessId)
+                        if (publish) businessesRepository.publishBusiness(businessId)
                         pendingEvent.value =
                             CreateBusinessOutboundEvent.OpenBusinessDashboard(
-                                businessId = result.data.business.id,
+                                businessId = businessId,
                             )
                     }
                     is NetworkResult.Failure -> {
@@ -405,6 +458,33 @@ open class CreateBusinessWizardViewModel
                     }
                 }
                 _state.update { it.copy(isCreating = false) }
+            }
+        }
+
+        /**
+         * Push the picked logo once the business id exists. RN treats a
+         * failed logo upload as non-critical (the business is already
+         * created), so navigation continues and a warning is surfaced.
+         */
+        private suspend fun uploadLogoIfNeeded(businessId: String) {
+            val current = _state.value
+            val pick = current.logoPick?.takeIf { !current.logoSkipped } ?: return
+            val result =
+                uploadRepository.uploadBusinessMedia(
+                    businessId = businessId,
+                    type = "logo",
+                    file = UploadFile(pick.fileName, pick.mimeType, pick.bytes),
+                )
+            when (result) {
+                is NetworkResult.Success -> _state.update { it.copy(logoPick = null) }
+                is NetworkResult.Failure ->
+                    _state.update {
+                        it.copy(
+                            logoUploadWarning =
+                                "Your business was created, but the logo didn't upload. " +
+                                    "Add it from the dashboard.",
+                        )
+                    }
             }
         }
 
@@ -462,7 +542,15 @@ open class CreateBusinessWizardViewModel
                     },
                 primaryCtaLabel = primaryLabel(state),
                 primaryCtaEnabled = primaryEnabled(state),
-                secondaryCta = null,
+                secondaryCta =
+                    if (state.currentStep == CreateBusinessStep.Confirm) {
+                        WizardSecondaryCta(
+                            label = "Save as draft",
+                            testTag = "createBusiness_saveDraft",
+                        )
+                    } else {
+                        null
+                    },
                 isSubmitting = state.isSubmittingCustom || state.isCreating,
                 dirty = isDirty(state),
                 showsProgressBar = true,
@@ -474,7 +562,10 @@ open class CreateBusinessWizardViewModel
                 CreateBusinessStep.PickCategory -> "Continue"
                 CreateBusinessStep.LegalInfo -> "Next"
                 CreateBusinessStep.Profile -> if (state.locationSkipped) "Skip" else "Next"
-                CreateBusinessStep.Confirm -> "Confirm"
+                // RN's review step publishes ("Publish"), with Save as Draft as
+                // the ghost — native previously created an unpublished business
+                // and called it "Confirm", so nothing ever went live.
+                CreateBusinessStep.Confirm -> "Publish"
             }
 
         private fun primaryEnabled(state: CreateBusinessUiState): Boolean =

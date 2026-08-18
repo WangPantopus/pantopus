@@ -66,10 +66,11 @@ public enum BroadcastAudience: String, Sendable, Hashable, CaseIterable, Identif
     }
 }
 
-/// One attached media item in the composer. `imageData` carries the
-/// bytes when the user picks a real photo (rendered inline); sample /
-/// snapshot data leaves it `nil` so the preview falls back to a tinted
-/// placeholder — deterministic for snapshot baselines.
+/// One attached media item in the composer. `data` carries the picked
+/// bytes — rendered inline for images and uploaded verbatim to
+/// `POST /api/upload/post-media/:messageId` after the broadcast is
+/// published. Sample / snapshot data leaves it `nil` so the preview falls
+/// back to a tinted placeholder — deterministic for snapshot baselines.
 public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
     public enum Kind: String, Sendable, Hashable {
         case image
@@ -79,13 +80,38 @@ public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
     public let id: String
     public let kind: Kind
     public let caption: String?
-    public let imageData: Data?
+    public let data: Data?
+    /// Set only for media that is already hosted (re-attached from an
+    /// existing post). Such items ride the `media[]` field of the publish
+    /// body instead of the post-media upload leg.
+    public let remoteURL: String?
+    /// Randomised on pick so the library's `IMG_xxxx` never reaches S3.
+    public let fileName: String
+    public let mimeType: String
 
-    public init(id: String = UUID().uuidString, kind: Kind, caption: String?, imageData: Data? = nil) {
+    public init(
+        id: String = UUID().uuidString,
+        kind: Kind,
+        caption: String?,
+        data: Data? = nil,
+        remoteURL: String? = nil,
+        fileName: String? = nil,
+        mimeType: String? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.caption = caption
-        self.imageData = imageData
+        self.data = data
+        self.remoteURL = remoteURL
+        let defaultMime = kind == .video ? "video/mp4" : "image/jpeg"
+        self.mimeType = mimeType ?? defaultMime
+        self.fileName = fileName ?? "broadcast-\(id.prefix(8)).\(kind == .video ? "mp4" : "jpg")"
+    }
+
+    /// Ready to ship to the multipart route.
+    public var uploadFile: MultipartFile? {
+        guard let data else { return nil }
+        return MultipartFile(fieldName: "files", filename: fileName, mimeType: mimeType, data: data)
     }
 }
 
@@ -93,24 +119,34 @@ public struct ComposeMediaPreview: Sendable, Hashable, Identifiable {
 /// value type so the VM can snapshot it for the send call and compare
 /// against the last-saved copy for the unsaved-draft indicator.
 public struct ComposeBroadcastDraft: Sendable, Hashable {
+    /// RN caps a broadcast at nine attachments
+    /// (`postMediaComposer.ts` → `.slice(0, 9)`), matching the multer
+    /// `upload.array('files', 9)` limit on `/api/upload/post-media/:postId`.
+    public static let mediaLimit = 9
+
     public var body: String
     public var audience: BroadcastAudience
-    public var media: ComposeMediaPreview?
+    public var media: [ComposeMediaPreview]
 
     public init(
         body: String = "",
         audience: BroadcastAudience = .allBeacons,
-        media: ComposeMediaPreview? = nil
+        media: [ComposeMediaPreview] = []
     ) {
         self.body = body
         self.audience = audience
-        self.media = media
+        self.media = Array(media.prefix(Self.mediaLimit))
     }
 
     /// Nothing worth sending — empty body (whitespace-trimmed) and no
     /// media. Audience choice alone doesn't count as content.
     public var isEmpty: Bool {
-        body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && media == nil
+        body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && media.isEmpty
+    }
+
+    /// Free attachment slots left before the nine-item cap.
+    public var remainingMediaSlots: Int {
+        max(0, Self.mediaLimit - media.count)
     }
 }
 

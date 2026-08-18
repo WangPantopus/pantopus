@@ -11,6 +11,7 @@
 package app.pantopus.android.ui.screens.notifications
 
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.core.routing.DeepLinkRouter
@@ -22,6 +23,7 @@ import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowDestructiveAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
@@ -48,7 +50,68 @@ import javax.inject.Inject
 object NotificationsTab {
     const val ALL = "all"
     const val UNREAD = "unread"
+
+    /**
+     * S5 parity with RN (`src/app/notifications.tsx:56`). Read rows are
+     * filtered client-side — the backend only understands `?unread=true`.
+     */
+    const val READ = "read"
 }
+
+/**
+ * Identity-firewall context values the backend validates against
+ * (`backend/routes/notifications.js:21-22`).
+ */
+object NotificationContext {
+    const val PERSONAL = "personal"
+    const val AUDIENCE = "audience"
+    const val PLATFORM = "platform"
+}
+
+/**
+ * Notification zone (P2.3 / unified-IA §6.1). The Personal zone folds
+ * `platform` announcements in with `personal`; the Audience (Beacon)
+ * zone is isolated so persona traffic never leaks into the personal
+ * stream. Mirrors iOS `NotificationsZone` and RN
+ * `src/app/notifications.tsx:84-91`.
+ */
+enum class NotificationsZone(val rawValue: String) {
+    Personal(NotificationContext.PERSONAL),
+    Audience(NotificationContext.AUDIENCE),
+    ;
+
+    /** Firewall contexts this zone pulls from `GET /api/notifications`. */
+    val contexts: List<String>
+        get() =
+            when (this) {
+                Personal -> listOf(NotificationContext.PERSONAL, NotificationContext.PLATFORM)
+                Audience -> listOf(NotificationContext.AUDIENCE)
+            }
+
+    val label: String
+        get() =
+            when (this) {
+                Personal -> "Personal"
+                Audience -> "Audience"
+            }
+
+    /** Unset context defaults to `personal`, matching RN. */
+    fun matches(context: String?): Boolean = contexts.contains(context?.takeIf { it.isNotEmpty() } ?: NotificationContext.PERSONAL)
+
+    companion object {
+        fun fromRaw(raw: String?): NotificationsZone? = entries.firstOrNull { it.rawValue == raw }
+    }
+}
+
+/**
+ * Pending "delete this notification?" confirmation. The screen binds an
+ * `AlertDialog` to this; the VM never destroys anything until
+ * [NotificationsViewModel.confirmDelete] runs.
+ */
+data class NotificationDeleteRequest(
+    val id: String,
+    val title: String,
+)
 
 /**
  * Seven type buckets the Notifications design surfaces. Each one drives
@@ -166,11 +229,36 @@ class NotificationsViewModel
     @Inject
     constructor(
         private val repo: NotificationsRepository,
+        // Default keeps the JVM unit tests constructing the VM with just the
+        // repository; Hilt always supplies the real handle.
+        savedStateHandle: SavedStateHandle = SavedStateHandle(),
     ) : ViewModel() {
         private val pageSize = 20
         private var hasMore = false
         private var loading = false
         private var notifications: MutableList<NotificationDto> = mutableListOf()
+
+        /**
+         * Per-context pagination cursors. The Personal zone fans out over
+         * two contexts, so a single `notifications.size` offset would skip
+         * rows on the second page (RN keeps the same per-context map —
+         * `src/app/notifications.tsx:16-18`).
+         */
+        private var offsets: MutableMap<String, Int> = mutableMapOf()
+
+        /**
+         * True when the route explicitly named a zone (Hub megaphone →
+         * `notifications?context=audience`). Keeps the strip visible from
+         * first paint and scopes the very first fetch.
+         */
+        private val hasExplicitZone: Boolean
+
+        /**
+         * True once the user picked a zone from the strip. Until then the
+         * list stays unscoped, matching RN's flag-off behaviour
+         * (`src/app/notifications.tsx:60-66`).
+         */
+        private var zoneWasChosen = false
 
         private val _state = MutableStateFlow<ListOfRowsUiState>(ListOfRowsUiState.Loading)
         val state: StateFlow<ListOfRowsUiState> = _state.asStateFlow()
@@ -178,14 +266,61 @@ class NotificationsViewModel
         private val _unreadCount = MutableStateFlow(0)
         val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
 
+        private val _zone = MutableStateFlow(NotificationsZone.Personal)
+        val zone: StateFlow<NotificationsZone> = _zone.asStateFlow()
+
+        /**
+         * Whether the Personal / Audience strip should render. True when
+         * the route asked for a zone, or once the loaded list has actually
+         * returned an audience-context row. Never assumed.
+         */
+        private val _showsZoneStrip = MutableStateFlow(false)
+        val showsZoneStrip: StateFlow<Boolean> = _showsZoneStrip.asStateFlow()
+
+        /** Row awaiting delete confirmation. Null = no dialog. */
+        private val _pendingDelete = MutableStateFlow<NotificationDeleteRequest?>(null)
+        val pendingDelete: StateFlow<NotificationDeleteRequest?> = _pendingDelete.asStateFlow()
+
         private val _tabs =
             MutableStateFlow(
                 listOf(
                     ListOfRowsTab(id = NotificationsTab.ALL, label = "All", count = 0),
                     ListOfRowsTab(id = NotificationsTab.UNREAD, label = "Unread", count = 0),
+                    ListOfRowsTab(id = NotificationsTab.READ, label = "Read", count = 0),
                 ),
             )
         val tabs: StateFlow<List<ListOfRowsTab>> = _tabs.asStateFlow()
+
+        init {
+            val requested = NotificationsZone.fromRaw(savedStateHandle.get<String>(CONTEXT_KEY))
+            hasExplicitZone = requested != null
+            if (requested != null) {
+                _zone.value = requested
+                _showsZoneStrip.value = true
+            }
+        }
+
+        /**
+         * Contexts the current view is scoped to — null while nobody has
+         * named a zone, which keeps the legacy unscoped list so Beacon rows
+         * are not silently hidden.
+         */
+        private fun activeContexts(): List<String>? = if (useScopedZones()) _zone.value.contexts else null
+
+        private fun useScopedZones(): Boolean = hasExplicitZone || zoneWasChosen
+
+        /**
+         * Switch the firewall zone and refetch. Also the moment the list
+         * stops being unscoped: once the user (or the route) has named a
+         * zone we start sending `?context=`.
+         */
+        fun selectZone(next: NotificationsZone) {
+            val becomesScoped = !useScopedZones()
+            if (_zone.value == next && !becomesScoped) return
+            _zone.value = next
+            zoneWasChosen = true
+            reload()
+        }
 
         private val _selectedTab = MutableStateFlow(NotificationsTab.ALL)
         val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
@@ -242,16 +377,75 @@ class NotificationsViewModel
             }
         }
 
-        /** Sweep every unread row — same optimistic + rollback pattern. */
+        /**
+         * Sweep every unread row — same optimistic + rollback pattern.
+         *
+         * Scoped to the active zone so "Mark all read" in the Personal
+         * zone never silently clears the Beacon stream (RN
+         * `src/app/notifications.tsx:206-214`).
+         */
         fun markAllRead() {
             if (_unreadCount.value == 0) return
             val previous = notifications.toList()
             val previousCount = _unreadCount.value
+            val contexts = activeContexts()
             notifications = notifications.map { it.copy(isRead = true) }.toMutableList()
             _unreadCount.value = 0
             applyState()
             viewModelScope.launch {
-                when (repo.markAllRead()) {
+                when (repo.markAllRead(contexts)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure -> {
+                        notifications = previous.toMutableList()
+                        _unreadCount.value = previousCount
+                        applyState()
+                    }
+                }
+            }
+        }
+
+        // ─── Delete ────────────────────────────────────────────────
+
+        /**
+         * Ask for confirmation before deleting a row. The screen renders
+         * an `AlertDialog` off [pendingDelete].
+         */
+        fun requestDelete(id: String) {
+            val target = notifications.firstOrNull { it.id == id } ?: return
+            _pendingDelete.value =
+                NotificationDeleteRequest(
+                    id = target.id,
+                    title = target.title ?: "this notification",
+                )
+        }
+
+        /** Dismiss the confirmation without deleting. */
+        fun cancelDelete() {
+            _pendingDelete.value = null
+        }
+
+        /** `DELETE /api/notifications/:id` once the user confirms. */
+        fun confirmDelete() {
+            val request = _pendingDelete.value ?: return
+            _pendingDelete.value = null
+            delete(request.id)
+        }
+
+        /**
+         * Delete without the confirmation hop. Optimistic — the row
+         * disappears immediately and is restored if the call fails.
+         */
+        fun delete(id: String) {
+            val target = notifications.firstOrNull { it.id == id } ?: return
+            val previous = notifications.toList()
+            val previousCount = _unreadCount.value
+            notifications = notifications.filterNot { it.id == id }.toMutableList()
+            if (target.isRead != true) {
+                _unreadCount.value = (previousCount - 1).coerceAtLeast(0)
+            }
+            applyState()
+            viewModelScope.launch {
+                when (repo.delete(id)) {
                     is NetworkResult.Success -> Unit
                     is NetworkResult.Failure -> {
                         notifications = previous.toMutableList()
@@ -268,6 +462,9 @@ class NotificationsViewModel
          */
         fun handleIncoming(dto: NotificationDto) {
             if (notifications.any { it.id == dto.id }) return
+            // Zone firewall: an audience notification must not land in the
+            // personal stream (RN `src/app/notifications.tsx:180`).
+            if (useScopedZones() && !_zone.value.matches(dto.context)) return
             notifications.add(0, dto)
             if (dto.isRead != true) {
                 _unreadCount.value = _unreadCount.value + 1
@@ -278,6 +475,7 @@ class NotificationsViewModel
         private fun reload() {
             _state.value = ListOfRowsUiState.Loading
             notifications = mutableListOf()
+            offsets = mutableMapOf()
             hasMore = false
             fetchPage(reset = true)
         }
@@ -285,31 +483,86 @@ class NotificationsViewModel
         private fun fetchPage(reset: Boolean) {
             if (loading) return
             loading = true
-            val offset = if (reset) 0 else notifications.size
+            if (reset) offsets = mutableMapOf()
             val unreadOnly = _selectedTab.value == NotificationsTab.UNREAD
+            // A null context means "unscoped legacy list"; the fan-out below
+            // walks one request per context so the Personal zone can merge
+            // `personal` + `platform` the way RN does.
+            val contexts = activeContexts() ?: listOf(UNSCOPED)
             viewModelScope.launch {
-                val result = repo.list(limit = pageSize, offset = offset, unreadOnly = unreadOnly)
-                loading = false
-                when (result) {
-                    is NetworkResult.Success -> {
-                        val body = result.data
-                        if (reset) notifications.clear()
-                        notifications.addAll(body.notifications)
-                        hasMore = body.hasMore ?: (body.notifications.size >= pageSize)
-                        _unreadCount.value =
-                            body.unreadCount ?: notifications.count { it.isRead != true }
-                        applyState()
-                    }
-                    is NetworkResult.Failure -> {
-                        if (reset) {
-                            _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
-                            _topBarAction.value =
-                                makeTopBarAction(enabled = _unreadCount.value > 0)
+                val incoming = mutableListOf<NotificationDto>()
+                var anyMore = false
+                var scopedUnread = 0
+                var sawUnreadCount = false
+                var failure: NetworkResult.Failure? = null
+                for (context in contexts) {
+                    val result =
+                        repo.list(
+                            limit = pageSize,
+                            offset = offsets[context] ?: 0,
+                            unreadOnly = unreadOnly,
+                            context = context.takeIf { it != UNSCOPED },
+                        )
+                    when (result) {
+                        is NetworkResult.Success -> {
+                            val body = result.data
+                            incoming.addAll(body.notifications)
+                            offsets[context] = (offsets[context] ?: 0) + body.notifications.size
+                            anyMore = anyMore || (body.hasMore ?: (body.notifications.size >= pageSize))
+                            body.unreadCount?.let {
+                                scopedUnread += it
+                                sawUnreadCount = true
+                            }
                         }
+                        is NetworkResult.Failure -> failure = result
                     }
                 }
+                loading = false
+                val failed = failure
+                if (failed != null && incoming.isEmpty()) {
+                    if (reset) {
+                        _state.value =
+                            ListOfRowsUiState.Error(failed.error.displayMessage("Couldn't load the list."))
+                        _topBarAction.value = makeTopBarAction(enabled = _unreadCount.value > 0)
+                    }
+                    return@launch
+                }
+                notifications =
+                    if (reset) {
+                        sortedByRecency(incoming).toMutableList()
+                    } else {
+                        merge(notifications, incoming).toMutableList()
+                    }
+                hasMore = anyMore
+                _unreadCount.value =
+                    if (sawUnreadCount) scopedUnread else notifications.count { it.isRead != true }
+                revealZoneStripIfAudienceSeen()
+                applyState()
             }
         }
+
+        /**
+         * Reveal the Personal / Audience strip once the unscoped list has
+         * actually returned a Beacon row. No probe request, no feature
+         * flag, no fabricated zone — the strip only appears when the
+         * backend has handed us audience-context data.
+         */
+        private fun revealZoneStripIfAudienceSeen() {
+            if (_showsZoneStrip.value) return
+            _showsZoneStrip.value = notifications.any { it.context == NotificationContext.AUDIENCE }
+        }
+
+        /**
+         * Rows for the active tab. `read` has no backend filter — the
+         * handler only understands `?unread=true` — so it is applied
+         * client-side exactly like RN (`src/app/notifications.tsx:259`).
+         */
+        private fun displayedNotifications(): List<NotificationDto> =
+            if (_selectedTab.value == NotificationsTab.READ) {
+                notifications.filter { it.isRead == true }
+            } else {
+                notifications
+            }
 
         private fun applyState() {
             _tabs.value =
@@ -324,15 +577,28 @@ class NotificationsViewModel
                         label = "Unread",
                         count = _unreadCount.value,
                     ),
+                    ListOfRowsTab(
+                        id = NotificationsTab.READ,
+                        label = "Read",
+                        count = notifications.count { it.isRead == true },
+                    ),
                 )
-            if (notifications.isEmpty()) {
+            val rows = displayedNotifications()
+            if (rows.isEmpty()) {
                 _state.value = emptyState()
                 _topBarAction.value = makeTopBarAction(enabled = _unreadCount.value > 0)
                 return
             }
             val now = Instant.now()
-            val zone = ZoneId.systemDefault()
-            val sections = makeSections(notifications, now = now, zone = zone, onTap = ::handleTap)
+            val timeZone = ZoneId.systemDefault()
+            val sections =
+                makeSections(
+                    rows,
+                    now = now,
+                    zone = timeZone,
+                    onDelete = ::requestDelete,
+                    onTap = ::handleTap,
+                )
             _state.value = ListOfRowsUiState.Loaded(sections = sections, hasMore = hasMore)
             _topBarAction.value = makeTopBarAction(enabled = _unreadCount.value > 0)
         }
@@ -349,12 +615,28 @@ class NotificationsViewModel
                         ctaTitle = "View all notifications",
                         onCta = { selectTab(NotificationsTab.ALL) },
                     )
-                else ->
+                NotificationsTab.READ ->
                     ListOfRowsUiState.Empty(
-                        icon = PantopusIcon.Bell,
-                        headline = "All caught up",
-                        subcopy = "When something needs your attention, it'll show up here.",
+                        icon = PantopusIcon.BellOff,
+                        headline = "No read notifications",
+                        subcopy = "Notifications you’ve already opened will collect here.",
+                        ctaTitle = "View all notifications",
+                        onCta = { selectTab(NotificationsTab.ALL) },
                     )
+                else ->
+                    if (_zone.value == NotificationsZone.Audience) {
+                        ListOfRowsUiState.Empty(
+                            icon = PantopusIcon.Bell,
+                            headline = "No audience activity",
+                            subcopy = "Replies, follows, and mentions on your Beacon land here.",
+                        )
+                    } else {
+                        ListOfRowsUiState.Empty(
+                            icon = PantopusIcon.Bell,
+                            headline = "All caught up",
+                            subcopy = "When something needs your attention, it'll show up here.",
+                        )
+                    }
             }
 
         private fun makeTopBarAction(enabled: Boolean): TopBarAction =
@@ -375,6 +657,30 @@ class NotificationsViewModel
         }
 
         companion object {
+            /** `SavedStateHandle` key for the optional `?context=` nav arg. */
+            const val CONTEXT_KEY = "context"
+
+            /** Sentinel offset key for the unscoped (no `?context=`) list. */
+            private const val UNSCOPED = "__all__"
+
+            /** Newest-first, matching the backend's `created_at desc` order. */
+            internal fun sortedByRecency(items: List<NotificationDto>): List<NotificationDto> =
+                items.sortedByDescending { parseInstant(it.createdAt) ?: Instant.EPOCH }
+
+            /** Append-and-dedupe for a paged multi-context fan-out. */
+            internal fun merge(
+                existing: List<NotificationDto>,
+                incoming: List<NotificationDto>,
+            ): List<NotificationDto> {
+                val seen = existing.map { it.id }.toMutableSet()
+                val next = existing.toMutableList()
+                for (item in incoming) {
+                    if (!seen.add(item.id)) continue
+                    next.add(item)
+                }
+                return sortedByRecency(next)
+            }
+
             /**
              * Group DTOs into Today + Earlier sections, in that order.
              * Public so the test suite can assert bucketing directly.
@@ -383,6 +689,7 @@ class NotificationsViewModel
                 dtos: List<NotificationDto>,
                 now: Instant,
                 zone: ZoneId,
+                onDelete: ((String) -> Unit)? = null,
                 onTap: (NotificationDto) -> Unit,
             ): List<RowSection> {
                 val today = now.atZone(zone).toLocalDate()
@@ -391,7 +698,7 @@ class NotificationsViewModel
                 for (dto in dtos) {
                     val created = parseInstant(dto.createdAt) ?: now
                     val createdDate = created.atZone(zone).toLocalDate()
-                    val row = row(dto = dto, now = now, zone = zone) { onTap(dto) }
+                    val row = row(dto = dto, now = now, zone = zone, onDelete = onDelete) { onTap(dto) }
                     if (!createdDate.isBefore(today)) {
                         todayRows.add(row)
                     } else {
@@ -417,10 +724,19 @@ class NotificationsViewModel
                 dto: NotificationDto,
                 now: Instant = Instant.now(),
                 zone: ZoneId = ZoneId.systemDefault(),
+                onDelete: ((String) -> Unit)? = null,
                 onSelect: () -> Unit,
             ): RowModel {
                 val unread = dto.isRead != true
                 val category = NotificationCategory.fromRaw(dto.type)
+                val destructive =
+                    onDelete?.let { handler ->
+                        RowDestructiveAction(
+                            label = "Delete",
+                            testTag = "notifications.row.${dto.id}.delete",
+                            onClick = { handler(dto.id) },
+                        )
+                    }
                 return RowModel(
                     id = dto.id,
                     title = dto.title ?: "Notification",
@@ -444,6 +760,7 @@ class NotificationsViewModel
                         ),
                     timeMeta = formatRelativeTime(dto.createdAt, now = now, zone = zone),
                     highlight = if (unread) RowHighlight.Unread else null,
+                    destructiveAction = destructive,
                 )
             }
 

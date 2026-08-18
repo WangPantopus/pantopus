@@ -24,6 +24,7 @@ import app.pantopus.android.data.gigs.GigDraftQueue
 import app.pantopus.android.data.gigs.GigQueuedDraft
 import app.pantopus.android.data.gigs.GigSavedSearchesRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.gigs.GigsV2Repository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.network.NetworkMonitor
@@ -102,6 +103,12 @@ class GigsFeedViewModelTest {
     private val authRepo: AuthRepository = mockk()
     private val location: LocationProvider = mockk()
     private val savedSearchesRepo: GigSavedSearchesRepository = mockk()
+
+    /**
+     * Nearby Support Trains only fire in the All / Support Trains feed
+     * scopes; the default Tasks scope never touches this repo.
+     */
+    private val gigsV2Repo: GigsV2Repository = mockk(relaxed = true)
     private val draftQueue = FakeGigDraftQueue()
     private val widgetSnapshots = FakeWidgetSnapshotStore()
     private val isOnline = MutableStateFlow(true)
@@ -129,7 +136,17 @@ class GigsFeedViewModelTest {
     }
 
     private fun makeVm() =
-        GigsFeedViewModel(repo, socket, authRepo, location, savedSearchesRepo, draftQueue, widgetSnapshots, networkMonitor)
+        GigsFeedViewModel(
+            repo,
+            socket,
+            authRepo,
+            location,
+            savedSearchesRepo,
+            draftQueue,
+            widgetSnapshots,
+            networkMonitor,
+            gigsV2Repo,
+        )
 
     private fun handymanGig(
         id: String = "g1",

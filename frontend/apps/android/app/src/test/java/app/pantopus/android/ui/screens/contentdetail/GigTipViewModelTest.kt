@@ -8,8 +8,10 @@ import app.pantopus.android.core.notifications.GigActiveNotifier
 import app.pantopus.android.data.api.models.gigs.GigBidsResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigMyBidResponse
 import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
+import app.pantopus.android.data.api.models.offers.MyBidsResponse
 import app.pantopus.android.data.api.models.payments.TipRefreshStatusResponse
 import app.pantopus.android.data.api.models.payments.TipResponse
 import app.pantopus.android.data.api.models.reviews.MyPendingReviewsResponse
@@ -18,7 +20,10 @@ import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigReassignmentRepository
+import app.pantopus.android.data.gigs.GigViewerBidRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.reviews.ReviewsRepository
@@ -49,6 +54,11 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigTipViewModelTest {
     private val repo: GigsRepository = mockk()
+    private val extrasRepo: app.pantopus.android.data.gigs.GigExtrasRepository = mockk()
+    private val reassignmentRepo: GigReassignmentRepository = mockk()
+    private val viewerBidRepo: GigViewerBidRepository = mockk()
+    private val ownerActionsRepo: app.pantopus.android.data.gigs.GigOwnerActionsRepository = mockk()
+    private val offersRepo: OffersRepository = mockk()
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
@@ -64,6 +74,10 @@ class GigTipViewModelTest {
                 user = UserDto(id = "owner-1", email = "o@example.com", displayName = "Owner", avatarUrl = null),
             )
         every { authRepo.state } returns MutableStateFlow<AuthRepository.State>(signed)
+        // Bidder-side lookup — the viewer here is the poster, so this never
+        // fires, but the mock must still answer if the gate ever changes.
+        coEvery { viewerBidRepo.myBid(any()) } returns NetworkResult.Success(GigMyBidResponse(bid = null))
+        coEvery { offersRepo.myBids(any()) } returns NetworkResult.Success(MyBidsResponse(bids = emptyList()))
     }
 
     @After
@@ -90,6 +104,11 @@ class GigTipViewModelTest {
         coEvery { repo.gigPayment("g1") } returns NetworkResult.Success(GigPaymentResponse())
         return GigDetailViewModel(
             repo,
+            extrasRepo,
+            reassignmentRepo,
+            viewerBidRepo,
+            ownerActionsRepo,
+            offersRepo,
             authRepo,
             filesRepo,
             paymentsRepo,

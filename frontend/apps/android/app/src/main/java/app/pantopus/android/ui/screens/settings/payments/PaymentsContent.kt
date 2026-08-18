@@ -62,6 +62,12 @@ data class PaymentMethod(
     val label: String,
     val subtext: String? = null,
     val chip: PaymentMethodChip? = null,
+    /**
+     * Last four digits of the card / bank account, when the server sent them.
+     * Only used to name the method in the destructive remove confirmation,
+     * mirroring RN's "…ending in 4421" alert (`PaymentMethodsTab.tsx:48-69`).
+     */
+    val last4: String? = null,
 )
 
 /** Brand badge variants for `PaymentMethodRow`. */
@@ -133,6 +139,14 @@ sealed interface PaymentsActivity {
     @Immutable
     data class Stats(val rows: List<PaymentsActivityStat>) : PaymentsActivity
 
+    /** The real transaction-history feed from `GET api/payments/history`. */
+    @Immutable
+    data class Transactions(val rows: List<PaymentsTransaction>) : PaymentsActivity
+
+    /**
+     * Single muted row. Used when the history feed came back empty (or
+     * couldn't be read — with the honest copy).
+     */
     @Immutable
     data class Empty(val title: String, val body: String) : PaymentsActivity
 }
@@ -144,3 +158,28 @@ data class PaymentsActivityStat(
     val label: String,
     val subtext: String? = null,
 )
+
+/**
+ * One row of the transaction-history feed (`GET api/payments/history`).
+ * Amounts are pre-formatted from the server's `amount_cents`; [isOutgoing]
+ * drives the sign and the red/green treatment.
+ */
+@Immutable
+data class PaymentsTransaction(
+    val id: String,
+    val kind: Kind,
+    /** Gig title / description / humanised payment type. */
+    val title: String,
+    /** "Mar 4 · Succeeded · to Ana Ruiz" — date, status and counterparty. */
+    val meta: String,
+    /** Signed, formatted amount — e.g. `"-$40.00"` / `"+$120.00"`. */
+    val amount: String,
+    val isOutgoing: Boolean,
+) {
+    /**
+     * Drives the leading icon disc, mirroring RN `HistoryTab` iconography:
+     * tip → star, payout → arrow-up disc, money out → arrow-up, money in →
+     * arrow-down.
+     */
+    enum class Kind { Tip, Payout, Sent, Received }
+}

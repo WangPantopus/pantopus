@@ -2,6 +2,7 @@ package app.pantopus.android.data.notifications
 
 import app.pantopus.android.data.api.ApiService
 import app.pantopus.android.data.api.models.feed.RegisterPushTokenRequest
+import app.pantopus.android.data.api.models.notifications.MarkAllNotificationsReadBody
 import app.pantopus.android.data.api.models.notifications.NotificationActionEcho
 import app.pantopus.android.data.api.models.notifications.NotificationUnreadCountResponse
 import app.pantopus.android.data.api.models.notifications.NotificationsListResponse
@@ -23,17 +24,40 @@ class NotificationsRepository
         private val api: NotificationsApi,
         private val legacyApi: ApiService,
     ) {
+        /**
+         * `GET /api/notifications` — route `backend/routes/notifications.js:85`.
+         * `context` scopes to one identity-firewall zone.
+         */
         suspend fun list(
             limit: Int,
             offset: Int,
             unreadOnly: Boolean? = null,
-        ): NetworkResult<NotificationsListResponse> = safeApiCall { api.list(limit = limit, offset = offset, unreadOnly = unreadOnly) }
+            context: String? = null,
+        ): NetworkResult<NotificationsListResponse> =
+            safeApiCall {
+                api.list(limit = limit, offset = offset, unreadOnly = unreadOnly, context = context)
+            }
 
         suspend fun unreadCount(): NetworkResult<NotificationUnreadCountResponse> = safeApiCall { api.unreadCount() }
 
         suspend fun markRead(id: String): NetworkResult<NotificationActionEcho> = safeApiCall { api.markRead(id) }
 
-        suspend fun markAllRead(): NetworkResult<NotificationActionEcho> = safeApiCall { api.markAllRead() }
+        /**
+         * `POST /api/notifications/read-all` — route
+         * `backend/routes/notifications.js:412`. Pass `contexts` to keep the
+         * sweep inside the zone the user is looking at; null clears all.
+         */
+        suspend fun markAllRead(contexts: List<String>? = null): NetworkResult<NotificationActionEcho> =
+            safeApiCall {
+                if (contexts.isNullOrEmpty()) {
+                    api.markAllRead()
+                } else {
+                    api.markAllReadInContexts(MarkAllNotificationsReadBody(contexts = contexts))
+                }
+            }
+
+        /** `DELETE /api/notifications/:id` — route `backend/routes/notifications.js:452`. */
+        suspend fun delete(id: String): NetworkResult<NotificationActionEcho> = safeApiCall { api.delete(id) }
 
         /**
          * Register the device's FCM token with the backend. Mirrors

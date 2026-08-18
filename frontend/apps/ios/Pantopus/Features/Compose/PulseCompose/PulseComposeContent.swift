@@ -27,6 +27,12 @@ public struct PulseComposeContentState: Equatable {
     public var recommendRating: Int
     public var dealExpiresAt: Date
     public var eligibilityWarning: String?
+    /// Soft nudge from `POST /api/posts/precheck` — dismissible.
+    public var precheckNudge: String?
+    /// Cooldown copy when the viewer is rate-limited / restricted.
+    public var precheckCooldown: String?
+    /// True when the precheck classified this as a visitor post.
+    public var isVisitorPost: Bool
     public var fields: [PulseComposeField: FormFieldState]
     public var photos: [PulseComposePhoto]
     /// True when the intent picker should render as a non-interactive
@@ -49,6 +55,9 @@ public struct PulseComposeContentState: Equatable {
         recommendRating: Int = 5,
         dealExpiresAt: Date = Date().addingTimeInterval(7 * 86400),
         eligibilityWarning: String? = nil,
+        precheckNudge: String? = nil,
+        precheckCooldown: String? = nil,
+        isVisitorPost: Bool = false,
         fields: [PulseComposeField: FormFieldState] = [:],
         photos: [PulseComposePhoto] = [],
         isIntentLocked: Bool = false,
@@ -67,6 +76,9 @@ public struct PulseComposeContentState: Equatable {
         self.recommendRating = recommendRating
         self.dealExpiresAt = dealExpiresAt
         self.eligibilityWarning = eligibilityWarning
+        self.precheckNudge = precheckNudge
+        self.precheckCooldown = precheckCooldown
+        self.isVisitorPost = isVisitorPost
         self.fields = fields
         self.photos = photos
         self.isIntentLocked = isIntentLocked
@@ -91,6 +103,10 @@ public struct PulseComposeContentActions {
     public var onUpdateField: (PulseComposeField, String) -> Void
     public var onPickPhotos: () -> Void
     public var onRemovePhoto: (UUID) -> Void
+    /// Body-field blur — runs `POST /api/posts/precheck`.
+    public var onBodyEditingEnded: () -> Void
+    /// X on the precheck nudge banner.
+    public var onDismissPrecheckNudge: () -> Void
 
     public init(
         onSelectIntent: @escaping (PulseComposeIntent) -> Void = { _ in },
@@ -105,7 +121,9 @@ public struct PulseComposeContentActions {
         onSelectDealExpires: @escaping (Date) -> Void = { _ in },
         onUpdateField: @escaping (PulseComposeField, String) -> Void = { _, _ in },
         onPickPhotos: @escaping () -> Void = {},
-        onRemovePhoto: @escaping (UUID) -> Void = { _ in }
+        onRemovePhoto: @escaping (UUID) -> Void = { _ in },
+        onBodyEditingEnded: @escaping () -> Void = {},
+        onDismissPrecheckNudge: @escaping () -> Void = {}
     ) {
         self.onSelectIntent = onSelectIntent
         self.onSelectIdentity = onSelectIdentity
@@ -120,6 +138,8 @@ public struct PulseComposeContentActions {
         self.onUpdateField = onUpdateField
         self.onPickPhotos = onPickPhotos
         self.onRemovePhoto = onRemovePhoto
+        self.onBodyEditingEnded = onBodyEditingEnded
+        self.onDismissPrecheckNudge = onDismissPrecheckNudge
     }
 }
 
@@ -147,6 +167,7 @@ public struct PulseComposeContent: View {
                 intentPicker
                 identitySection
             }
+            precheckBanners
             intentSpecificSection
             photosSection
             if !state.isFlowMode || state.visibility != .connections {
@@ -199,6 +220,65 @@ public struct PulseComposeContent: View {
             .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
             .padding(.horizontal, Spacing.s4)
             .accessibilityIdentifier("composePulseEligibilityWarning")
+        }
+    }
+
+    /// The three precheck outcomes RN renders above the body field:
+    /// the hard cooldown block, the visitor badge, and the soft nudge
+    /// (`PostComposerModal.tsx:617-657`).
+    @ViewBuilder
+    private var precheckBanners: some View {
+        if let cooldown = state.precheckCooldown {
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.ban, size: 16, strokeWidth: 2, color: Theme.Color.error)
+                Text(cooldown)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.errorBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulsePrecheckCooldown")
+        }
+        if state.isVisitorPost {
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.plane, size: 16, strokeWidth: 2, color: Theme.Color.success)
+                Text("You're posting as a visitor. Your post will show a visitor badge.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.success)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.successBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulseVisitorBanner")
+        }
+        if let nudge = state.precheckNudge {
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.lightbulb, size: 16, strokeWidth: 2, color: Theme.Color.warmAmber)
+                Text(nudge)
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: actions.onDismissPrecheckNudge) {
+                    Icon(.x, size: 14, strokeWidth: 2, color: Theme.Color.appTextSecondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss suggestion")
+                .accessibilityIdentifier("composePulsePrecheckNudgeDismiss")
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.warmAmberBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .padding(.horizontal, Spacing.s4)
+            .accessibilityIdentifier("composePulsePrecheckNudge")
         }
     }
 
@@ -845,6 +925,11 @@ public struct PulseComposeContent: View {
                     set: { actions.onUpdateField(.body, $0) }
                 ))
                 .focused($isBodyFieldFocused)
+                // RN runs the pre-post safety precheck on body blur
+                // (`PostComposerModal.tsx:801`).
+                .onChange(of: isBodyFieldFocused) { _, focused in
+                    if !focused { actions.onBodyEditingEnded() }
+                }
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: minHeight)
                 .padding(Spacing.s2)

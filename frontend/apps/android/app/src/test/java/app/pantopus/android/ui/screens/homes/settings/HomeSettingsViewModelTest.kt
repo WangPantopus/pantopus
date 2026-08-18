@@ -3,18 +3,25 @@
 package app.pantopus.android.ui.screens.homes.settings
 
 import androidx.lifecycle.SavedStateHandle
+import app.pantopus.android.data.api.models.homes.HomeAccessDto
 import app.pantopus.android.data.api.models.homes.HomeDetail
 import app.pantopus.android.data.api.models.homes.HomeDetailResponse
+import app.pantopus.android.data.api.models.homes.HomeDto
 import app.pantopus.android.data.api.models.homes.OccupantDto
 import app.pantopus.android.data.api.models.homes.OccupantsResponse
 import app.pantopus.android.data.api.models.homes.PendingInviteDto
+import app.pantopus.android.data.api.models.homes.UpdateHomeRequest
+import app.pantopus.android.data.api.models.homes.UpdateHomeResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomeMembersRepository
+import app.pantopus.android.data.homes.HomeSettingsRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.screens.shared.grouped_list.GroupedListUiState
 import app.pantopus.android.ui.screens.shared.grouped_list.RowControl
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,6 +46,8 @@ import org.junit.Test
 class HomeSettingsViewModelTest {
     private val homesRepository: HomesRepository = mockk()
     private val homeMembersRepository: HomeMembersRepository = mockk()
+    private val homeAdminRepository: HomeAdminRepository = mockk()
+    private val homeSettingsRepository: HomeSettingsRepository = mockk()
 
     @Before
     fun setUp() {
@@ -85,16 +94,38 @@ class HomeSettingsViewModelTest {
     private fun makeVm(
         detail: NetworkResult<HomeDetailResponse> = NetworkResult.Success(HomeDetailResponse(homeDetail())),
         occupants: NetworkResult<OccupantsResponse> = NetworkResult.Failure(NetworkError.NotFound),
+        access: NetworkResult<HomeAccessDto> = NetworkResult.Failure(NetworkError.NotFound),
+        updateHome: NetworkResult<UpdateHomeResponse> =
+            NetworkResult.Success(UpdateHomeResponse(message = "Home updated successfully", home = homeRow())),
         homeId: String = "home-1",
     ): HomeSettingsViewModel {
         coEvery { homesRepository.detail(any()) } returns detail
         coEvery { homeMembersRepository.listOccupants(any()) } returns occupants
+        coEvery { homeAdminRepository.myAccess(any()) } returns access
+        coEvery { homeSettingsRepository.updateHome(any(), any()) } returns updateHome
         return HomeSettingsViewModel(
             homesRepository = homesRepository,
             homeMembersRepository = homeMembersRepository,
+            homeAdminRepository = homeAdminRepository,
+            homeSettingsRepository = homeSettingsRepository,
             savedStateHandle = SavedStateHandle(mapOf(HOME_SETTINGS_HOME_ID_KEY to homeId)),
         )
     }
+
+    private fun homeRow(name: String? = "The Lane House") =
+        HomeDto(
+            id = "home-1",
+            name = name,
+            address = "14 Elm Park Lane",
+            city = "Oakland",
+            state = "CA",
+            zipcode = "94601",
+            homeType = "single_family",
+            visibility = "members",
+            description = null,
+            createdAt = null,
+            updatedAt = null,
+        )
 
     private fun loadedGroups(vm: HomeSettingsViewModel) = (vm.state.value as GroupedListUiState.Loaded).groups
 
@@ -114,7 +145,10 @@ class HomeSettingsViewModelTest {
         vm.load()
         val byGroup = loadedGroups(vm).associate { it.id to it.rows.map { row -> row.id } }
         assertEquals(listOf("address", "propertyDetails", "photos", "documents"), byGroup["homeIdentity"])
-        assertEquals(listOf("accessCodes", "trustedNeighbors", "privacy"), byGroup["access"])
+        assertEquals(
+            listOf("accessCodes", "trustedNeighbors", "privacy", "ownershipSecurity"),
+            byGroup["access"],
+        )
         assertEquals(listOf("people", "inviteLink"), byGroup["members"])
         assertEquals(listOf("homeNotifications"), byGroup["notifications"])
         assertEquals(listOf("leaveHome"), byGroup["windDown"])
@@ -191,6 +225,54 @@ class HomeSettingsViewModelTest {
         vm.load()
         vm.onRow("privacy")
         assertEquals(HomeSettingsRoute.Security, vm.navigation.value)
+    }
+
+    @Test
+    fun rename_is_gated_on_edit_permission() {
+        val vm = makeVm()
+        vm.load()
+        vm.beginRenaming()
+        assertEquals(false, vm.rename.value.canEdit)
+        assertEquals(false, vm.rename.value.isRenaming)
+    }
+
+    @Test
+    fun owner_rename_patches_the_home_and_closes_the_editor() {
+        val vm = makeVm(access = NetworkResult.Success(HomeAccessDto(hasAccess = true, isOwner = true)))
+        vm.load()
+        vm.beginRenaming()
+        assertTrue(vm.rename.value.isRenaming)
+        vm.updateRenameDraft("  The Lane House  ")
+        vm.saveRenaming()
+        coVerify { homeSettingsRepository.updateHome("home-1", UpdateHomeRequest(name = "The Lane House")) }
+        assertEquals(false, vm.rename.value.isRenaming)
+        assertNull(vm.rename.value.error)
+    }
+
+    @Test
+    fun blank_rename_never_reaches_the_network() {
+        val vm = makeVm(access = NetworkResult.Success(HomeAccessDto(hasAccess = true, isOwner = true)))
+        vm.load()
+        vm.beginRenaming()
+        vm.updateRenameDraft("   ")
+        vm.saveRenaming()
+        coVerify(exactly = 0) { homeSettingsRepository.updateHome(any(), any()) }
+        assertEquals("Enter a name for this home.", vm.rename.value.error)
+    }
+
+    @Test
+    fun rename_failure_keeps_the_editor_open_with_an_error() {
+        val vm =
+            makeVm(
+                access = NetworkResult.Success(HomeAccessDto(hasAccess = true, isOwner = true)),
+                updateHome = NetworkResult.Failure(NetworkError.Server(500, "Failed to update home")),
+            )
+        vm.load()
+        vm.beginRenaming()
+        vm.updateRenameDraft("The Lane House")
+        vm.saveRenaming()
+        assertTrue(vm.rename.value.isRenaming)
+        assertTrue(vm.rename.value.error!!.isNotEmpty())
     }
 
     @Test

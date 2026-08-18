@@ -2,24 +2,31 @@
 //  NotificationSettingsViewModel.swift
 //  Pantopus
 //
-//  P7.5 / A14.5 — Notification preferences. Reshaped from the old
-//  channel-keyed toggle list into the design's three-channel matrix:
-//  five category cards (Tasks · Pulse · Marketplace · Home & Mailbox ·
-//  Account & security), each row carrying a `ChannelTriad` (Push /
-//  Email / SMS). A Master card on top hosts the Pause-all toggle + a
-//  Quiet-hours row; flipping Pause swaps the Master card for the amber
-//  `PauseBanner` and dims the category cards to 0.5.
+//  A14.5 — Notification & briefing preferences, backed by
+//  `GET/PUT /api/hub/preferences` (`backend/routes/hub.js:648` / `:716`).
 //
-//  Backend persistence is out of scope for P7.5 (mirrors A14.2 Home
-//  security) — every chip / toggle flips local state only. The helper
-//  lines and channel patterns are the parity contract, mirrored
-//  word-for-word in the Android `NotificationSettingsViewModel`.
+//  Four cards, projected onto the shared GroupedList archetype and
+//  mirrored row-for-row in the Android `NotificationSettingsViewModel`:
+//    Briefings        — morning + evening enable toggles, each revealing
+//                       a send-time chip strip when on.
+//    Alert preferences— weather / AQI / home reminders / gig updates /
+//                       mail summary switches.
+//    Quiet hours      — one toggle (start-time presence is the server's
+//                       on/off signal) plus From / Until chip strips.
+//    Briefing location— radio over `primary_home | viewing_location |
+//                       device_location`.
 //
-//  Two variant frames cover the design parity audit:
-//    `.populated` — the real mix (push for replies, email for receipts,
-//                   Pulse quiet, Home gets everything, security locked).
-//    `.paused`    — Pause-all on: amber banner + dimmed category cards.
+//  Mutations are optimistic and debounce-saved on a 600 ms timer, so a
+//  burst of taps collapses into one PUT carrying the merged patch (RN
+//  debounces the same window at `notification-preferences.tsx:62-75`
+//  but drops all but the last key — we merge instead). A failed PUT
+//  toasts and re-fetches, which rolls the row back to server truth.
 //
+//  Times go over the wire as `HH:mm` strings: Joi rejects anything else
+//  (`hub.js:699-709`), so never format them for display locale.
+//
+
+// swiftlint:disable type_body_length
 
 import Foundation
 import Observation
@@ -31,333 +38,395 @@ public final class NotificationSettingsViewModel: GroupedListDataSource {
         "Notifications"
     }
 
-    /// Mono legend pinned at the bottom of the scroll, so the P/E/S
-    /// abbreviations never have to be guessed.
+    /// Which zone the server interprets the briefing times in. Pinned
+    /// under the last card so `07:30` is never ambiguous.
     public var footerCaption: String? {
-        "P · Push   E · Email   S · SMS"
+        guard let zone = preferences?.dailyBriefingTimezone, !zone.isEmpty else { return nil }
+        return "Briefing times use \(zone)"
     }
 
     public private(set) var state: GroupedListState = .loading
 
-    /// Master "Pause all" state. When on, the Master card is replaced by
-    /// the amber banner and the category cards dim.
-    public private(set) var isPaused: Bool
-    /// Per-row Push/Email/SMS pattern, keyed by row id. Locked channels
-    /// (Emergency push) live in `Self.locked(for:)`, not here.
-    private var patterns: [String: ChannelPattern]
+    /// Transient save / load feedback, mirroring RN's toasts
+    /// (`notification-preferences.tsx:48`, `:69`, `:71`). The view
+    /// renders it and clears it after the auto-dismiss delay.
+    public var toast: ToastMessage?
 
-    public enum Variant: Sendable, Hashable { case populated, paused }
+    /// Server truth, mutated optimistically ahead of the debounced PUT.
+    public private(set) var preferences: NotificationPreferencesDTO?
 
-    public init(variant: Variant = .populated) {
-        isPaused = (variant == .paused)
-        patterns = Self.seedPatterns()
+    private let api: APIClient
+    private let saveDebounce: Duration
+    /// Wire-name keys accumulated since the last flush. Merged rather
+    /// than replaced so a burst of taps on different rows all persist.
+    private var pendingPatch: [String: JSONValue] = [:]
+    private var saveTask: Task<Void, Never>?
+
+    init(api: APIClient = .shared, saveDebounce: Duration = .milliseconds(600)) {
+        self.api = api
+        self.saveDebounce = saveDebounce
     }
 
     // MARK: - GroupedListDataSource
 
-    public var banner: GroupedListBanner? {
-        guard isPaused else { return nil }
-        return GroupedListBanner(
-            icon: .bellOff,
-            title: "Paused for 2 hours",
-            subtitle: "Resumes 11:42 AM · Emergency alerts still come through",
-            actionLabel: "Resume"
-        )
-    }
-
-    public var contentDimmed: Bool {
-        isPaused
-    }
-
     public func load() async {
-        state = .loaded(groups())
+        if preferences == nil { state = .loading }
+        await fetch()
     }
 
-    public func tapRow(_: String) async {
-        // Quiet-hours opens a duration sheet in a later prompt; no-op
-        // while sheet wiring is out of scope.
+    public func refresh() async {
+        await fetch()
     }
 
-    public func selectRadio(_: String) async {}
+    public func tapRow(_: String) async {}
     public func setSlider(_: String, index _: Int) async {}
 
     public func toggleRow(_ rowId: String, isOn: Bool) async {
-        guard rowId == RowID.pauseAll else { return }
-        isPaused = isOn
-        state = .loaded(groups())
-    }
-
-    public func toggleChannel(_ rowId: String, channel: ChannelGlyph, isOn: Bool) async {
-        guard var pattern = patterns[rowId] else { return }
-        // Locked channels can't be toggled — the view guards this too.
-        guard !Self.locked(for: rowId).contains(channel) else { return }
-        switch channel {
-        case .p: pattern.p = isOn
-        case .e: pattern.e = isOn
-        case .s: pattern.s = isOn
+        guard preferences != nil else { return }
+        switch rowId {
+        case RowID.morningBriefing:
+            preferences?.dailyBriefingEnabled = isOn
+            enqueue(["daily_briefing_enabled": .bool(isOn)])
+        case RowID.eveningBriefing:
+            preferences?.eveningBriefingEnabled = isOn
+            enqueue(["evening_briefing_enabled": .bool(isOn)])
+        case RowID.weatherAlerts:
+            preferences?.weatherAlertsEnabled = isOn
+            enqueue(["weather_alerts_enabled": .bool(isOn)])
+        case RowID.aqiAlerts:
+            preferences?.aqiAlertsEnabled = isOn
+            enqueue(["aqi_alerts_enabled": .bool(isOn)])
+        case RowID.homeReminders:
+            preferences?.homeRemindersEnabled = isOn
+            enqueue(["home_reminders_enabled": .bool(isOn)])
+        case RowID.gigUpdates:
+            preferences?.gigUpdatesEnabled = isOn
+            enqueue(["gig_updates_enabled": .bool(isOn)])
+        case RowID.mailSummary:
+            preferences?.mailSummaryEnabled = isOn
+            enqueue(["mail_summary_enabled": .bool(isOn)])
+        case RowID.quietHours:
+            setQuietHours(enabled: isOn)
+        default:
+            break
         }
-        patterns[rowId] = pattern
-        state = .loaded(groups())
     }
 
-    public func tapBanner() async {
-        // Resume — clears the pause and brings the configured pattern
-        // back on.
-        isPaused = false
+    public func selectChip(_ rowId: String, value: String) async {
+        guard preferences != nil else { return }
+        switch rowId {
+        case RowID.morningTime:
+            preferences?.dailyBriefingTimeLocal = value
+            enqueue(["daily_briefing_time_local": .string(value)])
+        case RowID.eveningTime:
+            preferences?.eveningBriefingTimeLocal = value
+            enqueue(["evening_briefing_time_local": .string(value)])
+        case RowID.quietHoursStart:
+            preferences?.quietHoursStartLocal = value
+            enqueue(["quiet_hours_start_local": .string(value)])
+        case RowID.quietHoursEnd:
+            preferences?.quietHoursEndLocal = value
+            enqueue(["quiet_hours_end_local": .string(value)])
+        default:
+            break
+        }
+    }
+
+    public func selectRadio(_ rowId: String) async {
+        guard preferences != nil,
+              let option = Self.locationOptions.first(where: { $0.rowId == rowId })
+        else { return }
+        preferences?.locationMode = option.mode.rawValue
+        enqueue(["location_mode": .string(option.mode.rawValue)])
+    }
+
+    // MARK: - Networking
+
+    private func fetch() async {
+        do {
+            let response: NotificationPreferencesResponseDTO = try await api.request(
+                NotificationPreferencesEndpoints.fetch()
+            )
+            preferences = response.preferences
+            state = .loaded(groups())
+        } catch {
+            guard preferences != nil else {
+                state = .error(
+                    message: (error as? APIError)?.errorDescription
+                        ?? "Couldn't load your notification preferences."
+                )
+                return
+            }
+            // We already have something on screen — keep it and surface
+            // the failure as a toast, exactly like RN.
+            toast = ToastMessage(text: "Failed to load preferences", kind: .error)
+            state = .loaded(groups())
+        }
+    }
+
+    /// Apply locally, re-project, and (re)arm the debounce timer.
+    private func enqueue(_ patch: [String: JSONValue]) {
+        for (key, value) in patch { pendingPatch[key] = value }
         state = .loaded(groups())
+        saveTask?.cancel()
+        let delay = saveDebounce
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.flushPendingSave()
+        }
+    }
+
+    /// Test seam — drain the debounce window immediately.
+    func flushPendingSaveNow() async {
+        saveTask?.cancel()
+        saveTask = nil
+        await flushPendingSave()
+    }
+
+    private func flushPendingSave() async {
+        let patch = pendingPatch
+        pendingPatch = [:]
+        guard !patch.isEmpty else { return }
+        do {
+            let response: NotificationPreferencesResponseDTO = try await api.request(
+                NotificationPreferencesEndpoints.update(patch)
+            )
+            preferences = response.preferences
+            state = .loaded(groups())
+            toast = ToastMessage(text: "Saved", kind: .success)
+        } catch {
+            toast = ToastMessage(text: "Failed to save", kind: .error)
+            // Roll back by re-reading server truth (RN does the same).
+            await fetch()
+        }
+    }
+
+    private func setQuietHours(enabled: Bool) {
+        if enabled {
+            preferences?.quietHoursStartLocal = Self.defaultQuietStart
+            preferences?.quietHoursEndLocal = Self.defaultQuietEnd
+            enqueue([
+                "quiet_hours_start_local": .string(Self.defaultQuietStart),
+                "quiet_hours_end_local": .string(Self.defaultQuietEnd)
+            ])
+        } else {
+            preferences?.quietHoursStartLocal = nil
+            preferences?.quietHoursEndLocal = nil
+            enqueue([
+                "quiet_hours_start_local": .null,
+                "quiet_hours_end_local": .null
+            ])
+        }
     }
 
     // MARK: - Group projection
 
     private func groups() -> [GroupedListGroup] {
-        var result: [GroupedListGroup] = []
-        if !isPaused { result.append(globalGroup()) }
-        result.append(contentsOf: Self.categories.map(categoryGroup))
-        return result
+        guard let prefs = preferences else { return [] }
+        return [
+            briefingsGroup(prefs),
+            alertsGroup(prefs),
+            quietHoursGroup(prefs),
+            locationGroup(prefs)
+        ]
     }
 
-    private func globalGroup() -> GroupedListGroup {
-        GroupedListGroup(
-            id: "master",
-            overline: "Master",
-            helper: "Pause all silences every channel except emergency alerts. Quiet hours just delays them.",
-            rows: [
+    private func briefingsGroup(_ prefs: NotificationPreferencesDTO) -> GroupedListGroup {
+        var rows: [GroupedListRow] = [
+            GroupedListRow(
+                id: RowID.morningBriefing,
+                label: "Morning Briefing",
+                subtext: "Current weather plus the most relevant thing for today",
+                control: .toggle(isOn: prefs.dailyBriefingEnabled)
+            )
+        ]
+        if prefs.dailyBriefingEnabled {
+            rows.append(
                 GroupedListRow(
-                    id: RowID.pauseAll,
-                    label: "Pause all notifications",
-                    subtext: "Snooze everything but emergencies",
-                    control: .toggle(isOn: isPaused)
-                ),
-                GroupedListRow(
-                    id: RowID.quietHours,
-                    label: "Quiet hours",
-                    subtext: "10:00 PM – 7:00 AM · Weekdays",
-                    control: .chipStatus(label: "On", tone: .neutral, includesChevron: true)
-                )
-            ]
-        )
-    }
-
-    private func categoryGroup(_ category: Category) -> GroupedListGroup {
-        GroupedListGroup(
-            id: category.id,
-            overline: category.title,
-            helper: category.helper,
-            showsChannelHeader: true,
-            rows: category.rows.map { row in
-                let pattern = patterns[row.id] ?? row.seed
-                return GroupedListRow(
-                    id: row.id,
-                    label: row.label,
-                    subtext: row.sub,
-                    control: .channelTriad(
-                        p: pattern.p,
-                        e: pattern.e,
-                        s: pattern.s,
-                        locked: Self.locked(for: row.id)
+                    id: RowID.morningTime,
+                    label: "Briefing Time",
+                    subtext: "Choose when this briefing arrives",
+                    control: .chips(
+                        options: Self.morningTimeOptions,
+                        selected: prefs.dailyBriefingTimeLocal
                     )
                 )
+            )
+        }
+        rows.append(
+            GroupedListRow(
+                id: RowID.eveningBriefing,
+                label: "Evening Briefing",
+                subtext: "Tomorrow's forecast plus one useful thing to handle tonight",
+                control: .toggle(isOn: prefs.eveningBriefingEnabled)
+            )
+        )
+        if prefs.eveningBriefingEnabled {
+            rows.append(
+                GroupedListRow(
+                    id: RowID.eveningTime,
+                    label: "Briefing Time",
+                    subtext: "Choose when this briefing arrives",
+                    control: .chips(
+                        options: Self.eveningTimeOptions,
+                        selected: prefs.eveningBriefingTimeLocal
+                    )
+                )
+            )
+        }
+        return GroupedListGroup(id: GroupID.briefings, overline: "Briefings", rows: rows)
+    }
+
+    private func alertsGroup(_ prefs: NotificationPreferencesDTO) -> GroupedListGroup {
+        GroupedListGroup(
+            id: GroupID.alerts,
+            overline: "Alert preferences",
+            rows: [
+                GroupedListRow(
+                    id: RowID.weatherAlerts,
+                    label: "Weather Alerts",
+                    subtext: "Severe weather and storm warnings",
+                    control: .toggle(isOn: prefs.weatherAlertsEnabled)
+                ),
+                GroupedListRow(
+                    id: RowID.aqiAlerts,
+                    label: "Air Quality Alerts",
+                    subtext: "Unhealthy AQI notifications",
+                    control: .toggle(isOn: prefs.aqiAlertsEnabled)
+                ),
+                GroupedListRow(
+                    id: RowID.homeReminders,
+                    label: "Home Reminders",
+                    subtext: "Bills, tasks, and calendar events",
+                    control: .toggle(isOn: prefs.homeRemindersEnabled)
+                ),
+                GroupedListRow(
+                    id: RowID.gigUpdates,
+                    label: "Gig Updates",
+                    subtext: "Active gig status changes",
+                    control: .toggle(isOn: prefs.gigUpdatesEnabled)
+                ),
+                GroupedListRow(
+                    id: RowID.mailSummary,
+                    label: "Mail Summary",
+                    subtext: "Daily mailbox digest",
+                    control: .toggle(isOn: prefs.mailSummaryEnabled)
+                )
+            ]
+        )
+    }
+
+    private func quietHoursGroup(_ prefs: NotificationPreferencesDTO) -> GroupedListGroup {
+        var rows: [GroupedListRow] = [
+            GroupedListRow(
+                id: RowID.quietHours,
+                label: "Quiet Hours",
+                subtext: "Silence briefings during set hours",
+                control: .toggle(isOn: prefs.quietHoursEnabled)
+            )
+        ]
+        if prefs.quietHoursEnabled {
+            rows.append(
+                GroupedListRow(
+                    id: RowID.quietHoursStart,
+                    label: "From",
+                    control: .chips(
+                        options: Self.quietStartOptions,
+                        selected: prefs.quietHoursStartLocal ?? Self.defaultQuietStart
+                    )
+                )
+            )
+            rows.append(
+                GroupedListRow(
+                    id: RowID.quietHoursEnd,
+                    label: "Until",
+                    control: .chips(
+                        options: Self.quietEndOptions,
+                        selected: prefs.quietHoursEndLocal ?? Self.defaultQuietEnd
+                    )
+                )
+            )
+        }
+        return GroupedListGroup(id: GroupID.quietHours, overline: "Quiet hours", rows: rows)
+    }
+
+    private func locationGroup(_ prefs: NotificationPreferencesDTO) -> GroupedListGroup {
+        GroupedListGroup(
+            id: GroupID.briefingLocation,
+            overline: "Briefing location",
+            rows: Self.locationOptions.map { option in
+                GroupedListRow(
+                    id: option.rowId,
+                    label: option.label,
+                    control: .radio(isSelected: prefs.locationMode == option.mode.rawValue)
+                )
             }
         )
     }
 
-    // MARK: - Locked channels
+    // MARK: - Stable identifiers (parity contract — mirrored on Android)
 
-    /// Channels that can't be muted. Emergency alerts keep push locked
-    /// on — surfaced as a sky chip with a lock badge.
-    static func locked(for rowId: String) -> Set<ChannelGlyph> {
-        rowId == RowID.emergency ? [.p] : []
+    public enum GroupID {
+        public static let briefings = "briefings"
+        public static let alerts = "alerts"
+        public static let quietHours = "quietHours"
+        public static let briefingLocation = "briefingLocation"
     }
-
-    // MARK: - Stable identifiers
 
     public enum RowID {
-        public static let pauseAll = "master.pauseAll"
-        public static let quietHours = "master.quietHours"
-        public static let emergency = "home.emergency"
+        public static let morningBriefing = "briefings.morning"
+        public static let morningTime = "briefings.morningTime"
+        public static let eveningBriefing = "briefings.evening"
+        public static let eveningTime = "briefings.eveningTime"
+        public static let weatherAlerts = "alerts.weather"
+        public static let aqiAlerts = "alerts.aqi"
+        public static let homeReminders = "alerts.homeReminders"
+        public static let gigUpdates = "alerts.gigUpdates"
+        public static let mailSummary = "alerts.mailSummary"
+        public static let quietHours = "quietHours.enabled"
+        public static let quietHoursStart = "quietHours.start"
+        public static let quietHoursEnd = "quietHours.end"
+        public static let locationPrimaryHome = "briefingLocation.primaryHome"
+        public static let locationViewing = "briefingLocation.viewingLocation"
+        public static let locationDevice = "briefingLocation.deviceLocation"
     }
 
-    // MARK: - Seed data (parity contract — mirrored in Android)
+    // MARK: - Option catalogues (parity contract — mirrored on Android)
 
-    struct ChannelPattern: Hashable {
-        var p: Bool
-        var e: Bool
-        var s: Bool
+    /// One radio row in the Briefing-location card.
+    public struct LocationOption: Sendable, Hashable {
+        public let mode: BriefingLocationMode
+        public let rowId: String
+        public let label: String
     }
 
-    struct CategoryRowSpec {
-        let id: String
-        let label: String
-        let sub: String?
-        let seed: ChannelPattern
-    }
-
-    struct Category {
-        let id: String
-        let title: String
-        let helper: String?
-        let rows: [CategoryRowSpec]
-    }
-
-    static let categories: [Category] = [
-        Category(
-            id: "tasks",
-            title: "Tasks",
-            helper: "Push only for things that need a fast reply. Receipts go to email so they're searchable.",
-            rows: [
-                CategoryRowSpec(
-                    id: "tasks.bids",
-                    label: "Bids on my tasks",
-                    sub: "Within 5 minutes of posting",
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "tasks.messages",
-                    label: "New messages",
-                    sub: "From clients & taskers",
-                    seed: ChannelPattern(p: true, e: true, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "tasks.status",
-                    label: "Status updates",
-                    sub: "Accepted, on the way, done",
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "tasks.receipts",
-                    label: "Payment receipts",
-                    sub: nil,
-                    seed: ChannelPattern(p: false, e: true, s: false)
-                )
-            ]
-        ),
-        Category(
-            id: "pulse",
-            title: "Pulse",
-            helper: "Pulse is quiet by default. Mentions break through, browsing doesn't.",
-            rows: [
-                CategoryRowSpec(
-                    id: "pulse.replies",
-                    label: "Replies to my posts",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "pulse.mentions",
-                    label: "Mentions",
-                    sub: "When a neighbor @s you",
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "pulse.lostFound",
-                    label: "Nearby Lost & Found",
-                    sub: "Within 0.5 mi of your address",
-                    seed: ChannelPattern(p: false, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "pulse.digest",
-                    label: "Weekly digest",
-                    sub: "Sundays, 8am",
-                    seed: ChannelPattern(p: false, e: true, s: false)
-                )
-            ]
-        ),
-        Category(
-            id: "marketplace",
-            title: "Marketplace",
-            helper: nil,
-            rows: [
-                CategoryRowSpec(
-                    id: "marketplace.offers",
-                    label: "Offers on my listings",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: true, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "marketplace.buyerMessages",
-                    label: "Buyer messages",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "marketplace.priceDrops",
-                    label: "Price drops on saved items",
-                    sub: nil,
-                    seed: ChannelPattern(p: false, e: true, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "marketplace.expiring",
-                    label: "Listing expiring soon",
-                    sub: "48h before auto-pause",
-                    seed: ChannelPattern(p: false, e: true, s: false)
-                )
-            ]
-        ),
-        Category(
-            id: "homeMailbox",
-            title: "Home & Mailbox",
-            helper: "Emergency alerts can't be muted on push.",
-            rows: [
-                CategoryRowSpec(
-                    id: "home.package",
-                    label: "Package arrived",
-                    sub: "When carrier scans \"delivered\"",
-                    seed: ChannelPattern(p: true, e: true, s: true)
-                ),
-                CategoryRowSpec(
-                    id: "home.member",
-                    label: "Member activity",
-                    sub: "Check-ins, new passes, edits",
-                    seed: ChannelPattern(p: true, e: false, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "home.civic",
-                    label: "Civic notices",
-                    sub: "Permits, service alerts",
-                    seed: ChannelPattern(p: true, e: true, s: false)
-                ),
-                CategoryRowSpec(
-                    id: RowID.emergency,
-                    label: "Emergency alerts",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: true, s: true)
-                )
-            ]
-        ),
-        Category(
-            id: "accountSecurity",
-            title: "Account & security",
-            helper: "Security alerts always come through. You can choose how.",
-            rows: [
-                CategoryRowSpec(
-                    id: "account.signIn",
-                    label: "New sign-in",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: true, s: true)
-                ),
-                CategoryRowSpec(
-                    id: "account.verification",
-                    label: "Verification status",
-                    sub: nil,
-                    seed: ChannelPattern(p: true, e: true, s: false)
-                ),
-                CategoryRowSpec(
-                    id: "account.billing",
-                    label: "Billing & receipts",
-                    sub: nil,
-                    seed: ChannelPattern(p: false, e: true, s: false)
-                )
-            ]
-        )
+    /// RN `TIME_OPTIONS` (`notification-preferences.tsx:16-18`).
+    public static let morningTimeOptions = [
+        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00"
     ]
+    /// RN `EVENING_TIME_OPTIONS` (`notification-preferences.tsx:20-22`).
+    public static let eveningTimeOptions = [
+        "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00"
+    ]
+    public static let quietStartOptions = ["20:00", "21:00", "22:00", "23:00", "00:00"]
+    public static let quietEndOptions = ["05:00", "06:00", "07:00", "08:00", "09:00"]
+    /// RN seeds these when quiet hours are switched on
+    /// (`notification-preferences.tsx:208`).
+    public static let defaultQuietStart = "22:00"
+    public static let defaultQuietEnd = "07:00"
 
-    static func seedPatterns() -> [String: ChannelPattern] {
-        var map: [String: ChannelPattern] = [:]
-        for category in categories {
-            for row in category.rows {
-                map[row.id] = row.seed
-            }
-        }
-        return map
-    }
+    /// RN `LOCATION_MODES` (`notification-preferences.tsx:24-28`). The
+    /// backend also accepts `custom`, which needs lat/lng and has no RN
+    /// or native editor — a stored `custom` simply leaves all three
+    /// radios unselected rather than being silently rewritten.
+    public static let locationOptions: [LocationOption] = [
+        LocationOption(mode: .primaryHome, rowId: RowID.locationPrimaryHome, label: "Primary Home"),
+        LocationOption(
+            mode: .viewingLocation,
+            rowId: RowID.locationViewing,
+            label: "Current Viewing Location"
+        ),
+        LocationOption(mode: .deviceLocation, rowId: RowID.locationDevice, label: "Device Location")
+    ]
 }

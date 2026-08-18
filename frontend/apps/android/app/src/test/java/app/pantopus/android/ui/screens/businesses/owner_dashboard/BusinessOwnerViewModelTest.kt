@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.businesses.owner_dashboard
 
+import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import app.pantopus.android.data.api.models.businesses.BusinessDashboardProfileDto
 import app.pantopus.android.data.api.models.businesses.BusinessDashboardResponse
@@ -21,9 +22,11 @@ import app.pantopus.android.data.api.models.businesses.BusinessUserDetailDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businessfounding.BusinessFoundingRepository
 import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,9 +52,14 @@ import org.junit.Test
 class BusinessOwnerViewModelTest {
     private val businesses: BusinessesRepository = mockk()
     private val profiles: ProfileRepository = mockk()
+    private val founding: BusinessFoundingRepository = mockk()
+    private val prefs: SharedPreferences = mockk()
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Founding banner dismissed → the status fetch is short-circuited,
+        // keeping these cases focused on the dashboard projection.
+        every { prefs.getBoolean(any(), any()) } returns true
     }
 
     @After fun tearDown() {
@@ -62,6 +70,8 @@ class BusinessOwnerViewModelTest {
         BusinessOwnerViewModel(
             businesses = businesses,
             profiles = profiles,
+            founding = founding,
+            prefs = prefs,
             savedStateHandle = SavedStateHandle(mapOf(BUSINESS_OWNER_BUSINESS_ID_KEY to "marlow")),
         )
 

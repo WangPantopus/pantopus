@@ -16,13 +16,13 @@ final class AddHomeWizardSnapshotTests: XCTestCase {
     func test_find_home_nearby_selection_renders() {
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: .empty) { true }
         vm.selectAddressCandidate(AddHomeSampleData.nearbyHomes[0])
-        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+        assertRenders(AddHomeWizardView(viewModel: vm, onOpenHomeDashboard: { _ in }))
     }
 
     func test_find_home_autocomplete_renders() {
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: .empty) { true }
         vm.updateSearchQuery("412 Elm")
-        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+        assertRenders(AddHomeWizardView(viewModel: vm, onOpenHomeDashboard: { _ in }))
     }
 
     func test_add_home_geocoded_ready_renders() async {
@@ -32,7 +32,7 @@ final class AddHomeWizardSnapshotTests: XCTestCase {
         seed.step = AddHomeStep.address.rawValue
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed) { true }
         await vm.advanceForTesting()
-        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+        assertRenders(AddHomeWizardView(viewModel: vm, onOpenHomeDashboard: { _ in }))
     }
 
     func test_add_home_zip_mismatch_apply_renders() async {
@@ -42,7 +42,7 @@ final class AddHomeWizardSnapshotTests: XCTestCase {
         seed.step = AddHomeStep.address.rawValue
         let vm = AddHomeWizardViewModel(api: makeAPI(), initialState: seed) { true }
         await vm.advanceForTesting()
-        assertRenders(AddHomeWizardView(viewModel: vm) { _ in })
+        assertRenders(AddHomeWizardView(viewModel: vm, onOpenHomeDashboard: { _ in }))
     }
 
     private static let checkAddressGeocodedJSON = """

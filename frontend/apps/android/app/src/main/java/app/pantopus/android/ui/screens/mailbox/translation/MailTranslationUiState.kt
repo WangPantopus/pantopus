@@ -40,7 +40,14 @@ enum class TranslationListenColumn { Original, Translated }
 data class TranslationLanguages(
     val sourceCode: String,
     val sourceName: String,
-    val confidence: Int,
+    /**
+     * Detection confidence percentage, e.g. `98`. Null when the
+     * translator doesn't report one — the backend's `/p3/translate` route
+     * answers `{ translated_text, from_language, to_language, cached }`
+     * with no confidence, so the badge drops the "N% match" clause
+     * rather than inventing a number.
+     */
+    val confidence: Int?,
     val targetCode: String,
     val targetName: String,
 )

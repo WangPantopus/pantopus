@@ -33,19 +33,44 @@ final class TodayDetailViewModel {
 
     private(set) var state: State = .loading
 
+    /// Header title — "Morning Briefing" / "Evening Briefing" once a stored
+    /// delivery (or the deep link's `kind`) resolves; "Today" otherwise.
+    /// Mirrors RN `hub-today.tsx`'s `headerTitle`
+    /// (`pantopus/frontend/apps/mobile/src/app/hub-today.tsx:89`).
+    private(set) var headerTitle: String = "Today"
+
     private let api: APIClient
     private let now: @Sendable () -> Date
     /// Non-nil for the sample/preview path — `load()` resolves locally.
     private let sampleContent: TodayDetailContent?
     /// When a caller seeds an explicit state, `load()` is a no-op.
     private let seeded: Bool
+    /// `DailyBriefingDelivery.id` carried by the push notification.
+    private let briefingDeliveryId: String?
+    /// `morning` | `evening` from the notification type / metadata. Used as
+    /// the title fallback while (or if) the stored briefing can't be read.
+    private let requestedKind: String?
 
     /// Live (production) path.
-    init(api: APIClient = .shared, now: @escaping @Sendable () -> Date = { Date() }) {
+    ///
+    /// `briefingDeliveryId` / `requestedKind` arrive from a
+    /// `morning_briefing` / `evening_briefing` / `daily_briefing` push tap.
+    /// When a delivery id is present the stored briefing replaces the live
+    /// `/api/hub/today` summary + signals, so the user reads the briefing
+    /// they were actually notified about.
+    init(
+        api: APIClient = .shared,
+        briefingDeliveryId: String? = nil,
+        requestedKind: String? = nil,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.api = api
         self.now = now
+        self.briefingDeliveryId = briefingDeliveryId
+        self.requestedKind = requestedKind
         sampleContent = nil
         seeded = false
+        headerTitle = Self.title(forKind: requestedKind)
     }
 
     /// Sample/preview path — resolve from deterministic content.
@@ -54,6 +79,8 @@ final class TodayDetailViewModel {
         now = { Date() }
         sampleContent = content
         seeded = false
+        briefingDeliveryId = nil
+        requestedKind = nil
     }
 
     /// Seed an explicit state — exercises the loading / error chrome in
@@ -64,6 +91,8 @@ final class TodayDetailViewModel {
         sampleContent = content
         self.state = state
         seeded = true
+        briefingDeliveryId = nil
+        requestedKind = nil
     }
 
     func load() async {
@@ -83,20 +112,55 @@ final class TodayDetailViewModel {
 
     private func fetchLive() async {
         state = .loading
+        // Resolve the stored briefing first when the push carried one, so a
+        // briefing that outlives the live `/api/hub/today` window still opens.
+        let briefing = await fetchBriefing()
+        if let kind = briefing?.briefingKind ?? requestedKind {
+            headerTitle = Self.title(forKind: kind)
+        }
         do {
             // The success body is the payload at the top level (no `today`
             // wrapper); the failure path decodes with `error` set / no data.
             let payload: HubTodayPayload = try await api.request(HubEndpoints.today())
-            guard payload.isRenderable else {
+            guard payload.isRenderable || briefing?.summaryText?.isEmpty == false else {
                 state = .error(message: "Today's briefing isn't available right now.")
                 return
             }
-            let content = Self.makeContent(from: payload, now: now())
+            let content = Self.makeContent(from: payload, briefing: briefing, now: now())
             state = content.isAlert ? .alert(content) : .populated(content)
         } catch {
+            // A stored briefing is enough to render on its own — RN falls back
+            // the same way (`summaryText = briefing?.summary_text || today?.summary`).
+            if let briefing, briefing.summaryText?.isEmpty == false {
+                let content = Self.makeContent(from: nil, briefing: briefing, now: now())
+                state = .populated(content)
+                return
+            }
             state = .error(
                 message: (error as? APIError)?.errorDescription ?? "Couldn't load today's briefing."
             )
+        }
+    }
+
+    /// `GET /api/hub/briefings/:id`. A missing / expired delivery degrades to
+    /// the live Today payload rather than failing the screen.
+    private func fetchBriefing() async -> BriefingDeliveryDTO? {
+        guard let briefingDeliveryId, !briefingDeliveryId.isEmpty else { return nil }
+        do {
+            let response: BriefingDeliveryResponse = try await api.request(
+                HubEndpoints.briefingDelivery(id: briefingDeliveryId)
+            )
+            return response.briefing
+        } catch {
+            return nil
+        }
+    }
+
+    static func title(forKind kind: String?) -> String {
+        switch kind?.lowercased() {
+        case "evening": "Evening Briefing"
+        case "morning": "Morning Briefing"
+        default: "Today"
         }
     }
 
@@ -104,23 +168,32 @@ final class TodayDetailViewModel {
 
     /// Project the orchestrated payload into render content. `base` supplies
     /// the decorative sun-arc + share card the backend doesn't provide.
+    ///
+    /// When `briefing` is present (a push tap carrying
+    /// `metadata.briefing_delivery_id`), its stored `summary_text` and
+    /// `signals_snapshot` take precedence over the live Today snapshot —
+    /// the same precedence RN applies in `hub-today.tsx:87`.
     static func makeContent(
-        from payload: HubTodayPayload,
+        from payload: HubTodayPayload?,
+        briefing: BriefingDeliveryDTO? = nil,
         now: Date = Date(),
         base: TodayDetailContent = TodaySampleData.populated
     ) -> TodayDetailContent {
-        let alerts = payload.alerts ?? []
+        let alerts = payload?.alerts ?? []
         let hasAlert = !alerts.isEmpty
-        let signals = (payload.signals ?? []).map(signal(from:))
-        let label = payload.location?.label ?? "Today"
+        let storedSignals = briefing?.signalsSnapshot ?? []
+        let signals = (storedSignals.isEmpty ? (payload?.signals ?? []) : storedSignals)
+            .map(signal(from:))
+        let label = payload?.location?.label ?? "Today"
+        let storedSummary = briefing?.summaryText?.isEmpty == false ? briefing?.summaryText : nil
         return TodayDetailContent(
             kicker: hasAlert ? "\(label) · Advisory" : label,
-            dateLabel: dateLabel(now, timezone: payload.location?.timezone),
-            temperature: temperature(payload.weather),
-            condition: payload.weather?.conditionLabel ?? payload.summary ?? "—",
-            highLowFeels: highLow(payload.weather),
-            glyph: glyph(for: payload.weather, hasAlert: hasAlert),
-            chips: [aqiChip(payload.aqi)].compactMap { $0 },
+            dateLabel: dateLabel(now, timezone: payload?.location?.timezone),
+            temperature: temperature(payload?.weather),
+            condition: storedSummary ?? payload?.weather?.conditionLabel ?? payload?.summary ?? "—",
+            highLowFeels: highLow(payload?.weather),
+            glyph: glyph(for: payload?.weather, hasAlert: hasAlert),
+            chips: [aqiChip(payload?.aqi)].compactMap { $0 },
             ribbon: hasAlert ? ribbon(from: alerts[0]) : nil,
             sunSky: base.sunSky,
             signalsTitle: signals.isEmpty ? "Signals" : "Signals · \(signals.count) today",

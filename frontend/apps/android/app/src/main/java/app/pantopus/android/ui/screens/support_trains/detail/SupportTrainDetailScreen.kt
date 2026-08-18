@@ -19,7 +19,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +50,7 @@ import app.pantopus.android.ui.components.SlotCalendarDay
 import app.pantopus.android.ui.screens.support_trains.detail.components.RecipientCard
 import app.pantopus.android.ui.screens.support_trains.detail.components.SlotRow
 import app.pantopus.android.ui.screens.support_trains.detail.components.TypeDatesCard
+import app.pantopus.android.ui.screens.support_trains.reserve.ReserveSlotSheet
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -52,6 +58,7 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
+import kotlinx.coroutines.delay
 
 /**
  * A10.9 — Participant-facing Support Train detail screen.
@@ -62,6 +69,7 @@ import app.pantopus.android.ui.theme.pantopusShadow
  * share, sign-up, edit-slot, send-card, join-as-backup, message-host,
  * open-manage (organizer dock overflow).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportTrainDetailScreen(
     actions: SupportTrainDetailActions = SupportTrainDetailActions(),
@@ -69,15 +77,112 @@ fun SupportTrainDetailScreen(
     viewModel: SupportTrainDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val action by viewModel.action.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(action.toast) {
+        if (action.toast != null) {
+            delay(TOAST_MILLIS)
+            viewModel.acknowledgeToast()
+        }
+    }
 
-    SupportTrainDetailContentLayout(
-        state = state,
-        isOrganizer = isOrganizer,
-        actions = actions,
-        onRetry = { viewModel.refresh() },
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        SupportTrainDetailContentLayout(
+            state = state,
+            isOrganizer = isOrganizer,
+            actions =
+                actions.copy(
+                    // S1 — the reserve sheet is owned by this screen; the
+                    // host's `onSignUp` stays wired for analytics / nav.
+                    onSignUp = {
+                        viewModel.startReserve()
+                        actions.onSignUp()
+                    },
+                ),
+            onRetry = { viewModel.refresh() },
+            isSubmitting = action.isSubmitting,
+            onReserveSlot = { slotId -> viewModel.startReserve(slotId) },
+            onMarkDelivered = { viewModel.markDelivered(it) },
+            onConfirmDelivery = { viewModel.confirmDelivery(it) },
+            onRequestLeave = { viewModel.requestLeave(it) },
+        )
+
+        action.toast?.let { toast ->
+            Box(
+                modifier = Modifier.fillMaxSize().padding(bottom = Spacing.s12),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Text(
+                    text = toast,
+                    color = PantopusColors.appTextInverse,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.appText)
+                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                            .testTag("supportTrainDetailToast"),
+                )
+            }
+        }
+    }
+
+    val loaded = state as? SupportTrainDetailUiState.Loaded
+    val reserveSheet = action.reserveSheet
+    if (reserveSheet != null && loaded != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissReserve() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = PantopusColors.appBg,
+        ) {
+            ReserveSlotSheet(
+                preselectedSlotId = reserveSheet.slotId,
+                options = loaded.content.reserveOptions,
+                context = loaded.content.reserveContext,
+                isSubmitting = action.isSubmitting,
+                onSubmit = { slotId, body, done -> viewModel.reserve(slotId, body, done) },
+                onClose = { viewModel.dismissReserve() },
+            )
+        }
+    }
+
+    action.pendingLeave?.let { row ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissLeave() },
+            title = { Text("Leave this slot?") },
+            text = {
+                Text(
+                    "Leave ${row.title} on ${row.dayLabel} ${row.dateLabel}? " +
+                        "This reopens the date for someone else.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { row.reservationId?.let { viewModel.leaveSlot(it) } }) {
+                    Text("Leave slot", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissLeave() }) { Text("Keep signup") }
+            },
+            modifier = Modifier.testTag("supportTrainLeaveSlotDialog"),
+        )
+    }
+
+    action.error?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.acknowledgeError() },
+            title = { Text("Something went wrong") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.acknowledgeError() }) { Text("OK") }
+            },
+            modifier = Modifier.testTag("supportTrainDetailErrorDialog"),
+        )
+    }
 }
+
+private const val TOAST_MILLIS = 2_500L
 
 data class SupportTrainDetailActions(
     val onBack: () -> Unit = {},
@@ -100,6 +205,11 @@ internal fun SupportTrainDetailContentLayout(
     isOrganizer: Boolean = false,
     actions: SupportTrainDetailActions = SupportTrainDetailActions(),
     onRetry: () -> Unit = {},
+    isSubmitting: Boolean = false,
+    onReserveSlot: (String?) -> Unit = {},
+    onMarkDelivered: (String) -> Unit = {},
+    onConfirmDelivery: (String) -> Unit = {},
+    onRequestLeave: (SlotRowContent) -> Unit = {},
 ) {
     Column(
         modifier =
@@ -125,6 +235,11 @@ internal fun SupportTrainDetailContentLayout(
                     onSendCard = actions.onSendCard,
                     onJoinAsBackup = actions.onJoinAsBackup,
                     onMessageHost = actions.onMessageHost,
+                    isSubmitting = isSubmitting,
+                    onReserveSlot = onReserveSlot,
+                    onMarkDelivered = onMarkDelivered,
+                    onConfirmDelivery = onConfirmDelivery,
+                    onRequestLeave = onRequestLeave,
                 )
             is SupportTrainDetailUiState.Error ->
                 EmptyState(
@@ -276,6 +391,11 @@ private fun LoadedBody(
     onSendCard: () -> Unit,
     onJoinAsBackup: () -> Unit,
     onMessageHost: () -> Unit,
+    isSubmitting: Boolean = false,
+    onReserveSlot: (String?) -> Unit = {},
+    onMarkDelivered: (String) -> Unit = {},
+    onConfirmDelivery: (String) -> Unit = {},
+    onRequestLeave: (SlotRowContent) -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -309,7 +429,12 @@ private fun LoadedBody(
                     section.rows.forEach { row ->
                         SlotRow(
                             content = row,
-                            onSignUp = if (row.state == SlotRowState.Open) onSignUp else null,
+                            onSignUp =
+                                if (row.state == SlotRowState.Open) {
+                                    { onReserveSlot(row.slotId) }
+                                } else {
+                                    null
+                                },
                             onEdit =
                                 if (row.mine) {
                                     { onEditSlot(row) }
@@ -317,8 +442,21 @@ private fun LoadedBody(
                                     null
                                 },
                         )
+                        CommitmentActions(
+                            row = row,
+                            viewerRole = content.viewerRole,
+                            isSubmitting = isSubmitting,
+                            onMarkDelivered = onMarkDelivered,
+                            onConfirmDelivery = onConfirmDelivery,
+                            onRequestLeave = onRequestLeave,
+                        )
                     }
                 }
+            }
+
+            content.exactAddress?.let { address ->
+                SectionOverline("Delivery address")
+                ExactAddressCard(address, content.deliveryInstructions)
             }
 
             Spacer(modifier = Modifier.height(Spacing.s3))
@@ -332,6 +470,141 @@ private fun LoadedBody(
             onSendCard = onSendCard,
             onJoinAsBackup = onJoinAsBackup,
         )
+    }
+}
+
+/**
+ * S1 — helper-side actions under the viewer's own commitment rows:
+ * `POST …/deliver` and `POST …/cancel` with `helper_reason` (RN
+ * `handleLeaveSlot`, `src/app/support-trains/[id].tsx:322`). Recipients
+ * and organizers additionally get `POST …/confirm` on a delivered row.
+ */
+@Composable
+private fun CommitmentActions(
+    row: SlotRowContent,
+    viewerRole: SupportTrainViewerRole,
+    isSubmitting: Boolean,
+    onMarkDelivered: (String) -> Unit,
+    onConfirmDelivery: (String) -> Unit,
+    onRequestLeave: (SlotRowContent) -> Unit,
+) {
+    val reservationId = row.reservationId
+    if (!row.mine || reservationId == null) return
+    val canConfirm =
+        row.reservationStatus == "delivered" &&
+            (viewerRole == SupportTrainViewerRole.RECIPIENT || viewerRole.isOrganizer)
+    if (!row.canMarkDelivered && !row.canLeaveSlot && !canConfirm) return
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.s1),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (row.canMarkDelivered) {
+            RowActionButton(
+                label = "Mark delivered",
+                icon = PantopusIcon.Check,
+                tag = "supportTrainMarkDeliveredButton",
+                isEnabled = !isSubmitting,
+                onClick = { onMarkDelivered(reservationId) },
+            )
+        }
+        if (canConfirm) {
+            RowActionButton(
+                label = "Confirm delivery",
+                icon = PantopusIcon.CheckCircle,
+                tag = "supportTrainConfirmDeliveryButton",
+                isEnabled = !isSubmitting,
+                onClick = { onConfirmDelivery(reservationId) },
+            )
+        }
+        if (row.canLeaveSlot) {
+            RowActionButton(
+                label = "Leave slot",
+                icon = PantopusIcon.X,
+                tag = "supportTrainLeaveSlotButton",
+                isEnabled = !isSubmitting,
+                destructive = true,
+                onClick = { onRequestLeave(row) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowActionButton(
+    label: String,
+    icon: PantopusIcon,
+    tag: String,
+    isEnabled: Boolean,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+) {
+    val shape = RoundedCornerShape(Radii.md)
+    val tint = if (destructive) PantopusColors.error else PantopusColors.appText
+    Row(
+        modifier =
+            Modifier
+                .height(34.dp)
+                .clip(shape)
+                .background(if (destructive) PantopusColors.errorBg else PantopusColors.appSurface)
+                .border(1.dp, if (destructive) PantopusColors.errorLight else PantopusColors.appBorder, shape)
+                .clickable(enabled = isEnabled, onClick = onClick)
+                .padding(horizontal = Spacing.s3)
+                .testTag(tag)
+                .semantics {
+                    role = Role.Button
+                    contentDescription = label
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = tint)
+        Text(text = label, color = tint, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * The exact address only ever renders from the server payload — it is
+ * re-fetched (and re-gated) on every load, never cached locally.
+ */
+@Composable
+private fun ExactAddressCard(
+    address: String,
+    instructions: String?,
+) {
+    val shape = RoundedCornerShape(Radii.lg)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, shape)
+                .padding(Spacing.s3)
+                .testTag("supportTrainExactAddressCard"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MapPin,
+                contentDescription = null,
+                size = 15.dp,
+                tint = PantopusColors.primary600,
+            )
+            Text(
+                text = address,
+                color = PantopusColors.appText,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        if (!instructions.isNullOrBlank()) {
+            Text(text = instructions, color = PantopusColors.appTextSecondary, fontSize = 12.5.sp)
+        }
     }
 }
 

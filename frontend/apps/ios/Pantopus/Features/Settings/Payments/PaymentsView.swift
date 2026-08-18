@@ -32,6 +32,18 @@ public struct PaymentsView: View {
     }
 
     public var body: some View {
+        // Money surface — RN wraps this route in `SensitiveScreenGuard`
+        // (`app/settings/payments.tsx:31`), so the device credential is
+        // checked before any card / payout detail is composed.
+        SensitiveScreenGuard(
+            reason: "Verify to access Payments & Payouts",
+            onRejected: onBack
+        ) {
+            guardedBody
+        }
+    }
+
+    private var guardedBody: some View {
         VStack(spacing: Spacing.s0) {
             SettingsTopBar(title: "Payments", onBack: onBack)
                 .accessibilityIdentifier("paymentsTopBar")
@@ -102,6 +114,9 @@ private extension PaymentsView {
                 }
                 methodsSection(loaded.methods)
                 payoutsSection(loaded.payouts)
+                if let earnings = loaded.earnings {
+                    earningsSection(earnings)
+                }
                 activitySection(loaded.activity)
                 if loaded.canCloseAccount {
                     destructiveCard
@@ -118,6 +133,7 @@ private extension PaymentsView {
             }
             .padding(.bottom, Spacing.s5)
         }
+        .refreshable { await viewModel.refresh() }
         .accessibilityIdentifier("paymentsContent")
     }
 
@@ -203,6 +219,68 @@ private extension PaymentsView {
         }
     }
 
+    /// "Earnings & Spending" — the two lifetime totals from
+    /// `GET /api/payments/earnings` + `/spending`, mirroring RN
+    /// `components/payments/PayoutsTab.tsx:251`.
+    private func earningsSection(_ earnings: PaymentsEarnings) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            sectionOverline("Earnings & spending", id: "earnings")
+            card(id: "earnings") {
+                HStack(spacing: Spacing.s3) {
+                    earningsTile(
+                        label: "Total earned",
+                        value: earnings.totalEarned,
+                        tint: Theme.Color.success,
+                        identifier: "paymentsTotalEarned"
+                    )
+                    earningsTile(
+                        label: "Total spent",
+                        value: earnings.totalSpent,
+                        tint: Theme.Color.primary600,
+                        identifier: "paymentsTotalSpent"
+                    )
+                }
+                .padding(.horizontal, Spacing.s4)
+                .padding(.top, Spacing.s4)
+                Text(earnings.caption)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .padding(.horizontal, Spacing.s4)
+                    .padding(.top, Spacing.s3)
+                    .padding(.bottom, Spacing.s4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("paymentsEarningsCaption")
+            }
+        }
+    }
+
+    private func earningsTile(
+        label: String,
+        value: String,
+        tint: Color,
+        identifier: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text(label.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .kerning(0.8)
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.system(size: 20, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.Color.appText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.s3)
+        .background(tint.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(tint.opacity(0.25), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier(identifier)
+    }
+
     private func activitySection(_ activity: PaymentsActivity) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
             sectionOverline("Activity", id: "activity")
@@ -212,6 +290,13 @@ private extension PaymentsView {
                     ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
                         activityStatRow(stat)
                         if index < stats.count - 1 {
+                            divider
+                        }
+                    }
+                case let .transactions(transactions):
+                    ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
+                        transactionRow(transaction)
+                        if index < transactions.count - 1 {
                             divider
                         }
                     }
@@ -293,6 +378,65 @@ private extension PaymentsView {
         .padding(.vertical, 14)
         .frame(minHeight: 48)
         .accessibilityIdentifier("paymentsActivityStat_\(stat.id)")
+    }
+
+    /// One row of the real transaction-history feed
+    /// (`GET /api/payments/history`). Icon + tint mirror RN's `HistoryTab`:
+    /// tips get the star, payouts the indigo arrow disc, money-out red,
+    /// money-in green.
+    private func transactionRow(_ transaction: PaymentsTransaction) -> some View {
+        HStack(spacing: Spacing.s3) {
+            ZStack {
+                Circle()
+                    .fill(transactionTint(transaction.kind).opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Icon(
+                    transactionIcon(transaction.kind),
+                    size: 16,
+                    strokeWidth: 2.2,
+                    color: transactionTint(transaction.kind)
+                )
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                if !transaction.meta.isEmpty {
+                    Text(transaction.meta)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: Spacing.s2)
+            Text(transaction.amount)
+                .font(.system(size: 15, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(transaction.isOutgoing ? Theme.Color.error : Theme.Color.success)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, 14)
+        .frame(minHeight: 48)
+        .accessibilityIdentifier("paymentsTransaction_\(transaction.id)")
+    }
+
+    private func transactionIcon(_ kind: PaymentsTransaction.Kind) -> PantopusIcon {
+        switch kind {
+        case .tip: .star
+        case .payout: .arrowUp
+        case .sent: .arrowUp
+        case .received: .arrowDown
+        }
+    }
+
+    private func transactionTint(_ kind: PaymentsTransaction.Kind) -> Color {
+        switch kind {
+        case .tip: Theme.Color.warning
+        case .payout: Theme.Color.primary600
+        case .sent: Theme.Color.error
+        case .received: Theme.Color.success
+        }
     }
 
     private func activityEmptyRow(title: String, body: String) -> some View {

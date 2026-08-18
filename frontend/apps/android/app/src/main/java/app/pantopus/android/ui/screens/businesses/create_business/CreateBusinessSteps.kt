@@ -147,6 +147,35 @@ data class CategorySearchHit(
     val label: String,
 )
 
+/**
+ * A logo picked in the wizard, held in memory until create-full returns a
+ * business id (`POST /api/upload/business-media/:businessId` needs one).
+ * The filename is randomised at pick time so the photo picker's `IMG_xxxx`
+ * name never reaches S3 — the same firewall RN applies in
+ * `src/utils/mediaFirewall.ts`.
+ */
+data class CreateBusinessLogoPick(
+    val bytes: ByteArray,
+    val fileName: String,
+    val mimeType: String,
+) {
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            (
+                other is CreateBusinessLogoPick &&
+                    fileName == other.fileName &&
+                    mimeType == other.mimeType &&
+                    bytes.contentEquals(other.bytes)
+            )
+
+    override fun hashCode(): Int {
+        var result = fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        result = 31 * result + bytes.contentHashCode()
+        return result
+    }
+}
+
 /** Live username-availability state for the basic-info step. */
 sealed interface UsernameCheckStatus {
     data object Idle : UsernameCheckStatus

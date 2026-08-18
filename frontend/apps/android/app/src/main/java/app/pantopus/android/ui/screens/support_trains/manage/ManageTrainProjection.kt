@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.support_trains.manage
 
 import app.pantopus.android.data.api.models.support_trains.SupportTrainDetailDto
 import app.pantopus.android.data.api.models.support_trains.SupportTrainSlotDto
+import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailProjection
 import app.pantopus.android.ui.theme.PantopusIcon
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -63,6 +64,8 @@ object ManageTrainProjection {
                     coverageDays = "${days}d",
                     recipientQuote = dto.story ?: "",
                 ),
+            status = dto.status ?: "",
+            viewerRole = SupportTrainDetailProjection.viewerRole(dto),
         )
     }
 

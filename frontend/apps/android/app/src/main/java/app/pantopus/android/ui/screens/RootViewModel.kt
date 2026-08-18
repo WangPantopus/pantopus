@@ -18,6 +18,14 @@ class RootViewModel
     ) : ViewModel() {
         val authState: StateFlow<AuthRepository.State> = authRepository.state
 
+        /**
+         * Stamp of the last *interactive* sign-in — drives the one-time
+         * post-login app-lock offer. `null` after a silent session restore,
+         * which must never raise it. Mirrors iOS
+         * `AuthManager.lastInteractiveSignInAt`.
+         */
+        val lastInteractiveSignInAt: StateFlow<Long?> = authRepository.lastInteractiveSignInAt
+
         init {
             viewModelScope.launch { authRepository.restore() }
         }

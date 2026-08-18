@@ -297,3 +297,33 @@ data class TodaySignalDto(
     val urgency: String? = null,
     val action: String? = null,
 )
+
+// region Briefing delivery (GET /api/hub/briefings/:id — backend/routes/hub.js:612)
+
+/** `GET /api/hub/briefings/:id` envelope — `{ briefing: … }`. */
+@JsonClass(generateAdapter = true)
+data class BriefingDeliveryResponse(
+    val briefing: BriefingDeliveryDto,
+)
+
+/**
+ * One stored Morning/Evening Briefing delivery. Selected columns are listed
+ * verbatim at `backend/routes/hub.js:622`; `signals_snapshot` is a jsonb array
+ * whose element shape matches [TodaySignalDto].
+ */
+@JsonClass(generateAdapter = true)
+data class BriefingDeliveryDto(
+    val id: String,
+    @Json(name = "briefing_date_local") val briefingDateLocal: String? = null,
+    /** `morning` | `evening`. */
+    @Json(name = "briefing_kind") val briefingKind: String? = null,
+    @Json(name = "summary_text") val summaryText: String? = null,
+    @Json(name = "signals_snapshot") val signalsSnapshot: List<TodaySignalDto>? = null,
+    @Json(name = "location_geohash") val locationGeohash: String? = null,
+    @Json(name = "composition_mode") val compositionMode: String? = null,
+    val status: String? = null,
+    @Json(name = "delivered_at") val deliveredAt: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+)
+
+// endregion

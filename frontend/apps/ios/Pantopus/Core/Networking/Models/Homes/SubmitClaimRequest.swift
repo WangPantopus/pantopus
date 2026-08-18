@@ -39,6 +39,45 @@ public struct SubmitClaimResponse: Decodable, Sendable, Hashable {
     public struct ClaimEnvelope: Decodable, Sendable, Hashable {
         public let id: String?
         public let status: String
+        /// `routing_classification` decided by
+        /// `policy.canSubmitOwnerClaim` and echoed at
+        /// `backend/routes/homeOwnership.js:472`. One of
+        /// `first_claim` / `parallel_claim` / `challenge_claim`
+        /// (nil on the opaque duplicate path, which returns only
+        /// `{ id, status }`). Drives the pre-upload warnings and the
+        /// challenge activation.
+        public let routingClassification: String?
+        /// `claim_phase_v2` — `initiated` / `challenged` / …
+        public let claimPhaseV2: String?
+
+        public init(
+            id: String?,
+            status: String,
+            routingClassification: String? = nil,
+            claimPhaseV2: String? = nil
+        ) {
+            self.id = id
+            self.status = status
+            self.routingClassification = routingClassification
+            self.claimPhaseV2 = claimPhaseV2
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, status
+            case routingClassification = "routing_classification"
+            case claimPhaseV2 = "claim_phase_v2"
+        }
+    }
+
+    /// `routing_classification` values the backend emits
+    /// (`backend/services/homeClaimRoutingService.js` via
+    /// `policy.canSubmitOwnerClaim`).
+    public enum RoutingClassification {
+        /// Another person already has a pending claim on this address.
+        public static let parallelClaim = "parallel_claim"
+        /// The address already has a verified household; a strong
+        /// document can open a formal challenge.
+        public static let challengeClaim = "challenge_claim"
     }
 
     private enum CodingKeys: String, CodingKey {

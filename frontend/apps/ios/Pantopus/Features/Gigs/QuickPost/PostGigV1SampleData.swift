@@ -11,6 +11,11 @@ public enum PostGigV1SampleData {
     public static let maxPhotos = 6
     public static let descriptionMinLength = 40
     public static let descriptionMaxLength = 600
+    /// `Joi.array().items(Joi.string().max(50)).max(5)` (`gigs.js:461`).
+    public static let maxTags = 5
+    /// `Joi.array().…max(20)` on create / `.max(50)` on update — the
+    /// stricter create cap wins so the same form can post *and* patch.
+    public static let maxItems = 20
 
     public static let referenceNow: Date = makeDate(year: 2026, month: 5, day: 24, hour: 12)
 

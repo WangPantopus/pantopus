@@ -40,6 +40,8 @@ extension MailDetailViewModel {
         return MailDetailContent(
             mailId: item.id,
             category: category,
+            mailCategoryKey: item.category,
+            isSenderUnknown: resolveSenderTrust(item: item, sender: detail.sender) == "unknown",
             trust: trust,
             detailTrust: detailTrust,
             senderDisplayName: senderDisplayName,
@@ -70,6 +72,32 @@ extension MailDetailViewModel {
             partyDetail: variants.party,
             recordsDetail: variants.records
         )
+    }
+
+    /// RN `getSenderTrust` (`src/components/mailbox/sender.ts:39-58`) — the
+    /// same fallback ladder the backend's `resolveSenderTrust`
+    /// (`backend/routes/mailboxV2.js:198`) uses. Returns one of
+    /// `verified_gov` / `verified_utility` / `verified_business` /
+    /// `pantopus_user` / `unknown`. Only the `unknown` bucket matters to
+    /// the detail's ACTIONS row (it suppresses Pay / Sign).
+    static func resolveSenderTrust(
+        item: MailItem,
+        sender: MailDetailResponse.MailDetail.Sender?
+    ) -> String {
+        let known = [
+            "verified_gov",
+            "verified_utility",
+            "verified_business",
+            "pantopus_user",
+            "unknown"
+        ]
+        let raw = item.senderTrust?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if known.contains(raw) { return raw }
+        let business = item.senderBusinessName?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !business.isEmpty { return "verified_business" }
+        if item.senderUserId != nil || sender != nil { return "pantopus_user" }
+        return "unknown"
     }
 
     static func makeInitials(from name: String) -> String {

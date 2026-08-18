@@ -187,8 +187,29 @@ final class PaymentsViewModelTests: XCTestCase {
     {"setupIntent":"seti_123_secret_abc","ephemeralKey":"ek_test_123","customer":"cus_123","publishableKey":"pk_test_x"}
     """
 
+    /// `GET /api/payments/history` — every live `load()` reads it right after
+    /// the methods list.
+    private static let emptyHistoryJSON = "{\"transactions\":[],\"total\":0}"
+
+    private static let historyJSON = """
+    {"transactions":[\
+    {"id":"p1","entry_type":"payment","amount_cents":12000,"currency":"usd","direction":"credit",\
+    "status":"succeeded","payment_type":"gig_payment","created_at":"2026-03-04T17:00:00.000Z",\
+    "gig":{"id":"g1","title":"Gutter cleaning"},"payer":{"id":"u2","name":"Ana Ruiz"},"_isSender":false},\
+    {"id":"p2","entry_type":"payment","amount_cents":2500,"currency":"usd","direction":"debit",\
+    "status":"succeeded","payment_type":"tip","created_at":"2026-03-02T17:00:00.000Z",\
+    "payee":{"id":"u3","name":"Sam Cole"},"_isSender":true},\
+    {"id":"payout_1","entry_type":"payout","amount_cents":40000,"currency":"USD","direction":"debit",\
+    "status":"paid","destination_last4":"6789","description":"Payout to bank ••••6789",\
+    "created_at":"2026-03-01T17:00:00.000Z"}\
+    ],"total":3}
+    """
+
     func testLiveLoadProjectsRealMethods() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.methodsJSON)]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
         await vm.load()
         guard case let .loaded(loaded) = vm.state else {
@@ -211,8 +232,69 @@ final class PaymentsViewModelTests: XCTestCase {
         }
     }
 
+    /// The Activity card renders the real history feed — type, status,
+    /// counterparty and signed amounts.
+    func testLiveLoadProjectsTransactionHistory() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.historyJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state,
+              case let .transactions(rows) = loaded.activity
+        else {
+            return XCTFail("Expected the Activity card to carry transactions, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].title, "Gutter cleaning")
+        XCTAssertEqual(rows[0].kind, .received)
+        XCTAssertEqual(rows[0].amount, "+$120.00")
+        XCTAssertFalse(rows[0].isOutgoing)
+        XCTAssertTrue(rows[0].meta.contains("from Ana Ruiz"))
+        XCTAssertTrue(rows[0].meta.contains("Succeeded"))
+        XCTAssertEqual(rows[1].kind, .tip, "tips carry the star treatment")
+        XCTAssertEqual(rows[1].amount, "-$25.00")
+        XCTAssertTrue(rows[1].meta.contains("to Sam Cole"))
+        XCTAssertEqual(rows[2].kind, .payout)
+        XCTAssertEqual(rows[2].title, "Payout to bank ••••6789")
+        XCTAssertEqual(rows[2].amount, "-$400.00")
+    }
+
+    /// A user with no payments keeps the genuine empty state.
+    func testLiveLoadEmptyHistoryKeepsEmptyState() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, case let .empty(title, _) = loaded.activity else {
+            return XCTFail("Expected the empty activity row, got \(vm.state)")
+        }
+        XCTAssertEqual(title, "No transactions yet")
+    }
+
+    /// A history failure must not sink the screen — methods still render.
+    func testHistoryFailureKeepsMethodsUsable() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(500, body: "{\"error\":\"boom\"}")
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, case let .empty(title, _) = loaded.activity else {
+            return XCTFail("Expected .loaded with an honest activity row, got \(vm.state)")
+        }
+        XCTAssertEqual(loaded.methods.count, 2)
+        XCTAssertEqual(title, "Couldn't load transactions")
+    }
+
     func testLiveLoadEmptyMethods() async {
-        SequencedURLProtocol.sequence = [.status(200, body: "{\"paymentMethods\":[]}")]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
         await vm.load()
         guard case let .loaded(loaded) = vm.state else {
@@ -236,6 +318,7 @@ final class PaymentsViewModelTests: XCTestCase {
         // load (empty) → add-card params → reload (now one card).
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: Self.addCardParamsJSON),
             .status(200, body: Self.methodsJSON)
         ]
@@ -257,6 +340,7 @@ final class PaymentsViewModelTests: XCTestCase {
     func testAddCardCanceledDoesNotRefresh() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: Self.addCardParamsJSON)
         ]
         let presenter = StubPaymentSheetPresenter()
@@ -280,6 +364,7 @@ final class PaymentsViewModelTests: XCTestCase {
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: "{\"message\":\"ok\"}"),
             .status(200, body: reorderedJSON)
         ]
@@ -297,6 +382,7 @@ final class PaymentsViewModelTests: XCTestCase {
     func testSetDefaultFailureRevertsAndSurfacesError() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(500, body: "{\"error\":\"boom\"}")
         ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
@@ -317,6 +403,7 @@ final class PaymentsViewModelTests: XCTestCase {
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: "{\"message\":\"ok\"}"),
             .status(200, body: afterRemovalJSON)
         ]

@@ -38,7 +38,7 @@ object DeepLinkRouter {
         /** OAuth callback / Unknown — never stash, never park as content. */
         Discard,
 
-        /** Reset / verify — auth stack owns these; never persist. */
+        /** Reset / verify / join-invite — auth stack owns these; never persist. */
         AuthOwned,
 
         /** Content. When signed out, persist for post-login replay. */
@@ -203,6 +203,16 @@ object DeepLinkRouter {
         data class BusinessProfile(val businessId: String) : Destination
 
         /**
+         * C4 — `pantopus://b/:username/:slug` (and
+         * `pantopus://business/:username?pageSlug=…`): the public profile with
+         * one named custom page opened. RN redirects the short link to
+         * `/business/:username?pageSlug=slug`; dropping the slug here would
+         * silently land the user on the plain profile. Mirrors iOS
+         * `businessPage`.
+         */
+        data class BusinessPage(val businessId: String, val pageSlug: String) : Destination
+
+        /**
          * `pantopus://businesses/:id/page-editor` — A13.10 Edit Business Page
          * (owner-only). Mirrors iOS `editBusinessPage`.
          */
@@ -213,6 +223,28 @@ object DeepLinkRouter {
 
         /** `pantopus://homes/:id/waiting-room` — A18.4 persistent waiting room. */
         data class WaitingRoom(val homeId: String) : Destination
+
+        /**
+         * `pantopus://hub-today?deliveryId=&kind=morning|evening` — the Hub
+         * "Today" briefing opened from a Morning/Evening Briefing push. The
+         * notification's metadata carries `briefing_delivery_id` +
+         * `briefing_kind`; with an id the screen resolves that stored delivery
+         * rather than only the live `/api/hub/today` snapshot. Mirrors RN
+         * `resolveNotificationRoute`'s `/hub-today?…` target
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:18`).
+         */
+        data class HubToday(
+            val briefingDeliveryId: String?,
+            val kind: String?,
+        ) : Destination
+
+        /**
+         * `pantopus://profile?tab=receipt` — the profile tab with the Monthly
+         * Receipt card auto-expanded, the target RN resolves for a
+         * `monthly_receipt` notification
+         * (`pantopus/frontend/apps/mobile/src/utils/notificationRouting.ts:29`).
+         */
+        data object MonthlyReceipt : Destination
 
         data class Unknown(val uri: String) : Destination
     }
@@ -322,6 +354,16 @@ object DeepLinkRouter {
         when (destination) {
             is Destination.Unknown -> RoutingKind.Discard
             is Destination.ResetPassword, is Destination.VerifyEmail -> RoutingKind.AuthOwned
+            // RN sends a signed-out `/join/:code` straight to the register
+            // form with the code pre-filled — it never parks the link for
+            // post-login replay, because the code only matters while the
+            // account is still being created
+            // (`pantopus/frontend/apps/mobile/src/app/_layout.tsx:76`,
+            // `src/app/join/[code].tsx:20`). Auth-owned keeps it in memory so
+            // [app.pantopus.android.ui.screens.auth.AuthNavHost] can push
+            // Sign-up with the code, while a signed-in viewer still gets the
+            // token-accept surface from `RootTabScreen`.
+            is Destination.JoinInvite -> RoutingKind.AuthOwned
             else -> RoutingKind.Content
         }
 
@@ -383,6 +425,20 @@ object DeepLinkRouter {
             "feed" -> Destination.Feed
             "home" -> Destination.Home
             "notifications" -> Destination.Notifications
+            "hub-today", "hub_today", "today" ->
+                // `?deliveryId=` + `?kind=` ride the Morning/Evening Briefing push.
+                Destination.HubToday(
+                    briefingDeliveryId =
+                        Paths.queryParam(queryPart, "deliveryId")
+                            ?: Paths.queryParam(queryPart, "briefing_delivery_id"),
+                    kind =
+                        Paths.queryParam(queryPart, "kind")
+                            ?: Paths.queryParam(queryPart, "briefing_kind"),
+                )
+            "profile" ->
+                // Only `?tab=receipt` is deep-linkable today (the monthly-receipt
+                // push). A bare `pantopus://profile` falls through to Unknown.
+                if (tabQuery?.lowercase() == "receipt") Destination.MonthlyReceipt else Destination.Unknown(raw)
             "connections" -> Destination.Connections
             "beacons", "beacon-updates", "beacon_updates" -> Destination.Beacons
             "discover-hub", "discover_hub", "discoverhub" -> Destination.DiscoverHub
@@ -451,8 +507,14 @@ object DeepLinkRouter {
             }
             "business" -> {
                 // Singular `business/:username` is the A10.6 public profile.
+                // `?pageSlug=` is RN's redirect target for `/b/:username/:slug`.
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
+                val pageSlug = Paths.queryParam(queryPart, "pageSlug")
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
             }
             "chat", "message", "messages", "conversation" -> {
                 val id = segments.getOrNull(1)
@@ -467,8 +529,17 @@ object DeepLinkRouter {
                 if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.User(id)
             }
             "b" -> {
+                // Public business short link `pantopus://b/:username` and its
+                // named-page variant `pantopus://b/:username/:slug`. RN
+                // redirects the latter to `/business/:username?pageSlug=slug`,
+                // so the slug has to survive the parse (C4).
                 val id = segments.getOrNull(1)
-                if (id.isNullOrBlank()) Destination.Unknown(raw) else Destination.BusinessProfile(id)
+                val pageSlug = segments.getOrNull(2)
+                when {
+                    id.isNullOrBlank() -> Destination.Unknown(raw)
+                    !pageSlug.isNullOrBlank() -> Destination.BusinessPage(id, pageSlug)
+                    else -> Destination.BusinessProfile(id)
+                }
             }
             "persona" -> {
                 val handle = segments.getOrNull(1)

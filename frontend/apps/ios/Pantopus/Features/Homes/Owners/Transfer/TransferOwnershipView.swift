@@ -3,9 +3,15 @@
 //  Pantopus
 //
 //  A13.4 — Transfer Ownership form. Built on the shared `FormShell` with
-//  a bespoke sticky bottom CTA, a custom 1–60% slider with preset chips,
-//  the before/after `SplitDiff`, a typed-confirmation field, and a
-//  Face ID bottom-sheet confirmation step.
+//  a bespoke sticky bottom CTA, the buyer-email recipient field, a
+//  typed-confirmation field, and a biometric bottom-sheet confirmation
+//  step.
+//
+//  The share slider / before-after split the design sketches has no
+//  backend counterpart — `transferOwnerSchema`
+//  (`backend/routes/homeOwnership.js:74-79`) carries no percentage and
+//  `executeOwnershipTransfer` (line 2238) revokes the seller's row
+//  outright — so this screen commits a full transfer.
 //
 // swiftlint:disable file_length
 
@@ -41,6 +47,7 @@ public struct TransferOwnershipView: View {
                     .transition(.opacity)
             }
         }
+        .task { await viewModel.load() }
         .pantopusAnimation(.componentState, value: viewModel.sheetPhase)
         .overlay(alignment: .bottom) {
             if let toast = viewModel.toast {
@@ -73,6 +80,7 @@ public struct TransferOwnershipView: View {
                     Text(viewModel.ctaLabel)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.Color.appTextInverse)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, minHeight: 48)
             }
@@ -131,10 +139,9 @@ public struct TransferOwnershipView: View {
                 }
                 FaceIDConfirmSheet(
                     parties: viewModel.confirmSheetParties,
-                    amount: viewModel.amount,
-                    recipientName: viewModel.recipient.name,
-                    homeAddress: viewModel.homeContext.address,
-                    coOwnerNames: viewModel.homeContext.coOwnerNames,
+                    recipientName: viewModel.recipientEmail,
+                    homeAddress: viewModel.homeAddress,
+                    coOwnerNames: viewModel.coOwnerNames,
                     timestamp: viewModel.confirmationTimestamp,
                     biometryLabel: viewModel.biometryLabel,
                     isAuthenticating: viewModel.sheetPhase == .authenticating,
@@ -157,25 +164,34 @@ private struct TransferOwnershipContent: View {
     @Bindable var viewModel: TransferOwnershipViewModel
 
     var body: some View {
-        HomeStrip(context: viewModel.homeContext)
+        switch viewModel.loadState {
+        case .loading:
+            HomeStripSkeleton()
+                .padding(.horizontal, Spacing.s4)
+        case let .error(message):
+            TransferLoadError(message: message) {
+                Task { await viewModel.refresh() }
+            }
             .padding(.horizontal, Spacing.s4)
-
-        FormFieldGroup("Recipient") {
-            RecipientSearchField(value: viewModel.recipient.name)
-            TransferRecipientCard(recipient: viewModel.recipient)
+        case .loaded:
+            HomeStrip(
+                title: viewModel.homeTitle,
+                address: viewModel.homeAddress,
+                ownerSummary: viewModel.ownerSummary
+            )
+            .padding(.horizontal, Spacing.s4)
         }
 
-        FormFieldGroup("Share to transfer · \(viewModel.amount)%") {
-            SliderCard(viewModel: viewModel)
-            SplitDiff(
-                before: viewModel.beforeSegments,
-                after: viewModel.afterSegments,
-                amount: viewModel.amount,
-                recipientName: viewModel.recipient.name
-                    .split(separator: " ")
-                    .first
-                    .map(String.init) ?? viewModel.recipient.name
-            )
+        FormFieldGroup("Recipient") {
+            RecipientEmailField(viewModel: viewModel)
+            if viewModel.recipientIsValid {
+                TransferRecipientCard(
+                    email: viewModel.recipientEmail,
+                    initials: viewModel.recipientInitials
+                ) {
+                    viewModel.clearRecipientEmail()
+                }
+            }
         }
 
         FormFieldGroup("Confirmation") {
@@ -188,7 +204,9 @@ private struct TransferOwnershipContent: View {
 // MARK: - Home strip
 
 private struct HomeStrip: View {
-    let context: TransferOwnershipSampleData.HomeContext
+    let title: String
+    let address: String
+    let ownerSummary: String
 
     var body: some View {
         HStack(spacing: Spacing.s2 + 2) {
@@ -205,16 +223,11 @@ private struct HomeStrip: View {
                 Icon(.home, size: 15, color: Theme.Color.appTextInverse)
             }
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: Spacing.s1) {
-                    Text(context.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.Color.appText)
-                        .lineLimit(1)
-                    Text("· \(context.since)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.Color.appTextMuted)
-                }
-                Text("You hold \(context.yourStake)% · \(context.coOwnerNames)")
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                Text(ownerSummary)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.Color.appTextSecondary)
             }
@@ -244,86 +257,124 @@ private struct HomeStrip: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md + 2, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(context.address), you hold \(context.yourStake)%, transfer is irreversible")
+        .accessibilityLabel("\(address), \(ownerSummary), transfer is irreversible")
         .accessibilityIdentifier("transferHomeStrip")
     }
 }
 
-// MARK: - Recipient search
-
-private struct RecipientSearchField: View {
-    let value: String
-
+private struct HomeStripSkeleton: View {
     var body: some View {
-        HStack(spacing: Spacing.s2) {
-            Icon(.search, size: 16, color: Theme.Color.appTextSecondary)
-            Text(value.isEmpty ? "Search neighbors by name, email, or @handle" : value.lowercased())
-                .font(.system(size: 14, weight: value.isEmpty ? .regular : .medium))
-                .foregroundStyle(value.isEmpty ? Theme.Color.appTextMuted : Theme.Color.appText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(1)
-            if !value.isEmpty {
-                ZStack {
-                    Circle()
-                        .fill(Theme.Color.appSurfaceSunken)
-                        .frame(width: 20, height: 20)
-                    Icon(.x, size: 12, color: Theme.Color.appTextSecondary)
-                }
+        HStack(spacing: Spacing.s2 + 2) {
+            Shimmer(width: 32, height: 32, cornerRadius: 9)
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                Shimmer(width: 140, height: 11, cornerRadius: Radii.xs)
+                Shimmer(width: 96, height: 9, cornerRadius: Radii.xs)
             }
+            Spacer(minLength: Spacing.s0)
         }
         .padding(.horizontal, Spacing.s3)
-        .frame(height: 44)
-        .background(Theme.Color.appSurface)
+        .padding(.vertical, Spacing.s2 + 2)
+        .background(Theme.Color.appSurfaceRaised)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md + 2, style: .continuous))
+        .accessibilityIdentifier("transferHomeStripSkeleton")
+    }
+}
+
+private struct TransferLoadError: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Couldn't load this home")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.appText)
+            Text(message)
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            Button("Retry", action: onRetry)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.Color.primary600)
+                .accessibilityIdentifier("transferOwnershipRetry")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.s3)
+        .background(Theme.Color.appSurfaceRaised)
         .overlay(
             RoundedRectangle(cornerRadius: Radii.md + 2, style: .continuous)
                 .stroke(Theme.Color.appBorder, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.md + 2, style: .continuous))
-        .accessibilityIdentifier("recipientSearchField")
+        .accessibilityIdentifier("transferOwnershipLoadError")
+    }
+}
+
+// MARK: - Recipient email
+
+private struct RecipientEmailField: View {
+    @Bindable var viewModel: TransferOwnershipViewModel
+
+    var body: some View {
+        PantopusTextField(
+            "Buyer's email",
+            text: Binding(
+                get: { viewModel.recipientField.value },
+                set: { viewModel.updateRecipientEmail($0) }
+            ),
+            placeholder: "buyer@example.com",
+            state: viewModel.recipientFieldState,
+            isRequired: true,
+            keyboardType: .emailAddress,
+            contentType: .emailAddress,
+            identifier: "field_recipientEmail"
+        )
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
     }
 }
 
 // MARK: - Recipient card
 
 private struct TransferRecipientCard: View {
-    let recipient: TransferOwnershipSampleData.RecipientSeed
+    let email: String
+    let initials: String
+    let onClear: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            HStack(alignment: .top, spacing: Spacing.s3) {
-                avatar
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(recipient.name)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appText)
-                        Text("VERIFIED")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(0.7)
-                            .foregroundStyle(Theme.Color.success)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Theme.Color.successBg)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radii.xs, style: .continuous)
-                                    .stroke(Theme.Color.successLight, lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: Radii.xs, style: .continuous))
-                    }
-                    HStack(spacing: Spacing.s1) {
-                        Icon(.atSign, size: 11, color: Theme.Color.appTextSecondary)
-                        Text("\(recipient.handle) · \(recipient.email)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: Spacing.s0)
+        HStack(alignment: .top, spacing: Spacing.s3) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Theme.Color.business, Theme.Color.businessDark],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Text(initials)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+            }
+            .frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(email)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                Text(
+                    "We'll notify this address. If they don't have a Pantopus "
+                        + "account yet, the claim waits for them to sign up."
+                )
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            Spacer(minLength: Spacing.s0)
+            Button(action: onClear) {
                 Text("Change")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.Color.primary600)
             }
-            metaStrip
+            .accessibilityIdentifier("recipientClearButton")
         }
         .padding(Spacing.s3 + 2)
         .background(Theme.Color.appSurface)
@@ -331,160 +382,10 @@ private struct TransferRecipientCard: View {
             RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
                 .stroke(Theme.Color.primary600, lineWidth: 1.5)
         )
-        .background(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.primary600.opacity(0.10), lineWidth: 4)
-        )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Selected recipient \(recipient.name), verified")
+        .accessibilityLabel("Transfer recipient \(email)")
         .accessibilityIdentifier("recipientCard")
-    }
-
-    private var avatar: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Theme.Color.business, Theme.Color.businessDark],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: Theme.Color.businessDark.opacity(0.18), radius: 6, y: 4)
-            Text(recipient.initials)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Theme.Color.appTextInverse)
-        }
-        .frame(width: 48, height: 48)
-        .overlay(alignment: .bottomTrailing) {
-            ZStack {
-                Circle()
-                    .fill(Theme.Color.success)
-                    .overlay(Circle().stroke(Theme.Color.appSurface, lineWidth: 2))
-                Icon(.check, size: 9, strokeWidth: 4, color: Theme.Color.appTextInverse)
-            }
-            .frame(width: 17, height: 17)
-            .offset(x: 2, y: 2)
-        }
-    }
-
-    private var metaStrip: some View {
-        HStack(spacing: 1) {
-            MetaCell(icon: .home, label: "OWNS", value: recipient.owns)
-            divider
-            MetaCell(icon: .shieldCheck, label: "ON PANTOPUS", value: recipient.onPantopus)
-            divider
-            MetaCell(icon: .users, label: "MUTUAL", value: recipient.mutual)
-        }
-        .background(Theme.Color.appBorderSubtle)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                .stroke(Theme.Color.appBorderSubtle, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-    }
-
-    private var divider: some View {
-        Rectangle().fill(Theme.Color.appBorderSubtle).frame(width: 1)
-    }
-}
-
-private struct MetaCell: View {
-    let icon: PantopusIcon
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: Spacing.s1) {
-                Icon(icon, size: 10, color: Theme.Color.appTextSecondary)
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.4)
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-            Text(value)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(Theme.Color.appText)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.s2)
-        .background(Theme.Color.appSurface)
-    }
-}
-
-// MARK: - Slider card
-
-private struct SliderCard: View {
-    @Bindable var viewModel: TransferOwnershipViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s3) {
-            HStack(spacing: Spacing.s3 + 2) {
-                SharesSlider(
-                    value: Binding(
-                        get: { viewModel.amount },
-                        set: { viewModel.updateAmount($0) }
-                    ),
-                    range: viewModel.sliderRange,
-                    ticks: viewModel.presets
-                )
-                .frame(maxWidth: .infinity)
-                percentPill
-            }
-            HStack {
-                Text("1%")
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-                Spacer()
-                Text("Max \(viewModel.maxAmount)% (your stake)")
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(Theme.Color.appTextSecondary)
-            }
-            presetChips
-        }
-        .padding(Spacing.s3 + 2)
-        .background(Theme.Color.appSurface)
-        .overlay(
-            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
-                .stroke(Theme.Color.appBorder, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
-    }
-
-    private var percentPill: some View {
-        Text("\(viewModel.amount)%")
-            .font(.system(size: 13, weight: .bold, design: .monospaced))
-            .foregroundStyle(Theme.Color.primary700)
-            .frame(minWidth: 44)
-            .padding(.horizontal, Spacing.s2 + 2)
-            .padding(.vertical, Spacing.s1)
-            .background(Theme.Color.primary50)
-            .clipShape(Capsule())
-    }
-
-    private var presetChips: some View {
-        HStack(spacing: Spacing.s1 + 2) {
-            ForEach(viewModel.presets, id: \.self) { preset in
-                Button {
-                    viewModel.selectPreset(preset)
-                } label: {
-                    Text("\(preset)%")
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(preset == viewModel.amount ? Theme.Color.primary700 : Theme.Color.appTextStrong)
-                        .frame(maxWidth: .infinity, minHeight: 30)
-                }
-                .background(preset == viewModel.amount ? Theme.Color.primary50 : Theme.Color.appSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
-                        .stroke(preset == viewModel.amount ? Theme.Color.primary100 : Theme.Color.appBorder, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
-                .accessibilityIdentifier("sharePreset_\(preset)")
-            }
-        }
     }
 }
 
@@ -576,14 +477,14 @@ private struct WarningBlock: View {
 }
 
 #Preview("Ready") {
-    NavigationStack {
-        TransferOwnershipView(
-            viewModel: TransferOwnershipViewModel(
-                homeId: "preview",
-                biometricEvaluator: { _ in .success(()) },
-                transferExecutor: {}
-            )
-        )
+    let viewModel = TransferOwnershipViewModel(
+        homeId: "preview",
+        biometricEvaluator: { _ in .success(()) },
+        transferExecutor: { _ in "Transfer initiated." }
+    )
+    viewModel.updateRecipientEmail("buyer@example.com")
+    return NavigationStack {
+        TransferOwnershipView(viewModel: viewModel)
     }
 }
 
@@ -591,9 +492,10 @@ private struct WarningBlock: View {
     let viewModel = TransferOwnershipViewModel(
         homeId: "preview",
         biometricEvaluator: { _ in .success(()) },
-        transferExecutor: {}
+        transferExecutor: { _ in "Transfer initiated." }
     )
-    viewModel.updateConfirmation(TransferOwnershipSampleData.confirmationPhrase)
+    viewModel.updateRecipientEmail("buyer@example.com")
+    viewModel.updateConfirmation(TransferOwnershipViewModel.confirmationPhraseLiteral)
     viewModel.presentConfirmSheet()
     return NavigationStack {
         TransferOwnershipView(viewModel: viewModel)

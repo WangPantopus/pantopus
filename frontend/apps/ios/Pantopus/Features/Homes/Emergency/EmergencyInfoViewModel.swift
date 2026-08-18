@@ -49,6 +49,22 @@ public enum EmergencyFilter: String, CaseIterable, Sendable {
     }
 }
 
+/// Dialable phone number carried by a projection, or `nil` when the row
+/// has no number to call. Only contact / medical rows carry a phone in
+/// `actionTarget`; shutoff / evac carry a map or photo URL instead.
+/// Nonisolated so the `@Sendable` row handler can read it.
+func emergencyPhoneNumber(for projection: EmergencyRowProjection) -> String? {
+    switch projection.category {
+    case .contact, .medical:
+        guard let target = projection.actionTarget,
+              !target.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return nil }
+        return target
+    case .shutoff, .evac:
+        return nil
+    }
+}
+
 /// Pure projection: one DTO → display fields. Tested directly so the
 /// chip / banner mapping doesn't need a SwiftUI view to exercise.
 public struct EmergencyRowProjection: Sendable, Equatable {
@@ -104,6 +120,34 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
     /// Set by the banner's "Print card" CTA; `EmergencyInfoView` observes
     /// this to render + present the emergency-card PDF, then clears it.
     var printRequested = false
+
+    /// Phone number the user just asked to dial — either the standing
+    /// "Emergency? Call 911" banner or a stored contact's tap-to-dial
+    /// row. `EmergencyInfoView` observes this, opens the `tel:` URL, and
+    /// clears it. Mirrors RN's `callPhone` (`emergency.tsx:80`), which
+    /// dials both the 911 banner (`:107`) and every contact's phone row
+    /// (`:158`).
+    var dialRequest: String?
+
+    /// The number the standing red banner dials. RN hardcodes 911
+    /// (`emergency.tsx:107`).
+    static let emergencyNumber = "911"
+
+    /// Banner copy — word-for-word with RN (`emergency.tsx:109`) and the
+    /// Android screen.
+    static let emergencyBannerTitle = "Emergency? Call 911"
+
+    /// Ask the view to dial `number`. No-op for blank input so a contact
+    /// row without a stored phone can't open an empty dialer.
+    func dial(_ number: String?) {
+        guard let number, !number.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        dialRequest = number
+    }
+
+    /// Dial the emergency services number from the standing banner.
+    func dialEmergencyNumber() {
+        dial(Self.emergencyNumber)
+    }
 
     /// Chip-strip filter — primary navigation for the screen. Lives on
     /// `chipStrip` (mutually exclusive with `tabs`); the shell renders
@@ -343,7 +387,16 @@ final class EmergencyInfoViewModel: ListOfRowsDataSource {
                 accessibilityLabel: category.actionAccessibilityLabel,
                 background: category.background,
                 foreground: category.foreground
-            ) { [onAction] in onAction(dtoCopy) },
+            ) { [weak self, onAction] in
+                // A stored phone number is a tap-to-dial affordance (RN
+                // `emergency.tsx:157-162`); everything else opens the
+                // item detail.
+                if let phone = emergencyPhoneNumber(for: projection) {
+                    Task { @MainActor in self?.dial(phone) }
+                } else {
+                    onAction(dtoCopy)
+                }
+            },
             onTap: { [onAction] in onAction(dtoCopy) },
             body: projection.body,
             bodyIcon: projection.bodyIcon,

@@ -35,10 +35,12 @@ import app.pantopus.android.ui.screens.hub.sections.HubDiscoveryRail
 import app.pantopus.android.ui.screens.hub.sections.HubFirstRunHero
 import app.pantopus.android.ui.screens.hub.sections.HubFloatingProgress
 import app.pantopus.android.ui.screens.hub.sections.HubJumpBackIn
+import app.pantopus.android.ui.screens.hub.sections.HubNeighborDensitySection
 import app.pantopus.android.ui.screens.hub.sections.HubPillarGrid
 import app.pantopus.android.ui.screens.hub.sections.HubRecentActivity
 import app.pantopus.android.ui.screens.hub.sections.HubSetupBanner
 import app.pantopus.android.ui.screens.hub.sections.HubSkeleton
+import app.pantopus.android.ui.screens.hub.sections.HubStatusStrip
 import app.pantopus.android.ui.screens.hub.sections.HubTodayCard
 import app.pantopus.android.ui.screens.hub.sections.HubTopBar
 import app.pantopus.android.ui.theme.PantopusColors
@@ -57,6 +59,8 @@ fun HubScreen(
     viewModel: HubViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val discoveryFilter by viewModel.discoveryFilter.collectAsStateWithLifecycle()
+    val discoveryLoading by viewModel.discoveryLoading.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.load()
         app.pantopus.android.data.analytics.Analytics.track(
@@ -80,8 +84,25 @@ fun HubScreen(
     ) {
         when (val current = state) {
             HubUiState.Skeleton -> HubSkeleton()
-            is HubUiState.FirstRun -> FirstRunLayout(current.content, onIntent)
-            is HubUiState.Populated -> PopulatedLayout(current.content, onIntent, viewModel::dismissSetupBanner)
+            is HubUiState.FirstRun ->
+                FirstRunLayout(
+                    content = current.content,
+                    onIntent = onIntent,
+                    discoveryFilter = discoveryFilter,
+                    discoveryLoading = discoveryLoading,
+                    onDiscoveryFilterChange = viewModel::selectDiscoveryFilter,
+                )
+            is HubUiState.Populated ->
+                PopulatedLayout(
+                    content = current.content,
+                    onIntent = onIntent,
+                    onDismissBanner = viewModel::dismissSetupBanner,
+                    onDismissStatusItem = viewModel::dismissStatusItem,
+                    onDismissMilestone = viewModel::dismissDensityMilestone,
+                    discoveryFilter = discoveryFilter,
+                    discoveryLoading = discoveryLoading,
+                    onDiscoveryFilterChange = viewModel::selectDiscoveryFilter,
+                )
             is HubUiState.Error -> ErrorLayout(current.message, viewModel::refresh)
         }
         PullRefreshIndicator(
@@ -98,6 +119,11 @@ private fun PopulatedLayout(
     content: PopulatedContent,
     onIntent: (HubNavigationIntent) -> Unit,
     onDismissBanner: () -> Unit,
+    onDismissStatusItem: (String) -> Unit,
+    onDismissMilestone: () -> Unit,
+    discoveryFilter: HubDiscoveryFilter,
+    discoveryLoading: Boolean,
+    onDiscoveryFilterChange: (HubDiscoveryFilter) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -109,10 +135,31 @@ private fun PopulatedLayout(
                 onAvatarTap = { onIntent(HubNavigationIntent.OpenProfile) },
                 onBellTap = { onIntent(HubNavigationIntent.OpenNotifications) },
                 onMenuTap = { onIntent(HubNavigationIntent.OpenMenu) },
+                onAudienceTap =
+                    if (content.topBar.audienceUnreadCount > 0) {
+                        { onIntent(HubNavigationIntent.OpenAudienceNotifications) }
+                    } else {
+                        null
+                    },
             )
         }
         item(key = "actionStrip") {
             HubActionStrip(chips = content.actionChips) { onIntent(HubNavigationIntent.ActionTapped(it)) }
+        }
+        content.neighborDensity?.let { density ->
+            item(key = "neighborDensity") {
+                HubNeighborDensitySection(content = density, onDismissMilestone = onDismissMilestone)
+            }
+        }
+        // Rendered unconditionally: the empty set is the design's
+        // "All caught up" pill, not a hidden section (RN
+        // `HubActionStrip.tsx:33-38`).
+        item(key = "statusStrip") {
+            HubStatusStrip(
+                items = content.statusItems,
+                onTap = { onIntent(HubNavigationIntent.StatusItemTapped(it)) },
+                onDismiss = onDismissStatusItem,
+            )
         }
         content.setupBanner?.let { banner ->
             item(key = "setupBanner") {
@@ -131,14 +178,17 @@ private fun PopulatedLayout(
         item(key = "pillars") {
             HubPillarGrid(content.pillars) { onIntent(HubNavigationIntent.PillarTapped(it)) }
         }
-        if (content.discovery.isNotEmpty()) {
-            item(key = "discovery") {
-                HubDiscoveryRail(
-                    items = content.discovery,
-                    onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
-                    onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
-                )
-            }
+        item(key = "discovery") {
+            HubDiscoveryRail(
+                items = content.discovery,
+                onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
+                activeFilter = discoveryFilter,
+                onFilterChange = onDiscoveryFilterChange,
+                isLoading = discoveryLoading,
+                onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
+                onExploreMap = { onIntent(HubNavigationIntent.OpenExploreMap) },
+                onFindBusinesses = { onIntent(HubNavigationIntent.OpenFindBusinesses) },
+            )
         }
         if (content.jumpBackIn.isNotEmpty()) {
             item(key = "jumpBackIn") {
@@ -161,6 +211,9 @@ private fun PopulatedLayout(
 private fun FirstRunLayout(
     content: FirstRunContent,
     onIntent: (HubNavigationIntent) -> Unit,
+    discoveryFilter: HubDiscoveryFilter,
+    discoveryLoading: Boolean,
+    onDiscoveryFilterChange: (HubDiscoveryFilter) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -183,13 +236,16 @@ private fun FirstRunLayout(
             )
             HubFirstRunHero(content = content) { onIntent(HubNavigationIntent.StartVerification) }
             HubPillarGrid(content.pillars) { onIntent(HubNavigationIntent.PillarTapped(it)) }
-            if (content.discovery.isNotEmpty()) {
-                HubDiscoveryRail(
-                    items = content.discovery,
-                    onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
-                    onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
-                )
-            }
+            HubDiscoveryRail(
+                items = content.discovery,
+                onTap = { onIntent(HubNavigationIntent.DiscoveryTapped(it)) },
+                activeFilter = discoveryFilter,
+                onFilterChange = onDiscoveryFilterChange,
+                isLoading = discoveryLoading,
+                onSeeAll = { onIntent(HubNavigationIntent.OpenDiscoverHub) },
+                onExploreMap = { onIntent(HubNavigationIntent.OpenExploreMap) },
+                onFindBusinesses = { onIntent(HubNavigationIntent.OpenFindBusinesses) },
+            )
             // Bottom padding leaves room for the floating progress card.
             Spacer(Modifier.height(96.dp))
         }
@@ -262,6 +318,9 @@ private fun HubScreenFirstRunPreview() {
                 discovery = sampleContent().discovery,
             ),
         onIntent = {},
+        discoveryFilter = HubDiscoveryFilter.Gigs,
+        discoveryLoading = false,
+        onDiscoveryFilterChange = {},
     )
 }
 
@@ -272,6 +331,11 @@ private fun HubScreenPopulatedPreview() {
         content = sampleContent(),
         onIntent = {},
         onDismissBanner = {},
+        onDismissStatusItem = {},
+        onDismissMilestone = {},
+        discoveryFilter = HubDiscoveryFilter.Gigs,
+        discoveryLoading = false,
+        onDiscoveryFilterChange = {},
     )
 }
 

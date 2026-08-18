@@ -38,6 +38,10 @@ public struct PaymentsLoaded: Sendable, Hashable {
     public let canCloseAccount: Bool
     /// Monospaced footer caption rendered below the destructive card.
     public let footerCaption: String
+    /// Lifetime TOTAL EARNED / TOTAL SPENT tiles
+    /// (`GET /api/payments/earnings` + `/spending`). `nil` when neither
+    /// figure could be read — the card is hidden rather than showing "$0".
+    public let earnings: PaymentsEarnings?
 
     public init(
         balance: PaymentsBalance?,
@@ -45,7 +49,8 @@ public struct PaymentsLoaded: Sendable, Hashable {
         payouts: PaymentsPayouts,
         activity: PaymentsActivity,
         canCloseAccount: Bool,
-        footerCaption: String
+        footerCaption: String,
+        earnings: PaymentsEarnings? = nil
     ) {
         self.balance = balance
         self.methods = methods
@@ -53,6 +58,26 @@ public struct PaymentsLoaded: Sendable, Hashable {
         self.activity = activity
         self.canCloseAccount = canCloseAccount
         self.footerCaption = footerCaption
+        self.earnings = earnings
+    }
+}
+
+/// "Earnings & Spending" card — the two lifetime totals RN renders at the
+/// bottom of the Payouts tab (`components/payments/PayoutsTab.tsx:251`).
+/// Values are pre-formatted from the server's integer cents; an unreadable
+/// figure stays as the em-dash RN uses rather than a misleading "$0.00".
+public struct PaymentsEarnings: Sendable, Hashable {
+    /// `"$1,284.50"` or `"—"` when `GET /api/payments/earnings` failed.
+    public let totalEarned: String
+    /// `"$318.00"` or `"—"` when `GET /api/payments/spending` failed.
+    public let totalSpent: String
+    /// Caption clarifying that earned includes funds still in review.
+    public let caption: String
+
+    public init(totalEarned: String, totalSpent: String, caption: String) {
+        self.totalEarned = totalEarned
+        self.totalSpent = totalSpent
+        self.caption = caption
     }
 }
 
@@ -220,8 +245,10 @@ public enum PaymentsRowTrailing: Sendable, Hashable {
 public enum PaymentsActivity: Sendable, Hashable {
     /// Three chevron rows: Transactions · Statements · Disputes.
     case stats([PaymentsActivityStat])
-    /// Single muted "No transactions yet" row. Used on the empty
-    /// frame when there's no Stripe history.
+    /// The real transaction-history feed from `GET /api/payments/history`.
+    case transactions([PaymentsTransaction])
+    /// Single muted "No transactions yet" row. Used when the history feed
+    /// came back empty (or couldn't be read — with the honest copy).
     case empty(title: String, body: String)
 }
 
@@ -235,5 +262,46 @@ public struct PaymentsActivityStat: Identifiable, Sendable, Hashable {
         self.id = id
         self.label = label
         self.subtext = subtext
+    }
+}
+
+/// One row of the Transaction-history feed (`GET /api/payments/history`).
+/// Amounts are pre-formatted from the server's `amount_cents`; `isOutgoing`
+/// drives the sign and the red/green treatment.
+public struct PaymentsTransaction: Identifiable, Sendable, Hashable {
+    /// Drives the leading icon disc, mirroring RN's `HistoryTab`
+    /// iconography: tip → star, payout → arrow-up disc, money out → arrow-up,
+    /// money in → arrow-down.
+    public enum Kind: String, Sendable, Hashable {
+        case tip
+        case payout
+        case sent
+        case received
+    }
+
+    public let id: String
+    public let kind: Kind
+    /// Gig title / description / humanised payment type.
+    public let title: String
+    /// "Mar 4 · succeeded · to Ana Ruiz" — date, status and counterparty.
+    public let meta: String
+    /// Signed, formatted amount — e.g. `"-$40.00"` / `"+$120.00"`.
+    public let amount: String
+    public let isOutgoing: Bool
+
+    public init(
+        id: String,
+        kind: Kind,
+        title: String,
+        meta: String,
+        amount: String,
+        isOutgoing: Bool
+    ) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.meta = meta
+        self.amount = amount
+        self.isOutgoing = isOutgoing
     }
 }

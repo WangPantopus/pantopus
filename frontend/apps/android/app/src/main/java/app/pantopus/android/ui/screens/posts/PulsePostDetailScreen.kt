@@ -71,6 +71,8 @@ fun PulsePostDetailScreen(
     onBack: () -> Unit,
     onOpenProfile: (String) -> Unit = {},
     onEdit: (String) -> Unit = {},
+    /** "Nearby Providers" tap-through. Carries the business *username*. */
+    onOpenBusiness: (String) -> Unit = {},
     viewModel: PulsePostDetailViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -84,12 +86,14 @@ fun PulsePostDetailScreen(
     val isReposted by viewModel.isReposted.collectAsStateWithLifecycle()
     val selectedEmoji by viewModel.selectedReactionEmoji.collectAsStateWithLifecycle()
     val replyTarget by viewModel.replyTarget.collectAsStateWithLifecycle()
+    val nearbyProviders by viewModel.nearbyProviders.collectAsStateWithLifecycle()
 
     var showsReportReasons by remember { mutableStateOf(false) }
     var showsDeleteConfirm by remember { mutableStateOf(false) }
     var commentPendingDelete by remember { mutableStateOf<PostCommentRow?>(null) }
 
     LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(Unit) { viewModel.loadNearbyProviders() }
 
     LaunchedEffect(didDelete) {
         if (didDelete) onBack()
@@ -137,6 +141,8 @@ fun PulsePostDetailScreen(
                         ),
                     onBack = onBack,
                     onOpenProfile = onOpenProfile,
+                    nearbyProviders = nearbyProviders,
+                    onOpenBusiness = onOpenBusiness,
                     onReactionTap = { kind -> viewModel.tapReaction(kind) },
                     onSendTap = { viewModel.sendComment() },
                     onShowMoreReplies = { viewModel.showMoreReplies() },
@@ -335,6 +341,9 @@ fun PulsePostDetailLoadedContent(
     topBarSecondaryAction: ContentDetailTopBarAction? = null,
     onBack: () -> Unit = {},
     onOpenProfile: (String) -> Unit = {},
+    /** Organically matched local businesses — empty hides the card. */
+    nearbyProviders: List<NearbyProviderRow> = emptyList(),
+    onOpenBusiness: (String) -> Unit = {},
     onReactionTap: (app.pantopus.android.data.api.models.posts.PostReactionKind) -> Unit = {},
     onSendTap: () -> Unit = {},
     onShowMoreReplies: () -> Unit = {},
@@ -389,6 +398,17 @@ fun PulsePostDetailLoadedContent(
                 onCommentReply = onCommentReply,
                 onCommentLike = onCommentLike,
                 onCommentDelete = onCommentDelete,
+                belowReactions =
+                    if (nearbyProviders.isEmpty()) {
+                        null
+                    } else {
+                        {
+                            NearbyProvidersCard(
+                                rows = nearbyProviders,
+                                onOpenBusiness = onOpenBusiness,
+                            )
+                        }
+                    },
             )
         },
     )

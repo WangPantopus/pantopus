@@ -55,4 +55,17 @@ public enum FollowingEndpoints {
     public static func unfollow(personaId: String) -> Endpoint {
         Endpoint(method: .delete, path: "/api/personas/\(personaId)/follow")
     }
+
+    /// `PATCH /api/personas/:id/follow/preferences` — per-Beacon notification
+    /// level. `notification_level` is validated against
+    /// `all | highlights | none` (`notificationPreferenceSchema`,
+    /// `backend/routes/personas.js:88`). Route
+    /// `backend/routes/personas.js:1743`.
+    public static func notificationLevel(personaId: String, level: String) -> Endpoint {
+        Endpoint(
+            method: .patch,
+            path: "/api/personas/\(personaId)/follow/preferences",
+            body: FollowNotificationLevelBody(notificationLevel: level)
+        )
+    }
 }

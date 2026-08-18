@@ -166,6 +166,23 @@ final class DTODecodingTests: XCTestCase {
         XCTAssertEqual(response.homeCount, 2)
     }
 
+    /// Real `POST /api/homes/check-address` envelope
+    /// (`backend/routes/home.js:661`): status + home_id + is_multi_unit
+    /// + formatted_address, with the legacy triple derived.
+    func testCheckAddressResponseDecodesBackendShape() throws {
+        let json = """
+        { "status": "HOME_FOUND_CLAIMED", "home_id": "home_1",
+          "is_multi_unit": true, "formatted_address": "412 Elm St, Apt 3B, Brooklyn, NY, 11211" }
+        """
+        let response = try decode(CheckAddressResponse.self, from: json)
+        XCTAssertTrue(response.isAlreadyClaimed)
+        XCTAssertEqual(response.homeId, "home_1")
+        XCTAssertTrue(response.isMultiUnit)
+        XCTAssertEqual(response.formattedAddress, "412 Elm St, Apt 3B, Brooklyn, NY, 11211")
+        XCTAssertTrue(response.exists)
+        XCTAssertTrue(response.hasVerifiedMembers)
+    }
+
     // MARK: - Mailbox V1
 
     func testMailboxListDecodes() throws {

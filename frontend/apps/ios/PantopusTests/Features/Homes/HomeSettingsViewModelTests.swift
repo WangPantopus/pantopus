@@ -40,7 +40,13 @@ final class HomeSettingsViewModelTests: XCTestCase {
             uniqueKeysWithValues: groups.map { ($0.id, $0.rows.map(\.id)) }
         )
         XCTAssertEqual(rowsByGroup["homeIdentity"], ["address", "propertyDetails", "photos", "documents"])
-        XCTAssertEqual(rowsByGroup["access"], ["accessCodes", "trustedNeighbors", "privacy"])
+        // `ownershipSecurity` is the per-home security-policy row (privacy mask
+        // level / owner claim policy / member attach policy) added alongside the
+        // existing client-side privacy toggles.
+        XCTAssertEqual(
+            rowsByGroup["access"],
+            ["accessCodes", "trustedNeighbors", "privacy", "ownershipSecurity"]
+        )
         XCTAssertEqual(rowsByGroup["members"], ["people", "inviteLink"])
         XCTAssertEqual(rowsByGroup["notifications"], ["homeNotifications"])
         XCTAssertEqual(rowsByGroup["windDown"], ["leaveHome"])
@@ -101,6 +107,16 @@ final class HomeSettingsViewModelTests: XCTestCase {
         await vm.load()
         await vm.tapRow("privacy")
         XCTAssertEqual(receivedRoute, .security)
+    }
+
+    func testRenameIsGatedOnEditPermission() async {
+        // The sample-frame seam never resolves `GET /:id/me`, so the
+        // viewer has no `home.edit` and the inline editor stays closed.
+        let vm = HomeSettingsViewModel(homeId: "home-1", frame: .populated)
+        await vm.load()
+        XCTAssertFalse(vm.canEditHome)
+        vm.beginRenaming()
+        XCTAssertFalse(vm.isRenaming)
     }
 
     func testFrameInferenceFollowsHomeIdPrefix() {

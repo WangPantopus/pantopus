@@ -19,6 +19,7 @@ import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.services.AuthApi
+import app.pantopus.android.data.feed.FeedModerationStore
 import app.pantopus.android.data.observability.Observability
 import app.pantopus.android.data.realtime.SocketManager
 import com.squareup.moshi.Moshi
@@ -124,7 +125,8 @@ class AuthRepositoryTest {
         storage: TokenStorage = mockk(relaxed = true),
         obs: Observability = mockk(relaxed = true),
         socketManager: SocketManager = mockk(relaxed = true),
-    ) = AuthRepository(api, authApi, refreshApi, storage, obs, socketManager)
+        feedModeration: FeedModerationStore = FeedModerationStore(),
+    ) = AuthRepository(api, authApi, refreshApi, storage, obs, socketManager, feedModeration)
 
     private fun httpException(
         code: Int,

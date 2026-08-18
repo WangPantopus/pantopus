@@ -72,6 +72,7 @@ class PostcardVerificationSnapshotTest {
     @Test
     fun postcard_delivered() {
         val instance = vm("home-delivered")
+        instance.setStage(PostcardDeliveryStage.Delivered)
         instance.updateCode("4Q2K7B")
         paparazzi.snapshot {
             Frame {

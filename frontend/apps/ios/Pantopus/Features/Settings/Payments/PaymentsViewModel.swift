@@ -65,7 +65,18 @@ public final class PaymentsViewModel {
         state = .loading
         do {
             let methods = try await fetchMethods()
-            state = .loaded(Self.liveFrame(methods: methods))
+            // History + lifetime totals are supplementary — a failure there
+            // shouldn't sink the whole screen, so each degrades on its own
+            // (the "couldn't load" activity row / an em-dash tile) while the
+            // methods card still renders.
+            state = .loaded(
+                Self.liveFrame(
+                    methods: methods,
+                    activity: await fetchActivity(),
+                    earnings: await fetchEarnings(),
+                    connectAccount: await fetchConnectAccount()
+                )
+            )
         } catch {
             state = .error(message: Self.message(for: error))
         }
@@ -147,6 +158,53 @@ public final class PaymentsViewModel {
         return response.paymentMethods.map(Self.uiMethod(from:))
     }
 
+    /// `GET /api/payments/history` → the Activity card. A transport failure
+    /// keeps the screen usable and says so rather than claiming the user has
+    /// no transactions.
+    private func fetchActivity() async -> PaymentsActivity {
+        do {
+            let response: PaymentHistoryResponse = try await api.request(PaymentHistoryEndpoints.history())
+            return Self.activity(from: response.transactions)
+        } catch {
+            return .empty(
+                title: "Couldn't load transactions",
+                body: "Pull down to refresh and try again."
+            )
+        }
+    }
+
+    /// `GET /api/payments/earnings` + `GET /api/payments/spending` → the
+    /// "Earnings & Spending" card. Mirrors RN `PayoutsTab`'s
+    /// `Promise.allSettled`: each figure degrades to RN's em-dash on its own,
+    /// and when *neither* could be read the card is hidden rather than
+    /// claiming the user earned and spent nothing.
+    private func fetchEarnings() async -> PaymentsEarnings? {
+        let earned: EarningsSummaryResponse? = try? await api.request(EarningsEndpoints.earnings())
+        let spent: SpendingSummaryResponse? = try? await api.request(EarningsEndpoints.spending())
+        return Self.earnings(earned: earned?.earnings, spent: spent?.spending)
+    }
+
+    /// `GET /api/payments/connect/account` — drives the Payouts card. A 404
+    /// (the seller has never connected) or any transport error degrades to
+    /// `nil`, which renders the honest not-connected scaffold.
+    private func fetchConnectAccount() async -> ConnectAccountDTO? {
+        let response: ConnectAccountStatusResponse? = try? await api.request(
+            ConnectEndpoints.accountStatus()
+        )
+        return response?.account
+    }
+
+    /// Pure projection — the unit-test surface for the card.
+    static func earnings(earned: EarningsSummary?, spent: SpendingSummary?) -> PaymentsEarnings? {
+        guard earned != nil || spent != nil else { return nil }
+        return PaymentsEarnings(
+            totalEarned: earned.map { centsToCurrency($0.totalEarned) } ?? "—",
+            totalSpent: spent.map { centsToCurrency($0.totalSpent) } ?? "—",
+            caption: "Total earned includes funds still in review or on hold. "
+                + "Your wallet balance shows what's withdrawable now."
+        )
+    }
+
     private func reloadMethods() async {
         do {
             let methods = try await fetchMethods()
@@ -174,20 +232,225 @@ public final class PaymentsViewModel {
         }
     }
 
-    /// Live frame: real saved methods + a payout entry point. Balance and
-    /// activity stay nil here because Wallet owns the earnings-in surface.
-    static func liveFrame(methods: [PaymentMethod]) -> PaymentsLoaded {
+    /// Live frame: real saved methods + a payout entry point + the real
+    /// transaction history. The balance hero stays nil because Wallet owns
+    /// the earnings-in surface.
+    static func liveFrame(
+        methods: [PaymentMethod],
+        activity: PaymentsActivity = .empty(
+            title: "No transactions yet",
+            body: "Hires and sales will appear here."
+        ),
+        earnings: PaymentsEarnings? = nil,
+        connectAccount: ConnectAccountDTO? = nil
+    ) -> PaymentsLoaded {
         PaymentsLoaded(
             balance: nil,
             methods: methods,
-            payouts: notConnectedPayouts,
-            activity: .empty(
-                title: "No transactions yet",
-                body: "Hires and sales will appear here."
-            ),
+            payouts: payouts(from: connectAccount),
+            activity: activity,
             canCloseAccount: false,
-            footerCaption: "Payments are processed securely by Stripe."
+            footerCaption: "Payments are processed securely by Stripe.",
+            earnings: earnings
         )
+    }
+
+    // MARK: - Transaction history projection
+
+    /// Project `GET /api/payments/history` rows onto the Activity card. An
+    /// empty feed keeps the genuine empty state.
+    static func activity(from entries: [PaymentHistoryEntryDTO]) -> PaymentsActivity {
+        guard !entries.isEmpty else {
+            return .empty(title: "No transactions yet", body: "Hires and sales will appear here.")
+        }
+        return .transactions(entries.map(transaction(from:)))
+    }
+
+    /// One history row → one Activity row. Mirrors RN `HistoryTab`: payouts
+    /// and debits read as money out, credits as money in, tips get the star.
+    static func transaction(from entry: PaymentHistoryEntryDTO) -> PaymentsTransaction {
+        let isPayout = entry.entryType == "payout"
+        let isTip = entry.paymentType == "tip"
+        let isOutgoing = isPayout
+            || entry.direction?.lowercased() == "debit"
+            || (entry.direction == nil && entry.isSender == true)
+        let kind: PaymentsTransaction.Kind = if isTip {
+            .tip
+        } else if isPayout {
+            .payout
+        } else if isOutgoing {
+            .sent
+        } else {
+            .received
+        }
+        return PaymentsTransaction(
+            id: entry.id,
+            kind: kind,
+            title: title(for: entry, isPayout: isPayout),
+            meta: meta(for: entry, isPayout: isPayout, isOutgoing: isOutgoing),
+            amount: "\(isOutgoing ? "-" : "+")\(centsToCurrency(entry.amountCents))",
+            isOutgoing: isOutgoing
+        )
+    }
+
+    private static func title(for entry: PaymentHistoryEntryDTO, isPayout: Bool) -> String {
+        if isPayout {
+            if let last4 = entry.destinationLast4, !last4.isEmpty {
+                return "Payout to bank ••••\(last4)"
+            }
+            return entry.description ?? "Payout"
+        }
+        if let gigTitle = entry.gig?.title, !gigTitle.isEmpty { return gigTitle }
+        if let description = entry.description, !description.isEmpty { return description }
+        if let type = entry.paymentType, !type.isEmpty { return humanised(type) }
+        return "Payment"
+    }
+
+    private static func meta(
+        for entry: PaymentHistoryEntryDTO,
+        isPayout: Bool,
+        isOutgoing: Bool
+    ) -> String {
+        var parts: [String] = []
+        if let date = shortDate(entry.createdAt) { parts.append(date) }
+        if let status = entry.status, !status.isEmpty { parts.append(humanised(status)) }
+        if !isPayout {
+            let counterparty = isOutgoing ? entry.payee?.displayName : entry.payer?.displayName
+            if let counterparty {
+                parts.append(isOutgoing ? "to \(counterparty)" : "from \(counterparty)")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// `gig_payment` → `Gig payment`, `authorize_pending` → `Authorize pending`.
+    private static func humanised(_ raw: String) -> String {
+        let spaced = raw.replacingOccurrences(of: "_", with: " ")
+        return spaced.prefix(1).uppercased() + spaced.dropFirst()
+    }
+
+    private static let centsFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter
+    }()
+
+    /// Integer cents → `"$1,284.50"`. Formatting only — the server's amount
+    /// is never re-derived or rounded.
+    static func centsToCurrency(_ cents: Int) -> String {
+        let dollars = Double(abs(cents)) / 100.0
+        let plain = centsFormatter.string(from: NSNumber(value: dollars)) ?? String(format: "%.2f", dollars)
+        return "$\(plain)"
+    }
+
+    private static let iso8601Fraction: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    static func shortDate(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let date = iso8601Fraction.date(from: raw) ?? iso8601Plain.date(from: raw) else { return nil }
+        return shortDateFormatter.string(from: date)
+    }
+
+    /// Project the live Connect status onto the Payouts card. Mirrors RN
+    /// `PayoutsTab` (`PayoutsTab.tsx:129-248`) three-way split — onboarded
+    /// (`charges_enabled && payouts_enabled`) / account created but still
+    /// verifying / never connected — instead of always rendering the
+    /// not-connected scaffold. Stripe hands the platform no bank details for
+    /// an Express account, so the connected frame points at the seller's own
+    /// Stripe dashboard (reachable through the Wallet payout surface) rather
+    /// than inventing a bank name.
+    static func payouts(from account: ConnectAccountDTO?) -> PaymentsPayouts {
+        guard let account, let id = account.stripeAccountId, !id.isEmpty else {
+            return notConnectedPayouts
+        }
+        guard account.chargesEnabled, account.payoutsEnabled else {
+            return verifyingPayouts
+        }
+        let connectedOn = connectedDate(account.createdAt).map { "Connected \($0)" }
+        return PaymentsPayouts(
+            stripe: PaymentsPayoutRow(
+                id: "payouts.stripe",
+                leadingBrand: .stripe,
+                label: "Stripe Connect",
+                subtext: connectedOn ?? "Card payments and payouts enabled",
+                trailing: .chipChevron(label: "Connected", tone: .success)
+            ),
+            payoutMethod: PaymentsPayoutRow(
+                id: "payouts.method",
+                leadingBrand: .bank,
+                label: "Payout method",
+                subtext: "Managed in your Stripe dashboard",
+                trailing: .chevron
+            ),
+            payoutSchedule: nil,
+            taxInfo: PaymentsPayoutRow(
+                id: "payouts.tax",
+                label: "Tax info",
+                subtext: "Collected by Stripe during setup",
+                trailing: .chevron
+            ),
+            helper: "Stripe handles payouts. Funds clear to your bank in 1–2 business days."
+        )
+    }
+
+    private static let verifyingPayouts = PaymentsPayouts(
+        stripe: PaymentsPayoutRow(
+            id: "payouts.stripe",
+            leadingBrand: .stripe,
+            label: "Stripe Connect",
+            subtext: "Account verification in progress",
+            trailing: .ctaChip(label: "Continue setup", tone: .primary)
+        ),
+        payoutMethod: PaymentsPayoutRow(
+            id: "payouts.method",
+            label: "Payout method",
+            subtext: "Available once Stripe finishes verification",
+            trailing: .gatedDash
+        ),
+        payoutSchedule: nil,
+        taxInfo: PaymentsPayoutRow(
+            id: "payouts.tax",
+            label: "Tax info",
+            subtext: "W-9 collected during setup",
+            trailing: .gatedDash
+        ),
+        helper: "Stripe is verifying your identity. This usually takes 1–2 business days."
+    )
+
+    private static let connectedDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+
+    /// `StripeAccount.created_at` → "Mar 12, 2024". `nil` keeps the row on the
+    /// capability line rather than showing a fabricated date.
+    static func connectedDate(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let date = iso8601Fraction.date(from: raw) ?? iso8601Plain.date(from: raw) else { return nil }
+        return connectedDateFormatter.string(from: date)
     }
 
     private static let notConnectedPayouts = PaymentsPayouts(
@@ -269,7 +532,8 @@ private extension PaymentsLoaded {
             payouts: payouts,
             activity: activity,
             canCloseAccount: canCloseAccount,
-            footerCaption: footerCaption
+            footerCaption: footerCaption,
+            earnings: earnings
         )
     }
 

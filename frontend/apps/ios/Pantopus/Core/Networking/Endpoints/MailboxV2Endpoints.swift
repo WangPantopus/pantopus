@@ -71,14 +71,18 @@ public enum MailboxV2Endpoints {
         )
     }
 
-    /// `POST /api/mailbox/v2/community/rsvp` — route
+    /// `POST /api/mailbox/v2/p3/community/rsvp` — route
     /// `backend/routes/mailboxV2Phase3.js:746`. Adds a `will_attend`
     /// reaction to the `CommunityMailItem` and returns the updated
     /// RSVP count. The backend treats RSVP as idempotent.
+    ///
+    /// The Phase-3 router is mounted at `/api/mailbox/v2/p3`
+    /// (`backend/app.js:317`); the previously-shipped `/api/mailbox/v2/
+    /// community/rsvp` spelling had no matching route and 404'd.
     public static func communityRsvp(communityItemId: String) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/mailbox/v2/community/rsvp",
+            path: "/api/mailbox/v2/p3/community/rsvp",
             body: CommunityRsvpRequest(communityItemId: communityItemId)
         )
     }

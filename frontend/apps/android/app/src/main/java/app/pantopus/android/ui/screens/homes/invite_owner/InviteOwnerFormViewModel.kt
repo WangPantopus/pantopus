@@ -57,6 +57,14 @@ data class InviteOwnerUiState(
         InviteOwnerField.entries.associateWith { FormFieldState(id = it.key) },
     val grantPercent: Int = 0,
     val originalGrantPercent: Int = 0,
+    /**
+     * RN's "Fast track (vouch)" switch, defaulted ON
+     * (`src/app/homes/[id]/owners/invite.tsx:22`). Sent as `fast_track`;
+     * the handler files the claim as `method: 'vouch'` +
+     * `state: 'pending_challenge_window'` instead of `invite` /
+     * `submitted` (`backend/routes/homeOwnership.js:1473-1481`).
+     */
+    val fastTrack: Boolean = true,
     val autoBalancesSoleOwner: Boolean = false,
     val isSaving: Boolean = false,
     val toast: ToastPayload? = null,
@@ -174,6 +182,10 @@ class InviteOwnerFormViewModel
             }
         }
 
+        fun updateFastTrack(value: Boolean) {
+            _state.update { it.copy(fastTrack = value) }
+        }
+
         fun updateGrantPercent(value: Int) {
             _state.update { current ->
                 val clamped = value.coerceIn(0, 100)
@@ -273,7 +285,7 @@ class InviteOwnerFormViewModel
                     val result =
                         homesRepo.inviteOwner(
                             homeId,
-                            InviteOwnerRequest(email = email, phone = phone),
+                            InviteOwnerRequest(email = email, phone = phone, fastTrack = current.fastTrack),
                         )
                 ) {
                     is NetworkResult.Success -> {

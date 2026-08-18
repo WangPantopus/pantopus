@@ -84,6 +84,8 @@ interface GigsApi {
         @Query("schedule_type") scheduleType: String? = null,
         @Query("pay_type") payType: String? = null,
         @Query("deadline") deadline: String? = null,
+        @Query("max_distance") maxDistanceMeters: Int? = null,
+        @Query("task_archetype") taskArchetype: String? = null,
         @Query("search") search: String? = null,
         @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0,

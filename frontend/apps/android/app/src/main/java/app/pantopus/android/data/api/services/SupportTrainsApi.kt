@@ -16,13 +16,18 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * `/api/support-trains/[*]` — Support Trains (mutual-aid) endpoints
- * from `backend/routes/supportTrains.js`. The full surface area is 39
- * routes; this file wires the two list-feed endpoints powering the
- * My-trains / Nearby tabs and the organizer-only reservations feed
- * driving the Review-signups screen. Additional endpoints (slot
- * reservation, organizer mutations) are folded in additively as the
- * detail / wizard surfaces ship.
+ * `api/activities/support-trains/…` — Support Trains (mutual-aid)
+ * endpoints from `backend/routes/supportTrains.js`.
+ *
+ * S1 PREFIX FIX: these paths used to be `api/support-trains/…`.
+ * `backend/app.js:404` mounts the router at
+ * `/api/activities/support-trains` and no alias for the shorter prefix
+ * exists anywhere in the backend, so every call 404'd. They now compose
+ * the real mount, matching the RN client
+ * (`packages/api/src/endpoints/supportTrains.ts:30`).
+ *
+ * The write half (reserve / cancel / reveal / deliver / confirm plus
+ * the organizer management actions) lives in [SupportTrainActionsApi].
  */
 interface SupportTrainsApi {
     /**
@@ -30,7 +35,7 @@ interface SupportTrainsApi {
      * caller participates in (organizer or helper). Route
      * `backend/routes/supportTrains.js:445`.
      */
-    @GET("api/support-trains/me/support-trains")
+    @GET("api/activities/support-trains/me/support-trains")
     suspend fun mine(
         @Query("role") role: String? = null,
         @Query("status") status: String? = null,
@@ -43,7 +48,7 @@ interface SupportTrainsApi {
      * (default 25 mi radius). Route
      * `backend/routes/supportTrains.js:570`.
      */
-    @GET("api/support-trains/nearby")
+    @GET("api/activities/support-trains/nearby")
     suspend fun nearby(
         @Query("latitude") latitude: Double,
         @Query("longitude") longitude: Double,
@@ -56,7 +61,7 @@ interface SupportTrainsApi {
      * of pending / confirmed helper reservations. Route
      * `backend/routes/supportTrains.js:3306`.
      */
-    @GET("api/support-trains/{id}/reservations")
+    @GET("api/activities/support-trains/{id}/reservations")
     suspend fun reservations(
         @Path("id") supportTrainId: String,
     ): SupportTrainReservationsResponse
@@ -67,7 +72,7 @@ interface SupportTrainsApi {
      * this on launch, then [addSlot] for each generated slot, then
      * [publish]. Route `backend/routes/supportTrains.js:639`.
      */
-    @POST("api/support-trains")
+    @POST("api/activities/support-trains")
     suspend fun create(
         @Body body: CreateSupportTrainBody,
     ): CreateSupportTrainResponse
@@ -77,7 +82,7 @@ interface SupportTrainsApi {
      * The wizard calls this once per generated slot. Route
      * `backend/routes/supportTrains.js:921`.
      */
-    @POST("api/support-trains/{id}/slots")
+    @POST("api/activities/support-trains/{id}/slots")
     suspend fun addSlot(
         @Path("id") supportTrainId: String,
         @Body body: AddSupportTrainSlotBody,
@@ -89,7 +94,7 @@ interface SupportTrainsApi {
      * in the wizard's launch sequence. Route
      * `backend/routes/supportTrains.js:1236`.
      */
-    @POST("api/support-trains/{id}/publish")
+    @POST("api/activities/support-trains/{id}/publish")
     suspend fun publish(
         @Path("id") supportTrainId: String,
     ): ResponseBody
@@ -100,12 +105,12 @@ interface SupportTrainsApi {
      * scoped to the viewer's role. Route
      * `backend/routes/supportTrains.js:3444`.
      *
-     * PREFIX NOTE: this client family targets `/api/support-trains/{...}`
-     * (matching the shipped list/create siblings), while the Express router
-     * is mounted at `/api/activities/support-trains` (`backend/app.js:398`).
-     * Kept consistent with the siblings; see the P1-E delivery notes.
+     * PREFIX NOTE (resolved in S1): the family used to target
+     * `api/support-trains/{...}`; the router is mounted at
+     * `/api/activities/support-trains` (`backend/app.js:404`) with no
+     * alias, so every helper here composes the real mount.
      */
-    @GET("api/support-trains/{id}")
+    @GET("api/activities/support-trains/{id}")
     suspend fun detail(
         @Path("id") supportTrainId: String,
     ): SupportTrainDetailDto
@@ -115,7 +120,7 @@ interface SupportTrainsApi {
      * train's helpers (A13.13 Manage → Send update). Route
      * `backend/routes/supportTrains.js:1581`.
      */
-    @POST("api/support-trains/{id}/updates")
+    @POST("api/activities/support-trains/{id}/updates")
     suspend fun postUpdate(
         @Path("id") supportTrainId: String,
         @Body body: SupportTrainUpdateBody,
@@ -126,7 +131,7 @@ interface SupportTrainsApi {
      * (A13.13 Manage → Close train). Route
      * `backend/routes/supportTrains.js:1508`.
      */
-    @POST("api/support-trains/{id}/complete")
+    @POST("api/activities/support-trains/{id}/complete")
     suspend fun complete(
         @Path("id") supportTrainId: String,
     ): ResponseBody

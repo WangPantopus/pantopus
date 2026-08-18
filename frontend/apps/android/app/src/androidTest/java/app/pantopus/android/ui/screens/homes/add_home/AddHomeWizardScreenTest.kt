@@ -44,10 +44,7 @@ class AddHomeWizardScreenTest {
 
     private val checkAddressOk =
         CheckAddressResponse(
-            exists = false,
-            homeCount = 0,
-            hasVerifiedMembers = false,
-            verdictStatus = null,
+            status = CheckAddressResponse.STATUS_NOT_FOUND,
         )
 
     private val createHomeResponse =
@@ -79,7 +76,7 @@ class AddHomeWizardScreenTest {
             mockk<NetworkMonitor>(relaxed = true).also {
                 every { it.isOnline } returns MutableStateFlow(true)
             }
-        return AddHomeWizardViewModel(repo, SavedStateHandle(), networkMonitor)
+        return AddHomeWizardViewModel(repo, mockk(relaxed = true), SavedStateHandle(), networkMonitor)
     }
 
     private fun AddHomeWizardViewModel.fillAddress() {

@@ -8,6 +8,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,15 +22,23 @@ import javax.inject.Inject
 /** Utterance id for the read-aloud job. */
 private const val TTS_UTTERANCE_ID = "mail-translation"
 
+/** Error copy when either leg of the translation fetch fails. */
+private const val TRANSLATION_ERROR_FALLBACK =
+    "We couldn't translate this letter. Check your connection and try again."
+
 /**
  * A17.13 — Translation view-model. Mirror of iOS `MailTranslationViewModel`.
- * Drives the four DoD states off the sample letter, owns the machine →
- * confirmed transition (optimistic, rolls back on failure), the
- * [TranslationViewToggle] selection, and the stubbed "Listen" affordance.
+ * Fetches a real machine translation and drives the four DoD states off it,
+ * owns the machine → confirmed transition (optimistic, rolls back on
+ * failure), the view-toggle selection, and the read-aloud affordance.
  *
- * Translation / TTS are sample-driven (B2.3 out-of-scope) — the confirm
- * call hits the real translate endpoint so the wiring exists, but a failure
- * simply rolls the optimistic flip back.
+ * [load] reads both halves of the screen:
+ *  - `GET api/mailbox/:id` — the original letter + sender
+ *  - `POST api/mailbox/v2/p3/translate` — the translated text, the
+ *    detected source language, the target, and whether it was cached
+ *
+ * A failure on either leg lands in [MailTranslationUiState.Error], which
+ * the screen renders with a Retry wired to [refresh].
  */
 @HiltViewModel
 class MailTranslationViewModel
@@ -68,20 +77,42 @@ class MailTranslationViewModel
         @Volatile private var pendingUtterance: Pair<String, Locale>? = null
 
         /**
-         * Load the (sample) translation. Real MT lands behind this seam
-         * later; today the projection is deterministic so previews +
-         * snapshots are stable.
+         * Fetch the mail item and its machine translation, then project them
+         * into the screen content. Both legs are awaited — the side-by-side
+         * view needs the original as much as the translation — so either
+         * failing lands in [MailTranslationUiState.Error] with a Retry.
          */
         fun load() {
             _state.value = MailTranslationUiState.Loading
-            val content =
-                if (seedConfirmed) {
-                    MailTranslationSampleData.confirmedLetter(mailId.ifEmpty { "mail-translation-sample" })
-                } else {
-                    MailTranslationSampleData.letter(mailId.ifEmpty { "mail-translation-sample" })
+            viewModelScope.launch {
+                val detail = repo.detail(mailId)
+                if (detail !is NetworkResult.Success) {
+                    _state.value = MailTranslationUiState.Error(errorMessage(detail))
+                    return@launch
                 }
-            _state.value = MailTranslationUiState.Loaded(content)
+                val translation = repo.translate(mailId)
+                if (translation !is NetworkResult.Success) {
+                    _state.value = MailTranslationUiState.Error(errorMessage(translation))
+                    return@launch
+                }
+                var content =
+                    MailTranslationProjection.project(
+                        mailId = mailId,
+                        detail = detail.data.mail,
+                        translation = translation.data,
+                    )
+                if (seedConfirmed) {
+                    content = content.copy(confirmed = true, viewMode = TranslationViewMode.Translated)
+                }
+                _state.value = MailTranslationUiState.Loaded(content)
+            }
         }
+
+        private fun errorMessage(result: NetworkResult<*>): String =
+            (result as? NetworkResult.Failure)
+                ?.error
+                ?.displayMessage(TRANSLATION_ERROR_FALLBACK)
+                ?: TRANSLATION_ERROR_FALLBACK
 
         fun refresh() = load()
 
@@ -115,7 +146,11 @@ class MailTranslationViewModel
             _confirmInFlight.value = true
             _state.value =
                 MailTranslationUiState.Loaded(
-                    previous.copy(confirmed = true, viewMode = TranslationViewMode.Translated),
+                    previous.copy(
+                        confirmed = true,
+                        viewMode = TranslationViewMode.Translated,
+                        confirmedStamp = MailTranslationProjection.confirmedStamp(),
+                    ),
                 )
             viewModelScope.launch {
                 // The translate endpoint doubles as the "confirm/trust" write

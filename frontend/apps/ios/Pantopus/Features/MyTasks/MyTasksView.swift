@@ -21,8 +21,15 @@ public struct MyTasksView: View {
 
     public var body: some View {
         @Bindable var bindable = viewModel
-        return ListOfRowsView(dataSource: viewModel)
-            .accessibilityIdentifier("my-tasks")
+        return ListOfRowsView(dataSource: viewModel) {
+            // "Rebook a favorite helper". Renders above the list and collapses
+            // to nothing when the server has no rebookable tasks, so it never
+            // costs a task-less poster any vertical space.
+            RebookRailView { gig in
+                viewModel.rebook(gig)
+            }
+        }
+        .accessibilityIdentifier("my-tasks")
             .sheet(isPresented: $bindable.isFilterPresented) {
                 ActivityFilterSheet(
                     statusTitle: viewModel.statusFilterTitle,

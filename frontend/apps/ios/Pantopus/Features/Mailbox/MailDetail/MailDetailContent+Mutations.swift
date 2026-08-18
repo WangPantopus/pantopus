@@ -124,6 +124,8 @@ extension MailDetailContent {
         MailDetailContent(
             mailId: content.mailId,
             category: content.category,
+            mailCategoryKey: content.mailCategoryKey,
+            isSenderUnknown: content.isSenderUnknown,
             trust: content.trust,
             detailTrust: content.detailTrust,
             senderDisplayName: content.senderDisplayName,

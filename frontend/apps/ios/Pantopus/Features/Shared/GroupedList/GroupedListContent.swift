@@ -32,8 +32,23 @@ public enum RowControl: Sendable, Hashable {
     /// tiled into the trailing slot (`ChannelTriad`). `locked` forces a
     /// chip "on, untoggleable" — Emergency alerts keep push locked on.
     case channelTriad(p: Bool, e: Bool, s: Bool, locked: Set<ChannelGlyph>)
+    /// A14.5 Notifications — a horizontally scrolling strip of
+    /// single-select value chips rendered under the row label (e.g. the
+    /// briefing send-time options). `selected` is the active option's
+    /// raw value, which is also what gets sent to the backend.
+    case chips(options: [String], selected: String)
 
     public enum ChipTone: Sendable, Hashable { case success, info, neutral, warning }
+
+    /// Controls that own the taps inside their own sub-elements — the
+    /// shell must not put a row-level tap gesture (or a combined
+    /// accessibility element) over them.
+    public var ownsInnerTaps: Bool {
+        switch self {
+        case .channelTriad, .chips: true
+        default: false
+        }
+    }
 }
 
 /// One row in a group.
@@ -198,6 +213,9 @@ public protocol GroupedListDataSource: AnyObject, Observable {
     /// A14.5 — tap on one chip of a `.channelTriad` row. `isOn` is the
     /// value after the flip. Locked chips never call this.
     func toggleChannel(_ rowId: String, channel: ChannelGlyph, isOn: Bool) async
+    /// A14.5 — tap on one option of a `.chips` row. `value` is the raw
+    /// option string (already the wire value).
+    func selectChip(_ rowId: String, value: String) async
     /// A14.5 — tap on the banner's trailing action pill (e.g. Resume).
     func tapBanner() async
     /// A14.7 — release the Privacy location-fuzz slider on `stop`.
@@ -216,6 +234,7 @@ public extension GroupedListDataSource {
     }
 
     func toggleChannel(_: String, channel _: ChannelGlyph, isOn _: Bool) async {}
+    func selectChip(_: String, value _: String) async {}
     func tapBanner() async {}
     func setFuzz(_: String, stop _: FuzzStop) async {}
 }

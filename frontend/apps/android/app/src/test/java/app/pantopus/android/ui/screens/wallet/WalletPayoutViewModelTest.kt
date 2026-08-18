@@ -91,6 +91,72 @@ class WalletPayoutViewModelTest {
             assertFalse(content.payoutsEnabled)
         }
 
+    // MARK: - Payout-account card (makes "Open Stripe Dashboard" reachable)
+
+    /**
+     * An onboarded account renders the Payout-account card — the only
+     * reachable entry point to the Stripe Express dashboard.
+     */
+    @Test
+    fun onboarded_account_surfaces_dashboard_action() =
+        runTest {
+            coEvery { connectRepository.accountStatus() } returns
+                NetworkResult.Success(
+                    ConnectAccountStatusResponse(
+                        ConnectAccountDto(
+                            stripeAccountId = "acct_1",
+                            chargesEnabled = true,
+                            payoutsEnabled = true,
+                            detailsSubmitted = true,
+                        ),
+                    ),
+                )
+            val vm = vm()
+            vm.load()
+            val content = (vm.state.value as WalletUiState.Populated).content
+            assertEquals("Stripe account connected", content.payoutAccount?.headline)
+            assertEquals("Open Stripe Dashboard", content.payoutAccount?.actionLabel)
+            assertEquals(false, content.payoutAccount?.warn)
+        }
+
+    /** An account that exists but isn't onboarded resumes hosted onboarding. */
+    @Test
+    fun pending_account_surfaces_continue_setup() =
+        runTest {
+            coEvery { connectRepository.accountStatus() } returns
+                NetworkResult.Success(
+                    ConnectAccountStatusResponse(
+                        ConnectAccountDto(
+                            stripeAccountId = "acct_1",
+                            chargesEnabled = false,
+                            payoutsEnabled = false,
+                            detailsSubmitted = true,
+                        ),
+                    ),
+                )
+            val vm = vm()
+            vm.load()
+            val content = (vm.state.value as WalletUiState.Populated).content
+            assertEquals("Continue setup", content.payoutAccount?.actionLabel)
+            assertEquals(true, content.payoutAccount?.warn)
+            assertFalse(content.payoutsEnabled)
+        }
+
+    /**
+     * No connected account → no card (the bottom bar's "Set up payouts" stays
+     * the entry point) and nothing fabricated.
+     */
+    @Test
+    fun no_connect_account_hides_payout_card() =
+        runTest {
+            stubPayouts(enabled = false)
+            val vm = vm()
+            vm.load()
+            val content = (vm.state.value as WalletUiState.Populated).content
+            assertEquals(null, content.payoutAccount)
+            assertEquals(null, content.payoutMethod)
+        }
+
     // MARK: - Withdraw
 
     @Test

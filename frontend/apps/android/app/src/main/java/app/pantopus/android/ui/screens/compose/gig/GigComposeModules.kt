@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -37,10 +40,12 @@ import app.pantopus.android.data.api.models.gigs.CareDetailsDto
 import app.pantopus.android.data.api.models.gigs.EventDetailsDto
 import app.pantopus.android.data.api.models.gigs.LogisticsDetailsDto
 import app.pantopus.android.data.api.models.gigs.RemoteDetailsDto
+import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
+import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
@@ -53,7 +58,9 @@ import app.pantopus.android.ui.theme.Spacing
 //    home_service / quick_help → logistics_details
 //    remote_task               → remote_details
 //    event_shift               → event_details
-//    delivery_errand           → items[]
+//    delivery_errand           → pickup/dropoff columns + items[]
+//    pro_service_quote         → requires_license / insurance / scope /
+//                                deposit columns
 //  `is_urgent` adds urgent_details at body-build time (VM).
 // ════════════════════════════════════════════════════════════════
 
@@ -69,7 +76,8 @@ internal fun GigComposeModuleFields(
         "home_service", "quick_help" -> LogisticsModuleFields(form.logisticsDetails, vm::updateLogisticsDetails)
         "remote_task" -> RemoteModuleFields(form.remoteDetails, vm::updateRemoteDetails)
         "event_shift" -> EventModuleFields(form.eventDetails, vm::updateEventDetails)
-        "delivery_errand" -> ItemsModuleFields(state, vm)
+        "delivery_errand" -> DeliveryModuleFields(state, vm)
+        "pro_service_quote" -> ProServiceModuleFields(form.proServiceDetails, vm::updateProServiceDetails)
         else -> Unit
     }
 }
@@ -304,6 +312,172 @@ private fun EventModuleFields(
             keyboardType = KeyboardType.Number,
             fieldTestTag = "gigCompose.module.event.guests",
         )
+    }
+}
+
+// ─── delivery_errand → route + items[] ────────────────────────────
+
+/**
+ * Pickup → drop-off route (flat `pickup_*` / `dropoff_*` gig columns),
+ * the proof-photo toggle, and the shopping list. Mirrors RN's
+ * `gig-v2/_components/DeliveryModule.tsx`.
+ */
+@Composable
+private fun DeliveryModuleFields(
+    state: GigComposeUiState,
+    vm: GigComposeViewModel,
+) {
+    val current = state.form.deliveryDetails ?: GigDeliveryDetails()
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+        ModuleSection(title = "DELIVERY DETAILS", testTag = "gigCompose.module.delivery") {
+            PantopusTextField(
+                label = "Pickup address",
+                value = current.pickupAddress,
+                onValueChange = { vm.updateDeliveryDetails(current.copy(pickupAddress = it)) },
+                placeholder = "Pickup address",
+                fieldTestTag = "gigCompose.module.delivery.pickupAddress",
+            )
+            PantopusTextField(
+                label = "Pickup notes (optional)",
+                value = current.pickupNotes,
+                onValueChange = { vm.updateDeliveryDetails(current.copy(pickupNotes = it)) },
+                placeholder = "e.g. Ask for John at the counter",
+                fieldTestTag = "gigCompose.module.delivery.pickupNotes",
+            )
+            PantopusTextField(
+                label = "Drop-off address",
+                value = current.dropoffAddress,
+                onValueChange = { vm.updateDeliveryDetails(current.copy(dropoffAddress = it)) },
+                placeholder = "Drop-off address (defaults to your home)",
+                fieldTestTag = "gigCompose.module.delivery.dropoffAddress",
+            )
+            PantopusTextField(
+                label = "Drop-off notes (optional)",
+                value = current.dropoffNotes,
+                onValueChange = { vm.updateDeliveryDetails(current.copy(dropoffNotes = it)) },
+                placeholder = "e.g. Leave on the front porch",
+                fieldTestTag = "gigCompose.module.delivery.dropoffNotes",
+            )
+            ModuleSwitchRow(
+                label = "Require delivery proof photo",
+                checked = current.proofRequired,
+                testTag = "gigCompose.module.delivery.proof",
+                onToggle = { vm.updateDeliveryDetails(current.copy(proofRequired = it)) },
+            )
+        }
+        ItemsModuleFields(state, vm)
+    }
+}
+
+// ─── pro_service_quote → licence / insurance / scope / deposit ────
+
+/**
+ * Professional requirements for quote-style pro work. Mirrors RN's
+ * `gig-v2/_components/ProServicesModule.tsx`; the deposit amount is
+ * required once the toggle is on.
+ */
+@Composable
+private fun ProServiceModuleFields(
+    details: GigProServiceDetails?,
+    onUpdate: (GigProServiceDetails) -> Unit,
+) {
+    val current = details ?: GigProServiceDetails()
+    ModuleSection(title = "PROFESSIONAL REQUIREMENTS", testTag = "gigCompose.module.proService") {
+        ModuleSwitchRow(
+            label = "Requires license",
+            checked = current.requiresLicense,
+            testTag = "gigCompose.module.pro.license",
+            onToggle = { onUpdate(current.copy(requiresLicense = it)) },
+        )
+        if (current.requiresLicense) {
+            PantopusTextField(
+                label = "License type",
+                value = current.licenseType,
+                onValueChange = { onUpdate(current.copy(licenseType = it)) },
+                placeholder = "e.g. Licensed Plumber",
+                fieldTestTag = "gigCompose.module.pro.licenseType",
+            )
+        }
+        ModuleSwitchRow(
+            label = "Requires insurance",
+            checked = current.requiresInsurance,
+            testTag = "gigCompose.module.pro.insurance",
+            onToggle = { onUpdate(current.copy(requiresInsurance = it)) },
+        )
+        ModuleMultilineField(
+            label = "Scope of work",
+            value = current.scopeDescription,
+            onValueChange = { onUpdate(current.copy(scopeDescription = it)) },
+            placeholder = "Describe the scope of work needed…",
+            testTag = "gigCompose.module.pro.scope",
+        )
+        ModuleSwitchRow(
+            label = "Require deposit",
+            checked = current.depositRequired,
+            testTag = "gigCompose.module.pro.deposit",
+            onToggle = { onUpdate(current.copy(depositRequired = it)) },
+        )
+        if (current.depositRequired) {
+            PantopusTextField(
+                label = "Deposit amount ($)",
+                value = current.depositAmount,
+                onValueChange = { onUpdate(current.copy(depositAmount = it)) },
+                placeholder = "0",
+                state =
+                    if (current.isDepositAmountMissing) {
+                        PantopusFieldState.Error("Enter a deposit amount, or turn the deposit off.")
+                    } else {
+                        PantopusFieldState.Default
+                    },
+                keyboardType = KeyboardType.Decimal,
+                fieldTestTag = "gigCompose.module.pro.depositAmount",
+            )
+        }
+    }
+}
+
+/**
+ * Multi-line module input — the [PantopusTextField] chrome without its
+ * `singleLine` constraint, for scope-of-work style prose.
+ */
+@Composable
+private fun ModuleMultilineField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    testTag: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+        Text(text = label, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(width = 1.dp, color = PantopusColors.appBorder, shape = RoundedCornerShape(Radii.md))
+                    .padding(Spacing.s2),
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                modifier = Modifier.fillMaxWidth().testTag(testTag),
+                decorationBox = { inner ->
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    inner()
+                },
+            )
+        }
     }
 }
 

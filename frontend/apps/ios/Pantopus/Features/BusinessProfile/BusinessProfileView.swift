@@ -36,6 +36,7 @@ public struct BusinessProfileView: View {
 
     public init(
         businessId: String,
+        pageSlug: String? = nil,
         onBack: @escaping @MainActor () -> Void,
         onOpenMessages: @escaping @MainActor (InboxConversationDestination) -> Void = { _ in },
         onShare: @escaping @MainActor () -> Void = {},
@@ -44,7 +45,9 @@ public struct BusinessProfileView: View {
         onBook: @escaping @MainActor () -> Void = {},
         onEdit: @escaping @MainActor () -> Void = {}
     ) {
-        _viewModel = State(initialValue: BusinessProfileViewModel(businessId: businessId))
+        _viewModel = State(
+            initialValue: BusinessProfileViewModel(businessId: businessId, pageSlug: pageSlug)
+        )
         self.onBack = onBack
         self.onOpenMessages = onOpenMessages
         self.onShare = onShare
@@ -173,6 +176,7 @@ public struct BusinessProfileView: View {
             BusinessProfileLoadedView(
                 content: payload,
                 isSaved: payload.savedPlace.map(savedPlaceIsSaved) ?? false,
+                namedPage: viewModel.namedPage,
                 onBack: onBack,
                 onShare: onShare,
                 onMore: presentOverflow,
@@ -221,6 +225,9 @@ public struct BusinessProfileView: View {
 struct BusinessProfileLoadedView: View {
     let content: BusinessProfileContent
     let isSaved: Bool
+    /// C4 — the named custom page from `pantopus://b/:username/:slug`.
+    /// Defaults to `.none` so every existing call site is untouched.
+    var namedPage: BusinessProfileNamedPageState = .none
     let onBack: @MainActor () -> Void
     let onShare: @MainActor () -> Void
     let onMore: @MainActor () -> Void
@@ -243,6 +250,8 @@ struct BusinessProfileLoadedView: View {
                         status: bannerStatus
                     )
                     StatStrip(stats: content.stats)
+                    BusinessProfileNamedPageSection(state: namedPage)
+                        .padding(.horizontal, Spacing.s4)
                     BusinessProfileSections(content: content)
                         .padding(.horizontal, Spacing.s4)
                         .padding(.top, 14)

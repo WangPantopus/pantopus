@@ -9,10 +9,13 @@
 //  directly.
 //
 //  `submit()` issues the pass via `POST /api/homes/:id/guest-passes`
-//  (route `backend/routes/homeIam.js:667`), then raises a success toast
-//  ("Pass sent to <name>") and signals `shouldDismiss` so the host pops
-//  the modal. The contact, welcome note, and allowed-area chips are UI
-//  affordances the create endpoint doesn't model, so they stay local.
+//  (route `backend/routes/homeIam.js:667`), raises a success toast
+//  ("Pass sent to <name>") and publishes `createdShare` — the one-time
+//  share token composed into a viewer link. The host offers the OS share
+//  sheet (RN parity: `src/app/homes/[id]/share.tsx:60-82`) and then calls
+//  `acknowledgeShare()`, which flips `shouldDismiss` so the modal pops.
+//  The contact, welcome note, and allowed-area chips are UI affordances
+//  the create endpoint doesn't model, so they stay local.
 //
 
 import Foundation
@@ -42,6 +45,11 @@ public final class AddGuestFormViewModel {
     public private(set) var isSaving = false
     public var toast: ToastMessage?
     public private(set) var shouldDismiss = false
+
+    /// Set once the pass is created. Carries the raw one-time `token`
+    /// (composed into a public viewer URL) so the host can fire the OS
+    /// share sheet. Cleared by `acknowledgeShare()`.
+    public private(set) var createdShare: GuestPassShare?
 
     // MARK: - Inputs
 
@@ -183,8 +191,9 @@ public final class AddGuestFormViewModel {
             startAt: window.startAt,
             endAt: window.endAt
         )
+        let response: CreateGuestPassResponse
         do {
-            _ = try await api.request(
+            response = try await api.request(
                 HomesEndpoints.createGuestPass(homeId: homeId, request: request),
                 as: CreateGuestPassResponse.self
             )
@@ -201,6 +210,19 @@ public final class AddGuestFormViewModel {
         let name = firstName ?? "your guest"
         toast = ToastMessage(text: "Pass sent to \(name)", kind: .success)
         onSent(name)
+        // The raw token is returned exactly once (homeIam.js:762-767) —
+        // this is the only moment a shareable link can be built.
+        createdShare = GuestPassShare(
+            id: response.pass.id,
+            guestName: firstName ?? "",
+            urlString: GuestPassShare.url(forToken: response.token)
+        )
+    }
+
+    /// Called by the host once the user has either shared the new pass or
+    /// declined. Clears the offer and asks the host to pop the form.
+    public func acknowledgeShare() {
+        createdShare = nil
         shouldDismiss = true
     }
 

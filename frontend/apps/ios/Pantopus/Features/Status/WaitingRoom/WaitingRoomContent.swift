@@ -118,6 +118,11 @@ public enum WaitingRoomPhase: Sendable, Hashable {
     case loading
     case loaded
     case notice(WaitingRoomNotice)
+    /// No ownership claim is in review but the caller's occupancy still
+    /// isn't verified — render RN's Verification Center frame instead of
+    /// the dead-end "No claim in review" notice
+    /// (`src/app/homes/[id]/waiting-room.tsx:67-70`).
+    case verification(HomeVerificationContent)
     /// The claim resolved in the claimant's favour — render the A18.2
     /// "You're the owner" frame instead of a dead-end notice. The payload is
     /// built from the real claim row, so every date it prints is API-sourced.

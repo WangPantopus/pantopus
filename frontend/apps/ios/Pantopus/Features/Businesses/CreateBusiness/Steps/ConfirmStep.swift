@@ -15,9 +15,16 @@ struct ConfirmStep: View {
         BusinessIdentityChip()
         HeadlineBlock(
             "Confirm and create",
-            subtitle: "Review the details below, then create your business."
+            subtitle: "Publish takes your business live. Save as draft keeps it hidden until you're ready."
         )
         ReviewSummaryBlock(summaryRows)
+        if let warning = viewModel.logoUploadWarning {
+            Text(warning)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.Color.warning)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("createBusinessLogoWarning")
+        }
         if let submitError = viewModel.submitError, viewModel.currentStep == .confirm {
             Text(submitError)
                 .font(.system(size: 13))
@@ -55,6 +62,12 @@ struct ConfirmStep: View {
             ReviewSummaryRow(
                 label: "Hours",
                 value: viewModel.hasLocation && !viewModel.hoursSkipped ? "Weekday defaults" : "Not set"
+            )
+        )
+        rows.append(
+            ReviewSummaryRow(
+                label: "Logo",
+                value: viewModel.logoPick != nil && !viewModel.logoSkipped ? "Selected" : "Not set"
             )
         )
         return rows

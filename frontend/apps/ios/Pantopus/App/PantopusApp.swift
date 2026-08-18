@@ -145,6 +145,13 @@ struct RootView: View {
             appLock.clearTransientState()
             await auth.signOut()
         }
+        // One-time post-login offer to turn app lock on (RN
+        // `AppLockSetupPromptLayer`, `src/app/_layout.tsx:132`).
+        .appLockSetupPrompt(
+            manager: appLock,
+            isSignedIn: isSignedInState,
+            lastInteractiveSignInAt: auth.lastInteractiveSignInAt
+        )
         .onAppear { syncAppLock() }
         .onChange(of: auth.state) { previous, new in
             syncAppLock()
@@ -157,6 +164,13 @@ struct RootView: View {
                 }
             }
         }
+    }
+
+    /// True while the session is signed in — gates the app-lock setup offer,
+    /// which must never appear over the auth screens.
+    private var isSignedInState: Bool {
+        if case .signedIn = auth.state { return true }
+        return false
     }
 
     /// Signed-in *and* locked — the only state that raises `AppLockOverlay`.

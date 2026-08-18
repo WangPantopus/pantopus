@@ -139,6 +139,7 @@ class ExploreMapSnapshotTest {
                     ExploreKind.Item -> "$420"
                     ExploreKind.Post -> "Asked 2h ago"
                     ExploreKind.Spot -> "Open"
+                    ExploreKind.Home -> "Home"
                 },
             distanceLabel = "0.2 mi",
             distanceMiles = 0.2,
@@ -148,6 +149,7 @@ class ExploreMapSnapshotTest {
                     ExploreKind.Item -> ExploreBadge("New", ExploreBadgeTone.New)
                     ExploreKind.Post -> ExploreBadge("8 replies", ExploreBadgeTone.Replies)
                     ExploreKind.Spot -> ExploreBadge("4.8★", ExploreBadgeTone.Rating)
+                    ExploreKind.Home -> null
                 },
             verified = true,
             openNow = true,

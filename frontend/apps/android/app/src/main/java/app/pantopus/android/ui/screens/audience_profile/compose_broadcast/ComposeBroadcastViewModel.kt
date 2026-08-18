@@ -6,11 +6,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.audience.BroadcastHistoryMessageDto
+import app.pantopus.android.data.api.models.audience.BroadcastMediaPayload
 import app.pantopus.android.data.api.models.audience.MembershipStatsCountsDto
 import app.pantopus.android.data.api.models.audience.PersonaSummaryDto
 import app.pantopus.android.data.api.models.audience.PublishUpdateBody
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.data.upload.UploadFile
+import app.pantopus.android.data.upload.UploadRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +52,7 @@ class ComposeBroadcastViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repository: AudienceProfileRepository,
+        private val uploadRepository: UploadRepository,
     ) : ViewModel() {
         private val personaId: String =
             savedStateHandle.get<String>(COMPOSE_BROADCAST_PERSONA_ID_KEY)
@@ -130,18 +134,48 @@ class ComposeBroadcastViewModel
             }
         }
 
+        /**
+         * Two legs, mirroring RN `broadcast.tsx:118-145`:
+         *  1. `POST /api/broadcast/channels/:id/messages` creates the
+         *     broadcast — which is a `Post` row.
+         *  2. `POST /api/upload/post-media/:messageId` attaches the picked
+         *     files (part name `files`, max 9) to that row. The upload route
+         *     is the only way regular media reaches a post, and it needs the
+         *     id the first leg returns.
+         *
+         * A failed upload does **not** unpublish the broadcast; it raises
+         * RN's "your update was posted, but some media failed" warning.
+         */
         private suspend fun realPublish(draft: ComposeBroadcastDraft) {
             val channel = channelId ?: error("Your broadcast channel isn't ready yet. Try again in a moment.")
             val (visibility, rank) = wireFor(draft.audience)
+            val hosted = preUploadedMedia(draft)
+            val files = draft.media.mapNotNull(::uploadFileFor)
+            // `createBroadcastMessageSchema` rejects a payload with neither
+            // text nor already-hosted media, and locally-picked files can only
+            // be attached after the post exists — so text is required when the
+            // only media is local.
+            if (draft.body.isBlank() && hosted.isEmpty()) {
+                error("Add a message to go with your media.")
+            }
             val body =
                 PublishUpdateBody(
                     body = draft.body.trim(),
                     visibility = visibility,
                     targetTierRank = rank,
+                    media = hosted.ifEmpty { null },
                 )
-            when (val result = repository.publishUpdate(channel, body)) {
+            val messageId =
+                when (val result = repository.publishUpdate(channel, body)) {
+                    is NetworkResult.Success -> result.data.message?.id
+                    is NetworkResult.Failure -> throw result.error
+                }
+
+            if (files.isEmpty()) return
+            if (messageId == null) error(MEDIA_PARTIAL_FAILURE)
+            when (uploadRepository.uploadPostMediaFiles(messageId, files)) {
                 is NetworkResult.Success -> Unit
-                is NetworkResult.Failure -> throw result.error
+                is NetworkResult.Failure -> error(MEDIA_PARTIAL_FAILURE)
             }
         }
 
@@ -149,9 +183,22 @@ class ComposeBroadcastViewModel
 
         fun setAudience(audience: BroadcastAudience) = mutateDraft { it.copy(audience = audience) }
 
-        fun attachMedia(media: ComposeMediaPreview) = mutateDraft { it.copy(media = media) }
+        /** Append one attachment, respecting the nine-item cap. */
+        fun attachMedia(media: ComposeMediaPreview) = attachMedia(listOf(media))
 
-        fun removeMedia() = mutateDraft { it.copy(media = null) }
+        /**
+         * Append a multi-select batch, truncated to the remaining slots — RN
+         * parity (`broadcast.tsx:92` `appendMediaFiles`).
+         */
+        fun attachMedia(items: List<ComposeMediaPreview>) {
+            if (items.isEmpty()) return
+            mutateDraft { it.copy(media = (it.media + items).take(ComposeBroadcastDraft.MEDIA_LIMIT)) }
+        }
+
+        fun removeMedia(id: String) = mutateDraft { draft -> draft.copy(media = draft.media.filterNot { it.id == id }) }
+
+        /** Clear every attachment. */
+        fun removeMedia() = mutateDraft { it.copy(media = emptyList()) }
 
         fun schedule(atMillis: Long) {
             update {
@@ -223,6 +270,34 @@ class ComposeBroadcastViewModel
     }
 
 // MARK: - Pure mappers (mirror iOS `ComposeBroadcastViewModel` statics)
+
+/** RN's partial-success copy when the post lands but its media doesn't. */
+internal const val MEDIA_PARTIAL_FAILURE = "Your update was posted, but some media failed to upload."
+
+/**
+ * Attachments that are already hosted — they ride the publish body's
+ * `media[]` field (`backend/routes/broadcastChannels.js:113`) rather than
+ * the post-media upload leg.
+ */
+internal fun preUploadedMedia(draft: ComposeBroadcastDraft): List<BroadcastMediaPayload> =
+    draft.media.mapNotNull { item ->
+        val url = item.remoteUrl
+        if (url.isNullOrEmpty()) {
+            null
+        } else {
+            BroadcastMediaPayload(url = url, type = item.kind.name.lowercase(Locale.US))
+        }
+    }
+
+/** Locally-picked bytes, ready for the `files` multipart part. */
+internal fun uploadFileFor(item: ComposeMediaPreview): UploadFile? {
+    val bytes = item.bytes ?: return null
+    return UploadFile(
+        filename = item.resolvedFileName,
+        mimeType = item.resolvedMimeType,
+        bytes = bytes,
+    )
+}
 
 /** Targeting chip → broadcast `visibility` + `target_tier_rank`. */
 internal fun wireFor(audience: BroadcastAudience): Pair<String, Int?> =

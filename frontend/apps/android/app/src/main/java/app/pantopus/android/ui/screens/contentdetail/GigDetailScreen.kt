@@ -17,8 +17,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -40,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.data.api.models.offers.BidDto
 import app.pantopus.android.ui.screens.my_bids.EditBidSheetContent
 import app.pantopus.android.ui.screens.my_bids.EditBidSheetTarget
 import app.pantopus.android.ui.screens.settings.payments.StripePaymentSheets
@@ -65,6 +68,8 @@ fun GigDetailScreen(
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val cancelPreview by viewModel.cancelPreview.collectAsStateWithLifecycle()
     val cancelPreviewLoading by viewModel.cancelPreviewLoading.collectAsStateWithLifecycle()
+    // Bidder side — the viewer's own live bid, if any.
+    val viewerBid by viewModel.viewerBid.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var sheetTarget by remember { mutableStateOf<EditBidSheetTarget?>(null) }
     var deliveryTarget by remember { mutableStateOf<DeliveryProofTarget?>(null) }
@@ -72,6 +77,10 @@ fun GigDetailScreen(
     var showReportSheet by remember { mutableStateOf(false) }
     var showCancelSheet by remember { mutableStateOf(false) }
     var showRescheduleSheet by remember { mutableStateOf(false) }
+    // Poster's pre-start "Replace worker" confirm (`POST /reopen-bidding`).
+    var showReplaceWorkerConfirm by remember { mutableStateOf(false) }
+    // Poster's "Close Gig" confirm on a still-open task (`DELETE /api/gigs/:id`).
+    var showCloseTaskConfirm by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deliverySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -179,6 +188,26 @@ fun GigDetailScreen(
                     onClick = { showReportSheet = true },
                 ),
             )
+            if (viewModel.canReplaceWorker()) {
+                add(
+                    ContentDetailOverflowItem(
+                        label = "Replace worker",
+                        testTag = "gigDetail.replaceWorker",
+                        onClick = { showReplaceWorkerConfirm = true },
+                    ),
+                )
+            }
+            // RN branches on status: an open gig is *closed* (deleted, no
+            // fee), anything live is *cancelled* (`gig/[id].tsx:412`).
+            if (viewModel.canCloseTask()) {
+                add(
+                    ContentDetailOverflowItem(
+                        label = "Close task",
+                        testTag = "gigDetail.close",
+                        onClick = { showCloseTaskConfirm = true },
+                    ),
+                )
+            }
             if (viewModel.canCancelTask()) {
                 add(
                     ContentDetailOverflowItem(
@@ -211,6 +240,10 @@ fun GigDetailScreen(
                         )
                 // Phase 5 work item 3 — instant accept claims the task directly.
                 viewModel.canInstantAccept() -> viewModel.instantAccept()
+                // The viewer already bid → the same sheet in edit mode,
+                // pre-filled; `bidId != null` flips submit to a PUT update.
+                viewModel.viewerCanEditBid() ->
+                    sheetTarget = editBidTarget(viewModel, viewerBid, gig?.title)
                 else ->
                     sheetTarget =
                         EditBidSheetTarget(
@@ -236,6 +269,15 @@ fun GigDetailScreen(
         scrollFooter = {
             if (state is ContentDetailUiState.Loaded) {
                 GigLifecycleSections(viewModel)
+                // Bidder side — "Your bid" with Update / Withdraw and,
+                // while a counter-offer is live, Accept / Decline.
+                if (viewModel.showViewerBidPanel()) {
+                    val heroTitle = (state as? ContentDetailUiState.Loaded)?.content?.hero?.title
+                    GigViewerBidPanel(
+                        viewModel = viewModel,
+                        onEditBid = { sheetTarget = editBidTarget(viewModel, viewerBid, heroTitle) },
+                    )
+                }
                 GigQuestionsSection(viewModel) { message -> toastText = message }
             }
         },
@@ -244,6 +286,65 @@ fun GigDetailScreen(
     // Phase 5 — invisible anchor for the instant-accept dock CTA.
     if (viewModel.canInstantAccept()) {
         Box(modifier = Modifier.size(0.dp).testTag("gigDetail.instantAccept"))
+    }
+
+    // Poster's "Replace worker" confirm. Not a cancellation: the hold is
+    // released and the task goes straight back out for bids, so the copy
+    // spells both consequences out before the destructive tap.
+    if (showReplaceWorkerConfirm) {
+        AlertDialog(
+            onDismissRequest = { showReplaceWorkerConfirm = false },
+            title = { Text("Replace Worker") },
+            text = {
+                Text(
+                    "This will unassign the current worker, release any payment hold, " +
+                        "and reopen the task for bids. Use this only before work starts.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showReplaceWorkerConfirm = false
+                        viewModel.replaceWorker()
+                    },
+                    modifier = Modifier.testTag("gigDetail.replaceWorkerConfirm"),
+                ) {
+                    Text("Replace Worker", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReplaceWorkerConfirm = false }) { Text("Keep worker") }
+            },
+        )
+    }
+
+    // Poster closes a still-open task. RN copy verbatim
+    // (`gig/[id].tsx:414`); the row is deleted, so we pop back on success.
+    if (showCloseTaskConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCloseTaskConfirm = false },
+            title = { Text("Close Gig") },
+            text = {
+                Text(
+                    "Are you sure you want to close this gig? " +
+                        "It will be removed and this cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCloseTaskConfirm = false
+                        viewModel.closeGig { closed -> if (closed) onBack() }
+                    },
+                    modifier = Modifier.testTag("gigDetail.closeConfirm"),
+                ) {
+                    Text("Close Gig", color = PantopusColors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseTaskConfirm = false }) { Text("Keep Open") }
+            },
+        )
     }
 
     if (showReportSheet) {
@@ -334,17 +435,27 @@ fun GigDetailScreen(
             EditBidSheetContent(
                 target = target,
                 onSubmit = { draft ->
+                    // `target.bidId != null` ⇒ the viewer already has a bid
+                    // here, so this is a PUT update rather than a new POST.
                     val ok =
                         suspendCancellableCoroutine<Boolean> { cont ->
-                            viewModel.placeBid(
-                                amount = draft.amount,
-                                message = draft.message,
-                                proposedTime = draft.proposedTime,
-                            ) { result -> cont.resume(result) }
+                            if (target.isEditing) {
+                                viewModel.updateViewerBid(
+                                    amount = draft.amount,
+                                    message = draft.message,
+                                    proposedTime = draft.proposedTime,
+                                ) { result -> cont.resume(result) }
+                            } else {
+                                viewModel.placeBid(
+                                    amount = draft.amount,
+                                    message = draft.message,
+                                    proposedTime = draft.proposedTime,
+                                ) { result -> cont.resume(result) }
+                            }
                         }
                     if (ok) {
                         sheetTarget = null
-                        toastText = "Bid submitted."
+                        toastText = if (target.isEditing) "Bid updated." else "Bid submitted."
                     }
                     ok
                 },
@@ -411,6 +522,28 @@ fun GigDetailScreen(
             }
         }
     }
+}
+
+/**
+ * The shared bid sheet in *edit* mode, pre-filled with the viewer's live
+ * bid. `bidId != null` is what flips the submit path to
+ * `PUT /api/gigs/:gigId/bids/:bidId`.
+ */
+private fun editBidTarget(
+    viewModel: GigDetailViewModel,
+    viewerBid: BidDto?,
+    gigTitle: String?,
+): EditBidSheetTarget? {
+    val bid = viewerBid ?: return null
+    return EditBidSheetTarget(
+        id = "edit-bid-${bid.id}",
+        gigId = viewModel.currentGigId(),
+        gigTitle = gigTitle ?: "this task",
+        bidId = bid.id,
+        initialAmount = bid.bidAmount,
+        initialMessage = bid.message,
+        initialProposedTime = bid.proposedTime,
+    )
 }
 
 /** P1.C — top-bar bookmark toggle; primary600 fill when saved. */

@@ -25,6 +25,8 @@
 //  "everything else" rendering.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Observation
 
@@ -46,6 +48,9 @@ public final class MailDetailViewModel {
     /// A17.10 — Records file-to-vault mutation in-flight; disables the
     /// "File in vault" CTA while the optimistic flip is rolling.
     public private(set) var recordsFileInFlight: Bool = false
+    /// A17.8 — a package dashboard write (share ETA / report issue) is in
+    /// flight; keeps the overflow entries from double-firing.
+    public private(set) var packageActionInFlight: Bool = false
     /// T6.5e — Save-to-vault picker visibility. The view binds a
     /// confirmation dialog to this flag; tapping a folder calls
     /// `saveToVault(folderId:)`.
@@ -55,6 +60,28 @@ public final class MailDetailViewModel {
     public private(set) var saveToVaultFolders: [VaultFolderDTO] = []
     /// Save mutation in-flight.
     public private(set) var saveToVaultInFlight: Bool = false
+    /// A17.2 — booklet PDF download in flight; disables the "PDF" tile.
+    public private(set) var bookletDownloadInFlight: Bool = false
+    /// A17.3 — certified legal-proof fetch in flight; disables the
+    /// "Proof" tile.
+    public private(set) var certifiedProofInFlight: Bool = false
+    /// A17.3 — `true` once the legal delivery proof has been fetched, so
+    /// the tile flips to "Saved" (RN's `✓ Saved`, `certified.tsx:205`).
+    public private(set) var certifiedProofSaved: Bool = false
+    /// A17.1 — per-category action currently POSTing to
+    /// `/item/:id/action`; disables the ACTIONS row while it runs.
+    public private(set) var categoryActionInFlight: MailCategoryAction?
+    /// A17.1 — destructive category action awaiting confirmation
+    /// (today only `Dismiss`, which shreds the item).
+    public var pendingDestructiveAction: MailCategoryAction?
+    /// Set to this mail's id when the loaded item carries a stationery
+    /// theme — i.e. it came out of the Ceremonial Mail compose flow and
+    /// belongs in the ceremonial open experience (envelope tap-to-open,
+    /// voice postscript, ceremonial CTAs) rather than the plain detail.
+    /// The host observes this and *replaces* the current route, mirroring
+    /// RN's `router.replace('/mailbox/open?id=…')`
+    /// (`src/app/mailbox/detail.tsx:43-49`).
+    public private(set) var ceremonialRedirectMailId: String?
 
     private let mailId: String
     private let api: APIClient
@@ -84,11 +111,25 @@ public final class MailDetailViewModel {
         await fetch()
     }
 
+    /// Clear the ceremonial redirect once the host has navigated, so a
+    /// later `refresh()` can raise it again if needed.
+    public func acknowledgeCeremonialRedirect() {
+        ceremonialRedirectMailId = nil
+    }
+
     private func fetch() async {
         do {
             let response: MailDetailResponse = try await api.request(
                 MailboxEndpoints.detail(mailId: mailId)
             )
+            // Ceremonial mail never lands on the generic detail — hand it
+            // straight to the open experience and hold the loading frame
+            // so the plain layout never flashes (RN does the same by
+            // short-circuiting before `setLoading(false)`).
+            if response.mail.stationeryTheme != nil {
+                ceremonialRedirectMailId = mailId
+                return
+            }
             state = .loaded(Self.project(detail: response.mail, now: now()))
         } catch {
             state = .error(
@@ -413,6 +454,98 @@ public final class MailDetailViewModel {
         return "Today \(formatter.string(from: Date())) · retention 7y"
     }
 
+    // MARK: - Per-category actions (A17.1)
+
+    /// The ACTIONS row for the loaded item — RN's
+    /// `CATEGORY_ACTIONS[item.category] || CATEGORY_ACTIONS.other`, minus
+    /// `Pay` / `Sign` for unknown senders (`detail.tsx:56-72`).
+    public var categoryActions: [MailCategoryAction] {
+        guard case let .loaded(content) = state else { return [] }
+        return MailCategoryActions.actions(
+            forCategory: content.mailCategoryKey,
+            isSenderUnknown: content.isSenderUnknown
+        )
+    }
+
+    /// Route a tile tap. Destructive tiles park in
+    /// `pendingDestructiveAction` for the view's confirm dialog; the rest
+    /// fire straight away.
+    public func tapCategoryAction(_ action: MailCategoryAction) async {
+        guard action.isDestructive else {
+            await performCategoryAction(action)
+            return
+        }
+        pendingDestructiveAction = action
+    }
+
+    /// `POST /api/mailbox/v2/item/:id/action` — route
+    /// `backend/routes/mailboxV2.js:459`. The handler records a
+    /// `mail_action_clicked` event itself, so (unlike RN, which posts a
+    /// second `/event` write) one call is enough.
+    public func performCategoryAction(_ action: MailCategoryAction) async {
+        guard case .loaded = state, categoryActionInFlight == nil else { return }
+        pendingDestructiveAction = nil
+        categoryActionInFlight = action
+        defer { categoryActionInFlight = nil }
+        do {
+            let _: MailboxItemActionResponse = try await api.request(
+                MailboxV2Endpoints.itemAction(mailId: mailId, action: action.actionKey)
+            )
+            // RN only toasts (`detail.tsx:56-66`) — the generic detail
+            // renders nothing derived from `lifecycle`, so a refetch would
+            // buy a loading flash and nothing else.
+            toast = action.successToast
+        } catch {
+            toast = (error as? APIError)?.errorDescription ?? "Action failed"
+        }
+    }
+
+    // MARK: - Package dashboard actions (A17.8)
+
+    /// A17.8 — "Share ETA with household". Drops a package-arriving notice
+    /// into every other resident's Home drawer via
+    /// `POST /api/mailbox/v2/package/:mailId/share-eta`
+    /// (`backend/routes/mailboxV2.js:727`) and toasts how many people were
+    /// notified. Mirrors RN `src/app/mailbox/package.tsx:40-48`.
+    public func sharePackageEta() async {
+        guard case let .loaded(content) = state,
+              content.category == .package,
+              !packageActionInFlight else { return }
+        packageActionInFlight = true
+        defer { packageActionInFlight = false }
+        do {
+            let response: SharePackageEtaResponse = try await api.request(
+                MailboxPackageEndpoints.shareEta(mailId: mailId)
+            )
+            let notified = response.notified ?? 0
+            toast = "ETA shared with \(notified) household member\(notified == 1 ? "" : "s")"
+        } catch {
+            toast = (error as? APIError)?.errorDescription ?? "Failed to share"
+        }
+    }
+
+    /// A17.8 — "Report issue". RN logs a `package_issue_reported` event
+    /// against the mail item (`src/app/mailbox/package.tsx:60-64`); the
+    /// native overflow entry used to be a no-op.
+    public func reportPackageIssue() async {
+        guard case let .loaded(content) = state,
+              content.category == .package,
+              !packageActionInFlight else { return }
+        packageActionInFlight = true
+        defer { packageActionInFlight = false }
+        do {
+            let _: MailboxLogEventResponse = try await api.request(
+                MailboxPackageEndpoints.logEvent(
+                    eventType: "package_issue_reported",
+                    mailId: mailId
+                )
+            )
+            toast = "Package issue has been reported"
+        } catch {
+            toast = (error as? APIError)?.errorDescription ?? "Couldn't report this issue"
+        }
+    }
+
     // MARK: - Save to vault (T6.5e / P19.5)
 
     /// Open the save-to-vault picker. Fetches folders on the first
@@ -456,5 +589,52 @@ public final class MailDetailViewModel {
                 ?? "Couldn't save to vault. Try again."
         }
         showsSaveToVaultPicker = false
+    }
+
+    // MARK: - Document artefacts (A17.2 booklet PDF / A17.3 proof)
+
+    /// A17.2 — `POST /api/mailbox/v2/p2/booklet/:mailId/download`
+    /// (`backend/routes/mailboxV2Phase2.js:447`). Mirrors RN's
+    /// "Download Started · Downloading X.X MB" confirmation
+    /// (`src/app/mailbox/booklet.tsx:43`). The backend answers 404 when
+    /// the booklet has no rendered PDF, which surfaces as RN's
+    /// "Download not available".
+    public func downloadBookletPDF() async {
+        guard !bookletDownloadInFlight else { return }
+        bookletDownloadInFlight = true
+        defer { bookletDownloadInFlight = false }
+        do {
+            let response: BookletDownloadResponse = try await api.request(
+                MailboxDocumentEndpoints.bookletDownload(mailId: mailId)
+            )
+            toast = response.megabytesLabel.map { "Download started · \($0)" }
+                ?? "Download started"
+        } catch {
+            toast = "Download not available"
+        }
+    }
+
+    /// A17.3 — `GET /api/mailbox/v2/p2/certified/:mailId/proof`
+    /// (`backend/routes/mailboxV2Phase2.js:705`). The route rejects with
+    /// 400 until the item is acknowledged, which is exactly when RN
+    /// surfaces the button (`src/app/mailbox/certified.tsx:200`), so the
+    /// failure copy matches RN's "Proof not available yet".
+    public func downloadCertifiedProof() async {
+        guard !certifiedProofInFlight, !certifiedProofSaved else { return }
+        certifiedProofInFlight = true
+        defer { certifiedProofInFlight = false }
+        do {
+            let response: CertifiedProofResponse = try await api.request(
+                MailboxDocumentEndpoints.certifiedProof(mailId: mailId)
+            )
+            guard response.proof != nil else {
+                toast = "Proof not available yet"
+                return
+            }
+            certifiedProofSaved = true
+            toast = "Delivery proof saved"
+        } catch {
+            toast = "Proof not available yet"
+        }
     }
 }

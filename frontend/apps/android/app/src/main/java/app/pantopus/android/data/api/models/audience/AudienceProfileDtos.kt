@@ -23,6 +23,9 @@ data class PersonaSummaryDto(
     val bio: String? = null,
     val category: String? = null,
     val audienceLabel: String? = null,
+    /** `open / approval_required / invite_only / organization_managed`. */
+    val audienceMode: String? = null,
+    val publicLinks: List<PersonaPublicLinkDto>? = null,
     val followerCount: Int? = null,
     val postCount: Int? = null,
 )
@@ -42,6 +45,17 @@ data class AudienceListResponse(
     val persona: PersonaSummaryDto? = null,
     val items: List<FanDto> = emptyList(),
     val counts: AudienceCountsDto = AudienceCountsDto(),
+    /** Offset cursor echoed by the handler
+     *  (`backend/routes/personas.js:735-741`). Absent on the no-persona
+     *  short-circuit, so it stays nullable. */
+    val pagination: AudiencePaginationDto? = null,
+)
+
+/** `{ nextOffset, hasMore }` — `nextOffset` is null on the last page. */
+@JsonClass(generateAdapter = true)
+data class AudiencePaginationDto(
+    val nextOffset: Int? = null,
+    val hasMore: Boolean? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -92,6 +106,31 @@ data class AudienceMemberActionBody(
 data class AudienceMemberActionResponse(
     val membershipId: String? = null,
     val status: String? = null,
+)
+
+// PATCH /api/personas/:id/followers/:followId
+
+/** Body for the owner-side follower status change. Only `status` is sent;
+ *  the schema also accepts `relationship_type` / `notification_level` but
+ *  the block flow never changes those. */
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerStatusBody(
+    val status: String,
+)
+
+/** `{ follower: … }` echoed after the change
+ *  (`serializePersonaFollowForOwner`, `backend/routes/personas.js:225`). */
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerUpdateResponse(
+    val follower: AudienceFollowerDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AudienceFollowerDto(
+    val id: String? = null,
+    val status: String? = null,
+    val relationshipType: String? = null,
+    val notificationLevel: String? = null,
 )
 
 // GET /api/personas/:handle/posts
@@ -179,11 +218,32 @@ data class PersonaThreadDto(
 
 // POST /api/broadcast/channels/:id/messages
 
+/**
+ * `visibility` ∈ `public / followers / tier_or_above / subscribers`;
+ * `target_tier_rank` (1-4) is required for `tier_or_above`. [media] carries
+ * already-hosted items (max 10) — locally-picked files are attached after
+ * publish via `POST /api/upload/post-media/:messageId`, because a broadcast
+ * message *is* a Post row and that route needs its id.
+ */
 @JsonClass(generateAdapter = true)
 data class PublishUpdateBody(
     val body: String,
     val visibility: String,
     @Json(name = "target_tier_rank") val targetTierRank: Int? = null,
+    val media: List<BroadcastMediaPayload>? = null,
+)
+
+/**
+ * One already-hosted media item on the publish call.
+ * `broadcastMediaItemsFromPayload` (`backend/routes/broadcastChannels.js:113`)
+ * reads `url` + `type` (+ optional `thumbnailUrl` / `liveVideoUrl`).
+ */
+@JsonClass(generateAdapter = true)
+data class BroadcastMediaPayload(
+    val url: String,
+    val type: String,
+    val thumbnailUrl: String? = null,
+    val liveVideoUrl: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

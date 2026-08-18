@@ -94,6 +94,12 @@ public struct PulseTabRoot: View {
                 },
                 onEdit: { id in
                     Task { @MainActor in path.append(.editPost(postId: id)) }
+                },
+                onOpenBusiness: { username in
+                    // The Pulse stack has no business-profile route; hand the
+                    // public `/business/:username` link to the router, which
+                    // opens it in the Hub tab's stack.
+                    Task { @MainActor in DeepLinkRouter.shared.handle(path: "/business/\(username)") }
                 }
             )
         case let .compose(intent):

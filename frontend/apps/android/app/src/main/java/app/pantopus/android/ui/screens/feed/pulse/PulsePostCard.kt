@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.feed.pulse
 
@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.feed.FeedMuteEntityType
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatar
 import app.pantopus.android.ui.screens.shared.feed.FeedAvatarTint
 import app.pantopus.android.ui.screens.shared.media.PostMediaGridStyle
@@ -40,6 +41,50 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+
+/**
+ * Which overflow actions a single Pulse card offers this viewer, and which
+ * of them are already applied. Mirrors RN's per-card gating in
+ * `src/components/feed/PostCard.tsx:97-101, 382-397, 445-470`.
+ */
+@Immutable
+data class PulsePostActions(
+    /** Cold-start neighborhood fact — dismissable, never reportable. */
+    val isSeeded: Boolean = false,
+    val isSaved: Boolean = false,
+    val isReposted: Boolean = false,
+    val shareCount: Int = 0,
+    /** `state == "solved"` — renders the inline Solved badge. */
+    val isSolved: Boolean = false,
+    /** Viewer authored this post. */
+    val isOwner: Boolean = false,
+    /** Author-only + Ask post + not already solved. */
+    val canMarkSolved: Boolean = false,
+    /** Place surface only, and never on the viewer's own post. */
+    val canFlagNotHelpful: Boolean = false,
+    /** Author identity to mute — `null` on seeded / system cards. */
+    val muteEntityType: FeedMuteEntityType? = null,
+    val muteEntityId: String? = null,
+    /** Display name used in the mute row + its confirm copy. */
+    val muteEntityName: String = "this author",
+    /** `post_type` fed to `POST /api/posts/mute/topic`. */
+    val postType: String? = null,
+    /** Human label for the topic being muted ("Ask", "Event", …). */
+    val topicLabel: String? = null,
+) {
+    /** Report is offered to everyone except the author. */
+    val canReport: Boolean get() = !isOwner && !isSeeded
+
+    /** Delete is author-only. */
+    val canDelete: Boolean get() = isOwner && !isSeeded
+
+    /** Muting needs a resolvable entity and never applies to your own post. */
+    val canMuteAuthor: Boolean
+        get() = !isOwner && !isSeeded && muteEntityType != null && !muteEntityId.isNullOrEmpty()
+
+    /** Topic mute needs a concrete post type. */
+    val canMuteTopic: Boolean get() = !isSeeded && !postType.isNullOrEmpty()
+}
 
 /** VM-prepared content for a single Pulse card. */
 @Immutable
@@ -58,6 +103,8 @@ data class PulsePostCardContent(
     val userHasReacted: Boolean,
     val commentCount: Int = 0,
     val media: List<PostMediaItem> = emptyList(),
+    /** Overflow-menu capability set for this viewer. */
+    val actions: PulsePostActions = PulsePostActions(),
 ) {
     /** Thumbnail-preferring URL projection kept for test compatibility. */
     val mediaUrls: List<String>
@@ -76,11 +123,20 @@ data class PulseAttendeeStrip(
  * Pulse post card — entirely render-only; tap dispatch is parent-controlled.
  */
 @Composable
+@Suppress("LongParameterList")
 fun PulsePostCard(
     content: PulsePostCardContent,
     onTap: () -> Unit,
     onPrimaryReaction: () -> Unit,
     onRSVP: (() -> Unit)? = null,
+    /** Opens the card's overflow menu. `null` hides the affordance. */
+    onOverflow: (() -> Unit)? = null,
+    /** Dismisses a cold-start seeded fact. `null` hides the affordance. */
+    onDismissSeeded: (() -> Unit)? = null,
+    /** Bookmark toggle in the engagement strip. `null` hides it. */
+    onToggleSave: (() -> Unit)? = null,
+    /** Repost toggle in the engagement strip. `null` hides it. */
+    onToggleRepost: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -98,7 +154,11 @@ fun PulsePostCard(
                 .testTag("pulsePostCard_${content.id}"),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        CardHeader(content = content)
+        CardHeader(
+            content = content,
+            onOverflow = onOverflow,
+            onDismissSeeded = onDismissSeeded,
+        )
         if (!content.title.isNullOrEmpty()) {
             Text(
                 text = content.title,
@@ -131,12 +191,18 @@ fun PulsePostCard(
         ReactionStrip(
             content = content,
             onPrimary = onPrimaryReaction,
+            onToggleSave = onToggleSave,
+            onToggleRepost = onToggleRepost,
         )
     }
 }
 
 @Composable
-private fun CardHeader(content: PulsePostCardContent) {
+private fun CardHeader(
+    content: PulsePostCardContent,
+    onOverflow: (() -> Unit)?,
+    onDismissSeeded: (() -> Unit)?,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -165,6 +231,60 @@ private fun CardHeader(content: PulsePostCardContent) {
             )
         }
         PulseIntentChip(intent = content.intent)
+        HeaderTrailingControl(
+            content = content,
+            onOverflow = onOverflow,
+            onDismissSeeded = onDismissSeeded,
+        )
+    }
+}
+
+/**
+ * Seeded facts get a dismiss "x"; every other card gets the overflow menu.
+ * RN splits the same way (`PostCard.tsx:85-88`).
+ */
+@Composable
+private fun HeaderTrailingControl(
+    content: PulsePostCardContent,
+    onOverflow: (() -> Unit)?,
+    onDismissSeeded: (() -> Unit)?,
+) {
+    if (content.actions.isSeeded) {
+        if (onDismissSeeded != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clickable(onClick = onDismissSeeded)
+                        .semantics { contentDescription = "Dismiss this suggestion" }
+                        .testTag("pulsePostDismissSeeded_${content.id}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.X,
+                    contentDescription = null,
+                    size = 15.dp,
+                    tint = PantopusColors.appTextMuted,
+                )
+            }
+        }
+    } else if (onOverflow != null) {
+        Box(
+            modifier =
+                Modifier
+                    .size(28.dp)
+                    .clickable(onClick = onOverflow)
+                    .semantics { contentDescription = "Post options" }
+                    .testTag("pulsePostOverflow_${content.id}"),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.MoreHorizontal,
+                contentDescription = null,
+                size = 16.dp,
+                tint = PantopusColors.appTextMuted,
+            )
+        }
     }
 }
 
@@ -248,6 +368,8 @@ private fun AttendeeStrip(
 private fun ReactionStrip(
     content: PulsePostCardContent,
     onPrimary: () -> Unit,
+    onToggleSave: (() -> Unit)? = null,
+    onToggleRepost: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -262,7 +384,66 @@ private fun ReactionStrip(
                 postId = content.id,
             )
         }
+        if (content.actions.isSolved) {
+            SolvedBadge(postId = content.id)
+        }
         Spacer(modifier = Modifier.weight(1f))
+        if (onToggleSave != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .clickable(onClick = onToggleSave)
+                        .semantics {
+                            contentDescription =
+                                if (content.actions.isSaved) "Remove bookmark" else "Save post"
+                        }
+                        .testTag("pulsePostSave_${content.id}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.Bookmark,
+                    contentDescription = null,
+                    size = Radii.lg,
+                    tint =
+                        if (content.actions.isSaved) {
+                            PantopusColors.primary600
+                        } else {
+                            PantopusColors.appTextSecondary
+                        },
+                )
+            }
+        }
+        if (onToggleRepost != null) {
+            val repostTint =
+                if (content.actions.isReposted) PantopusColors.success else PantopusColors.appTextSecondary
+            Row(
+                modifier =
+                    Modifier
+                        .clickable(onClick = onToggleRepost)
+                        .semantics {
+                            contentDescription =
+                                if (content.actions.isReposted) "Undo repost" else "Repost"
+                        }
+                        .testTag("pulsePostRepost_${content.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                PantopusIconImage(
+                    icon = PantopusIcon.ArrowsRepeat,
+                    contentDescription = null,
+                    size = Radii.lg,
+                    tint = repostTint,
+                )
+                if (content.actions.shareCount > 0) {
+                    Text(
+                        text = "${content.actions.shareCount}",
+                        fontSize = 11.5.sp,
+                        color = repostTint,
+                    )
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
             PantopusIconImage(
                 icon = PantopusIcon.MessageCircle,
@@ -277,6 +458,39 @@ private fun ReactionStrip(
                 color = PantopusColors.appTextSecondary,
             )
         }
+    }
+}
+
+/**
+ * Inline "Solved" pill — RN renders the same badge once
+ * `state === 'solved'` (`PostCard.tsx:474-479`).
+ */
+@Composable
+private fun SolvedBadge(postId: String) {
+    Row(
+        modifier =
+            Modifier
+                .height(22.dp)
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.successLight)
+                .padding(horizontal = Spacing.s2)
+                .semantics { contentDescription = "Solved" }
+                .testTag("pulsePostSolvedBadge_$postId"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.CheckCircle,
+            contentDescription = null,
+            size = 11.dp,
+            tint = PantopusColors.success,
+        )
+        Text(
+            text = "Solved",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.success,
+        )
     }
 }
 
@@ -368,7 +582,11 @@ private fun PulseIntent.tintColors(): Pair<Color, Color> =
         PulseIntent.Recommend -> PantopusColors.success to PantopusColors.successLight
         PulseIntent.Event -> PantopusColors.magic to PantopusColors.magicBg
         PulseIntent.Lost -> PantopusColors.rose to PantopusColors.roseBg
+        PulseIntent.Alert -> PantopusColors.error to PantopusColors.errorBg
+        PulseIntent.Deal -> PantopusColors.success to PantopusColors.successBg
         PulseIntent.Announce -> PantopusColors.slate to PantopusColors.slateBg
+        PulseIntent.NeighborhoodWin -> PantopusColors.warning to PantopusColors.warningBg
+        PulseIntent.VisitorGuide -> PantopusColors.info to PantopusColors.infoBg
     }
 
 private fun buildA11yLabel(content: PulsePostCardContent): String {

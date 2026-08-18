@@ -59,6 +59,15 @@ public final class WalletViewModel {
     /// balance, in cents) + whether the connected account can receive payouts.
     private var availableCents: Int = 0
     private var payoutsEnabled: Bool = false
+    /// The server's `Wallet.frozen` flag from the last read. A frozen wallet
+    /// is rejected by `POST /api/wallet/withdraw` (403), so the client must
+    /// not offer the action — RN's `canWithdraw` rule.
+    private var walletFrozen: Bool = false
+
+    /// Inline validation error for the withdraw amount field. Distinct from
+    /// `action` so a bad amount keeps the sheet open (RN re-alerts and leaves
+    /// the form up) instead of dismissing it with a toast.
+    public private(set) var withdrawError: String?
     /// Non-nil for the sample/preview path — `load()` resolves locally and
     /// never touches the network.
     private let sampleContent: WalletContent?
@@ -124,8 +133,18 @@ public final class WalletViewModel {
         await fetchLive()
     }
 
+    /// Pull-to-refresh + the error frame's Retry. Keeps a loaded frame on
+    /// screen while re-reading (the pull indicator is the progress signal);
+    /// only an error frame falls back to the loading shell. Mirrors RN's
+    /// `RefreshControl` on the wallet route (`app/wallet.tsx:50`).
     public func refresh() async {
-        await load()
+        guard !seeded else { return }
+        if let sampleContent {
+            state = sampleContent.isOnHold ? .hold(sampleContent) : .populated(sampleContent)
+            return
+        }
+        let showLoading: Bool = if case .error = state { true } else { false }
+        await fetchLive(showLoading: showLoading)
     }
 
     // MARK: - Live fetch
@@ -151,11 +170,13 @@ public final class WalletViewModel {
             let enabled = connect?.account.payoutsEnabled ?? false
             availableCents = balance.wallet.balance
             payoutsEnabled = enabled
+            walletFrozen = balance.wallet.frozen
             let content = Self.makeContent(
                 balance: balance,
                 transactions: history.transactions,
                 pending: pending,
                 payoutsEnabled: enabled,
+                connectAccount: connect?.account,
                 calendar: calendar,
                 now: now()
             )
@@ -169,19 +190,38 @@ public final class WalletViewModel {
 
     // MARK: - Payout actions (Block 3C)
 
-    /// Withdraw the full available balance to the seller's bank. Only reachable
-    /// when `payoutsEnabled` (the view gates the CTA), but re-checked here.
-    public func withdraw() async {
+    /// Withdraw to the seller's bank. `amountText` is the raw decimal-pad
+    /// string from the sheet — RN validates it against the available balance
+    /// and posts *that* amount (`components/payments/WalletTab.tsx:65`).
+    /// Passing `nil` keeps the original "whole balance" behaviour for callers
+    /// that have no field (and for the projection tests).
+    public func withdraw(amountText: String? = nil) async {
         guard sampleContent == nil, !seeded else { return }
-        guard payoutsEnabled, availableCents >= 100 else {
-            action = .withdrawFailed(message: "Set up payouts before withdrawing.")
+        withdrawError = nil
+        guard payoutsEnabled, !walletFrozen, availableCents >= 100 else {
+            action = .withdrawFailed(message: Self.withdrawGateMessage(
+                payoutsEnabled: payoutsEnabled,
+                frozen: walletFrozen
+            ))
             return
+        }
+        let amountCents: Int
+        if let amountText {
+            switch Self.parseWithdrawAmount(amountText, availableCents: availableCents) {
+            case let .success(cents):
+                amountCents = cents
+            case let .failure(message):
+                withdrawError = message
+                return
+            }
+        } else {
+            amountCents = availableCents
         }
         action = .withdrawing
         do {
             let response: WalletWithdrawResponse = try await api.request(
                 WalletEndpoints.withdraw(
-                    body: WalletWithdrawRequest(amount: availableCents, idempotencyKey: UUID().uuidString)
+                    body: WalletWithdrawRequest(amount: amountCents, idempotencyKey: UUID().uuidString)
                 )
             )
             action = .withdrawSucceeded(message: response.message ?? "Withdrawal initiated.")
@@ -238,18 +278,65 @@ public final class WalletViewModel {
         action = .idle
     }
 
+    /// Drop the inline amount error once the user edits the field.
+    public func clearWithdrawError() {
+        withdrawError = nil
+    }
+
+    // MARK: - Withdraw amount validation (pure — unit-test surface)
+
+    /// Parse the decimal-pad string into integer cents, mirroring RN's three
+    /// guards: a positive number, at or under the available balance, and the
+    /// server's $1.00 floor (`backend/services/walletService.js:92`).
+    static func parseWithdrawAmount(
+        _ raw: String,
+        availableCents: Int
+    ) -> Result<Int, String> {
+        let cleaned = raw
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let dollars = Double(cleaned), dollars > 0 else {
+            return .failure("Please enter a valid amount to withdraw.")
+        }
+        let cents = Int((dollars * 100).rounded())
+        guard cents >= 100 else {
+            return .failure("The minimum withdrawal is $1.00.")
+        }
+        guard cents <= availableCents else {
+            return .failure("Your available balance is \(centsToCurrency(availableCents)).")
+        }
+        return .success(cents)
+    }
+
+    /// Why the withdraw gate refused, in RN's order: frozen wallets are a
+    /// support matter, a missing payout account is self-serve, and an empty
+    /// balance is simply nothing to move.
+    static func withdrawGateMessage(payoutsEnabled: Bool, frozen: Bool) -> String {
+        if frozen {
+            return "Your wallet is frozen. Please contact support."
+        }
+        if !payoutsEnabled {
+            return "Set up payouts before withdrawing."
+        }
+        return "No funds to withdraw."
+    }
+
     // MARK: - Mapping (pure — unit-test surface)
 
-    /// Project the read-path DTOs into a `WalletContent`. The withdraw/payout
-    /// slots (payout method, tax docs) stay nil — they are wired in Phase 3
-    /// with Stripe Connect, and the screen hides those sections rather than
-    /// showing fixture bank details / YTD earnings. `holdState` stays nil
+    /// Project the read-path DTOs into a `WalletContent`. `payoutMethod` and
+    /// `taxDocs` stay nil — Stripe never hands the platform bank details for
+    /// an Express account, and the screen hides those sections rather than
+    /// showing fixture bank details / YTD earnings. `payoutAccount` *is*
+    /// populated from the real Connect status, which is what makes the
+    /// "Open Stripe Dashboard" action reachable. `holdState` stays nil
     /// because the hold banner copy is Stripe-specific.
     public static func makeContent(
         balance: WalletBalanceResponse,
         transactions: [WalletTransactionDTO],
         pending: WalletPendingReleaseResponse?,
         payoutsEnabled: Bool = true,
+        connectAccount: ConnectAccountDTO? = nil,
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> WalletContent {
@@ -260,13 +347,58 @@ public final class WalletViewModel {
             available: centsToPlain(balance.wallet.balance),
             pending: centsToCurrency(pendingCents),
             pendingMeta: pendingMeta(count: pendingCount, cents: pendingCents),
+            pendingBreakdown: pendingBreakdown(from: pending),
             monthValue: centsToCurrency(monthIncomeCents(transactions, calendar: calendar, now: now)),
             monthMeta: monthMeta(count: monthIncomeCount(transactions, calendar: calendar, now: now)),
             activity: activity,
             payoutMethod: nil,
+            payoutAccount: payoutAccount(from: connectAccount),
             taxDocs: nil,
             holdState: nil,
-            payoutsEnabled: payoutsEnabled
+            payoutsEnabled: payoutsEnabled,
+            lifetimeEarned: balance.wallet.lifetimeReceived.map(centsToCurrency),
+            lifetimeWithdrawn: balance.wallet.lifetimeWithdrawals.map(centsToCurrency),
+            frozen: balance.wallet.frozen,
+            hasBalance: balance.wallet.balance > 0
+        )
+    }
+
+    /// Map the live Connect status onto the "Payout account" card. Mirrors
+    /// RN `PayoutsTab`: onboarded = `charges_enabled && payouts_enabled`;
+    /// an account id without both flags is still verifying. No account at
+    /// all → nil, and the bottom bar's "Set up payouts" remains the entry
+    /// point. The onboarded frame carries RN's CARD PAYMENTS / PAYOUTS
+    /// capability tiles (`PayoutsTab.tsx:177-190`) instead of collapsing the
+    /// account to one boolean.
+    public static func payoutAccount(from account: ConnectAccountDTO?) -> WalletPayoutAccount? {
+        guard let account else { return nil }
+        let onboarded = account.chargesEnabled && account.payoutsEnabled
+        if onboarded {
+            return WalletPayoutAccount(
+                headline: "Stripe account connected",
+                bodyText: "Payouts enabled · Card payments enabled",
+                actionLabel: "Open Stripe Dashboard",
+                warn: false,
+                capabilities: [
+                    WalletPayoutCapability(
+                        key: "cardPayments",
+                        label: "Card payments",
+                        enabled: account.chargesEnabled
+                    ),
+                    WalletPayoutCapability(
+                        key: "payouts",
+                        label: "Payouts",
+                        enabled: account.payoutsEnabled
+                    )
+                ]
+            )
+        }
+        guard let id = account.stripeAccountId, !id.isEmpty else { return nil }
+        return WalletPayoutAccount(
+            headline: "Account verification in progress",
+            bodyText: "Stripe is verifying your identity. This usually takes 1–2 business days.",
+            actionLabel: "Continue setup",
+            warn: true
         )
     }
 
@@ -394,6 +526,21 @@ public final class WalletViewModel {
             guard direction(for: tx) == .in, let date = parseDate(tx.createdAt) else { return false }
             return calendar.isDate(date, equalTo: now, toGranularity: .month)
         }
+    }
+
+    /// Split the escrow total into RN's two named lines
+    /// (`WalletTab.tsx:161-173`). Gated on `total_pending_cents > 0` — same
+    /// condition RN uses — so an empty escrow hides the section instead of
+    /// rendering two `$0.00` rows. The server's own cents are formatted;
+    /// nothing is re-derived client-side.
+    static func pendingBreakdown(from pending: WalletPendingReleaseResponse?) -> WalletPendingBreakdown? {
+        guard let pending, pending.totalPendingCents > 0 else { return nil }
+        return WalletPendingBreakdown(
+            inReview: centsToCurrency(pending.inReviewCents),
+            releasingSoon: centsToCurrency(pending.releasingSoonCents),
+            inReviewCount: pending.inReviewCount,
+            releasingSoonCount: pending.releasingSoonCount
+        )
     }
 
     private static func pendingMeta(count: Int, cents: Int) -> String {

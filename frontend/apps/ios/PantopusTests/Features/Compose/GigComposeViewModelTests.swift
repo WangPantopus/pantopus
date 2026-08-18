@@ -447,6 +447,66 @@ final class GigComposeViewModelTests: XCTestCase {
         XCTAssertNil(body.draft.tags)
     }
 
+    // MARK: - G2 Delivery / pro-service module fields
+
+    /// `delivery_errand` posts carry the flat pickup / drop-off columns.
+    func testBuildBodyCarriesDeliveryModuleFields() throws {
+        let vm = makeVM(initialState: filledAtReview())
+        vm.updateForm { form in
+            form.taskArchetype = "delivery_errand"
+            form.deliveryDetails = GigDeliveryDetails(
+                pickupAddress: "  12 Market St  ",
+                pickupNotes: "Ask for John",
+                dropoffAddress: "48 Rose Court",
+                dropoffNotes: "",
+                proofRequired: true
+            )
+        }
+        let body = try XCTUnwrap(vm.buildMagicPostBody())
+        XCTAssertEqual(body.draft.pickupAddress, "12 Market St", "Addresses are trimmed before sending.")
+        XCTAssertEqual(body.draft.pickupNotes, "Ask for John")
+        XCTAssertEqual(body.draft.dropoffAddress, "48 Rose Court")
+        XCTAssertNil(body.draft.dropoffNotes, "Blank optional strings ride as null, matching RN.")
+        XCTAssertEqual(body.draft.deliveryProofRequired, true)
+        XCTAssertNil(body.draft.requiresLicense, "Pro columns stay absent on a delivery post.")
+    }
+
+    /// `pro_service_quote` posts carry the licence / insurance / scope /
+    /// deposit columns, and the deposit amount is required once on.
+    func testBuildBodyCarriesProServiceModuleFields() throws {
+        let vm = makeVM(initialState: filledAtReview())
+        vm.updateForm { form in
+            form.taskArchetype = "pro_service_quote"
+            form.proServiceDetails = GigProServiceDetails(
+                requiresLicense: true,
+                licenseType: "Licensed Plumber",
+                requiresInsurance: true,
+                scopeDescription: "Replace the water heater",
+                depositRequired: true,
+                depositAmount: "150"
+            )
+        }
+        let body = try XCTUnwrap(vm.buildMagicPostBody())
+        XCTAssertEqual(body.draft.requiresLicense, true)
+        XCTAssertEqual(body.draft.licenseType, "Licensed Plumber")
+        XCTAssertEqual(body.draft.requiresInsurance, true)
+        XCTAssertEqual(body.draft.scopeDescription, "Replace the water heater")
+        XCTAssertEqual(body.draft.depositRequired, true)
+        XCTAssertEqual(body.draft.depositAmount, 150.0)
+        XCTAssertNil(body.draft.pickupAddress, "Delivery columns stay absent on a pro post.")
+    }
+
+    func testDepositToggleWithoutAmountBlocksPosting() {
+        let vm = makeVM(initialState: filledAtReview())
+        vm.updateForm { form in
+            form.taskArchetype = "pro_service_quote"
+            form.proServiceDetails = GigProServiceDetails(depositRequired: true, depositAmount: "")
+        }
+        XCTAssertNil(vm.buildMagicPostBody(), "A deposit with no amount is incomplete.")
+        vm.updateForm { $0.proServiceDetails?.depositAmount = "75" }
+        XCTAssertNotNil(vm.buildMagicPostBody())
+    }
+
     func testCancellationPolicyWireValues() {
         XCTAssertEqual(GigCancellationPolicy.flexible.wireValue, "flexible")
         XCTAssertEqual(GigCancellationPolicy.moderate.wireValue, "standard")
