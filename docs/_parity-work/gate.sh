@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Compile gate for the RN→native parity waves.
 #   ./gate.sh ios      → xcodegen + xcodebuild (simulator, Debug) + test-target compile
-#   ./gate.sh android  → :app:compileDebugKotlin + :app:compileDebugUnitTestKotlin
+#   ./gate.sh android  → :app:compileDebugKotlin + both test source sets
 #   ./gate.sh both     → ios then android
 #
-# The gate compiles BOTH the app and the unit-test source set on each platform.
-# It did not always: for three medium/low waves it built only the app targets,
-# and the Android test target silently stopped compiling at Wave B (28cf1ca9)
-# without anything going red. A green gate must mean the tests still build.
+# The gate compiles the app AND every test source set on each platform. It did
+# not always: for three medium/low waves it built only the app targets, and the
+# Android unit-test target silently stopped compiling at Wave B (28cf1ca9)
+# without anything going red. The instrumented source set hid a second failure
+# the same way. A green gate must mean the tests still build.
 #
 # Writes full logs to $GATE_LOGDIR (default: a tmp dir) and prints only errors.
 set -uo pipefail
@@ -54,7 +55,8 @@ gate_android() {
     return 2
   fi
   ( cd "$ROOT/frontend/apps/android" \
-    && ./gradlew :app:compileDebugKotlin :app:compileDebugUnitTestKotlin --console=plain \
+    && ./gradlew :app:compileDebugKotlin :app:compileDebugUnitTestKotlin \
+         :app:compileDebugAndroidTestKotlin --console=plain \
   ) >"$LOGDIR/gate-android.log" 2>&1
   local rc=$?
   if [ $rc -eq 0 ]; then
