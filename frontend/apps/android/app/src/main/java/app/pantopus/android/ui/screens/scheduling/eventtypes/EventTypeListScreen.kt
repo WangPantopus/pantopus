@@ -697,6 +697,30 @@ private fun EventTypeRowCard(
                         tint = PantopusColors.appTextMuted,
                     )
                 }
+                row.hostsBadge?.let { badge ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Radii.pill))
+                                .background(PantopusColors.appSurfaceSunken)
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                    ) {
+                        PantopusIconImage(
+                            icon = PantopusIcon.Users,
+                            contentDescription = null,
+                            size = 9.dp,
+                            tint = PantopusColors.appTextSecondary,
+                        )
+                        Text(
+                            text = badge,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                    }
+                }
             }
             val sub = listOfNotNull(row.meta.takeIf { it.isNotEmpty() }, row.priceLabel).joinToString(" · ")
             if (sub.isNotEmpty()) {

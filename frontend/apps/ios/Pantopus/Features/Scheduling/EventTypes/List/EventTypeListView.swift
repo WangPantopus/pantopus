@@ -231,6 +231,7 @@ struct EventTypeListView: View {
                     isHidden: viewModel.isHidden(eventType),
                     isSecret: viewModel.isSecret(eventType),
                     canEdit: viewModel.canEdit,
+                    hostsBadge: viewModel.hostsBadge(for: eventType),
                     isReordering: true,
                     onTap: {},
                     onToggle: {},
@@ -270,6 +271,7 @@ struct EventTypeListView: View {
                         isHidden: viewModel.isHidden(eventType),
                         isSecret: viewModel.isSecret(eventType),
                         canEdit: viewModel.canEdit,
+                        hostsBadge: viewModel.hostsBadge(for: eventType),
                         onTap: { viewModel.openEventType(eventType) },
                         onToggle: { Task { await viewModel.toggleHidden(eventType) } },
                         onMenu: { viewModel.menuTarget = eventType }
@@ -430,6 +432,8 @@ private struct EventTypeRowCard: View {
     let isHidden: Bool
     let isSecret: Bool
     var canEdit: Bool = true
+    /// "N hosts" pill next to the name (design EventRow `hosts`); nil hides it.
+    var hostsBadge: String?
     /// FRAME 6: leading grip, no overflow, inert toggle.
     var isReordering: Bool = false
     let onTap: () -> Void
@@ -453,6 +457,17 @@ private struct EventTypeRowCard: View {
                     if isSecret {
                         Icon(.eyeOff, size: 11, strokeWidth: 2.4, color: Theme.Color.appTextMuted)
                             .accessibilityLabel("Unlisted")
+                    }
+                    if let hostsBadge {
+                        HStack(spacing: 3) {
+                            Icon(.users, size: 9, strokeWidth: 2.4, color: Theme.Color.appTextSecondary)
+                            Text(hostsBadge)
+                                .font(.system(size: 9.5, weight: .bold))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Theme.Color.appSurfaceSunken, in: Capsule())
                     }
                 }
                 if !meta.isEmpty {

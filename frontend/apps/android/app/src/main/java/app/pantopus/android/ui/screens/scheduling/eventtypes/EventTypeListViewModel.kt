@@ -467,7 +467,16 @@ class EventTypeListViewModel
                 isSecret = visibility == VISIBILITY_SECRET,
                 priceLabel = if (showPrice) MoneyAndFlag.formatPrice(priceCents, currency) else null,
                 slug = slug,
+                hostsBadge = hostsBadge(),
             )
+        }
+
+        /** "N hosts" for team rows (mirrors web `isTeam` + iOS `hostsBadge(for:)`). */
+        private fun EventTypeDto.hostsBadge(): String? {
+            if (assignmentMode !in TEAM_MODES) return null
+            val count = assigneeCount ?: return null
+            if (count <= 0) return null
+            return if (count == 1) "1 host" else "$count hosts"
         }
 
         private fun noOwnerMessage(target: SchedulingPillar): String =
@@ -495,6 +504,9 @@ class EventTypeListViewModel
             private const val CODE_HAS_UPCOMING = "HAS_BOOKINGS"
             private const val VISIBILITY_SECRET = "secret"
             private const val DEFAULT_DURATION = 30
+
+            /** Assignment modes that carry a host roster (mirrors web `isTeam`). */
+            private val TEAM_MODES = setOf("round_robin", "collective", "group")
         }
     }
 

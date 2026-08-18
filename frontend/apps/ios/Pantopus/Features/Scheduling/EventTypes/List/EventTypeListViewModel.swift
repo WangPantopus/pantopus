@@ -164,6 +164,16 @@ final class EventTypeListViewModel: ListOfRowsDataSource {
         eventType.visibility == "secret"
     }
 
+    /// "N hosts" pill label for team rows (design EventRow `hosts`), from the
+    /// list endpoint's aggregated `assignee_count`. Mirrors web's `isTeam` gate;
+    /// nil (no pill) for solo modes or when the count is absent/zero.
+    func hostsBadge(for eventType: EventTypeDTO) -> String? {
+        let teamModes = ["round_robin", "collective", "group"]
+        guard teamModes.contains(eventType.assignmentMode ?? ""),
+              let count = eventType.assigneeCount, count > 0 else { return nil }
+        return count == 1 ? "1 host" : "\(count) hosts"
+    }
+
     /// Business owners price their bookable services (design `FrameBusiness`);
     /// personal events have no price concept (design `FramePersonal`).
     var isBusiness: Bool {

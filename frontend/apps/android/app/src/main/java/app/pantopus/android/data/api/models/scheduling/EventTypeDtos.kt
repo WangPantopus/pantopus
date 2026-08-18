@@ -53,6 +53,8 @@ data class EventTypeDto(
     @Json(name = "schedule_id") val scheduleId: String? = null,
     @Json(name = "is_active") val isActive: Boolean? = null,
     @Json(name = "sort_order") val sortOrder: Int? = null,
+    /** Active assignee count, aggregated by `GET /event-types` for the list's "N hosts" pill. */
+    @Json(name = "assignee_count") val assigneeCount: Int? = null,
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
 )

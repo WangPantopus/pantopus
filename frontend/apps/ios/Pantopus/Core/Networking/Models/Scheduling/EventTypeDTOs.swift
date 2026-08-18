@@ -51,6 +51,9 @@ public struct EventTypeDTO: Decodable, Sendable, Hashable, Identifiable {
     public let scheduleId: String?
     public let isActive: Bool?
     public let sortOrder: Int?
+    /// Active assignee count, aggregated by `GET /event-types` for the list's
+    /// "N hosts" pill. Absent on single-row responses.
+    public let assigneeCount: Int?
     public let createdAt: String?
     public let updatedAt: String?
 
@@ -91,6 +94,7 @@ public struct EventTypeDTO: Decodable, Sendable, Hashable, Identifiable {
         case scheduleId = "schedule_id"
         case isActive = "is_active"
         case sortOrder = "sort_order"
+        case assigneeCount = "assignee_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

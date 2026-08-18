@@ -25,6 +25,8 @@ data class EventTypeRowUi(
     val isSecret: Boolean,
     val priceLabel: String? = null,
     val slug: String? = null,
+    /** "N hosts" pill next to the name (design EventRow `hosts`); null hides it. */
+    val hostsBadge: String? = null,
 )
 
 /**
