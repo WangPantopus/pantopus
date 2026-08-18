@@ -353,8 +353,8 @@ private fun LinkPreview(
                     Modifier
                         .clip(RoundedCornerShape(Radii.pill))
                         .background(PantopusColors.appSurface)
-                        // Hub frames use the deep warm-amber trio (P.warning #b45309 /
-                        // warningBorder #fde68a), not the lighter semantic warning tokens.
+                        // Hub frames use the deep warm-amber trio (P.warning /
+                        // warningBorder), not the lighter semantic warning tokens.
                         .border(1.dp, PantopusColors.warmAmberBorder, RoundedCornerShape(Radii.pill))
                         .padding(horizontal = 11.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,

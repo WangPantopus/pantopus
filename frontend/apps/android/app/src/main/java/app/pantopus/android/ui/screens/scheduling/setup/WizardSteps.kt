@@ -266,7 +266,7 @@ internal fun WizardHoursGrid(
                     }
                 }
                 if (index < DAY_LABELS.lastIndex) {
-                    // Design DayRow separates with the standard `P.border` (#E5E7EB), not
+                    // Design DayRow separates with the standard `P.border` token, not
                     // the subtle hairline (scheduling-setup-frames.jsx:309-314; iOS uses
                     // Theme.Color.appBorder).
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PantopusColors.appBorder))
