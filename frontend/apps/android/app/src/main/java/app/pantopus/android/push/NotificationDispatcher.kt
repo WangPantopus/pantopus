@@ -144,7 +144,7 @@ class NotificationDispatcher
         internal fun briefingOrReceiptLink(data: Map<String, String>): String? {
             val type = data["type"].orEmpty().lowercase()
             if (type == "monthly_receipt") return "/profile?tab=receipt"
-            if (type !in BRIEFING_TYPES) return null
+            if (type !in briefingTypes) return null
             val kind =
                 if (type == "evening_briefing") {
                     "evening"
@@ -162,7 +162,7 @@ class NotificationDispatcher
             return "/hub-today?kind=$resolvedKind$suffix"
         }
 
-        private val BRIEFING_TYPES =
+        private val briefingTypes =
             setOf("daily_briefing", "morning_briefing", "evening_briefing")
 
         /**

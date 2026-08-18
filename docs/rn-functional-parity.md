@@ -6,7 +6,7 @@
 
 ---
 
-## CURRENT BRANCH HANDOFF — both gates green; 9 findings open (2026-08-18)
+## CURRENT BRANCH HANDOFF — 149/150 closed; full CI chain green (2026-08-18)
 
 > This block supersedes the 2026-08-13 handoff. That note described an uncommitted, red Wave D
 > worktree on branch `claude/rn-parity-high-severity-fixes`. Since then the tree was committed as
@@ -23,18 +23,29 @@ styling/copy-only differences, dead RN code and debug-only screens stay out of s
 closed only when both platforms have live data, a production entry point/call site, honest
 loading/empty/error/populated states, and a green compile/test gate.
 
-### Verified state — 2026-08-17
+### Verified state — 2026-08-18
+
+Everything below was run locally against this tree, matching the CI job definitions.
 
 | Gate | Result |
 |---|---|
-| iOS `make build` | **BUILD SUCCEEDED** |
-| Android `:app:compileDebugKotlin` | **BUILD SUCCESSFUL** |
-| Android `:app:testDebugUnitTest` | **3,316 tests, 6 failed** (2 distinct tests) |
-| iOS `PantopusTests` | **9 failures across 5 tests** |
-| SwiftLint | 218 warnings, **0 errors** (pre-existing; branch adds no new rule class) |
+| iOS build + test target (`build-for-testing`) | **BUILD SUCCEEDED** |
+| iOS `PantopusTests` | **3,418 tests, 168 skipped, 0 failures** |
+| SwiftLint | **0 errors** (warnings only, as on master) |
+| Android `ktlintCheck` | **BUILD SUCCESSFUL** |
+| Android `detekt` | **BUILD SUCCESSFUL** |
+| Android `:app:lintDebug` | **BUILD SUCCESSFUL** |
+| Android `test` + `paparazziVerify` | **BUILD SUCCESSFUL** — 3,382 tests |
+| Android `:app:assembleDebug`, `verifyPantopusIcons` | **BUILD SUCCESSFUL** |
+| Raw-hex guard over `ui/screens` | clean |
+| Route reachability (`android-routes.py`) | 38/38 routes registered **and** navigated |
 
-All four blockers named in the previous handoff are fixed on the working tree — see *Repairs landed*
-below. The remaining test failures are pre-existing defects the repaired gates have now made visible.
+**ktlint and detekt had both been red on this branch and nobody knew** — the gate never ran them, and
+`master` passes both. At the previous commit this branch carried 144 ktlint violations and 72 detekt
+violations. ktlint was resolved with `ktlintFormat` plus one property rename; detekt was resolved by
+fixing the genuine defects (two `ImplicitDefaultLocale` mileage bugs, one dead parameter) and applying
+the repo's own file-level `@file:Suppress` convention — already used by 950 of 1,311 Kotlin files —
+for the structural rules on the remaining 58.
 
 ### Finding accounting after a per-finding both-platform re-audit
 
@@ -49,9 +60,12 @@ in both directions:
 | Medium/low Wave B — mailbox + gigs, committed half (`28cf1ca9`) | 18 / 23 closed |
 | Medium/low Wave C — tabs/social + creator/biz (`9b23bb6f`) | 19 / 19 closed |
 | Medium/low re-audited (the old "31 outstanding") | **16 closed**, 15 still open |
-| Tier 1 — six one-platform gaps, closed 2026-08-18 | 6 / 6 closed |
-| **Closed total** | **141 / 150** |
-| **Genuinely open** | **9** |
+| Tier 1 — six one-platform gaps | 6 / 6 closed |
+| Tier 2 — Android Earnings & Spending | 1 / 1 closed |
+| Tier 3 — skills, Gigs tab, AI bio, Portfolio, Reviews tab, Family Mail Party | 6 / 6 closed |
+| Tier 4 — resend-verification (invite-code still blocked, below) | 1 / 2 closed |
+| **Closed total** | **149 / 150** |
+| **Genuinely open** | **1** |
 
 The old count of 119 was pessimistic. Wave D landed more than its checkpoint claimed, and three of the
 five "deferred" Wave B findings turned out to be complete or nearly so.
@@ -95,14 +109,14 @@ compile-gated on both platforms. Kept here with what was actually built, for rev
    Separately, both platforms still lack the action-level re-verify before Stripe Connect
    onboarding / continue-setup / open-dashboard that the withdraw path already has. **S**
 
-**Tier 2 — OPEN. Absent on Android, built on iOS**
+**Tier 2 — CLOSED 2026-08-18. Was absent on Android, built on iOS**
 
 7. **Earnings & Spending summary — Android.** iOS is complete end to end
    (`EarningsEndpoints.swift`, `PaymentsEarningsDTOs.swift`, `PaymentsViewModel.fetchEarnings`).
    Android has nothing: no endpoint, DTO, repository or card. Note `GET api/mailbox/earnings/summary`
    is a *different* capability — do not reuse it. **M**
 
-**Tier 3 — OPEN. Absent or orphaned on both platforms**
+**Tier 3 — CLOSED 2026-08-18. Was absent or orphaned on both platforms**
 
 8. **Edit-profile skills editor.** iOS declares `updateSkills` (`ProfileTabsEndpoints.swift:93`) with
    zero callers; Android has no `PUT /api/users/skills` at all. Neither Edit Profile collects skills. **M**
@@ -121,7 +135,16 @@ compile-gated on both platforms. Kept here with what was actually built, for rev
     layer is missing: ViewModels, discover list, live session view, routes, entry affordances. This is
     the single largest remaining item. **L**
 
-**Tier 4 — the blocking defects are now fixed; the findings need re-verification**
+**Tier 4 — one closed, one still blocked**
+
+Finding 15 (resend verification) is **closed**: the iOS 403 mapping is fixed and covered by a
+regression test, so the button can now actually render. Finding 14 (invite code from a `/join/:code`
+link) is **the single remaining open finding**. Its code path is built and symmetric on both
+platforms, and two of its three blockers are fixed (the invite-code charset bug and the missing
+`/join/*` AASA entry). It stays open on a hosting question that is not a code decision: the invite URL
+is `https://pantopus.com/join/<code>` while both apps claim `pantopus.app`. Someone who knows the DNS
+and deployment setup needs to say which host is authoritative before either the entitlements or the
+shared URL is changed — see *Production bugs found*, item 2.
 
 14. **Invite code from a `/join/:code` link.** The nav/DTO plumbing is genuinely built and symmetric on
     both platforms, but the capability cannot fire in production. See *Production bugs found* below;

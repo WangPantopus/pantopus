@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod", "ktlint:standard:import-ordering")
+@file:Suppress("LargeClass", "LongMethod")
 
 package app.pantopus.android.ui.screens.root
 
@@ -46,7 +46,6 @@ import app.pantopus.android.ui.components.NavigationDrawer
 import app.pantopus.android.ui.components.NavigationDrawerContext
 import app.pantopus.android.ui.components.NavigationDrawerDestination
 import app.pantopus.android.ui.components.composeEmail
-import kotlinx.coroutines.launch
 import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
@@ -112,28 +111,6 @@ import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
-import app.pantopus.android.ui.screens.persona_dm.FanInboxScreen
-import app.pantopus.android.ui.screens.persona_dm.PersonaDmThreadScreen
-import app.pantopus.android.ui.screens.place.HomeLanding
-import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
-import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
-import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
-import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_ADDRESS_KEY
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_MESSAGE_ID_KEY
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageComposeScreen
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageInboxScreen
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageReceivedScreen
-import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_METHOD_KEY
-import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
-import app.pantopus.android.ui.screens.place.verify.PlaceVerifyStatusScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
@@ -165,8 +142,6 @@ import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_VERIFICATION_
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
 import app.pantopus.android.ui.screens.homes.claim_review.HOME_CLAIM_REVIEW_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.claim_review.HomeClaimReviewScreen
-import app.pantopus.android.ui.screens.homes.issues.HOME_ISSUES_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.issues.HomeIssuesListScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
@@ -192,6 +167,8 @@ import app.pantopus.android.ui.screens.homes.guests.GuestPassesListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.issues.HOME_ISSUES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.issues.HomeIssuesListScreen
 import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.LogMaintenanceFormScreen
@@ -222,6 +199,8 @@ import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
 import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
+import app.pantopus.android.ui.screens.homes.property_correction.PROPERTY_CORRECTION_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.property_correction.PropertyCorrectionScreen
 import app.pantopus.android.ui.screens.homes.property_details.PropertyDetailsScreen
 import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
@@ -234,11 +213,9 @@ import app.pantopus.android.ui.screens.homes.settings.notifications.HomeNotifica
 import app.pantopus.android.ui.screens.homes.settings.ownership_security.HOME_OWNERSHIP_SECURITY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.ownership_security.HomeOwnershipSecurityScreen
 import app.pantopus.android.ui.screens.homes.settings.photos.HomePhotosScreen
-import app.pantopus.android.ui.screens.homes.settings.trusted_neighbors.TrustedNeighborsScreen
-import app.pantopus.android.ui.screens.homes.property_correction.PROPERTY_CORRECTION_HOME_ID_KEY
-import app.pantopus.android.ui.screens.homes.property_correction.PropertyCorrectionScreen
 import app.pantopus.android.ui.screens.homes.settings.security.HOME_SECURITY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.security.HomeSecurityScreen
+import app.pantopus.android.ui.screens.homes.settings.trusted_neighbors.TrustedNeighborsScreen
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
@@ -263,13 +240,13 @@ import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadContext
-import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
 import app.pantopus.android.ui.screens.inbox.conversation.ChatInitialTopic
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
@@ -287,6 +264,7 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_M
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_party.MailPartyScreen
 import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_NONE
 import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_SENDER_KEY
@@ -318,6 +296,28 @@ import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsZone
 import app.pantopus.android.ui.screens.offers.OffersScreen
+import app.pantopus.android.ui.screens.persona_dm.FanInboxScreen
+import app.pantopus.android.ui.screens.persona_dm.PersonaDmThreadScreen
+import app.pantopus.android.ui.screens.place.HomeLanding
+import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
+import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
+import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_MESSAGE_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageComposeScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageInboxScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageReceivedScreen
+import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_METHOD_KEY
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyStatusScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.EditProfileScreen
@@ -363,6 +363,7 @@ import app.pantopus.android.ui.screens.wallet.WalletActivityListScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
 import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
+import kotlinx.coroutines.launch
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -1576,6 +1577,9 @@ private object ChildRoutes {
 
     /** A17.4 — Community mail feed (neighborhood / civic). */
     const val MAILBOX_COMMUNITY = "mailbox/community"
+
+    /** Family Mail Party — household co-opening (discover / live session). */
+    const val MAILBOX_PARTY = "mailbox/party"
 
     /** Home Records — the linked-asset hub behind the Mailbox. */
     const val MAILBOX_HOME_RECORDS = "mailbox/records"
@@ -3284,6 +3288,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ),
                             )
                         },
+                        // Gigs tab rows open gig detail; review cards open the
+                        // reviewer's own public profile.
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onOpenProfile = { reviewerId ->
+                            navController.navigate(ChildRoutes.publicProfile(reviewerId))
+                        },
                     )
                 }
                 composable(
@@ -4742,10 +4752,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenUnboxing = { navController.navigate(ChildRoutes.unboxing()) },
                         onOpenCompose = { navController.navigate(ChildRoutes.CEREMONIAL_MAIL) },
                         onOpenRoutingQueue = { navController.navigate(ChildRoutes.MAIL_ROUTING_QUEUE) },
+                        onOpenMailParty = { navController.navigate(ChildRoutes.MAILBOX_PARTY) },
                         onOpenCommunity = { navController.navigate(ChildRoutes.MAILBOX_COMMUNITY) },
                         onOpenRecords = { navController.navigate(ChildRoutes.MAILBOX_HOME_RECORDS) },
                         onOpenMailTasks = { navController.navigate(ChildRoutes.mailTaskList()) },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_PARTY) {
+                    MailPartyScreen(
+                        onBack = { navController.popBackStack() },
+                        // Declining a party opens the item solo — the same
+                        // mail detail the drawer rows push.
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
                     )
                 }
                 composable(ChildRoutes.MAILBOX_COMMUNITY) {

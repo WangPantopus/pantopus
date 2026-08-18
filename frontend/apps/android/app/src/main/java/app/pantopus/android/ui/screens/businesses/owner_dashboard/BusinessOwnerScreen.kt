@@ -131,6 +131,7 @@ fun BusinessOwnerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toast by viewModel.toast.collectAsStateWithLifecycle()
     var mode by remember { mutableStateOf(OwnerViewMode.Owner) }
+
     /** C2 — bumped per composer open so each post starts from a blank draft. */
     var composeSession by remember { mutableIntStateOf(0) }
 

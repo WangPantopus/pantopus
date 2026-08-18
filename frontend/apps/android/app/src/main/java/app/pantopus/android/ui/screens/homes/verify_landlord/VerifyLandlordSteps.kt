@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("CyclomaticComplexMethod", "PackageNaming")
 
 package app.pantopus.android.ui.screens.homes.verify_landlord
 

@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber")
+@file:Suppress("LongMethod", "MagicNumber")
 
 package app.pantopus.android.ui.screens.feed.pulse
 

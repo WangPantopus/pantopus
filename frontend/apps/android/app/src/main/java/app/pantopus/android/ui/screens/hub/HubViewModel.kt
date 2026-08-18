@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "ComplexCondition")
+@file:Suppress("ComplexCondition", "MagicNumber", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.hub
 
@@ -359,13 +359,10 @@ class HubViewModel
         }
 
         /** RN's milestone ladder — the highest rung the count has passed. */
-        private fun crossedMilestone(count: Int): Int? =
-            listOf(500, 200, 100, 50, 25, 10).firstOrNull { count >= it }
+        private fun crossedMilestone(count: Int): Int? = listOf(500, 200, 100, 50, 25, 10).firstOrNull { count >= it }
 
         /** Project `/api/hub/discovery` rows onto the rail's card model. */
-        private fun projectDiscovery(
-            items: List<app.pantopus.android.data.api.models.hub.DiscoveryItem>,
-        ): List<DiscoveryCardContent> =
+        private fun projectDiscovery(items: List<app.pantopus.android.data.api.models.hub.DiscoveryItem>): List<DiscoveryCardContent> =
             items.take(10).map {
                 val kind = DiscoveryKind.fromRawType(it.type)
                 DiscoveryCardContent(

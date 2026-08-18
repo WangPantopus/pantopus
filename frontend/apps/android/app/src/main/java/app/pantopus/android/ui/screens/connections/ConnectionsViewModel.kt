@@ -1,11 +1,12 @@
 @file:Suppress(
-    "MagicNumber",
-    "LongMethod",
-    "PackageNaming",
-    "TooManyFunctions",
+    "ComplexCondition",
     "ComplexMethod",
     "CyclomaticComplexMethod",
+    "LongMethod",
     "LongParameterList",
+    "MagicNumber",
+    "PackageNaming",
+    "TooManyFunctions",
 )
 
 package app.pantopus.android.ui.screens.connections

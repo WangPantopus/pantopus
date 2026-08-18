@@ -85,8 +85,7 @@ enum class InviteFeatureTier(
 object MonthlyReceiptFormat {
     fun dollars(cents: Int): String = String.format(Locale.US, "\$%.2f", cents / 100.0)
 
-    fun rating(value: Double?): String =
-        if (value == null || value <= 0) "N/A" else String.format(Locale.US, "%.1f", value)
+    fun rating(value: Double?): String = if (value == null || value <= 0) "N/A" else String.format(Locale.US, "%.1f", value)
 
     fun signedRating(value: Double?): String {
         if (value == null) return "N/A"

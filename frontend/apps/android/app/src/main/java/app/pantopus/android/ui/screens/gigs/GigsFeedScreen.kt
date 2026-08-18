@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "PackageNaming", "CyclomaticComplexMethod")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package app.pantopus.android.ui.screens.gigs

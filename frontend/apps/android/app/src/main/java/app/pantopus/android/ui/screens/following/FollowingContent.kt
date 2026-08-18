@@ -79,8 +79,7 @@ enum class FollowingNotificationLevel(
             }
 
     companion object {
-        fun from(raw: String?): FollowingNotificationLevel =
-            entries.firstOrNull { it.wire == raw?.lowercase() } ?: All
+        fun from(raw: String?): FollowingNotificationLevel = entries.firstOrNull { it.wire == raw?.lowercase() } ?: All
     }
 }
 

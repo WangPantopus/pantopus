@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package app.pantopus.android.core.security
 
 import android.content.Context
@@ -47,8 +49,7 @@ class AppLockManager
             ;
 
             companion object {
-                fun fromWire(value: String?): SetupPromptState =
-                    entries.firstOrNull { it.wireValue == value } ?: Pending
+                fun fromWire(value: String?): SetupPromptState = entries.firstOrNull { it.wireValue == value } ?: Pending
             }
         }
 

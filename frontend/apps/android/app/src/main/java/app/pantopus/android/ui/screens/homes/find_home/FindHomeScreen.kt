@@ -418,9 +418,10 @@ private fun FindHomeResultRow(
     home: DiscoveredHomeDto,
     onClick: () -> Unit,
 ) {
-    val primaryLine = home.address?.trim()?.takeIf { it.isNotEmpty() }
-        ?: home.name?.trim()?.takeIf { it.isNotEmpty() }
-        ?: "Unnamed home"
+    val primaryLine =
+        home.address?.trim()?.takeIf { it.isNotEmpty() }
+            ?: home.name?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "Unnamed home"
     val secondaryLine =
         listOfNotNull(home.city, home.state, home.zipcode)
             .map { it.trim() }

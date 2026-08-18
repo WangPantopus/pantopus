@@ -35,6 +35,22 @@ extension EditProfileView {
         }
     }
 
+    /// Skills ride `PUT /api/users/skills`, not the profile PATCH, but
+    /// they commit through the same Save so the group sits inline with
+    /// the rest of the form (`backend/routes/users.js:2246`).
+    var skillsSection: some View {
+        FormFieldGroup("Skills") {
+            EditProfileSkillsBlock(
+                skills: viewModel.skills,
+                draft: viewModel.skillDraft,
+                canAdd: viewModel.canAddSkill,
+                onDraftChange: { viewModel.skillDraft = $0 },
+                onAdd: { viewModel.addSkill() },
+                onRemove: { viewModel.removeSkill($0) }
+            )
+        }
+    }
+
     var contactSection: some View {
         FormFieldGroup("Contact") {
             // Note: the design allows editing email when `verified ==
@@ -183,7 +199,11 @@ extension EditProfileView {
     @ViewBuilder var bioField: some View {
         let snapshot = viewModel.fields[.bio] ?? FormFieldState(id: "bio", originalValue: "")
         VStack(alignment: .leading, spacing: Spacing.s1) {
-            EditProfileFieldLabel("Bio", dirty: snapshot.isDirty)
+            HStack {
+                EditProfileFieldLabel("Bio", dirty: snapshot.isDirty)
+                Spacer()
+                generateBioButton
+            }
             TextEditor(text: Binding(
                 get: { snapshot.value },
                 set: { viewModel.update(.bio, to: $0) }
@@ -204,8 +224,49 @@ extension EditProfileView {
                     .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.error)
             }
+            if case let .failed(message) = viewModel.bioDraftState {
+                HStack(spacing: Spacing.s2) {
+                    Text(message)
+                        .pantopusTextStyle(.caption)
+                        .foregroundStyle(Theme.Color.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Dismiss") { viewModel.dismissBioDraftError() }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .accessibilityIdentifier("editProfileBioDraftError")
+            }
         }
         .accessibilityIdentifier("field_bio")
+    }
+
+    /// "Generate with AI" — drafts a bio through `POST /api/ai/draft/post`
+    /// from the name / skills / tagline / city already on the form and
+    /// writes it into the bio field, where it rides the normal PATCH.
+    /// Disabled while in flight and while the form has nothing to prompt
+    /// with, so the CTA is never enabled when the route would refuse.
+    @ViewBuilder var generateBioButton: some View {
+        let isGenerating = viewModel.bioDraftState == .generating
+        let tint = viewModel.canGenerateBio ? Theme.Color.primary600 : Theme.Color.appTextMuted
+        Button {
+            Task { await viewModel.generateBio() }
+        } label: {
+            HStack(spacing: Spacing.s1) {
+                if isGenerating {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Icon(.sparkles, size: 13, color: tint)
+                }
+                Text(isGenerating ? "Generating…" : "Generate with AI")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .disabled(!viewModel.canGenerateBio)
+        .accessibilityIdentifier("editProfileGenerateBioButton")
+        .accessibilityHint("Drafts a bio from your name, skills, tagline and city")
     }
 
     @ViewBuilder var dateOfBirthField: some View {

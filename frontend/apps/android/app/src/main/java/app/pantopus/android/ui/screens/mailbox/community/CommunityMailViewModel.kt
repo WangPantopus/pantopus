@@ -54,8 +54,7 @@ enum class CommunityFeedType(
     ;
 
     companion object {
-        fun fromRaw(raw: String?): CommunityFeedType =
-            entries.firstOrNull { it.slug == raw } ?: CIVIC_NOTICE
+        fun fromRaw(raw: String?): CommunityFeedType = entries.firstOrNull { it.slug == raw } ?: CIVIC_NOTICE
     }
 }
 

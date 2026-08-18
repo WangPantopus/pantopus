@@ -21,8 +21,7 @@ class BusinessInvoicesRepository
         private val api: BusinessInvoicesApi,
     ) {
         /** `GET api/businesses/invoices/{invoiceId}`. */
-        suspend fun invoice(invoiceId: String): NetworkResult<BusinessInvoiceResponse> =
-            safeApiCall { api.receivedInvoice(invoiceId) }
+        suspend fun invoice(invoiceId: String): NetworkResult<BusinessInvoiceResponse> = safeApiCall { api.receivedInvoice(invoiceId) }
 
         /** `GET api/businesses/invoices/received`. */
         suspend fun receivedInvoices(

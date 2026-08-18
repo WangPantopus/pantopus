@@ -43,6 +43,28 @@ data class PaymentsLoaded(
     val canCloseAccount: Boolean,
     /** Monospaced footer caption rendered below the destructive card. */
     val footerCaption: String,
+    /**
+     * Lifetime TOTAL EARNED / TOTAL SPENT tiles
+     * (`GET api/payments/earnings` + `/spending`). `null` when neither figure
+     * could be read — the card is hidden rather than showing "$0".
+     */
+    val earnings: PaymentsEarnings? = null,
+)
+
+/**
+ * "Earnings & Spending" card — the two lifetime totals rendered at the bottom
+ * of the payouts surface. Values are pre-formatted from the server's integer
+ * cents; an unreadable figure stays an em-dash rather than a misleading
+ * "$0.00".
+ */
+@Immutable
+data class PaymentsEarnings(
+    /** `"$1,284.50"` or `"—"` when `GET api/payments/earnings` failed. */
+    val totalEarned: String,
+    /** `"$318.00"` or `"—"` when `GET api/payments/spending` failed. */
+    val totalSpent: String,
+    /** Caption clarifying that earned includes funds still in review. */
+    val caption: String,
 )
 
 /** Balance hero — A14.6's compact `BalanceHero` payout variant. */

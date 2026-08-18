@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "LongMethod", "TooManyFunctions", "PackageNaming")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.gigs.quickpost
 

@@ -24,8 +24,7 @@ class NotificationPreferencesPatchTest {
             .addLast(KotlinJsonAdapterFactory())
             .build()
 
-    private fun encode(patch: NotificationPreferencesPatch): String =
-        moshi.adapter(NotificationPreferencesPatch::class.java).toJson(patch)
+    private fun encode(patch: NotificationPreferencesPatch): String = moshi.adapter(NotificationPreferencesPatch::class.java).toJson(patch)
 
     @Test
     fun writes_only_the_changed_key() {

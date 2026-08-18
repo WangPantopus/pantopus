@@ -80,7 +80,6 @@ data class PackageGigOption(
          * Pre-delivery keeps only the options that make sense before the
          * carrier drops the box; post-delivery offers everything.
          */
-        fun options(isPreDelivery: Boolean): List<PackageGigOption> =
-            if (isPreDelivery) ALL.filter { it.availablePreDelivery } else ALL
+        fun options(isPreDelivery: Boolean): List<PackageGigOption> = if (isPreDelivery) ALL.filter { it.availablePreDelivery } else ALL
     }
 }

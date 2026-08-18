@@ -20,10 +20,8 @@ class MailboxDocumentRepository
         private val api: MailboxDocumentApi,
     ) {
         /** `POST api/mailbox/v2/p2/booklet/:mailId/download`. */
-        suspend fun bookletDownload(mailId: String): NetworkResult<BookletDownloadResponse> =
-            safeApiCall { api.bookletDownload(mailId) }
+        suspend fun bookletDownload(mailId: String): NetworkResult<BookletDownloadResponse> = safeApiCall { api.bookletDownload(mailId) }
 
         /** `GET api/mailbox/v2/p2/certified/:mailId/proof`. */
-        suspend fun certifiedProof(mailId: String): NetworkResult<CertifiedProofResponse> =
-            safeApiCall { api.certifiedProof(mailId) }
+        suspend fun certifiedProof(mailId: String): NetworkResult<CertifiedProofResponse> = safeApiCall { api.certifiedProof(mailId) }
     }

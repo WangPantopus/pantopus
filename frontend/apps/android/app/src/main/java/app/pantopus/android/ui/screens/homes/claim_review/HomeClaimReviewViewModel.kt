@@ -663,13 +663,14 @@ class HomeClaimReviewViewModel
 
             fun dayAgeLabel(iso: String?): String? = dayDelta(iso)?.let { "${it}d ago" }
 
-            fun submittedLabel(iso: String?): String? = dayDelta(iso)?.let { days ->
-                when (days) {
-                    0L -> "Submitted today"
-                    1L -> "Submitted 1d ago"
-                    else -> "Submitted ${days}d ago"
+            fun submittedLabel(iso: String?): String? =
+                dayDelta(iso)?.let { days ->
+                    when (days) {
+                        0L -> "Submitted today"
+                        1L -> "Submitted 1d ago"
+                        else -> "Submitted ${days}d ago"
+                    }
                 }
-            }
 
             fun shortDate(iso: String?): String? {
                 val instant = parseInstant(iso) ?: return null

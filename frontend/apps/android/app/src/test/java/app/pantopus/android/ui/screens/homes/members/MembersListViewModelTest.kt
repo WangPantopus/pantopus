@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod")
+@file:Suppress("LargeClass", "LongMethod", "PackageNaming")
 
 package app.pantopus.android.ui.screens.homes.members
 

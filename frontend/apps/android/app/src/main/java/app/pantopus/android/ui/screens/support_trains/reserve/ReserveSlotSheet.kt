@@ -1,4 +1,12 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "LongParameterList")
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LongParameterList",
+    "MagicNumber",
+    "MatchingDeclarationName",
+    "PackageNaming",
+    "UnusedPrivateMember",
+)
 
 package app.pantopus.android.ui.screens.support_trains.reserve
 

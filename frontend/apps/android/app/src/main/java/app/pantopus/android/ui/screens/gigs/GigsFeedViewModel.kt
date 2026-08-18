@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
+@file:Suppress("LargeClass", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.gigs
 

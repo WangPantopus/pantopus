@@ -87,11 +87,9 @@ class LoginViewModel
         private var hostLeftForeground: Boolean = false
         private var cancelJob: Job? = null
 
-        fun onEmailChange(value: String) =
-            _uiState.update { it.copy(email = value, errorMessage = null, infoMessage = null) }
+        fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null, infoMessage = null) }
 
-        fun onPasswordChange(value: String) =
-            _uiState.update { it.copy(password = value, errorMessage = null, infoMessage = null) }
+        fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null, infoMessage = null) }
 
         fun clearError() = _uiState.update { it.copy(errorMessage = null, infoMessage = null) }
 

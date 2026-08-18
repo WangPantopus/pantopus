@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod", "MatchingDeclarationName")
+
 package app.pantopus.android.core.security
 
 import androidx.compose.foundation.background

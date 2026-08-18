@@ -54,6 +54,8 @@ class EditProfileSnapshotTest {
                     onCommit = {},
                     onDiscard = {},
                     onUpdate = { _, _ -> },
+                    skillsSlot = { SkillsSlot() },
+                    bioActionSlot = { BioActionSlot() },
                 )
             }
         }
@@ -78,6 +80,8 @@ class EditProfileSnapshotTest {
                     onCommit = {},
                     onDiscard = {},
                     onUpdate = { _, _ -> },
+                    skillsSlot = { SkillsSlot() },
+                    bioActionSlot = { BioActionSlot() },
                 )
             }
         }
@@ -113,6 +117,8 @@ class EditProfileSnapshotTest {
                         onCommit = {},
                         onDiscard = {},
                         onUpdate = { _, _ -> },
+                        skillsSlot = { SkillsSlot() },
+                        bioActionSlot = { BioActionSlot() },
                     )
                     EditProfileToastView(
                         payload = EditProfileToast("Fix the highlighted field.", isError = true),
@@ -121,6 +127,30 @@ class EditProfileSnapshotTest {
                 }
             }
         }
+    }
+
+    /** Populated skills group — the `PUT /api/users/skills` leg
+     *  (`backend/routes/users.js:2246`) renders inline with the form. */
+    @Composable
+    private fun SkillsSlot() {
+        EditProfileSkillsBlock(
+            skills = listOf("Plumbing", "Tutoring", "Dog walking"),
+            draft = "",
+            canAdd = false,
+            onDraftChange = {},
+            onAdd = {},
+            onRemove = {},
+        )
+    }
+
+    /** Resting pose of the bio "Generate with AI" action. */
+    @Composable
+    private fun BioActionSlot() {
+        EditProfileGenerateBioButton(
+            state = EditProfileBioDraftState.Idle,
+            enabled = true,
+            onGenerate = {},
+        )
     }
 
     @Composable

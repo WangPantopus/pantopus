@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "TooManyFunctions", "LongMethod")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "ReturnCount", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.persona_dm
 

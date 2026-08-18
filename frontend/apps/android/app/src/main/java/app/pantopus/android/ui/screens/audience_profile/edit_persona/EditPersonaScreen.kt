@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions", "LongParameterList")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "MatchingDeclarationName", "PackageNaming", "TooManyFunctions")
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package app.pantopus.android.ui.screens.audience_profile.edit_persona
@@ -75,6 +75,7 @@ import kotlinx.coroutines.withContext
  * rather than rendered from a fixture — they belong to the tier and
  * monetization routes.
  */
+
 /**
  * Every editing intent the scaffold needs, bundled so the Paparazzi
  * snapshots can render the loaded frame without a Hilt view-model.

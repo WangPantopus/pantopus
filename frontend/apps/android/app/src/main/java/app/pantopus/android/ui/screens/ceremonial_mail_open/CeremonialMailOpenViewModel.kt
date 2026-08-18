@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "ReturnCount")
 
 package app.pantopus.android.ui.screens.ceremonial_mail_open
 

@@ -1,5 +1,5 @@
+@file:Suppress("LongParameterList", "PackageNaming")
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@file:Suppress("PackageNaming")
 
 package app.pantopus.android.ui.screens.auth
 

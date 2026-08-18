@@ -252,17 +252,27 @@ public struct TasksTabRoot: View {
     }
 
     private func publicProfileDestination(userId: String) -> some View {
-        PublicProfileView(userId: userId, onBack: pop) { profile in
-            Task { @MainActor in
-                path.append(.chatConversation(InboxConversationDestination(
-                    mode: .person(otherUserId: profile.id),
-                    displayName: profile.displayName,
-                    initials: Self.initials(from: profile.displayName),
-                    identityKind: nil,
-                    verified: profile.verified ?? false
-                )))
+        PublicProfileView(
+            userId: userId,
+            onBack: pop,
+            onOpenMessages: { profile in
+                Task { @MainActor in
+                    path.append(.chatConversation(InboxConversationDestination(
+                        mode: .person(otherUserId: profile.id),
+                        displayName: profile.displayName,
+                        initials: Self.initials(from: profile.displayName),
+                        identityKind: nil,
+                        verified: profile.verified ?? false
+                    )))
+                }
+            },
+            onOpenGig: { gigId in
+                Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+            },
+            onOpenProfile: { reviewerId in
+                Task { @MainActor in path.append(.publicProfile(userId: reviewerId)) }
             }
-        }
+        )
     }
 
     private func editListingDestination(listingId: String, jumpToStep: ListingComposeStep?) -> some View {

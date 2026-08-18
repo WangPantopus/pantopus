@@ -79,8 +79,7 @@ class HomeOwnershipSecurityViewModelTest {
             savedStateHandle = SavedStateHandle(mapOf(HOME_OWNERSHIP_SECURITY_HOME_ID_KEY to homeId)),
         )
 
-    private fun groups(vm: HomeOwnershipSecurityViewModel): List<GroupedListGroup> =
-        (vm.state.value as GroupedListUiState.Loaded).groups
+    private fun groups(vm: HomeOwnershipSecurityViewModel): List<GroupedListGroup> = (vm.state.value as GroupedListUiState.Loaded).groups
 
     @Test fun load_projects_three_radio_groups() =
         runTest {

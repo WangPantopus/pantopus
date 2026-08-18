@@ -5,9 +5,11 @@ package app.pantopus.android.ui.screens.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -508,23 +512,38 @@ private fun BeaconPostsEmptyState(
 // MARK: - A21.2 Local tab strip
 
 /**
- * Underline-active two-tab strip for the Local Beacon profile archetype
- * (Posts · About). Mirrors the design's `TabStrip` — and iOS
- * `LocalProfileTabStrip` — so both platforms read identically.
+ * Underline-active tab strip for the Local Beacon profile archetype
+ * (Posts · About · Portfolio · Gigs · Reviews). Mirrors the design's
+ * `TabStrip` — and iOS `LocalProfileTabStrip` — so both platforms read
+ * identically. Scrolls horizontally so the marketplace tabs survive the
+ * larger font scales.
+ *
+ * [reviewCount] badges the Reviews tab the way [postCount] badges Posts;
+ * `null` hides the badge.
  */
 @Composable
 fun LocalProfileTabStrip(
     postCount: Int?,
     selected: LocalProfileTab,
     onSelect: (LocalProfileTab) -> Unit,
+    reviewCount: Int? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag("publicProfileLocalTabStrip")) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s6)) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s6),
+        ) {
             LocalProfileTab.entries.forEach { tab ->
                 val active = tab == selected
                 Column(
                     modifier =
                         Modifier
+                            // The scrolling Row hands children an unbounded
+                            // width, under which `fillMaxWidth()` is a no-op —
+                            // the active underline below would measure to zero.
+                            // Pinning the column to its label's intrinsic width
+                            // restores it, matching iOS's `VStack` sizing.
+                            .width(IntrinsicSize.Max)
                             .clickable { onSelect(tab) }
                             .testTag("publicProfileLocalTab_${tab.name.lowercase()}")
                             .semantics { contentDescription = tab.label },
@@ -541,9 +560,15 @@ fun LocalProfileTabStrip(
                             fontWeight = FontWeight.SemiBold,
                             color = if (active) PantopusColors.primary700 else PantopusColors.appTextSecondary,
                         )
-                        if (tab == LocalProfileTab.Posts && postCount != null) {
+                        val badge =
+                            when (tab) {
+                                LocalProfileTab.Posts -> postCount
+                                LocalProfileTab.Reviews -> reviewCount
+                                else -> null
+                            }
+                        if (badge != null) {
                             Text(
-                                text = "$postCount",
+                                text = "$badge",
                                 fontSize = 10.5.sp,
                                 color = PantopusColors.appTextMuted,
                             )

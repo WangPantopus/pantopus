@@ -23,6 +23,5 @@ open class HomeOwnershipClaimRepository
             homeId: String,
             claimId: String,
             note: String? = null,
-        ): NetworkResult<ChallengeClaimResponse> =
-            safeApiCall { api.challengeClaim(homeId, claimId, ChallengeClaimRequest(note = note)) }
+        ): NetworkResult<ChallengeClaimResponse> = safeApiCall { api.challengeClaim(homeId, claimId, ChallengeClaimRequest(note = note)) }
     }

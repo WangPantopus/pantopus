@@ -378,6 +378,9 @@ public enum YouRoute: Hashable {
     /// Disambiguation queue behind the Mailbox root's
     /// "N items need routing" banner.
     case mailRoutingQueue
+    /// Family Mail Party — household co-opening (discover / join / start /
+    /// react / hand off). Reached from the Mailbox root overflow menu.
+    case mailParty
     #if DEBUG
     case statusWaiting
     #endif
@@ -959,6 +962,7 @@ public struct YouTabRoot: View {
                     onOpenUnboxing: { path.append(.unboxing(mailId: nil)) },
                     onOpenCompose: { path.append(.ceremonialMail) },
                     onOpenRoutingQueue: { path.append(.mailRoutingQueue) },
+                    onOpenMailParty: { path.append(.mailParty) },
                     onOpenCommunity: { path.append(.communityMail) },
                     onOpenRecords: { path.append(.homeRecords) },
                     onOpenMailTasks: {
@@ -2386,6 +2390,12 @@ public struct YouTabRoot: View {
                             verified: profile.verified ?? false
                         )))
                     }
+                },
+                onOpenGig: { gigId in
+                    Task { @MainActor in path.append(.gigDetail(gigId: gigId)) }
+                },
+                onOpenProfile: { reviewerId in
+                    Task { @MainActor in path.append(.publicProfile(userId: reviewerId)) }
                 }
             )
         case let .businessProfile(businessId):
@@ -2646,6 +2656,13 @@ public struct YouTabRoot: View {
             )
         case .mailRoutingQueue:
             MailRoutingQueueView { Task { @MainActor in pop() } }
+        case .mailParty:
+            MailPartyView(
+                onOpenMail: { mailId in
+                    Task { @MainActor in path.append(.mailItemDetail(mailId: mailId)) }
+                },
+                onClose: { Task { @MainActor in pop() } }
+            )
         #if DEBUG
         case .statusWaiting:
             StatusWaitingView(

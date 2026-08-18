@@ -106,6 +106,18 @@ class GigsRepository
                 )
             }
 
+        /**
+         * `GET /api/gigs?user_id=…&limit=…` — the gigs one user posted,
+         * for the public-profile Gigs tab. Route
+         * `backend/routes/gigs.js:2089`; `user_id` both scopes the feed
+         * (`:2473`) and suppresses the "exclude my own gigs" branch
+         * (`:2125`). Mirrors iOS `ProfileTabsEndpoints.userGigs`.
+         */
+        suspend fun userGigs(
+            userId: String,
+            limit: Int = 20,
+        ): NetworkResult<GigsListResponse> = safeApiCall { api.list(userId = userId, limit = limit) }
+
         /** `GET /api/gigs/browse` — pre-sectioned browse feed. `radiusMeters` null ⇒ server default (~100 mi). */
         suspend fun browse(
             lat: Double,

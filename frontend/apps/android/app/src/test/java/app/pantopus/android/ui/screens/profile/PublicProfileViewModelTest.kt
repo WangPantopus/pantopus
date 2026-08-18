@@ -49,6 +49,7 @@ class PublicProfileViewModelTest {
     private val repo: ProfileRepository = mockk()
     private val social: UserSocialRepository = mockk(relaxed = true)
     private val relationships: RelationshipsRepository = mockk()
+
     // Owns the disconnect half of `/api/relationships` (S5 split).
     private val connections: ConnectionsRepository = mockk(relaxed = true)
     private val blocks: BlocksRepository = mockk()

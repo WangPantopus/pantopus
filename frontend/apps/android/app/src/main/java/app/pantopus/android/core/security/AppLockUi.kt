@@ -1,3 +1,5 @@
+@file:Suppress("ComplexCondition")
+
 package app.pantopus.android.core.security
 
 import android.content.Context

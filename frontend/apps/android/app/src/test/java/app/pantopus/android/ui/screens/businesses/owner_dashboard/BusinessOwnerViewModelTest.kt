@@ -22,8 +22,8 @@ import app.pantopus.android.data.api.models.businesses.BusinessUserDetailDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
-import app.pantopus.android.data.businessfounding.BusinessFoundingRepository
 import app.pantopus.android.data.businesses.BusinessesRepository
+import app.pantopus.android.data.businessfounding.BusinessFoundingRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import io.mockk.coEvery
 import io.mockk.every

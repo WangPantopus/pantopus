@@ -217,6 +217,9 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     private let onOpenCompose: @MainActor () -> Void
     /// "N items need routing" banner — opens the disambiguation queue.
     private let onOpenRoutingQueueHandler: @MainActor () -> Void
+    /// Overflow-menu "Mail party" entry. Opens the Family Mail Party
+    /// surface (`GET /api/mailbox/v2/p2/party/active` and friends).
+    private let onOpenMailPartyHandler: @MainActor () -> Void
     /// Preview/test seam. Non-nil → sample mode: the screen projects this
     /// fixture and never touches the network. Nil → live mode (production).
     private let sampleProvider: ((MailboxDrawer, MailboxTab) -> [MailboxSampleSection])?
@@ -255,6 +258,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenUnboxing: @escaping @MainActor () -> Void = {},
         onOpenCompose: @escaping @MainActor () -> Void = {},
         onOpenRoutingQueue: @escaping @MainActor () -> Void = {},
+        onOpenMailParty: @escaping @MainActor () -> Void = {},
         onOpenCommunity: @escaping @MainActor () -> Void = {},
         onOpenRecords: @escaping @MainActor () -> Void = {},
         onOpenMailTasks: @escaping @MainActor () -> Void = {},
@@ -275,6 +279,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
             onOpenUnboxing: onOpenUnboxing,
             onOpenCompose: onOpenCompose,
             onOpenRoutingQueue: onOpenRoutingQueue,
+            onOpenMailParty: onOpenMailParty,
             onOpenCommunity: onOpenCommunity,
             onOpenRecords: onOpenRecords,
             onOpenMailTasks: onOpenMailTasks,
@@ -299,6 +304,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenUnboxing: @escaping @MainActor () -> Void = {},
         onOpenCompose: @escaping @MainActor () -> Void = {},
         onOpenRoutingQueue: @escaping @MainActor () -> Void = {},
+        onOpenMailParty: @escaping @MainActor () -> Void = {},
         onOpenCommunity: @escaping @MainActor () -> Void = {},
         onOpenRecords: @escaping @MainActor () -> Void = {},
         onOpenMailTasks: @escaping @MainActor () -> Void = {},
@@ -318,6 +324,7 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
         onOpenUnboxingHandler = onOpenUnboxing
         self.onOpenCompose = onOpenCompose
         onOpenRoutingQueueHandler = onOpenRoutingQueue
+        onOpenMailPartyHandler = onOpenMailParty
         onOpenCommunityHandler = onOpenCommunity
         onOpenRecordsHandler = onOpenRecords
         onOpenMailTasksHandler = onOpenMailTasks
@@ -354,6 +361,12 @@ public final class MailboxRootViewModel: ListOfRowsDataSource {
     /// Invoked from the "N items need routing" banner in the header.
     public func openRoutingQueue() {
         onOpenRoutingQueueHandler()
+    }
+
+    /// Invoked from `MailboxRootView`'s overflow menu when the user taps
+    /// "Mail party". Opens the household co-opening surface.
+    public func openMailParty() {
+        onOpenMailPartyHandler()
     }
 
     /// A17.4 — invoked from `MailboxRootView`'s overflow menu when the

@@ -49,4 +49,16 @@ public enum AIEndpoints {
         // and the multi-image upload itself takes a few seconds.
         Endpoint(method: .post, path: "/api/ai/draft/listing-vision", body: body, timeout: 45)
     }
+
+    /// `POST /api/ai/draft/post` — single-turn post draft from a
+    /// free-text prompt. Edit Profile's "Generate with AI" bio action
+    /// feeds it the name / skills / tagline / city the user already
+    /// entered and writes `draft.content` back into the bio field.
+    /// Route `backend/routes/ai.js:218`.
+    public static func draftPost(_ body: AIDraftPostRequest) -> Endpoint {
+        // 35s: the backend gives the draft model 30s
+        // (`DRAFT_TIMEOUT_MS`, `backend/services/ai/agentService.js:30`),
+        // which overruns the session's 20s inactivity default.
+        Endpoint(method: .post, path: "/api/ai/draft/post", body: body, timeout: 35)
+    }
 }

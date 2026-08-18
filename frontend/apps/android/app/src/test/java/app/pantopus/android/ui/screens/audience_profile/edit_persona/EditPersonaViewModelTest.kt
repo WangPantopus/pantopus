@@ -73,8 +73,7 @@ class EditPersonaViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun makeVm(): EditPersonaViewModel =
-        EditPersonaViewModel(audienceRepository, personaEditRepository, uploadRepository)
+    private fun makeVm(): EditPersonaViewModel = EditPersonaViewModel(audienceRepository, personaEditRepository, uploadRepository)
 
     private fun persona(
         id: String = "p_1",

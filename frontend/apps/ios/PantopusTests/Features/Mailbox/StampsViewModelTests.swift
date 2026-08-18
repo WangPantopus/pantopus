@@ -213,7 +213,11 @@ final class StampsViewModelTests: XCTestCase {
         guard case let .loaded(themes) = vm.themes else {
             return XCTFail("Expected .loaded themes, got \(vm.themes)")
         }
-        XCTAssertEqual(themes.themes.count, 2)
+        // The fixture carries three themes — t3 ("Harvest", the default-unlock
+        // autumn theme) was added with the wave-B stamps work but the count was
+        // never updated. Locked themes are projected too, which the
+        // `themes[1].isUnlocked == false` assertion below relies on.
+        XCTAssertEqual(themes.themes.count, 3)
         XCTAssertEqual(themes.activeThemeId, "t1")
         XCTAssertEqual(themes.activeTheme?.name, "First Frost")
         XCTAssertEqual(themes.themes.first?.season, .winter)

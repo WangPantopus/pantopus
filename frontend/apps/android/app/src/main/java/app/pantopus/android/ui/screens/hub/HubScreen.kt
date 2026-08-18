@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "UnusedPrivateMember", "LongMethod", "TopLevelPropertyNaming")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "TopLevelPropertyNaming", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.hub
 

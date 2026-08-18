@@ -27,8 +27,7 @@ open class MailboxPartyRepository
         private val api: MailboxPartyApi,
     ) {
         /** `GET api/mailbox/v2/p2/party/active`. */
-        open suspend fun activeSessions(): NetworkResult<MailPartyActiveResponse> =
-            safeApiCall { api.activeSessions() }
+        open suspend fun activeSessions(): NetworkResult<MailPartyActiveResponse> = safeApiCall { api.activeSessions() }
 
         /** `POST api/mailbox/v2/p2/party/create`. */
         open suspend fun createSession(mailId: String): NetworkResult<MailPartyCreateResponse> =

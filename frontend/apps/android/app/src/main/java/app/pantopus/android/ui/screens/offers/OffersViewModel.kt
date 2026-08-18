@@ -743,8 +743,7 @@ class OffersViewModel
              * Confirm copy for Accept. Paid offers authorize a hold first,
              * so the dialog quotes the exact amount (RN `handleAcceptBid`).
              */
-            fun acceptConfirmTitle(dto: BidDto): String =
-                if ((dto.bidAmount ?: 0.0) > 0) "Authorize payment method?" else "Accept offer"
+            fun acceptConfirmTitle(dto: BidDto): String = if ((dto.bidAmount ?: 0.0) > 0) "Authorize payment method?" else "Accept offer"
 
             fun acceptConfirmMessage(dto: BidDto): String {
                 val amount = dto.bidAmount ?: 0.0

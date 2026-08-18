@@ -393,6 +393,9 @@ public enum HubRoute: Hashable {
     /// Disambiguation queue behind the Mailbox root's
     /// "N items need routing" banner.
     case mailRoutingQueue
+    /// Family Mail Party — household co-opening (discover / join / start /
+    /// react / hand off). Reached from the Mailbox root overflow menu.
+    case mailParty
     /// A13.16 — My Mail Day editor (mid-afternoon triage + empty hero).
     /// Pushed from the Mailbox root header CTA + the
     /// `pantopus://mailbox/mailday` deep link.
@@ -1783,6 +1786,12 @@ public struct HubTabRoot: View {
                             verified: profile.verified ?? false
                         )))
                     }
+                },
+                onOpenGig: { gigId in
+                    Task { @MainActor in push(.gigDetail(gigId: gigId)) }
+                },
+                onOpenProfile: { reviewerId in
+                    Task { @MainActor in push(.publicProfile(userId: reviewerId)) }
                 }
             )
         case let .businessProfile(businessId):
@@ -2669,6 +2678,7 @@ public struct HubTabRoot: View {
                     onOpenUnboxing: { push(.unboxing(mailId: nil)) },
                     onOpenCompose: { push(.ceremonialMail) },
                     onOpenRoutingQueue: { push(.mailRoutingQueue) },
+                    onOpenMailParty: { push(.mailParty) },
                     onOpenCommunity: { push(.communityMail) },
                     onOpenRecords: { push(.homeRecords) },
                     onOpenMailTasks: {
@@ -2700,6 +2710,13 @@ public struct HubTabRoot: View {
             )
         case .mailRoutingQueue:
             MailRoutingQueueView { Task { @MainActor in pop() } }
+        case .mailParty:
+            MailPartyView(
+                onOpenMail: { mailId in
+                    Task { @MainActor in push(.mailItemDetail(mailId: mailId)) }
+                },
+                onClose: { Task { @MainActor in pop() } }
+            )
         case .mailboxMap:
             MailboxMapView { pop() }
         case .vacationHold:

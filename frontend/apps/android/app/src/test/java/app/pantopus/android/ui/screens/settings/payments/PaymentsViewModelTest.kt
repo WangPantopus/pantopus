@@ -4,6 +4,7 @@ package app.pantopus.android.ui.screens.settings.payments
 
 import app.cash.turbine.test
 import app.pantopus.android.data.api.models.payments.AddCardSheetParamsDto
+import app.pantopus.android.data.api.models.payments.EarningsSummaryDto
 import app.pantopus.android.data.api.models.payments.PaymentHistoryEntryDto
 import app.pantopus.android.data.api.models.payments.PaymentHistoryGigDto
 import app.pantopus.android.data.api.models.payments.PaymentHistoryPartyDto
@@ -11,6 +12,7 @@ import app.pantopus.android.data.api.models.payments.PaymentHistoryResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodAckResponse
 import app.pantopus.android.data.api.models.payments.PaymentMethodDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodsResponse
+import app.pantopus.android.data.api.models.payments.PaymentsEarningsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.connect.ConnectRepository
@@ -56,6 +58,10 @@ class PaymentsViewModelTest {
         // No connected account by default → the not-connected Payouts scaffold.
         coEvery { connectRepository.accountStatus() } returns
             NetworkResult.Failure(NetworkError.NotFound)
+        // Neither lifetime summary reads by default → the Earnings & Spending
+        // card stays hidden unless a test opts into it.
+        coEvery { repository.earnings() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
+        coEvery { repository.spending() } returns NetworkResult.Failure(NetworkError.Server(500, "boom"))
     }
 
     @After
@@ -273,6 +279,37 @@ class PaymentsViewModelTest {
             val content = (vm.state.value as PaymentsUiState.Loaded).content
             assertEquals(1, content.methods.size)
             assertEquals("Couldn't load transactions", (content.activity as PaymentsActivity.Empty).title)
+        }
+
+    /**
+     * The lifetime summaries land on the Earnings & Spending card, and a
+     * failure on one of them degrades only its own tile.
+     */
+    @Test
+    fun live_load_projects_lifetime_earnings_and_spending() =
+        runTest {
+            coEvery { repository.paymentMethods() } returns NetworkResult.Success(PaymentMethodsResponse(emptyList()))
+            coEvery { repository.earnings() } returns
+                NetworkResult.Success(PaymentsEarningsResponse(EarningsSummaryDto(totalEarned = 128_450)))
+            val vm = vm()
+            vm.load()
+            val earnings = (vm.state.value as PaymentsUiState.Loaded).content.earnings
+
+            assertNotNull(earnings)
+            assertEquals("$1,284.50", earnings?.totalEarned)
+            // Spending still fails from setUp() — its tile alone falls back.
+            assertEquals("—", earnings?.totalSpent)
+        }
+
+    /** Neither summary read → hide the card instead of claiming two zeroes. */
+    @Test
+    fun both_summary_failures_hide_the_earnings_card() =
+        runTest {
+            coEvery { repository.paymentMethods() } returns NetworkResult.Success(PaymentMethodsResponse(emptyList()))
+            val vm = vm()
+            vm.load()
+
+            assertNull((vm.state.value as PaymentsUiState.Loaded).content.earnings)
         }
 
     @Test

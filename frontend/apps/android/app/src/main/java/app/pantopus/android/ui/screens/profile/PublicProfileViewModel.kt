@@ -47,13 +47,21 @@ const val PUBLIC_PROFILE_USER_ID_KEY = "userId"
 enum class PublicProfileKind { Persona, Local }
 
 /**
- * A21.2 — the two-tab strip on the Local Beacon profile archetype
- * (Posts · About). Separate from [ProfileTab] so the persona path keeps
- * its own four-tab body untouched.
+ * A21.2 — the tab strip on the Local Beacon profile archetype. Separate
+ * from [ProfileTab] so the persona path keeps its own body untouched.
+ *
+ * Posts · About are the designed pair; Portfolio · Gigs · Reviews carry
+ * the marketplace surfaces a verified neighbour actually has —
+ * `GET /api/files/portfolio/{userId}` (`backend/routes/files.js:526`),
+ * `GET /api/gigs?user_id=…` (`backend/routes/gigs.js:2089`) and
+ * `GET /api/reviews/user/{userId}` (`backend/routes/reviews.js:149`).
  */
 enum class LocalProfileTab(val label: String) {
     Posts("Posts"),
     About("About"),
+    Portfolio("Portfolio"),
+    Gigs("Gigs"),
+    Reviews("Reviews"),
 }
 
 /**
@@ -184,8 +192,7 @@ enum class ProfileConnection(
          * Decode the server's string, defaulting anything unrecognised to
          * [None] — the same fallback RN applies (`rel.relationship || 'none'`).
          */
-        fun fromApi(value: String?): ProfileConnection =
-            entries.firstOrNull { it.apiValue == value?.lowercase() } ?: None
+        fun fromApi(value: String?): ProfileConnection = entries.firstOrNull { it.apiValue == value?.lowercase() } ?: None
     }
 }
 
@@ -442,8 +449,7 @@ class PublicProfileViewModel
         fun showsConnectAction(): Boolean = _canFollow.value && _connection.value != ProfileConnection.Blocked
 
         /** Tapping is a no-op while a request is outstanding or in flight. */
-        fun isConnectEnabled(): Boolean =
-            _connection.value.isActionable && _connectState.value !is PublicProfileActionState.InFlight
+        fun isConnectEnabled(): Boolean = _connection.value.isActionable && _connectState.value !is PublicProfileActionState.InFlight
 
         /**
          * The Connect affordance. What it does depends on the edge the

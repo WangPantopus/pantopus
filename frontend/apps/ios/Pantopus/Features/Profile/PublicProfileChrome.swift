@@ -510,50 +510,66 @@ struct PublicProfilePostsFeed: View {
 
 // MARK: - A21.2 Local tab strip
 
-/// Underline-active two-tab strip for the Local Beacon profile archetype
-/// (Posts · About). Mirrors the design's `TabStrip` — and the persona
-/// `BeaconProfileTabStrip` — so both archetypes read identically.
+/// Underline-active tab strip for the Local Beacon profile archetype
+/// (Posts · About · Portfolio · Gigs · Reviews). Mirrors the design's
+/// `TabStrip` — and the persona `BeaconProfileTabStrip` — so both
+/// archetypes read identically. Scrolls horizontally so the marketplace
+/// tabs survive the larger dynamic-type sizes.
 @MainActor
 struct LocalProfileTabStrip: View {
     let postCount: Int?
+    /// Server-side review total, badged on the Reviews tab the way
+    /// `postCount` badges Posts. `nil` hides the badge.
+    var reviewCount: Int?
     let selected: LocalProfileTab
     let onSelect: @MainActor (LocalProfileTab) -> Void
 
     var body: some View {
-        HStack(spacing: Spacing.s6) {
-            ForEach(LocalProfileTab.allCases) { tab in
-                let isActive = tab == selected
-                Button {
-                    onSelect(tab)
-                } label: {
-                    VStack(spacing: Spacing.s2) {
-                        HStack(spacing: Spacing.s1) {
-                            Text(tab.label)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
-                            if tab == .posts, let postCount {
-                                Text("\(postCount)")
-                                    .font(.system(size: 10.5))
-                                    .foregroundStyle(Theme.Color.appTextMuted)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s6) {
+                ForEach(LocalProfileTab.allCases) { tab in
+                    let isActive = tab == selected
+                    Button {
+                        onSelect(tab)
+                    } label: {
+                        VStack(spacing: Spacing.s2) {
+                            HStack(spacing: Spacing.s1) {
+                                Text(tab.label)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                                if let count = badgeCount(for: tab) {
+                                    Text("\(count)")
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(Theme.Color.appTextMuted)
+                                }
                             }
+                            Rectangle()
+                                .fill(isActive ? Theme.Color.primary600 : Color.clear)
+                                .frame(height: 2)
                         }
-                        Rectangle()
-                            .fill(isActive ? Theme.Color.primary600 : Color.clear)
-                            .frame(height: 2)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("publicProfileLocalTab_\(tab.rawValue)")
+                    .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("publicProfileLocalTab_\(tab.rawValue)")
-                .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+                Spacer(minLength: Spacing.s0)
             }
-            Spacer(minLength: Spacing.s0)
         }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Theme.Color.appBorder)
                 .frame(height: 1)
         }
         .accessibilityIdentifier("publicProfileLocalTabStrip")
+    }
+
+    private func badgeCount(for tab: LocalProfileTab) -> Int? {
+        switch tab {
+        case .posts: postCount
+        case .reviews: reviewCount
+        default: nil
+        }
     }
 }
 

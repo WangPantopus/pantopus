@@ -16,6 +16,5 @@ class PostPrecheckRepository
         private val api: PostPrecheckApi,
     ) {
         /** `POST /api/posts/precheck`. */
-        suspend fun precheck(request: PostPrecheckRequest): NetworkResult<PostPrecheckResponse> =
-            safeApiCall { api.precheck(request) }
+        suspend fun precheck(request: PostPrecheckRequest): NetworkResult<PostPrecheckResponse> = safeApiCall { api.precheck(request) }
     }

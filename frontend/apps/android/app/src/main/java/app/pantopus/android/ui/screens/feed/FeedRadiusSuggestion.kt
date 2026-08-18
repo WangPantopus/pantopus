@@ -24,6 +24,7 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import java.util.Locale
 
 /**
  * Port of RN's `useRadiusSuggestion` + `RadiusSuggestionBanner`. When
@@ -47,7 +48,7 @@ data class FeedRadiusSuggestion(
             when {
                 miles >= GLOBAL_RADIUS_MILES -> "Global"
                 miles == Math.floor(miles) -> "${miles.toInt()} mi"
-                else -> String.format("%.1f mi", miles)
+                else -> String.format(Locale.US, "%.1f mi", miles)
             }
 
         /**
@@ -70,13 +71,11 @@ data class FeedRadiusSuggestion(
                 index == -1 -> null
                 itemCount == 0 && canExpand ->
                     expand(
-                        currentRadius = currentRadius,
                         next = radiusOptions[index + 1],
                         reasonLead = "No $pluralLabel within ${formatRadius(currentRadius)}.",
                     )
                 itemCount <= 2 && currentRadius < GLOBAL_RADIUS_MILES && canExpand ->
                     expand(
-                        currentRadius = currentRadius,
                         next = radiusOptions[index + 1],
                         reasonLead = "$itemCount $noun within ${formatRadius(currentRadius)}.",
                     )
@@ -91,7 +90,6 @@ data class FeedRadiusSuggestion(
         }
 
         private fun expand(
-            currentRadius: Double,
             next: Double,
             reasonLead: String,
         ): FeedRadiusSuggestion =

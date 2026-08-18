@@ -17,8 +17,7 @@ class PersonaEditRepository
         private val api: PersonaEditApi,
     ) {
         /** `POST /api/personas` — create the caller's Beacon. */
-        suspend fun createPersona(body: PersonaWriteBody): NetworkResult<PersonaWriteResponse> =
-            safeApiCall { api.createPersona(body) }
+        suspend fun createPersona(body: PersonaWriteBody): NetworkResult<PersonaWriteResponse> = safeApiCall { api.createPersona(body) }
 
         /** `PATCH /api/personas/:id` — update an owned Beacon. */
         suspend fun updatePersona(
@@ -27,6 +26,5 @@ class PersonaEditRepository
         ): NetworkResult<PersonaWriteResponse> = safeApiCall { api.updatePersona(personaId, body) }
 
         /** `GET /api/personas/compliance/categories` — selectable categories. */
-        suspend fun categoryPolicies(): NetworkResult<PersonaCategoryPoliciesResponse> =
-            safeApiCall { api.categoryPolicies() }
+        suspend fun categoryPolicies(): NetworkResult<PersonaCategoryPoliciesResponse> = safeApiCall { api.categoryPolicies() }
     }

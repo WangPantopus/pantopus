@@ -466,6 +466,12 @@ private fun LoadedFrame(
                 )
             }
         }
+        if (loaded.earnings != null) {
+            item(key = "overline_earnings") { SectionOverline("Earnings & spending", id = "earnings") }
+            item(key = "card_earnings") {
+                EarningsCard(earnings = loaded.earnings)
+            }
+        }
         item(key = "overline_activity") { SectionOverline("Activity", id = "activity") }
         item(key = "card_activity") {
             ActivityCard(activity = loaded.activity, onTapRow = onTapRow)
@@ -590,6 +596,83 @@ private fun PayoutsCard(
                 Divider()
             }
         }
+    }
+}
+
+/**
+ * "Earnings & Spending" — the two lifetime totals from
+ * `GET api/payments/earnings` + `/spending`. A figure the server wouldn't
+ * hand back stays an em-dash rather than reading as "$0.00".
+ */
+@Composable
+private fun EarningsCard(earnings: PaymentsEarnings) {
+    Card(id = "earnings") {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s4),
+        ) {
+            EarningsTile(
+                label = "Total earned",
+                value = earnings.totalEarned,
+                tint = PantopusColors.success,
+                tileTestTag = "paymentsTotalEarned",
+                modifier = Modifier.weight(1f),
+            )
+            EarningsTile(
+                label = "Total spent",
+                value = earnings.totalSpent,
+                tint = PantopusColors.primary600,
+                tileTestTag = "paymentsTotalSpent",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            text = earnings.caption,
+            color = PantopusColors.appTextSecondary,
+            fontSize = 11.5.sp,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = Spacing.s4, end = Spacing.s4, top = Spacing.s3, bottom = Spacing.s4)
+                    .testTag("paymentsEarningsCaption"),
+        )
+    }
+}
+
+@Composable
+private fun EarningsTile(
+    label: String,
+    value: String,
+    tint: Color,
+    tileTestTag: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(Radii.md))
+                .background(tint.copy(alpha = 0.08f))
+                .border(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(Radii.md))
+                .padding(Spacing.s3)
+                .testTag(tileTestTag),
+    ) {
+        Text(
+            text = label.uppercase(),
+            color = tint,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+        )
+        Text(
+            text = value,
+            color = PantopusColors.appText,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "FunctionNaming")
+@file:Suppress("FunctionNaming", "MagicNumber", "MatchingDeclarationName", "PackageNaming")
 
 package app.pantopus.android.ui.screens.mailbox.earn
 

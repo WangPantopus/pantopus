@@ -16,14 +16,12 @@ class BusinessInboxRepository
         private val api: BusinessInboxApi,
     ) {
         /** Messages section — rooms addressed to the business identity. */
-        suspend fun rooms(businessId: String): NetworkResult<BusinessInboxRoomsResponse> =
-            safeApiCall { api.rooms(businessId) }
+        suspend fun rooms(businessId: String): NetworkResult<BusinessInboxRoomsResponse> = safeApiCall { api.rooms(businessId) }
 
         /** Mentions section — neighborhood posts matched to the business. */
         suspend fun matchedPosts(
             businessId: String,
             page: Int = 1,
             pageSize: Int = 30,
-        ): NetworkResult<BusinessMatchedPostsResponse> =
-            safeApiCall { api.matchedPosts(businessId, page, pageSize) }
+        ): NetworkResult<BusinessMatchedPostsResponse> = safeApiCall { api.matchedPosts(businessId, page, pageSize) }
     }

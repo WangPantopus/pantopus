@@ -42,8 +42,7 @@ enum class RecordAssetCategory(
     ;
 
     companion object {
-        fun fromRaw(raw: String?): RecordAssetCategory =
-            entries.firstOrNull { it.slug == raw } ?: OTHER
+        fun fromRaw(raw: String?): RecordAssetCategory = entries.firstOrNull { it.slug == raw } ?: OTHER
     }
 }
 
@@ -62,8 +61,7 @@ enum class RecordWarrantyStatus(
     ;
 
     companion object {
-        fun fromRaw(raw: String?): RecordWarrantyStatus =
-            entries.firstOrNull { it.slug == raw } ?: NONE
+        fun fromRaw(raw: String?): RecordWarrantyStatus = entries.firstOrNull { it.slug == raw } ?: NONE
     }
 }
 
@@ -253,8 +251,7 @@ class HomeRecordsViewModel
         }
 
         /** Every loaded asset, ignoring the room chip — the link picker needs all. */
-        fun allAssets(): List<HomeRecordAsset> =
-            (_state.value as? HomeRecordsUiState.Loaded)?.assets ?: emptyList()
+        fun allAssets(): List<HomeRecordAsset> = (_state.value as? HomeRecordsUiState.Loaded)?.assets ?: emptyList()
 
         private suspend fun fetchAssets() {
             resolveHomeIdIfNeeded()

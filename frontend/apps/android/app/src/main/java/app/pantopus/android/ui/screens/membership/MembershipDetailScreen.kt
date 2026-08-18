@@ -552,7 +552,7 @@ private fun TierOptionRow(
                 .semantics {
                     contentDescription =
                         "${option.direction.label} to ${option.name}, ${option.priceLabel}. " +
-                            option.direction.timingNote
+                        option.direction.timingNote
                 }.testTag("membershipTierOption_${option.rank}"),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,

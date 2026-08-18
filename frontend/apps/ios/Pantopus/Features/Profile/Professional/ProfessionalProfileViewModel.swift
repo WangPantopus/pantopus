@@ -24,6 +24,10 @@
 import Foundation
 import Observation
 
+// The professional editor holds the whole form — categories, pricing, service
+// area and verification — in one observable object, matching Android's single
+// ProfessionalProfileViewModel. Splitting it would fork the parity contract.
+// swiftlint:disable type_body_length
 @Observable
 @MainActor
 public final class ProfessionalProfileViewModel {
@@ -678,3 +682,5 @@ public final class ProfessionalProfileViewModel {
             : .pending(content, dirtyCount: dirty, pendingCount: content.pendingCount)
     }
 }
+
+// swiftlint:enable type_body_length

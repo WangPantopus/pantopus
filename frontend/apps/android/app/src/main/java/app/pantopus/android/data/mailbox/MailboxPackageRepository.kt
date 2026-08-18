@@ -25,8 +25,7 @@ open class MailboxPackageRepository
         private val api: MailboxPackageApi,
     ) {
         /** `GET api/mailbox/v2/package/:mailId`. */
-        open suspend fun packageDetail(mailId: String): NetworkResult<UnboxingPackageResponse> =
-            safeApiCall { api.packageDetail(mailId) }
+        open suspend fun packageDetail(mailId: String): NetworkResult<UnboxingPackageResponse> = safeApiCall { api.packageDetail(mailId) }
 
         /** `POST api/mailbox/v2/p2/package/:mailId/unboxing`. */
         open suspend fun recordUnboxing(
@@ -38,8 +37,7 @@ open class MailboxPackageRepository
         open suspend fun saveWarranty(
             mailId: String,
             type: String,
-        ): NetworkResult<PackageSaveWarrantyResponse> =
-            safeApiCall { api.saveWarranty(mailId, PackageSaveWarrantyRequest(type = type)) }
+        ): NetworkResult<PackageSaveWarrantyResponse> = safeApiCall { api.saveWarranty(mailId, PackageSaveWarrantyRequest(type = type)) }
 
         /** `POST api/mailbox/v2/p2/package/:mailId/gig`. */
         open suspend fun createPackageGig(
@@ -48,6 +46,5 @@ open class MailboxPackageRepository
         ): NetworkResult<PackageGigResponse> = safeApiCall { api.createPackageGig(mailId, request) }
 
         /** `POST api/mailbox/v2/package/:mailId/share-eta`. */
-        open suspend fun shareEta(mailId: String): NetworkResult<SharePackageEtaResponse> =
-            safeApiCall { api.shareEta(mailId) }
+        open suspend fun shareEta(mailId: String): NetworkResult<SharePackageEtaResponse> = safeApiCall { api.shareEta(mailId) }
     }

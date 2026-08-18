@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming")
 
 package app.pantopus.android.ui.screens.support_trains.manage
 

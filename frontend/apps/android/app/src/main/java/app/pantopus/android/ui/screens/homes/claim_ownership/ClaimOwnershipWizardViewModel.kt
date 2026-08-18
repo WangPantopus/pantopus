@@ -142,8 +142,7 @@ data class ClaimOwnershipUiState(
         get() = bothSlotsHaveFiles && !needsDocumentTypeSelection
 
     /** `evidence_type` sent for [slot]: fixed, or the user's pick. */
-    fun evidenceTypeFor(slot: ClaimEvidenceSlot): String =
-        slot.fixedBackendType ?: selectedDocumentType ?: slot.backendType
+    fun evidenceTypeFor(slot: ClaimEvidenceSlot): String = slot.fixedBackendType ?: selectedDocumentType ?: slot.backendType
 }
 
 /**

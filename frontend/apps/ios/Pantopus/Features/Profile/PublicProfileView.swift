@@ -31,6 +31,8 @@ public struct PublicProfileView: View {
     private let onEditPersona: @MainActor () -> Void
     private let onOpenInsights: @MainActor () -> Void
     private let onComposeBroadcast: @MainActor () -> Void
+    private let onOpenGig: @MainActor (String) -> Void
+    private let onOpenProfile: @MainActor (String) -> Void
 
     public init(
         userId: String,
@@ -39,7 +41,9 @@ public struct PublicProfileView: View {
         onOpenMessages: @escaping @MainActor (PublicProfile) -> Void = { _ in },
         onEditPersona: @escaping @MainActor () -> Void = {},
         onOpenInsights: @escaping @MainActor () -> Void = {},
-        onComposeBroadcast: @escaping @MainActor () -> Void = {}
+        onComposeBroadcast: @escaping @MainActor () -> Void = {},
+        onOpenGig: @escaping @MainActor (String) -> Void = { _ in },
+        onOpenProfile: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         // No call site threads the signed-in id through, so fall back to the
         // session when the caller doesn't supply one — otherwise `isOwner`
@@ -55,6 +59,8 @@ public struct PublicProfileView: View {
         self.onEditPersona = onEditPersona
         self.onOpenInsights = onOpenInsights
         self.onComposeBroadcast = onComposeBroadcast
+        self.onOpenGig = onOpenGig
+        self.onOpenProfile = onOpenProfile
     }
 
     public var body: some View {
@@ -224,6 +230,7 @@ public struct PublicProfileView: View {
 
                     LocalProfileTabStrip(
                         postCount: payload.posts.isEmpty ? nil : payload.posts.count,
+                        reviewCount: payload.profile.reviewCount.flatMap { $0 > 0 ? $0 : nil },
                         selected: viewModel.selectedLocalTab
                     ) { viewModel.selectedLocalTab = $0 }
                         .padding(.horizontal, Spacing.s4)
@@ -251,6 +258,15 @@ public struct PublicProfileView: View {
             )
         case .about:
             LocalProfileAboutSection(content: neighbor)
+                .padding(.horizontal, Spacing.s4)
+        case .portfolio:
+            ProfilePortfolioSection(userId: payload.profile.id, isOwnProfile: payload.isOwner)
+                .padding(.horizontal, Spacing.s4)
+        case .gigs:
+            ProfileGigsSection(userId: payload.profile.id, onOpenGig: onOpenGig)
+                .padding(.horizontal, Spacing.s4)
+        case .reviews:
+            ProfileGigReviewsSection(userId: payload.profile.id, onOpenReviewer: onOpenProfile)
                 .padding(.horizontal, Spacing.s4)
         }
     }
@@ -304,9 +320,13 @@ public struct PublicProfileView: View {
                         ),
                         showStats: false,
                         showActionRow: false,
+                        profileUserId: payload.profile.id,
+                        isOwnProfile: payload.isOwner,
                         onMessage: { onOpenMessages(payload.profile) },
                         onConnect: { Task { await viewModel.connect() } },
-                        onOverflow: { viewModel.showOverflow = true }
+                        onOverflow: { viewModel.showOverflow = true },
+                        onOpenGig: onOpenGig,
+                        onOpenReviewer: onOpenProfile
                     )
                     ReceivedReviewsSection(userId: payload.profile.id)
                     PublicProfilePostsFeed(

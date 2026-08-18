@@ -281,8 +281,7 @@ class BusinessOwnerViewModel
          * RN gate: `access.role_base && ['owner','admin','editor'].includes(...)`
          * (`src/app/businesses/[id]/index.tsx:67`).
          */
-        private fun canPost(roleBase: String?): Boolean =
-            !roleBase.isNullOrEmpty() && roleBase in BusinessOwnerContent.POSTING_ROLES
+        private fun canPost(roleBase: String?): Boolean = !roleBase.isNullOrEmpty() && roleBase in BusinessOwnerContent.POSTING_ROLES
 
         private fun insightTiles(insights: BusinessInsightsResponse?): List<OwnerInsightTile> {
             if (insights == null) return emptyList()

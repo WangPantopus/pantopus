@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.mailbox.unboxing
 

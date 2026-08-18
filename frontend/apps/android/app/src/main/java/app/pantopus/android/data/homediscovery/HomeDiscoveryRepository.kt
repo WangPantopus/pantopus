@@ -26,8 +26,7 @@ open class HomeDiscoveryRepository
         open suspend fun discover(query: String): NetworkResult<HomeDiscoverResponse> = safeApiCall { api.discover(query) }
 
         /** `GET /api/homes/:id/public-profile`. */
-        open suspend fun publicPreview(homeId: String): NetworkResult<HomePublicPreviewResponse> =
-            safeApiCall { api.publicPreview(homeId) }
+        open suspend fun publicPreview(homeId: String): NetworkResult<HomePublicPreviewResponse> = safeApiCall { api.publicPreview(homeId) }
 
         /** `POST /api/homes/:id/request-household-from-owner`. */
         open suspend fun requestHouseholdFromOwner(

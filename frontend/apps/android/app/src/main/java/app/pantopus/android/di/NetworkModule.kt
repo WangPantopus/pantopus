@@ -154,6 +154,9 @@ object NetworkModule {
             .add(app.pantopus.android.data.api.models.businesses.BusinessCatalogItemRequestJsonAdapter())
             .add(app.pantopus.android.data.api.models.homes.BillDecimalAdapter())
             .add(app.pantopus.android.data.api.models.homes.PollOptionAdapter())
+            // Payments earnings/spending: the summary arrives both nested and
+            // spread at the envelope root, in snake_case and camelCase.
+            .add(app.pantopus.android.data.api.models.payments.PaymentsEarningsJsonAdapter())
             // Place Intelligence: the envelope's payload type depends on
             // the sibling `id` field (hand-written adapter), and the Place
             // display vocabularies decode unknown values to UNKNOWN.
@@ -306,8 +309,7 @@ object NetworkModule {
 
     /** First-50 founding-business offer (status + claim). */
     @Provides @Singleton
-    fun provideBusinessFoundingApi(retrofit: Retrofit): BusinessFoundingApi =
-        retrofit.create(BusinessFoundingApi::class.java)
+    fun provideBusinessFoundingApi(retrofit: Retrofit): BusinessFoundingApi = retrofit.create(BusinessFoundingApi::class.java)
 
     /** Broadcast read receipts fired from the public Beacon profile. */
     @Provides @Singleton
@@ -338,13 +340,11 @@ object NetworkModule {
 
     /** H6 — per-home owner claim review (ownership + residency claims). */
     @Provides @Singleton
-    fun provideHomeClaimReviewApi(retrofit: Retrofit): HomeClaimReviewApi =
-        retrofit.create(HomeClaimReviewApi::class.java)
+    fun provideHomeClaimReviewApi(retrofit: Retrofit): HomeClaimReviewApi = retrofit.create(HomeClaimReviewApi::class.java)
 
     /** H1 — dashboard aggregate + Home Intelligence reads. */
     @Provides @Singleton
-    fun provideHomeDashboardApi(retrofit: Retrofit): HomeDashboardApi =
-        retrofit.create(HomeDashboardApi::class.java)
+    fun provideHomeDashboardApi(retrofit: Retrofit): HomeDashboardApi = retrofit.create(HomeDashboardApi::class.java)
 
     @Provides @Singleton
     fun provideHomePetsApi(retrofit: Retrofit): HomePetsApi = retrofit.create(HomePetsApi::class.java)
@@ -362,8 +362,7 @@ object NetworkModule {
     fun provideHomeAdminApi(retrofit: Retrofit): HomeAdminApi = retrofit.create(HomeAdminApi::class.java)
 
     @Provides @Singleton
-    fun provideHomeOwnershipClaimApi(retrofit: Retrofit): HomeOwnershipClaimApi =
-        retrofit.create(HomeOwnershipClaimApi::class.java)
+    fun provideHomeOwnershipClaimApi(retrofit: Retrofit): HomeOwnershipClaimApi = retrofit.create(HomeOwnershipClaimApi::class.java)
 
     @Provides @Singleton
     fun provideHomeGuestPassesApi(retrofit: Retrofit): HomeGuestPassesApi = retrofit.create(HomeGuestPassesApi::class.java)
@@ -402,31 +401,25 @@ object NetworkModule {
     fun provideMailboxTasksApi(retrofit: Retrofit): MailboxTasksApi = retrofit.create(MailboxTasksApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxPackageApi(retrofit: Retrofit): MailboxPackageApi =
-        retrofit.create(MailboxPackageApi::class.java)
+    fun provideMailboxPackageApi(retrofit: Retrofit): MailboxPackageApi = retrofit.create(MailboxPackageApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxCommunityApi(retrofit: Retrofit): MailboxCommunityApi =
-        retrofit.create(MailboxCommunityApi::class.java)
+    fun provideMailboxCommunityApi(retrofit: Retrofit): MailboxCommunityApi = retrofit.create(MailboxCommunityApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxRecordsApi(retrofit: Retrofit): MailboxRecordsApi =
-        retrofit.create(MailboxRecordsApi::class.java)
+    fun provideMailboxRecordsApi(retrofit: Retrofit): MailboxRecordsApi = retrofit.create(MailboxRecordsApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxKeepsakeApi(retrofit: Retrofit): MailboxKeepsakeApi =
-        retrofit.create(MailboxKeepsakeApi::class.java)
+    fun provideMailboxKeepsakeApi(retrofit: Retrofit): MailboxKeepsakeApi = retrofit.create(MailboxKeepsakeApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxPartyApi(retrofit: Retrofit): MailboxPartyApi =
-        retrofit.create(MailboxPartyApi::class.java)
+    fun provideMailboxPartyApi(retrofit: Retrofit): MailboxPartyApi = retrofit.create(MailboxPartyApi::class.java)
 
     @Provides @Singleton
     fun provideMailboxVaultApi(retrofit: Retrofit): MailboxVaultApi = retrofit.create(MailboxVaultApi::class.java)
 
     @Provides @Singleton
-    fun provideMailboxDocumentApi(retrofit: Retrofit): MailboxDocumentApi =
-        retrofit.create(MailboxDocumentApi::class.java)
+    fun provideMailboxDocumentApi(retrofit: Retrofit): MailboxDocumentApi = retrofit.create(MailboxDocumentApi::class.java)
 
     @Provides @Singleton
     fun provideMailDayApi(retrofit: Retrofit): MailDayApi = retrofit.create(MailDayApi::class.java)
@@ -444,8 +437,7 @@ object NetworkModule {
     fun provideSportsApi(retrofit: Retrofit): SportsApi = retrofit.create(SportsApi::class.java)
 
     @Provides @Singleton
-    fun provideViewingLocationApi(retrofit: Retrofit): ViewingLocationApi =
-        retrofit.create(ViewingLocationApi::class.java)
+    fun provideViewingLocationApi(retrofit: Retrofit): ViewingLocationApi = retrofit.create(ViewingLocationApi::class.java)
 
     @Provides @Singleton
     fun provideFeedActionsApi(retrofit: Retrofit): FeedActionsApi = retrofit.create(FeedActionsApi::class.java)
@@ -468,12 +460,10 @@ object NetworkModule {
     fun provideFollowingApi(retrofit: Retrofit): FollowingApi = retrofit.create(FollowingApi::class.java)
 
     @Provides @Singleton
-    fun provideMatchedBusinessesApi(retrofit: Retrofit): MatchedBusinessesApi =
-        retrofit.create(MatchedBusinessesApi::class.java)
+    fun provideMatchedBusinessesApi(retrofit: Retrofit): MatchedBusinessesApi = retrofit.create(MatchedBusinessesApi::class.java)
 
     @Provides @Singleton
-    fun provideProfileInsightsApi(retrofit: Retrofit): ProfileInsightsApi =
-        retrofit.create(ProfileInsightsApi::class.java)
+    fun provideProfileInsightsApi(retrofit: Retrofit): ProfileInsightsApi = retrofit.create(ProfileInsightsApi::class.java)
 
     @Provides @Singleton
     fun provideSavedPlacesApi(retrofit: Retrofit): SavedPlacesApi = retrofit.create(SavedPlacesApi::class.java)
@@ -530,9 +520,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideGigOwnerActionsApi(
-        retrofit: Retrofit,
-    ): app.pantopus.android.data.api.services.GigOwnerActionsApi =
+    fun provideGigOwnerActionsApi(retrofit: Retrofit): app.pantopus.android.data.api.services.GigOwnerActionsApi =
         retrofit.create(app.pantopus.android.data.api.services.GigOwnerActionsApi::class.java)
 
     @Provides
@@ -621,8 +609,7 @@ object NetworkModule {
     /** S1 — Support Train write routes (reserve / cancel / organizer management). */
     @Provides
     @Singleton
-    fun provideSupportTrainActionsApi(retrofit: Retrofit): SupportTrainActionsApi =
-        retrofit.create(SupportTrainActionsApi::class.java)
+    fun provideSupportTrainActionsApi(retrofit: Retrofit): SupportTrainActionsApi = retrofit.create(SupportTrainActionsApi::class.java)
 
     /** S2 — universal search fan-out across the five search surfaces. */
     @Provides

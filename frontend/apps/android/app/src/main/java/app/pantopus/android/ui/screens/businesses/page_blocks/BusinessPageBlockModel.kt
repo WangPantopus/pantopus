@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions", "LongParameterList", "MagicNumber")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.businesses.page_blocks
 

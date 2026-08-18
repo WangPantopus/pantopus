@@ -25,8 +25,7 @@ open class HomeDashboardRepository
         private val api: HomeDashboardApi,
     ) {
         /** `GET /api/homes/:id/dashboard`. */
-        open suspend fun dashboard(homeId: String): NetworkResult<HomeDashboardResponse> =
-            safeApiCall { api.dashboard(homeId) }
+        open suspend fun dashboard(homeId: String): NetworkResult<HomeDashboardResponse> = safeApiCall { api.dashboard(homeId) }
 
         /** `GET /api/homes/:id/health-score?force=true`. */
         open suspend fun healthScore(
@@ -53,10 +52,8 @@ open class HomeDashboardRepository
             }
 
         /** `GET /api/homes/:id/property-value`. */
-        open suspend fun propertyValue(homeId: String): NetworkResult<HomePropertyValueDto> =
-            safeApiCall { api.propertyValue(homeId) }
+        open suspend fun propertyValue(homeId: String): NetworkResult<HomePropertyValueDto> = safeApiCall { api.propertyValue(homeId) }
 
         /** `GET /api/homes/:id/bill-trends`. 403s without finance permission. */
-        open suspend fun billTrends(homeId: String): NetworkResult<HomeBillTrendsDto> =
-            safeApiCall { api.billTrends(homeId) }
+        open suspend fun billTrends(homeId: String): NetworkResult<HomeBillTrendsDto> = safeApiCall { api.billTrends(homeId) }
     }

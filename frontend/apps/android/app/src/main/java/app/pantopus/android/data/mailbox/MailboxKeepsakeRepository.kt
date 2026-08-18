@@ -43,23 +43,19 @@ open class MailboxKeepsakeRepository
         open suspend fun onThisDay(): NetworkResult<MailMemoriesResponse> = safeApiCall { api.onThisDay() }
 
         /** `GET api/mailbox/v2/p3/memory/year/:year`. */
-        open suspend fun yearInMail(year: Int): NetworkResult<YearInMailResponse> =
-            safeApiCall { api.yearInMail(year) }
+        open suspend fun yearInMail(year: Int): NetworkResult<YearInMailResponse> = safeApiCall { api.yearInMail(year) }
 
         /** `POST api/mailbox/v2/p3/memory/dismiss`. */
         open suspend fun dismissMemory(memoryId: String): NetworkResult<DismissMailMemoryResponse> =
             safeApiCall { api.dismissMemory(DismissMailMemoryRequest(memoryId = memoryId)) }
 
         /** `POST api/mailbox/v2/p3/memory/year/:year/share`. */
-        open suspend fun shareYearInMail(year: Int): NetworkResult<ShareYearInMailResponse> =
-            safeApiCall { api.shareYearInMail(year) }
+        open suspend fun shareYearInMail(year: Int): NetworkResult<ShareYearInMailResponse> = safeApiCall { api.shareYearInMail(year) }
 
         /** `GET api/mailbox/v2/p3/mailday/settings`. */
-        open suspend fun mailDaySettings(): NetworkResult<MailDaySettingsDto> =
-            safeApiCall { api.mailDaySettings() }
+        open suspend fun mailDaySettings(): NetworkResult<MailDaySettingsDto> = safeApiCall { api.mailDaySettings() }
 
         /** `PATCH api/mailbox/v2/p3/mailday/settings`. */
-        open suspend fun updateMailDaySettings(
-            patch: MailDaySettingsPatch,
-        ): NetworkResult<MailDaySettingsPatchResponse> = safeApiCall { api.updateMailDaySettings(patch) }
+        open suspend fun updateMailDaySettings(patch: MailDaySettingsPatch): NetworkResult<MailDaySettingsPatchResponse> =
+            safeApiCall { api.updateMailDaySettings(patch) }
     }

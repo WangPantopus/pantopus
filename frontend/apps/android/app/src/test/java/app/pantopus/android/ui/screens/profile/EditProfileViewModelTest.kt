@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.profile
 
+import app.pantopus.android.data.ai.AIDraftRepository
 import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
@@ -46,6 +47,7 @@ class EditProfileViewModelTest {
     private val uploads: UploadRepository = mockk(relaxed = true)
     private val authRepository: AuthRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor = mockk()
+    private val aiDraftRepository: AIDraftRepository = mockk(relaxed = true)
     private val isOnline = MutableStateFlow(true)
 
     @Before fun setUp() {
@@ -58,7 +60,7 @@ class EditProfileViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(): EditProfileViewModel = EditProfileViewModel(repo, uploads, authRepository, networkMonitor)
+    private fun viewModel(): EditProfileViewModel = EditProfileViewModel(repo, uploads, authRepository, networkMonitor, aiDraftRepository)
 
     private fun seededProfile(): UserProfile =
         UserProfile(

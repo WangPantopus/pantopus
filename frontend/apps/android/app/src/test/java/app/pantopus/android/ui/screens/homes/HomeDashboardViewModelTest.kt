@@ -246,6 +246,7 @@ class HomeDashboardViewModelTest {
             val vm = makeVm()
             vm.load()
             val loaded = vm.state.value as HomeDashboardUiState.Loaded
+
             fun badge(id: String) = loaded.content.quickActions.firstOrNull { it.id == id }?.badge
             assertEquals("5", badge("view_tasks"))
             assertEquals("2", badge("view_bills"))

@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package app.pantopus.android.data.api.models.homes
 
 import com.squareup.moshi.Json

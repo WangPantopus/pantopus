@@ -1,12 +1,14 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.ai.AIDraftRepository
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
+import app.pantopus.android.data.api.models.ai.AIDraftPostRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.net.NetworkResult
@@ -109,6 +111,20 @@ sealed interface EditProfileAvatarState {
 }
 
 /**
+ * "Generate with AI" leg state for the bio field. Separate from
+ * [EditProfileUiState] for the same reason as the avatar: the form stays
+ * usable while the draft is in flight, and a failed draft must not blank
+ * the bio the user already typed. Mirrors iOS `EditProfileBioDraftState`.
+ */
+sealed interface EditProfileBioDraftState {
+    data object Idle : EditProfileBioDraftState
+
+    data object Generating : EditProfileBioDraftState
+
+    data class Failed(val message: String) : EditProfileBioDraftState
+}
+
+/**
  * Backs `EditProfileScreen`. Fetches `GET /api/users/profile`
  * (`backend/routes/users.js:1962`) and submits
  * `PATCH /api/users/profile` (`backend/routes/users.js:2052`). The
@@ -122,6 +138,13 @@ sealed interface EditProfileAvatarState {
  * server-side. [uploadAvatar] drives that leg and then refreshes the
  * session user so the new photo appears app-wide (RN
  * `src/app/profile/edit.tsx:75-106`).
+ *
+ * Skills are the other exception: they live in `UserSkill`, not on
+ * `User`, and commit through `PUT /api/users/skills`
+ * (`backend/routes/users.js:2246`) in the same [save] as the profile
+ * PATCH. The bio's "Generate with AI" action drafts through
+ * `POST /api/ai/draft/post` (`backend/routes/ai.js:218`) and writes the
+ * result into the bio field, so it rides the PATCH like any typed edit.
  *
  * Note: the design also calls for an editable email when unverified and
  * boolean visibility toggles (`profile_visibility_public` +
@@ -137,6 +160,7 @@ class EditProfileViewModel
         private val uploads: UploadRepository,
         private val authRepository: AuthRepository,
         private val networkMonitor: NetworkMonitor,
+        private val aiDraftRepository: AIDraftRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<EditProfileUiState>(EditProfileUiState.Loading)
         val state: StateFlow<EditProfileUiState> = _state.asStateFlow()
@@ -179,6 +203,28 @@ class EditProfileViewModel
 
         private val _avatarState = MutableStateFlow<EditProfileAvatarState>(EditProfileAvatarState.Idle)
         val avatarState: StateFlow<EditProfileAvatarState> = _avatarState.asStateFlow()
+
+        /**
+         * Working skill list, saved with `PUT /api/users/skills` next to
+         * the profile PATCH. `GET /api/users/profile` returns the list
+         * (`backend/routes/users.js:2020`) but `PATCH /api/users/profile`
+         * does NOT echo it, so the baseline is seeded on load and
+         * re-seeded from the skills PUT — never from the PATCH response.
+         */
+        private val _skills = MutableStateFlow<List<String>>(emptyList())
+        val skills: StateFlow<List<String>> = _skills.asStateFlow()
+
+        /** Last-saved skill list — the dirty baseline for [skills]. */
+        private val _savedSkills = MutableStateFlow<List<String>>(emptyList())
+        val savedSkills: StateFlow<List<String>> = _savedSkills.asStateFlow()
+
+        /** Text sitting in the add-skill input. */
+        private val _skillDraft = MutableStateFlow("")
+        val skillDraft: StateFlow<String> = _skillDraft.asStateFlow()
+
+        /** Bio "Generate with AI" leg state. */
+        private val _bioDraftState = MutableStateFlow<EditProfileBioDraftState>(EditProfileBioDraftState.Idle)
+        val bioDraftState: StateFlow<EditProfileBioDraftState> = _bioDraftState.asStateFlow()
 
         /**
          * Push a picked image to `POST /api/upload/profile-picture`, then
@@ -239,8 +285,28 @@ class EditProfileViewModel
             get() = FormAggregate.from(EditProfileField.entries.mapNotNull { _fields.value[it] })
 
         val isValid: Boolean get() = aggregate.isValid
-        val isDirty: Boolean get() = aggregate.isDirty
-        val dirtyFieldCount: Int get() = _fields.value.values.count { it.isDirty }
+
+        /** Skills ride their own PUT, so they widen the form's dirty state
+         *  without appearing in [aggregate]. */
+        val isDirty: Boolean get() = aggregate.isDirty || isSkillsDirty
+
+        /** True when the working skill list differs from the last-saved one. */
+        val isSkillsDirty: Boolean get() = _skills.value != _savedSkills.value
+
+        /** The skill list counts as one dirty field on the sticky pill. */
+        val dirtyFieldCount: Int
+            get() = _fields.value.values.count { it.isDirty } + if (isSkillsDirty) 1 else 0
+
+        /** Whether the add-skill CTA can fire — an empty input or a full
+         *  list would only produce a no-op or a server rejection. */
+        val canAddSkill: Boolean
+            get() = _skillDraft.value.trim().isNotEmpty() && _skills.value.size < MAX_SKILLS
+
+        /** Whether "Generate with AI" can fire. False while a draft is in
+         *  flight and false when the form carries nothing to prompt with —
+         *  a CTA the route would refuse must not be tappable. */
+        val canGenerateBio: Boolean
+            get() = _bioDraftState.value !is EditProfileBioDraftState.Generating && bioPrompt().isNotEmpty()
 
         /** Idempotent — refuses to refetch when already loaded. */
         fun load() {
@@ -250,6 +316,12 @@ class EditProfileViewModel
                 when (val result = repo.ownProfile()) {
                     is NetworkResult.Success -> {
                         hydrate(result.data.user)
+                        // Seeded here rather than in `hydrate`: the PATCH
+                        // echo carries no `skills` key
+                        // (`backend/routes/users.js:2194`), so hydrating
+                        // skills there would blank the list after a save.
+                        _skills.value = result.data.user.skills.orEmpty()
+                        _savedSkills.value = _skills.value
                         _state.value = EditProfileUiState.Loaded
                     }
                     is NetworkResult.Failure -> {
@@ -283,6 +355,41 @@ class EditProfileViewModel
             _toast.value = null
         }
 
+        /** Text change on the add-skill input. */
+        fun updateSkillDraft(value: String) {
+            _skillDraft.value = value
+        }
+
+        /**
+         * Commit the add-skill input to the working list. Mirrors the web
+         * editor (`frontend/apps/web/src/hooks/useProfileForm.ts:233`) and
+         * pre-applies the route's own trim / dedupe / cap rules so the CTA
+         * never sends something the server would reject.
+         */
+        fun addSkill() {
+            val trimmed = _skillDraft.value.trim()
+            if (trimmed.isEmpty()) return
+            if (trimmed.length > MAX_SKILL_LENGTH) {
+                _toast.value = EditProfileToast("Skills are capped at $MAX_SKILL_LENGTH characters.", isError = true)
+                return
+            }
+            if (_skills.value.size >= MAX_SKILLS) {
+                _toast.value = EditProfileToast("You can list up to $MAX_SKILLS skills.", isError = true)
+                return
+            }
+            // The route dedupes exactly; we match case-insensitively so the
+            // chip row doesn't show "Plumbing" and "plumbing" side by side.
+            if (_skills.value.none { it.equals(trimmed, ignoreCase = true) }) {
+                _skills.value = _skills.value + trimmed
+            }
+            _skillDraft.value = ""
+        }
+
+        /** Drop one skill from the working list (tap-to-remove on the chip). */
+        fun removeSkill(skill: String) {
+            _skills.value = _skills.value.filterNot { it == skill }
+        }
+
         fun discardChanges() {
             val map = _fields.value.toMutableMap()
             for (field in EditProfileField.entries) {
@@ -295,6 +402,8 @@ class EditProfileViewModel
                     )
             }
             _fields.value = map
+            _skills.value = _savedSkills.value
+            _skillDraft.value = ""
         }
 
         fun acknowledgeDismiss() {
@@ -324,7 +433,9 @@ class EditProfileViewModel
                 Analytics.track(AnalyticsEvent.FormEditProfileValidationError(field = invalid.key))
                 return
             }
-            if (!aggregate.isDirty) return
+            val fieldsDirty = aggregate.isDirty
+            val skillsDirty = isSkillsDirty
+            if (!fieldsDirty && !skillsDirty) return
             if (!networkMonitor.isOnline.value) {
                 // P15: don't silently queue. Surface the error inline.
                 _toast.value =
@@ -337,28 +448,117 @@ class EditProfileViewModel
             }
             _isSaving.value = true
             viewModelScope.launch {
-                when (val result = repo.updateProfile(buildRequest())) {
-                    is NetworkResult.Success -> {
-                        hydrate(result.data.user)
-                        _toast.value = EditProfileToast("Profile updated.", isError = false)
-                        _shouldDismiss.value = true
-                        Analytics.track(
-                            AnalyticsEvent.FormEditProfileSubmit(result = AnalyticsResult.SUCCESS),
-                        )
+                // The two legs are independent on the wire, so each
+                // re-baselines itself the moment it lands: a failure on one
+                // never discards the other's edits, and a retry re-sends
+                // only what is still dirty.
+                var failure: String? = null
+                if (fieldsDirty) {
+                    when (val result = repo.updateProfile(buildRequest())) {
+                        is NetworkResult.Success -> hydrate(result.data.user)
+                        is NetworkResult.Failure ->
+                            failure = result.error.message.ifBlank { "Couldn't save profile." }
                     }
-                    is NetworkResult.Failure -> {
-                        _toast.value =
-                            EditProfileToast(
-                                result.error.message.ifBlank { "Couldn't save profile." },
-                                isError = true,
-                            )
-                        Analytics.track(
-                            AnalyticsEvent.FormEditProfileSubmit(result = AnalyticsResult.ERROR),
-                        )
+                }
+                if (skillsDirty) {
+                    when (val result = repo.updateSkills(_skills.value)) {
+                        is NetworkResult.Success -> {
+                            // The route trims, dedupes and caps the list,
+                            // then echoes the cleaned array — so the echo,
+                            // not the local list, becomes the new baseline.
+                            _skills.value = result.data.skills
+                            _savedSkills.value = result.data.skills
+                        }
+                        is NetworkResult.Failure ->
+                            failure = failure ?: result.error.message.ifBlank { "Couldn't save skills." }
                     }
+                }
+                val message = failure
+                if (message != null) {
+                    _toast.value = EditProfileToast(message, isError = true)
+                    Analytics.track(AnalyticsEvent.FormEditProfileSubmit(result = AnalyticsResult.ERROR))
+                } else {
+                    _toast.value = EditProfileToast("Profile updated.", isError = false)
+                    _shouldDismiss.value = true
+                    Analytics.track(AnalyticsEvent.FormEditProfileSubmit(result = AnalyticsResult.SUCCESS))
                 }
                 _isSaving.value = false
             }
+        }
+
+        /**
+         * Draft a bio through `POST /api/ai/draft/post` and write the
+         * result into the bio field, where it stays dirty-tracked and
+         * rides the existing profile PATCH. The prompt is composed only
+         * from what the user already entered — name, skills, tagline, city.
+         */
+        fun generateBio() {
+            if (_bioDraftState.value is EditProfileBioDraftState.Generating) return
+            val prompt = bioPrompt()
+            if (prompt.isEmpty()) {
+                _bioDraftState.value =
+                    EditProfileBioDraftState.Failed(
+                        "Add your name, tagline, city or a skill first so the draft has something to work from.",
+                    )
+                return
+            }
+            if (!networkMonitor.isOnline.value) {
+                _bioDraftState.value =
+                    EditProfileBioDraftState.Failed("You're offline. Try again when you're back online.")
+                return
+            }
+            _bioDraftState.value = EditProfileBioDraftState.Generating
+            viewModelScope.launch {
+                when (val result = aiDraftRepository.draftPost(AIDraftPostRequest(text = prompt))) {
+                    is NetworkResult.Success -> {
+                        val content = result.data.draft.content.trim()
+                        if (content.isEmpty()) {
+                            _bioDraftState.value =
+                                EditProfileBioDraftState.Failed("The draft came back empty. Try again.")
+                        } else {
+                            // `update` re-runs the bio validator (max 2000,
+                            // per `updateProfileSchema`) and marks it dirty.
+                            update(EditProfileField.Bio, content)
+                            _bioDraftState.value = EditProfileBioDraftState.Idle
+                        }
+                    }
+                    is NetworkResult.Failure ->
+                        _bioDraftState.value =
+                            EditProfileBioDraftState.Failed(
+                                result.error.message.ifBlank { "Couldn't draft a bio. Try again." },
+                            )
+                }
+            }
+        }
+
+        /** Clear a failed draft so the row returns to its resting pose. */
+        fun dismissBioDraftError() {
+            if (_bioDraftState.value is EditProfileBioDraftState.Failed) {
+                _bioDraftState.value = EditProfileBioDraftState.Idle
+            }
+        }
+
+        /**
+         * Compose the draft prompt from the fields the user already
+         * filled. Returns "" when there is nothing to work with, so
+         * [canGenerateBio] can keep the CTA disabled instead of sending an
+         * empty prompt the route's `min(1)` rule would 400 on.
+         */
+        fun bioPrompt(): String {
+            fun value(field: EditProfileField): String = _fields.value[field]?.value.orEmpty().trim()
+
+            val name =
+                listOf(value(EditProfileField.FirstName), value(EditProfileField.LastName))
+                    .filter { it.isNotEmpty() }
+                    .joinToString(" ")
+            val lines = mutableListOf<String>()
+            if (name.isNotEmpty()) lines += "Name: $name"
+            value(EditProfileField.Tagline).takeIf { it.isNotEmpty() }?.let { lines += "Tagline: $it" }
+            value(EditProfileField.City).takeIf { it.isNotEmpty() }?.let { lines += "City: $it" }
+            if (_skills.value.isNotEmpty()) lines += "Skills: ${_skills.value.joinToString(", ")}"
+            if (lines.isEmpty()) return ""
+            val instruction = "Write a short first-person profile bio (2-3 sentences) for this neighbor."
+            return (listOf(instruction) + lines).joinToString("\n").take(MAX_BIO_PROMPT_LENGTH)
         }
 
         private fun hydrate(profile: UserProfile) {
@@ -428,6 +628,7 @@ class EditProfileViewModel
                 if (text.isEmpty() && field !in ALLOWS_EMPTY) return null
                 return text
             }
+
             /** Boolean-backed field → `true` only when it was actually toggled. */
             fun boolean(field: EditProfileField): Boolean? {
                 val snapshot = map[field] ?: return null
@@ -458,6 +659,14 @@ class EditProfileViewModel
         }
 
         companion object {
+            /** `PUT /api/users/skills` caps the list at 50 entries and each
+             *  entry at 100 characters (`backend/routes/users.js:2256-2263`). */
+            const val MAX_SKILLS = 50
+            const val MAX_SKILL_LENGTH = 100
+
+            /** Joi `draftPostSchema` caps `text` at 2000 (`backend/routes/ai.js:82`). */
+            const val MAX_BIO_PROMPT_LENGTH = 2000
+
             /**
              * First glyph of the best available display name — matches the RN
              * `displayInitial` fallback on the avatar circle and the iOS

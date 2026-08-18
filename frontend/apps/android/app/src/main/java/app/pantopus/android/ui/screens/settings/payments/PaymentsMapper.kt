@@ -3,8 +3,10 @@
 package app.pantopus.android.ui.screens.settings.payments
 
 import app.pantopus.android.data.api.models.connect.ConnectAccountDto
+import app.pantopus.android.data.api.models.payments.EarningsSummaryDto
 import app.pantopus.android.data.api.models.payments.PaymentHistoryEntryDto
 import app.pantopus.android.data.api.models.payments.PaymentMethodDto
+import app.pantopus.android.data.api.models.payments.SpendingSummaryDto
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -21,6 +23,9 @@ import java.util.Locale
  */
 @Suppress("TooManyFunctions")
 object PaymentsMapper {
+    /** Stands in for a lifetime total the server wouldn't hand back. */
+    private const val EM_DASH = "—"
+
     private val emptyActivity =
         PaymentsActivity.Empty(
             title = "No transactions yet",
@@ -31,6 +36,7 @@ object PaymentsMapper {
         methods: List<PaymentMethod>,
         activity: PaymentsActivity = emptyActivity,
         connectAccount: ConnectAccountDto? = null,
+        earnings: PaymentsEarnings? = null,
     ): PaymentsLoaded =
         PaymentsLoaded(
             balance = null,
@@ -39,7 +45,29 @@ object PaymentsMapper {
             activity = activity,
             canCloseAccount = false,
             footerCaption = "Payments are processed securely by Stripe.",
+            earnings = earnings,
         )
+
+    /**
+     * Project the two lifetime summaries onto the "Earnings & Spending" card.
+     * The reads degrade independently — each figure falls back to an em-dash
+     * on its own — and when *neither* could be read the card is hidden rather
+     * than claiming the user earned and spent nothing. Mirrors iOS
+     * `PaymentsViewModel.earnings(earned:spent:)`.
+     */
+    fun earnings(
+        earned: EarningsSummaryDto?,
+        spent: SpendingSummaryDto?,
+    ): PaymentsEarnings? {
+        if (earned == null && spent == null) return null
+        return PaymentsEarnings(
+            totalEarned = earned?.let { centsToCurrency(it.totalEarned) } ?: EM_DASH,
+            totalSpent = spent?.let { centsToCurrency(it.totalSpent) } ?: EM_DASH,
+            caption =
+                "Total earned includes funds still in review or on hold. " +
+                    "Your wallet balance shows what's withdrawable now.",
+        )
+    }
 
     /**
      * Project the live Connect status onto the Payouts card. Mirrors RN

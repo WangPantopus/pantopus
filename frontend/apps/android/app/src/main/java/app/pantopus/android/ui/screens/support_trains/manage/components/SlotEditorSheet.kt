@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber")
+@file:Suppress("LongMethod", "MagicNumber", "PackageNaming", "UnusedPrivateMember")
 
 package app.pantopus.android.ui.screens.support_trains.manage.components
 

@@ -25,8 +25,7 @@ open class HomeAdminRepository
         private val api: HomeAdminApi,
     ) {
         /** `DELETE /api/homes/:id`. */
-        open suspend fun deleteHome(homeId: String): NetworkResult<DeleteHomeResponse> =
-            safeApiCall { api.deleteHome(homeId) }
+        open suspend fun deleteHome(homeId: String): NetworkResult<DeleteHomeResponse> = safeApiCall { api.deleteHome(homeId) }
 
         /** `GET /api/homes/:id/me`. */
         open suspend fun myAccess(homeId: String): NetworkResult<HomeAccessDto> = safeApiCall { api.myAccess(homeId) }
@@ -56,20 +55,17 @@ open class HomeAdminRepository
         open suspend fun householdAccessRequests(
             homeId: String,
             status: String = "pending",
-        ): NetworkResult<HouseholdAccessRequestsResponse> =
-            safeApiCall { api.householdAccessRequests(homeId, status) }
+        ): NetworkResult<HouseholdAccessRequestsResponse> = safeApiCall { api.householdAccessRequests(homeId, status) }
 
         /** `POST …/household-access-requests/:requestId/approve`. */
         open suspend fun approveHouseholdAccessRequest(
             homeId: String,
             requestId: String,
-        ): NetworkResult<HouseholdAccessRequestActionResponse> =
-            safeApiCall { api.approveHouseholdAccessRequest(homeId, requestId) }
+        ): NetworkResult<HouseholdAccessRequestActionResponse> = safeApiCall { api.approveHouseholdAccessRequest(homeId, requestId) }
 
         /** `POST …/household-access-requests/:requestId/reject`. */
         open suspend fun rejectHouseholdAccessRequest(
             homeId: String,
             requestId: String,
-        ): NetworkResult<HouseholdAccessRequestActionResponse> =
-            safeApiCall { api.rejectHouseholdAccessRequest(homeId, requestId) }
+        ): NetworkResult<HouseholdAccessRequestActionResponse> = safeApiCall { api.rejectHouseholdAccessRequest(homeId, requestId) }
     }

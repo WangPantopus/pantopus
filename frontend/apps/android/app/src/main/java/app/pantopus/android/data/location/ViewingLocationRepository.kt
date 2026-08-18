@@ -22,8 +22,7 @@ class ViewingLocationRepository
         suspend fun current(): NetworkResult<ViewingLocationPayload> = safeApiCall { api.current() }
 
         /** `PUT /api/location`. */
-        suspend fun set(request: SetViewingLocationRequest): NetworkResult<SetViewingLocationResponse> =
-            safeApiCall { api.set(request) }
+        suspend fun set(request: SetViewingLocationRequest): NetworkResult<SetViewingLocationResponse> = safeApiCall { api.set(request) }
 
         /** `PUT /api/location/radius`. */
         suspend fun setRadius(miles: Double): NetworkResult<SetViewingRadiusResponse> =

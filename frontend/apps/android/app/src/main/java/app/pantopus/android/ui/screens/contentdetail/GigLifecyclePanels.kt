@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber", "LongMethod", "TooManyFunctions", "LongParameterList")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.contentdetail
@@ -93,6 +93,7 @@ fun GigLifecycleSections(viewModel: GigDetailViewModel) {
 
     var counterTarget by remember { mutableStateOf<GigBidDto?>(null) }
     var rejectTarget by remember { mutableStateOf<GigBidDto?>(null) }
+
     /** Bid whose pending counter-offer the poster is about to withdraw. */
     var withdrawCounterTarget by remember { mutableStateOf<GigBidDto?>(null) }
     var noShowSheetVisible by remember { mutableStateOf(false) }

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongParameterList")
+@file:Suppress("LongMethod", "LongParameterList", "PackageNaming")
 
 package app.pantopus.android.ui.screens.mailbox.mailbox_root
 
@@ -48,6 +48,7 @@ fun MailboxRootScreen(
     onOpenUnboxing: () -> Unit = {},
     onOpenCompose: () -> Unit = {},
     onOpenRoutingQueue: () -> Unit = {},
+    onOpenMailParty: () -> Unit = {},
     onOpenCommunity: () -> Unit = {},
     onOpenRecords: () -> Unit = {},
     onOpenMailTasks: () -> Unit = {},
@@ -127,6 +128,7 @@ fun MailboxRootScreen(
                 onOpenUnboxing = onOpenUnboxing,
                 onOpenVacationHold = onOpenVacationHold,
                 onOpenStamps = onOpenStamps,
+                onOpenMailParty = onOpenMailParty,
                 onOpenCommunity = onOpenCommunity,
                 onOpenRecords = onOpenRecords,
                 onOpenMailTasks = onOpenMailTasks,
@@ -147,6 +149,7 @@ private fun MailboxRootSettingsMenu(
     onOpenUnboxing: () -> Unit,
     onOpenVacationHold: () -> Unit,
     onOpenStamps: () -> Unit,
+    onOpenMailParty: () -> Unit,
     onOpenCommunity: () -> Unit,
     onOpenRecords: () -> Unit,
     onOpenMailTasks: () -> Unit,
@@ -190,6 +193,14 @@ private fun MailboxRootSettingsMenu(
                 onOpenMailTasks()
             },
             modifier = Modifier.testTag("mailboxRootSettings.mailTasks"),
+        )
+        DropdownMenuItem(
+            text = { Text("Mail party", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenMailParty()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.mailParty"),
         )
         DropdownMenuItem(
             text = { Text("Community mail", color = PantopusColors.appText) },

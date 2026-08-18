@@ -36,6 +36,9 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.GhostButton
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
+import app.pantopus.android.ui.screens.profile.tabs.ProfileGigReviewsSection
+import app.pantopus.android.ui.screens.profile.tabs.ProfileGigsSection
+import app.pantopus.android.ui.screens.profile.tabs.ProfilePortfolioSection
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailShell
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBar
 import app.pantopus.android.ui.screens.shared.content_detail.ContentDetailTopBarAction
@@ -72,6 +75,8 @@ fun PublicProfileScreen(
     onOpenInsights: () -> Unit = {},
     onEditPersona: () -> Unit = {},
     onComposeBroadcast: () -> Unit = {},
+    onOpenGig: (String) -> Unit = {},
+    onOpenProfile: (String) -> Unit = {},
     viewModel: PublicProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -142,6 +147,8 @@ fun PublicProfileScreen(
                             ),
                         connection = connection,
                         onFollow = { viewModel.follow() },
+                        onOpenGig = onOpenGig,
+                        onOpenProfile = onOpenProfile,
                     )
                 } else {
                     PublicProfileLoadedFrame(
@@ -165,6 +172,9 @@ fun PublicProfileScreen(
                         onOpenInsights = onOpenInsights,
                         onEditPersona = onEditPersona,
                         onComposeBroadcast = onComposeBroadcast,
+                        profileUserId = content.profile.id,
+                        onOpenGig = onOpenGig,
+                        onOpenProfile = onOpenProfile,
                         receivedReviews = {
                             ReceivedTransactionReviewsSection(userId = content.profile.id)
                         },
@@ -289,6 +299,13 @@ internal fun PublicProfileLoadedFrame(
     onOpenInsights: () -> Unit = {},
     onEditPersona: () -> Unit = {},
     onComposeBroadcast: () -> Unit = {},
+    // Threading the profile id lights up the live Reviews / Gigs /
+    // Portfolio panels, which self-load through `hiltViewModel()`. It
+    // stays null for the Paparazzi hosts (same escape hatch as
+    // [receivedReviews]) — they render without a Hilt graph.
+    profileUserId: String? = null,
+    onOpenGig: (String) -> Unit = {},
+    onOpenProfile: (String) -> Unit = {},
     receivedReviews: @Composable () -> Unit = {},
 ) {
     val persona = content.kind == PublicProfileKind.Persona
@@ -383,9 +400,13 @@ internal fun PublicProfileLoadedFrame(
                     onSelectTab = onSelectTab,
                     showStats = false,
                     showActionRow = false,
+                    profileUserId = profileUserId,
+                    isOwnProfile = content.isOwner,
                     onMessage = onMessage,
                     onConnect = onConnect,
                     onOverflow = onOverflow,
+                    onOpenGig = onOpenGig,
+                    onOpenReviewer = onOpenProfile,
                 )
                 receivedReviews()
                 PublicProfilePostsFeed(
@@ -426,6 +447,8 @@ internal fun LocalProfileLoadedFrame(
     follow: ProfileFollowState = ProfileFollowState(),
     connection: ProfileConnection = ProfileConnection.None,
     onFollow: () -> Unit = {},
+    onOpenGig: (String) -> Unit = {},
+    onOpenProfile: (String) -> Unit = {},
 ) {
     ContentDetailShell(
         title = null,
@@ -486,6 +509,7 @@ internal fun LocalProfileLoadedFrame(
                         postCount = content.posts.size.takeIf { it > 0 },
                         selected = selectedTab,
                         onSelect = onSelectTab,
+                        reviewCount = content.profile.reviewCount?.takeIf { it > 0 },
                     )
                 }
                 when (selectedTab) {
@@ -500,6 +524,24 @@ internal fun LocalProfileLoadedFrame(
                     LocalProfileTab.About ->
                         Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
                             LocalProfileAboutSection(content = neighbor)
+                        }
+                    LocalProfileTab.Portfolio ->
+                        Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+                            ProfilePortfolioSection(
+                                userId = content.profile.id,
+                                isOwnProfile = content.isOwner,
+                            )
+                        }
+                    LocalProfileTab.Gigs ->
+                        Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+                            ProfileGigsSection(userId = content.profile.id, onOpenGig = onOpenGig)
+                        }
+                    LocalProfileTab.Reviews ->
+                        Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
+                            ProfileGigReviewsSection(
+                                userId = content.profile.id,
+                                onOpenReviewer = onOpenProfile,
+                            )
                         }
                 }
             }

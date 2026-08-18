@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "MagicNumber")
+@file:Suppress("MagicNumber", "PackageNaming", "ReturnCount", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.mailbox.translation
 
@@ -145,8 +145,7 @@ object MailTranslationProjection {
         }
     }
 
-    internal fun paragraphs(text: String): List<String> =
-        text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+    internal fun paragraphs(text: String): List<String> = text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
 
     // ─── Sender ────────────────────────────────────────────
 

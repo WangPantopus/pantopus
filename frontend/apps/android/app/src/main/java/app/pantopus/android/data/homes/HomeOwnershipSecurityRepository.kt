@@ -17,8 +17,7 @@ class HomeOwnershipSecurityRepository
         private val api: HomeOwnershipSecurityApi,
     ) {
         /** `GET /api/homes/:id/security`. */
-        suspend fun getSecurity(homeId: String): NetworkResult<HomeOwnershipSecurityResponse> =
-            safeApiCall { api.getSecurity(homeId) }
+        suspend fun getSecurity(homeId: String): NetworkResult<HomeOwnershipSecurityResponse> = safeApiCall { api.getSecurity(homeId) }
 
         /** `PATCH /api/homes/:id/security`. */
         suspend fun updateSecurity(

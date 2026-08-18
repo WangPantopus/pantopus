@@ -14,6 +14,5 @@ class BroadcastReadRepository
     constructor(
         private val api: BroadcastReadApi,
     ) {
-        suspend fun markRead(messageId: String): NetworkResult<BroadcastReadResponse> =
-            safeApiCall { api.markRead(messageId) }
+        suspend fun markRead(messageId: String): NetworkResult<BroadcastReadResponse> = safeApiCall { api.markRead(messageId) }
     }

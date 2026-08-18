@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "TooManyFunctions")
+@file:Suppress("ComplexCondition", "LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "ReturnCount", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.contentdetail
 
@@ -1877,6 +1877,7 @@ class GigDetailViewModel
         }
 
         /** Owner can cancel while the task is open / assigned / in progress. */
+
         /**
          * "Cancel task" overflow gate — the poster on a live gig.
          *

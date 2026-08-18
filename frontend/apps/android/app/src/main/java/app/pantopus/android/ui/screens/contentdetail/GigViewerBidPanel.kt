@@ -336,5 +336,4 @@ private fun ViewerBidButton(
 }
 
 /** `$60` / `$60.50` — matches the iOS panel's money formatting. */
-private fun moneyLabel(value: Double): String =
-    if (value % 1.0 == 0.0) "$${value.toInt()}" else String.format(Locale.US, "$%.2f", value)
+private fun moneyLabel(value: Double): String = if (value % 1.0 == 0.0) "$${value.toInt()}" else String.format(Locale.US, "$%.2f", value)

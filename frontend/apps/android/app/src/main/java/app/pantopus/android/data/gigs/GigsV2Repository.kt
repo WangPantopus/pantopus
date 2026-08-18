@@ -28,8 +28,7 @@ class GigsV2Repository
             longitude: Double,
             radiusMeters: Double? = null,
             limit: Int = DEFAULT_NEARBY_LIMIT,
-        ): NetworkResult<GigsFeedNearbyTrainsResponse> =
-            safeApiCall { api.nearbySupportTrains(latitude, longitude, radiusMeters, limit) }
+        ): NetworkResult<GigsFeedNearbyTrainsResponse> = safeApiCall { api.nearbySupportTrains(latitude, longitude, radiusMeters, limit) }
 
         companion object {
             /** Mirrors RN's `listNearbySupportTrains({ limit: 50 })`. */

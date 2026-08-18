@@ -224,10 +224,11 @@ class BusinessProfileViewModel
          * two failure copies.
          */
         private suspend fun loadNamedPage(username: String?) {
-            val slug = pageSlug ?: run {
-                _namedPage.value = BusinessProfileNamedPageState.None
-                return
-            }
+            val slug =
+                pageSlug ?: run {
+                    _namedPage.value = BusinessProfileNamedPageState.None
+                    return
+                }
             // `pantopus://b/:username/:slug` routes the *username* through as
             // the id, so it is the right fallback when the detail read has no
             // handle of its own.

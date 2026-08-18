@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "TooManyFunctions")
+@file:Suppress("PackageNaming", "ReturnCount", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.guests
 

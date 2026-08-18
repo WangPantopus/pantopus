@@ -95,6 +95,9 @@ class PaymentsViewModel
          */
         private suspend fun fetch(showLoading: Boolean) {
             if (showLoading) _state.value = PaymentsUiState.Loading
+            // History, the lifetime totals and the Connect status are
+            // supplementary — a failure in any of them degrades on its own
+            // while the methods card still renders.
             when (val result = repository.paymentMethods()) {
                 is NetworkResult.Success ->
                     _state.value =
@@ -103,6 +106,7 @@ class PaymentsViewModel
                                 methods = result.data.paymentMethods.map(PaymentsMapper::toUiMethod),
                                 activity = fetchActivity(),
                                 connectAccount = fetchConnectAccount(),
+                                earnings = fetchEarnings(),
                             ),
                         )
                 is NetworkResult.Failure ->
@@ -132,6 +136,19 @@ class PaymentsViewModel
          */
         private suspend fun fetchConnectAccount(): ConnectAccountDto? =
             (connectRepository.accountStatus() as? NetworkResult.Success)?.data?.account
+
+        /**
+         * `GET api/payments/earnings` + `GET api/payments/spending` → the
+         * "Earnings & Spending" card. The two reads degrade independently:
+         * each figure falls back to an em-dash on its own, and when neither
+         * could be read the card is hidden rather than claiming the user
+         * earned and spent nothing.
+         */
+        private suspend fun fetchEarnings(): PaymentsEarnings? {
+            val earned = (repository.earnings() as? NetworkResult.Success)?.data?.earnings
+            val spent = (repository.spending() as? NetworkResult.Success)?.data?.spending
+            return PaymentsMapper.earnings(earned = earned, spent = spent)
+        }
 
         /**
          * Pull-to-refresh + the error frame's Retry. Keeps a loaded frame on

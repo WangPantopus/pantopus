@@ -34,8 +34,7 @@ class GigOwnerActionsRepository
         suspend fun deleteGig(id: String): NetworkResult<GigDeleteResponse> = safeApiCall { api.deleteGig(id) }
 
         /** `GET /api/gigs/:gigId/active-status` — urgent-task live status. */
-        suspend fun activeStatus(gigId: String): NetworkResult<GigActiveStatusResponse> =
-            safeApiCall { api.activeStatus(gigId) }
+        suspend fun activeStatus(gigId: String): NetworkResult<GigActiveStatusResponse> = safeApiCall { api.activeStatus(gigId) }
 
         /** `POST /api/gigs/:gigId/status` — advance the urgent-task fulfillment status. */
         suspend fun updateFulfillmentStatus(

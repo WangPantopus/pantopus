@@ -112,6 +112,7 @@ object HomeDashboardProjection {
         access: HomeAccessDto? = null,
     ): List<QuickActionTile> {
         val safe = counts ?: HomeDashboardCountsDto()
+
         fun allowed(permission: String): Boolean = access?.can(permission) ?: true
         return buildList {
             if (allowed("tasks.view")) {

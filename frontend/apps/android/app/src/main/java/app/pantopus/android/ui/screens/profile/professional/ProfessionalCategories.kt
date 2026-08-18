@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("MatchingDeclarationName", "PackageNaming")
 
 package app.pantopus.android.ui.screens.profile.professional
 

@@ -68,8 +68,7 @@ enum class StampRarity(
             }
 
     companion object {
-        fun fromRaw(raw: String?): StampRarity =
-            entries.firstOrNull { it.slug == raw?.lowercase() } ?: Common
+        fun fromRaw(raw: String?): StampRarity = entries.firstOrNull { it.slug == raw?.lowercase() } ?: Common
     }
 }
 
@@ -140,8 +139,7 @@ enum class MailboxThemeSeason(
             }
 
     companion object {
-        fun fromRaw(raw: String?): MailboxThemeSeason =
-            entries.firstOrNull { it.slug == raw?.lowercase() } ?: Custom
+        fun fromRaw(raw: String?): MailboxThemeSeason = entries.firstOrNull { it.slug == raw?.lowercase() } ?: Custom
     }
 }
 

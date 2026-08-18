@@ -68,9 +68,26 @@ def builder_output(body):
     return re.sub(r"\$\{[^}]*\}|\$[A-Za-z0-9_]+", "X", "".join(literals))
 
 
+def camel(constant):
+    """UNBOXING -> unboxing, PACKAGE_GIG -> packageGig."""
+    head, *rest = constant.lower().split("_")
+    return head + "".join(part.capitalize() for part in rest)
+
+
+# Two signals, unioned. The naming convention carries most of the file — a
+# parameterised route FOO_BAR is navigated through ChildRoutes.fooBar(...) — and
+# it is the only one that survives builders with block bodies, string
+# concatenation or Uri.encode, which no literal match can evaluate. The literal
+# match then catches the exceptions, where the builder is named for the surface
+# rather than the constant (NOTIFICATIONS_ROUTE -> notificationsZone).
 builder_for = {}
-for route, pattern in consts.items():
-    matcher = route_matcher(pattern)
+builder_names = set(builders) | set(re.findall(r"fun ([a-zA-Z0-9_]+)\s*\(", src))
+for route in set(consts) | set(routes):
+    if camel(route) in builder_names:
+        builder_for.setdefault(route, set()).add(camel(route))
+    if route not in consts:
+        continue
+    matcher = route_matcher(consts[route])
     for name, body in builders.items():
         produced = builder_output(body)
         if produced and matcher.match(produced):

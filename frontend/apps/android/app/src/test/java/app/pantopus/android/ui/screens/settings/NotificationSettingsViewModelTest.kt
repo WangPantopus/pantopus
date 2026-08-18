@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "TooManyFunctions")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.settings
 
@@ -283,8 +283,7 @@ class NotificationSettingsViewModelTest {
 
     // MARK: - Helpers
 
-    private fun NotificationSettingsViewModel.groups(): List<GroupedListGroup> =
-        (state.value as GroupedListUiState.Loaded).groups
+    private fun NotificationSettingsViewModel.groups(): List<GroupedListGroup> = (state.value as GroupedListUiState.Loaded).groups
 
     private fun List<GroupedListGroup>.row(id: String): GroupedListRow? = flatMap { it.rows }.firstOrNull { it.id == id }
 

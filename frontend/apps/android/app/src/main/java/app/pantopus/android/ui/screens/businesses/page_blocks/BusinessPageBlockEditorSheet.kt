@@ -340,8 +340,7 @@ private fun ButtonListEditor(
 ) {
     val buttons = draft.buttonList(key)
 
-    fun write(next: List<BusinessPageBlockButton>) =
-        onDraftChange(draft.copy(data = draft.data + (key to next.map { it.toMap() })))
+    fun write(next: List<BusinessPageBlockButton>) = onDraftChange(draft.copy(data = draft.data + (key to next.map { it.toMap() })))
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(text = title, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
@@ -388,8 +387,7 @@ private fun FaqEditor(
 ) {
     val items = draft.faqItems
 
-    fun write(next: List<BusinessPageBlockFaqItem>) =
-        onDraftChange(draft.copy(data = draft.data + ("items" to next.map { it.toMap() })))
+    fun write(next: List<BusinessPageBlockFaqItem>) = onDraftChange(draft.copy(data = draft.data + ("items" to next.map { it.toMap() })))
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(
@@ -445,8 +443,7 @@ private fun StatsEditor(
 ) {
     val stats = draft.stats
 
-    fun write(next: List<BusinessPageBlockStat>) =
-        onDraftChange(draft.copy(data = draft.data + ("stats" to next.map { it.toMap() })))
+    fun write(next: List<BusinessPageBlockStat>) = onDraftChange(draft.copy(data = draft.data + ("stats" to next.map { it.toMap() })))
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         Text(text = "Stats", style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)

@@ -17,6 +17,5 @@ class BusinessFoundingRepository
     ) {
         suspend fun status(): NetworkResult<FoundingOfferStatusDto> = safeApiCall { api.foundingOfferStatus() }
 
-        suspend fun claim(businessId: String): NetworkResult<FoundingSlotClaimDto> =
-            safeApiCall { api.claimFoundingOffer(businessId) }
+        suspend fun claim(businessId: String): NetworkResult<FoundingSlotClaimDto> = safeApiCall { api.claimFoundingOffer(businessId) }
     }

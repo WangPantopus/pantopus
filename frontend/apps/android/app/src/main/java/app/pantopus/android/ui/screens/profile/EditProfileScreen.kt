@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming", "LongMethod")
+@file:Suppress("MagicNumber", "PackageNaming", "LongMethod", "LongParameterList")
 
 package app.pantopus.android.ui.screens.profile
 
@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,8 +67,10 @@ import kotlinx.coroutines.delay
 
 /**
  * P1.4 — Settings → Edit profile. Mirrors the iOS `EditProfileView`
- * 1:1: same sections (About / Contact / Address / Social / Visibility),
- * same field set, same validators, same dirty-tracked PATCH body.
+ * 1:1: same sections (About / Skills / Contact / Address / Social /
+ * Visibility), same field set, same validators, same dirty-tracked PATCH
+ * body. Skills are the one group that doesn't ride that PATCH — they
+ * commit through `PUT /api/users/skills` in the same Save.
  *
  * Renders four states out of [EditProfileUiState]: shimmer skeleton,
  * loaded form, error empty-state (with retry), and an inline toast for
@@ -88,6 +92,17 @@ fun EditProfileScreen(
     val avatarUrl by viewModel.avatarUrl.collectAsStateWithLifecycle()
     val avatarInitial by viewModel.avatarInitial.collectAsStateWithLifecycle()
     val avatarState by viewModel.avatarState.collectAsStateWithLifecycle()
+    // Skills ride `PUT /api/users/skills`, not the profile PATCH, but they
+    // commit through the same Save (`backend/routes/users.js:2246`).
+    // Read with `.value` here rather than `by`: `isDirty`, `dirtyFieldCount`,
+    // `canAddSkill` and `canGenerateBio` are plain getters over these flows,
+    // and they are evaluated in *this* scope. Reading the flows only inside
+    // the slot lambdas below would give those lambdas the invalidation and
+    // leave a skills-only edit unable to light the Save CTA or the sticky
+    // "N unsaved" pill.
+    val skills = viewModel.skills.collectAsStateWithLifecycle().value
+    val skillDraft = viewModel.skillDraft.collectAsStateWithLifecycle().value
+    val bioDraftState = viewModel.bioDraftState.collectAsStateWithLifecycle().value
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -149,6 +164,29 @@ fun EditProfileScreen(
                             scope = scope,
                         )
                     },
+                    skillsSlot = {
+                        EditProfileSkillsBlock(
+                            skills = skills,
+                            draft = skillDraft,
+                            canAdd = viewModel.canAddSkill,
+                            onDraftChange = viewModel::updateSkillDraft,
+                            onAdd = viewModel::addSkill,
+                            onRemove = viewModel::removeSkill,
+                        )
+                    },
+                    bioActionSlot = {
+                        EditProfileGenerateBioButton(
+                            state = bioDraftState,
+                            enabled = viewModel.canGenerateBio,
+                            onGenerate = viewModel::generateBio,
+                        )
+                    },
+                    bioDraftErrorSlot = {
+                        EditProfileBioDraftError(
+                            state = bioDraftState,
+                            onDismiss = viewModel::dismissBioDraftError,
+                        )
+                    },
                 )
             is EditProfileUiState.Error ->
                 EmptyState(
@@ -206,6 +244,9 @@ internal fun EditProfileLoaded(
     onUpdate: (EditProfileField, String) -> Unit,
     shakeTrigger: Int = 0,
     avatarSlot: @Composable () -> Unit = {},
+    skillsSlot: @Composable () -> Unit = {},
+    bioActionSlot: @Composable () -> Unit = {},
+    bioDraftErrorSlot: @Composable () -> Unit = {},
 ) {
     Box(
         modifier =
@@ -238,6 +279,9 @@ internal fun EditProfileLoaded(
                 emailVerified = state.emailVerified,
                 onUpdate = onUpdate,
                 avatarSlot = avatarSlot,
+                skillsSlot = skillsSlot,
+                bioActionSlot = bioActionSlot,
+                bioDraftErrorSlot = bioDraftErrorSlot,
             )
         }
     }
@@ -250,6 +294,9 @@ private fun EditProfileSections(
     emailVerified: Boolean,
     onUpdate: (EditProfileField, String) -> Unit,
     avatarSlot: @Composable () -> Unit = {},
+    skillsSlot: @Composable () -> Unit = {},
+    bioActionSlot: @Composable () -> Unit = {},
+    bioDraftErrorSlot: @Composable () -> Unit = {},
 ) {
     // A13.9 §① — avatar + "Change photo". The photo does not ride the
     // PATCH body; it has its own multipart route
@@ -282,8 +329,16 @@ private fun EditProfileSections(
             fields = fields,
             onUpdate = onUpdate,
         )
-        BioField(fields = fields, onUpdate = onUpdate)
+        BioField(
+            fields = fields,
+            onUpdate = onUpdate,
+            actionSlot = bioActionSlot,
+            draftErrorSlot = bioDraftErrorSlot,
+        )
     }
+    // Skills live in `UserSkill`, not on `User`, so this group commits
+    // through `PUT /api/users/skills` inside the same Save.
+    FormFieldGroup("Skills") { skillsSlot() }
     FormFieldGroup("Contact") {
         // Note: the design allows editing email when `verified ==
         // false`. `updateProfileSchema` exposes no `email` key, so
@@ -468,11 +523,23 @@ private fun TextRow(
 private fun BioField(
     fields: Map<EditProfileField, FormFieldState>,
     onUpdate: (EditProfileField, String) -> Unit,
+    actionSlot: @Composable () -> Unit = {},
+    draftErrorSlot: @Composable () -> Unit = {},
 ) {
     val snapshot = fields[EditProfileField.Bio]
     val error = snapshot?.error
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
-        DirtyFieldLabel(label = "Bio", dirty = snapshot?.isDirty == true)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DirtyFieldLabel(
+                label = "Bio",
+                dirty = snapshot?.isDirty == true,
+                modifier = Modifier.weight(1f),
+            )
+            actionSlot()
+        }
         BasicTextField(
             value = snapshot?.value.orEmpty(),
             onValueChange = { onUpdate(EditProfileField.Bio, it) },
@@ -498,6 +565,192 @@ private fun BioField(
                 color = PantopusColors.error,
             )
         }
+        draftErrorSlot()
+    }
+}
+
+/**
+ * "Generate with AI" — drafts a bio through `POST /api/ai/draft/post`
+ * (`backend/routes/ai.js:218`) from the name / skills / tagline / city
+ * already on the form and writes it into the bio field, where it rides
+ * the normal PATCH. Not clickable while in flight, and not clickable
+ * when the form has nothing to prompt with.
+ */
+@Composable
+internal fun EditProfileGenerateBioButton(
+    state: EditProfileBioDraftState,
+    enabled: Boolean,
+    onGenerate: () -> Unit,
+) {
+    val generating = state is EditProfileBioDraftState.Generating
+    val tint = if (enabled) PantopusColors.primary600 else PantopusColors.appTextMuted
+    Row(
+        modifier =
+            Modifier
+                .heightIn(min = 44.dp)
+                .clickable(enabled = enabled, onClick = onGenerate)
+                .testTag("editProfileGenerateBioButton")
+                .semantics {
+                    contentDescription = "Generate bio with AI, drafts from your name, skills, tagline and city"
+                },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        if (generating) {
+            CircularProgressIndicator(
+                color = PantopusColors.appTextMuted,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(14.dp),
+            )
+        } else {
+            PantopusIconImage(
+                icon = PantopusIcon.Sparkles,
+                contentDescription = null,
+                size = 14.dp,
+                tint = tint,
+            )
+        }
+        Text(
+            text = if (generating) "Generating…" else "Generate with AI",
+            style = PantopusTextStyle.caption,
+            color = tint,
+        )
+    }
+}
+
+/** Inline failure line for the bio draft, with a dismiss affordance. */
+@Composable
+internal fun EditProfileBioDraftError(
+    state: EditProfileBioDraftState,
+    onDismiss: () -> Unit,
+) {
+    val failure = state as? EditProfileBioDraftState.Failed ?: return
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("editProfileBioDraftError"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = failure.message,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.error,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "Dismiss",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier =
+                Modifier
+                    .clickable(onClick = onDismiss)
+                    .testTag("editProfileBioDraftErrorDismiss"),
+        )
+    }
+}
+
+/**
+ * Skills editor — an add-skill input plus tap-to-remove chips. The
+ * working list lives on [EditProfileViewModel] and is committed by its
+ * `save()` through `PUT /api/users/skills`
+ * (`backend/routes/users.js:2246`) alongside the profile PATCH. Chip
+ * presentation matches the read-only chips on the public profile
+ * (`NeighborSkillChips`, `PublicProfileNeighbor.kt:644`).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun EditProfileSkillsBlock(
+    skills: List<String>,
+    draft: String,
+    canAdd: Boolean,
+    onDraftChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("editProfileSkills"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                PantopusTextField(
+                    label = "Add a skill",
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    placeholder = "Plumbing, tutoring, dog walking…",
+                    fieldTestTag = "field_skillDraft",
+                )
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .heightIn(min = 44.dp)
+                        .widthIn(min = 56.dp)
+                        .clickable(enabled = canAdd, onClick = onAdd)
+                        .testTag("editProfileAddSkillButton")
+                        .semantics { contentDescription = "Add skill" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Add",
+                    style = PantopusTextStyle.body,
+                    color = if (canAdd) PantopusColors.primary600 else PantopusColors.appTextMuted,
+                )
+            }
+        }
+        if (skills.isEmpty()) {
+            Text(
+                text = "No skills yet. Neighbors browse these when they're looking for help.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextSecondary,
+                modifier = Modifier.testTag("editProfileSkillsEmpty"),
+            )
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
+                skills.forEach { skill ->
+                    EditProfileSkillChip(skill = skill, onRemove = onRemove)
+                }
+            }
+        }
+    }
+}
+
+/** One removable skill chip. */
+@Composable
+private fun EditProfileSkillChip(
+    skill: String,
+    onRemove: (String) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Radii.pill))
+                .background(PantopusColors.primary100)
+                .clickable { onRemove(skill) }
+                .padding(horizontal = Spacing.s3, vertical = 6.dp)
+                .testTag("editProfileSkillChip_$skill")
+                .semantics { contentDescription = "Remove $skill" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Text(
+            text = skill,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.primary700,
+        )
+        PantopusIconImage(
+            icon = PantopusIcon.X,
+            contentDescription = null,
+            size = 12.dp,
+            tint = PantopusColors.primary700,
+        )
     }
 }
 

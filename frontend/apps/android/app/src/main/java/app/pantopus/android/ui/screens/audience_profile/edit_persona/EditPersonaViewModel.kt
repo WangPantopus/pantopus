@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.audience_profile.edit_persona
 

@@ -1,3 +1,5 @@
+@file:Suppress("LongParameterList")
+
 package app.pantopus.android.data.posts
 
 import app.pantopus.android.data.api.models.feed.FeedResponse

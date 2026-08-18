@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.sp
 import app.pantopus.android.ui.components.AvatarWithIdentityRing
 import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.IdentityPillar
+import app.pantopus.android.ui.screens.profile.tabs.ProfileGigReviewsSection
+import app.pantopus.android.ui.screens.profile.tabs.ProfileGigsSection
+import app.pantopus.android.ui.screens.profile.tabs.ProfilePortfolioSection
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -62,6 +65,7 @@ enum class ProfileTab(val label: String) {
     About("About"),
     Reviews("Reviews"),
     Gigs("Gigs"),
+    Portfolio("Portfolio"),
 }
 
 /** Review row passed to the Reviews tab. */
@@ -90,6 +94,14 @@ data class StatsTabsContent(
  * P6.5 — [showActionRow] lets callers suppress the inline Message /
  * Connect / overflow row when the host screen renders kind-aware CTAs
  * in a sticky footer instead (Public profile · Persona vs Local).
+ *
+ * With [profileUserId], the Reviews / Gigs / Portfolio panels mount the
+ * live sections in `ui/screens/profile/tabs/ProfileTabsSections.kt`,
+ * backed by `GET /api/reviews/user/{userId}` (`reviews.js:149`),
+ * `GET /api/gigs?user_id=…` (`gigs.js:2089`) and
+ * `GET /api/files/portfolio[/{userId}]` (`files.js:489` / `:526`).
+ * Without an id the body keeps the caller-supplied static content and
+ * hides Portfolio, since there is nothing to fetch.
  */
 @Composable
 fun StatsTabsBody(
@@ -98,9 +110,13 @@ fun StatsTabsBody(
     onSelectTab: (ProfileTab) -> Unit,
     showStats: Boolean = true,
     showActionRow: Boolean = true,
+    profileUserId: String? = null,
+    isOwnProfile: Boolean = false,
     onMessage: () -> Unit = {},
     onConnect: () -> Unit = {},
     onOverflow: () -> Unit = {},
+    onOpenGig: (String) -> Unit = {},
+    onOpenReviewer: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -127,6 +143,7 @@ fun StatsTabsBody(
             )
         }
         TabStrip(
+            tabs = visibleTabs(profileUserId),
             selectedTab = selectedTab,
             onSelectTab = onSelectTab,
             modifier = Modifier.padding(horizontal = Spacing.s4),
@@ -134,9 +151,24 @@ fun StatsTabsBody(
         Box(modifier = Modifier.padding(horizontal = Spacing.s4)) {
             when (selectedTab) {
                 ProfileTab.About -> AboutTabContent(bio = content.bio, skills = content.skills)
-                ProfileTab.Reviews -> ReviewsTabContent(reviews = content.reviews)
-                // Gigs feature is not yet integrated in mobile.
-                ProfileTab.Gigs -> GigsTabContent()
+                ProfileTab.Reviews ->
+                    if (profileUserId != null) {
+                        ProfileGigReviewsSection(userId = profileUserId, onOpenReviewer = onOpenReviewer)
+                    } else {
+                        ReviewsTabContent(reviews = content.reviews)
+                    }
+                ProfileTab.Gigs ->
+                    if (profileUserId != null) {
+                        ProfileGigsSection(userId = profileUserId, onOpenGig = onOpenGig)
+                    } else {
+                        GigsTabContent()
+                    }
+                ProfileTab.Portfolio ->
+                    if (profileUserId != null) {
+                        ProfilePortfolioSection(userId = profileUserId, isOwnProfile = isOwnProfile)
+                    } else {
+                        PortfolioTabContent()
+                    }
             }
         }
     }
@@ -249,14 +281,26 @@ private fun ActionRow(
     }
 }
 
+/**
+ * Portfolio only exists once the host knows *whose* profile this is —
+ * there is no static portfolio payload to fall back on.
+ */
+private fun visibleTabs(profileUserId: String?): List<ProfileTab> =
+    if (profileUserId == null) {
+        listOf(ProfileTab.About, ProfileTab.Reviews, ProfileTab.Gigs)
+    } else {
+        ProfileTab.entries
+    }
+
 @Composable
 private fun TabStrip(
+    tabs: List<ProfileTab>,
     selectedTab: ProfileTab,
     onSelectTab: (ProfileTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        ProfileTab.entries.forEach { tab ->
+        tabs.forEach { tab ->
             val active = tab == selectedTab
             Column(
                 modifier =
@@ -361,13 +405,26 @@ private fun ReviewsTabContent(reviews: List<ProfileReviewCard>) {
 
 @Composable
 private fun GigsTabContent() {
-    // The public gigs feed is not surfaced on profile yet; this empty
-    // state stands in until the Gigs feature lands (T2.3).
+    // Fallback for hosts that don't know whose profile this is (previews,
+    // Paparazzi) — the live feed needs a `user_id` to filter on.
     Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
         EmptyState(
             icon = PantopusIcon.Hammer,
             headline = "No recent gigs",
             subcopy = "Recent gigs from this user will appear here.",
+        )
+    }
+}
+
+@Composable
+private fun PortfolioTabContent() {
+    // Same fallback for the Portfolio panel; without a user id there is
+    // nothing to fetch from `GET /api/files/portfolio[/:userId]`.
+    Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+        EmptyState(
+            icon = PantopusIcon.Image,
+            headline = "No portfolio yet",
+            subcopy = "Portfolio work from this user will appear here.",
         )
     }
 }

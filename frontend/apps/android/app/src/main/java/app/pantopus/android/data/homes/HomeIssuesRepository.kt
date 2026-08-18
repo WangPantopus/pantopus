@@ -23,8 +23,7 @@ open class HomeIssuesRepository
         private val api: HomeIssuesApi,
     ) {
         /** `GET /api/homes/:id/issues`. */
-        open suspend fun getHomeIssues(homeId: String): NetworkResult<HomeIssuesResponse> =
-            safeApiCall { api.getHomeIssues(homeId) }
+        open suspend fun getHomeIssues(homeId: String): NetworkResult<HomeIssuesResponse> = safeApiCall { api.getHomeIssues(homeId) }
 
         /** `POST /api/homes/:id/issues`. */
         open suspend fun createHomeIssue(

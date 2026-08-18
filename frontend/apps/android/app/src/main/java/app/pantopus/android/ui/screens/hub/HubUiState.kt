@@ -3,6 +3,7 @@ package app.pantopus.android.ui.screens.hub
 import androidx.compose.runtime.Immutable
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.theme.PantopusIcon
+import java.util.Locale
 
 /**
  * Top-level hub lifecycle state. Marked `@Immutable` so Compose treats
@@ -129,7 +130,7 @@ data class NeighborDensityContent(
         }
 
     private fun formatRadius(miles: Double): String =
-        if (miles == Math.floor(miles)) "${miles.toInt()} mi" else String.format("%.1f mi", miles)
+        if (miles == Math.floor(miles)) "${miles.toInt()} mi" else String.format(Locale.US, "%.1f mi", miles)
 }
 
 /** Setup-step row. */

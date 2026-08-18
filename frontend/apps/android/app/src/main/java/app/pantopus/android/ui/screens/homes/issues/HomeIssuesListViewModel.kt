@@ -438,28 +438,48 @@ open class HomeIssuesListViewModel
                 return when (status) {
                     HomeIssueChipStatus.Open ->
                         HomeIssueRowProjection(
-                            issue.title, subtitle, "Open",
-                            StatusChipVariant.Warning, PantopusIcon.AlertCircle, status,
+                            issue.title,
+                            subtitle,
+                            "Open",
+                            StatusChipVariant.Warning,
+                            PantopusIcon.AlertCircle,
+                            status,
                         )
                     HomeIssueChipStatus.Scheduled ->
                         HomeIssueRowProjection(
-                            issue.title, subtitle, "Scheduled",
-                            StatusChipVariant.Info, PantopusIcon.Calendar, status,
+                            issue.title,
+                            subtitle,
+                            "Scheduled",
+                            StatusChipVariant.Info,
+                            PantopusIcon.Calendar,
+                            status,
                         )
                     HomeIssueChipStatus.InProgress ->
                         HomeIssueRowProjection(
-                            issue.title, subtitle, "In progress",
-                            StatusChipVariant.Business, PantopusIcon.Wrench, status,
+                            issue.title,
+                            subtitle,
+                            "In progress",
+                            StatusChipVariant.Business,
+                            PantopusIcon.Wrench,
+                            status,
                         )
                     HomeIssueChipStatus.Completed ->
                         HomeIssueRowProjection(
-                            issue.title, subtitle, "Completed",
-                            StatusChipVariant.Success, PantopusIcon.CheckCircle, status,
+                            issue.title,
+                            subtitle,
+                            "Completed",
+                            StatusChipVariant.Success,
+                            PantopusIcon.CheckCircle,
+                            status,
                         )
                     HomeIssueChipStatus.Dismissed ->
                         HomeIssueRowProjection(
-                            issue.title, subtitle, "Dismissed",
-                            StatusChipVariant.Neutral, PantopusIcon.XCircle, status,
+                            issue.title,
+                            subtitle,
+                            "Dismissed",
+                            StatusChipVariant.Neutral,
+                            PantopusIcon.XCircle,
+                            status,
                         )
                     HomeIssueChipStatus.Unknown ->
                         HomeIssueRowProjection(

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("MatchingDeclarationName", "PackageNaming")
 
 package app.pantopus.android.ui.screens.my_tasks
 
@@ -35,7 +35,6 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.RebookableGigDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.gigs.GigExtrasRepository
-
 import app.pantopus.android.ui.screens.gigs.GigsCategory
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -131,8 +130,7 @@ class RebookRailViewModel
                 ).joinToString(" · ")
 
             /** "4.9" — one decimal, or an em dash when the worker has no rating. */
-            fun ratingLabel(rating: Double?): String =
-                if (rating == null || rating <= 0) "—" else String.format(Locale.US, "%.1f", rating)
+            fun ratingLabel(rating: Double?): String = if (rating == null || rating <= 0) "—" else String.format(Locale.US, "%.1f", rating)
         }
     }
 

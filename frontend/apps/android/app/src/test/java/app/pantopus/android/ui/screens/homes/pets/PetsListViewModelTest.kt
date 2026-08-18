@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("LongParameterList", "PackageNaming")
 
 package app.pantopus.android.ui.screens.homes.pets
 

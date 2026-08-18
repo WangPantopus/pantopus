@@ -411,8 +411,7 @@ class InvoiceDetailViewModel
                 }
 
             /** Short, human reference for an invoice UUID — first block, upper-cased. */
-            fun reference(invoiceId: String): String =
-                invoiceId.substringBefore('-').take(8).uppercase(Locale.US)
+            fun reference(invoiceId: String): String = invoiceId.substringBefore('-').take(8).uppercase(Locale.US)
 
             fun currencyCode(invoice: BusinessInvoiceDto): String =
                 invoice.currency?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(Locale.US) ?: "USD"

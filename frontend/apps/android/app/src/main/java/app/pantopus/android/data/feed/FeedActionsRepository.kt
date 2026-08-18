@@ -73,7 +73,6 @@ class FeedActionsRepository
         suspend fun feedPreferences(): NetworkResult<FeedPreferencesResponse> = safeApiCall { api.feedPreferences() }
 
         /** `PUT /api/posts/feed-preferences`. */
-        suspend fun updateFeedPreferences(
-            body: FeedPreferencesUpdateRequest,
-        ): NetworkResult<FeedPreferencesResponse> = safeApiCall { api.updateFeedPreferences(body) }
+        suspend fun updateFeedPreferences(body: FeedPreferencesUpdateRequest): NetworkResult<FeedPreferencesResponse> =
+            safeApiCall { api.updateFeedPreferences(body) }
     }

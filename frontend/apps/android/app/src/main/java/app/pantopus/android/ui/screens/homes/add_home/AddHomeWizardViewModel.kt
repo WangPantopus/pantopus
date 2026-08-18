@@ -1,10 +1,4 @@
-@file:Suppress(
-    "PackageNaming",
-    "TooManyFunctions",
-    "LongParameterList",
-    "LongMethod",
-    "CyclomaticComplexMethod",
-)
+@file:Suppress("CyclomaticComplexMethod", "LargeClass", "LongMethod", "LongParameterList", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.add_home
 

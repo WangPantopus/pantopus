@@ -45,8 +45,7 @@ class EarnOffersRepository
         suspend fun closeOffer(
             offerId: String,
             dwellMs: Long,
-        ): NetworkResult<EarnCloseOfferResponse> =
-            safeApiCall { api.closeOffer(offerId, EarnCloseOfferRequest(dwellMs = dwellMs)) }
+        ): NetworkResult<EarnCloseOfferResponse> = safeApiCall { api.closeOffer(offerId, EarnCloseOfferRequest(dwellMs = dwellMs)) }
 
         /** `POST /api/mailbox/v2/earn/save/:offerId`. */
         suspend fun saveOffer(offerId: String): NetworkResult<EarnSaveOfferResponse> = safeApiCall { api.saveOffer(offerId) }

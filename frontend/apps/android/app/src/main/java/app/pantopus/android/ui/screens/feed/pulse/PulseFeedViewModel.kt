@@ -386,8 +386,7 @@ class PulseFeedViewModel
          * `topic` param — Place-only, and only while a lane is active
          * (`backend/routes/posts.js:1481-1484` rejects it elsewhere).
          */
-        private fun topicQueryValue(): String? =
-            if (_surface.value == FeedSurface.Pulse) _activeTopic.value?.key else null
+        private fun topicQueryValue(): String? = if (_surface.value == FeedSurface.Pulse) _activeTopic.value?.key else null
 
         /** `eventKey` param — the user's pick, else the primary event. */
         private fun resolvedEventKey(): String? = eventKey ?: _primarySportsEvent.value?.eventKey
@@ -875,16 +874,13 @@ class PulseFeedViewModel
 
         private fun effectiveIsSaved(post: FeedPost): Boolean = overrides[post.id]?.isSaved ?: post.userHasSaved
 
-        private fun effectiveIsReposted(post: FeedPost): Boolean =
-            overrides[post.id]?.isReposted ?: post.userHasReposted
+        private fun effectiveIsReposted(post: FeedPost): Boolean = overrides[post.id]?.isReposted ?: post.userHasReposted
 
         private fun effectiveShareCount(post: FeedPost): Int = overrides[post.id]?.shareCount ?: post.shareCount
 
-        private fun effectiveIsSolved(post: FeedPost): Boolean =
-            overrides[post.id]?.isSolved ?: (post.state == "solved")
+        private fun effectiveIsSolved(post: FeedPost): Boolean = overrides[post.id]?.isSolved ?: (post.state == "solved")
 
-        private fun effectiveHasReacted(post: FeedPost): Boolean =
-            overrides[post.id]?.hasReacted ?: post.userHasLiked
+        private fun effectiveHasReacted(post: FeedPost): Boolean = overrides[post.id]?.hasReacted ?: post.userHasLiked
 
         private fun effectiveLikeCount(post: FeedPost): Int = overrides[post.id]?.likeCount ?: post.likeCount
 

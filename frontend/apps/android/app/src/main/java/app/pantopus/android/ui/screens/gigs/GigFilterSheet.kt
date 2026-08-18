@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("CyclomaticComplexMethod", "MagicNumber", "PackageNaming", "ReturnCount")
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.gigs

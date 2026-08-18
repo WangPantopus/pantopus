@@ -64,6 +64,12 @@ public struct MailboxRootView: View {
                     }
                     .accessibilityIdentifier("mailboxRootSettings.mailTasks")
                     Button {
+                        viewModel.openMailParty()
+                    } label: {
+                        Label("Mail party", systemImage: "party.popper")
+                    }
+                    .accessibilityIdentifier("mailboxRootSettings.mailParty")
+                    Button {
                         viewModel.openCommunity()
                     } label: {
                         Label("Community mail", systemImage: "megaphone")

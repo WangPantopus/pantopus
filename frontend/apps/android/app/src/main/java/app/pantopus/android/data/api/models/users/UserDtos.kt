@@ -140,6 +140,26 @@ data class ProfileUpdateResponse(
 )
 
 /**
+ * Body for `PUT /api/users/skills` — replaces the caller's whole skill
+ * list. Route `backend/routes/users.js:2246`; mirror of iOS
+ * `UpdateSkillsRequest`.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateSkillsRequest(
+    val skills: List<String>,
+)
+
+/**
+ * `{ skills: [...] }` echo from `PUT /api/users/skills`. The handler
+ * trims, dedupes, caps each entry at 100 chars and the list at 50, then
+ * returns the cleaned array (`backend/routes/users.js:2254`).
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateSkillsResponse(
+    val skills: List<String>,
+)
+
+/**
  * `GET /api/users/:id/stats` envelope — route
  * `backend/routes/users.js:2787`.
  */

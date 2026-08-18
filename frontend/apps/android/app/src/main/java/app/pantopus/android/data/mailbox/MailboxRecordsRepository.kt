@@ -25,21 +25,18 @@ open class MailboxRecordsRepository
         private val api: MailboxRecordsApi,
     ) {
         /** `GET api/mailbox/v2/p3/records/assets`. */
-        open suspend fun assets(homeId: String? = null): NetworkResult<HomeAssetsResponse> =
-            safeApiCall { api.assets(homeId) }
+        open suspend fun assets(homeId: String? = null): NetworkResult<HomeAssetsResponse> = safeApiCall { api.assets(homeId) }
 
         /** `GET api/mailbox/v2/p3/records/asset/:id/mail`. */
-        open suspend fun assetMail(assetId: String): NetworkResult<AssetMailResponse> =
-            safeApiCall { api.assetMail(assetId) }
+        open suspend fun assetMail(assetId: String): NetworkResult<AssetMailResponse> = safeApiCall { api.assetMail(assetId) }
 
         /** `POST api/mailbox/v2/p3/records/auto-detect`. */
         open suspend fun autoDetect(homeId: String): NetworkResult<AutoDetectAssetsResponse> =
             safeApiCall { api.autoDetect(AutoDetectAssetsRequest(homeId = homeId)) }
 
         /** `GET api/mailbox/v2/p3/records/suggestions`. */
-        open suspend fun suggestions(
-            homeId: String? = null,
-        ): NetworkResult<AssetSuggestionsResponse> = safeApiCall { api.suggestions(homeId) }
+        open suspend fun suggestions(homeId: String? = null): NetworkResult<AssetSuggestionsResponse> =
+            safeApiCall { api.suggestions(homeId) }
 
         /** `POST api/mailbox/v2/p3/records/link`. */
         open suspend fun link(
@@ -58,6 +55,5 @@ open class MailboxRecordsRepository
             }
 
         /** `DELETE api/mailbox/v2/p3/records/unlink/:id`. */
-        open suspend fun unlink(linkId: String): NetworkResult<UnlinkMailFromAssetResponse> =
-            safeApiCall { api.unlink(linkId) }
+        open suspend fun unlink(linkId: String): NetworkResult<UnlinkMailFromAssetResponse> = safeApiCall { api.unlink(linkId) }
     }

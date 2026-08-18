@@ -40,12 +40,20 @@ public enum PublicProfileKind: String, Sendable, Equatable, Hashable {
     case local
 }
 
-/// A21.2 — the two-tab strip on the Local Beacon profile archetype
-/// (Posts · About). Separate from `ProfileTab` so the persona path keeps
-/// its own four-tab body untouched.
+/// A21.2 — the tab strip on the Local Beacon profile archetype. Separate
+/// from `ProfileTab` so the persona path keeps its own body untouched.
+///
+/// Posts · About are the designed pair; Portfolio · Gigs · Reviews carry
+/// the marketplace surfaces a verified neighbour actually has —
+/// `GET /api/files/portfolio/:userId` (`backend/routes/files.js:526`),
+/// `GET /api/gigs?user_id=…` (`backend/routes/gigs.js:2089`) and
+/// `GET /api/reviews/user/:userId` (`backend/routes/reviews.js:149`).
 public enum LocalProfileTab: String, Sendable, Equatable, Hashable, CaseIterable, Identifiable {
     case posts
     case about
+    case portfolio
+    case gigs
+    case reviews
 
     public var id: String {
         rawValue
@@ -55,6 +63,9 @@ public enum LocalProfileTab: String, Sendable, Equatable, Hashable, CaseIterable
         switch self {
         case .posts: "Posts"
         case .about: "About"
+        case .portfolio: "Portfolio"
+        case .gigs: "Gigs"
+        case .reviews: "Reviews"
         }
     }
 }

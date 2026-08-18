@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "TooManyFunctions")
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.settings.ownership_security
 

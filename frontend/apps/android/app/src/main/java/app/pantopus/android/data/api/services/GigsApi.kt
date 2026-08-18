@@ -69,11 +69,16 @@ interface GigsApi {
      * Excludes the caller's own gigs by default. `schedule_type` takes a
      * single value, `pay_type` takes `offers` for open-to-bids, and
      * `deadline` accepts `today` / `tomorrow` / `this_week`.
+     *
+     * `user_id` scopes the feed to one poster and suppresses the
+     * "exclude my own gigs" branch (`backend/routes/gigs.js:2103-2125`,
+     * applied at `:2473`) — the public-profile Gigs tab's only filter.
      */
     @Suppress("LongParameterList")
     @GET("api/gigs")
     suspend fun list(
         @Query("category") category: String? = null,
+        @Query("user_id") userId: String? = null,
         @Query("sort") sort: String? = null,
         @Query("latitude") latitude: Double? = null,
         @Query("longitude") longitude: Double? = null,

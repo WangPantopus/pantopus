@@ -300,8 +300,7 @@ class FeedMapViewModel
         }
 
         /** Widen the cluster radius as the camera zooms out and vice versa. */
-        private fun clusterRadius(target: FeedMapRegion): Double =
-            (target.latitudeDelta * 0.08).coerceIn(0.0005, 0.05)
+        private fun clusterRadius(target: FeedMapRegion): Double = (target.latitudeDelta * 0.08).coerceIn(0.0005, 0.05)
 
         companion object {
             /**

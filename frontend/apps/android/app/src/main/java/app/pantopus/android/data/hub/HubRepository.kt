@@ -46,8 +46,7 @@ class HubRepository
         suspend fun todayDetail(): NetworkResult<HubTodayPayload> = safeApiCall { api.todayDetail() }
 
         /** `GET /api/hub/briefings/:id` — a stored Morning/Evening Briefing. */
-        suspend fun briefingDelivery(id: String): NetworkResult<BriefingDeliveryResponse> =
-            safeApiCall { api.briefingDelivery(id) }
+        suspend fun briefingDelivery(id: String): NetworkResult<BriefingDeliveryResponse> = safeApiCall { api.briefingDelivery(id) }
 
         /**
          * `GET /api/hub/discovery?filter=...&limit=...`.

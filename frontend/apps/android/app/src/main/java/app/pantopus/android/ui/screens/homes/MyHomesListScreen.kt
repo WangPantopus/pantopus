@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod")
+
 package app.pantopus.android.ui.screens.homes
 
 import androidx.compose.foundation.layout.Box

@@ -63,9 +63,17 @@ public struct FeedMapRegion: Sendable, Hashable {
     )
 
     /// South / west / north / east — the four params `/api/posts/map`
-    /// requires (`backend/routes/posts.js:1652`).
-    public var bounds: (south: Double, west: Double, north: Double, east: Double) {
-        (
+    /// requires (`backend/routes/posts.js:1652`). A named box rather than a
+    /// 4-tuple so the edges cannot be transposed at the call site.
+    public struct Bounds: Sendable, Equatable {
+        public let south: Double
+        public let west: Double
+        public let north: Double
+        public let east: Double
+    }
+
+    public var bounds: Bounds {
+        Bounds(
             south: latitude - latitudeDelta / 2,
             west: longitude - longitudeDelta / 2,
             north: latitude + latitudeDelta / 2,
