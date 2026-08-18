@@ -21,8 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,6 +43,7 @@ import app.pantopus.android.ui.components.EmptyState
 import app.pantopus.android.ui.components.OfflineBannerHost
 import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.scheduling._shared.OwnerPillarHeader
+import app.pantopus.android.ui.screens.scheduling._shared.PantopusMiniToggle
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingPillar
 import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.theme.PantopusColors
@@ -488,15 +487,15 @@ private fun ToggleRow(
                     modifier = Modifier.size(20.dp),
                 )
             } else {
-                Switch(
+                // Design availability-settings-frames.jsx ToggleGreen: a 36×20 pill with
+                // a 16dp thumb in the home accent — not the 52×32 Material 3 Switch.
+                PantopusMiniToggle(
                     checked = on,
-                    onCheckedChange = { if (!disabled) onToggle(it) },
-                    enabled = !disabled,
-                    colors =
-                        SwitchDefaults.colors(
-                            checkedTrackColor = PantopusColors.home,
-                            checkedThumbColor = PantopusColors.appTextInverse,
-                        ),
+                    onCheckedChange = if (disabled) null else onToggle,
+                    accent = PantopusColors.home,
+                    trackWidth = 36.dp,
+                    trackHeight = 20.dp,
+                    thumbSize = 16.dp,
                 )
             }
         }

@@ -126,7 +126,7 @@ fun ConnectedCalendarsScreen(
                     is ConnectedCalendarsUiState.Error -> ErrorState(message = s.message, onRetry = viewModel::load)
                     is ConnectedCalendarsUiState.Loaded ->
                         if (s.calendars.isEmpty()) {
-                            EmptyState(onConnect = viewModel::connect)
+                            ComingSoonState()
                         } else {
                             ConnectedList(calendars = s.calendars, onConnect = viewModel::connect)
                         }
@@ -181,20 +181,23 @@ private fun Helper(text: String) {
     )
 }
 
-// ─── Empty (no calendars) — coming-soon hero + connect rows ──────────────────
+// ─── Empty (no calendars) — the calm coming-soon placeholder ─────────────────
 
+/**
+ * Design `connected-calendars-frames.jsx` FramePlaceholder: when sync isn't
+ * available yet the sheet carries the calm coming-soon card **alone**. The
+ * helper line and the per-provider connect rows belong to FrameNone (rendered
+ * by [ConnectedList] once the backend returns unconnected providers) — the two
+ * are distinct states and must not be stacked.
+ */
 @Composable
-private fun EmptyState(onConnect: () -> Unit) {
+private fun ComingSoonState() {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.s4),
         verticalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
         PillarOverline()
         ComingSoon()
-        Helper("Connect a calendar to check for conflicts and add bookings automatically.")
-        listOf("google", "apple", "outlook").forEach { provider ->
-            ConnectRow(provider = provider, onConnect = onConnect)
-        }
     }
 }
 

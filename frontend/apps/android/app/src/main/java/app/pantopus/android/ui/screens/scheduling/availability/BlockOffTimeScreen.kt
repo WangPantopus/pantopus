@@ -85,7 +85,13 @@ fun BlockOffTimeScreen(
                 A3ConflictCard(message = conflict.message, onViewBooking = viewModel::viewConflictBooking)
             }
             RepeatCard(form = form, onSelect = viewModel::setRepeat)
-            A3LockFootnote("This time won't be offered for booking. It's private to you.")
+            // Design block-time-frames.jsx FrameSaving: the footer swaps the lock
+            // footnote for a shimmering "Saving…" bar while the write is in flight.
+            if (form.saving) {
+                A3SavingFootnoteBar()
+            } else {
+                A3LockFootnote("This time won't be offered for booking. It's private to you.")
+            }
         }
     }
 

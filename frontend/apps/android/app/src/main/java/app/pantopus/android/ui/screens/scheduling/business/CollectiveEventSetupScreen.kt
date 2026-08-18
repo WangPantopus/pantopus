@@ -136,9 +136,11 @@ private fun CollectiveBody(
                     onPlus = viewModel::incrementSeats,
                 )
                 BizNote(
+                    // Design collective-frames.jsx:116,170 sets this explainer's glyph
+                    // to `git-merge` — the intersection metaphor, not a swap arrow.
                     text = "Times come from where every required member is free. Fewer common openings means fewer slots.",
                     tone = BizNoteTone.Info,
-                    icon = PantopusIcon.ArrowRightLeft,
+                    icon = PantopusIcon.GitMerge,
                 )
             } else {
                 BizNote(

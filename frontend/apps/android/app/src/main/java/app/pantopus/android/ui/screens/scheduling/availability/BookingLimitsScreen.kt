@@ -12,15 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -97,10 +92,9 @@ private fun LimitsBody(
                 .padding(horizontal = Spacing.s3, vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
+        // Design booking-limits-frames.jsx has no "Applies to" event-type selector —
+        // the sheet is scoped to the event type it was opened from.
         SectionOverline("Personal · ${form.selectedName}", modifier = Modifier.padding(start = Spacing.s1, top = Spacing.s1))
-        if (form.eventTypes.size > 1) {
-            EventTypeSelector(form = form, onSelect = viewModel::selectEventType)
-        }
         Text(
             "Sensible defaults are set, so you usually don't need to touch these.",
             color = PantopusColors.appTextSecondary,
@@ -159,31 +153,6 @@ private fun LimitsBody(
             caption = "Where bookings can start within the hour.",
             onSelect = { viewModel.setStartInterval(StartInterval.entries[it]) },
         )
-    }
-}
-
-@Composable
-private fun EventTypeSelector(
-    form: BookingLimitsForm,
-    onSelect: (String) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    A3Card {
-        FieldLabel("Applies to")
-        Box {
-            A3FieldButton(icon = PantopusIcon.SlidersHorizontal, value = form.selectedName, onClick = { open = true })
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                form.eventTypes.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option.name) },
-                        onClick = {
-                            open = false
-                            onSelect(option.id)
-                        },
-                    )
-                }
-            }
-        }
     }
 }
 

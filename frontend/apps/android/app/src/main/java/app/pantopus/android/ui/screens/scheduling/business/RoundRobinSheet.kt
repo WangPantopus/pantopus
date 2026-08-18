@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -139,7 +140,13 @@ private fun RoundRobinBody(
                 selected = content.rule == RoundRobinAssignmentViewModel.Rule.Strict,
                 onClick = { viewModel.selectRule(RoundRobinAssignmentViewModel.Rule.Strict) },
             )
-            BizOverline("Bookable members", modifier = Modifier.padding(top = Spacing.s2))
+            // Design roundrobin-frames.jsx:66 sets this sheet's Overline in the neutral
+            // fg3 grey, not the business violet the shared BizOverline defaults to.
+            BizOverline(
+                "Bookable members",
+                modifier = Modifier.padding(top = Spacing.s2),
+                color = PantopusColors.appTextSecondary,
+            )
             if (content.checkedCount == 0) {
                 BizNote(
                     text = "Pick at least one member to take bookings.",
@@ -357,33 +364,36 @@ private fun StepperButton(
     }
 }
 
+/**
+ * Design `roundrobin-frames.jsx` FrameLoading: the rule tiles and the seat rows
+ * are shimmer skeletons mirroring the loaded geometry (checkbox · avatar · two
+ * text lines · trailing weight pill), never flat grey blocks.
+ */
 @Composable
 private fun RoundRobinLoading() {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         repeat(3) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radii.lg))
-                        .background(PantopusColors.appSurfaceSunken)
-                        .padding(Spacing.s5),
-            )
+            Shimmer(modifier = Modifier.fillMaxWidth(), height = 56.dp, cornerRadius = Radii.lg)
         }
-        BizOverline("Bookable members", modifier = Modifier.padding(top = Spacing.s2))
+        BizOverline(
+            "Bookable members",
+            modifier = Modifier.padding(top = Spacing.s2),
+            color = PantopusColors.appTextSecondary,
+        )
         BizCard {
             repeat(4) { i ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s3),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 ) {
-                    Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(PantopusColors.appSurfaceSunken))
-                    Box(
-                        modifier =
-                            Modifier.weight(
-                                1f,
-                            ).size(12.dp).clip(RoundedCornerShape(Radii.xs)).background(PantopusColors.appSurfaceSunken),
-                    )
+                    Shimmer(width = 22.dp, height = 22.dp, cornerRadius = Radii.sm)
+                    Shimmer(width = 34.dp, height = 34.dp, cornerRadius = Radii.pill)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Shimmer(width = 110.dp, height = 11.dp, cornerRadius = Radii.sm)
+                        Shimmer(width = 150.dp, height = 8.dp, cornerRadius = Radii.xs)
+                    }
+                    Shimmer(width = 54.dp, height = 24.dp, cornerRadius = Radii.pill)
                 }
                 if (i != 3) BizRowDivider()
             }

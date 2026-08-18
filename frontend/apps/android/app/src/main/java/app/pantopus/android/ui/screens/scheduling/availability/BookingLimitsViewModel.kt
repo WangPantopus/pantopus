@@ -20,18 +20,11 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** An event type the limits apply to. */
-@Immutable
-data class EventTypeOption(
-    val id: String,
-    val name: String,
-)
-
 /** The editable booking-limits form (maps to event-type fields). */
 @Immutable
 data class BookingLimitsForm(
-    val eventTypes: List<EventTypeOption>,
     val selectedId: String,
+    val selectedName: String,
     val minNoticeHours: Int,
     val bookUpToDays: Int,
     val maxPerDay: Int,
@@ -43,8 +36,6 @@ data class BookingLimitsForm(
     val startInterval: StartInterval,
     val saving: Boolean = false,
 ) {
-    val selectedName: String get() = eventTypes.firstOrNull { it.id == selectedId }?.name ?: "Event type"
-
     /** Window-shorter-than-notice conflict (design's error state). */
     val windowError: Boolean
         get() = bookUpToDays < 1 || bookUpToDays.toLong() * MINUTES_PER_DAY < minNoticeHours.toLong() * MINUTES_PER_HOUR
@@ -109,7 +100,7 @@ class BookingLimitsViewModel
                             if (first == null) {
                                 BookingLimitsUiState.Empty
                             } else {
-                                BookingLimitsUiState.Content(first.toForm(eventTypes))
+                                BookingLimitsUiState.Content(first.toForm())
                             }
                     }
                     is NetworkResult.Failure ->
@@ -120,10 +111,10 @@ class BookingLimitsViewModel
 
         fun refresh() = load()
 
-        private fun EventTypeDto.toForm(all: List<EventTypeDto>): BookingLimitsForm =
+        private fun EventTypeDto.toForm(): BookingLimitsForm =
             BookingLimitsForm(
-                eventTypes = all.map { EventTypeOption(it.id, it.name) },
                 selectedId = id,
+                selectedName = name,
                 minNoticeHours = (minNoticeMin ?: DEFAULT_NOTICE_MIN) / MIN_PER_HOUR,
                 bookUpToDays = maxHorizonDays ?: DEFAULT_HORIZON_DAYS,
                 // Caps are positive integers (design + iOS clamp to min 1; no
@@ -132,11 +123,6 @@ class BookingLimitsViewModel
                 perPerson = (perBookerCap ?: DEFAULT_PER_PERSON).coerceAtLeast(MIN_CAP),
                 startInterval = StartInterval.fromMinutes(slotIntervalMin),
             )
-
-        fun selectEventType(id: String) {
-            val dto = eventTypes.firstOrNull { it.id == id } ?: return
-            _state.value = BookingLimitsUiState.Content(dto.toForm(eventTypes))
-        }
 
         private inline fun mutate(transform: (BookingLimitsForm) -> BookingLimitsForm) {
             val form = (_state.value as? BookingLimitsUiState.Content)?.form ?: return
@@ -189,7 +175,7 @@ class BookingLimitsViewModel
                 // would e.g. stamp daily_cap=8 onto an unlimited event type or turn
                 // a web-configured 30-min notice into 0. Mirrors iOS
                 // BookingLimitsViewModel's loaded-value snapshots.
-                val baseline = eventTypes.firstOrNull { it.id == form.selectedId }?.toForm(eventTypes)
+                val baseline = eventTypes.firstOrNull { it.id == form.selectedId }?.toForm()
                 val body = buildPatch(form, baseline)
                 when (val result = repo.updateEventType(owner, form.selectedId, body)) {
                     is NetworkResult.Success -> {

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -551,6 +552,10 @@ fun A3FieldButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    // The generic field button tints its glyph sky (block-time-frames.jsx:106); the
+    // timezone card is the exception and draws its globe in fg3 grey
+    // (weekly-hours-frames.jsx:44).
+    iconTint: Color = PantopusColors.primary600,
 ) {
     Row(
         modifier =
@@ -564,7 +569,7 @@ fun A3FieldButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
-        PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = PantopusColors.primary600)
+        PantopusIconImage(icon = icon, contentDescription = null, size = 15.dp, tint = iconTint)
         Text(value, modifier = Modifier.weight(1f), color = PantopusColors.appText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         PantopusIconImage(icon = PantopusIcon.ChevronDown, contentDescription = null, size = 15.dp, tint = PantopusColors.appTextMuted)
     }
@@ -736,8 +741,10 @@ fun A3WarningCard(
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             PantopusIconImage(icon = PantopusIcon.TriangleAlert, contentDescription = null, size = 17.dp, tint = PantopusColors.warning)
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = PantopusColors.warning, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text(body, color = PantopusColors.appTextStrong, fontSize = 11.5.sp)
+                // Design WarningCard (weekly-hours-frames.jsx:209-210): amber-800 title
+                // over an amber-900 body — the amber-600 [warning] stays on the glyph.
+                Text(title, color = PantopusColors.warningStrong, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(body, color = PantopusColors.warningDeep, fontSize = 11.5.sp)
             }
         }
         action?.invoke()
@@ -828,6 +835,19 @@ fun A3ConflictCard(
                 Text("View booking", color = PantopusColors.warning, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+/**
+ * The block-off sheet's "Saving…" bar (`block-time-frames.jsx:82-85`): a 24dp
+ * shimmering track with the centred label, shown in place of the lock footnote
+ * while the write is in flight.
+ */
+@Composable
+fun A3SavingFootnoteBar(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Shimmer(modifier = Modifier.fillMaxWidth(), height = 24.dp, cornerRadius = Radii.md)
+        Text("Saving…", color = PantopusColors.appTextMuted, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -180,7 +180,8 @@ private fun OverridesBody(
             onNext = viewModel::nextMonth,
         )
         PickerBlock(form = form, onChoice = viewModel::setChoice, onEditCustomHours = onEditCustomHours, onApply = viewModel::applySelected)
-        A3LinkRow(icon = PantopusIcon.CalendarDays, label = "Block a date range", onClick = onStartRange)
+        // Design date-overrides-frames.jsx:195 RangeLink glyph is `calendar-range`.
+        A3LinkRow(icon = PantopusIcon.CalendarRange, label = "Block a date range", onClick = onStartRange)
 
         SectionLabel("Overrides")
         OverridesCard {
@@ -211,6 +212,14 @@ private fun OverridesBody(
                     if (index != holidayRows.lastIndex) RowDivider()
                 }
             }
+            // Design FrameHolidays footnote (date-overrides-frames.jsx:366-368) —
+            // explains that the set is all-or-nothing. Mirrors iOS DateOverridesView.
+            Text(
+                "Holidays are blocked as a set. Turn the set off to remove them all at once.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = Spacing.s1),
+            )
         }
     }
 }
@@ -242,7 +251,9 @@ private fun PickerBlock(
         }
         A3PrimaryButton(
             label = if (custom) "Add custom hours for this day" else "Block this date",
-            icon = if (custom) PantopusIcon.Clock else PantopusIcon.CalendarX,
+            // Design PickerBlock CTA glyph (date-overrides-frames.jsx:181): clock when
+            // custom hours, `calendar-off` when blocking the date.
+            icon = if (custom) PantopusIcon.Clock else PantopusIcon.CalendarOff,
             onClick = onApply,
         )
     }
@@ -293,7 +304,8 @@ private fun OverrideRow(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = if (item.isUnavailable) PantopusIcon.CalendarX else PantopusIcon.Clock,
+                // Design OverrideRow glyph (date-overrides-frames.jsx:219).
+                icon = if (item.isUnavailable) PantopusIcon.CalendarOff else PantopusIcon.Clock,
                 contentDescription = null,
                 size = 16.dp,
                 tint = if (item.isUnavailable) PantopusColors.appTextSecondary else PantopusColors.primary600,
@@ -332,7 +344,8 @@ private fun HolidayRow(
             contentAlignment = Alignment.Center,
         ) {
             PantopusIconImage(
-                icon = PantopusIcon.CalendarX,
+                // Design HolidayRow glyph (date-overrides-frames.jsx:272).
+                icon = PantopusIcon.CalendarOff,
                 contentDescription = null,
                 size = 16.dp,
                 tint = PantopusColors.appTextSecondary,

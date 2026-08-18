@@ -87,7 +87,24 @@ fun WeeklyHoursEditorScreen(
                 is WeeklyHoursUiState.Content -> if (s.form.isUnset) "Set hours" else "Edit schedule"
                 else -> "Edit schedule"
             }
-        AvailabilityTopBar(title = topBarTitle, onBack = onBack)
+        // Design event-editor-shell.jsx TopBar carries a trailing Save / Saving text
+        // action on every editor frame (weekly-hours-frames.jsx:281-362).
+        AvailabilityTopBar(
+            title = topBarTitle,
+            onBack = onBack,
+            trailing = {
+                val form = (state as? WeeklyHoursUiState.Content)?.form
+                if (form?.saving == true) {
+                    Text("Saving", color = PantopusColors.appTextMuted, fontSize = 15.sp)
+                } else {
+                    TopBarTextAction(
+                        label = "Save",
+                        enabled = form != null && form.isValid,
+                        onClick = viewModel::save,
+                    )
+                }
+            },
+        )
         when (val s = state) {
             WeeklyHoursUiState.Loading ->
                 SchedulingLoadingSkeleton(modifier = Modifier.fillMaxWidth().weight(1f), rows = 4)
@@ -232,7 +249,15 @@ private fun TimezoneCard(
 ) {
     A3Card(overline = "Timezone") {
         FieldLabel("Time zone")
-        A3FieldButton(icon = PantopusIcon.Globe, value = label, enabled = enabled, onClick = onPick)
+        // Design TimezoneCard (weekly-hours-frames.jsx:44): the globe is fg3 grey,
+        // not the sky the generic field button tints its glyph.
+        A3FieldButton(
+            icon = PantopusIcon.Globe,
+            value = label,
+            enabled = enabled,
+            onClick = onPick,
+            iconTint = PantopusColors.appTextSecondary,
+        )
         A3ToggleRow(
             icon = PantopusIcon.Lock,
             label = "Lock to my timezone",
