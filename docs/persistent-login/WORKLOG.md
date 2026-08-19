@@ -394,3 +394,12 @@ Cross-platform:
   OPS BEFORE FLIPPING AUTH_DEVICE_BINDING=required: set PUBLIC_API_BASE_URL
   and DPOP_CUTOVER.
 - 2026-08-19: Stage E launched: run wf_64da43ba-bd8 (task ww1yh2avd) — adversarial security review + fixes. Also clarified event.deviceId semantics in CONTRACT.md (row id, joins devices[].id).
+- 2026-08-19: COMMITTED + PUSHED to origin/persistent-login (5 commits:
+  bf3abf3e docs, 5bdcee1a backend, e6640b9d ios, a4bf493c android,
+  b6bec6c8 web+docs). Full backend suite re-run before committing:
+  220 suites / 3451 tests / 0 failures.
+  Stage E (security review) had DIED on a session limit but had already
+  landed S1-S5 fixes + regression tests (auth suites 214/0); its report
+  header still says IN PROGRESS — the remaining work is only its own
+  write-up plus items S6+ it never reached. Stage F (final CI-equivalent
+  verify) has NOT been run; CI on the pushed branch now covers it.
