@@ -127,7 +127,7 @@ targets:
         NSCameraUsageDescription: "Pantopus uses the camera for profile photos, listing images, mail capture, and taking photos to send in chat."
         NSPhotoLibraryUsageDescription: "Pantopus uses your photo library to upload profile photos, listing images, and mail."
         NSMicrophoneUsageDescription: "Pantopus uses the microphone for voice messages in chat."
-        NSFaceIDUsageDescription: "Pantopus uses Face ID to lock sensitive actions like payments."
+        NSFaceIDUsageDescription: "Pantopus uses Face ID to continue signed in after a reinstall, to unlock the app, and to confirm sensitive actions like payments and removing devices."
         UIBackgroundModes:
           - remote-notification
         LSApplicationQueriesSchemes:
@@ -145,9 +145,25 @@ targets:
         # production APNs environment). Xcode substitutes the build setting
         # into the entitlements plist at sign time.
         aps-environment: $(APS_ENVIRONMENT)
+        # pantopus.com is the product domain (share / invite links, AASA);
+        # the .app entries are kept so links already in circulation still
+        # resolve. This list is the regen source of truth for
+        # Pantopus/Resources/Pantopus.entitlements — keep both in sync.
+        #
+        # `webcredentials:` (persistent login, design §8 / §11): associates
+        # the app with the web origins for Password AutoFill + passkeys, so
+        # the `.username` login field offers the credential saved for
+        # pantopus.com. Served from each host's
+        # `.well-known/apple-app-site-association` (`webcredentials` key).
         com.apple.developer.associated-domains:
+          - applinks:pantopus.com
+          - applinks:www.pantopus.com
           - applinks:pantopus.app
           - applinks:www.pantopus.app
+          - webcredentials:pantopus.com
+          - webcredentials:www.pantopus.com
+          - webcredentials:pantopus.app
+          - webcredentials:www.pantopus.app
         # Phase 6c — shared UserDefaults suite feeding the Tasks-near-me
         # widget snapshot (also declared on PantopusWidgets).
         com.apple.security.application-groups:
