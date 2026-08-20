@@ -410,3 +410,55 @@ Cross-platform:
   write-up) THEN final verify x3 in parallel (backend pnpm test + test:privacy,
   iOS make bootstrap/build/test/lint, Android full android-ci.yml quality job).
   Agents were told NOT to git commit; the parent session commits.
+
+## FINAL STATE (2026-08-20)
+
+Stage E+F run wf_a2bea3f0-e2b: ALL 4 AGENTS COMPLETED. Everything pushed to
+origin/persistent-login (9 commits total, 212 files, +37685/-685 vs master).
+
+Stage E (security review) — Status DONE. S1-S5 (first pass, already committed)
+re-verified present and correct in the tree; S4's fix had no test for the
+branch it introduced — added. SIX NEW findings, all fixed + regression tests:
+  S6  HIGH     /oauth/token could rebind a victim's live session to a thief's
+               key and rotate their AuthDevice row (bearer-only path).
+  S8  HIGH     PRE-EXISTING: /reset-password JWT branch accepted ANY valid
+               access token as a reset credential => stolen bearer = full
+               takeover (+ lockout, once the new reset hook landed).
+  S7  MED      client-declared X-Token-Transport was the required-mode
+               exemption => header+cookie opted a stolen unbound token out.
+  S10 LOW-MED  req.ip written raw into inet columns; an unvalidated hop
+               ("unknown"/planted) failed the write and lost the session row.
+  S9  LOW      control chars in device name/model => log-record forgery.
+  S11 LOW      unset PUBLIC_API_BASE_URL makes DPoP htu trust the Host header
+               (warning + doc, not fail-closed).
+Each fix proven to matter by neutralising it and re-running (S6 4/7 fail,
+S7 6/8, S8 3/5).
+
+Stage F (final verification) — all three layers GREEN:
+  backend  220 suites / 3479 tests / 0 failures; test:privacy all gates PASS;
+           identity-firewall 10 suites / 60 tests. (I re-ran the full suite 6x
+           myself: 5 clean, 1 single-test failure I could NOT reproduce or
+           name — treat as a suspected flake, watch CI.)
+  iOS      make build OK; CI gate 3551 tests / 0 failures; swiftformat clean.
+           Pre-existing only: 6 UI-test failures (CI skips that target),
+           verify-tokens 505 violations across 91 files (empty intersection
+           with the 53 feature files), 6 swiftlint force_unwrapping in
+           #Preview of untouched files (local 0.63.2 vs CI-pinned 0.63.3).
+  Android  full CI quality job BUILD SUCCESSFUL: ktlint, detekt (0 issues),
+           lintDebug 0 errors, 3477 unit tests debug+release / 0 failures,
+           paparazziVerify no drift, assembleDebug OK.
+
+CARRIED FORWARD (not done, deliberate):
+  - in-process rate limiters + jti store must move to a shared store before
+    AUTH_DEVICE_BINDING=required on a multi-instance fleet.
+  - pushService.saveToken upserts on `token` alone => registering another
+    account's push token re-points that row; needs a (user_id, token) unique
+    constraint + migration.
+  - keyBacking is self-asserted until attestation ships (v1 limitation).
+  - OPS before flipping required mode: set PUBLIC_API_BASE_URL and DPOP_CUTOVER.
+  - Out of scope this pass: App Attest / Play Integrity / key attestation,
+    native SIWA + Credential Manager Google (endpoint exists server-side),
+    passkeys, Android assetlinks fingerprint (needs Play App Signing SHA-256;
+    tools/gen-association-files.mjs is ready).
+  - NOT validated: migration 160 against a real database; no end-to-end run
+    against live Supabase; no on-device reinstall test.
