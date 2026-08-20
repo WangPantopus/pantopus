@@ -133,8 +133,11 @@ enum class PlaceSectionId(val raw: String) {
     AIR_QUALITY("air_quality"),
     ALERTS("alerts"),
     SUNRISE_SUNSET("sunrise_sunset"),
+    GOOD_DAY_TO("good_day_to"),
     YOUR_HOME("your_home"),
+    HOME_SYSTEMS("home_systems"),
     FLOOD("flood"),
+    HEAT_COLD("heat_cold"),
     SEISMIC("seismic"),
     WILDFIRE("wildfire"),
     LEAD_RADON("lead_radon"),
@@ -701,6 +704,140 @@ data class PlaceYourHomeData(
     @Json(name = "assessed_value") val assessedValue: Double? = null,
 )
 
+/**
+ * "Good day to…" — verdicts, not readings. Computed from the weather/AQI
+ * payload already fetched for the two Today layers, crossed with the
+ * home's own facts, so it costs no additional provider call.
+ */
+enum class GoodDayVerdict {
+    @Json(name = "yes")
+    YES,
+
+    @Json(name = "caution")
+    CAUTION,
+
+    @Json(name = "no")
+    NO,
+
+    UNKNOWN,
+    ;
+
+    companion object {
+        fun from(raw: String?): GoodDayVerdict = when (raw) {
+            "yes" -> YES
+            "caution" -> CAUTION
+            "no" -> NO
+            else -> UNKNOWN
+        }
+    }
+}
+
+@JsonClass(generateAdapter = true)
+data class PlaceGoodDayTile(
+    val id: String = "",
+    val label: String = "",
+    /** Display glyph (emoji) — the server picks it so all clients agree. */
+    val glyph: String = "",
+    val verdict: GoodDayVerdict = GoodDayVerdict.UNKNOWN,
+    /** The short answer, e.g. "Yes — until 3pm". */
+    val answer: String = "",
+    /**
+     * The reasoning WITH the actual numbers. An opinionated tile that
+     * won't show its inputs is not trustworthy, so this always renders.
+     */
+    val because: String = "",
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceGoodDayData(
+    val tiles: List<PlaceGoodDayTile> = emptyList(),
+)
+
+/** NWS HeatRisk index: 0 little-to-none → 4 extreme. */
+@JsonClass(generateAdapter = true)
+data class PlaceHeatRiskDay(
+    val date: String = "",
+    /** 1-based day index in the NWS 7-day series. */
+    val day: Int = 0,
+    val level: Int = 0,
+    val label: String = "",
+    /** The published meaning of this level. */
+    val meaning: String = "",
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceFreezeWindow(
+    val starts: String = "",
+    val ends: String = "",
+    /** Contiguous hours at or below freezing. */
+    val hours: Int = 0,
+    @Json(name = "min_temp_f") val minTempF: Int = 0,
+)
+
+/**
+ * Heat & cold — the seasonal spine, nationally. `heatCovered` is false
+ * outside CONUS, where HeatRisk has no data: a coverage gap, NOT a
+ * reading of zero, and the card must say so rather than imply calm.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceHeatColdData(
+    /** "heat" | "cold" | "none" — `none` is the honest common case. */
+    val mode: String = "none",
+    @Json(name = "heat_days") val heatDays: List<PlaceHeatRiskDay> = emptyList(),
+    @Json(name = "heat_covered") val heatCovered: Boolean = false,
+    @Json(name = "peak_level") val peakLevel: Int? = null,
+    @Json(name = "peak_date") val peakDate: String? = null,
+    val freeze: PlaceFreezeWindow? = null,
+    val headline: String = "",
+    /** The home-conditioned instruction. Empty when there is nothing to do. */
+    val guidance: String = "",
+    @Json(name = "source_note") val sourceNote: String = "",
+)
+
+/**
+ * Systems Ledger (Band C) — the household's own record.
+ *
+ * Every system is seeded from the build year so the ledger is never
+ * blank, and each carries HOW it is known: an estimate is never dressed
+ * up as a fact, and a resident's correction outranks anything derived.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceHomeSystem(
+    val key: String = "",
+    val label: String = "",
+    @Json(name = "installed_year") val installedYear: Int? = null,
+    @Json(name = "age_years") val ageYears: Int? = null,
+    @Json(name = "typical_life_low") val typicalLifeLow: Int = 0,
+    @Json(name = "typical_life_high") val typicalLifeHigh: Int = 0,
+    /** "ok" | "aging" | "past_expected" | "unknown". */
+    val status: String = "unknown",
+    /** 0–1 for the remaining-life bar; null when the year is unknown. */
+    @Json(name = "life_remaining") val lifeRemaining: Double? = null,
+    /** "estimated" | "permit" | "marketplace" | "resident". */
+    val source: String = "estimated",
+    /** Provenance chip copy, e.g. "Estimated from year built". */
+    @Json(name = "source_label") val sourceLabel: String = "",
+    val confidence: String = "low",
+    @Json(name = "source_ref") val sourceRef: String? = null,
+    val note: String = "",
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceHomeSystemsSummary(
+    @Json(name = "past_expected_count") val pastExpectedCount: Int = 0,
+    @Json(name = "aging_count") val agingCount: Int = 0,
+    /** How much of the ledger rests on evidence rather than a prior. */
+    @Json(name = "confirmed_count") val confirmedCount: Int = 0,
+    @Json(name = "total_count") val totalCount: Int = 0,
+    val headline: String = "",
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceHomeSystemsData(
+    val systems: List<PlaceHomeSystem> = emptyList(),
+    val summary: PlaceHomeSystemsSummary = PlaceHomeSystemsSummary(),
+)
+
 // ─── Section payload union ───────────────────────────────────
 
 /** Typed payload for a section envelope — one case per launch-set id. */
@@ -713,7 +850,13 @@ sealed interface PlaceSectionData {
 
     data class SunriseSunset(val value: PlaceSunriseSunsetData) : PlaceSectionData
 
+    data class GoodDayTo(val value: PlaceGoodDayData) : PlaceSectionData
+
     data class YourHome(val value: PlaceYourHomeData) : PlaceSectionData
+
+    data class HomeSystems(val value: PlaceHomeSystemsData) : PlaceSectionData
+
+    data class HeatCold(val value: PlaceHeatColdData) : PlaceSectionData
 
     data class Flood(val value: PlaceFloodData) : PlaceSectionData
 
@@ -778,7 +921,10 @@ data class PlaceSectionEnvelope(
     val airQuality: PlaceAirQualityData? get() = (data as? PlaceSectionData.AirQuality)?.value
     val alerts: PlaceAlertsData? get() = (data as? PlaceSectionData.Alerts)?.value
     val sunriseSunset: PlaceSunriseSunsetData? get() = (data as? PlaceSectionData.SunriseSunset)?.value
+    val goodDayTo: PlaceGoodDayData? get() = (data as? PlaceSectionData.GoodDayTo)?.value
     val yourHome: PlaceYourHomeData? get() = (data as? PlaceSectionData.YourHome)?.value
+    val homeSystems: PlaceHomeSystemsData? get() = (data as? PlaceSectionData.HomeSystems)?.value
+    val heatCold: PlaceHeatColdData? get() = (data as? PlaceSectionData.HeatCold)?.value
     val flood: PlaceFloodData? get() = (data as? PlaceSectionData.Flood)?.value
     val seismic: PlaceSeismicData? get() = (data as? PlaceSectionData.Seismic)?.value
     val wildfire: PlaceWildfireData? get() = (data as? PlaceSectionData.Wildfire)?.value

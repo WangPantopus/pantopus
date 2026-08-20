@@ -151,8 +151,11 @@ public enum PlaceSectionID: Sendable, Hashable {
     case airQuality
     case alerts
     case sunriseSunset
+    case goodDayTo
     case yourHome
+    case homeSystems
     case flood
+    case heatCold
     case seismic
     case wildfire
     case leadRadon
@@ -173,8 +176,11 @@ public enum PlaceSectionID: Sendable, Hashable {
         case "air_quality": self = .airQuality
         case "alerts": self = .alerts
         case "sunrise_sunset": self = .sunriseSunset
+        case "good_day_to": self = .goodDayTo
         case "your_home": self = .yourHome
+        case "home_systems": self = .homeSystems
         case "flood": self = .flood
+        case "heat_cold": self = .heatCold
         case "seismic": self = .seismic
         case "wildfire": self = .wildfire
         case "lead_radon": self = .leadRadon
@@ -197,8 +203,11 @@ public enum PlaceSectionID: Sendable, Hashable {
         case .airQuality: "air_quality"
         case .alerts: "alerts"
         case .sunriseSunset: "sunrise_sunset"
+        case .goodDayTo: "good_day_to"
         case .yourHome: "your_home"
+        case .homeSystems: "home_systems"
         case .flood: "flood"
+        case .heatCold: "heat_cold"
         case .seismic: "seismic"
         case .wildfire: "wildfire"
         case .leadRadon: "lead_radon"
@@ -858,6 +867,158 @@ public struct PlaceYourHomeData: Decodable, Sendable, Hashable {
     }
 }
 
+// MARK: - Good day to…
+
+/// A verdict on one everyday question. `.unknown` keeps a server-side
+/// vocabulary addition from breaking an older build.
+public enum GoodDayVerdict: String, Decodable, Sendable, Hashable {
+    case yes
+    case caution
+    case no
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GoodDayVerdict(rawValue: raw) ?? .unknown
+    }
+}
+
+public struct PlaceGoodDayTile: Decodable, Sendable, Hashable {
+    /// Stable id, e.g. "open_windows".
+    public let id: String
+    public let label: String
+    /// Display glyph (emoji) — the server picks it so all clients agree.
+    public let glyph: String
+    public let verdict: GoodDayVerdict
+    /// The short answer, e.g. "Yes — until 3pm".
+    public let answer: String
+    /// The reasoning WITH the actual numbers. An opinionated tile that
+    /// won't show its inputs is not trustworthy, so this always renders.
+    public let because: String
+}
+
+/// "Good day to…" — verdicts, not readings. Computed from the weather/AQI
+/// payload already fetched for the Today layers crossed with the home's
+/// own facts, so it costs no additional provider call.
+public struct PlaceGoodDayData: Decodable, Sendable, Hashable {
+    public let tiles: [PlaceGoodDayTile]
+}
+
+// MARK: - Heat & cold
+
+/// NWS HeatRisk index: 0 little-to-none → 4 extreme.
+public struct PlaceHeatRiskDay: Decodable, Sendable, Hashable {
+    public let date: String
+    /// 1-based day index in the NWS 7-day series.
+    public let day: Int
+    public let level: Int
+    public let label: String
+    /// The published meaning of this level.
+    public let meaning: String
+}
+
+public struct PlaceFreezeWindow: Decodable, Sendable, Hashable {
+    public let starts: String
+    public let ends: String
+    /// Contiguous hours at or below freezing.
+    public let hours: Int
+    public let minTempF: Int
+
+    enum CodingKeys: String, CodingKey {
+        case starts, ends, hours
+        case minTempF = "min_temp_f"
+    }
+}
+
+/// Heat & cold — the seasonal spine, nationally.
+///
+/// `heatCovered` is false outside CONUS, where HeatRisk has no data. That
+/// is a coverage gap, NOT a reading of zero, and the card must say so
+/// rather than imply calm.
+public struct PlaceHeatColdData: Decodable, Sendable, Hashable {
+    /// "heat" | "cold" | "none" — `none` is the honest common case.
+    public let mode: String
+    public let heatDays: [PlaceHeatRiskDay]
+    public let heatCovered: Bool
+    public let peakLevel: Int?
+    public let peakDate: String?
+    public let freeze: PlaceFreezeWindow?
+    public let headline: String
+    /// The home-conditioned instruction. Empty when there is nothing to do.
+    public let guidance: String
+    public let sourceNote: String
+
+    enum CodingKeys: String, CodingKey {
+        case mode, freeze, headline, guidance
+        case heatDays = "heat_days"
+        case heatCovered = "heat_covered"
+        case peakLevel = "peak_level"
+        case peakDate = "peak_date"
+        case sourceNote = "source_note"
+    }
+}
+
+// MARK: - Systems Ledger (Band C)
+
+/// One building system in the household's own record.
+///
+/// Every system is seeded from the build year so the ledger is never
+/// blank, and each carries HOW it is known: an estimate is never dressed
+/// up as a fact, and a resident's correction outranks anything derived.
+public struct PlaceHomeSystem: Decodable, Sendable, Hashable {
+    public let key: String
+    public let label: String
+    public let installedYear: Int?
+    public let ageYears: Int?
+    /// Typical service life range, in years. A range, not a prediction.
+    public let typicalLifeLow: Int
+    public let typicalLifeHigh: Int
+    /// "ok" | "aging" | "past_expected" | "unknown".
+    public let status: String
+    /// 0–1 for the remaining-life bar; nil when the year is unknown.
+    public let lifeRemaining: Double?
+    /// "estimated" | "permit" | "marketplace" | "resident".
+    public let source: String
+    /// Provenance chip copy, e.g. "Estimated from year built".
+    public let sourceLabel: String
+    public let confidence: String
+    public let sourceRef: String?
+    public let note: String
+
+    enum CodingKeys: String, CodingKey {
+        case key, label, status, source, confidence, note
+        case installedYear = "installed_year"
+        case ageYears = "age_years"
+        case typicalLifeLow = "typical_life_low"
+        case typicalLifeHigh = "typical_life_high"
+        case lifeRemaining = "life_remaining"
+        case sourceLabel = "source_label"
+        case sourceRef = "source_ref"
+    }
+}
+
+public struct PlaceHomeSystemsSummary: Decodable, Sendable, Hashable {
+    public let pastExpectedCount: Int
+    public let agingCount: Int
+    /// How much of the ledger rests on evidence rather than a prior.
+    public let confirmedCount: Int
+    public let totalCount: Int
+    public let headline: String
+
+    enum CodingKeys: String, CodingKey {
+        case headline
+        case pastExpectedCount = "past_expected_count"
+        case agingCount = "aging_count"
+        case confirmedCount = "confirmed_count"
+        case totalCount = "total_count"
+    }
+}
+
+public struct PlaceHomeSystemsData: Decodable, Sendable, Hashable {
+    public let systems: [PlaceHomeSystem]
+    public let summary: PlaceHomeSystemsSummary
+}
+
 // MARK: - Section payload union
 
 /// Typed payload for a section envelope — one case per launch-set id.
@@ -866,8 +1027,11 @@ public enum PlaceSectionData: Sendable, Hashable {
     case airQuality(PlaceAirQualityData)
     case alerts(PlaceAlertsData)
     case sunriseSunset(PlaceSunriseSunsetData)
+    case goodDayTo(PlaceGoodDayData)
     case yourHome(PlaceYourHomeData)
+    case homeSystems(PlaceHomeSystemsData)
     case flood(PlaceFloodData)
+    case heatCold(PlaceHeatColdData)
     case seismic(PlaceSeismicData)
     case wildfire(PlaceWildfireData)
     case leadRadon(PlaceLeadRadonData)
@@ -940,8 +1104,11 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
         case .airQuality: return payload(PlaceAirQualityData.self).map(PlaceSectionData.airQuality)
         case .alerts: return payload(PlaceAlertsData.self).map(PlaceSectionData.alerts)
         case .sunriseSunset: return payload(PlaceSunriseSunsetData.self).map(PlaceSectionData.sunriseSunset)
+        case .goodDayTo: return payload(PlaceGoodDayData.self).map(PlaceSectionData.goodDayTo)
         case .yourHome: return payload(PlaceYourHomeData.self).map(PlaceSectionData.yourHome)
+        case .homeSystems: return payload(PlaceHomeSystemsData.self).map(PlaceSectionData.homeSystems)
         case .flood: return payload(PlaceFloodData.self).map(PlaceSectionData.flood)
+        case .heatCold: return payload(PlaceHeatColdData.self).map(PlaceSectionData.heatCold)
         case .seismic: return payload(PlaceSeismicData.self).map(PlaceSectionData.seismic)
         case .wildfire: return payload(PlaceWildfireData.self).map(PlaceSectionData.wildfire)
         case .leadRadon: return payload(PlaceLeadRadonData.self).map(PlaceSectionData.leadRadon)
@@ -965,6 +1132,21 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
 public extension PlaceSectionEnvelope {
     var weather: PlaceWeatherData? {
         if case let .weather(d) = data { return d }
+        return nil
+    }
+
+    var goodDayTo: PlaceGoodDayData? {
+        if case let .goodDayTo(d) = data { return d }
+        return nil
+    }
+
+    var homeSystems: PlaceHomeSystemsData? {
+        if case let .homeSystems(d) = data { return d }
+        return nil
+    }
+
+    var heatCold: PlaceHeatColdData? {
+        if case let .heatCold(d) = data { return d }
         return nil
     }
 

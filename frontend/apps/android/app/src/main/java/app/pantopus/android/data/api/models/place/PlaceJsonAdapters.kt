@@ -87,10 +87,16 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                     parse(PlaceAlertsData::class.java)?.let(PlaceSectionData::Alerts)
                 PlaceSectionId.SUNRISE_SUNSET ->
                     parse(PlaceSunriseSunsetData::class.java)?.let(PlaceSectionData::SunriseSunset)
+                PlaceSectionId.GOOD_DAY_TO ->
+                    parse(PlaceGoodDayData::class.java)?.let(PlaceSectionData::GoodDayTo)
                 PlaceSectionId.YOUR_HOME ->
                     parse(PlaceYourHomeData::class.java)?.let(PlaceSectionData::YourHome)
+                PlaceSectionId.HOME_SYSTEMS ->
+                    parse(PlaceHomeSystemsData::class.java)?.let(PlaceSectionData::HomeSystems)
                 PlaceSectionId.FLOOD ->
                     parse(PlaceFloodData::class.java)?.let(PlaceSectionData::Flood)
+                PlaceSectionId.HEAT_COLD ->
+                    parse(PlaceHeatColdData::class.java)?.let(PlaceSectionData::HeatCold)
                 PlaceSectionId.SEISMIC ->
                     parse(PlaceSeismicData::class.java)?.let(PlaceSectionData::Seismic)
                 PlaceSectionId.WILDFIRE ->
@@ -147,8 +153,11 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                 is PlaceSectionData.AirQuality -> writeValue(writer, payload.value)
                 is PlaceSectionData.Alerts -> writeValue(writer, payload.value)
                 is PlaceSectionData.SunriseSunset -> writeValue(writer, payload.value)
+                is PlaceSectionData.GoodDayTo -> writeValue(writer, payload.value)
                 is PlaceSectionData.YourHome -> writeValue(writer, payload.value)
+                is PlaceSectionData.HomeSystems -> writeValue(writer, payload.value)
                 is PlaceSectionData.Flood -> writeValue(writer, payload.value)
+                is PlaceSectionData.HeatCold -> writeValue(writer, payload.value)
                 is PlaceSectionData.Seismic -> writeValue(writer, payload.value)
                 is PlaceSectionData.Wildfire -> writeValue(writer, payload.value)
                 is PlaceSectionData.LeadRadon -> writeValue(writer, payload.value)

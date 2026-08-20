@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import app.pantopus.android.data.api.models.place.AirQualityCategory
 import app.pantopus.android.data.api.models.place.BenchmarkComparison
 import app.pantopus.android.data.api.models.place.FloodRiskLevel
+import app.pantopus.android.data.api.models.place.GoodDayVerdict
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
@@ -144,8 +145,13 @@ object PlacePresentation {
             PlaceSectionId.ALERTS -> PlaceSectionDisplayConfig(PantopusIcon.Bell, "Alerts", inline = true)
             PlaceSectionId.SUNRISE_SUNSET ->
                 PlaceSectionDisplayConfig(PantopusIcon.Sunrise, "Sunrise & sunset", inline = true)
+            PlaceSectionId.GOOD_DAY_TO ->
+                PlaceSectionDisplayConfig(PantopusIcon.ListChecks, "Good day to\u2026", inline = true)
             PlaceSectionId.YOUR_HOME -> PlaceSectionDisplayConfig(PantopusIcon.Home, "Your home", sparkline = true)
+            PlaceSectionId.HOME_SYSTEMS -> PlaceSectionDisplayConfig(PantopusIcon.Wrench, "Systems", inline = true)
             PlaceSectionId.FLOOD -> PlaceSectionDisplayConfig(PantopusIcon.Waves, "Flood", inline = true)
+            PlaceSectionId.HEAT_COLD ->
+                PlaceSectionDisplayConfig(PantopusIcon.Sun, "Heat & cold", inline = true)
             PlaceSectionId.SEISMIC -> PlaceSectionDisplayConfig(PantopusIcon.Activity, "Earthquake", inline = true)
             PlaceSectionId.WILDFIRE -> PlaceSectionDisplayConfig(PantopusIcon.Flame, "Wildfire", inline = true)
             PlaceSectionId.LEAD_RADON -> PlaceSectionDisplayConfig(PantopusIcon.TestTube, "Lead & radon")
@@ -196,6 +202,49 @@ object PlacePresentation {
             PlaceSectionId.SUNRISE_SUNSET -> {
                 val d = env.sunriseSunset ?: return PlaceSectionReading()
                 PlaceSectionReading(value = "${fmtSunClock(d.sunrise)} · ${fmtSunClock(d.sunset)}")
+            }
+            PlaceSectionId.GOOD_DAY_TO -> {
+                val d = env.goodDayTo ?: return PlaceSectionReading()
+                // Lead with what the row says yes to; a row of no's still
+                // reads usefully rather than rendering blank.
+                val yes = d.tiles.filter { it.verdict == GoodDayVerdict.YES }
+                if (yes.isEmpty()) {
+                    PlaceSectionReading(value = "Nothing outdoors today", statusDot = PantopusColors.warning)
+                } else {
+                    PlaceSectionReading(
+                        value = yes.take(2).joinToString(", ") { it.label.lowercase() },
+                        statusDot = PantopusColors.home,
+                    )
+                }
+            }
+            PlaceSectionId.HOME_SYSTEMS -> {
+                val d = env.homeSystems ?: return PlaceSectionReading()
+                when {
+                    d.summary.pastExpectedCount > 0 -> PlaceSectionReading(
+                        value = "${d.summary.pastExpectedCount} past expected life",
+                        statusDot = PantopusColors.error,
+                    )
+                    d.summary.agingCount > 0 -> PlaceSectionReading(
+                        value = "${d.summary.agingCount} aging",
+                        statusDot = PantopusColors.warning,
+                    )
+                    else -> PlaceSectionReading(
+                        value = "All within expected life",
+                        statusDot = PantopusColors.home,
+                    )
+                }
+            }
+            PlaceSectionId.HEAT_COLD -> {
+                val d = env.heatCold ?: return PlaceSectionReading()
+                when (d.mode) {
+                    "cold" -> PlaceSectionReading(value = "Freeze expected", statusDot = PantopusColors.error)
+                    "heat" -> PlaceSectionReading(
+                        value = "${d.heatDays.firstOrNull { it.level == d.peakLevel }?.label ?: "Elevated"} heat risk",
+                        statusDot = if ((d.peakLevel ?: 0) >= 3) PantopusColors.error else PantopusColors.warning,
+                    )
+                    // `none` is the honest common case, not a missing reading.
+                    else -> PlaceSectionReading(value = "Nothing expected", statusDot = PantopusColors.home)
+                }
             }
             PlaceSectionId.YOUR_HOME -> {
                 val d = env.yourHome ?: return PlaceSectionReading()
