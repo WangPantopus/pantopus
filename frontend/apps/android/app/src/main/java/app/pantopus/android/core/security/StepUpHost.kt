@@ -37,14 +37,21 @@ import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 
-/** Test tags for the step-up password sheet (mirror iOS `stepUp.*`). */
+/**
+ * Test tags for the step-up password sheet. Mirrors iOS
+ * `Features/Auth/StepUpPasswordPrompt.swift`, which uses
+ * `auth.stepUp.{passwordSheet,passwordField,cancel,confirm}` — same prefix
+ * family as `auth.continueAs.*`. [TITLE] and [ERROR] have no iOS
+ * counterpart yet (SwiftUI addresses those two by text); they follow the
+ * same naming so the identifier can simply be added there later.
+ */
 object StepUpTags {
-    const val SHEET = "stepUp.passwordSheet"
-    const val TITLE = "stepUp.title"
-    const val PASSWORD_FIELD = "stepUp.passwordField"
-    const val VERIFY = "stepUp.verify"
-    const val CANCEL = "stepUp.cancel"
-    const val ERROR = "stepUp.error"
+    const val SHEET = "auth.stepUp.passwordSheet"
+    const val TITLE = "auth.stepUp.title"
+    const val PASSWORD_FIELD = "auth.stepUp.passwordField"
+    const val CONFIRM = "auth.stepUp.confirm"
+    const val CANCEL = "auth.stepUp.cancel"
+    const val ERROR = "auth.stepUp.error"
 }
 
 /**
@@ -162,11 +169,14 @@ fun StepUpPasswordSheet(
                     modifier = Modifier.weight(1f).testTag(StepUpTags.CANCEL),
                 )
                 PrimaryButton(
-                    title = "Verify",
+                    // Same word as iOS `StepUpPasswordPrompt` — this sheet is
+                    // the one surface both platforms render for `password`
+                    // step-up, so the copy has to match too.
+                    title = "Confirm",
                     onClick = { onSubmit(password) },
                     isLoading = request.isSubmitting,
                     isEnabled = password.isNotBlank() && !request.isSubmitting,
-                    modifier = Modifier.weight(1f).testTag(StepUpTags.VERIFY),
+                    modifier = Modifier.weight(1f).testTag(StepUpTags.CONFIRM),
                 )
             }
         }
