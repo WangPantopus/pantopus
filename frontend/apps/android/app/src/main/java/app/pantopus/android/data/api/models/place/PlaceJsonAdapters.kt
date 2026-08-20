@@ -201,6 +201,13 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             LeadPaintRisk::class.java to LeadPaintRisk.UNKNOWN,
             PlaceDensityBucket::class.java to PlaceDensityBucket.UNKNOWN,
             BillUtilityKind::class.java to BillUtilityKind.UNKNOWN,
+            // Without this, a fourth verdict from the server throws inside
+            // decodePayload's runCatching and blanks the WHOLE good_day_to
+            // section — including the tiles whose verdicts were valid. The
+            // UNKNOWN constant and its doc comment promised forward
+            // compatibility the factory was never told about. iOS handles
+            // this in GoodDayVerdict's Decodable init.
+            GoodDayVerdict::class.java to GoodDayVerdict.UNKNOWN,
             BenchmarkComparison::class.java to BenchmarkComparison.UNKNOWN,
             IncentiveLevel::class.java to IncentiveLevel.UNKNOWN,
             IncentiveType::class.java to IncentiveType.UNKNOWN,

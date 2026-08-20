@@ -24,7 +24,39 @@ const USER = 'mailday-user-1';
 const OTHER = 'mailday-user-2';
 const TODAY = new Date().toISOString().slice(0, 10);
 
+// The job derives its candidates from the SCAN side — unresolved
+// MailRoutingQueue rows on homes the user occupies — and materialises
+// MailDayItem itself. Seeding MailDayItem directly (as these tests first
+// did) reads the artifact rather than the source, and that is precisely
+// what hid the defect: the push could only reach users who had already
+// opened the Mail Day screen that day.
+//
 // seedTable replaces the table, so multi-user cases push onto the live array.
+function seedScannedMail(userId, kinds) {
+  const homeId = `${userId}-home`;
+  getTable('HomeOccupancy').push({ user_id: userId, home_id: homeId, is_active: true });
+  kinds.forEach((kind, i) => {
+    const mailId = `${userId}-mail-${i}`;
+    getTable('Mail').push({
+      id: mailId,
+      // kindFor() maps category/object type onto the triage kind.
+      category: kind === 'bill' ? 'bill' : null,
+      mail_object_type: kind === 'package' ? 'package' : 'envelope',
+      subject: 'A piece of mail',
+      created_at: new Date().toISOString(),
+    });
+    getTable('MailRoutingQueue').push({
+      id: `${userId}-q-${i}`,
+      home_id: homeId,
+      mail_id: mailId,
+      resolved: false,
+      best_match_confidence: 0.9,
+      Mail: getTable('Mail').find((m) => m.id === mailId),
+    });
+  });
+}
+
+/** Pre-materialised triage rows, for the already-reviewed case. */
 function seedItems(userId, kinds, status = 'unreviewed') {
   getTable('MailDayItem').push(...kinds.map((kind, i) => ({
     id: `${userId}-item-${i}`,
@@ -147,7 +179,7 @@ describe('mailDayNotification job', () => {
   });
 
   test('sends one push through the notification service', async () => {
-    seedItems(USER, ['envelope', 'bill']);
+    seedScannedMail(USER, ['envelope', 'bill']);
     seedPrefs(USER);
 
     await mailDayNotification();
@@ -162,7 +194,7 @@ describe('mailDayNotification job', () => {
   });
 
   test('claims the day so a second run does not re-send', async () => {
-    seedItems(USER, ['bill']);
+    seedScannedMail(USER, ['bill']);
     seedPrefs(USER);
 
     await mailDayNotification();
@@ -174,7 +206,7 @@ describe('mailDayNotification job', () => {
   });
 
   test('skips a user who already finished the day', async () => {
-    seedItems(USER, ['bill']);
+    seedScannedMail(USER, ['bill']);
     seedPrefs(USER);
     seedTable('MailDaySession', [{
       user_id: USER, day_date: TODAY, finished_at: new Date().toISOString(), streak_days: 4,
@@ -186,7 +218,7 @@ describe('mailDayNotification job', () => {
   });
 
   test('defers instead of dropping when it is night for the user', async () => {
-    seedItems(USER, ['bill']);
+    seedScannedMail(USER, ['bill']);
     seedPrefs(USER, { daily_briefing_timezone: NIGHT_TZ });
 
     await mailDayNotification();
@@ -207,7 +239,7 @@ describe('mailDayNotification job', () => {
   });
 
   test('retries next run when the notification fails to write', async () => {
-    seedItems(USER, ['bill']);
+    seedScannedMail(USER, ['bill']);
     seedPrefs(USER);
     notificationService.createNotification.mockResolvedValueOnce(null);
 
@@ -220,8 +252,8 @@ describe('mailDayNotification job', () => {
   });
 
   test('handles several users independently', async () => {
-    seedItems(USER, ['bill', 'envelope']);
-    seedItems(OTHER, ['flyer']);
+    seedScannedMail(USER, ['bill', 'envelope']);
+    seedScannedMail(OTHER, ['envelope']);
     seedPrefs(USER);
     seedPrefs(OTHER, { daily_briefing_timezone: NIGHT_TZ });
 
@@ -229,5 +261,65 @@ describe('mailDayNotification job', () => {
 
     expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
     expect(notificationService.createNotification.mock.calls[0][0].userId).toBe(USER);
+  });
+});
+
+// ── Regression: who the push can actually reach ──────────────────────────
+// Candidates used to come from MailDayItem, whose only production writer is
+// `ensureTodayItems` — called from GET /today and nowhere else. So the push
+// could only reach a user who had ALREADY opened the Mail Day screen that
+// day: the exact inverse of "schedule off the scan, not the clock".
+describe('reaches users who have not opened the app', () => {
+  beforeEach(() => {
+    resetTables();
+    notificationService.createNotification.mockReset();
+    notificationService.createNotification.mockResolvedValue({ id: 'notif-1' });
+  });
+
+  test('notifies from scanned mail alone, with no pre-existing triage rows', async () => {
+    seedScannedMail(USER, ['bill', 'envelope']);
+    seedPrefs(USER);
+    // Nothing has ever materialised a MailDayItem for this user.
+    expect(getTable('MailDayItem')).toHaveLength(0);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
+    // The job materialised the day itself, exactly as the screen would.
+    expect(getTable('MailDayItem').length).toBeGreaterThan(0);
+  });
+
+  test('ignores mail whose routing is already resolved', async () => {
+    seedScannedMail(USER, ['bill']);
+    getTable('MailRoutingQueue').forEach((q) => { q.resolved = true; });
+    seedPrefs(USER);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+  });
+
+  test('ignores a home the user no longer occupies', async () => {
+    seedScannedMail(USER, ['bill']);
+    getTable('HomeOccupancy').forEach((o) => { o.is_active = false; });
+    seedPrefs(USER);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+  });
+
+  test('does not seed streak_days when it claims the day', async () => {
+    // The job is often the first writer of today's session row. Writing a
+    // streak here would blank a live streak in GET /today all day.
+    seedScannedMail(USER, ['bill']);
+    seedPrefs(USER);
+
+    await mailDayNotification();
+
+    const session = getTable('MailDaySession').find((s) => s.user_id === USER);
+    expect(session.notified_at).toBeTruthy();
+    expect(session.finished_at).toBeFalsy();
+    expect(session.streak_days).toBeUndefined();
   });
 });

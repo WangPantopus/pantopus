@@ -35,7 +35,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // ── Push routing ────────────────────────────────────────────────────
 //
-// The `route` a push carries is parsed by DeepLinkRouter on both clients
+// The destination is carried under `link`. BOTH clients read
+// `data["link"] ?? data["deepLink"]` and neither has ever read `route`
+// (iOS `App/AppDelegate.swift`, Android `push/NotificationDispatcher.kt`),
+// so a `route`-only payload produced no deep link at all — the gig push at
+// the bottom of this file has always used `link` for exactly that reason.
+// `route` is kept alongside as a harmless alias.
+//
+// The path is parsed by DeepLinkRouter on both clients
 // (`frontend/apps/{ios,android}/**/DeepLinkRouter.{swift,kt}`), so these
 // shapes are a contract:
 //
@@ -271,6 +278,7 @@ router.post('/send', verifyInternalApiKey, async (req, res) => {
       body: result.text,
       data: {
         type: briefingConfig.notificationType,
+        link: placeRoute(result.home_id),
         route: placeRoute(result.home_id),
         homeId: result.home_id || null,
         briefingKind,
@@ -414,7 +422,12 @@ router.post('/alert-push', verifyInternalApiKey, async (req, res) => {
         body,
         // Weather and air-quality alerts are Today-group content, so they
         // open the Place Today detail rather than the Hub.
-        data: { type: `${alertType}_alert`, route: placeRoute(data?.homeId, 'today'), ...data },
+        data: {
+          type: `${alertType}_alert`,
+          link: placeRoute(data?.homeId, 'today'),
+          route: placeRoute(data?.homeId, 'today'),
+          ...data,
+        },
       });
       sent++;
     } catch (err) {
@@ -486,7 +499,12 @@ router.post('/reminder-push', verifyInternalApiKey, async (req, res) => {
     await pushService.sendToUser(userId, {
       title,
       body,
-      data: { type: reminderType, route: placeRoute(data?.homeId), ...data },
+      data: {
+        type: reminderType,
+        link: placeRoute(data?.homeId),
+        route: placeRoute(data?.homeId),
+        ...data,
+      },
     });
 
     return res.json({ status: 'sent' });

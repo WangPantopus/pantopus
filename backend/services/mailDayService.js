@@ -1,0 +1,142 @@
+// ============================================================
+// MAIL DAY — shared triage primitives
+//
+// `ensureTodayItems` materialises today's triage queue for a user from the
+// unresolved `MailRoutingQueue` rows on their accessible homes. It lived
+// inside routes/mailDay.js with exactly one caller, `GET /today`.
+//
+// That made it the ONLY writer of `MailDayItem` outside a dev-only seed
+// route — which quietly inverted the Mail Day push. The notification job
+// picks its candidates from `MailDayItem`, so a user who had not already
+// opened the Mail Day screen that day had no rows and could not be
+// notified: the push only reached people who had already visited the
+// surface it advertises, which is the opposite of "schedule off the scan,
+// not the clock".
+//
+// Extracted here so the job can materialise the same rows the screen
+// would, from the same source, rather than duplicating the mapping.
+// ============================================================
+
+const supabaseAdmin = require('../config/supabaseAdmin');
+const logger = require('../utils/logger');
+
+/** Homes the user actively occupies. */
+async function getAccessibleHomeIds(userId) {
+  const { data } = await supabaseAdmin
+    .from('HomeOccupancy')
+    .select('home_id')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+  return (data || []).map((r) => r.home_id);
+}
+
+// Mail object type / category → the faux-photo MailDayKind the screen
+// renders. Mirrors the Android `kindFor` mapping.
+function kindFor(objectType, category) {
+  if (category && String(category).toLowerCase().includes('bill')) return 'bill';
+  switch (objectType) {
+    case 'package': return 'package';
+    case 'postcard': return 'postcard';
+    case 'booklet': return 'magazine';
+    case 'bundle': return 'flyer';
+    default: return 'envelope';
+  }
+}
+
+/**
+ * Materialise today's triage queue for a user, if it isn't already there.
+ *
+ * Idempotent: returns early when the user already has rows for `today`.
+ * Never throws — a failed backfill must not take down the screen that
+ * calls it, nor the notification job.
+ *
+ * @param {string} userId
+ * @param {string} today  UTC YYYY-MM-DD (matches MailDayItem.day_date)
+ * @returns {Promise<number>} rows inserted (0 when nothing to do)
+ */
+async function ensureTodayItems(userId, today) {
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from('MailDayItem')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('day_date', today);
+    if (existing && existing.length > 0) return 0;
+
+    const homeIds = await getAccessibleHomeIds(userId);
+    if (homeIds.length === 0) return 0;
+
+    const { data: queue } = await supabaseAdmin
+      .from('MailRoutingQueue')
+      .select('*, Mail!inner(*)')
+      .in('home_id', homeIds)
+      .eq('resolved', false);
+    const rows = queue || [];
+    if (rows.length === 0) return 0;
+
+    const nowIso = new Date().toISOString();
+    const inserts = rows.map((q) => {
+      const mail = q.Mail || {};
+      return {
+        user_id: userId,
+        home_id: q.home_id || null,
+        mail_id: q.mail_id,
+        kind: kindFor(mail.mail_object_type, mail.category),
+        label: (mail.subject && String(mail.subject).trim()) || 'Mail',
+        sender: mail.sender_display || mail.sender_business_name || null,
+        suggested_name: q.recipient_name_raw || mail.recipient_name || '',
+        suggested_avatar: 'personal_sky',
+        confidence_percent: Math.round(Math.min(1, Math.max(0, q.best_match_confidence || 0)) * 100),
+        secondary_label: 'Other',
+        status: 'unreviewed',
+        action: null,
+        day_date: today,
+        scanned_at: mail.created_at || nowIso,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+    });
+    await supabaseAdmin.from('MailDayItem').insert(inserts);
+    return inserts.length;
+  } catch (err) {
+    logger.warn('Mail day backfill failed (non-fatal)', { userId, error: err.message });
+    return 0;
+  }
+}
+
+/**
+ * Users who have physical mail waiting to be triaged — the scan side.
+ *
+ * This is what the notification job must key off. It walks unresolved
+ * `MailRoutingQueue` rows to the homes they belong to, then to the people
+ * who actively occupy those homes, so a scan reaches its recipients
+ * whether or not anyone has opened the app today.
+ *
+ * @returns {Promise<string[]>} distinct user ids
+ */
+async function usersWithUnresolvedMail() {
+  const { data: queue, error } = await supabaseAdmin
+    .from('MailRoutingQueue')
+    .select('home_id')
+    .eq('resolved', false);
+  if (error) throw new Error(error.message);
+
+  const homeIds = [...new Set((queue || []).map((q) => q && q.home_id).filter(Boolean))];
+  if (homeIds.length === 0) return [];
+
+  const { data: occupants, error: occErr } = await supabaseAdmin
+    .from('HomeOccupancy')
+    .select('user_id')
+    .in('home_id', homeIds)
+    .eq('is_active', true);
+  if (occErr) throw new Error(occErr.message);
+
+  return [...new Set((occupants || []).map((o) => o && o.user_id).filter(Boolean))];
+}
+
+module.exports = {
+  ensureTodayItems,
+  usersWithUnresolvedMail,
+  getAccessibleHomeIds,
+  kindFor,
+};

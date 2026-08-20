@@ -84,9 +84,12 @@ router.put('/:id/systems/:key', verifyToken, async (req, res) => {
       return res.status(400).json({ error: `Unknown system: ${key}` });
     }
 
-    // Band C is the household's own record — writing needs the same
-    // access the section requires to be read.
-    const access = await checkHomePermission(id, userId);
+    // Band C is the household's own record. Reading needs membership;
+    // WRITING needs edit rights — `checkHomePermission` with no permission
+    // argument short-circuits to bare membership, which would let a guest
+    // or restricted member rewrite the ledger. Every comparable per-home
+    // write in routes/home.js passes an explicit permission.
+    const access = await checkHomePermission(id, userId, 'home.edit');
     if (!access.hasAccess) {
       return res.status(403).json({ error: 'You do not have access to this place.' });
     }
@@ -104,7 +107,6 @@ router.put('/:id/systems/:key', verifyToken, async (req, res) => {
       // Always 'resident' here: this endpoint is the household speaking.
       // Derived sources write through the service, never through the API.
       source: 'resident',
-      notes: typeof body.notes === 'string' ? body.notes.slice(0, 500) : null,
       userId,
     });
 

@@ -9,7 +9,7 @@
 //   - retryCaptureFailures        → every 15 minutes at :05/:20/:35/:50
 //   - expireUncapturedAuths      → daily at 3:00 AM
 //   - autoArchivePosts           → daily at 4:00 AM
-//   - mailDayNotification        → daily at 8:00 AM
+//   - mailDayNotification        → every 15 minutes
 //   - mailInterruptNotification  → every 5 minutes
 //   - mailPartyExpiry            → every minute (Phase 2)
 //   - earnRiskReview             → every 15 minutes (Phase 2)
@@ -480,7 +480,7 @@ function startJobs() {
       { name: 'retryCaptureFailures', schedule: 'every 15 minutes at :05/:20/:35/:50' },
       { name: 'expireUncapturedAuthorizations', schedule: 'daily at 3:00 AM UTC' },
       { name: 'autoArchivePosts', schedule: 'daily at 4:00 AM UTC' },
-      { name: 'mailDayNotification', schedule: 'daily at 8:00 AM UTC' },
+      { name: 'mailDayNotification', schedule: 'every 15 minutes' },
       { name: 'mailInterruptNotification', schedule: 'every 5 minutes' },
       { name: 'mailPartyExpiry', schedule: 'every minute' },
       { name: 'earnRiskReview', schedule: 'every 15 minutes' },

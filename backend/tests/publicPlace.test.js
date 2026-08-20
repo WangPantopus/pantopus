@@ -145,7 +145,9 @@ describe('GET /api/public/place', () => {
       const density = res.body.free.density;
       expect(typeof density.bucket).toBe('string');
       expect(['none', 'forming', 'few', 'growing']).toContain(density.bucket);
-      expect(density.bucket).toBe('few'); // seeded count = 5
+      // Seeded count = 5, which is below the k-anon floor (10) and so must
+      // be indistinguishable from a count of 1.
+      expect(density.bucket).toBe('forming');
       // The raw count (5) must never appear anywhere on the density object.
       expect(density).not.toHaveProperty('verified_users_count');
       expect(density).not.toHaveProperty('count');
@@ -170,13 +172,24 @@ describe('GET /api/public/place', () => {
   });
 
   describe('density buckets are floored server-side', () => {
+    // This endpoint used to carry its own thresholds ({growing:10, few:3,
+    // forming:1}) — a third implementation of the k-anon flooring, and the
+    // loosest of the three on the only UNAUTHENTICATED surface: a public
+    // `forming` meant the cell held exactly 1–2 verified users. It now
+    // shares services/place/densityReader, so counts below K_ANON_MIN (10)
+    // are indistinguishable from one another here too.
+    //
+    // Strictly more conservative than before: nothing that was private
+    // became public, and cells of 3–9 stopped being separable from 1–2.
     const cases = [
       [0, 'none'],
       [1, 'forming'],
       [2, 'forming'],
-      [3, 'few'],
-      [9, 'few'],
-      [10, 'growing'],
+      [3, 'forming'],
+      [9, 'forming'],
+      [10, 'few'],
+      [24, 'few'],
+      [25, 'growing'],
       [250, 'growing'],
     ];
     it.each(cases)('count %i → bucket "%s" (no number leaked)', async (count, expected) => {
@@ -243,7 +256,8 @@ describe('GET /api/public/place', () => {
       expect(res.body.status).toBe('ready');
       expect(res.body.free.flood).toMatchObject({ status: 'ready', zone: 'X' });
       expect(res.body.free.area).toMatchObject({ status: 'ready', median_year_built: 1985 });
-      expect(res.body.free.density.bucket).toBe('few');
+      // Seeded count 5 is below the k-anon floor (10) — see the bucket table.
+      expect(res.body.free.density.bucket).toBe('forming');
     });
   });
 
@@ -256,7 +270,8 @@ describe('GET /api/public/place', () => {
       expect(res.body.status).toBe('partial');
       expect(res.body.free.flood.status).toBe('unavailable');
       expect(res.body.free.area.status).toBe('ready');
-      expect(res.body.free.density.bucket).toBe('few');
+      // Seeded count 5 is below the k-anon floor (10) — see the bucket table.
+      expect(res.body.free.density.bucket).toBe('forming');
     });
 
     it('returns partial when the Census area teaser is unavailable', async () => {

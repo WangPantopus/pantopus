@@ -105,6 +105,35 @@ function nextFreezeWindow(hours) {
   return null;
 }
 
+/** True when a colder night follows the first freezing one — worth saying. */
+function coldColderLater(firstFreeze, coldest) {
+  return Boolean(
+    firstFreeze && coldest
+      && coldest.date !== firstFreeze.date
+      && coldest.low_f < firstFreeze.low_f,
+  );
+}
+
+/**
+ * The FIRST day in the forecast that reaches freezing.
+ *
+ * Distinct from `coldestDay`, and the distinction matters: the guidance
+ * attached to this headline is protective action tied to a specific night
+ * ("disconnect the hose bib, leave the far tap dripping"). Naming the
+ * coldest night instead of the next freezing one tells the resident to act
+ * on the wrong evening — with lows 40/31/36/38/18 the freeze is Wednesday
+ * at 31°F, not Saturday at 18°F.
+ */
+function nextFreezingDay(daily) {
+  if (!Array.isArray(daily)) return null;
+  for (const d of daily) {
+    const low = num(d && d.low_f);
+    if (low === null || !d.date) continue;
+    if (low <= FREEZE_F) return { date: d.date, low_f: low };
+  }
+  return null;
+}
+
 /** The coldest daily low in the forecast, and which day it lands on. */
 function coldestDay(daily) {
   if (!Array.isArray(daily)) return null;
@@ -192,8 +221,11 @@ function buildHeatColdOutlook({ heatRisk, weather, home, timezone, now = new Dat
 
   const freeze = nextFreezeWindow(hours);
   const cold = coldestDay(daily);
-  // A freeze beyond the hourly horizon still deserves a heads-up.
-  const upcomingFreeze = !freeze && cold && cold.low_f <= FREEZE_F ? cold : null;
+  // A freeze beyond the hourly horizon still deserves a heads-up — and it
+  // must be the NEXT freezing day, not the coldest one in the week. The
+  // hourly horizon is 24h while the daily forecast runs 7 days, so this
+  // branch is the common case, not an edge.
+  const upcomingFreeze = freeze ? null : nextFreezingDay(daily);
 
   // Nothing usable at all — no forecast and no coverage.
   if (heatDays.length === 0 && hours.length === 0 && daily.length === 0) return null;
@@ -229,7 +261,10 @@ function buildHeatColdOutlook({ heatRisk, weather, home, timezone, now = new Dat
       peak_level: peak ? peak.level : null,
       peak_date: peak ? peak.date : null,
       freeze: null,
-      headline: `Freezing ${dayName(upcomingFreeze.date, todayStr, timezone)} — low near ${Math.round(upcomingFreeze.low_f)}°F.`,
+      headline: coldColderLater(upcomingFreeze, cold)
+        ? `Freezing ${dayName(upcomingFreeze.date, todayStr, timezone)} — low near ${Math.round(upcomingFreeze.low_f)}°F, `
+          + `and colder ${dayName(cold.date, todayStr, timezone)} at ${Math.round(cold.low_f)}°F.`
+        : `Freezing ${dayName(upcomingFreeze.date, todayStr, timezone)} — low near ${Math.round(upcomingFreeze.low_f)}°F.`,
       guidance: coldGuidance({ yearBuilt, homeType }),
       source_note: 'National Weather Service forecast',
     };
@@ -237,7 +272,18 @@ function buildHeatColdOutlook({ heatRisk, weather, home, timezone, now = new Dat
 
   // ── Heat leads when HeatRisk says it is worth acting on.
   if (peak && peak.level >= HEAT_NOTABLE_LEVEL) {
-    const run = heatDays.filter((d) => d.level >= HEAT_NOTABLE_LEVEL);
+    // Walk OUTWARD from the peak and stop at the first day below the
+    // threshold. Filtering the whole array and taking [0] and [last]
+    // spanned level-0 gaps — NWS HeatRisk genuinely produces
+    // non-contiguous notable days, so [3,0,0,2] read as "Major heat risk,
+    // today through Saturday", attaching check-on-your-neighbours guidance
+    // to two cool days in the middle.
+    const peakIdx = heatDays.findIndex((d) => d.date === peak.date);
+    let lo = peakIdx;
+    let hi = peakIdx;
+    while (lo - 1 >= 0 && heatDays[lo - 1].level >= HEAT_NOTABLE_LEVEL) lo -= 1;
+    while (hi + 1 < heatDays.length && heatDays[hi + 1].level >= HEAT_NOTABLE_LEVEL) hi += 1;
+    const run = heatDays.slice(lo, hi + 1);
     const first = run[0];
     const last = run[run.length - 1];
     const span = first && last && first.date !== last.date
@@ -276,6 +322,7 @@ module.exports = {
   buildHeatColdOutlook,
   // Exported for unit testing.
   nextFreezeWindow,
+  nextFreezingDay,
   coldestDay,
   warmestNight,
   forwardHours,

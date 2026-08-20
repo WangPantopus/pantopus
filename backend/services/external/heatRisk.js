@@ -125,14 +125,23 @@ async function fetchHeatRisk(latitude, longitude, { catalog } = {}) {
     // rather than an error — that is a coverage gap, not a zero reading.
     if (samples.length === 0) return { days: [], covered: false };
 
-    const day1Ms = Number.isFinite(cat.day1ValidMs) ? cat.day1ValidMs : Date.now();
+    // Anchor on day 1's valid time. Falling back to Date.now() shifted every
+    // derived date by a day for US evenings (UTC is already tomorrow), so a
+    // catalog without a usable day-1 timestamp reports no coverage instead
+    // of confidently wrong dates.
+    if (!Number.isFinite(cat.day1ValidMs)) return { days: [], covered: false };
+    const day1Ms = cat.day1ValidMs;
     const days = [];
 
     for (const s of samples) {
       const day = cat.byRasterId[String(s.rasterId)];
       if (!day) continue;
       const raw = Number(s.value);
-      if (!Number.isFinite(raw)) continue;
+      // Reject rather than clamp. ArcGIS can report NoData as a numeric
+      // sentinel (-9999, float max); clamping turned those into a
+      // confident level 0 or 4 with covered:true, which is exactly the
+      // "reading of zero" this module promises never to emit.
+      if (!Number.isFinite(raw) || raw < -0.5 || raw > 4.5) continue;
       const level = Math.max(0, Math.min(4, Math.round(raw)));
       const meta = HEAT_RISK_LEVELS[level];
       days.push({

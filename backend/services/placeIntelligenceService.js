@@ -184,6 +184,9 @@ function mapWeatherHours(hourly) {
       time: h.datetime_utc,
       temp_f: tempF,
       condition_code: mapConditionCode(h.condition_code),
+      // The contract types this as a non-null number, so the rendered strip
+      // keeps 0. The ENGINE input below deliberately keeps null instead —
+      // that is where an absent probability was being read as "dry".
       precip_chance: finiteNumber(h.precip_chance_pct) ?? 0,
     });
   }
@@ -254,21 +257,13 @@ function engineHours(hourly) {
       temp_f: tempF,
       feels_like_f: finiteNumber(h.feels_like_f),
       wind_mph: finiteNumber(h.wind_mph),
-      precip_chance: finiteNumber(h.precip_chance_pct) ?? 0,
+      precip_chance: finiteNumber(h.precip_chance_pct),
     });
   }
   return out;
 }
 
-async function composeToday(userId, home) {
-  let hub = null;
-  try {
-    // `detail` carries the forecast arrays, feels-like, the dominant
-    // pollutant and the real alert body — all already fetched upstream.
-    hub = await providerOrchestrator.getHubToday(userId, { detail: true });
-  } catch (err) {
-    logger.warn('placeIntelligence: getHubToday failed', { userId, error: err.message });
-  }
+async function composeToday(userId, home, hub) {
   const asOf = (hub && hub.fetched_at) || null;
   const out = [];
 
@@ -357,16 +352,14 @@ async function composeToday(userId, home) {
 }
 
 // heat_cold needs the same temperature forecast the Today group fetches.
-// getHubToday is memoised per (user, shape) for 2 minutes, so asking again
-// inside one request is free rather than a second provider round-trip.
-async function composeHeatCold(home, userId) {
-  let hub = null;
-  try {
-    hub = await providerOrchestrator.getHubToday(userId, { detail: true });
-  } catch (err) {
-    logger.warn('placeIntelligence: getHubToday failed for heat_cold', { userId, error: err.message });
-  }
-
+//
+// It used to call getHubToday itself on the assumption that the 2-minute
+// memo would absorb it. It does not: the cache entry is written only after
+// the whole pipeline completes, and the composers run inside one
+// Promise.all, so both calls always missed and every request made two full
+// provider round-trips. The hub payload is now fetched ONCE in
+// composeHomeIntelligence and passed down.
+async function composeHeatCold(home, hub) {
   const weather = hub && hub.weather
     ? {
       hourly: mapWeatherHours(hub.weather.hourly),
@@ -681,10 +674,10 @@ async function composeHomeSystems(home, tier) {
 // Still BUILD_PENDING: `incentives` only (DSIRE's API is license-gated;
 // curated federal copy would rot).
 const COMPOSER_SECTIONS = [
-  { ids: ['weather', 'air_quality', 'alerts', 'good_day_to'], run: ({ home, userId }) => composeToday(userId, home) },
+  { ids: ['weather', 'air_quality', 'alerts', 'good_day_to'], run: ({ home, userId, hub }) => composeToday(userId, home, hub) },
   { ids: ['sunrise_sunset'], run: ({ home }) => placeSectionAdapters.composeSunriseSunset(home) },
   { ids: ['flood', 'census_context'], run: ({ home }) => composeNeighborhood(home) },
-  { ids: ['heat_cold'], run: ({ home, userId }) => composeHeatCold(home, userId) },
+  { ids: ['heat_cold'], run: ({ home, hub }) => composeHeatCold(home, hub) },
   { ids: ['seismic'], run: ({ home }) => placeSectionAdapters.composeSeismic(home) },
   { ids: ['wildfire'], run: ({ home }) => placeSectionAdapters.composeWildfire(home) },
   { ids: ['lead_radon'], run: ({ home }) => placeSectionAdapters.composeLeadRadon(home) },
@@ -755,9 +748,26 @@ async function composeHomeIntelligence({ homeId, userId, access, sectionIds }) {
   // home's privacy toggles — in parallel; each composer is self-contained
   // and resolves (never rejects), so one failure can't sink the response.
   const runs = COMPOSER_SECTIONS.filter(({ ids }) => ids.some((id) => requested.has(id)));
+
+  // The Today group and heat_cold both need the same provider payload.
+  // Fetched ONCE here rather than inside each composer: the getHubToday memo
+  // is written only after its whole pipeline completes, and the composers run
+  // concurrently below, so two calls always missed the cache and doubled the
+  // outbound WeatherKit/AirNow/NOAA traffic. Only fetched when a section that
+  // needs it was actually requested.
+  const HUB_SECTIONS = ['weather', 'air_quality', 'alerts', 'good_day_to', 'heat_cold'];
+  let hub = null;
+  if (HUB_SECTIONS.some((id) => requested.has(id))) {
+    try {
+      hub = await providerOrchestrator.getHubToday(userId, { detail: true });
+    } catch (err) {
+      logger.warn('placeIntelligence: getHubToday failed', { userId, error: err.message });
+    }
+  }
+
   const [privacy, ...groups] = await Promise.all([
     getHomePrivacy(homeId),
-    ...runs.map(({ run }) => run({ home, userId, tier })),
+    ...runs.map(({ run }) => run({ home, userId, tier, hub })),
   ]);
 
   const composed = {};

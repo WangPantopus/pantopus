@@ -280,8 +280,11 @@ describe('provenance capture from a completed job', () => {
     expect(rows[0].task).toBe('Gutter clearing');
     expect(rows[0].cost).toBe(180);
     expect(rows[0].status).toBe('completed');
-    // The gig id is what makes the row verifiable rather than self-reported.
-    expect(rows[0].notes).toBe('gig:gig-1');
+    // The gig id is what makes the row verifiable rather than self-reported,
+    // and it lives in its own column (migration 163) with a partial unique
+    // index behind it — so the guarantee does not rest on user-visible text.
+    expect(rows[0].gig_id).toBe('gig-1');
+    expect(rows[0].notes).toBeUndefined();
   });
 
   test('is idempotent — re-confirming does not duplicate the history', async () => {

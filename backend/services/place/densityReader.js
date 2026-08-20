@@ -42,8 +42,12 @@ const DENSITY_BUCKET = Object.freeze({
 // underlying count by comparison.
 //
 // Reconciled here, on the stricter of the two, so consolidating could not
-// loosen anything that was already live. The inline copy is gone; this is now
-// the single implementation.
+// loosen anything that was already live.
+//
+// A THIRD copy lived in routes/public.js on the unauthenticated surface with
+// the loosest thresholds of all ({growing:10, few:3, forming:1} — a public
+// `forming` meant 1–2 verified users). It now calls this helper too, so the
+// floor is genuinely universal rather than merely asserted here.
 const K_ANON_MIN = 10;
 // Upper edge of the 'few' band; above it the cell reads as 'growing'. Bands
 // stay wide on purpose so no exact count can be inferred from the bucket.

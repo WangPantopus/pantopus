@@ -243,7 +243,7 @@ function buildHeadline(past, aging, confirmedCount, total) {
  * @param {string} [params.userId]
  * @returns {Promise<{ok: boolean, reason?: string}>}
  */
-async function recordSystem({ homeId, systemKey, installedYear, source = 'resident', sourceRef, userId, notes }) {
+async function recordSystem({ homeId, systemKey, installedYear, source = 'resident', sourceRef, userId }) {
   if (!homeId || !SYSTEM_KEYS.includes(systemKey)) {
     return { ok: false, reason: 'invalid_system' };
   }
@@ -255,12 +255,17 @@ async function recordSystem({ homeId, systemKey, installedYear, source = 'reside
   }
 
   try {
-    const { data: existing } = await supabaseAdmin
+    // The error is checked, not dropped: a transient read failure used to
+    // leave `existing` null, skip the SOURCE_RANK ratchet below, and fall
+    // through to an unconditional upsert — exactly how a derived source
+    // could overwrite what the household told us.
+    const { data: existing, error: readErr } = await supabaseAdmin
       .from('HomeSystem')
       .select('id, source')
       .eq('home_id', homeId)
       .eq('system_key', systemKey)
       .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
 
     // Provenance only ratchets up. A permit or a completed job must never
     // silently overwrite what the person living there told us.
@@ -277,7 +282,6 @@ async function recordSystem({ homeId, systemKey, installedYear, source = 'reside
         installed_year: year,
         source,
         source_ref: sourceRef || null,
-        notes: notes || null,
         updated_by: userId || null,
         updated_at: nowIso,
       }, { onConflict: 'home_id,system_key' });
@@ -313,13 +317,17 @@ async function recordCompletedJob({ homeId, gigId, title, category, price, perfo
   if (!homeId || !gigId) return { ok: false, reason: 'missing_home_or_gig' };
 
   try {
-    // One row per gig — a re-confirmation must not duplicate the history.
-    const { data: existing } = await supabaseAdmin
+    // One row per gig. Backed by a partial unique index on gig_id
+    // (migration 163), so this read is a fast path rather than the
+    // guarantee — two concurrent owner-confirms are stopped by the index,
+    // not by the check. The error is surfaced rather than dropped: a failed
+    // read used to fall through to an unconditional insert.
+    const { data: existing, error: readErr } = await supabaseAdmin
       .from('HomeMaintenanceLog')
       .select('id')
-      .eq('home_id', homeId)
-      .eq('notes', `gig:${gigId}`)
+      .eq('gig_id', gigId)
       .maybeSingle();
+    if (readErr) throw new Error(readErr.message);
     if (existing) return { ok: true, reason: 'already_recorded' };
 
     const nowIso = new Date().toISOString();
@@ -332,8 +340,9 @@ async function recordCompletedJob({ homeId, gigId, title, category, price, perfo
         performed_by: performedBy || null,
         cost: Number.isFinite(Number(price)) ? Number(price) : null,
         // The gig id is the evidence pointer — it is what makes this row
-        // verifiable rather than a self-reported claim.
-        notes: `gig:${gigId}`,
+        // verifiable rather than a self-reported claim. It lives in its own
+        // column so the guarantee does not rest on user-visible free text.
+        gig_id: gigId,
         status: 'completed',
         recurrence: 'one_time',
         created_at: nowIso,

@@ -30,6 +30,7 @@
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const notificationService = require('../services/notificationService');
+const { ensureTodayItems, usersWithUnresolvedMail } = require('../services/mailDayService');
 
 // The local-time window the push may land in. Outside it the user is
 // simply skipped — the next run re-evaluates, so a late scan still gets
@@ -113,29 +114,102 @@ function composeMailDayPush(unreviewedItems) {
   return { title: 'Mail day', body, pieces, needs_you: needsYou };
 }
 
+/**
+ * Claim today for this user, atomically.
+ *
+ * The previous order was read `notified_at` → send → write, a check-then-act
+ * with no lock, on a job that now runs every 15 minutes and is started
+ * unconditionally by every app instance (`app.js` calls startJobs with no
+ * leader election). Two overlapping runs could both pass the read and both
+ * send.
+ *
+ * The conditional UPDATE is the lock: only one caller can flip a NULL
+ * notified_at, and only that caller gets a row back.
+ *
+ * `streak_days` is deliberately NOT written here. The job is often the first
+ * writer of today's session row, and `currentStreak` (routes/mailDay.js)
+ * reads a today row's streak_days directly — so seeding it with 0 would
+ * blank the streak in the UI for the rest of the day, every day.
+ *
+ * @returns {Promise<boolean>} true when this caller owns the day.
+ */
+async function claimMailDay(userId, today, claimedAt, existingSession) {
+  if (existingSession && existingSession.id) {
+    const { data, error } = await supabaseAdmin
+      .from('MailDaySession')
+      .update({ notified_at: claimedAt, updated_at: claimedAt })
+      .eq('id', existingSession.id)
+      .is('notified_at', null)
+      .select('id');
+    if (error) throw new Error(error.message);
+    return Array.isArray(data) ? data.length > 0 : Boolean(data);
+  }
+
+  // No row yet — insert one. The (user_id, day_date) unique constraint makes
+  // a concurrent insert fail rather than duplicate, so the loser simply does
+  // not own the day.
+  const { data, error } = await supabaseAdmin
+    .from('MailDaySession')
+    .insert({
+      user_id: userId,
+      day_date: today,
+      notified_at: claimedAt,
+      created_at: claimedAt,
+      updated_at: claimedAt,
+    })
+    .select('id');
+  if (error) return false; // unique violation ⇒ another run owns it
+  return Array.isArray(data) ? data.length > 0 : Boolean(data);
+}
+
+/** Hand the day back when dispatch failed, so a later run can retry. */
+async function releaseMailDay(userId, today) {
+  await supabaseAdmin
+    .from('MailDaySession')
+    .update({ notified_at: null, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('day_date', today);
+}
+
 // ── The job ─────────────────────────────────────────────────
 
 async function mailDayNotification() {
   const today = todayDate();
   logger.info('[MailDay] Starting mail day notification job', { day_date: today });
 
-  // Only users with something still to triage today are candidates.
-  const { data: items, error } = await supabaseAdmin
-    .from('MailDayItem')
-    .select('user_id, kind, scanned_at')
-    .eq('day_date', today)
-    .eq('status', 'unreviewed');
-
-  if (error) {
-    logger.error('[MailDay] Failed to query today\'s triage queue', { error: error.message });
+  // Candidates come from the SCAN side, not from MailDayItem.
+  //
+  // MailDayItem is materialised by `ensureTodayItems`, whose only caller is
+  // GET /api/mailbox/v2/mailday/today. Selecting candidates from it meant a
+  // user who had not already opened the Mail Day screen that day had no rows
+  // and could not be notified — the push reached only people who had already
+  // visited the surface it advertises, the exact inverse of rule 1 above.
+  //
+  // Walking the unresolved routing queue instead, and materialising the same
+  // rows the screen would, makes a scan reach its recipients whether or not
+  // anyone has opened the app.
+  let candidateUserIds = [];
+  try {
+    candidateUserIds = await usersWithUnresolvedMail();
+  } catch (err) {
+    logger.error('[MailDay] Failed to find users with unresolved mail', { error: err.message });
     return;
   }
 
   const byUser = new Map();
-  for (const item of items || []) {
-    if (!item.user_id) continue;
-    if (!byUser.has(item.user_id)) byUser.set(item.user_id, []);
-    byUser.get(item.user_id).push(item);
+  for (const userId of candidateUserIds) {
+    try {
+      await ensureTodayItems(userId, today);
+      const { data: items } = await supabaseAdmin
+        .from('MailDayItem')
+        .select('user_id, kind, scanned_at')
+        .eq('user_id', userId)
+        .eq('day_date', today)
+        .eq('status', 'unreviewed');
+      if (items && items.length) byUser.set(userId, items);
+    } catch (err) {
+      logger.warn('[MailDay] Failed to prepare a user', { userId, error: err.message });
+    }
   }
 
   logger.info(`[MailDay] ${byUser.size} users with unreviewed mail today`);
@@ -178,6 +252,13 @@ async function mailDayNotification() {
         continue;
       }
 
+      // Claim BEFORE dispatching — see claimMailDay.
+      const claimedAt = new Date().toISOString();
+      if (!(await claimMailDay(userId, today, claimedAt, session))) {
+        skipped++;
+        continue;
+      }
+
       // createNotification applies the user's global push toggle and the
       // `mail_summary_enabled` type preference, emits the socket event, and
       // refreshes the badge — so the job never talks to pushService directly.
@@ -196,23 +277,12 @@ async function mailDayNotification() {
       });
 
       if (!created) {
-        // The notification row failed to write; leave notified_at unset so
-        // the next run retries rather than silently losing the day.
+        // Dispatch failed — hand the day back so a later run retries rather
+        // than silently losing it.
+        await releaseMailDay(userId, today).catch(() => {});
         skipped++;
         continue;
       }
-
-      // Claim the day. Upsert because the triage session row is created
-      // lazily — a user who has not opened the screen yet has no row.
-      await supabaseAdmin
-        .from('MailDaySession')
-        .upsert({
-          user_id: userId,
-          day_date: today,
-          notified_at: new Date().toISOString(),
-          streak_days: session?.streak_days || 0,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,day_date' });
 
       await supabaseAdmin
         .from('MailEvent')

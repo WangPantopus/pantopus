@@ -81,6 +81,15 @@ describe('densityReader.bucketForCount — k-anon flooring', () => {
     expect(bucketForCount('not-a-number')).toBe('none');
   });
 
+  it('pins the k-anon policy values themselves', () => {
+    // The boundary assertions below are parameterised on these constants,
+    // which makes them tautological on their own — dropping K_ANON_MIN to 3
+    // would leave the whole block green. Pin the policy here so a change to
+    // the floor is a deliberate edit to this line, not a silent loosening.
+    expect(K_ANON_MIN).toBe(10);
+    expect(FEW_MAX).toBe(24);
+  });
+
   it('floors fractional counts before bucketing', () => {
     // Parameterised on the constants: the k-anon floor moved once already
     // (5 → 10, reconciling a second inline copy that served the dashboard),

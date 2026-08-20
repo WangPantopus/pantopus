@@ -105,9 +105,12 @@ describe('POST /api/internal/briefing/send', () => {
     expect(res.status).toBe(200);
     expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
     const payload = pushService.sendToUser.mock.calls[0][1];
+    // BOTH clients read `link` (then `deepLink`) and neither reads `route`,
+    // so a route-only payload produces no deep link at all.
+    expect(payload.data.link).toBe('/place/home-abc');
     expect(payload.data.route).toBe('/place/home-abc');
     expect(payload.data.homeId).toBe('home-abc');
-    expect(payload.data.route).not.toContain('/hub');
+    expect(payload.data.link).not.toContain('/hub');
   });
 
   it('falls back to a bare Place link when the briefing has no home', async () => {
@@ -140,6 +143,7 @@ describe('POST /api/internal/briefing/send', () => {
       .send({ userId: USER_ID, briefingKind: 'morning' });
 
     // The client resolves the primary home, exactly as the auto-land does.
+    expect(pushService.sendToUser.mock.calls[0][1].data.link).toBe('/place');
     expect(pushService.sendToUser.mock.calls[0][1].data.route).toBe('/place');
   });
 });

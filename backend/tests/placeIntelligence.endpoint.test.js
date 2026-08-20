@@ -184,6 +184,23 @@ describe('GET /api/homes/:id/intelligence', () => {
       seedHome();
     });
 
+    test('fetches the provider payload exactly ONCE per request', async () => {
+      // composeToday and composeHeatCold both need it, and both used to call
+      // getHubToday themselves. The 2-minute memo does not absorb that: the
+      // cache entry is written only after the pipeline completes and the
+      // composers run concurrently, so every request made two full provider
+      // round-trips.
+      await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+      expect(providerOrchestrator.getHubToday).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not fetch the provider payload when no section needs it', async () => {
+      await request(app)
+        .get(`/api/homes/${HOME_ID}/intelligence?sections=flood`)
+        .set('x-test-user-id', USER);
+      expect(providerOrchestrator.getHubToday).not.toHaveBeenCalled();
+    });
+
     test('requests the detail payload from the orchestrator', async () => {
       await request(app).get(`/api/homes/${HOME_ID}/intelligence?sections=weather`).set('x-test-user-id', USER);
       expect(providerOrchestrator.getHubToday).toHaveBeenCalledWith(USER, { detail: true });

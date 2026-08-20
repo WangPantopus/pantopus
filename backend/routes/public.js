@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabaseAdmin = require('../config/supabaseAdmin');
 const geo = require('../services/geo');
+const { bucketForCount } = require('../services/place/densityReader');
 const {
   geocodeToTractCached,
   fetchCensusACS,
@@ -169,23 +170,22 @@ router.get('/posts/:id', async (req, res) => {
 
 // Density buckets are floored server-side from the raw verified-home count so
 // the response can describe activity qualitatively without ever exposing a
-// number (the §4.1 k-anon rule). Thresholds align with the preview-refresh
-// milestone scale (first milestone = 10).
-const DENSITY_THRESHOLDS = { growing: 10, few: 3, forming: 1 };
+// number (the §4.1 k-anon rule).
+//
+// This file used to carry its own thresholds ({growing:10, few:3, forming:1}),
+// a THIRD implementation of the same primitive — and the loosest of the
+// three, on the only UNAUTHENTICATED surface: a public `forming` meant the
+// cell held exactly 1–2 verified users. It now shares the audited helper, so
+// the floor is genuinely universal rather than merely claimed to be.
+//
+// This is strictly more conservative than before (cells of 3–9 now read
+// `forming` rather than `few`), so nothing that was private became public.
 const DENSITY_LABELS = {
   growing: 'Growing activity near this area',
   few: 'A few verified homes nearby',
   forming: 'Your block is starting to form',
   none: 'No activity shown yet',
 };
-
-function densityBucket(count) {
-  const n = Number.isFinite(count) ? count : 0;
-  if (n >= DENSITY_THRESHOLDS.growing) return 'growing';
-  if (n >= DENSITY_THRESHOLDS.few) return 'few';
-  if (n >= DENSITY_THRESHOLDS.forming) return 'forming';
-  return 'none';
-}
 
 // Everything outside the free demonstration subset, described so the client
 // can render the locked cards + soft-wall. `unlock` is the tier that actually
@@ -367,7 +367,7 @@ async function readDensityBucket(geohash) {
       console.warn('[public/place] density read error:', error.message);
       return 'none';
     }
-    return densityBucket(data?.verified_users_count ?? 0);
+    return bucketForCount(data?.verified_users_count ?? 0);
   } catch (err) {
     console.warn('[public/place] density read exception:', err.message);
     return 'none';

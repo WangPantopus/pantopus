@@ -243,3 +243,92 @@ describe('honesty', () => {
     expect(out.freeze).toBeNull();
   });
 });
+
+// ── Regression: which freezing night the headline names ──────────────────
+// `upcomingFreeze` was driven by coldestDay(daily), which scans the whole
+// week for the minimum with no date ordering. The guidance attached to the
+// headline is protective action tied to a specific night, so naming the
+// wrong night is exactly the failure this section exists to prevent. The
+// hourly horizon is 24h while daily runs 7 days, so this branch is the
+// common case, not an edge.
+describe('the freeze headline names the NEXT freezing night', () => {
+  const { nextFreezingDay } = require('../services/heatColdEngine');
+
+  test('nextFreezingDay returns the first qualifying day, not the coldest', () => {
+    const d = days([[40, 55], [31, 42], [36, 48], [38, 50], [18, 30]]);
+    expect(nextFreezingDay(d).low_f).toBe(31);
+    expect(coldestDay(d).low_f).toBe(18);
+  });
+
+  test('the headline leads with the first freeze, not the deepest one', () => {
+    const out = buildHeatColdOutlook({
+      // No freeze inside the hourly horizon, so the daily branch runs.
+      weather: {
+        hourly: hours([48, 46, 44]),
+        daily: days([[40, 55], [31, 42], [36, 48], [38, 50], [18, 30]]),
+      },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+
+    expect(out.mode).toBe('cold');
+    expect(out.headline).toContain('31°F');
+    // And it still tells them a colder night is coming, rather than hiding it.
+    expect(out.headline).toContain('18°F');
+    expect(out.headline).toContain('colder');
+  });
+
+  test('says it once when the first freeze IS the coldest night', () => {
+    const out = buildHeatColdOutlook({
+      weather: { hourly: hours([48, 46]), daily: days([[40, 55], [22, 34], [30, 41]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+    expect(out.headline).toContain('22°F');
+    expect(out.headline).not.toContain('colder');
+  });
+
+  test('stays quiet when no day reaches freezing', () => {
+    const out = buildHeatColdOutlook({
+      weather: { hourly: hours([48, 46]), daily: days([[40, 55], [38, 50]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+    expect(out.mode).toBe('none');
+  });
+});
+
+// ── Regression: the heat span must be CONTIGUOUS ─────────────────────────
+// The span was built by filtering the whole array on level >= threshold and
+// taking [0]..[last], which jumps level-0 gaps. NWS HeatRisk genuinely
+// produces non-contiguous notable days.
+describe('heat span stops at the first cool day', () => {
+  test('does not bridge a gap between two notable stretches', () => {
+    const out = buildHeatColdOutlook({
+      heatRisk: heat([3, 0, 0, 2]),
+      weather: { hourly: hours([90, 92]), daily: days([[70, 95], [60, 80], [58, 78], [68, 92]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+
+    expect(out.mode).toBe('heat');
+    expect(out.peak_level).toBe(3);
+    // The peak is day 1 alone; the run must not reach the level-2 day.
+    expect(out.headline).toBe('Major heat risk, today.');
+  });
+
+  test('still spans a genuinely contiguous stretch', () => {
+    const out = buildHeatColdOutlook({
+      heatRisk: heat([1, 3, 3, 2, 0]),
+      weather: { hourly: hours([90, 92]), daily: days([[70, 95], [76, 101], [78, 103], [74, 98], [62, 84]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+    expect(out.headline).toContain('through');
+  });
+});

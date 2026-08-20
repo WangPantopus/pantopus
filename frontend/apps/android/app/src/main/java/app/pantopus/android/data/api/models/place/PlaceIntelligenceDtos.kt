@@ -732,16 +732,6 @@ enum class GoodDayVerdict {
     NO,
 
     UNKNOWN,
-    ;
-
-    companion object {
-        fun from(raw: String?): GoodDayVerdict = when (raw) {
-            "yes" -> YES
-            "caution" -> CAUTION
-            "no" -> NO
-            else -> UNKNOWN
-        }
-    }
 }
 
 @JsonClass(generateAdapter = true)

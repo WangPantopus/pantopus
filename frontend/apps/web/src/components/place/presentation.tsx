@@ -251,7 +251,8 @@ const SECTION_CONFIG: Record<PlaceSectionId, SectionConfig> = {
       const d = data as PlaceHeatColdData;
       // The dashboard row is the verdict, not the index — and `none` is the
       // honest answer on most days rather than a manufactured warning.
-      if (d.mode === 'cold') return { value: 'Freeze expected', statusDot: 'warning' };
+      // `error`, matching both mobile clients and RiskDetail's own cold tone.
+      if (d.mode === 'cold') return { value: 'Freeze expected', statusDot: 'error' };
       if (d.mode === 'heat') {
         const level = d.peak_level ?? 0;
         return {

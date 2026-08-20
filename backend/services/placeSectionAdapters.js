@@ -154,14 +154,26 @@ async function composeHeatCold(home, weather) {
       ttlMs: 6 * 60 * 60 * 1000,
       fetch: async () => {
         const result = await fetchHeatRisk(ll.lat, ll.lng);
-        // Cache the coverage gap too — re-asking NWS about Honolulu every
-        // request would be a fetch per view for zero new information.
-        return result || { days: [], covered: false };
+        // A genuine out-of-CONUS gap ({days:[], covered:false}) IS cached —
+        // re-asking NWS about Honolulu every request buys nothing.
+        //
+        // A FAILURE (null) must not be. Coalescing the two used to pin
+        // "NWS HeatRisk covers the contiguous US" onto a Phoenix home for
+        // six hours during an NWS outage — a false statement about the
+        // place, cached across the whole geohash-5 cell. Returning null
+        // lets placeSectionCache decline to cache it and lets the section
+        // report an error instead of a calm reading.
+        return result;
       },
     });
 
+    // Null payload = the NWS fetch failed (see above). The freeze half still
+    // works off the temperature forecast, so the section degrades to
+    // `partial` with an honest reason rather than claiming a coverage gap.
+    const heatFetchFailed = payload == null;
+
     const outlook = buildHeatColdOutlook({
-      heatRisk: payload,
+      heatRisk: heatFetchFailed ? null : payload,
       weather,
       home,
       timezone: (weather && weather.timezone) || null,
@@ -182,7 +194,9 @@ async function composeHeatCold(home, weather) {
       coverage: outlook.heat_covered ? 'full' : 'partial',
       unavailableReason: outlook.heat_covered
         ? null
-        : 'NWS HeatRisk covers the contiguous US; the freeze forecast still applies here.',
+        : (heatFetchFailed
+          ? 'Heat risk is temporarily unavailable; the freeze forecast still applies.'
+          : 'NWS HeatRisk covers the contiguous US; the freeze forecast still applies here.'),
       data: outlook,
     })];
   } catch (err) {

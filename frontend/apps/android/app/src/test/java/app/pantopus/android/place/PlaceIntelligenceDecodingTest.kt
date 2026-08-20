@@ -187,6 +187,14 @@ class PlaceIntelligenceDecodingTest {
         // T3 payload carries 7 groups (identity is T4) and all 18 sections.
         assertEquals(7, intelligence.groups.size)
         val sections = intelligence.groups.flatMap { it.sections }
+        // NOTE: this fixture is a 2026-06-12 capture, taken BEFORE
+        // good_day_to / heat_cold / home_systems were added, so it carries
+        // 18 of the 21 contract sections. The count is asserted against the
+        // fixture's own group totals rather than a magic number, so it
+        // cannot silently drift; the three newer sections are covered by
+        // PlaceIntelligenceDecodingTest's dedicated cases above (inline
+        // payloads) until the fixture is re-captured from a live T3 response.
+        assertEquals(intelligence.groups.sumOf { it.sections.size }, sections.size)
         assertEquals(18, sections.size)
 
         assertEquals(PlaceGroup.TODAY, intelligence.groups.first().groupId)

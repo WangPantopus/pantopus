@@ -18,6 +18,7 @@ import type {
   IncentiveLevel,
   IncentiveType,
   BenchmarkComparison,
+  BillUtilityKind,
 } from '@pantopus/types';
 import { Zap, BadgePercent, Building2, Landmark, PlusCircle, Lock } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
@@ -35,7 +36,18 @@ const BILL_VERDICT: Record<BenchmarkComparison, { text: string; color: string }>
   higher: { text: 'Higher than typical', color: 'text-app-warning' },
 };
 
-const UTILITY_LABEL: Record<string, string> = { electric: 'Electric', gas: 'Gas', water: 'Water' };
+// Typed on the union, not `string`, so widening BillUtilityKind is a
+// compile error here rather than a silent "Utility" heading above a summary
+// line that correctly says "internet".
+const UTILITY_LABEL: Record<BillUtilityKind, string> = {
+  electric: 'Electric',
+  gas: 'Gas',
+  water: 'Water',
+  sewer: 'Sewer',
+  trash: 'Trash',
+  internet: 'Internet',
+  cable: 'Cable',
+};
 
 function BillBenchmark({ data }: { data: PlaceBillBenchmarkData }) {
   const your = data.your_amount;
