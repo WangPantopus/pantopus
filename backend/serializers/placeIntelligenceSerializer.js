@@ -47,9 +47,20 @@ const PLACE_SECTION_META = {
   air_quality: { group: 'today', band: 'A', source: 'AirNow · EPA', layer: 2 },
   alerts: { group: 'today', band: 'A', source: 'National Weather Service', layer: null },
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo', layer: null },
+  // Verdicts, not readings — derived from the weather/AQI payload already
+  // fetched for the two layers above, crossed with the home's own facts.
+  good_day_to: { group: 'today', band: 'A', source: 'Pantopus · derived from today\'s conditions', layer: null },
   // Band B (W0.2) — exact property facts + valuation (ATTOM).
   your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
+  // Band C — the household's OWN record, the first section in that band.
+  // Seeded from the build year so it is never blank; each row carries how
+  // it is known so an estimate is never dressed up as a fact.
+  home_systems: { group: 'your_home', band: 'C', source: 'Your household record', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
+  // Heat from NWS HeatRisk (CONUS); cold derived from the temperature
+  // forecast already fetched for `weather`. The national replacement for
+  // seasonalEngine's two-city gate.
+  heat_cold: { group: 'risk_readiness', band: 'A', source: 'NWS HeatRisk · National Weather Service', layer: null },
   // Phase 4 — the deferred half of risk & readiness.
   seismic: { group: 'risk_readiness', band: 'A', source: 'USGS seismic design values (ASCE 7-22)', layer: null },
   wildfire: { group: 'risk_readiness', band: 'A', source: 'USFS Wildfire Hazard Potential', layer: null },

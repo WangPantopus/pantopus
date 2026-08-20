@@ -193,6 +193,45 @@ export interface PlaceSunriseSunsetData {
   daylight_minutes: number;
 }
 
+/**
+ * A verdict on one everyday question.
+ *   yes     — go ahead
+ *   caution — conditionally, with a stated limit
+ *   no      — don't, with the reason
+ */
+export type GoodDayVerdict = 'yes' | 'caution' | 'no';
+
+export interface PlaceGoodDayTile {
+  /** Stable id, e.g. "open_windows". Clients key icons/analytics off this. */
+  id: string;
+  /** The verb, e.g. "Open windows". */
+  label: string;
+  /** Display glyph (emoji) — the server picks it so all clients agree. */
+  glyph: string;
+  verdict: GoodDayVerdict;
+  /** The short answer, e.g. "Yes — until 3pm". */
+  answer: string;
+  /**
+   * The reasoning WITH the actual numbers, e.g. "AQI 38 and 64–72°F
+   * through 3pm." Shown on tap. An opinionated tile that won't show its
+   * inputs is not trustworthy, so this is required, never empty.
+   */
+  because: string;
+}
+
+/**
+ * "Good day to…" — verdicts, not readings.
+ *
+ * Every tile is computed from data already fetched for `weather` and
+ * `air_quality` (the hourly/daily forecast, feels-like, UV, AQI) crossed
+ * with the home's own facts, so it costs no additional provider call.
+ * The tile set is deliberately small: a row of five is a glance, a row of
+ * twelve is noise.
+ */
+export interface PlaceGoodDayData {
+  tiles: PlaceGoodDayTile[];
+}
+
 // ── Risk & readiness ─────────────────────────────────────────
 
 export type FloodRiskLevel = 'minimal' | 'moderate' | 'high';
@@ -210,6 +249,60 @@ export interface PlaceFloodData {
   insurance_required: boolean;
   /** Plain "what this means" copy. */
   plain_meaning: string;
+}
+
+/** NWS HeatRisk index: 0 Little to none → 4 Extreme. */
+export type HeatRiskLevel = 0 | 1 | 2 | 3 | 4;
+
+export interface PlaceHeatRiskDay {
+  /** ISO 8601 date. */
+  date: string;
+  /** 1-based day index in the NWS 7-day series. */
+  day: number;
+  level: HeatRiskLevel;
+  /** e.g. "Major". */
+  label: string;
+  /** The published meaning of this level. */
+  meaning: string;
+}
+
+export interface PlaceFreezeWindow {
+  /** ISO 8601. */
+  starts: string;
+  /** ISO 8601. */
+  ends: string;
+  /** Contiguous hours at or below freezing. */
+  hours: number;
+  min_temp_f: number;
+}
+
+/**
+ * Heat & cold — the seasonal spine, nationally.
+ *
+ * Heat comes from NWS HeatRisk (CONUS, 7 days); cold is derived from the
+ * temperature forecast already fetched for `weather`, so the freeze half
+ * costs no additional provider call. `mode` says which one leads today —
+ * `none` is the honest answer on the ~340 days a year when neither is
+ * worth acting on.
+ *
+ * `heat_covered` is false outside CONUS (Alaska, Hawaii, the
+ * territories), where HeatRisk has no data. That is a coverage gap, not
+ * a reading of zero, and the card must say so.
+ */
+export interface PlaceHeatColdData {
+  mode: 'heat' | 'cold' | 'none';
+  heat_days: PlaceHeatRiskDay[];
+  heat_covered: boolean;
+  peak_level: HeatRiskLevel | null;
+  /** ISO 8601 date of the peak heat day. */
+  peak_date: string | null;
+  freeze: PlaceFreezeWindow | null;
+  /** The verdict, e.g. "Hard freeze, 19°F for 9 hours starting Tue 11pm." */
+  headline: string;
+  /** The home-conditioned instruction. Empty when there is nothing to do. */
+  guidance: string;
+  /** Which forecast the headline came from. */
+  source_note: string;
 }
 
 /** ASCE 7 seismic design categories (A lowest demand → E highest). */
@@ -459,6 +552,59 @@ export interface PlaceYourHomeData {
 }
 
 // ════════════════════════════════════════════════════════════
+// BAND-C SECTION — the household's own record
+// ════════════════════════════════════════════════════════════
+
+/** How a system's install year is known. Never presented as a bare fact. */
+export type HomeSystemSource = 'estimated' | 'permit' | 'marketplace' | 'resident';
+
+export type HomeSystemStatus = 'ok' | 'aging' | 'past_expected' | 'unknown';
+
+export interface PlaceHomeSystem {
+  /** Stable key, e.g. "water_heater". */
+  key: string;
+  label: string;
+  installed_year: number | null;
+  age_years: number | null;
+  /** Typical service life range, in years. A range, not a prediction. */
+  typical_life_low: number;
+  typical_life_high: number;
+  status: HomeSystemStatus;
+  /** 0–1 for the remaining-life bar; null when the year is unknown. */
+  life_remaining: number | null;
+  source: HomeSystemSource;
+  /** Provenance chip copy, e.g. "Estimated from year built". */
+  source_label: string;
+  confidence: 'low' | 'medium' | 'high';
+  /** Permit number, gig id, etc. */
+  source_ref: string | null;
+  /** What the typical range means for this system. */
+  note: string;
+}
+
+export interface PlaceHomeSystemsSummary {
+  past_expected_count: number;
+  aging_count: number;
+  /** How much of the ledger rests on evidence rather than a prior. */
+  confirmed_count: number;
+  total_count: number;
+  headline: string;
+}
+
+/**
+ * Systems Ledger — the six major building systems, with provenance.
+ *
+ * Band C: the household's own record, not a public fact about the place.
+ * Every system is seeded from the build year so the ledger is never
+ * blank, and each carries HOW it is known — an estimate is never dressed
+ * up as a fact, and a resident's correction outranks anything derived.
+ */
+export interface PlaceHomeSystemsData {
+  systems: PlaceHomeSystem[];
+  summary: PlaceHomeSystemsSummary;
+}
+
+// ════════════════════════════════════════════════════════════
 // SECTION ENVELOPE + RESPONSE
 // ════════════════════════════════════════════════════════════
 
@@ -468,7 +614,9 @@ export interface PlaceSectionDataMap {
   air_quality: PlaceAirQualityData;
   alerts: PlaceAlertsData;
   sunrise_sunset: PlaceSunriseSunsetData;
+  good_day_to: PlaceGoodDayData;
   flood: PlaceFloodData;
+  heat_cold: PlaceHeatColdData;
   seismic: PlaceSeismicData;
   wildfire: PlaceWildfireData;
   lead_radon: PlaceLeadRadonData;
@@ -483,6 +631,7 @@ export interface PlaceSectionDataMap {
   civic_election: PlaceCivicElectionData;
   // Band B (W0.2) — exact property facts + valuation.
   your_home: PlaceYourHomeData;
+  home_systems: PlaceHomeSystemsData;
 }
 
 export type PlaceSectionId = keyof PlaceSectionDataMap;
@@ -492,8 +641,11 @@ export const PLACE_SECTION_IDS = [
   'air_quality',
   'alerts',
   'sunrise_sunset',
+  'good_day_to',
   'your_home',
+  'home_systems',
   'flood',
+  'heat_cold',
   'seismic',
   'wildfire',
   'lead_radon',
@@ -523,8 +675,11 @@ export const PLACE_SECTION_META: Record<PlaceSectionId, PlaceSectionMeta> = {
   air_quality: { group: 'today', band: 'A', source: 'AirNow · EPA', layer: 2 },
   alerts: { group: 'today', band: 'A', source: 'National Weather Service', layer: null },
   sunrise_sunset: { group: 'today', band: 'A', source: 'Open-Meteo', layer: null },
+  good_day_to: { group: 'today', band: 'A', source: 'Pantopus · derived from today\'s conditions', layer: null },
   your_home: { group: 'your_home', band: 'B', source: 'County records · ATTOM', layer: null },
+  home_systems: { group: 'your_home', band: 'C', source: 'Your household record', layer: null },
   flood: { group: 'risk_readiness', band: 'A', source: 'FEMA National Flood Hazard Layer', layer: 3 },
+  heat_cold: { group: 'risk_readiness', band: 'A', source: 'NWS HeatRisk · National Weather Service', layer: null },
   seismic: { group: 'risk_readiness', band: 'A', source: 'USGS seismic design values (ASCE 7-22)', layer: null },
   wildfire: { group: 'risk_readiness', band: 'A', source: 'USFS Wildfire Hazard Potential', layer: null },
   lead_radon: { group: 'health_environment', band: 'A', source: 'EPA radon zones · HUD lead-paint rules', layer: 6 },

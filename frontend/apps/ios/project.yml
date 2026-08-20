@@ -146,6 +146,17 @@ targets:
         # into the entitlements plist at sign time.
         aps-environment: $(APS_ENVIRONMENT)
         com.apple.developer.associated-domains:
+          # pantopus.com is the product domain: it is what the backend and
+          # both clients put in share and invite links, and it is where the
+          # web app serves .well-known/apple-app-site-association. These two
+          # entries lived only in the checked-in Pantopus.entitlements, so
+          # every `make bootstrap` regenerated the file without them and
+          # silently broke universal links on the primary domain. The .app
+          # entries stay so any link already in circulation still resolves;
+          # iOS verifies each domain independently, so an unserved one costs
+          # nothing.
+          - applinks:pantopus.com
+          - applinks:www.pantopus.com
           - applinks:pantopus.app
           - applinks:www.pantopus.app
         # Phase 6c — shared UserDefaults suite feeding the Tasks-near-me

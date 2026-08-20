@@ -36,6 +36,8 @@ const neighborhoodProfileService = require('./ai/neighborhoodProfileService');
 const propertyIntelligenceService = require('./ai/propertyIntelligenceService');
 const placeSectionAdapters = require('./placeSectionAdapters');
 const { getHomePrivacy } = require('./homePrivacyService');
+const { buildGoodDayTiles } = require('./goodDayEngine');
+const { getSystemsLedger } = require('./homeSystemsService');
 
 const HOME_SELECT =
   'id, owner_id, address, address2, city, state, zipcode, map_center_lat, map_center_lng, year_built, sq_ft, bedrooms, bathrooms, lot_sq_ft, home_type';
@@ -164,10 +166,112 @@ function censusSummary(profile) {
 // error/unavailable status).
 // ════════════════════════════════════════════════════════════
 
-async function composeToday(userId) {
+// Number(null) and Number('') are both 0, which is finite — so a plain
+// Number.isFinite check silently turns a missing reading into a real 0°F.
+// Anything not already a usable number becomes null here.
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// The contract's hourly strip wants { time, temp_f, condition_code,
+// precip_chance }; the provider speaks { datetime_utc, temp_f,
+// condition_code, precip_chance_pct }. Rows without a usable timestamp or
+// temperature are dropped rather than rendered as gaps in the strip.
+function mapWeatherHours(hourly) {
+  if (!Array.isArray(hourly)) return [];
+  const out = [];
+  for (const h of hourly) {
+    if (!h || !h.datetime_utc) continue;
+    const tempF = finiteNumber(h.temp_f);
+    if (tempF === null) continue;
+    out.push({
+      time: h.datetime_utc,
+      temp_f: tempF,
+      condition_code: mapConditionCode(h.condition_code),
+      precip_chance: finiteNumber(h.precip_chance_pct) ?? 0,
+    });
+  }
+  return out;
+}
+
+// The contract types high_f/low_f as non-null numbers, so a day missing
+// either bound is dropped rather than emitted with a hole in it.
+function mapWeatherDays(daily) {
+  if (!Array.isArray(daily)) return [];
+  const out = [];
+  for (const d of daily) {
+    if (!d || !d.date) continue;
+    const highF = finiteNumber(d.high_f);
+    const lowF = finiteNumber(d.low_f);
+    if (highF === null || lowF === null) continue;
+    out.push({
+      date: d.date,
+      condition_code: mapConditionCode(d.condition_code),
+      high_f: highF,
+      low_f: lowF,
+      precip_chance: finiteNumber(d.precip_chance_pct) ?? 0,
+    });
+  }
+  return out;
+}
+
+// AirNow reports the pollutant as a display name ("PM2.5", "O3"); the
+// contract wants a stable machine token.
+const POLLUTANT_TOKENS = {
+  'pm2.5': 'pm25',
+  pm25: 'pm25',
+  pm10: 'pm10',
+  o3: 'ozone',
+  ozone: 'ozone',
+  no2: 'no2',
+  so2: 'so2',
+  co: 'co',
+};
+function mapDominantPollutant(pollutant) {
+  const raw = String(pollutant || '').trim().toLowerCase();
+  if (!raw) return null;
+  return POLLUTANT_TOKENS[raw] || raw.replace(/[^a-z0-9]+/g, '');
+}
+
+// NOAA carries both a description (≤500 chars) and a protective-action
+// instruction (≤300). The instruction is the actionable half, so it is
+// kept rather than dropped — but never at the cost of the description.
+function alertBody(a) {
+  const description = String(a.description || '').trim();
+  const instruction = String(a.instruction || '').trim();
+  if (description && instruction) return `${description}\n\n${instruction}`;
+  return description || instruction || String(a.title || '');
+}
+
+// The verdict engine wants the provider's richer hourly rows — wind and,
+// where the provider supplies it, per-hour feels-like — which the narrower
+// contract strip drops. Same source array, one extra projection.
+function engineHours(hourly) {
+  if (!Array.isArray(hourly)) return [];
+  const out = [];
+  for (const h of hourly) {
+    if (!h || !h.datetime_utc) continue;
+    const tempF = finiteNumber(h.temp_f);
+    if (tempF === null) continue;
+    out.push({
+      time: h.datetime_utc,
+      temp_f: tempF,
+      feels_like_f: finiteNumber(h.feels_like_f),
+      wind_mph: finiteNumber(h.wind_mph),
+      precip_chance: finiteNumber(h.precip_chance_pct) ?? 0,
+    });
+  }
+  return out;
+}
+
+async function composeToday(userId, home) {
   let hub = null;
   try {
-    hub = await providerOrchestrator.getHubToday(userId);
+    // `detail` carries the forecast arrays, feels-like, the dominant
+    // pollutant and the real alert body — all already fetched upstream.
+    hub = await providerOrchestrator.getHubToday(userId, { detail: true });
   } catch (err) {
     logger.warn('placeIntelligence: getHubToday failed', { userId, error: err.message });
   }
@@ -182,11 +286,11 @@ async function composeToday(userId) {
         current_temp_f: hub.weather.current_temp_f,
         condition_code: mapConditionCode(hub.weather.condition_code),
         condition_label: hub.weather.condition_label,
-        feels_like_f: null,
+        feels_like_f: hub.weather.feels_like_f ?? null,
         high_f: hub.weather.high_f,
         low_f: hub.weather.low_f,
-        hourly: [],
-        daily: [],
+        hourly: mapWeatherHours(hub.weather.hourly),
+        daily: mapWeatherDays(hub.weather.daily),
       },
     }));
   } else {
@@ -202,7 +306,7 @@ async function composeToday(userId) {
         index: hub.aqi.index,
         category,
         category_label: hub.aqi.category || AQI_CATEGORY_LABELS[category],
-        dominant_pollutant: null,
+        dominant_pollutant: mapDominantPollutant(hub.aqi.dominant_pollutant),
         health_message: AQI_HEALTH_MESSAGES[category],
       },
     }));
@@ -215,8 +319,8 @@ async function composeToday(userId) {
       id: String(a.id),
       event: a.title,
       severity: mapAlertSeverity(a.severity),
-      headline: a.title,
-      description: a.title,
+      headline: a.headline || a.title,
+      description: alertBody(a),
       onset: a.starts_at || null,
       ends: a.ends_at || null,
     }));
@@ -226,7 +330,58 @@ async function composeToday(userId) {
     out.push(serializePlaceSection('alerts', { access: 'available', status: 'unavailable' }));
   }
 
+  // Verdicts, derived from what the two sections above already fetched —
+  // no additional provider call. Omitted entirely when the forecast is
+  // thin enough that every answer would be a guess.
+  const goodDay = hub && hub.weather
+    ? buildGoodDayTiles({
+      // The engine reads the provider's richer hourly rows (wind, and
+      // feels-like where the provider supplies it), not the narrower
+      // contract shape.
+      weather: {
+        hourly: engineHours(hub.weather.hourly),
+        daily: mapWeatherDays(hub.weather.daily),
+      },
+      aqi: hub.aqi
+        ? {
+          index: hub.aqi.index,
+          category_label: hub.aqi.category || AQI_CATEGORY_LABELS[mapAqiCategory(hub.aqi.category)],
+        }
+        : null,
+      timezone: (hub.location && hub.location.timezone) || null,
+      homeType: home && home.home_type,
+    })
+    : null;
+
+  if (goodDay) {
+    out.push(serializePlaceSection('good_day_to', { access: 'available', asOf, data: goodDay }));
+  } else {
+    out.push(serializePlaceSection('good_day_to', { access: 'available', status: 'unavailable' }));
+  }
+
   return out;
+}
+
+// heat_cold needs the same temperature forecast the Today group fetches.
+// getHubToday is memoised per (user, shape) for 2 minutes, so asking again
+// inside one request is free rather than a second provider round-trip.
+async function composeHeatCold(home, userId) {
+  let hub = null;
+  try {
+    hub = await providerOrchestrator.getHubToday(userId, { detail: true });
+  } catch (err) {
+    logger.warn('placeIntelligence: getHubToday failed for heat_cold', { userId, error: err.message });
+  }
+
+  const weather = hub && hub.weather
+    ? {
+      hourly: mapWeatherHours(hub.weather.hourly),
+      daily: mapWeatherDays(hub.weather.daily),
+      timezone: (hub.location && hub.location.timezone) || null,
+    }
+    : null;
+
+  return placeSectionAdapters.composeHeatCold(home, weather);
 }
 
 async function composeNeighborhood(home) {
@@ -429,6 +584,32 @@ async function composeBillBenchmark(home) {
   })];
 }
 
+// ── home_systems (Band C — the household's own record) ───────
+// The first section in Band C, so it is also the first thing on this
+// endpoint that the trust ladder actually gates: `bandAccess` returns
+// 'locked' below T3, and the client renders the locked card.
+async function composeHomeSystems(home, tier) {
+  const access = bandAccess('C', tier);
+  if (access !== 'available') {
+    return [serializePlaceSection('home_systems', {
+      access,
+      status: 'unavailable',
+      unavailableReason: 'Claim this home to keep its maintenance record.',
+    })];
+  }
+
+  try {
+    const ledger = await getSystemsLedger(home);
+    if (!ledger) {
+      return [serializePlaceSection('home_systems', { access, status: 'unavailable' })];
+    }
+    return [serializePlaceSection('home_systems', { access, data: ledger })];
+  } catch (err) {
+    logger.warn('placeIntelligence: home_systems failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('home_systems', { access, status: 'error' })];
+  }
+}
+
 // ════════════════════════════════════════════════════════════
 // composeHomeIntelligence — the full grouped response
 // ════════════════════════════════════════════════════════════
@@ -440,9 +621,10 @@ async function composeBillBenchmark(home) {
 // Still BUILD_PENDING: `incentives` only (DSIRE's API is license-gated;
 // curated federal copy would rot).
 const COMPOSER_SECTIONS = [
-  { ids: ['weather', 'air_quality', 'alerts'], run: ({ userId }) => composeToday(userId) },
+  { ids: ['weather', 'air_quality', 'alerts', 'good_day_to'], run: ({ home, userId }) => composeToday(userId, home) },
   { ids: ['sunrise_sunset'], run: ({ home }) => placeSectionAdapters.composeSunriseSunset(home) },
   { ids: ['flood', 'census_context'], run: ({ home }) => composeNeighborhood(home) },
+  { ids: ['heat_cold'], run: ({ home, userId }) => composeHeatCold(home, userId) },
   { ids: ['seismic'], run: ({ home }) => placeSectionAdapters.composeSeismic(home) },
   { ids: ['wildfire'], run: ({ home }) => placeSectionAdapters.composeWildfire(home) },
   { ids: ['lead_radon'], run: ({ home }) => placeSectionAdapters.composeLeadRadon(home) },
@@ -450,6 +632,7 @@ const COMPOSER_SECTIONS = [
   { ids: ['environmental_hazards'], run: ({ home }) => placeSectionAdapters.composeEnvironmentalHazards(home) },
   { ids: ['block_density'], run: ({ home }) => composeDensity(home) },
   { ids: ['your_home'], run: ({ home, tier }) => composeYourHome(home, tier) },
+  { ids: ['home_systems'], run: ({ home, tier }) => composeHomeSystems(home, tier) },
   { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
   { ids: ['rent_band'], run: ({ home }) => placeSectionAdapters.composeRentBand(home) },
   { ids: ['civic_districts'], run: ({ home }) => placeSectionAdapters.composeCivicDistricts(home) },

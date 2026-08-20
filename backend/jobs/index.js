@@ -168,10 +168,13 @@ function startJobs() {
   });
 
   // ─── Mail Day Notification ───
-  // Runs daily at 8:00 AM UTC (default; per-user time checked inside job).
-  // Builds a summary of each user's mailbox and logs a mail_day_notification
-  // event. Phase 2 will wire to actual push notifications.
-  cron.schedule('0 8 * * *', wrapJob('mailDayNotification', mailDayNotification), {
+  // Runs every 15 minutes — the send is triggered by mail actually being
+  // scanned, not by the clock. Each run picks up users who have unreviewed
+  // pieces today and are currently inside their own local daytime window;
+  // MailDaySession.notified_at keeps that to exactly one push per user per
+  // mail day. (It previously ran once at 08:00 UTC — 1am Pacific — which
+  // is both the wrong hour and before most mail is scanned.)
+  cron.schedule('*/15 * * * *', wrapJob('mailDayNotification', mailDayNotification), {
     scheduled: true,
     timezone: 'UTC',
   });

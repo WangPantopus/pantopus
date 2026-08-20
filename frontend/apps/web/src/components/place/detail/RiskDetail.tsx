@@ -15,6 +15,8 @@ import type {
   PlaceIntelligence,
   PlaceFloodData,
   FloodRiskLevel,
+  PlaceHeatColdData,
+  PlaceHeatRiskDay,
   PlaceSeismicData,
   PlaceWildfireData,
   PlaceLeadRadonData,
@@ -23,6 +25,7 @@ import type {
 } from '@pantopus/types';
 import {
   Waves,
+  Thermometer,
   ShieldCheck,
   TriangleAlert,
   Activity,
@@ -310,10 +313,72 @@ function EmergencyPlan({ homeId }: { homeId: string | null }) {
   );
 }
 
+// ── Heat & cold ─────────────────────────────────────────────
+// The 7-day HeatRisk strip plus the verdict. Levels use the published
+// NWS HeatRisk scale colors — a data-viz ramp with no token equivalent,
+// the same treatment the EPA AQI bands get in TodayDetail.
+const HEAT_RISK_COLORS = ['#C6E4B4', '#FFEA61', '#FFA33F', '#E8442E', '#8A2BE2'];
+
+function HeatDayCell({ day, isFirst }: { day: PlaceHeatRiskDay; isFirst: boolean }) {
+  const d = new Date(`${day.date}T12:00:00Z`);
+  const label = isFirst
+    ? 'Today'
+    : new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(d);
+  return (
+    <div className="flex-1 min-w-[38px] flex flex-col items-center gap-1.5">
+      <span className="text-[12px] font-semibold text-app-text-secondary">{label}</span>
+      <span
+        className={`w-full rounded-md ${isFirst ? 'h-9' : 'h-6'}`}
+        style={{ backgroundColor: HEAT_RISK_COLORS[day.level] ?? HEAT_RISK_COLORS[0] }}
+        title={`${day.label} — ${day.meaning}`}
+      />
+      <span className="text-[11px] text-app-text-muted">{day.level}</span>
+    </div>
+  );
+}
+
+function HeatColdCard({ data }: { data: PlaceHeatColdData }) {
+  const tone =
+    data.mode === 'none'
+      ? 'text-app-text-secondary'
+      : (data.peak_level ?? 0) >= 3 || data.mode === 'cold'
+        ? 'text-app-error'
+        : 'text-app-warning';
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px] flex flex-col gap-3">
+      <div>
+        <div className={`text-[15.5px] font-semibold leading-[21px] ${tone}`}>{data.headline}</div>
+        {data.guidance ? (
+          <div className="text-[13.5px] text-app-text-strong leading-[19px] mt-1.5">{data.guidance}</div>
+        ) : null}
+      </div>
+
+      {data.heat_covered && data.heat_days.length > 0 ? (
+        <>
+          <div className="flex gap-1.5 items-end">
+            {data.heat_days.slice(0, 7).map((d, i) => (
+              <HeatDayCell key={d.date} day={d} isFirst={i === 0} />
+            ))}
+          </div>
+          <div className="text-[11.5px] text-app-text-muted">
+            NWS HeatRisk, 0 (little to none) to 4 (extreme). Experimental product.
+          </div>
+        </>
+      ) : (
+        <div className="text-[12.5px] text-app-text-muted">
+          NWS HeatRisk covers the contiguous US. The freeze forecast above still applies here.
+        </div>
+      )}
+    </div>
+  );
+}
+
 const isReady = (s: { status: string; data: unknown } | null | undefined) =>
   Boolean(s && (s.status === 'ready' || s.status === 'stale' || s.status === 'partial') && s.data);
 
 export default function RiskDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
+  const heatCold = findPlaceSection(intelligence, 'heat_cold');
   const flood = findPlaceSection(intelligence, 'flood');
   const floodReady = isReady(flood);
   const seismic = findPlaceSection(intelligence, 'seismic');
@@ -326,6 +391,14 @@ export default function RiskDetail({ intelligence, homeId }: { intelligence: Pla
     <>
       <DetailHeader title="Risk & readiness" address={detailAddress(intelligence.place)} />
       <div className="px-4 sm:px-5 pt-1 pb-16">
+        <DetailSectionLabel>Heat &amp; cold</DetailSectionLabel>
+        {isReady(heatCold) ? (
+          <HeatColdCard data={heatCold!.data as PlaceHeatColdData} />
+        ) : (
+          <SectionCard icon={Thermometer} title="Heat &amp; cold" state={heatCold ? statusToState(heatCold.status) : 'unavailable'} caption={heatCold?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
+        )}
+        {heatCold?.source ? <SourceNote name={heatCold.source} asOf="7-day forecast" /> : null}
+
         <DetailSectionLabel>Flood</DetailSectionLabel>
         {floodReady ? (
           <FloodCard data={flood!.data as PlaceFloodData} />

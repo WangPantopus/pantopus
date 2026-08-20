@@ -1986,6 +1986,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.MAILBOX_VACATION)
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.Place -> {
+                // Server-sent Place links carry the home id, so the common
+                // path goes straight to the dashboard (and to a group-detail
+                // page when the push names one). A bare link has no home to
+                // open, so it drops to the Home tab, whose landing resolver
+                // picks the primary home — the same path a cold start takes.
+                val homeId = pending.homeId
+                if (homeId.isNullOrBlank()) {
+                    navController.navigate(PantopusRoute.Home.path) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                } else {
+                    navController.navigate(ChildRoutes.placeDashboard(homeId))
+                    val slug = pending.slug
+                    if (!slug.isNullOrBlank()) {
+                        // Pushed on top of the dashboard so Back lands there
+                        // rather than leaving the stack, matching MailDay below.
+                        navController.navigate(ChildRoutes.placeDetail(homeId, slug))
+                    }
+                }
+                DeepLinkRouter.consume()
+            }
             DeepLinkRouter.Destination.MailDay -> {
                 // Push mailbox root first so Back walks back through the
                 // drawer view, then push the day editor on top.

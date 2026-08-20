@@ -21,8 +21,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 const GROUP: Record<PlaceSectionId, PlaceSection['group']> = {
-  weather: 'today', air_quality: 'today', alerts: 'today', sunrise_sunset: 'today',
-  your_home: 'your_home', flood: 'risk_readiness', seismic: 'risk_readiness', wildfire: 'risk_readiness', lead_radon: 'health_environment',
+  weather: 'today', air_quality: 'today', alerts: 'today', sunrise_sunset: 'today', good_day_to: 'today',
+  your_home: 'your_home', home_systems: 'your_home', flood: 'risk_readiness', heat_cold: 'risk_readiness', seismic: 'risk_readiness', wildfire: 'risk_readiness', lead_radon: 'health_environment',
   drinking_water: 'health_environment', environmental_hazards: 'health_environment',
   block_density: 'your_block', census_context: 'your_block', bill_benchmark: 'money_signals',
   incentives: 'money_signals', rent_band: 'money_signals', civic_districts: 'civic', civic_election: 'civic',

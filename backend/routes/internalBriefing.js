@@ -32,6 +32,30 @@ function verifyInternalApiKey(req, res, next) {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ── Push routing ────────────────────────────────────────────────────
+//
+// The `route` a push carries is parsed by DeepLinkRouter on both clients
+// (`frontend/apps/{ios,android}/**/DeepLinkRouter.{swift,kt}`), so these
+// shapes are a contract:
+//
+//   /place                      → dashboard; the client resolves the home
+//   /place/<homeId>             → that home's dashboard
+//   /place/<homeId>/<slug>      → a group-detail page
+//
+// A slug is only appended alongside a home id, because the detail route
+// needs both. Slugs must stay in the set both routers accept; an unknown
+// one degrades to the dashboard rather than a dead link.
+const PLACE_DETAIL_SLUGS = new Set([
+  'today', 'your-home', 'risk', 'block', 'money', 'civic', 'identity',
+]);
+
+function placeRoute(homeId, slug) {
+  const id = typeof homeId === 'string' && homeId.trim() ? homeId.trim() : null;
+  if (!id) return '/place';
+  if (slug && PLACE_DETAIL_SLUGS.has(slug)) return `/place/${id}/${slug}`;
+  return `/place/${id}`;
+}
 const BRIEFING_KINDS = new Set(['morning', 'evening']);
 
 function getBriefingConfig(kind) {
@@ -236,12 +260,19 @@ router.post('/send', verifyInternalApiKey, async (req, res) => {
     }
 
     // 9. Send push
+    // Route to Place, not /hub. Both mobile clients auto-land the Home tab
+    // on the Place dashboard, so a push that opened /hub dropped the user on
+    // the *secondary* address surface — and until the Place deep link landed
+    // there was no way back to Place at all after a back-swipe. The home id
+    // comes from the same location the briefing was composed for, so the
+    // link opens the dashboard for the address the copy is about.
     await pushService.sendToUser(userId, {
       title: briefingConfig.title,
       body: result.text,
       data: {
         type: briefingConfig.notificationType,
-        route: '/hub/today',
+        route: placeRoute(result.home_id),
+        homeId: result.home_id || null,
         briefingKind,
         briefingDeliveryId: deliveryId,
       },
@@ -381,7 +412,9 @@ router.post('/alert-push', verifyInternalApiKey, async (req, res) => {
       await pushService.sendToUser(userId, {
         title,
         body,
-        data: { type: `${alertType}_alert`, route: '/hub', ...data },
+        // Weather and air-quality alerts are Today-group content, so they
+        // open the Place Today detail rather than the Hub.
+        data: { type: `${alertType}_alert`, route: placeRoute(data?.homeId, 'today'), ...data },
       });
       sent++;
     } catch (err) {
@@ -453,7 +486,7 @@ router.post('/reminder-push', verifyInternalApiKey, async (req, res) => {
     await pushService.sendToUser(userId, {
       title,
       body,
-      data: { type: reminderType, route: '/hub', ...data },
+      data: { type: reminderType, route: placeRoute(data?.homeId), ...data },
     });
 
     return res.json({ status: 'sent' });
@@ -524,3 +557,5 @@ router.post('/no-bid-nudge', verifyInternalApiKey, async (req, res) => {
 });
 
 module.exports = router;
+// Exported for unit testing — the route shapes are a client contract.
+module.exports.placeRoute = placeRoute;

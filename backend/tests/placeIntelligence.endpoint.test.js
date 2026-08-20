@@ -79,6 +79,51 @@ function defaultHubToday() {
   };
 }
 
+// The `detail: true` shape — what the providers actually cache and what
+// getHubToday now passes through instead of dropping at the block step.
+function detailedHubToday() {
+  return {
+    fetched_at: '2026-06-07T09:12:00.000Z',
+    weather: {
+      current_temp_f: 62,
+      condition_code: 'clear',
+      condition_label: 'Clear',
+      high_f: 68,
+      low_f: 49,
+      precipitation_next_6h: false,
+      precipitation_start_at: null,
+      feels_like_f: 59,
+      humidity_pct: 71,
+      uv_index: 4,
+      dew_point_f: null,
+      wind_mph: 6,
+      hourly: [
+        { datetime_utc: '2026-06-07T10:00:00.000Z', temp_f: 63, condition_code: 'mostly_clear', precip_chance_pct: 5 },
+        { datetime_utc: '2026-06-07T11:00:00.000Z', temp_f: 65, condition_code: 'rain', precip_chance_pct: 70 },
+        // Dropped: no usable temperature.
+        { datetime_utc: '2026-06-07T12:00:00.000Z', temp_f: null, condition_code: 'rain', precip_chance_pct: 80 },
+      ],
+      daily: [
+        { date: '2026-06-07', high_f: 68, low_f: 49, condition_code: 'clear', precip_chance_pct: 10 },
+        { date: '2026-06-08', high_f: 71, low_f: 52, condition_code: 'partly', precip_chance_pct: 20 },
+        // Dropped: the contract types both bounds as non-null numbers.
+        { date: '2026-06-09', high_f: 74, low_f: null, condition_code: 'clear', precip_chance_pct: 0 },
+      ],
+    },
+    aqi: { index: 38, category: 'Good', is_noteworthy: false, dominant_pollutant: 'PM2.5' },
+    alerts: [{
+      id: 'NWS-1',
+      severity: 'severe',
+      title: 'Wind Advisory',
+      starts_at: '2026-06-07T14:00:00.000Z',
+      ends_at: '2026-06-08T02:00:00.000Z',
+      headline: 'Wind Advisory issued June 7 at 7:00AM PDT until June 7 at 7:00PM PDT',
+      description: 'Southwest winds 20 to 30 mph with gusts up to 45 mph expected.',
+      instruction: 'Secure loose outdoor objects and use extra care when driving.',
+    }],
+  };
+}
+
 function defaultNeighborhoodProfile() {
   return {
     profile: {
@@ -126,6 +171,73 @@ describe('GET /api/homes/:id/intelligence', () => {
   afterAll(() => {
     if (savedAttomKey === undefined) delete process.env.ATTOM_API_KEY;
     else process.env.ATTOM_API_KEY = savedAttomKey;
+  });
+
+  // ── Regression: the Today section used to hardcode `hourly: []`,
+  // `daily: []`, `feels_like_f: null` and `dominant_pollutant: null`, and
+  // set both the alert headline and description to the alert title —
+  // discarding data the providers had already fetched and cached. These
+  // assertions fail against that behavior.
+  describe('Today section carries the full already-fetched payload', () => {
+    beforeEach(() => {
+      providerOrchestrator.getHubToday.mockResolvedValue(detailedHubToday());
+      seedHome();
+    });
+
+    test('requests the detail payload from the orchestrator', async () => {
+      await request(app).get(`/api/homes/${HOME_ID}/intelligence?sections=weather`).set('x-test-user-id', USER);
+      expect(providerOrchestrator.getHubToday).toHaveBeenCalledWith(USER, { detail: true });
+    });
+
+    test('weather carries feels-like plus the hourly and daily forecasts', async () => {
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+      const w = sectionsById(res.body).weather;
+
+      expect(w.status).toBe('ready');
+      expect(w.data.feels_like_f).toBe(59);
+
+      // Rows without a usable temperature are dropped, not rendered as gaps.
+      expect(w.data.hourly).toEqual([
+        { time: '2026-06-07T10:00:00.000Z', temp_f: 63, condition_code: 'partly_cloudy', precip_chance: 5 },
+        { time: '2026-06-07T11:00:00.000Z', temp_f: 65, condition_code: 'rain', precip_chance: 70 },
+      ]);
+
+      // A day missing either bound is dropped — the contract types both as numbers.
+      expect(w.data.daily).toEqual([
+        { date: '2026-06-07', condition_code: 'clear', high_f: 68, low_f: 49, precip_chance: 10 },
+        { date: '2026-06-08', condition_code: 'partly_cloudy', high_f: 71, low_f: 52, precip_chance: 20 },
+      ]);
+    });
+
+    test('air quality names the dominant pollutant as a machine token', async () => {
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+      expect(sectionsById(res.body).air_quality.data.dominant_pollutant).toBe('pm25');
+    });
+
+    test('alerts carry the real headline and the description plus instruction', async () => {
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+      const alert = sectionsById(res.body).alerts.data.active[0];
+
+      expect(alert.event).toBe('Wind Advisory');
+      expect(alert.severity).toBe('warning');
+      expect(alert.headline).toBe('Wind Advisory issued June 7 at 7:00AM PDT until June 7 at 7:00PM PDT');
+      expect(alert.headline).not.toBe(alert.event);
+      expect(alert.description).toContain('gusts up to 45 mph');
+      // The protective-action instruction is the actionable half — kept.
+      expect(alert.description).toContain('Secure loose outdoor objects');
+    });
+
+    test('degrades to empty arrays when the provider returns no forecast', async () => {
+      providerOrchestrator.getHubToday.mockResolvedValue(defaultHubToday());
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+      const w = sectionsById(res.body).weather;
+
+      expect(w.status).toBe('ready');
+      expect(w.data.hourly).toEqual([]);
+      expect(w.data.daily).toEqual([]);
+      expect(w.data.feels_like_f).toBeNull();
+      expect(sectionsById(res.body).air_quality.data.dominant_pollutant).toBeNull();
+    });
   });
 
   test('composes the grouped contract with per-section status', async () => {

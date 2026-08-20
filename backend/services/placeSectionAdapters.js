@@ -30,6 +30,8 @@ const { encodeGeohash } = require('../utils/geohash');
 const { serializePlaceSection } = require('../serializers/placeIntelligenceSerializer');
 const { readThrough } = require('./placeSectionCache');
 const { geocodeToTract } = require('./ai/neighborhoodProfileService');
+const { fetchHeatRisk } = require('./external/heatRisk');
+const { buildHeatColdOutlook } = require('./heatColdEngine');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
@@ -126,6 +128,66 @@ async function composeSunriseSunset(home) {
   } catch (err) {
     logger.warn('placeSections: sunrise failed', { homeId: home.id, error: err.message });
     return [serializePlaceSection('sunrise_sunset', { status: 'error' })];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// heat_cold — NWS HeatRisk (CONUS) + the freeze line
+// ════════════════════════════════════════════════════════════
+// The national replacement for seasonalEngine's two-city gate. Heat comes
+// from the NWS HeatRisk ImageServer; cold is derived from the temperature
+// forecast the caller already fetched for `weather`, so the freeze half
+// costs no extra provider call.
+//
+// HeatRisk is published once daily, so a 6 h budget at geohash-5 (~5 km,
+// twice the raster's 2.5 km cell) keeps the day fresh while collapsing a
+// whole neighbourhood onto one fetch.
+async function composeHeatCold(home, weather) {
+  const ll = homeLatLng(home);
+  if (!ll) return [serializePlaceSection('heat_cold', { status: 'unavailable' })];
+
+  try {
+    const gh5 = encodeGeohash(ll.lat, ll.lng, 5);
+    const { payload, fetchedAt, stale } = await readThrough({
+      cacheKey: `geo:${gh5}`,
+      sectionId: 'heat_cold',
+      ttlMs: 6 * 60 * 60 * 1000,
+      fetch: async () => {
+        const result = await fetchHeatRisk(ll.lat, ll.lng);
+        // Cache the coverage gap too — re-asking NWS about Honolulu every
+        // request would be a fetch per view for zero new information.
+        return result || { days: [], covered: false };
+      },
+    });
+
+    const outlook = buildHeatColdOutlook({
+      heatRisk: payload,
+      weather,
+      home,
+      timezone: (weather && weather.timezone) || null,
+    });
+
+    if (!outlook) {
+      return [serializePlaceSection('heat_cold', {
+        status: 'unavailable',
+        unavailableReason: 'No temperature forecast for this area yet.',
+      })];
+    }
+
+    return [serializePlaceSection('heat_cold', {
+      asOf: fetchedAt,
+      status: stale ? 'stale' : 'ready',
+      // Outside CONUS the heat half has no data; the freeze half still works,
+      // so the section is genuinely partial rather than unavailable.
+      coverage: outlook.heat_covered ? 'full' : 'partial',
+      unavailableReason: outlook.heat_covered
+        ? null
+        : 'NWS HeatRisk covers the contiguous US; the freeze forecast still applies here.',
+      data: outlook,
+    })];
+  } catch (err) {
+    logger.warn('placeSections: heat_cold failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('heat_cold', { status: 'error' })];
   }
 }
 
@@ -878,6 +940,7 @@ async function composeWildfire(home) {
 
 module.exports = {
   composeSunriseSunset,
+  composeHeatCold,
   composeLeadRadon,
   composeRentBand,
   composeDrinkingWater,

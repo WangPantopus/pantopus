@@ -1,0 +1,233 @@
+// ============================================================
+// TEST: Mail Day daily push — jobs/mailDayNotification.js
+//
+// The job shipped as a Phase-1 stub that wrote a MailEvent row and never
+// called the notification service, on a fixed 08:00 UTC cron (1am
+// Pacific). These tests pin the rewritten contract:
+//   * it sends through notificationService (so preferences/push/badge
+//     plumbing applies) rather than talking to pushService directly,
+//   * exactly one push per user per mail day,
+//   * it defers rather than drops outside the local daytime window,
+//   * the copy never carries a sender or a category.
+// ============================================================
+
+jest.mock('../services/notificationService', () => ({
+  createNotification: jest.fn(),
+}));
+
+const { resetTables, seedTable, getTable } = require('./__mocks__/supabaseAdmin');
+const notificationService = require('../services/notificationService');
+const mailDayNotification = require('../jobs/mailDayNotification');
+const { composeMailDayPush, isSendableNow, inQuietHours, localHour } = mailDayNotification;
+
+const USER = 'mailday-user-1';
+const OTHER = 'mailday-user-2';
+const TODAY = new Date().toISOString().slice(0, 10);
+
+// seedTable replaces the table, so multi-user cases push onto the live array.
+function seedItems(userId, kinds, status = 'unreviewed') {
+  getTable('MailDayItem').push(...kinds.map((kind, i) => ({
+    id: `${userId}-item-${i}`,
+    user_id: userId,
+    kind,
+    status,
+    day_date: TODAY,
+    scanned_at: new Date().toISOString(),
+  })));
+}
+
+/** A timezone where "now" is reliably mid-afternoon, whatever the runner's clock. */
+function timezoneWhereItIsHour(targetHour) {
+  const utcHour = new Date().getUTCHours();
+  // Etc/GMT offsets are inverted: Etc/GMT+5 is UTC-5.
+  let offset = targetHour - utcHour;
+  while (offset > 12) offset -= 24;
+  while (offset < -11) offset += 24;
+  return offset <= 0 ? `Etc/GMT+${Math.abs(offset)}` : `Etc/GMT-${offset}`;
+}
+
+const MIDDAY_TZ = timezoneWhereItIsHour(14);
+const NIGHT_TZ = timezoneWhereItIsHour(3);
+
+function seedPrefs(userId, extra = {}) {
+  getTable('UserNotificationPreferences').push({
+    user_id: userId,
+    daily_briefing_timezone: MIDDAY_TZ,
+    quiet_hours_start_local: null,
+    quiet_hours_end_local: null,
+    ...extra,
+  });
+}
+
+describe('composeMailDayPush', () => {
+  test('counts pieces and calls out the ones needing action', () => {
+    const push = composeMailDayPush([
+      { kind: 'envelope' }, { kind: 'bill' }, { kind: 'flyer' },
+    ]);
+    expect(push.body).toBe('3 pieces today — 1 needs you.');
+    expect(push.pieces).toBe(3);
+    expect(push.needs_you).toBe(1);
+  });
+
+  test('drops the "needs you" clause when nothing is actionable', () => {
+    expect(composeMailDayPush([{ kind: 'flyer' }, { kind: 'magazine' }]).body)
+      .toBe('2 pieces today.');
+  });
+
+  test('singularises a lone piece', () => {
+    expect(composeMailDayPush([{ kind: 'postcard' }]).body).toBe('1 piece today.');
+  });
+
+  test('returns null when there is nothing to say', () => {
+    expect(composeMailDayPush([])).toBeNull();
+  });
+
+  test('never leaks a sender or a category into the copy', () => {
+    const push = composeMailDayPush([
+      { kind: 'bill', sender: 'Kaiser Permanente', label: 'Explanation of Benefits' },
+      { kind: 'envelope', sender: 'Multnomah County Elections', label: 'Ballot' },
+    ]);
+    const text = `${push.title} ${push.body}`;
+    expect(text).not.toMatch(/Kaiser|Multnomah|Benefits|Ballot|bill/i);
+  });
+});
+
+describe('quiet hours', () => {
+  test('handles a range that wraps past midnight', () => {
+    expect(inQuietHours(23, '22:00', '07:00')).toBe(true);
+    expect(inQuietHours(2, '22:00', '07:00')).toBe(true);
+    expect(inQuietHours(12, '22:00', '07:00')).toBe(false);
+    expect(inQuietHours(7, '22:00', '07:00')).toBe(false);
+  });
+
+  test('handles a same-day range', () => {
+    expect(inQuietHours(14, '13:00', '16:00')).toBe(true);
+    expect(inQuietHours(17, '13:00', '16:00')).toBe(false);
+  });
+
+  test('is inert when unset or degenerate', () => {
+    expect(inQuietHours(3, null, null)).toBe(false);
+    expect(inQuietHours(3, '08:00', '08:00')).toBe(false);
+  });
+});
+
+describe('localHour', () => {
+  test('resolves a real zone', () => {
+    expect(localHour('UTC')).toBe(new Date().getUTCHours());
+  });
+
+  test('falls back rather than throwing on a bad zone', () => {
+    expect(Number.isInteger(localHour('Not/AZone'))).toBe(true);
+  });
+});
+
+describe('isSendableNow', () => {
+  test('sends in the local afternoon', () => {
+    expect(isSendableNow({ daily_briefing_timezone: MIDDAY_TZ })).toBe(true);
+  });
+
+  test('never sends in the middle of the local night', () => {
+    expect(isSendableNow({ daily_briefing_timezone: NIGHT_TZ })).toBe(false);
+  });
+
+  test('respects quiet hours inside the daytime window', () => {
+    expect(isSendableNow({
+      daily_briefing_timezone: MIDDAY_TZ,
+      quiet_hours_start_local: '13:00',
+      quiet_hours_end_local: '16:00',
+    })).toBe(false);
+  });
+});
+
+describe('mailDayNotification job', () => {
+  beforeEach(() => {
+    resetTables();
+    notificationService.createNotification.mockReset();
+    notificationService.createNotification.mockResolvedValue({ id: 'notif-1' });
+  });
+
+  test('sends one push through the notification service', async () => {
+    seedItems(USER, ['envelope', 'bill']);
+    seedPrefs(USER);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
+    const arg = notificationService.createNotification.mock.calls[0][0];
+    expect(arg.userId).toBe(USER);
+    // 'mail_summary' is gated by the existing mail_summary_enabled toggle.
+    expect(arg.type).toBe('mail_summary');
+    expect(arg.body).toBe('2 pieces today — 1 needs you.');
+    expect(arg.metadata.day_date).toBe(TODAY);
+  });
+
+  test('claims the day so a second run does not re-send', async () => {
+    seedItems(USER, ['bill']);
+    seedPrefs(USER);
+
+    await mailDayNotification();
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
+    const session = getTable('MailDaySession').find((s) => s.user_id === USER);
+    expect(session.notified_at).toBeTruthy();
+  });
+
+  test('skips a user who already finished the day', async () => {
+    seedItems(USER, ['bill']);
+    seedPrefs(USER);
+    seedTable('MailDaySession', [{
+      user_id: USER, day_date: TODAY, finished_at: new Date().toISOString(), streak_days: 4,
+    }]);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+  });
+
+  test('defers instead of dropping when it is night for the user', async () => {
+    seedItems(USER, ['bill']);
+    seedPrefs(USER, { daily_briefing_timezone: NIGHT_TZ });
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+    // No delivery record written — the next run re-evaluates.
+    const session = (getTable('MailDaySession') || []).find((s) => s.user_id === USER);
+    expect(session?.notified_at).toBeFalsy();
+  });
+
+  test('ignores users whose mail is already triaged', async () => {
+    seedItems(USER, ['bill'], 'reviewed');
+    seedPrefs(USER);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+  });
+
+  test('retries next run when the notification fails to write', async () => {
+    seedItems(USER, ['bill']);
+    seedPrefs(USER);
+    notificationService.createNotification.mockResolvedValueOnce(null);
+
+    await mailDayNotification();
+    const afterFailure = (getTable('MailDaySession') || []).find((s) => s.user_id === USER);
+    expect(afterFailure?.notified_at).toBeFalsy();
+
+    await mailDayNotification();
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(2);
+  });
+
+  test('handles several users independently', async () => {
+    seedItems(USER, ['bill', 'envelope']);
+    seedItems(OTHER, ['flyer']);
+    seedPrefs(USER);
+    seedPrefs(OTHER, { daily_briefing_timezone: NIGHT_TZ });
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
+    expect(notificationService.createNotification.mock.calls[0][0].userId).toBe(USER);
+  });
+});

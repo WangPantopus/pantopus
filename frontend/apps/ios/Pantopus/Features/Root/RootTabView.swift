@@ -164,7 +164,10 @@ public struct RootTabView: View {
              .businessOwner, .viewAs, .waitingRoom,
              // Morning/Evening Briefing push — the Today briefing lives in
              // the Hub tab's stack.
-             .hubToday:
+             .hubToday,
+             // `pantopus://place` — the address dashboard is the Home tab's
+             // landing surface, so Place links resolve inside that stack.
+             .place:
             model.selected = .home
         case .monthlyReceipt:
             // `monthly_receipt` push — open the profile cover with the

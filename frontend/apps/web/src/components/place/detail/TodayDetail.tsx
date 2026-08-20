@@ -9,6 +9,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
   PlaceIntelligence,
@@ -18,6 +19,8 @@ import type {
   PlaceAlertsData,
   PlaceWeatherAlert,
   PlaceSunriseSunsetData,
+  PlaceGoodDayData,
+  GoodDayVerdict,
   WeatherConditionCode,
   AirQualityCategory,
 } from '@pantopus/types';
@@ -354,11 +357,61 @@ function SunCard({ data }: { data: PlaceSunriseSunsetData }) {
   );
 }
 
+// ── Good day to… ────────────────────────────────────────────
+// Verdicts, not readings. Each tile answers one everyday question and
+// shows the numbers behind it on tap — an opinionated tile that won't
+// show its inputs is worse than no tile, because one visibly wrong
+// verdict discredits every other card here.
+const VERDICT_TINT: Record<GoodDayVerdict, { chip: string; frame: string }> = {
+  yes: { chip: 'text-app-success', frame: 'border-app-success-light' },
+  caution: { chip: 'text-app-warning', frame: 'border-app-warning-light' },
+  no: { chip: 'text-app-text-muted', frame: 'border-app-border' },
+};
+
+function GoodDayRow({ data }: { data: PlaceGoodDayData }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const tiles = data.tiles.slice(0, 5);
+  if (tiles.length === 0) return null;
+  const open = tiles.find((t) => t.id === openId) ?? null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex overflow-x-auto gap-2 pb-0.5 -mx-1 px-1">
+        {tiles.map((tile) => {
+          const tint = VERDICT_TINT[tile.verdict];
+          const isOpen = tile.id === openId;
+          return (
+            <button
+              key={tile.id}
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpenId(isOpen ? null : tile.id)}
+              className={`flex-none w-[104px] flex flex-col items-start gap-1.5 rounded-2xl border bg-app-surface shadow-sm px-3 py-3 text-left transition-colors hover:bg-app-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 ${isOpen ? 'border-app-border-strong' : tint.frame}`}
+            >
+              <span className="text-[19px] leading-none" aria-hidden="true">{tile.glyph}</span>
+              <span className="text-[12.5px] font-semibold text-app-text-secondary leading-tight">{tile.label}</span>
+              <span className={`text-[13px] font-semibold leading-tight ${tint.chip}`}>{tile.answer}</span>
+            </button>
+          );
+        })}
+      </div>
+      {open ? (
+        <div className="bg-app-surface-sunken border border-app-border-subtle rounded-xl px-3.5 py-2.5">
+          <div className="text-[12px] font-semibold text-app-text-secondary mb-0.5">{open.label}</div>
+          <div className="text-[13.5px] text-app-text-strong leading-[19px]">{open.because}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function TodayDetail({ intelligence }: { intelligence: PlaceIntelligence }) {
   const weather = findPlaceSection(intelligence, 'weather');
   const aqi = findPlaceSection(intelligence, 'air_quality');
   const alerts = findPlaceSection(intelligence, 'alerts');
   const sun = findPlaceSection(intelligence, 'sunrise_sunset');
+  const goodDay = findPlaceSection(intelligence, 'good_day_to');
+  const goodDayReady = goodDay && (goodDay.status === 'ready' || goodDay.status === 'stale' || goodDay.status === 'partial') && goodDay.data;
 
   const weatherReady = weather && (weather.status === 'ready' || weather.status === 'stale' || weather.status === 'partial') && weather.data;
   const aqiReady = aqi && (aqi.status === 'ready' || aqi.status === 'stale' || aqi.status === 'partial') && aqi.data;
@@ -380,6 +433,14 @@ export default function TodayDetail({ intelligence }: { intelligence: PlaceIntel
           <SectionCard icon={CloudSun} title="Weather" state={weather ? statusToState(weather.status) : 'unavailable'} caption={weather?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
         )}
         {weather?.source ? <SourceNote name={weather.source} asOf={fmtTime(weather.as_of) ? `as of ${fmtTime(weather.as_of)}` : undefined} /> : null}
+
+        {goodDayReady ? (
+          <>
+            <DetailSectionLabel>Good day to…</DetailSectionLabel>
+            <GoodDayRow data={goodDay!.data as PlaceGoodDayData} />
+            {goodDay?.source ? <SourceNote name={goodDay.source} asOf={fmtTime(goodDay.as_of) ? `as of ${fmtTime(goodDay.as_of)}` : undefined} /> : null}
+          </>
+        ) : null}
 
         <DetailSectionLabel>Air quality</DetailSectionLabel>
         {aqiReady ? (
