@@ -462,3 +462,35 @@ CARRIED FORWARD (not done, deliberate):
     tools/gen-association-files.mjs is ready).
   - NOT validated: migration 160 against a real database; no end-to-end run
     against live Supabase; no on-device reinstall test.
+
+## CI / PR (2026-08-20)
+
+PR #351 "Persistent login" is OPEN on branch persistent-login.
+
+REAL BUG CAUGHT BY CI THAT LOCAL VERIFICATION MISSED:
+  Android CI run 32284730161 failed at the "Instrumented tests (emulator)" job:
+  `LoginScreenTest > submit_button_enables_once_form_is_valid` threw
+  `kotlin.KotlinNothingValueException` and crashed the whole instrumentation
+  process ("Instrumentation run failed due to Process crashed").
+  ROOT CAUSE: `StateFlow.collect` is declared to return `Nothing` (it never
+  completes). A mockk `relaxed = true` stub returns normally instead, so the
+  compiler-inserted check throws — inside `viewModelScope` on
+  Dispatchers.Main, which kills the process rather than failing one test.
+  LoginViewModel gained `rememberedAccounts` + `sessionEndReason` collections
+  (LoginViewModel.kt:119,124); the UNIT test was updated to stub them
+  (LoginViewModelTest.kt:50-51) but the INSTRUMENTED test was not — and
+  androidTest only runs on an emulator, which the local passes never used
+  (`testDebugUnitTest` only). Fixed in 7e4a767d via a shared `repoMock()`
+  helper that stubs every collected flow.
+  LESSON: `./gradlew test` does NOT cover `app/src/androidTest`. Any ViewModel
+  that gains a new collected flow must have BOTH its unit and instrumented
+  mocks updated.
+
+DELIBERATELY NOT FIXED — `pushService.saveToken` upsert-on-token:
+  the security review suggested a `(user_id, token)` unique constraint. On
+  reflection that is NOT obviously correct: today one push token maps to
+  exactly one user, so a device that switches accounts correctly re-points.
+  Adding (user_id, token) would let two users share a token and send user A's
+  notifications to a device now owned by user B — worse than the current
+  behaviour. Needs a product decision about shared/handed-over devices, not a
+  rushed migration. Left as a documented follow-up.
