@@ -497,6 +497,18 @@ enum class BillUtilityKind {
 
     @Json(name = "water")
     WATER,
+
+    @Json(name = "sewer")
+    SEWER,
+
+    @Json(name = "trash")
+    TRASH,
+
+    @Json(name = "internet")
+    INTERNET,
+
+    @Json(name = "cable")
+    CABLE,
     UNKNOWN,
 }
 

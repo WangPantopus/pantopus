@@ -283,6 +283,80 @@ describe('GET /api/homes/:id/intelligence', () => {
     });
   });
 
+  // Regression: bill_type was hardcoded to 'electric' on BOTH the benchmark
+  // read and the own-amount read, while the refresh job has always grouped
+  // by type — so gas/water/internet benchmarks were computed and ignored.
+  describe('bill benchmark picks a bill it can actually compare', () => {
+    function seedBenchmarks(rows) {
+      seedTable('BillBenchmark', rows.map((r) => ({ geohash: GEOHASH, ...r })));
+    }
+
+    async function benchmark() {
+      const res = await request(app)
+        .get(`/api/homes/${HOME_ID}/intelligence?sections=bill_benchmark`)
+        .set('x-test-user-id', USER);
+      return sectionsById(res.body).bill_benchmark;
+    }
+
+    beforeEach(() => seedHome());
+
+    test('surfaces a non-electric benchmark that used to be ignored', async () => {
+      seedBenchmarks([
+        { bill_type: 'internet', avg_amount_cents: 7000, household_count: 14 },
+        { bill_type: 'internet', avg_amount_cents: 9000, household_count: 14 },
+      ]);
+
+      const s = await benchmark();
+      expect(s.status).toBe('ready');
+      expect(s.data.utility).toBe('internet');
+      expect(s.data.summary).toContain('internet');
+    });
+
+    test('prefers the type the resident can be compared on', async () => {
+      // Electric has the bigger cohort, but the resident only logs internet —
+      // and a comparison is the whole point of the section.
+      seedBenchmarks([
+        { bill_type: 'electric', avg_amount_cents: 16000, household_count: 40 },
+        { bill_type: 'electric', avg_amount_cents: 20000, household_count: 40 },
+        { bill_type: 'internet', avg_amount_cents: 7000, household_count: 12 },
+        { bill_type: 'internet', avg_amount_cents: 9000, household_count: 12 },
+      ]);
+      seedTable('HomeBill', [{ home_id: HOME_ID, bill_type: 'internet', amount: 6000 }]);
+
+      const s = await benchmark();
+      expect(s.data.utility).toBe('internet');
+      expect(s.data.your_amount).toBe(60);
+      expect(s.data.comparison).toBe('lower');
+      expect(s.data.summary).toContain('internet');
+    });
+
+    test('falls back to the largest cohort when nothing is comparable', async () => {
+      seedBenchmarks([
+        { bill_type: 'water', avg_amount_cents: 4000, household_count: 11 },
+        { bill_type: 'electric', avg_amount_cents: 16000, household_count: 40 },
+      ]);
+
+      expect((await benchmark()).data.utility).toBe('electric');
+    });
+
+    test('never benchmarks rent or mortgage', async () => {
+      // Wildly home-specific: comparing them tells the resident nothing, and
+      // rent already has its own section from HUD Fair Market Rents.
+      seedBenchmarks([
+        { bill_type: 'rent', avg_amount_cents: 210000, household_count: 30 },
+        { bill_type: 'mortgage', avg_amount_cents: 320000, household_count: 30 },
+      ]);
+      seedTable('HomeBill', [{ home_id: HOME_ID, bill_type: 'rent', amount: 200000 }]);
+
+      expect((await benchmark()).status).toBe('unavailable');
+    });
+
+    test('still honours the k-anon cohort floor', async () => {
+      seedBenchmarks([{ bill_type: 'gas', avg_amount_cents: 5000, household_count: 4 }]);
+      expect((await benchmark()).status).toBe('unavailable');
+    });
+  });
+
   test('composes the grouped contract with per-section status', async () => {
     seedHome();
     seedTable('NeighborhoodPreview', [{ geohash: GEOHASH, verified_users_count: 12 }]);

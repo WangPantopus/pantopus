@@ -614,10 +614,17 @@ public struct PlaceCensusContextData: Decodable, Sendable, Hashable {
 
 // MARK: - Money signals payloads
 
+/// Bill types worth comparing against neighbors — the area-service bills.
+/// Rent and mortgage are deliberately excluded: they are home-specific, and
+/// rent has its own section from HUD Fair Market Rents.
 public enum BillUtilityKind: String, Sendable, Hashable {
     case electric
     case gas
     case water
+    case sewer
+    case trash
+    case internet
+    case cable
     case unknown
 }
 

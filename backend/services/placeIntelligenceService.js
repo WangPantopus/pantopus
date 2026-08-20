@@ -502,11 +502,62 @@ async function composeYourHome(home, tier) {
   })];
 }
 
+// Bill types worth comparing against neighbors. Deliberately the
+// area-service bills only: rent and mortgage are wildly home-specific, so
+// a peer comparison tells the resident nothing useful (and rent already
+// has its own `rent_band` section from HUD FMRs). HOA and insurance are
+// property-specific for the same reason.
+const BENCHMARKABLE_BILL_TYPES = ['electric', 'gas', 'water', 'sewer', 'trash', 'internet', 'cable'];
+
+const BILL_LABELS = {
+  electric: 'electric',
+  gas: 'gas',
+  water: 'water',
+  sewer: 'sewer',
+  trash: 'trash',
+  internet: 'internet',
+  cable: 'cable',
+};
+
+/**
+ * Pick which bill to benchmark.
+ *
+ * This used to be hardcoded to `electric` on BOTH reads, while the refresh
+ * job has always grouped by bill_type — so benchmarks for gas, water,
+ * internet and the rest were computed and then ignored. A resident whose
+ * only logged bill was internet saw "unavailable" on a block that had an
+ * internet benchmark sitting right there.
+ *
+ * Preference order, most useful first:
+ *   1. a type where the resident has bills AND the block has a band — the
+ *      only state that can show a comparison, which is the whole point;
+ *   2. otherwise the band backed by the largest cohort (most reliable);
+ *   3. otherwise nothing.
+ */
+function pickBillType(benchmarkRows, ownBillTypes) {
+  const byType = new Map();
+  for (const row of benchmarkRows) {
+    if (!BENCHMARKABLE_BILL_TYPES.includes(row.bill_type)) continue;
+    const entry = byType.get(row.bill_type) || { rows: [], households: 0 };
+    entry.rows.push(row);
+    entry.households = Math.max(entry.households, Number(row.household_count) || 0);
+    byType.set(row.bill_type, entry);
+  }
+  if (byType.size === 0) return null;
+
+  const comparable = [...byType.entries()].filter(([type]) => ownBillTypes.has(type));
+  const pool = comparable.length ? comparable : [...byType.entries()];
+
+  pool.sort((a, b) => b[1].households - a[1].households);
+  const [type, entry] = pool[0];
+  return { type, rows: entry.rows };
+}
+
 async function composeBillBenchmark(home) {
   const ll = homeLatLng(home);
   if (!ll) return [serializePlaceSection('bill_benchmark', { access: 'available', status: 'unavailable' })];
 
-  let rows = null;
+  let benchmarkRows = [];
   try {
     const geohash = encodeGeohash(ll.lat, ll.lng, 6);
     // Privacy floor: only household_count >= 10 may be shown (matches the
@@ -515,15 +566,39 @@ async function composeBillBenchmark(home) {
       .from('BillBenchmark')
       .select('bill_type, avg_amount_cents, household_count')
       .eq('geohash', geohash)
-      .eq('bill_type', 'electric')
       .gte('household_count', 10);
-    rows = data;
+    benchmarkRows = data || [];
   } catch (err) {
     logger.warn('placeIntelligence: billBenchmark failed', { homeId: home.id, error: err.message });
     return [serializePlaceSection('bill_benchmark', { access: 'available', status: 'error' })];
   }
 
-  const amounts = (rows || [])
+  // The resident's own bills (Band C input) — read first so the picker can
+  // prefer a type they can actually be compared on.
+  const ownByType = new Map();
+  try {
+    const { data: bills } = await supabaseAdmin
+      .from('HomeBill')
+      .select('amount, bill_type')
+      .eq('home_id', home.id);
+    for (const b of bills || []) {
+      const amount = Number(b && b.amount);
+      if (!b || !Number.isFinite(amount)) continue;
+      if (!BENCHMARKABLE_BILL_TYPES.includes(b.bill_type)) continue;
+      const list = ownByType.get(b.bill_type) || [];
+      list.push(amount);
+      ownByType.set(b.bill_type, list);
+    }
+  } catch (err) {
+    logger.warn('placeIntelligence: own bills read failed', { homeId: home.id, error: err.message });
+  }
+
+  const picked = pickBillType(benchmarkRows, new Set(ownByType.keys()));
+  if (!picked) {
+    return [serializePlaceSection('bill_benchmark', { access: 'available', status: 'unavailable' })];
+  }
+
+  const amounts = picked.rows
     .map((r) => Number(r.avg_amount_cents) / 100)
     .filter((n) => Number.isFinite(n));
   if (!amounts.length) {
@@ -534,22 +609,14 @@ async function composeBillBenchmark(home) {
   const bandHigh = Math.round(Math.max(...amounts));
   const bandMid = (bandLow + bandHigh) / 2;
 
-  // Optional: compare the resident's own electric bills (Band C input).
-  let yourAmount = null;
-  try {
-    const { data: bills } = await supabaseAdmin
-      .from('HomeBill')
-      .select('amount, bill_type')
-      .eq('home_id', home.id)
-      .eq('bill_type', 'electric');
-    // HomeBill.amount is stored in cents (the benchmark job averages it
-    // straight into avg_amount_cents); convert to dollars to match the band.
-    const vals = (bills || []).map((b) => Number(b.amount)).filter((n) => Number.isFinite(n));
-    if (vals.length) yourAmount = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length / 100);
-  } catch (err) {
-    logger.warn('placeIntelligence: own bills read failed', { homeId: home.id, error: err.message });
-  }
+  // HomeBill.amount is stored in cents (the benchmark job averages it
+  // straight into avg_amount_cents); convert to dollars to match the band.
+  const ownVals = ownByType.get(picked.type) || [];
+  const yourAmount = ownVals.length
+    ? Math.round(ownVals.reduce((a, b) => a + b, 0) / ownVals.length / 100)
+    : null;
 
+  const label = BILL_LABELS[picked.type] || picked.type;
   let comparison = 'typical';
   let comparisonPct = 0;
   let summary;
@@ -557,15 +624,15 @@ async function composeBillBenchmark(home) {
     comparisonPct = Math.round(((yourAmount - bandMid) / bandMid) * 100);
     comparison = comparisonPct > 5 ? 'higher' : comparisonPct < -5 ? 'lower' : 'typical';
     const dir = comparison === 'higher' ? 'above' : comparison === 'lower' ? 'below' : 'in line with';
-    summary = `Your electric bill is ${Math.abs(comparisonPct)}% ${dir} neighbors`;
+    summary = `Your ${label} bill is ${Math.abs(comparisonPct)}% ${dir} neighbors`;
   } else {
-    summary = `Neighborhood electric bills average about $${Math.round(bandMid).toLocaleString('en-US')}/mo`;
+    summary = `Neighborhood ${label} bills average about $${Math.round(bandMid).toLocaleString('en-US')}/mo`;
   }
 
   return [serializePlaceSection('bill_benchmark', {
     access: 'available',
     data: {
-      utility: 'electric',
+      utility: picked.type,
       your_amount: yourAmount,
       band_low: bandLow,
       band_high: bandHigh,

@@ -418,7 +418,17 @@ export interface PlaceCensusContextData {
 
 // ── Money signals ────────────────────────────────────────────
 
-export type BillUtilityKind = 'electric' | 'gas' | 'water';
+/**
+ * Bill types worth comparing against neighbors.
+ *
+ * Deliberately the area-service bills only. Rent and mortgage are excluded
+ * because they are wildly home-specific — comparing them tells a resident
+ * nothing useful, and rent already has its own `rent_band` section from HUD
+ * Fair Market Rents. HOA and insurance are property-specific for the same
+ * reason.
+ */
+export type BillUtilityKind =
+  | 'electric' | 'gas' | 'water' | 'sewer' | 'trash' | 'internet' | 'cable';
 export type BenchmarkComparison = 'lower' | 'typical' | 'higher';
 
 /** Launch layer #12 — Bill benchmark (peer-relative; informational). */
