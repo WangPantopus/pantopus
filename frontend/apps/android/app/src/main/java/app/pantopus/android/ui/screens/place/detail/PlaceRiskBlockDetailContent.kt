@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,9 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.place.PlaceHeatColdData
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
@@ -39,6 +43,19 @@ import app.pantopus.android.ui.theme.PantopusIcon
 
 @Composable
 fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
+    // Heat & cold leads: it is the only thing here with a forecast horizon
+    // short enough to act on today. Everything below it is a standing fact.
+    intel.section(PlaceSectionId.HEAT_COLD)?.let { env ->
+        PlaceDetailSectionLabel("Heat & cold")
+        val data = env.heatCold
+        if (data != null && env.isLive()) {
+            HeatColdCard(data)
+            PlaceSourceNote(env.source.orEmpty(), "7-day forecast")
+        } else {
+            PlaceDetailFallbackCard(env)
+        }
+    }
+
     PlaceDetailSectionLabel("Flood & hazards")
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(PlaceSectionId.FLOOD, PlaceSectionId.SEISMIC, PlaceSectionId.WILDFIRE).forEach { id ->
@@ -60,6 +77,95 @@ fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
     PlaceDetailSectionLabel("Emergency plan")
     EmergencyChecklist()
     PlaceSourceNote("Ready.gov · American Red Cross")
+}
+
+/**
+ * Heat & cold — the 7-day NWS HeatRisk strip plus the verdict.
+ *
+ * Level colours are the published HeatRisk ramp: a data-viz scale with no
+ * token equivalent, the same treatment the EPA AQI bands get. Outside
+ * CONUS the strip is replaced by a coverage note — `heat_covered=false`
+ * is a GAP, not a reading of zero, and must never imply calm.
+ */
+private val HEAT_RISK_COLORS =
+    listOf(
+        Color(0xFFC6E4B4),
+        Color(0xFFFFEA61),
+        Color(0xFFFFA33F),
+        Color(0xFFE8442E),
+        Color(0xFF8A2BE2),
+    )
+
+@Composable
+private fun HeatColdCard(data: PlaceHeatColdData) {
+    val tone =
+        when {
+            data.mode == "none" -> PantopusColors.appTextSecondary
+            data.mode == "cold" || (data.peakLevel ?: 0) >= 3 -> PantopusColors.error
+            else -> PantopusColors.warning
+        }
+    PlaceDetailCard {
+        Text(data.headline, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold, color = tone)
+        if (data.guidance.isNotEmpty()) {
+            Text(data.guidance, fontSize = 13.5.sp, color = PantopusColors.appTextStrong)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        if (data.heatCovered && data.heatDays.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                data.heatDays.take(7).forEachIndexed { i, day ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            if (i == 0) "Today" else weekdayLabel(day.date),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PantopusColors.appTextSecondary,
+                        )
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(if (i == 0) 34.dp else 22.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(HEAT_RISK_COLORS.getOrElse(day.level) { HEAT_RISK_COLORS[0] }),
+                        )
+                        Text("${day.level}", fontSize = 11.sp, color = PantopusColors.appTextMuted)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "NWS HeatRisk, 0 (little to none) to 4 (extreme). Experimental product.",
+                fontSize = 11.5.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        } else {
+            Text(
+                "NWS HeatRisk covers the contiguous US. The freeze forecast above still applies here.",
+                fontSize = 12.5.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+    }
+}
+
+/** "Mon" from an ISO date, without pulling in a formatter dependency. */
+private fun weekdayLabel(date: String): String {
+    val parts = date.split("-")
+    if (parts.size != 3) return ""
+    return runCatching {
+        java.time.LocalDate
+            .of(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
+            .dayOfWeek
+            .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+    }.getOrDefault("")
 }
 
 @Composable
