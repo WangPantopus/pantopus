@@ -403,3 +403,10 @@ Cross-platform:
   header still says IN PROGRESS — the remaining work is only its own
   write-up plus items S6+ it never reached. Stage F (final CI-equivalent
   verify) has NOT been run; CI on the pushed branch now covers it.
+- 2026-08-19: Stage E+F COMBINED launched: run wf_a2bea3f0-e2b (task w2d18qi6g),
+  script `.../workflows/scripts/persistent-login-stage-ef.js`.
+  Sequential: security-review (with explicit resume context — verify S1-S5 are
+  really in the tree, continue the threat model beyond them, finish the
+  write-up) THEN final verify x3 in parallel (backend pnpm test + test:privacy,
+  iOS make bootstrap/build/test/lint, Android full android-ci.yml quality job).
+  Agents were told NOT to git commit; the parent session commits.
