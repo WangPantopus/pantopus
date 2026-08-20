@@ -54,9 +54,15 @@ function isInteractiveContext(context) {
   return context !== 'restored';
 }
 
+// C0 + DEL + C1 control characters. Device names / models / versions are
+// attacker-chosen strings that end up in log lines, push bodies, e-mail
+// subjects and the security-event feed; strip the characters that let them
+// forge a second log record or a second mail header there.
+const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f-\u009f]+/g;
+
 function str(value, max = 200) {
   if (value === undefined || value === null) return null;
-  const s = String(value).trim();
+  const s = String(value).replace(CONTROL_CHARS_RE, ' ').trim();
   if (!s) return null;
   return s.slice(0, max);
 }
@@ -364,9 +370,17 @@ function publicDevice(row, { isNew = false } = {}) {
  * @param {object} [p.req]
  * @param {string} [p.authMethod] password|oauth_google|oauth_apple|siwa_native|google_native
  * @param {string} [p.context]    'interactive' (default) | 'oauth'
- * @returns {Promise<{sessionId:string, session:{id:string,context:string}, device:object|null, sessionRow:object|null}>}
+ * @param {boolean} [p.credential] true (default) when a real secret was shown
+ *   (password, IdP code, IdP identity token). `/oauth/token` passes false: its
+ *   "credential" is an access+refresh pair, which is exactly what a token thief
+ *   holds, so it may register a NEW session but never re-point an existing
+ *   session's binding nor rotate an existing device row onto another key.
+ * @returns {Promise<{sessionId:string, session:{id:string,context:string}, device:object|null,
+ *                    sessionRow:object|null, rebindRefused:boolean, boundDevice:object|null}>}
+ *   `rebindRefused` ⇒ the caller presented a session that is already bound to a
+ *   device key it could not prove; the caller must refuse the request.
  */
-async function bindAtIssue({ userId, session, device, dpop, req, authMethod = 'password', context = 'interactive' }) {
+async function bindAtIssue({ userId, session, device, dpop, req, authMethod = 'password', context = 'interactive', credential = true }) {
   const claims = sessionClaimsFromAccessToken(session?.access_token);
   let sessionId = claims?.id;
   if (!isUuid(sessionId)) {
@@ -379,11 +393,42 @@ async function bindAtIssue({ userId, session, device, dpop, req, authMethod = 'p
     session: { id: sessionId, context },
     device: null,
     sessionRow: null,
+    rebindRefused: false,
+    boundDevice: null,
   };
 
   let deviceRow = null;
   let isNew = false;
   try {
+    // A credential path normally mints a brand-new Supabase session, so there
+    // is no registry row yet. A row that ALREADY exists means this session is
+    // being re-presented — the only route that can do that is /oauth/token,
+    // whose "credential" is an access+refresh pair, i.e. exactly what a token
+    // thief holds. Such a re-presentation must never move (or clear) the
+    // session's binding: that would let a stolen pair hand the session to an
+    // attacker's key, defeat AUTH_DEVICE_BINDING=required, and lock the real
+    // device out. Skipped in `off` mode so the kill switch stays a kill switch.
+    const existingSession = await authSessionService.getSessionById(sessionId);
+    if (mode !== 'off' && existingSession?.device_id) {
+      const boundDevice = await getDevice(existingSession.device_id);
+      const provesKey = Boolean(dpop?.thumbprint)
+        && Boolean(boundDevice)
+        && thumbprintEquals(boundDevice.key_thumbprint, dpop.thumbprint);
+      if (!provesKey) {
+        logger.warn('auth.bind.rebind_refused', {
+          userId,
+          sessionId,
+          deviceRowId: existingSession.device_id,
+          hasProof: Boolean(dpop?.thumbprint),
+        });
+        result.rebindRefused = true;
+        result.sessionRow = existingSession;
+        result.boundDevice = boundDevice || null;
+        return result;
+      }
+      result.boundDevice = boundDevice;
+    }
+
     if (mode !== 'off' && device && dpop?.thumbprint) {
       const parsed = normalizeDeviceDescriptor(device);
       if (!parsed.ok) {
@@ -395,6 +440,10 @@ async function bindAtIssue({ userId, session, device, dpop, req, authMethod = 'p
           dpop,
           req,
           interactive: isInteractiveContext(context),
+          // Rotating an existing (user, deviceId) row onto a new key retires
+          // the victim's sessions and wipes its enrolled step-up key — a
+          // credential-grade operation. A re-presented token pair is not one.
+          allowRebind: credential || !existingSession,
         });
         if (upserted) {
           deviceRow = upserted.row;
@@ -403,13 +452,19 @@ async function bindAtIssue({ userId, session, device, dpop, req, authMethod = 'p
       }
     }
 
+    // Never downgrade an already-registered session: keep its binding when this
+    // call produced none, and keep its context unless a real credential was shown
+    // (a restored session is only promoted by password/step-up, design §7.10).
+    const deviceRowId = deviceRow?.id || existingSession?.device_id || null;
+    const sessionContext = existingSession && !credential ? existingSession.context || context : context;
+    result.session = { id: sessionId, context: sessionContext };
     result.sessionRow = await authSessionService.insertSession({
       id: sessionId,
       userId,
-      deviceRowId: deviceRow?.id || null,
-      context,
+      deviceRowId,
+      context: sessionContext,
       authMethod,
-      boundAtIssue: Boolean(deviceRow),
+      boundAtIssue: Boolean(deviceRow) || Boolean(existingSession?.bound_at_issue && deviceRowId),
       refreshToken: session?.refresh_token || null,
       req,
     });
@@ -484,6 +539,36 @@ function verifyRefreshProof(session, device, dpop, refreshToken) {
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return { ok: false, reason: 'rth' };
   }
   return { ok: true, reason: null };
+}
+
+/**
+ * Markers only a native client sends. Used to deny the `required`-mode web
+ * exemption to a caller that declares `X-Token-Transport: cookie` while
+ * behaving like an app (see checkRefresh SECURITY note).
+ */
+function looksNativeRequest(req) {
+  if (!req) return false;
+  if (platformFromRequest(req) !== null) return true;
+  const header = (name) => (typeof req.get === 'function' ? req.get(name) : req.headers?.[name]);
+  if (header('x-device-id')) return true;
+  if (header('dpop')) return true;
+  const body = req.body || {};
+  if (typeof body.deviceId === 'string' && body.deviceId) return true;
+  if (body.device && typeof body.device === 'object' && !Array.isArray(body.device)) return true;
+  return false;
+}
+
+/**
+ * Whether the STORED session row was issued to a native client. `device_id` /
+ * `bound_at_issue` are conclusive; otherwise fall back to the user agent that
+ * the genuine client wrote at issuance. Unknown/absent user agents count as
+ * non-native so server-side web proxies keep working.
+ */
+function sessionLooksNative(session) {
+  if (!session) return false;
+  if (session.device_id || session.bound_at_issue) return true;
+  const platform = inferPlatformFromUserAgent(session.user_agent);
+  return platform === 'ios' || platform === 'android';
 }
 
 function codeForRevokedSession(session) {
@@ -576,6 +661,16 @@ async function markReuse({ session, req }) {
  * DPoP proof, so `required` mode never refuses an unbound web session — the
  * cookie jar + CSRF + the session registry are its binding.
  *
+ * SECURITY (`webExemption`): `cookieTransport` is derived from the
+ * `X-Token-Transport: cookie` request header, which the *client* chooses. On
+ * its own it would hand anyone holding a stolen UNBOUND refresh token an opt-out
+ * from `required` mode: send the header, put the token in the `pantopus_refresh`
+ * cookie, done. The exemption therefore also requires that nothing says "native
+ * client" — neither the request (`X-Client-Platform: ios|android`, `X-Device-Id`,
+ * a `DPoP` header, a `device`/`deviceId` in the body) nor the session row, whose
+ * `user_agent`/binding were recorded when the genuine client issued it and which
+ * an attacker cannot rewrite without first passing this very check.
+ *
  * SECURITY (`tokenResolved`): `sessionId` (request body) and `accessToken` are
  * only *hints* — neither is authenticated here (the JWT is decoded, never
  * verified). A session that was found through a hint rather than through the
@@ -592,11 +687,14 @@ async function markReuse({ session, req }) {
  */
 async function checkRefresh({ refreshToken, sessionId, accessToken, dpop, req, cookieTransport = false }) {
   const mode = authPolicy.deviceBindingMode();
-  const enforceProof = mode === 'required' && !cookieTransport;
   const { session, matchedBy } = await resolveSessionForRefresh({ refreshToken, sessionId, accessToken });
   // True only when the PRESENTED refresh token hashes to this row (current or
   // previous generation) — i.e. the caller really holds a token of this session.
   const tokenResolved = matchedBy === 'hash' || matchedBy === 'prev_hash';
+  // See SECURITY (`webExemption`) above: a client-declared header alone may not
+  // buy an opt-out from `required` mode.
+  const webExemption = cookieTransport && !looksNativeRequest(req) && !sessionLooksNative(session);
+  const enforceProof = mode === 'required' && !webExemption;
 
   if (!session) {
     // Pre-registry session (issued before migration 160). Accepted while the

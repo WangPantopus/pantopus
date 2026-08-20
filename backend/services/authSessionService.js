@@ -15,6 +15,7 @@
 // ============================================================
 
 const crypto = require('crypto');
+const net = require('net');
 const { EventEmitter } = require('events');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const { createServerSupabaseClient } = require('../config/supabaseClient');
@@ -87,9 +88,23 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * The caller's IP, or null when it is not one.
+ *
+ * SECURITY/INTEGRITY: `req.ip` is derived from `X-Forwarded-For` whenever
+ * `trust proxy` is on, and neither Express nor proxy-addr validates the hop it
+ * picks — it hands back whatever token stood there ("unknown", which some CDNs
+ * emit, or anything a client can plant when the configured hop count is larger
+ * than the real proxy chain). `AuthSession.last_ip`, `AuthDevice.last_ip` and
+ * `AuthSecurityEvent.ip` are `inet` columns, so a non-address value makes the
+ * whole write fail with 22P02 — silently losing the session row, the rotation
+ * hashes or the security event. Store only what Postgres will accept.
+ */
 function clientIp(req) {
-  const ip = req?.ip || null;
-  return typeof ip === 'string' && ip ? ip : null;
+  const raw = req?.ip;
+  if (typeof raw !== 'string' || !raw) return null;
+  const value = raw.split('%')[0]; // drop an IPv6 zone index (fe80::1%eth0)
+  return net.isIP(value) ? value : null;
 }
 
 function userAgent(req) {

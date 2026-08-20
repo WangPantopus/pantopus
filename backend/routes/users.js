@@ -595,6 +595,47 @@ function sessionFields(req, bind) {
   return { sessionId: bind.sessionId, session: bind.session, device: bind.device || null };
 }
 
+// GoTrue records how a session was authenticated in the JWT's `amr` claim
+// (`[{method, timestamp}]`). Anything below is a normal sign-in, never a
+// password-recovery credential.
+const NON_RECOVERY_AMR_METHODS = new Set([
+  'password', 'oauth', 'id_token', 'totp', 'mfa/totp', 'sso/saml',
+  'anonymous', 'web3', 'webauthn', 'passkey', 'invite', 'signup', 'email_change',
+]);
+
+function amrMethods(claims) {
+  const amr = claims?.amr;
+  if (!Array.isArray(amr)) return [];
+  return amr
+    .map((entry) => (typeof entry === 'string' ? entry : (entry && typeof entry.method === 'string' ? entry.method : null)))
+    .filter(Boolean);
+}
+
+/**
+ * Is this access token the one a recovery link minted, rather than an ordinary
+ * application session token? Two independent signals, both fail-closed:
+ *   1. `amr` — reject as soon as it names a normal sign-in method. (Absent on
+ *      very old GoTrue releases, hence signal 2.)
+ *   2. the session registry — every session we hand to a client (login, OAuth,
+ *      resume grant) gets an AuthSession row; the short-lived session behind a
+ *      recovery link never does. A `session_id` we know is therefore an app
+ *      session, whatever its `amr` says.
+ * Only call with a token `auth.getUser` has already accepted.
+ * @returns {Promise<{ok:true}|{ok:false, reason:string}>}
+ */
+async function isRecoveryAccessToken(token) {
+  const claims = authSessionService.decodeJwtPayload(token) || {};
+  const methods = amrMethods(claims);
+  const signIn = methods.find((m) => NON_RECOVERY_AMR_METHODS.has(m));
+  if (signIn) return { ok: false, reason: `amr:${signIn}` };
+  const sessionId = typeof claims.session_id === 'string' ? claims.session_id : null;
+  if (authSessionService.isUuid(sessionId)) {
+    const row = await authSessionService.getSessionById(sessionId);
+    if (row) return { ok: false, reason: 'registered_session' };
+  }
+  return { ok: true };
+}
+
 /** Best-effort persistent-login hook: registry failures never fail the auth route. */
 async function safeHook(name, fn) {
   try {
@@ -680,6 +721,15 @@ const logoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   message: { error: 'Too many logout requests. Please try again later.' },
+});
+
+// /reset-password consumes a recovery credential and, since the persistent-login
+// hooks landed, signs every device out and moves `sessions_valid_after` — i.e. a
+// successful call is a full account lockout. It had no limiter of its own.
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: 'Too many password reset attempts. Please try again later.' },
 });
 
 const OAUTH_USER_SELECT = 'id, username, name, first_name, last_name, email, verified, role';
@@ -3552,7 +3602,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSc
  * POST /api/users/reset-password
  * Reset password using recovery token (token_hash) or access token
  */
-router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
+router.post('/reset-password', resetPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     const isJwtAccessToken = token.split('.').length === 3;
@@ -3562,6 +3612,22 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res) =
       const { data: userData, error: userError } = await authClient.auth.getUser(token);
       if (userError || !userData?.user?.id) {
         logger.warn('Reset password failed - invalid access token', { error: userError?.message });
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      // SECURITY: this branch exists for the JWT a recovery link mints. It must
+      // NOT accept an ordinary application access token: /password demands the
+      // current password, so a bearer-only path to "set a new password" would
+      // turn any stolen access token into a full account takeover — and, since
+      // the reset hook below signs every device out and moves
+      // `sessions_valid_after`, into a lockout of the real owner too.
+      const recovery = await isRecoveryAccessToken(token);
+      if (!recovery.ok) {
+        logger.warn('Reset password refused - not a recovery session', {
+          userId: userData.user.id,
+          reason: recovery.reason,
+          ip: req.ip,
+        });
         return res.status(400).json({ error: 'Invalid or expired reset token' });
       }
 
@@ -4175,6 +4241,12 @@ router.post('/oauth/token', oauthLimiter, authRouteDpop(), async (req, res) => {
     logger.info('OAuth token login successful', { userId, email });
 
     const oauthProvider = getAuthProviders(user).find((p) => p === 'apple' || p === 'google') || null;
+    // `credential:false` — unlike /login, /oauth/callback and /oauth/native,
+    // the only thing this route was shown is an access+refresh pair, which is
+    // exactly what a token thief holds. It may register a brand-new session,
+    // but it must never re-point an already-bound session at another key nor
+    // rotate an existing device row (that would retire the real device's
+    // sessions and wipe its enrolled step-up key from a bearer-only path).
     const bind = await safeHook('oauth_token_bind', () => authDeviceService.bindAtIssue({
       userId,
       session: pairSession,
@@ -4183,7 +4255,27 @@ router.post('/oauth/token', oauthLimiter, authRouteDpop(), async (req, res) => {
       req,
       authMethod: oauthProvider ? `oauth_${oauthProvider}` : 'oauth',
       context: 'interactive',
+      credential: false,
     }));
+
+    if (bind?.rebindRefused) {
+      // The pair belongs to a session that is bound to a device key the caller
+      // could not prove — the same signal /refresh treats as DEVICE_MISMATCH.
+      logger.warn('auth.oauth_token.rebind_refused', { userId, sessionId: bind.sessionId, ip: req.ip });
+      await safeHook('oauth_token_mismatch', () => authDeviceService.markMismatch({
+        session: bind.sessionRow,
+        device: bind.boundDevice,
+        req,
+        reason: 'oauth_token_without_device_key',
+      }));
+      // Never leave the pair GoTrue just minted usable.
+      await revokeSessionByAccessToken(pairSession.access_token, { source: 'oauth_token_rebind_refused', userId });
+      clearAuthCookies(res);
+      return res.status(401).json({
+        error: authDeviceService.SECURITY_MESSAGES.DEVICE_MISMATCH,
+        code: 'DEVICE_MISMATCH',
+      });
+    }
 
     applyAuthTransport(req, res, pairSession.access_token, pairSession.refresh_token, userId);
 

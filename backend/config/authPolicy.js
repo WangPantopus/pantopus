@@ -60,10 +60,27 @@ function dpopCutover() {
   return new Date('9999-01-01T00:00:00.000Z');
 }
 
-/** Optional public base URL (scheme://host[:port], no trailing slash). */
+let _warnedNoBaseUrl = false;
+/**
+ * Optional public base URL (scheme://host[:port], no trailing slash).
+ *
+ * SECURITY: when this is unset the DPoP `htu` is compared against the host the
+ * *request* claims (`Host` / `X-Forwarded-Host`). A proof a client was tricked
+ * into minting for an attacker-controlled host can then be replayed against the
+ * real API by spoofing that same Host header, wherever the edge forwards
+ * unknown Host values. Pin it in production; we warn once when it is missing.
+ */
 function publicApiBaseUrl() {
   const raw = String(process.env.PUBLIC_API_BASE_URL || '').trim();
-  if (!raw) return null;
+  if (!raw) {
+    if (process.env.NODE_ENV === 'production' && !_warnedNoBaseUrl) {
+      _warnedNoBaseUrl = true;
+      logger.warn(
+        'PUBLIC_API_BASE_URL is not set: DPoP htu falls back to the request Host header, which the edge may let a client choose. Set it to the API origin clients use.'
+      );
+    }
+    return null;
+  }
   try {
     const url = new URL(raw);
     if (!['http:', 'https:'].includes(url.protocol)) return null;
@@ -140,5 +157,6 @@ module.exports = {
   _resetForTests() {
     _stepUpSecret = null;
     _warnedFallback = false;
+    _warnedNoBaseUrl = false;
   },
 };

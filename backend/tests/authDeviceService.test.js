@@ -1150,6 +1150,24 @@ describe('descriptor + helpers', () => {
     expect(ok.ok).toBe(true);
     expect(ok.value).toMatchObject({ platform: 'ios', name: 'My phone', hasOsLock: false, keyBacking: 'software', attestation: { type: 'app_attest' } });
 
+    // S9: control characters are stripped — device names reach log lines,
+    // push bodies, e-mail subjects and the security-event feed.
+    const CR = String.fromCharCode(13);
+    const LF = String.fromCharCode(10);
+    const NUL = String.fromCharCode(0);
+    const injected = authDeviceService.normalizeDeviceDescriptor({
+      deviceId: DEVICE_ID,
+      platform: 'ios',
+      name: `Ying${CR}${LF}Bcc: evil@example.com`,
+      model: `iPhone${NUL}16,2`,
+      osVersion: `18.5${LF}fake: 1`,
+    });
+    expect(injected.ok).toBe(true);
+    expect(injected.value.name).toBe('Ying Bcc: evil@example.com');
+    expect(injected.value.model).toBe('iPhone 16,2');
+    expect(injected.value.osVersion).toBe('18.5 fake: 1');
+    expect(/[\u0000-\u001f\u007f-\u009f]/.test(JSON.stringify(injected.value))).toBe(false);
+
     expect(authDeviceService.platformFromRequest(fakeReq({ headers: { 'x-client-platform': 'android' } }))).toBe('android');
     expect(authDeviceService.platformFromRequest(fakeReq({ headers: { 'x-client-platform': 'iOS 18.5' } }))).toBe('ios');
     expect(authDeviceService.platformFromRequest(fakeReq({ headers: { 'x-client-platform': 'web' } }))).toBeNull();
@@ -1171,5 +1189,47 @@ describe('descriptor + helpers', () => {
     expect(authSessionService.hashToken('x')).toBe(crypto.createHash('sha256').update('x').digest('base64url'));
     expect(authSessionService.isUuid(SID)).toBe(true);
     expect(authSessionService.isUuid('nope')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security review — S10: `req.ip` comes from X-Forwarded-For when `trust proxy`
+// is on and is NOT validated by Express. The registry's IP columns are `inet`,
+// so a non-address value would make the whole row write fail (22P02).
+// ---------------------------------------------------------------------------
+describe('clientIp — only real addresses reach the inet columns (S10)', () => {
+  const ip = (value) => authSessionService.clientIp({ ip: value });
+
+  test('valid addresses pass through unchanged', () => {
+    expect(ip('203.0.113.7')).toBe('203.0.113.7');
+    expect(ip('2001:db8::1')).toBe('2001:db8::1');
+    expect(ip('::ffff:203.0.113.7')).toBe('::ffff:203.0.113.7');
+  });
+
+  test('an IPv6 zone index is dropped (Postgres inet rejects it)', () => {
+    expect(ip('fe80::1%eth0')).toBe('fe80::1');
+  });
+
+  test('anything that is not an address becomes null instead of poisoning the write', () => {
+    expect(ip('unknown')).toBeNull();
+    expect(ip('not-an-ip-at-all')).toBeNull();
+    expect(ip("203.0.113.7'); select 1 --")).toBeNull();
+    expect(ip('203.0.113.7, 198.51.100.4')).toBeNull();
+    expect(ip('')).toBeNull();
+    expect(ip(undefined)).toBeNull();
+    expect(authSessionService.clientIp(null)).toBeNull();
+  });
+
+  test('a session insert with a bogus forwarded IP still stores the row', async () => {
+    const row = await authSessionService.insertSession({
+      id: SID,
+      userId: UID,
+      refreshToken: 'rt-x',
+      req: { ip: 'unknown', headers: { 'user-agent': 'okhttp/4.12.0' } },
+    });
+    expect(row).toBeTruthy();
+    expect(getTable('AuthSession')).toHaveLength(1);
+    expect(getTable('AuthSession')[0].last_ip).toBeNull();
+    expect(getTable('AuthSession')[0].user_agent).toBe('okhttp/4.12.0');
   });
 });

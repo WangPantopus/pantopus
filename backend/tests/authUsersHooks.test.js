@@ -1199,3 +1199,354 @@ describe('OAuth routes — bind at issue', () => {
     expect(row.refresh_token_hash).toBe(authSessionService.hashToken('rotated-rt'));
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. Security review — S6: /oauth/token must not become a binding bypass.
+//    Its "credential" is an access+refresh pair, i.e. exactly what a token
+//    thief holds. A re-presented pair may not re-point an already-bound
+//    session at another key, nor rotate the device row onto that key.
+// ---------------------------------------------------------------------------
+describe('POST /api/users/oauth/token — cannot rebind an existing bound session (S6)', () => {
+  const STEP_KEY = { kty: 'EC', crv: 'P-256', x: 'step-x', y: 'step-y' };
+
+  function stolenPair() {
+    // A session that was bound to KEY at login and is already in the registry.
+    seedBoundSession({
+      refresh: 'victim-rt',
+      deviceOverrides: { step_key_jwk: STEP_KEY, step_key_enrolled_via: 'interactive' },
+    });
+    const rotated = supaSession({ sub: UID, session_id: SID, refresh: 'rotated-rt' });
+    mockAnonAuth.refreshSession.mockResolvedValue({ data: { session: rotated, user: { id: UID } }, error: null });
+    return { supplied: jwtFor({ sub: UID, session_id: SID }), rotated };
+  }
+
+  test('attacker key + victim deviceId → 401 DEVICE_MISMATCH; binding, step-up key and device row survive', async () => {
+    const { supplied, rotated } = stolenPair();
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .set('DPoP', await proof(KEY2, '/api/users/oauth/token'))
+      .set('x-client-platform', 'ios')
+      .send({ accessToken: supplied, refreshToken: 'victim-rt', device: descriptor() });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ code: 'DEVICE_MISMATCH' });
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.body.refreshToken).toBeUndefined();
+
+    // The device row keeps the legitimate key, its enrolled step-up key and its id.
+    const device = findRow('AuthDevice', DEV_ROW);
+    expect(device.key_thumbprint).toBe(KEY.thumbprint);
+    expect(device.step_key_jwk).toEqual(STEP_KEY);
+    expect(device.revoked_at).toBeNull();
+    // No second device row was created for the attacker's key.
+    expect(getTable('AuthDevice')).toHaveLength(1);
+    // The session stays pointed at the real device (mismatch handling revokes it).
+    const session = findRow('AuthSession', SID);
+    expect(session.device_id).toBe(DEV_ROW);
+    expect(session.revoked_reason).toBe('mismatch');
+    // The pair GoTrue minted for the attacker is revoked, not handed out.
+    expect(adminSignOut).toHaveBeenCalledWith(rotated.access_token, 'local');
+    expect(events('device_mismatch')).toHaveLength(1);
+  });
+
+  test('no DPoP proof at all is refused the same way', async () => {
+    const { supplied } = stolenPair();
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .send({ accessToken: supplied, refreshToken: 'victim-rt', device: descriptor() });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DEVICE_MISMATCH');
+    expect(findRow('AuthDevice', DEV_ROW).key_thumbprint).toBe(KEY.thumbprint);
+  });
+
+  test('a brand-new deviceId cannot take the session either', async () => {
+    const { supplied } = stolenPair();
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .set('DPoP', await proof(KEY2, '/api/users/oauth/token'))
+      .send({ accessToken: supplied, refreshToken: 'victim-rt', device: descriptor({ deviceId: DEVICE_ID2 }) });
+    expect(res.status).toBe(401);
+    expect(findRow('AuthSession', SID).device_id).toBe(DEV_ROW);
+    expect(getTable('AuthDevice')).toHaveLength(1);
+  });
+
+  test('the device that really holds the key still refreshes its pair through /oauth/token', async () => {
+    const { supplied, rotated } = stolenPair();
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .set('DPoP', await proof(KEY, '/api/users/oauth/token'))
+      .send({ accessToken: supplied, refreshToken: 'victim-rt', device: descriptor() });
+    expect(res.status).toBe(200);
+    expect(res.body.accessToken).toBe(rotated.access_token);
+    const session = findRow('AuthSession', SID);
+    expect(session.device_id).toBe(DEV_ROW);
+    expect(session.revoked_at).toBeNull();
+    expect(findRow('AuthDevice', DEV_ROW).key_thumbprint).toBe(KEY.thumbprint);
+  });
+
+  test('a restored session is not promoted to interactive by re-presenting its pair', async () => {
+    seedBoundSession({ context: 'restored', refresh: 'victim-rt' });
+    const rotated = supaSession({ sub: UID, session_id: SID, refresh: 'rotated-rt' });
+    mockAnonAuth.refreshSession.mockResolvedValue({ data: { session: rotated, user: { id: UID } }, error: null });
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .set('DPoP', await proof(KEY, '/api/users/oauth/token'))
+      .send({ accessToken: jwtFor({ sub: UID, session_id: SID }), refreshToken: 'victim-rt', device: descriptor() });
+    expect(res.status).toBe(200);
+    expect(findRow('AuthSession', SID).context).toBe('restored');
+    expect(res.body.session).toEqual({ id: SID, context: 'restored' });
+  });
+
+  test('AUTH_DEVICE_BINDING=off: the kill switch still lets the pair through and keeps the existing binding', async () => {
+    process.env.AUTH_DEVICE_BINDING = 'off';
+    const { supplied } = stolenPair();
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .send({ accessToken: supplied, refreshToken: 'victim-rt', device: descriptor() });
+    expect(res.status).toBe(200);
+    const session = findRow('AuthSession', SID);
+    expect(session.device_id).toBe(DEV_ROW);
+    expect(session.bound_at_issue).toBe(true);
+  });
+
+  test('a fresh OAuth pair (no registry row yet) still binds normally', async () => {
+    seedTable('AuthDevice', []);
+    seedTable('AuthSession', []);
+    const rotated = supaSession({ sub: UID, session_id: SID2, refresh: 'rotated-rt' });
+    mockAnonAuth.refreshSession.mockResolvedValue({ data: { session: rotated, user: { id: UID } }, error: null });
+    const res = await request(app)
+      .post('/api/users/oauth/token')
+      .set('DPoP', await proof(KEY, '/api/users/oauth/token'))
+      .set('x-client-platform', 'ios')
+      .send({ accessToken: jwtFor({ sub: UID, session_id: SID2 }), refreshToken: 'fresh-rt', device: descriptor() });
+    expect(res.status).toBe(200);
+    expect(res.body.device).toMatchObject({ deviceId: DEVICE_ID, isNew: true });
+    expect(findRow('AuthSession', SID2)).toMatchObject({ bound_at_issue: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Security review — S7: `X-Token-Transport: cookie` is client-declared and
+//     must not, on its own, buy an opt-out from AUTH_DEVICE_BINDING=required.
+// ---------------------------------------------------------------------------
+describe('POST /api/users/refresh — the web exemption cannot be spoofed (S7)', () => {
+  const NEW_RT2 = 'rt-2';
+
+  function refreshOk(sessionId = SID) {
+    const next = supaSession({ session_id: sessionId, refresh: NEW_RT2 });
+    mockAnonAuth.refreshSession.mockResolvedValue({ data: { session: next, user: { id: UID } }, error: null });
+    return next;
+  }
+
+  /** Presents the stolen token exactly as a browser would (cookie + header). */
+  function asWeb(extraHeaders = {}) {
+    let r = request(app)
+      .post('/api/users/refresh')
+      .set('x-token-transport', 'cookie')
+      .set('Cookie', ['pantopus_refresh=rt-1']);
+    Object.entries(extraHeaders).forEach(([k, v]) => { r = r.set(k, v); });
+    return r;
+  }
+
+  beforeEach(() => {
+    process.env.AUTH_DEVICE_BINDING = 'required';
+  });
+
+  test('a session issued to a native client is refused even when the caller declares cookie transport', async () => {
+    seedTable('AuthSession', [sessionRow({
+      refresh_token_hash: authSessionService.hashToken('rt-1'),
+      user_agent: 'okhttp/4.12.0',
+    })]);
+    refreshOk();
+    const res = await asWeb().send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+    expect(mockAnonAuth.refreshSession).not.toHaveBeenCalled();
+  });
+
+  test('same for an iOS user agent (CFNetwork/Darwin)', async () => {
+    seedTable('AuthSession', [sessionRow({
+      refresh_token_hash: authSessionService.hashToken('rt-1'),
+      user_agent: 'Pantopus/1.4.0 CFNetwork/1494 Darwin/23.4.0',
+    })]);
+    refreshOk();
+    const res = await asWeb().send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+  });
+
+  test('native markers on the request deny the exemption: X-Client-Platform', async () => {
+    seedTable('AuthSession', [sessionRow({ refresh_token_hash: authSessionService.hashToken('rt-1') })]);
+    refreshOk();
+    const res = await asWeb({ 'x-client-platform': 'ios' }).send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+  });
+
+  test('native markers on the request deny the exemption: X-Device-Id', async () => {
+    seedTable('AuthSession', [sessionRow({ refresh_token_hash: authSessionService.hashToken('rt-1') })]);
+    refreshOk();
+    const res = await asWeb({ 'x-device-id': DEVICE_ID }).send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+  });
+
+  test('native markers in the body deny the exemption: deviceId', async () => {
+    seedTable('AuthSession', [sessionRow({ refresh_token_hash: authSessionService.hashToken('rt-1') })]);
+    refreshOk();
+    const res = await asWeb().send({ deviceId: DEVICE_ID });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+  });
+
+  test('a pre-registry session (no row) with native markers is refused too', async () => {
+    seedTable('AuthSession', []);
+    refreshOk();
+    const res = await asWeb({ 'x-client-platform': 'android' }).send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DPOP_REQUIRED');
+  });
+
+  test('a genuine browser session still refreshes (browser user agent, no native markers)', async () => {
+    seedTable('AuthSession', [sessionRow({
+      refresh_token_hash: authSessionService.hashToken('rt-1'),
+      user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+    })]);
+    refreshOk();
+    const res = await asWeb().send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, sessionId: SID });
+  });
+
+  test('a bound session is refused with DEVICE_MISMATCH regardless of the declared transport', async () => {
+    seedBoundSession();
+    refreshOk();
+    const res = await asWeb().send({});
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('DEVICE_MISMATCH');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. Security review — S8: POST /reset-password accepts a JWT, but only the
+//     one a recovery link mints. An ordinary application access token must not
+//     be a "set a new password" credential (that is what /password is, and it
+//     asks for the current password).
+// ---------------------------------------------------------------------------
+describe('POST /api/users/reset-password — the JWT branch only accepts recovery sessions (S8)', () => {
+  const NEW_PW = 'brand-new-password-1';
+  let updateUserById;
+
+  function jwtWith({ session_id = SID3, amr } = {}) {
+    const iat = Math.floor(Date.now() / 1000);
+    const payload = { sub: UID, session_id, iat, exp: iat + 3600 };
+    if (amr) payload.amr = amr;
+    return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64(payload)}.sig`;
+  }
+
+  beforeEach(() => {
+    updateUserById = jest.fn().mockResolvedValue({ data: { user: { id: UID } }, error: null });
+    setAuthMocks({ adminUpdateUserById: updateUserById });
+    seedTable('AuthSession', [sessionRow(), sessionRow({ id: SID2 })]);
+  });
+
+  test('a stolen access token whose session is in the registry is refused; nothing is changed', async () => {
+    const stolen = jwtWith({ session_id: SID });
+    const res = await request(app).post('/api/users/reset-password').send({ token: stolen, newPassword: NEW_PW });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid or expired reset token');
+    expect(updateUserById).not.toHaveBeenCalled();
+    expect(findRow('AuthSession', SID).revoked_at).toBeNull();
+    expect(findRow('User', UID).sessions_valid_after).toBeFalsy();
+  });
+
+  test('an amr that names a normal sign-in method is refused even for an unregistered session', async () => {
+    for (const method of ['password', 'oauth', 'id_token', 'totp']) {
+      const res = await request(app)
+        .post('/api/users/reset-password')
+        .send({ token: jwtWith({ amr: [{ method, timestamp: Math.floor(Date.now() / 1000) }] }), newPassword: NEW_PW });
+      expect(res.status).toBe(400);
+    }
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  test('a resume-grant (restored) session token is refused', async () => {
+    addRows('AuthSession', [sessionRow({ id: SID3, context: 'restored', auth_method: 'resume_grant' })]);
+    const res = await request(app)
+      .post('/api/users/reset-password')
+      .send({ token: jwtWith({ session_id: SID3, amr: [{ method: 'magiclink' }] }), newPassword: NEW_PW });
+    expect(res.status).toBe(400);
+    expect(updateUserById).not.toHaveBeenCalled();
+  });
+
+  test('a genuine recovery JWT still resets the password and signs everything out', async () => {
+    const recoveryJwt = jwtWith({ session_id: SID3, amr: [{ method: 'recovery', timestamp: Math.floor(Date.now() / 1000) }] });
+    const res = await request(app).post('/api/users/reset-password').send({ token: recoveryJwt, newPassword: NEW_PW });
+    expect(res.status).toBe(200);
+    expect(updateUserById).toHaveBeenCalledWith(UID, { password: NEW_PW });
+    expect(findRow('AuthSession', SID)).toMatchObject({ revoked_reason: 'password_reset' });
+    expect(findRow('AuthSession', SID2)).toMatchObject({ revoked_reason: 'password_reset' });
+    expect(findRow('User', UID).sessions_valid_after).toBeTruthy();
+  });
+
+  test('the token_hash (verifyOtp) branch is unaffected', async () => {
+    const recovery = supaSession({ session_id: SID3, refresh: 'rec-rt' });
+    mockAnonAuth.verifyOtp.mockResolvedValue({ data: { session: recovery, user: { id: UID } }, error: null });
+    mockAnonAuth.setSession.mockResolvedValue({ error: null });
+    mockAnonAuth.updateUser.mockResolvedValue({ error: null });
+    const res = await request(app).post('/api/users/reset-password').send({ token: 'recovery-hash-token', newPassword: NEW_PW });
+    expect(res.status).toBe(200);
+    expect(findRow('AuthSession', SID)).toMatchObject({ revoked_reason: 'password_reset' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Security review — S4 follow-up: reuse detection must key off GoTrue's
+//     structured `code`, and the legacy message regex must not fire when a
+//     code is present (it is both fragile and far too broad — "... not found"
+//     appears in plenty of unrelated errors, and each false positive revokes a
+//     live session, flags the device and mails the user).
+// ---------------------------------------------------------------------------
+describe('POST /api/users/refresh — TOKEN_REUSE keys off the structured code (S4)', () => {
+  function refreshFails(error) {
+    mockAnonAuth.refreshSession.mockResolvedValue({ data: { session: null, user: null }, error });
+  }
+
+  async function refresh() {
+    return request(app)
+      .post('/api/users/refresh')
+      .set('DPoP', await proof(KEY, '/api/users/refresh', { refreshToken: 'rt-1' }))
+      .send({ refreshToken: 'rt-1' });
+  }
+
+  test.each(['refresh_token_already_used', 'refresh_token_not_found'])(
+    'code %s → TOKEN_REUSE whatever the message says',
+    async (code) => {
+      seedBoundSession();
+      refreshFails({ code, message: 'an unrelated wording the regex would miss' });
+      const res = await refresh();
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('TOKEN_REUSE');
+      expect(findRow('AuthSession', SID)).toMatchObject({ revoked_reason: 'reuse' });
+    }
+  );
+
+  test('a non-reuse code whose message merely contains "not found" is NOT punished', async () => {
+    seedBoundSession();
+    refreshFails({ code: 'over_request_rate_limit', message: 'upstream user profile not found' });
+    const res = await refresh();
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('UNAUTHORIZED');
+    expect(findRow('AuthSession', SID).revoked_at).toBeNull();
+    expect(findRow('AuthDevice', DEV_ROW)).toMatchObject({ require_step_up: false, trust_level: 'trusted' });
+    expect(events('refresh_reuse')).toHaveLength(0);
+  });
+
+  test('older GoTrue releases with no code still fall back to the message regex', async () => {
+    seedBoundSession();
+    refreshFails({ message: 'Invalid Refresh Token: Already Used' });
+    const res = await refresh();
+    expect(res.body.code).toBe('TOKEN_REUSE');
+    expect(findRow('AuthSession', SID)).toMatchObject({ revoked_reason: 'reuse' });
+  });
+});
