@@ -494,3 +494,26 @@ DELIBERATELY NOT FIXED — `pushService.saveToken` upsert-on-token:
   notifications to a device now owned by user B — worse than the current
   behaviour. Needs a product decision about shared/handed-over devices, not a
   rushed migration. Left as a documented follow-up.
+
+### The backend "flake" — IDENTIFIED (2026-08-20)
+
+Earlier I reported 1 unexplained single-test failure in 6 full-suite runs and
+flagged it rather than accept a green retry. Chased it down:
+
+  FAIL tests/unit/gigBrowseSections.test.js
+    ● GET /api/gigs/browse › returns total_active and radius_used in response
+      socket hang up
+
+Reproduced 1 time in 8 full-suite runs; 0 failures in 12 ISOLATED runs of that
+file. So it only fails under full-suite parallel load — a supertest/agent
+teardown race ("socket hang up"), i.e. worker contention, not a logic bug.
+
+PRE-EXISTING AND UNRELATED TO THIS BRANCH:
+  - the test file was last modified in commit 79086121 (2026-05-13), which is
+    an ancestor of master;
+  - `git diff --name-only master..HEAD` contains neither
+    backend/tests/unit/gigBrowseSections.test.js nor routes/gigs*.js;
+  - it is a gigs-browse endpoint test — nothing to do with auth.
+NOT an auth flake. Left alone deliberately: fixing someone else's supertest
+teardown is out of scope for this branch. Worth a separate ticket
+(the whole suite runs with `--forceExit`, which is the underlying smell).
