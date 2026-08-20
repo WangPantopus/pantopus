@@ -7509,7 +7509,21 @@ router.get('/:id/seasonal-checklist', verifyToken, async (req, res) => {
     const access = await checkHomePermission(homeId, userId, 'home.view');
     if (!access.hasAccess) return res.status(403).json({ error: 'No access to this home' });
 
-    const seasonalCtx = getSeasonalContext();
+    // Pass the home's coordinates so the engine can tell whether its
+    // region-specific copy applies. Calling without them satisfied the old
+    // `!hasCoords ||` gate, which served Portland-specific tips to every
+    // home in the country. The season itself is month-based and resolves
+    // nationally, so the checklist below works either way.
+    const { data: seasonHome } = await supabaseAdmin
+      .from('Home')
+      .select('map_center_lat, map_center_lng')
+      .eq('id', homeId)
+      .maybeSingle();
+    const seasonalCtx = getSeasonalContext(
+      seasonHome && seasonHome.map_center_lat != null && seasonHome.map_center_lng != null
+        ? { latitude: Number(seasonHome.map_center_lat), longitude: Number(seasonHome.map_center_lng) }
+        : {},
+    );
     const seasonKey = seasonalCtx.primary_season;
     const year = new Date().getFullYear();
     const seasonDef = SEASONS[seasonKey] || {};

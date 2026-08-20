@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
   PlaceIntelligence,
@@ -40,6 +40,7 @@ import {
   Flower2,
   Trash2,
   ZapOff,
+  BellRing,
 } from 'lucide-react';
 import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow } from '@/components/archetypes/place';
 import { findPlaceSection, detailAddress } from './sections';
@@ -405,6 +406,122 @@ function GoodDayRow({ data }: { data: PlaceGoodDayData }) {
   );
 }
 
+// ── Morning briefing opt-in ─────────────────────────────────
+// `daily_briefing_enabled` defaults false while the evening one defaults
+// true, so the morning briefing has effectively never shipped — the
+// control sits in Settings → Notifications where almost nobody finds it.
+//
+// The fix is deliberately not to flip the default: turning on a push for
+// existing users without asking is exactly how a notification channel
+// gets burned. Instead the product asks once, here, where the briefing's
+// own content lives — with the time visible, and taking "no" permanently.
+const BRIEFING_TIMES = ['06:30', '07:00', '07:30', '08:00', '08:30'];
+
+function BriefingOptIn() {
+  const [show, setShow] = useState(false);
+  const [time, setTime] = useState('07:30');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<'on' | 'off' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/hub/preferences', { credentials: 'include' });
+        if (!res.ok) return;
+        const { preferences } = await res.json();
+        // Ask only when it is off AND we have never asked. Both a yes and a
+        // no stamp `daily_briefing_prompted_at`, so this never returns.
+        if (cancelled) return;
+        if (!preferences?.daily_briefing_enabled && !preferences?.daily_briefing_prompted_at) {
+          if (preferences?.daily_briefing_time_local) setTime(preferences.daily_briefing_time_local);
+          setShow(true);
+        }
+      } catch {
+        // A failed preference read simply means no prompt — never a broken card.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function answer(enabled: boolean) {
+    setBusy(true);
+    try {
+      await fetch('/api/hub/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          daily_briefing_enabled: enabled,
+          ...(enabled ? { daily_briefing_time_local: time } : {}),
+          daily_briefing_prompted: true,
+        }),
+      });
+      setDone(enabled ? 'on' : 'off');
+      setShow(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done === 'on') {
+    return (
+      <div className="bg-app-success-bg border border-app-success-light rounded-2xl px-4 py-3 text-[13.5px] text-app-text-strong">
+        Morning briefing on, around {time}. Change it any time in Settings → Notifications.
+      </div>
+    );
+  }
+  if (!show) return null;
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px] flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <span className="w-9 h-9 rounded-[11px] bg-app-info-bg flex items-center justify-center shrink-0">
+          <BellRing size={18} strokeWidth={2} className="text-app-info" />
+        </span>
+        <div>
+          <div className="text-[15px] font-semibold text-app-text">A morning heads-up?</div>
+          <div className="text-[13.5px] text-app-text-secondary leading-[19px] mt-0.5">
+            One line, once a day, and only when something here actually needs you —
+            a warning, a bill, a freeze. Nothing on a quiet day.
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <label htmlFor="briefing-time" className="text-[12.5px] text-app-text-secondary">Send around</label>
+        <select
+          id="briefing-time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="text-[13px] px-2.5 py-1.5 rounded-lg border border-app-border bg-app-surface text-app-text"
+        >
+          {BRIEFING_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => answer(true)}
+          className="text-[13.5px] font-semibold px-3.5 py-2 rounded-lg bg-primary-500 text-white disabled:opacity-60"
+        >
+          Turn it on
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => answer(false)}
+          className="text-[13.5px] font-semibold px-3.5 py-2 rounded-lg border border-app-border text-app-text-secondary disabled:opacity-60"
+        >
+          No thanks
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TodayDetail({ intelligence }: { intelligence: PlaceIntelligence }) {
   const weather = findPlaceSection(intelligence, 'weather');
   const aqi = findPlaceSection(intelligence, 'air_quality');
@@ -422,6 +539,8 @@ export default function TodayDetail({ intelligence }: { intelligence: PlaceIntel
     <>
       <DetailHeader title="Today" address={detailAddress(intelligence.place)} />
       <div className="px-4 sm:px-5 pt-1 pb-16">
+        <div className="mt-2"><BriefingOptIn /></div>
+
         <DetailSectionLabel>Weather</DetailSectionLabel>
         {weatherReady ? (
           <div className="flex flex-col gap-2.5">

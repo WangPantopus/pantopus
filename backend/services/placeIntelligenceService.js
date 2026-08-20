@@ -37,6 +37,7 @@ const propertyIntelligenceService = require('./ai/propertyIntelligenceService');
 const placeSectionAdapters = require('./placeSectionAdapters');
 const { getHomePrivacy } = require('./homePrivacyService');
 const { buildGoodDayTiles } = require('./goodDayEngine');
+const { getDensityBucket } = require('./place/densityReader');
 const { getSystemsLedger } = require('./homeSystemsService');
 
 const HOME_SELECT =
@@ -142,13 +143,6 @@ function floodRiskLevel(zone) {
   return 'minimal';
 }
 
-function densityBucket(count) {
-  const n = Number(count) || 0;
-  if (n <= 0) return 'none';
-  if (n < 10) return 'forming';
-  if (n < 25) return 'few';
-  return 'growing';
-}
 
 function censusSummary(profile) {
   const parts = [];
@@ -442,13 +436,12 @@ async function composeDensity(home) {
 
   try {
     const geohash = encodeGeohash(ll.lat, ll.lng, 6);
-    const { data } = await supabaseAdmin
-      .from('NeighborhoodPreview')
-      .select('verified_users_count')
-      .eq('geohash', geohash)
-      .maybeSingle();
-    // k-anon: the raw count is floored to a bucket and never returned.
-    const bucket = densityBucket(data && data.verified_users_count);
+    // Goes through the audited k-anon helper rather than a second inline
+    // copy of the same flooring. Two implementations of one privacy
+    // primitive is itself a leak — the same cell reporting different
+    // buckets on two surfaces narrows the count by comparison.
+    // The raw count never leaves the reader.
+    const { bucket } = await getDensityBucket(geohash);
     return [serializePlaceSection('block_density', {
       access: 'available',
       data: { bucket, label: DENSITY_LABELS[bucket] },
@@ -725,7 +718,6 @@ module.exports = {
   // Exported for unit testing.
   resolveTier,
   bandAccess,
-  densityBucket,
   floodRiskLevel,
   mapAqiCategory,
   buildPlaceRef,

@@ -240,6 +240,49 @@ describe('GET /api/homes/:id/intelligence', () => {
     });
   });
 
+  // Regression: the dashboard used to floor density with its own inline copy
+  // of the k-anon logic (k=10) while the audited helper (k=5) had no callers
+  // at all. Two implementations of one privacy primitive is itself a leak —
+  // the same cell reporting different buckets on two surfaces narrows the
+  // count by comparison. These pin the single reconciled floor.
+  describe('block density uses one k-anon floor', () => {
+    const { K_ANON_MIN, FEW_MAX } = require('../services/place/densityReader');
+
+    async function bucketFor(count) {
+      seedHome();
+      seedTable('NeighborhoodPreview', [{ geohash: GEOHASH, verified_users_count: count }]);
+      const res = await request(app)
+        .get(`/api/homes/${HOME_ID}/intelligence?sections=block_density`)
+        .set('x-test-user-id', USER);
+      return sectionsById(res.body).block_density.data.bucket;
+    }
+
+    test('floors everything below the k-anon minimum to "forming"', async () => {
+      expect(await bucketFor(1)).toBe('forming');
+      expect(await bucketFor(K_ANON_MIN - 1)).toBe('forming');
+    });
+
+    test('opens the "few" band exactly at the floor', async () => {
+      expect(await bucketFor(K_ANON_MIN)).toBe('few');
+      expect(await bucketFor(FEW_MAX)).toBe('few');
+    });
+
+    test('reads as "growing" above the band', async () => {
+      expect(await bucketFor(FEW_MAX + 1)).toBe('growing');
+    });
+
+    test('never returns the raw count', async () => {
+      seedHome();
+      seedTable('NeighborhoodPreview', [{ geohash: GEOHASH, verified_users_count: 17 }]);
+      const res = await request(app)
+        .get(`/api/homes/${HOME_ID}/intelligence?sections=block_density`)
+        .set('x-test-user-id', USER);
+      const data = sectionsById(res.body).block_density.data;
+      expect(Object.keys(data).sort()).toEqual(['bucket', 'label']);
+      expect(JSON.stringify(data)).not.toContain('17');
+    });
+  });
+
   test('composes the grouped contract with per-section status', async () => {
     seedHome();
     seedTable('NeighborhoodPreview', [{ geohash: GEOHASH, verified_users_count: 12 }]);

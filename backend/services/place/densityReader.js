@@ -32,13 +32,22 @@ const DENSITY_BUCKET = Object.freeze({
 
 // k-anon floor: a non-empty cell with fewer than K_ANON_MIN verified
 // neighbors never reveals more than 'forming', so counts of 1..K_ANON_MIN-1
-// are indistinguishable from one another. k=5 matches the privacy floors used
-// elsewhere (BillBenchmark write floor 3 / display floor 10) and the semantic
-// ladder ("starting to form" → "a few" → "growing").
-const K_ANON_MIN = 5;
+// are indistinguishable from one another.
+//
+// This helper originally used k=5, but `placeIntelligenceService` had its own
+// inline copy of the same flooring at k=10 with a 'few' band ending at 24 —
+// and THAT copy was the one serving the dashboard, while this tested one had
+// no callers at all. Two implementations of one privacy primitive is itself a
+// leak: the same cell reporting different buckets on two surfaces narrows the
+// underlying count by comparison.
+//
+// Reconciled here, on the stricter of the two, so consolidating could not
+// loosen anything that was already live. The inline copy is gone; this is now
+// the single implementation.
+const K_ANON_MIN = 10;
 // Upper edge of the 'few' band; above it the cell reads as 'growing'. Bands
 // stay wide on purpose so no exact count can be inferred from the bucket.
-const FEW_MAX = 20;
+const FEW_MAX = 24;
 
 /**
  * Floor a raw verified-neighbor count into a k-anon bucket enum.
@@ -53,9 +62,9 @@ const FEW_MAX = 20;
 function bucketForCount(count) {
   const n = Math.floor(Number(count));
   if (!Number.isFinite(n) || n <= 0) return DENSITY_BUCKET.NONE;
-  if (n < K_ANON_MIN) return DENSITY_BUCKET.FORMING; // 1 .. 4
-  if (n <= FEW_MAX) return DENSITY_BUCKET.FEW;        // 5 .. 20
-  return DENSITY_BUCKET.GROWING;                       // 21+
+  if (n < K_ANON_MIN) return DENSITY_BUCKET.FORMING; // 1 .. 9
+  if (n <= FEW_MAX) return DENSITY_BUCKET.FEW;        // 10 .. 24
+  return DENSITY_BUCKET.GROWING;                       // 25+
 }
 
 /**
