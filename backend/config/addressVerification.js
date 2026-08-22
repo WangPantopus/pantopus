@@ -85,6 +85,9 @@ function buildConfig() {
       apiKey: envStr('LOB_API_KEY'),
       env: envStr('LOB_ENV', 'test'),
       webhookSecret: envStr('LOB_WEBHOOK_SECRET'),
+      // A real Lob template id (`tmpl_...`). When unset the provider renders
+      // the postcard from inline HTML, which also carries the code.
+      postcardTemplateId: envStr('LOB_POSTCARD_TEMPLATE_ID'),
       from: {
         name: envStr('LOB_FROM_NAME', 'Pantopus'),
         addressLine1: envStr('LOB_FROM_ADDRESS_LINE1', '123 Verification Ln'),
@@ -165,6 +168,9 @@ const PRODUCTION_REQUIRED = [
   { key: 'SMARTY_AUTH_ID', label: 'Smarty auth-id', provider: 'smarty' },
   { key: 'SMARTY_AUTH_TOKEN', label: 'Smarty auth-token', provider: 'smarty' },
   { key: 'LOB_API_KEY', label: 'Lob API key', provider: 'lob' },
+  // Without this the webhook handler skips signature verification entirely
+  // and accepts any unauthenticated POST (routes/lobWebhook.js).
+  { key: 'LOB_WEBHOOK_SECRET', label: 'Lob webhook signing secret', provider: 'lob' },
 ];
 
 /**
@@ -182,6 +188,25 @@ function validate() {
     if (!process.env[req.key]?.trim()) {
       missing.push(req);
     }
+  }
+
+  if (isProd && config.lob.env !== 'live') {
+    logger.error(
+      `Address verification configuration error: LOB_ENV is '${config.lob.env}' in production. ` +
+      'Lob test mode does not mail anything, so every address verification would silently fail. ' +
+      'Set LOB_ENV=live.',
+    );
+    process.exit(1);
+  }
+
+  if (isProd && config.lob.postcardTemplateId
+      && !/^tmpl_[A-Za-z0-9]+$/.test(config.lob.postcardTemplateId)) {
+    logger.error(
+      `Address verification configuration error: LOB_POSTCARD_TEMPLATE_ID ` +
+      `('${config.lob.postcardTemplateId}') is not a Lob template id. Lob template ids look ` +
+      'like `tmpl_...`. Leave it unset to render the postcard from inline HTML.',
+    );
+    process.exit(1);
   }
 
   if (isProd && missing.length > 0) {

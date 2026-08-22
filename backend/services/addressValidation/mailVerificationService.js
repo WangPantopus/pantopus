@@ -69,13 +69,13 @@ class MailVerificationService {
       .eq('id', attemptId);
   }
 
-  async _dispatchVerificationJob(jobId, context = {}) {
+  async _dispatchVerificationJob(jobId, code, context = {}) {
     if (!jobId) {
       return { success: false, error: 'Mail verification job not found' };
     }
 
     try {
-      return await mailVendorService.dispatchPostcard(jobId);
+      return await mailVendorService.dispatchPostcard(jobId, code);
     } catch (error) {
       logger.error('MailVerificationService: dispatch failed unexpectedly', {
         ...context,
@@ -201,10 +201,9 @@ class MailVerificationService {
       .insert({
         attempt_id: attempt.id,
         vendor: 'pending',
-        template_id: 'address_verification_v1',
+        template_id: addressConfig.lob.postcardTemplateId || null,
         vendor_status: 'pending',
         metadata: {
-          code,
           address_id: addressId,
           unit: unit || null,
         },
@@ -222,7 +221,7 @@ class MailVerificationService {
       return { success: false, error: 'Failed to create mail verification job' };
     }
 
-    const dispatchResult = await this._dispatchVerificationJob(job?.id, {
+    const dispatchResult = await this._dispatchVerificationJob(job?.id, code, {
       attemptId: attempt.id,
       addressId,
       userId,
@@ -380,10 +379,9 @@ class MailVerificationService {
       .insert({
         attempt_id: attemptId,
         vendor: 'pending',
-        template_id: 'address_verification_v1',
+        template_id: addressConfig.lob.postcardTemplateId || null,
         vendor_status: 'pending',
         metadata: {
-          code: newCode,
           address_id: attempt.address_id,
           resend_number: token.resend_count + 1,
         },
@@ -421,7 +419,7 @@ class MailVerificationService {
       return { success: false, error: 'Failed to create mail verification job' };
     }
 
-    const dispatchResult = await this._dispatchVerificationJob(job?.id, {
+    const dispatchResult = await this._dispatchVerificationJob(job?.id, newCode, {
       attemptId,
       addressId: attempt.address_id,
       userId,

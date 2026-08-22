@@ -167,7 +167,8 @@ describe('startVerification', () => {
     const jobs = getTable('MailVerificationJob');
     expect(jobs).toHaveLength(1);
     expect(jobs[0].vendor_status).toBe('pending');
-    expect(jobs[0].metadata.code).toMatch(/^\d{6}$/);
+    expect(jobs[0].metadata.code).toBeUndefined();
+    expect(mockDispatchPostcard.mock.calls[0][1]).toMatch(/^\d{6}$/);
   });
 
   test('dispatches the postcard immediately after job creation', async () => {
@@ -176,7 +177,7 @@ describe('startVerification', () => {
     await service.startVerification('user-1', 'addr-1');
 
     const jobs = getTable('MailVerificationJob');
-    expect(mockDispatchPostcard).toHaveBeenCalledWith(jobs[0].id);
+    expect(mockDispatchPostcard).toHaveBeenCalledWith(jobs[0].id, expect.stringMatching(/^\d{6}$/));
   });
 
   test('fails fast and rolls back created records when postcard dispatch fails', async () => {
@@ -423,7 +424,8 @@ describe('resendCode', () => {
 
     const jobs = getTable('MailVerificationJob');
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].metadata.code).toMatch(/^\d{6}$/);
+    expect(jobs[0].metadata.code).toBeUndefined();
+    expect(mockDispatchPostcard.mock.calls[0][1]).toMatch(/^\d{6}$/);
   });
 
   test('dispatches the new postcard immediately on resend', async () => {
@@ -433,7 +435,7 @@ describe('resendCode', () => {
     await service.resendCode('attempt-1', 'user-1');
 
     const jobs = getTable('MailVerificationJob');
-    expect(mockDispatchPostcard).toHaveBeenCalledWith(jobs[0].id);
+    expect(mockDispatchPostcard).toHaveBeenCalledWith(jobs[0].id, expect.stringMatching(/^\d{6}$/));
   });
 
   test('fails when attempt not found', async () => {
@@ -790,16 +792,16 @@ describe('confirmCode', () => {
 // ============================================================
 
 describe('Full flow: start → confirm', () => {
-  test('start then confirm with code from job metadata', async () => {
+  test('start then confirm with the code handed to the mail vendor', async () => {
     seedAddress();
     seedHome();
 
     const startResult = await service.startVerification('user-1', 'addr-1');
     expect(startResult.success).toBe(true);
 
-    // Extract code from the MailVerificationJob metadata
+    // The code is never persisted; observe it where it is actually used
     const jobs = getTable('MailVerificationJob');
-    const code = jobs[0].metadata.code;
+    const code = mockDispatchPostcard.mock.calls[0][1];
 
     const confirmResult = await service.confirmCode(startResult.attempt_id, code, 'user-1');
     expect(confirmResult.verified).toBe(true);
@@ -822,8 +824,8 @@ describe('Full flow: start → confirm', () => {
 
     // The old code from first job should no longer work
     const jobs = getTable('MailVerificationJob');
-    const oldCode = jobs[0].metadata.code;
-    const newCode = jobs[1].metadata.code;
+    const oldCode = mockDispatchPostcard.mock.calls[0][1];
+    const newCode = mockDispatchPostcard.mock.calls[1][1];
     expect(oldCode).not.toBe(newCode);
 
     // Old code fails

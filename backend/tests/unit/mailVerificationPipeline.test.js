@@ -96,12 +96,17 @@ function seedHome(overrides = {}) {
 }
 
 /**
- * Extract the plaintext verification code from the MailVerificationJob metadata.
+ * Extract the plaintext verification code.
+ *
+ * The code is deliberately NOT persisted — RLS lets the requesting user read
+ * their own MailVerificationJob row, so a stored code would defeat the hash.
+ * It is handed to the mail vendor in memory, so the dispatch call is the only
+ * place a test can observe it.
  */
 function extractCode() {
-  const jobs = getTable('MailVerificationJob');
-  const latest = jobs[jobs.length - 1];
-  return latest.metadata.code;
+  const calls = mockDispatchPostcard.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1][1];
 }
 
 /**
