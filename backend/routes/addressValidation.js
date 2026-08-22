@@ -16,7 +16,12 @@ const supabaseAdmin = require('../config/supabaseAdmin');
 const verifyToken = require('../middleware/verifyToken');
 const validate = require('../middleware/validate');
 const logger = require('../utils/logger');
-const { addressValidationLimiter, addressClaimLimiter } = require('../middleware/rateLimiter');
+const {
+  addressValidationLimiter,
+  addressClaimLimiter,
+  postcardLimiter,
+  verificationAttemptLimiter,
+} = require('../middleware/rateLimiter');
 const addressConfig = require('../config/addressVerification');
 const googleProvider = require('../services/addressValidation/googleProvider');
 const smartyProvider = require('../services/addressValidation/smartyProvider');
@@ -442,6 +447,7 @@ function toMailVerificationResponse(result, fallbackAddressId) {
 router.post(
   '/verify/mail/start',
   verifyToken,
+  postcardLimiter,
   validate(mailStartSchema),
   async (req, res) => {
     const userId = req.user.id;
@@ -511,6 +517,7 @@ async function handleMailResend(req, res) {
 router.post(
   '/verify/mail/:verification_id/resend',
   verifyToken,
+  postcardLimiter,
   handleMailResend,
 );
 
@@ -518,6 +525,7 @@ router.post(
 router.post(
   '/verify/mail/resend',
   verifyToken,
+  postcardLimiter,
   validate(mailResendLegacySchema),
   handleMailResend,
 );
@@ -598,6 +606,7 @@ function mapConfirmResponse(result) {
 router.post(
   '/verify/mail/confirm',
   verifyToken,
+  verificationAttemptLimiter,
   validate(mailConfirmSchema),
   async (req, res) => {
     const userId = req.user.id;

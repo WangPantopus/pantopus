@@ -46,6 +46,9 @@ const USER_RATE_WINDOW_HOURS = mv.userRateWindowHours;
 const ADDRESS_RATE_LIMIT = mv.addressRateLimit;
 const ADDRESS_RATE_WINDOW_DAYS = mv.addressRateWindowDays;
 
+/** Max attempts one user may make against one address inside the address window. */
+const USER_ADDRESS_RATE_LIMIT = mv.userAddressRateLimit;
+
 /** Active attempt statuses (not terminal). */
 const ACTIVE_STATUSES = ['created', 'sent', 'delivered_unknown'];
 
@@ -136,6 +139,12 @@ class MailVerificationService {
     // ── 4. Address rate limit (5 attempts per 7 days) ───────
     const addressRateCheck = await this._checkAddressRateLimit(addressId);
     if (addressRateCheck.exceeded) {
+      return { success: false, error: 'Rate limit exceeded: too many verification attempts for this address.' };
+    }
+
+    // ── 4b. This user's share of that address's budget ──────
+    const userAddressCheck = await this._checkUserAddressRateLimit(userId, addressId);
+    if (userAddressCheck.exceeded) {
       return { success: false, error: 'Rate limit exceeded: too many verification attempts for this address.' };
     }
 
@@ -585,10 +594,7 @@ class MailVerificationService {
       return { verified: false, error: 'Verification token not found' };
     }
 
-    // ── 4. Increment attempt count ───────────────────────────
-    const newAttemptCount = token.attempt_count + 1;
-
-    // ── 5. Check lockout (before comparison) ─────────────────
+    // ── 4. Check lockout (before comparison) ─────────────────
     if (token.attempt_count >= token.max_attempts) {
       await supabaseAdmin
         .from('AddressVerificationAttempt')
@@ -597,15 +603,35 @@ class MailVerificationService {
       return { verified: false, locked: true, error: 'Too many attempts. Request a new code.' };
     }
 
+    // ── 5. Claim the attempt atomically ──────────────────────
+    // SEC-04: this used to be a read-modify-write — read attempt_count, then
+    // write attempt_count + 1. Concurrent guesses all read the same value and
+    // all wrote the same value, so N parallel requests cost a single
+    // increment and the 900,000-code space could be sprayed cheaply.
+    //
+    // The extra .eq('attempt_count', ...) makes this a compare-and-swap: the
+    // row matches only if nobody else has incremented since we read it. A
+    // caller that loses the race is refused rather than retried, so running
+    // guesses in parallel is strictly worse for an attacker than running them
+    // serially — which the lockout already bounds.
+    const newAttemptCount = token.attempt_count + 1;
+    const { data: claimed } = await supabaseAdmin
+      .from('AddressVerificationToken')
+      .update({ attempt_count: newAttemptCount })
+      .eq('id', token.id)
+      .eq('attempt_count', token.attempt_count)
+      .select('id');
+
+    if (Array.isArray(claimed) && claimed.length === 0) {
+      return {
+        verified: false,
+        error: 'Another verification attempt is in progress. Please try again.',
+      };
+    }
+
     // ── 6. Compare code (timing-safe) ────────────────────────
     const submittedHash = this._hashCode(code);
     const match = this._timingSafeCompare(submittedHash, token.code_hash);
-
-    // Always increment attempt_count regardless of result
-    await supabaseAdmin
-      .from('AddressVerificationToken')
-      .update({ attempt_count: newAttemptCount })
-      .eq('id', token.id);
 
     if (!match) {
       // Check if this attempt now triggers lockout
@@ -664,8 +690,12 @@ class MailVerificationService {
       .gte('created_at', cutoff.toISOString());
 
     if (error) {
-      logger.warn('MailVerificationService._checkUserRateLimit: error', { error: error.message });
-      return { exceeded: false }; // fail open
+      // SEC-08: fail CLOSED. Every bypass of this limit costs a physical
+      // postcard, so a transient DB error must not become free mail.
+      logger.error('MailVerificationService._checkUserRateLimit: failing closed', {
+        error: error.message,
+      });
+      return { exceeded: true };
     }
 
     return { exceeded: count >= USER_RATE_LIMIT };
@@ -676,6 +706,33 @@ class MailVerificationService {
    * @param {string} addressId
    * @returns {Promise<{exceeded: boolean}>}
    */
+  /**
+   * How much of a single address's budget one user may consume.
+   *
+   * SEC-06: the address budget was keyed on address_id alone, so a handful of
+   * throwaway accounts could exhaust a victim's budget and lock the genuine
+   * resident out of verifying their own home (and bill us for the postcards).
+   */
+  async _checkUserAddressRateLimit(userId, addressId) {
+    const cutoff = new Date(Date.now() - ADDRESS_RATE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const { count, error } = await supabaseAdmin
+      .from('AddressVerificationAttempt')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('address_id', addressId)
+      .gte('created_at', cutoff.toISOString());
+
+    if (error) {
+      logger.error('MailVerificationService._checkUserAddressRateLimit: failing closed', {
+        error: error.message,
+      });
+      return { exceeded: true };
+    }
+
+    return { exceeded: count >= USER_ADDRESS_RATE_LIMIT };
+  }
+
   async _checkAddressRateLimit(addressId) {
     const cutoff = new Date(Date.now() - ADDRESS_RATE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
@@ -686,8 +743,10 @@ class MailVerificationService {
       .gte('created_at', cutoff.toISOString());
 
     if (error) {
-      logger.warn('MailVerificationService._checkAddressRateLimit: error', { error: error.message });
-      return { exceeded: false };
+      logger.error('MailVerificationService._checkAddressRateLimit: failing closed', {
+        error: error.message,
+      });
+      return { exceeded: true };
     }
 
     return { exceeded: count >= ADDRESS_RATE_LIMIT };
@@ -853,6 +912,7 @@ MailVerificationService.MAX_ATTEMPTS = MAX_ATTEMPTS;
 MailVerificationService.USER_RATE_LIMIT = USER_RATE_LIMIT;
 MailVerificationService.USER_RATE_WINDOW_HOURS = USER_RATE_WINDOW_HOURS;
 MailVerificationService.ADDRESS_RATE_LIMIT = ADDRESS_RATE_LIMIT;
+MailVerificationService.USER_ADDRESS_RATE_LIMIT = USER_ADDRESS_RATE_LIMIT;
 MailVerificationService.ADDRESS_RATE_WINDOW_DAYS = ADDRESS_RATE_WINDOW_DAYS;
 
 module.exports = new MailVerificationService();

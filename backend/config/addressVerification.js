@@ -57,6 +57,9 @@ function buildConfig() {
     // ── Google Address Validation ─────────────────────────────
     google: {
       apiKey: envStr('GOOGLE_ADDRESS_VALIDATION_API_KEY'),
+      // REL-02: without this a hung connection parks the request for undici's
+      // default (~300s) while the client has long since given up and retried.
+      timeoutMs: envInt('ADDRESS_GOOGLE_TIMEOUT_MS', 2500),
     },
 
     googlePlaces: {
@@ -68,6 +71,7 @@ function buildConfig() {
     smarty: {
       authId: envStr('SMARTY_AUTH_ID'),
       authToken: envStr('SMARTY_AUTH_TOKEN'),
+      timeoutMs: envInt('ADDRESS_SMARTY_TIMEOUT_MS', 2500),
     },
 
     secondaryAddress: {
@@ -106,6 +110,7 @@ function buildConfig() {
       userRateLimit: envInt('MAIL_VERIFY_USER_RATE_LIMIT', 2),
       userRateWindowHours: envInt('MAIL_VERIFY_USER_RATE_WINDOW_HOURS', 24),
       addressRateLimit: envInt('MAIL_VERIFY_ADDRESS_RATE_LIMIT', 5),
+      userAddressRateLimit: envInt('MAIL_VERIFY_USER_ADDRESS_RATE_LIMIT', 2),
       addressRateWindowDays: envInt('MAIL_VERIFY_ADDRESS_RATE_WINDOW_DAYS', 7),
       stepUpMaxAgeDays: envInt('ADDRESS_STEP_UP_MAX_AGE_DAYS', 90),
     },
