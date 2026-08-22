@@ -2455,29 +2455,29 @@ router.get('/:id/public-profile', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Home not found' });
     }
 
-    // Public profile can be viewed by: members/owners, public_preview, creator (onboarding/claim UI),
-    // user has a claim (residency/ownership) for this home,
-    // OR the home already has a verified owner (user B claim/join flow before any claim row exists).
+    // Public profile can be viewed by: members/owners, public_preview, creator
+    // (onboarding/claim UI), or a user who has actually filed a claim on this home.
+    //
+    // SEC-01: there used to be a fourth leg — a `verifiedOwnerProbe` that granted
+    // access whenever *the home* had a verified owner, regardless of who was
+    // asking. Since this response carries the full street address and the
+    // owner's real name and photo, that turned any home id into an
+    // address-to-identity lookup for any authenticated account, which is the
+    // exact disclosure the identity firewall exists to prevent. A user who wants
+    // to join a household files a claim first (POST /:id/claim); the pre-claim
+    // conflict signal is served by POST /api/homes/check-address, which returns
+    // no identity.
     const access = await checkHomePermission(homeId, userId);
     let canView =
       access.hasAccess ||
       home.visibility === 'public_preview' ||
       (home.created_by_user_id && home.created_by_user_id === userId);
     if (!canView) {
-      const [residencyClaim, ownershipClaim, verifiedOwnerProbe] = await Promise.all([
+      const [residencyClaim, ownershipClaim] = await Promise.all([
         supabaseAdmin.from('HomeResidencyClaim').select('id').eq('home_id', homeId).eq('user_id', userId).limit(1).maybeSingle(),
         supabaseAdmin.from('HomeOwnershipClaim').select('id').eq('home_id', homeId).eq('claimant_user_id', userId).limit(1).maybeSingle(),
-        supabaseAdmin
-          .from('HomeOwner')
-          .select('id')
-          .eq('home_id', homeId)
-          .eq('subject_type', 'user')
-          .eq('owner_status', 'verified')
-          .limit(1)
-          .maybeSingle(),
       ]);
       if (residencyClaim.data || ownershipClaim.data) canView = true;
-      if (verifiedOwnerProbe.data) canView = true;
     }
     if (!canView) {
       return res.status(403).json({ error: 'This home is not publicly discoverable' });
@@ -3580,7 +3580,7 @@ router.post('/:id/challenge-member/:occupancyId', verifyToken, async (req, res) 
 
     // 1. Verify caller has members.manage permission
     const access = await checkHomePermission(homeId, userId, 'members.manage');
-    if (!access.allowed) {
+    if (!access.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to challenge members' });
     }
 
@@ -6720,7 +6720,7 @@ router.get('/:id/claims', verifyToken, async (req, res) => {
 
     const { checkHomePermission } = require('../utils/homePermissions');
     const access = await checkHomePermission(homeId, userId, 'members.manage');
-    if (!access.allowed) {
+    if (!access.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to view claims' });
     }
 
@@ -6757,7 +6757,7 @@ router.post('/:id/claim/:claimId/approve', verifyToken, async (req, res) => {
 
     const { checkHomePermission } = require('../utils/homePermissions');
     const access = await checkHomePermission(homeId, userId, 'members.manage');
-    if (!access.allowed) {
+    if (!access.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to approve claims' });
     }
 
@@ -6843,7 +6843,7 @@ router.post('/:id/claim/:claimId/reject', verifyToken, async (req, res) => {
 
     const { checkHomePermission } = require('../utils/homePermissions');
     const access = await checkHomePermission(homeId, userId, 'members.manage');
-    if (!access.allowed) {
+    if (!access.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to reject claims' });
     }
 

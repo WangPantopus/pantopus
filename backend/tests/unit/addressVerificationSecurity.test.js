@@ -87,3 +87,39 @@ describe('SCN-02 / PRV-03 — the verification code is never persisted', () => {
     expect(tokens[0].code).toBeUndefined();
   });
 });
+
+describe('SCN-03 — checkHomePermission return shape', () => {
+  // Four routes tested `access.allowed`, a property checkHomePermission never
+  // returns, so `!undefined` was always true and every one of them returned
+  // 403 unconditionally. The household-approval flow was entirely unreachable.
+  // This guards the contract so the same class of bug cannot recur silently.
+  const fs = require('fs');
+  const path = require('path');
+
+  const homeRoutes = fs.readFileSync(
+    path.join(__dirname, '../../routes/home.js'), 'utf8',
+  );
+
+  test('no route gates on a property checkHomePermission does not return', () => {
+    // checkHomePermission returns { hasAccess, isOwner, occupancy }.
+    const offenders = homeRoutes
+      .split('\n')
+      .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+      .filter(({ line }) => /\baccess\.allowed\b/.test(line));
+
+    expect(offenders).toEqual([]);
+  });
+
+  test('checkHomePermission advertises hasAccess, never allowed', () => {
+    const perms = fs.readFileSync(
+      path.join(__dirname, '../../utils/homePermissions.js'), 'utf8',
+    );
+    const fn = perms.slice(perms.indexOf('async function checkHomePermission'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+
+    expect(body).toContain('hasAccess');
+    // the role-comparison helpers return { allowed } — that shape must not
+    // leak into checkHomePermission itself
+    expect(body).not.toMatch(/return\s*\{\s*allowed/);
+  });
+});

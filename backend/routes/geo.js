@@ -1,8 +1,14 @@
+// CST-01: every endpoint here proxies a per-request billed geocoding API.
+// They were previously mounted unauthenticated and unmetered, so anyone with
+// curl could run up the bill indefinitely. All three now require a session and
+// are metered per user.
 const express = require('express');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const { geoCache } = require('../utils/geoCache');
 const geoProvider = require('../services/geo');
+const verifyToken = require('../middleware/verifyToken');
+const { geocodeLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 
 /** Label for geo provider in log events. */
@@ -36,7 +42,7 @@ function logResponse(startTime, fields) {
 
 // ── GET /geo/autocomplete?q=... ──────────────────────────────
 
-router.get('/autocomplete', async (req, res) => {
+router.get('/autocomplete', verifyToken, geocodeLimiter, async (req, res) => {
   const startTime = process.hrtime.bigint();
   const ipHash = hashIp(req);
   const q = (req.query.q || '').toString().trim();
@@ -117,7 +123,7 @@ router.get('/autocomplete', async (req, res) => {
 
 // ── POST /geo/resolve { suggestion_id } ──────────────────────
 
-router.post('/resolve', async (req, res) => {
+router.post('/resolve', verifyToken, geocodeLimiter, async (req, res) => {
   const startTime = process.hrtime.bigint();
   const ipHash = hashIp(req);
   const suggestionId = (req.body?.suggestion_id || '').toString().trim();
@@ -182,7 +188,7 @@ router.post('/resolve', async (req, res) => {
 
 // ── GET /geo/reverse?lat=..&lon=.. ───────────────────────────
 
-router.get('/reverse', async (req, res) => {
+router.get('/reverse', verifyToken, geocodeLimiter, async (req, res) => {
   const startTime = process.hrtime.bigint();
   const ipHash = hashIp(req);
 

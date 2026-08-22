@@ -120,6 +120,23 @@ const authEndpointLimiter = rateLimit({
  * Limiter for address validation calls (Google + Smarty are billed per call).
  * 10 requests per hour per user.
  */
+/**
+ * Limiter for the geocoding proxy (/api/geo).
+ *
+ * CST-01: these endpoints are thin proxies in front of a per-request billed
+ * geocoding API. They were mounted unauthenticated and unmetered, so anyone
+ * with curl could run up the bill indefinitely (denial-of-wallet). Mounted
+ * after verifyToken so the key is a user id rather than a rotatable IP.
+ */
+const geocodeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many location lookups. Please try again later.' },
+});
+
 const addressValidationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   limit: 10,
@@ -265,6 +282,7 @@ const residencyLetterIssueLimiter = rateLimit({
 });
 
 module.exports = {
+  geocodeLimiter,
   globalWriteLimiter,
   financialWriteLimiter,
   contentCreationLimiter,
