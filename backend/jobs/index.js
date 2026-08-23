@@ -58,6 +58,7 @@ const validateHomeCoordinates = require('./validateHomeCoordinates');
 const notifyClaimWindowExpiry = require('./notifyClaimWindowExpiry');
 const expireInitiatedHomeClaims = require('./expireInitiatedHomeClaims');
 const expireAddressVerifications = require('./expireAddressVerifications');
+const purgeAddressVerificationEvents = require('./purgeAddressVerificationEvents');
 const reconcileHomeHouseholdResolution = require('./reconcileHomeHouseholdResolution');
 // Chat jobs
 const chatRedactionJob = require('./chatRedactionJob');
@@ -355,6 +356,18 @@ function startJobs() {
     timezone: 'UTC',
   });
 
+  // ─── Purge Address Verification Events ───
+  // Runs daily at 03:41 UTC.
+  // Retention for verification telemetry. The table previously grew without
+  // bound and no job touched it.
+  cron.schedule('41 3 * * *', wrapJob(
+    'purgeAddressVerificationEvents',
+    () => purgeAddressVerificationEvents(),
+  ), {
+    scheduled: true,
+    timezone: 'UTC',
+  });
+
   // ─── Expire Address Verifications ───
   // Runs hourly at :26.
   // Sweeps mail-verification attempts and postcard codes past their expiry.
@@ -513,6 +526,7 @@ function startJobs() {
       { name: 'notifyClaimWindowExpiry', schedule: 'every 2 hours at :20' },
       { name: 'expireInitiatedHomeClaims', schedule: 'hourly at :11' },
       { name: 'expireAddressVerifications', schedule: 'hourly at :26' },
+      { name: 'purgeAddressVerificationEvents', schedule: 'daily at 03:41 UTC' },
       { name: 'reconcileHomeHouseholdResolution', schedule: 'every 30 minutes at :14/:44' },
       { name: 'chatRedactionJob', schedule: 'hourly at :30' },
       { name: 'cleanupGhostBusinesses', schedule: 'daily at 2:30 AM UTC' },
