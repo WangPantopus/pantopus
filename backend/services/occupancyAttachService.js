@@ -17,6 +17,7 @@
  */
 
 const logger = require('../utils/logger');
+const verificationAge = require('../utils/verificationAge');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const { writeAuditLog, applyOccupancyTemplate, VERIFIED_TEMPLATES, ALL_FALSE_TEMPLATE } = require('../utils/homePermissions');
 
@@ -686,10 +687,16 @@ class OccupancyAttachService {
     if (existing.verification_status !== 'verified' && verificationStatus === 'verified') {
       await supabaseAdmin
         .from('HomeOccupancy')
-        .update({
-          verification_status: 'verified',
-          updated_at: new Date().toISOString(),
-        })
+        .update((() => {
+          // §5.1: record WHEN, so staleness is expressible at all.
+          const verifiedAt = new Date().toISOString();
+          return {
+            verification_status: 'verified',
+            verified_at: verifiedAt,
+            verification_expires_at: verificationAge.expiryFor(verifiedAt),
+            updated_at: verifiedAt,
+          };
+        })())
         .eq('id', existing.id);
     }
 

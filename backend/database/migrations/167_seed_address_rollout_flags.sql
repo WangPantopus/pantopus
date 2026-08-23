@@ -31,3 +31,11 @@ VALUES
   ('address.enforce_low_confidence_step_up',
    'Address: require step-up verification for LOW_CONFIDENCE verdicts.')
 ON CONFLICT ("flag_name") DO NOTHING;
+
+-- Added with migration 169: gates whether a stale verification loses trust.
+-- Seeded disabled — expiring the existing verified base is a product decision.
+INSERT INTO "public"."FeatureFlag" ("flag_name", "description")
+VALUES
+  ('address.enforce_verification_expiry',
+   'Address: treat a verification older than the validity window as stale.')
+ON CONFLICT ("flag_name") DO NOTHING;

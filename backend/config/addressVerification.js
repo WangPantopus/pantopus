@@ -113,6 +113,8 @@ function buildConfig() {
       userAddressRateLimit: envInt('MAIL_VERIFY_USER_ADDRESS_RATE_LIMIT', 2),
       addressRateWindowDays: envInt('MAIL_VERIFY_ADDRESS_RATE_WINDOW_DAYS', 7),
       stepUpMaxAgeDays: envInt('ADDRESS_STEP_UP_MAX_AGE_DAYS', 90),
+      // How long a residency verification stands before re-attestation.
+      validityDays: envInt('VERIFICATION_VALIDITY_DAYS', 365),
     },
 
     // ── Cache ────────────────────────────────────────────────
@@ -140,6 +142,10 @@ function buildConfig() {
       requireAddressIdForHomeCreate: envBool('REQUIRE_ADDRESS_ID_FOR_HOME_CREATE', false),
       enforceMixedUseStepUp: envBool('ENFORCE_MIXED_USE_STEP_UP', false),
       enforceLowConfidenceStepUp: envBool('ENFORCE_LOW_CONFIDENCE_STEP_UP', false),
+      // §5.1: whether a verification older than the validity window loses
+      // trust. Off by default — expiring the existing verified base is a
+      // product decision, so the mechanism ships before the policy.
+      enforceVerificationExpiry: envBool('ENFORCE_VERIFICATION_EXPIRY', false),
     },
   };
 }

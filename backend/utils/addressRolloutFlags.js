@@ -32,6 +32,7 @@ const FLAG_NAMES = {
   requireAddressIdForHomeCreate: 'address.require_address_id_for_home_create',
   enforceMixedUseStepUp: 'address.enforce_mixed_use_step_up',
   enforceLowConfidenceStepUp: 'address.enforce_low_confidence_step_up',
+  enforceVerificationExpiry: 'address.enforce_verification_expiry',
 };
 
 const REFRESH_INTERVAL_MS = Number(process.env.ADDRESS_ROLLOUT_REFRESH_MS || 60_000);
