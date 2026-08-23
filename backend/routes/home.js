@@ -269,6 +269,42 @@ function getHomeValidationError(verdict) {
     };
   }
 
+  // SCN-04: PO_BOX, MISSING_STREET_NUMBER and UNVERIFIED_STREET_NUMBER had no
+  // handler here and fell through to ADDRESS_VALIDATION_UNAVAILABLE — telling
+  // the user verification was "temporarily unavailable, try again in a moment"
+  // for an address that would never pass, however many times they retried.
+  if (status === AddressVerdictStatus.PO_BOX) {
+    return {
+      error: 'A PO Box cannot be used as a home address.',
+      code: 'ADDRESS_PO_BOX',
+      message: 'Please enter the street address where you live.',
+    };
+  }
+
+  if (status === AddressVerdictStatus.MISSING_STREET_NUMBER) {
+    return {
+      error: 'This address is missing a street number.',
+      code: 'ADDRESS_MISSING_STREET_NUMBER',
+      message: 'Please include the street number and try again.',
+    };
+  }
+
+  if (status === AddressVerdictStatus.UNVERIFIED_STREET_NUMBER) {
+    return {
+      error: 'We could not confirm that street number on this street.',
+      code: 'ADDRESS_UNVERIFIED_STREET_NUMBER',
+      message: 'Please double-check the street number and try again.',
+    };
+  }
+
+  if (status === AddressVerdictStatus.MIXED_USE) {
+    return {
+      error: 'This building has both homes and businesses.',
+      code: 'ADDRESS_STEP_UP_REQUIRED',
+      message: 'We need to confirm you live here before adding this home.',
+    };
+  }
+
   if (status === AddressVerdictStatus.BUSINESS) {
     return {
       error: 'This address appears to be a business or office location, not a home.',
