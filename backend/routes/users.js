@@ -4015,6 +4015,37 @@ router.delete('/account', verifyToken, async (req, res) => {
       });
     }
 
+    // LIF-02: block deletion while this user is the owner of a home that other
+    // people still live in. Home.owner_id now SET NULLs rather than cascading
+    // (migration 163), so the home itself survives — but a household left with
+    // no owner has nobody who can manage members, so make it an explicit
+    // hand-over rather than a silent one. This mirrors the gig and escrow
+    // pre-checks above.
+    const { data: ownedHomes } = await supabaseAdmin
+      .from('Home')
+      .select('id')
+      .eq('owner_id', userId);
+
+    if (ownedHomes && ownedHomes.length > 0) {
+      const homeIds = ownedHomes.map((h) => h.id);
+      const { data: coResidents } = await supabaseAdmin
+        .from('HomeOccupancy')
+        .select('home_id')
+        .in('home_id', homeIds)
+        .eq('is_active', true)
+        .neq('user_id', userId);
+
+      if (coResidents && coResidents.length > 0) {
+        const blocked = [...new Set(coResidents.map((o) => o.home_id))];
+        return res.status(409).json({
+          error: 'Cannot delete account while you own a home that other people live in. '
+            + 'Transfer ownership or remove the other residents first.',
+          code: 'HOME_TRANSFER_REQUIRED',
+          homeCount: blocked.length,
+        });
+      }
+    }
+
     // ── 2. Nullify bare FK columns (NO ON DELETE clause) ─────────
     // These columns reference User(id) without an ON DELETE rule,
     // meaning PostgreSQL defaults to NO ACTION which blocks deletion.

@@ -80,6 +80,10 @@ let _authMocks = {
     error: null,
   }),
   adminSignOut: async () => ({ data: null, error: null }),
+  adminGetUserById: async (id) => ({
+    data: { user: { id, last_sign_in_at: new Date().toISOString() } },
+    error: null,
+  }),
 };
 
 function resetTables() {
@@ -159,6 +163,10 @@ function resetTables() {
       error: null,
     }),
     adminSignOut: async () => ({ data: null, error: null }),
+  adminGetUserById: async (id) => ({
+    data: { user: { id, last_sign_in_at: new Date().toISOString() } },
+    error: null,
+  }),
   };
 }
 
@@ -678,6 +686,10 @@ const supabaseAdmin = {
       deleteUser: jest.fn().mockResolvedValue({ data: {}, error: null }),
       generateLink: (...args) => _authMocks.adminGenerateLink(...args),
       signOut: (...args) => _authMocks.adminSignOut(...args),
+      // Activity lookups read auth.users, not the public User table.
+      // Default: a recently-active user, so callers that fail closed on
+      // uncertainty take the "active" branch unless a test says otherwise.
+      getUserById: (...args) => _authMocks.adminGetUserById(...args),
     },
   },
 };

@@ -241,6 +241,47 @@ class OccupancyAttachService {
       return { success: false, error: 'Failed to deactivate occupancy' };
     }
 
+    // LIF-01: clear the legacy ownership pointer when the departing user is
+    // the one it names. checkHomePermission treats Home.owner_id === userId as
+    // ownership, so leaving it set means a moved-out user keeps full
+    // administrative control of the home — including deleting it — forever.
+    // The authoritative ownership record is the HomeOwner table; this column
+    // is only a legacy shortcut.
+    const { data: home, error: homeErr } = await supabaseAdmin
+      .from('Home')
+      .select('owner_id')
+      .eq('id', homeId)
+      .maybeSingle();
+
+    if (homeErr) {
+      logger.error('OccupancyAttachService.detach: home lookup failed', {
+        error: homeErr.message, homeId, userId,
+      });
+      return { success: false, error: 'Failed to deactivate occupancy' };
+    }
+
+    if (home && home.owner_id === userId) {
+      const { error: clearErr } = await supabaseAdmin
+        .from('Home')
+        .update({ owner_id: null, updated_at: now })
+        .eq('id', homeId)
+        .eq('owner_id', userId);
+
+      if (clearErr) {
+        // Do not report success: the occupancy is gone but the user would
+        // still hold owner-level access, which is the bug this prevents.
+        logger.error('OccupancyAttachService.detach: failed to clear owner_id', {
+          error: clearErr.message, homeId, userId,
+        });
+        return { success: false, error: 'Failed to revoke ownership on detach' };
+      }
+
+      await writeAuditLog(homeId, actorId || userId, 'HOME_OWNER_POINTER_CLEARED', 'Home', homeId, {
+        reason,
+        previous_owner_id: userId,
+      });
+    }
+
     await writeAuditLog(homeId, actorId || userId, 'OCCUPANCY_DETACHED', 'HomeOccupancy', occupancy.id, {
       reason,
       verification_status: verificationStatus,

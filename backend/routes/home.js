@@ -6619,7 +6619,7 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
         .insert({
           home_id: homeId,
           user_id: userId,
-          code,
+          code_hash: hashPostcardCode(code),
           status: 'pending',
           expires_at: expiresAt,
         })
@@ -6650,15 +6650,21 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
     } else {
       // PATH 3 — Normal: home has active authorities
 
-      // Check for stale authorities (all inactive for 30+ days)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: activeAuthUsers } = await supabaseAdmin
-        .from('User')
-        .select('id')
-        .in('id', authorities.map(a => a.user_id))
-        .gt('last_sign_in_at', thirtyDaysAgo);
+      // Check for stale authorities (all inactive for 30+ days).
+      //
+      // LIF-03: this used to filter `User.last_sign_in_at`, a column that does
+      // not exist on the public User table — it lives on auth.users. The query
+      // therefore errored, `activeAuthUsers` was always empty, and EVERY
+      // move-in conflict was classified "all authorities stale" and routed away
+      // from the household. Now that postcards are actually mailed, that
+      // misrouting would let a stranger bypass household approval entirely, so
+      // this reads the real source and fails closed: any uncertainty means the
+      // authorities are treated as active and the household is asked.
+      const authoritiesStale = await allAuthoritiesStale(
+        authorities.map(a => a.user_id), 30,
+      );
 
-      if (!activeAuthUsers || activeAuthUsers.length === 0) {
+      if (authoritiesStale) {
         // All authorities are stale — treat as cold-start (PATH 2 fallback)
         const code = generateSafeCode(8);
         const expiresAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
@@ -6668,7 +6674,7 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
           .insert({
             home_id: homeId,
             user_id: userId,
-            code,
+            code_hash: hashPostcardCode(code),
             status: 'pending',
             expires_at: expiresAt,
           })
@@ -6901,6 +6907,42 @@ router.post('/:id/claim/:claimId/reject', verifyToken, async (req, res) => {
  * Helper: Generate a safe alphanumeric code for postcard verification.
  * Excludes confusing characters: 0/O, 1/I/L.
  */
+/** SHA-256 of a postcard code; only the hash is persisted (migration 162). */
+function hashPostcardCode(code) {
+  return crypto.createHash('sha256').update(String(code).toUpperCase()).digest('hex');
+}
+
+/**
+ * Are ALL of these users inactive for `days`?
+ *
+ * Fails closed: if any user's activity cannot be determined, they count as
+ * active, so the caller keeps the household in the loop rather than falling
+ * back to a self-service path.
+ */
+async function allAuthoritiesStale(userIds, days) {
+  if (!Array.isArray(userIds) || userIds.length === 0) return false;
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+  for (const userId of userIds) {
+    try {
+      const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (error || !data?.user) return false;
+
+      const lastSignIn = data.user.last_sign_in_at;
+      if (!lastSignIn) return false;
+      if (new Date(lastSignIn).getTime() > cutoff) return false;
+    } catch (err) {
+      logger.warn('allAuthoritiesStale: activity lookup failed, treating as active', {
+        userId, error: err.message,
+      });
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function generateSafeCode(length) {
   const safeChars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
   const bytes = crypto.randomBytes(length);

@@ -562,6 +562,39 @@ router.delete('/:id/members/:userId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Cannot remove the home owner' });
     }
 
+    // LIF-01: self-removal used to skip the owner guard entirely, so a primary
+    // owner could leave through this route while POST /:id/move-out refused the
+    // same action with TRANSFER_REQUIRED. Keep the two paths consistent: a
+    // verified primary owner must hand over before leaving a home that still
+    // has other residents, otherwise the household is left with no owner.
+    if (isSelf) {
+      const { data: primaryOwner } = await supabaseAdmin
+        .from('HomeOwner')
+        .select('id')
+        .eq('home_id', homeId)
+        .eq('subject_id', targetUserId)
+        .eq('subject_type', 'user')
+        .eq('is_primary_owner', true)
+        .eq('owner_status', 'verified')
+        .maybeSingle();
+
+      if (primaryOwner) {
+        const { count: otherOccupants } = await supabaseAdmin
+          .from('HomeOccupancy')
+          .select('id', { count: 'exact', head: true })
+          .eq('home_id', homeId)
+          .eq('is_active', true)
+          .neq('user_id', targetUserId);
+
+        if ((otherOccupants || 0) > 0) {
+          return res.status(400).json({
+            error: 'Primary owners must transfer ownership before leaving',
+            code: 'TRANSFER_REQUIRED',
+          });
+        }
+      }
+    }
+
     // Soft-revoke via centralized gateway
     const occupancyAttachService = require('../services/occupancyAttachService');
     const detachResult = await occupancyAttachService.detach({
