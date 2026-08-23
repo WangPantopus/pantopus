@@ -460,8 +460,44 @@ export default function NewHomePage() {
           setValidatedAddressId(null);
           setError('Address verification is temporarily unavailable. Please try again.');
           return false;
-        default:
+        case 'PO_BOX':
+          setValidatedAddressId(null);
+          setFieldErrors({
+            address: 'A PO Box can’t be used as a home address. Please enter the street address where you live.',
+          });
+          setError('Please fix the highlighted fields.');
+          return false;
+        case 'MISSING_STREET_NUMBER':
+          setValidatedAddressId(null);
+          setFieldErrors({ address: 'This address is missing a street number.' });
+          setError('Please fix the highlighted fields.');
+          return false;
+        case 'UNVERIFIED_STREET_NUMBER':
+          setValidatedAddressId(null);
+          setFieldErrors({
+            address: 'We couldn’t confirm that street number on this street. Please double-check it.',
+          });
+          setError('Please fix the highlighted fields.');
+          return false;
+        case 'MIXED_USE':
+          setValidatedAddressId(null);
+          setFieldErrors({
+            address: 'This building has both homes and businesses, so we need to confirm you live here.',
+          });
+          setError('This address needs an extra verification step.');
+          return false;
+        case 'OK':
           break;
+        default:
+          // SCN-12: previously `default: break`, so any status the client did
+          // not recognise — PO_BOX, MISSING_STREET_NUMBER,
+          // UNVERIFIED_STREET_NUMBER and MIXED_USE among them — fell through
+          // and the home was created as though the address had passed. An
+          // unrecognised verdict is a refusal, not a pass: the server knows
+          // something the client does not.
+          setValidatedAddressId(null);
+          setError('We couldn’t verify this address. Please check it and try again.');
+          return false;
       }
 
       if (!validation?.address_id) {
