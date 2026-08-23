@@ -1,4 +1,5 @@
 const express = require('express');
+const { getRolloutFlag } = require('../utils/addressRolloutFlags');
 const router = express.Router();
 const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
@@ -387,7 +388,7 @@ function getCreateHomeStepUpPolicy(verdict) {
 
   if (
     verdict.status === AddressVerdictStatus.MIXED_USE &&
-    addressConfig.rollout.enforceMixedUseStepUp
+    getRolloutFlag('enforceMixedUseStepUp')
   ) {
     return {
       policy: 'mixed_use',
@@ -397,7 +398,7 @@ function getCreateHomeStepUpPolicy(verdict) {
 
   if (
     verdict.status === AddressVerdictStatus.LOW_CONFIDENCE &&
-    addressConfig.rollout.enforceLowConfidenceStepUp &&
+    getRolloutFlag('enforceLowConfidenceStepUp') &&
     isApprovedLowConfidenceStepUpCase(verdict)
   ) {
     return {
@@ -721,7 +722,7 @@ router.post('/', verifyToken, (req, res, next) => {
 
     const countryVal = country || 'US';
 
-    if (addressConfig.rollout.requireAddressIdForHomeCreate && !requestedAddressId) {
+    if (getRolloutFlag('requireAddressIdForHomeCreate') && !requestedAddressId) {
       await recordCreateHomeOutcomeSafe({
         address_id: null,
         outcome: 'blocked',
@@ -875,9 +876,9 @@ router.post('/', verifyToken, (req, res, next) => {
       const storedInputs = pipelineService.buildStoredDecisionInputs(canonicalAddress);
       addressVerdict = addressDecisionEngine.classify({
         ...storedInputs,
-        use_provider_place_for_business: addressConfig.rollout.enforcePlaceProviderBusiness,
-        use_provider_unit_intelligence: addressConfig.rollout.enableSecondaryProvider,
-        use_provider_parcel_for_classification: addressConfig.rollout.enforceParcelProviderClassification,
+        use_provider_place_for_business: getRolloutFlag('enforcePlaceProviderBusiness'),
+        use_provider_unit_intelligence: getRolloutFlag('enableSecondaryProvider'),
+        use_provider_parcel_for_classification: getRolloutFlag('enforceParcelProviderClassification'),
         provider_parcel_max_age_days: addressConfig.parcelIntel.cacheDays,
       });
 
@@ -921,9 +922,9 @@ router.post('/', verifyToken, (req, res, next) => {
       const storedInputs = pipelineService.buildStoredDecisionInputs(canonicalAddress);
       addressVerdict = addressDecisionEngine.classify({
         ...storedInputs,
-        use_provider_place_for_business: addressConfig.rollout.enforcePlaceProviderBusiness,
-        use_provider_unit_intelligence: addressConfig.rollout.enableSecondaryProvider,
-        use_provider_parcel_for_classification: addressConfig.rollout.enforceParcelProviderClassification,
+        use_provider_place_for_business: getRolloutFlag('enforcePlaceProviderBusiness'),
+        use_provider_unit_intelligence: getRolloutFlag('enableSecondaryProvider'),
+        use_provider_parcel_for_classification: getRolloutFlag('enforceParcelProviderClassification'),
         provider_parcel_max_age_days: addressConfig.parcelIntel.cacheDays,
       });
     } else if (

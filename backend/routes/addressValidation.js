@@ -10,6 +10,7 @@
  */
 
 const express = require('express');
+const { getRolloutFlag } = require('../utils/addressRolloutFlags');
 const router = express.Router();
 const Joi = require('joi');
 const supabaseAdmin = require('../config/supabaseAdmin');
@@ -282,9 +283,9 @@ router.post(
 
         const verdict = decisionEngine.classify({
           ...storedInputs,
-          use_provider_place_for_business: addressConfig.rollout.enforcePlaceProviderBusiness,
-          use_provider_unit_intelligence: addressConfig.rollout.enableSecondaryProvider,
-          use_provider_parcel_for_classification: addressConfig.rollout.enforceParcelProviderClassification,
+          use_provider_place_for_business: getRolloutFlag('enforcePlaceProviderBusiness'),
+          use_provider_unit_intelligence: getRolloutFlag('enableSecondaryProvider'),
+          use_provider_parcel_for_classification: getRolloutFlag('enforceParcelProviderClassification'),
           provider_parcel_max_age_days: addressConfig.parcelIntel.cacheDays,
         });
 

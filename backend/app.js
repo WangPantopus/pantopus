@@ -453,6 +453,11 @@ assertPersonaFollowViewActive();
 const PORT = process.env.PORT || 8000;
 const HOST = process.env.HOST || '0.0.0.0'; // 0.0.0.0 = accept connections from LAN (e.g. mobile device)
 
+// Validate address verification config BEFORE accepting traffic. This used to
+// run inside the listen callback, so in production the process bound the port,
+// began serving requests, and only then process.exit(1)'d on missing keys.
+require('./config/addressVerification').validate();
+
 server.listen(PORT, HOST, () => {
   logger.info(`🚀 Pantopus Backend Server started`, {
     host: HOST,
@@ -476,8 +481,10 @@ server.listen(PORT, HOST, () => {
     secretKey: process.env.AWS_SECRET_ACCESS_KEY ? '✓ Set' : '✗ Missing',
   });
 
-  // Validate address verification config (exits in prod if keys missing)
-  require('./config/addressVerification').validate();
+  // Begin polling the address rollout flags so enforcement posture can be
+  // changed at runtime through the admin feature-flag route instead of
+  // requiring an environment change and a redeploy.
+  require('./utils/addressRolloutFlags').startRolloutFlagRefresh();
 
   // Start background jobs (cron-based)
   startJobs();
