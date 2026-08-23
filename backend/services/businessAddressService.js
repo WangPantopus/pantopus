@@ -230,8 +230,71 @@ function inferLocationType(input, cmraResult) {
 
 // ── Step 5: Conflict / Duplicate Check ───────────────────────
 
+/**
+ * Does a verified household already live at this address?
+ *
+ * CRIT-01: businessAddressService is a second, complete address-decision engine
+ * that shared computeAddressHash with the residential pipeline and never
+ * consulted it. Its conflict check queried only BusinessLocation, and the
+ * residential side was equally blind in reverse. A user could therefore file a
+ * business at a stranger's — or an ex-partner's — verified home address, and
+ * because a `storefront` location publishes address, city, state, zipcode and
+ * an exact map pin, that address became public. The residential CONFLICT
+ * verdict, the check-address gate and the household-collision detector were all
+ * bypassed simply by using the business endpoint instead.
+ *
+ * The collision was always computable; it was just never computed.
+ */
+async function findHouseholdAtAddress(hash) {
+  if (!hash) return null;
+
+  const { data: homes, error } = await supabaseAdmin
+    .from('Home')
+    .select('id')
+    .eq('address_hash', hash)
+    .limit(25);
+
+  if (error) {
+    logger.warn('Household conflict probe failed', { error: error.message });
+    // Fail closed: treat an unreadable household table as a possible conflict
+    // rather than publishing someone's home address on the strength of a
+    // failed query.
+    return { unknown: true };
+  }
+
+  if (!homes || homes.length === 0) return null;
+
+  const { data: occupants, error: occErr } = await supabaseAdmin
+    .from('HomeOccupancy')
+    .select('id')
+    .in('home_id', homes.map((h) => h.id))
+    .eq('is_active', true)
+    .limit(1);
+
+  if (occErr) {
+    logger.warn('Household occupancy probe failed', { error: occErr.message });
+    return { unknown: true };
+  }
+
+  return (occupants && occupants.length > 0) ? { homeIds: homes.map((h) => h.id) } : null;
+}
+
 async function checkConflicts(normalized, hash, businessUserId) {
   try {
+    // A residential household at this address is a conflict regardless of what
+    // other businesses are registered there.
+    const household = await findHouseholdAtAddress(hash);
+    if (household) {
+      return {
+        has_conflict: true,
+        conflicting_location_ids: [],
+        status: 'conflict',
+        reasons: household.unknown
+          ? ['household_check_unavailable']
+          : ['residential_household_at_address'],
+      };
+    }
+
     let query = supabaseAdmin
       .from('BusinessLocation')
       .select('id, business_user_id, address_hash, address2')
