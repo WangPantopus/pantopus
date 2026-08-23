@@ -282,6 +282,19 @@ class OccupancyAttachService {
       });
     }
 
+    // LIF-06: a residency letter asserts to landlords, schools and the DMV that
+    // this person lives here. Ending residency must retire the credential;
+    // previously it survived move-out, eviction and removal untouched.
+    try {
+      const residencyLetterService = require('./residencyLetterService');
+      await residencyLetterService.revokeLettersForResidency(homeId, userId, `residency_${reason || 'ended'}`);
+    } catch (err) {
+      // Never block the detach itself on this, but make the gap visible.
+      logger.error('OccupancyAttachService.detach: letter revocation failed', {
+        homeId, userId, error: err.message,
+      });
+    }
+
     await writeAuditLog(homeId, actorId || userId, 'OCCUPANCY_DETACHED', 'HomeOccupancy', occupancy.id, {
       reason,
       verification_status: verificationStatus,
