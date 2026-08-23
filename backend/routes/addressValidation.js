@@ -31,6 +31,7 @@ const decisionEngine = require('../services/addressValidation/addressDecisionEng
 const mailVerificationService = require('../services/addressValidation/mailVerificationService');
 const pipelineService = require('../services/addressValidation/pipelineService');
 const addressVerificationObservability = require('../services/addressValidation/addressVerificationObservability');
+const addressReviewService = require('../services/addressValidation/addressReviewService');
 const { AddressVerdictStatus } = require('../services/addressValidation/types');
 
 // ============================================================
@@ -122,6 +123,15 @@ router.post(
 
       const result = await pipelineService.runValidationPipeline(input, {
         auditContext: { trigger: 'validate' },
+      });
+
+      // SCN-11: six rungs of the ladder emit `manual_review` as their next
+      // action. Nothing used to consume it, so every escalation was a dead end.
+      await addressReviewService.openCase({
+        addressId: result.address_id,
+        userId,
+        verdict: result.verdict,
+        trigger: 'validate',
       });
 
       return res.json({
