@@ -617,6 +617,19 @@ export default function NewHomePage() {
       fieldErrors[field] ? 'border-red-300 bg-red-50/40' : 'border-app-border'
     }`;
 
+  /**
+   * Spread onto an input so an invalid field is conveyed to assistive tech,
+   * not only by a red border.
+   *
+   * UX-05: error state was signalled with colour alone (WCAG 1.4.1) and no
+   * aria-invalid, so a screen reader user was never told which field was
+   * rejected — or that one had been.
+   */
+  const fieldA11y = (field: string) =>
+    (fieldErrors[field]
+      ? { 'aria-invalid': true as const, 'aria-describedby': `err-${field}` }
+      : {});
+
   // --- Derived display helpers ---
   const homeTypeLabel = HOME_TYPES.find(t => t.value === homeType)?.label || homeType;
   const homeTypeIcon = HOME_TYPES.find(t => t.value === homeType)?.icon || '🏠';
@@ -697,8 +710,17 @@ export default function NewHomePage() {
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-app-surface rounded-xl border border-app-border p-6">
+          {/*
+            UX-05: async verdicts and submit failures were rendered purely
+            visually, so a screen reader user got no indication that anything
+            had gone wrong — the form simply did not advance. role="alert"
+            makes the failure interrupt and be read.
+          */}
           {error ? (
-            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div
+              role="alert"
+              className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+            >
               {error}
             </div>
           ) : null}
@@ -749,15 +771,18 @@ export default function NewHomePage() {
               ) : (
                 <p className="text-sm text-app-text-muted">Start typing, then pick a suggestion to verify.</p>
               )}
-              {fieldErrors.location ? <p className="text-xs text-red-600">{fieldErrors.location}</p> : null}
-              {fieldErrors.address ? <p className="text-xs text-red-600">{fieldErrors.address}</p> : null}
-              {fieldErrors.city ? <p className="text-xs text-red-600">{fieldErrors.city}</p> : null}
-              {fieldErrors.state ? <p className="text-xs text-red-600">{fieldErrors.state}</p> : null}
-              {fieldErrors.zipcode ? <p className="text-xs text-red-600">{fieldErrors.zipcode}</p> : null}
+              {fieldErrors.location ? <p id="err-location" role="alert" className="text-xs text-red-600">{fieldErrors.location}</p> : null}
+              {fieldErrors.address ? <p id="err-address" role="alert" className="text-xs text-red-600">{fieldErrors.address}</p> : null}
+              {fieldErrors.city ? <p id="err-city" role="alert" className="text-xs text-red-600">{fieldErrors.city}</p> : null}
+              {fieldErrors.state ? <p id="err-state" role="alert" className="text-xs text-red-600">{fieldErrors.state}</p> : null}
+              {fieldErrors.zipcode ? <p id="err-zipcode" role="alert" className="text-xs text-red-600">{fieldErrors.zipcode}</p> : null}
 
               <div>
-                <label className="block text-sm font-medium text-app-text-strong mb-2">Unit / Apt # (optional)</label>
+                <label htmlFor="home-unit" className="block text-sm font-medium text-app-text-strong mb-2">
+                  Unit / Apt # (optional)
+                </label>
                 <input
+                  id="home-unit"
                   value={unit}
                   onChange={e => {
                     resetAddressValidation();
@@ -765,8 +790,26 @@ export default function NewHomePage() {
                   }}
                   placeholder="e.g. Apt 12B"
                   className={inputClass('unit_number')}
+                  aria-invalid={fieldErrors.unit_number ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.unit_number ? 'err-unit_number home-unit-hint' : 'home-unit-hint'
+                  }
                 />
-                {fieldErrors.unit_number ? <p className="mt-1 text-xs text-red-600">{fieldErrors.unit_number}</p> : null}
+                {/*
+                  UX-04: the prompt used to say only "this address needs a unit
+                  number", with no indication of the accepted format and no way
+                  forward for someone whose home genuinely has none — which is
+                  an unbreakable loop for basement, rear, ADU and duplex
+                  "Unit 1" addresses that USPS does not list.
+                */}
+                <p id="home-unit-hint" className="mt-1 text-xs text-app-text-secondary">
+                  Apt 12B, Unit 4, Ste 200, #3 — whichever appears on your mail.
+                </p>
+                {fieldErrors.unit_number ? (
+                  <p id="err-unit_number" role="alert" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.unit_number}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
@@ -890,26 +933,30 @@ export default function NewHomePage() {
                 <div>
                   <label className="block text-sm font-medium text-app-text-strong mb-2">Bedrooms</label>
                   <input type="number" min="0" value={bedrooms} onChange={e => setBedrooms(e.target.value)} placeholder="—"
-                    className={inputClass('bedrooms')} />
-                  {fieldErrors.bedrooms ? <p className="mt-1 text-xs text-red-600">{fieldErrors.bedrooms}</p> : null}
+                    className={inputClass('bedrooms')}
+                  {...fieldA11y('bedrooms')} />
+                  {fieldErrors.bedrooms ? <p id="err-bedrooms" role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.bedrooms}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-app-text-strong mb-2">Bathrooms</label>
                   <input type="number" min="0" step="0.5" value={bathrooms} onChange={e => setBathrooms(e.target.value)} placeholder="—"
-                    className={inputClass('bathrooms')} />
-                  {fieldErrors.bathrooms ? <p className="mt-1 text-xs text-red-600">{fieldErrors.bathrooms}</p> : null}
+                    className={inputClass('bathrooms')}
+                  {...fieldA11y('bathrooms')} />
+                  {fieldErrors.bathrooms ? <p id="err-bathrooms" role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.bathrooms}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-app-text-strong mb-2">Sq ft</label>
                   <input type="number" min="0" value={sqft} onChange={e => setSqft(e.target.value)} placeholder="—"
-                    className={inputClass('sq_ft')} />
-                  {fieldErrors.sq_ft ? <p className="mt-1 text-xs text-red-600">{fieldErrors.sq_ft}</p> : null}
+                    className={inputClass('sq_ft')}
+                  {...fieldA11y('sq_ft')} />
+                  {fieldErrors.sq_ft ? <p id="err-sq_ft" role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.sq_ft}</p> : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-app-text-strong mb-2">Year built</label>
                   <input type="number" min="1600" max="2100" value={yearBuilt} onChange={e => setYearBuilt(e.target.value)} placeholder="—"
-                    className={inputClass('year_built')} />
-                  {fieldErrors.year_built ? <p className="mt-1 text-xs text-red-600">{fieldErrors.year_built}</p> : null}
+                    className={inputClass('year_built')}
+                  {...fieldA11y('year_built')} />
+                  {fieldErrors.year_built ? <p id="err-year_built" role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.year_built}</p> : null}
                 </div>
               </div>
 
@@ -922,8 +969,9 @@ export default function NewHomePage() {
                   onChange={e => setLotSqft(e.target.value)}
                   placeholder="—"
                   className={inputClass('lot_sq_ft')}
+                  {...fieldA11y('lot_sq_ft')}
                 />
-                {fieldErrors.lot_sq_ft ? <p className="mt-1 text-xs text-red-600">{fieldErrors.lot_sq_ft}</p> : null}
+                {fieldErrors.lot_sq_ft ? <p id="err-lot_sq_ft" role="alert" className="mt-1 text-xs text-red-600">{fieldErrors.lot_sq_ft}</p> : null}
               </div>
 
               {/* Description */}
