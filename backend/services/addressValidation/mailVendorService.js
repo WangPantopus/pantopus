@@ -18,6 +18,7 @@ const logger = require('../../utils/logger');
 const supabaseAdmin = require('../../config/supabaseAdmin');
 const lobMailProvider = require('./lobMailProvider');
 const mockMailProvider = require('./mockMailProvider');
+const observability = require('./addressVerificationObservability');
 
 /** Remove any persisted plaintext code from a metadata blob. */
 function stripCode(metadata) {
@@ -268,6 +269,15 @@ class MailVendorService {
       vendorJobId,
       eventType,
       newStatus,
+    });
+
+    // The delivery signal was previously collected from Lob and discarded.
+    await observability.recordMailLifecycleEvent({
+      step: 'vendor_status',
+      status: newStatus,
+      attemptId: job.attempt_id,
+      vendor: job.vendor || null,
+      detail: { event_type: eventType },
     });
 
     return { success: true };

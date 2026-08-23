@@ -254,3 +254,36 @@ describe('SCN-06 — a correct code with no occupancy is not reported as success
     expect(attempt.status).toBe('verified');
   });
 });
+
+describe('REL — the mail lifecycle is observable, and never logs a code', () => {
+  const observability = require('../../services/addressValidation/addressVerificationObservability');
+
+  test('starting a verification emits an event', async () => {
+    await mailVerificationService.startVerification('user-1', 'addr-1');
+
+    const events = getTable('AddressVerificationEvent');
+    const start = events.find((e) => e.event_type === 'mail_start');
+    expect(start).toBeDefined();
+    expect(start.status).toBe('ok');
+  });
+
+  test('no emitted event ever carries the verification code', async () => {
+    await mailVerificationService.startVerification('user-1', 'addr-1');
+    const code = mockDispatchPostcard.mock.calls[0][1];
+
+    const serialized = JSON.stringify(getTable('AddressVerificationEvent'));
+    expect(serialized).not.toContain(code);
+  });
+
+  test('a code cannot be smuggled through the detail field', async () => {
+    await observability.recordMailLifecycleEvent({
+      step: 'test',
+      status: 'ok',
+      detail: { code: '424242', unit_supplied: true },
+    });
+
+    const serialized = JSON.stringify(getTable('AddressVerificationEvent'));
+    expect(serialized).not.toContain('424242');
+    expect(serialized).toContain('unit_supplied');
+  });
+});

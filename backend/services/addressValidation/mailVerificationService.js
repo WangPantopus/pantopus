@@ -21,6 +21,7 @@ const logger = require('../../utils/logger');
 const supabaseAdmin = require('../../config/supabaseAdmin');
 const addressConfig = require('../../config/addressVerification');
 const mailVendorService = require('./mailVendorService');
+const observability = require('./addressVerificationObservability');
 
 // ── Constants (from config, with env-var overrides) ──────────
 
@@ -243,12 +244,28 @@ class MailVerificationService {
         jobId: job?.id || null,
         error: dispatchResult.error,
       });
+      await observability.recordMailLifecycleEvent({
+        step: 'dispatch',
+        status: 'failed',
+        addressId,
+        attemptId: attempt.id,
+        reasons: [dispatchResult.error || 'dispatch_failed'],
+      });
+
       await this._deleteAttemptArtifacts(attempt.id);
       return { success: false, error: 'Failed to send verification mail' };
     }
 
     logger.info('MailVerificationService.startVerification: created', {
       userId, addressId, attemptId: attempt.id,
+    });
+
+    await observability.recordMailLifecycleEvent({
+      step: 'start',
+      status: 'ok',
+      addressId,
+      attemptId: attempt.id,
+      detail: { unit_supplied: !!unit },
     });
 
     return {
@@ -600,6 +617,14 @@ class MailVerificationService {
         .from('AddressVerificationAttempt')
         .update({ status: 'locked', updated_at: new Date().toISOString() })
         .eq('id', attemptId);
+
+      await observability.recordMailLifecycleEvent({
+        step: 'confirm',
+        status: 'locked',
+        attemptId,
+        reasons: ['max_attempts_exceeded'],
+      });
+
       return { verified: false, locked: true, error: 'Too many attempts. Request a new code.' };
     }
 
@@ -676,6 +701,14 @@ class MailVerificationService {
         attemptId, userId, addressId: attempt.address_id,
       });
 
+      await observability.recordMailLifecycleEvent({
+        step: 'confirm',
+        status: 'partial',
+        addressId: attempt.address_id,
+        attemptId,
+        reasons: ['no_occupancy_attached'],
+      });
+
       return {
         verified: false,
         code_accepted: true,
@@ -687,6 +720,13 @@ class MailVerificationService {
 
     logger.info('MailVerificationService.confirmCode: verified', {
       attemptId, userId, occupancyId: occupancyResult.occupancy_id,
+    });
+
+    await observability.recordMailLifecycleEvent({
+      step: 'confirm',
+      status: 'ok',
+      addressId: attempt.address_id,
+      attemptId,
     });
 
     return {
