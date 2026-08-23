@@ -362,6 +362,7 @@ describe('rate limiting', () => {
 describe('resend rotates code', () => {
   test('resend generates new code and invalidates old', async () => {
     seedDeliverableAddress();
+    seedHome(); // confirmCode now reports failure if no occupancy can be attached
 
     const startResult = await service.startVerification('user-1', 'addr-1');
     const originalCode = extractCode();

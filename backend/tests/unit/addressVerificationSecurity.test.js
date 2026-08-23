@@ -226,3 +226,31 @@ describe('PRV-05 — residency is not an anonymous oracle', () => {
     expect(res).toEqual({ hasHome: false, city: null, state: null, verified: false });
   });
 });
+
+describe('SCN-06 — a correct code with no occupancy is not reported as success', () => {
+  test('reports failure, flags support, and does not claim verification', async () => {
+    // No Home row for this address, so the occupancy attach finds nothing.
+    // The old code returned { verified: true, occupancy_id: null } and the user
+    // saw a success screen while holding no residency at all.
+    const start = await mailVerificationService.startVerification('user-1', 'addr-1');
+    const code = mockDispatchPostcard.mock.calls[0][1];
+
+    const res = await mailVerificationService.confirmCode(start.attempt_id, code, 'user-1');
+
+    expect(res.verified).toBe(false);
+    expect(res.code_accepted).toBe(true);
+    expect(res.needs_support).toBe(true);
+    expect(res.error).toMatch(/contact support/i);
+  });
+
+  test('the code is still consumed, so it cannot be replayed', async () => {
+    const start = await mailVerificationService.startVerification('user-1', 'addr-1');
+    const code = mockDispatchPostcard.mock.calls[0][1];
+
+    await mailVerificationService.confirmCode(start.attempt_id, code, 'user-1');
+
+    const attempt = getTable('AddressVerificationAttempt')
+      .find((a) => a.id === start.attempt_id);
+    expect(attempt.status).toBe('verified');
+  });
+});

@@ -1328,8 +1328,15 @@ router.post('/:id/transfer-admin', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Home not found' });
     }
 
+    // SEC-13: this said "Only the primary owner can transfer admin" but checked
+    // only isOwner, which isVerifiedOwner returns true for ANY verified owner.
+    // Any co-owner could therefore seize primary ownership from the actual
+    // primary owner. The helper already reports isPrimary; the route ignored it.
     const transferOwnerCheck = await isVerifiedOwner(homeId, actorId);
-    if (!transferOwnerCheck.isOwner && home.owner_id !== actorId) {
+    const isPrimaryOwner = transferOwnerCheck.isOwner && transferOwnerCheck.isPrimary;
+    const isLegacyOwner = home.owner_id === actorId;
+
+    if (!isPrimaryOwner && !isLegacyOwner) {
       return res.status(403).json({ error: 'Only the primary owner can transfer admin' });
     }
 

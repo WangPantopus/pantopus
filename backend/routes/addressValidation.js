@@ -305,7 +305,11 @@ router.post(
         storedStatus === AddressVerdictStatus.LOW_CONFIDENCE
       ) {
         claimStatus = 'pending';
-        verificationMethod = 'escalation_required';
+        // ARC-01: 'escalation_required' is not one of the values
+        // AddressClaim_verification_method_chk permits, so even with the
+        // column list corrected this insert would still have been rejected.
+        // A pending claim awaiting review is 'manual_review'.
+        verificationMethod = 'manual_review';
       } else {
         // UNDELIVERABLE, BUSINESS, MISSING_UNIT, SERVICE_ERROR, CONFLICT, etc.
         const verdictMessages = {
@@ -339,14 +343,21 @@ router.post(
       }
 
       // ── Create the AddressClaim ────────────────────────────
+      // ARC-01: this insert used to supply `confidence` and `verdict_status`,
+      // neither of which is a column on AddressClaim (migration 067) — the
+      // table carries a `verdict_snapshot` jsonb instead. PostgREST rejects
+      // unknown columns, so every call to this route 500'd, and this is the
+      // only writer of AddressClaim in the codebase.
       const claim = {
         user_id: userId,
         address_id,
         unit_number: unit || null,
         claim_status: claimStatus,
         verification_method: verificationMethod,
-        confidence: storedConfidence,
-        verdict_status: storedStatus,
+        verdict_snapshot: {
+          status: storedStatus,
+          confidence: storedConfidence,
+        },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

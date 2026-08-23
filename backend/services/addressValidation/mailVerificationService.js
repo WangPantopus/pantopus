@@ -663,13 +663,35 @@ class MailVerificationService {
     // ── 8. Create/update HomeOccupancy ───────────────────────
     const occupancyResult = await this._attachOccupancy(userId, attempt.address_id);
 
+    // SCN-06: this used to return verified:true with occupancy_id:null when the
+    // attach silently no-opped — because the Home had been deleted mid-flight,
+    // or the address had duplicate homes and .maybeSingle() returned null. The
+    // user typed the right code, saw a success screen, and had no residency and
+    // no way to tell. Report the partial state honestly.
+    //
+    // The attempt stays 'verified' either way: the code was genuinely proven,
+    // and must not become replayable just because the follow-up failed.
+    if (!occupancyResult.occupancy_id) {
+      logger.error('MailVerificationService.confirmCode: verified but no occupancy attached', {
+        attemptId, userId, addressId: attempt.address_id,
+      });
+
+      return {
+        verified: false,
+        code_accepted: true,
+        needs_support: true,
+        error: 'Your code was correct, but we could not finish setting up your home. '
+          + 'Please contact support — you will not need to request another code.',
+      };
+    }
+
     logger.info('MailVerificationService.confirmCode: verified', {
       attemptId, userId, occupancyId: occupancyResult.occupancy_id,
     });
 
     return {
       verified: true,
-      occupancy_id: occupancyResult.occupancy_id || null,
+      occupancy_id: occupancyResult.occupancy_id,
     };
   }
 

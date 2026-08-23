@@ -811,6 +811,7 @@ describe('Full flow: start → confirm', () => {
 
   test('start then resend then confirm with new code', async () => {
     seedAddress();
+    seedHome(); // confirmCode now reports failure if no occupancy can be attached
 
     const startResult = await service.startVerification('user-1', 'addr-1');
     expect(startResult.success).toBe(true);
