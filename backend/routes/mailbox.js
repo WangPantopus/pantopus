@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const supabaseAdmin = require('../config/supabaseAdmin');
+const { getAccessibleHomeIds } = require('../utils/homeMailAccess');
 const verifyToken = require('../middleware/verifyToken');
 const validate = require('../middleware/validate');
 const Joi = require('joi');
@@ -748,36 +749,6 @@ const sendHomeVerificationRequired = (res) =>
     code: HOME_ADDRESS_VERIFICATION_REQUIRED_CODE,
   });
 
-const getAccessibleHomeIds = async (userId) => {
-  const homeIdSet = new Set();
-
-  const [occupancyRes, ownerRes] = await Promise.allSettled([
-    supabaseAdmin
-      .from('HomeOccupancy')
-      .select('home_id')
-      .eq('user_id', userId),
-    supabaseAdmin
-      .from('Home')
-      .select('id')
-      .eq('owner_id', userId)
-  ]);
-
-  if (occupancyRes.status === 'fulfilled') {
-    const rows = occupancyRes.value?.data || [];
-    rows.forEach((row) => {
-      if (row?.home_id) homeIdSet.add(row.home_id);
-    });
-  }
-
-  if (ownerRes.status === 'fulfilled') {
-    const rows = ownerRes.value?.data || [];
-    rows.forEach((row) => {
-      if (row?.id) homeIdSet.add(row.id);
-    });
-  }
-
-  return Array.from(homeIdSet);
-};
 
 const applyMailboxScopeToQuery = (query, { scope, userId, homeId, accessibleHomeIds }) => {
   if (scope === 'home') {

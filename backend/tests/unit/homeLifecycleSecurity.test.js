@@ -92,3 +92,53 @@ describe('LIF-01 — moving out revokes legacy ownership', () => {
     expect(occ.end_at).toBeTruthy();
   });
 });
+
+describe('CRIT-03 — household mail access has exactly one definition', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const routesDir = path.join(__dirname, '../../routes');
+
+  test('no route file defines its own getAccessibleHomeIds', () => {
+    // Four copies filtered is_active; the fifth (mailbox.js) did not, so a
+    // moved-out roommate kept reading the household's physical mail there.
+    const offenders = fs.readdirSync(routesDir)
+      .filter((f) => f.endsWith('.js'))
+      .filter((f) => {
+        const src = fs.readFileSync(path.join(routesDir, f), 'utf8');
+        return /(?:async\s+function|const)\s+getAccessibleHomeIds\s*(?:\(|=)/.test(src);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  test('the shared helper requires an active occupancy', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../utils/homeMailAccess.js'), 'utf8',
+    );
+    expect(src).toContain("eq('is_active', true)");
+    // and must not re-admit the legacy owner_id leg
+    expect(src).not.toContain("eq('owner_id'");
+  });
+});
+
+describe('CRIT-03 — the shared helper fails closed', () => {
+  const { getAccessibleHomeIds } = require('../../utils/homeMailAccess');
+
+  test('returns nothing for a user with only an inactive occupancy', async () => {
+    seedTable('HomeOccupancy', [{
+      id: 'occ-x', home_id: 'home-9', user_id: 'moved-out', is_active: false,
+    }]);
+    await expect(getAccessibleHomeIds('moved-out')).resolves.toEqual([]);
+  });
+
+  test('returns the home for an active occupant', async () => {
+    seedTable('HomeOccupancy', [{
+      id: 'occ-y', home_id: 'home-9', user_id: 'resident', is_active: true,
+    }]);
+    await expect(getAccessibleHomeIds('resident')).resolves.toEqual(['home-9']);
+  });
+
+  test('returns nothing for a missing user id', async () => {
+    await expect(getAccessibleHomeIds(null)).resolves.toEqual([]);
+  });
+});

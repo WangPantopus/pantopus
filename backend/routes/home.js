@@ -20,6 +20,8 @@ const {
   mapLegacyRole,
   writeAuditLog,
   applyOccupancyTemplate,
+  getActiveOccupancy,
+  assertCanMutateTarget,
 } = require('../utils/homePermissions');
 const { getClaimRiskScore } = require('../utils/homeSecurityPolicy');
 const homeClaimCompatService = require('../services/homeClaimCompatService');
@@ -2020,10 +2022,52 @@ router.post('/invitations/:invitationId/reject', verifyToken, async (req, res) =
     const { invitationId } = req.params;
     const userId = req.user.id;
 
+    // SEC-09: this route read userId and never used it, so any authenticated
+    // account could revoke any invitation by id — enough to block every
+    // household on the platform from adding members. Only the person the
+    // invitation is addressed to, or someone who can manage members on that
+    // home, may reject it.
+    const { data: invite, error: lookupErr } = await supabaseAdmin
+      .from('HomeInvite')
+      .select('id, home_id, invitee_user_id, invitee_email, status')
+      .eq('id', invitationId)
+      .maybeSingle();
+
+    if (lookupErr) {
+      logger.error('Error loading invitation', { error: lookupErr.message });
+      return res.status(500).json({ error: 'Failed to reject invitation' });
+    }
+
+    if (!invite) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    let permitted = invite.invitee_user_id === userId;
+
+    if (!permitted && invite.invitee_email) {
+      const { data: me } = await supabaseAdmin
+        .from('User')
+        .select('email')
+        .eq('id', userId)
+        .maybeSingle();
+      permitted = !!me?.email
+        && me.email.toLowerCase() === invite.invitee_email.toLowerCase();
+    }
+
+    if (!permitted) {
+      const access = await checkHomePermission(invite.home_id, userId, 'members.manage');
+      permitted = access.hasAccess;
+    }
+
+    if (!permitted) {
+      return res.status(403).json({ error: 'Not authorized to reject this invitation' });
+    }
+
     const { error } = await supabaseAdmin
       .from('HomeInvite')
       .update({ status: 'revoked' })
-      .eq('id', invitationId);
+      .eq('id', invitationId)
+      .eq('status', 'pending');
 
     if (error) {
       logger.error('Error rejecting invitation', { error: error.message });
@@ -5894,6 +5938,30 @@ router.post('/:id/invite', verifyToken, async (req, res) => {
 
     // Validate: manager and service_provider roles require a targeted invite
     const proposedRoleBase = mapLegacyRole(relationship || 'member');
+
+    // SEC-07: an invite could propose `owner`, which mapLegacyRole turns into a
+    // full IAM owner. Combined with the absence of a rank check, an admin
+    // holding can_manage_access could mint an owner ranked above themselves,
+    // taking over the household — and it bypassed the address-claim gate that
+    // ownership is supposed to require. Ownership is transferred through the
+    // claim and transfer flows, never through an invitation.
+    if (proposedRoleBase === 'owner') {
+      return res.status(400).json({
+        error: 'Ownership cannot be granted by invitation. Use the ownership transfer flow.',
+        code: 'OWNER_INVITE_FORBIDDEN',
+      });
+    }
+
+    // The inviter may not propose a role at or above their own rank.
+    const inviterOccupancy = await getActiveOccupancy(homeId, userId);
+    const inviterRoleBase = access.isOwner
+      ? 'owner'
+      : (inviterOccupancy?.role_base || mapLegacyRole(inviterOccupancy?.role) || 'member');
+
+    const rankCheck = assertCanMutateTarget(inviterRoleBase, proposedRoleBase);
+    if (!rankCheck.allowed) {
+      return res.status(403).json({ error: rankCheck.reason });
+    }
     if (isOpenInvite && (proposedRoleBase === 'manager' || proposedRoleBase === 'service_provider')) {
       return res.status(400).json({
         error: 'Property managers and service providers must be invited by email or user ID',
