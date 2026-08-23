@@ -125,7 +125,7 @@ class MailVerificationService {
     }
 
     // ── 2. Check for household authority conflict ────────────
-    const conflictCheck = await this._checkHouseholdConflict(addressId);
+    const conflictCheck = await this._checkHouseholdConflict(addressId, userId);
     if (conflictCheck.blocked) {
       return { success: false, error: conflictCheck.reason };
     }
@@ -762,12 +762,35 @@ class MailVerificationService {
    * @param {string} addressId
    * @returns {Promise<{blocked: boolean, reason?: string}>}
    */
-  async _checkHouseholdConflict(addressId) {
-    // Find homes at this address
-    const { data: homes } = await supabaseAdmin
+  /**
+   * Should a mail-code verification be refused because a household already
+   * lives here?
+   *
+   * SCN-03: this used to key entirely on `HomeAuthority.status === 'verified'`.
+   * Nothing in the codebase can set that status — the landlord/authority path
+   * has no route that calls verifyAuthority — so the list was always empty,
+   * the gate always returned blocked:false, and anyone holding a mailed code
+   * joined an already-occupied household with no approval from anyone living
+   * there. It also used .maybeSingle() on a query that returns one row per
+   * admin, which errors when a home has more than one, failing open exactly
+   * on the busiest households.
+   *
+   * The gate now keys on active occupancy, which is state the system actually
+   * maintains. An address with existing residents routes through the claim and
+   * approval flow instead of self-service mail.
+   */
+  async _checkHouseholdConflict(addressId, userId) {
+    const { data: homes, error: homesErr } = await supabaseAdmin
       .from('Home')
       .select('id')
       .eq('address_id', addressId);
+
+    if (homesErr) {
+      logger.error('MailVerificationService._checkHouseholdConflict: failing closed', {
+        addressId, error: homesErr.message,
+      });
+      return { blocked: true, reason: 'Unable to verify this address right now. Please try again.' };
+    }
 
     if (!homes || homes.length === 0) {
       return { blocked: false };
@@ -775,31 +798,26 @@ class MailVerificationService {
 
     const homeIds = homes.map((h) => h.id);
 
-    // Check for verified authority (owner or manager) on any home
-    const { data: authorities } = await supabaseAdmin
-      .from('HomeAuthority')
-      .select('id, home_id, role, status')
+    const { data: occupants, error: occErr } = await supabaseAdmin
+      .from('HomeOccupancy')
+      .select('id, user_id, home_id')
       .in('home_id', homeIds)
-      .eq('status', 'verified');
+      .eq('is_active', true);
 
-    if (authorities && authorities.length > 0) {
-      // There's at least one verified authority — check active occupancy
-      for (const auth of authorities) {
-        const { data: occupancy } = await supabaseAdmin
-          .from('HomeOccupancy')
-          .select('id, user_id')
-          .eq('home_id', auth.home_id)
-          .eq('is_active', true)
-          .in('role_base', ['owner', 'admin', 'manager'])
-          .maybeSingle();
+    if (occErr) {
+      logger.error('MailVerificationService._checkHouseholdConflict: occupancy lookup failed', {
+        addressId, error: occErr.message,
+      });
+      return { blocked: true, reason: 'Unable to verify this address right now. Please try again.' };
+    }
 
-        if (occupancy) {
-          return {
-            blocked: true,
-            reason: 'Address is actively controlled by a verified household admin',
-          };
-        }
-      }
+    const others = (occupants || []).filter((o) => o.user_id !== userId);
+    if (others.length > 0) {
+      return {
+        blocked: true,
+        reason: 'Someone already lives at this address on Pantopus. '
+          + 'Ask them to add you, or file a claim for review.',
+      };
     }
 
     return { blocked: false };

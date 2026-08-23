@@ -454,7 +454,7 @@ describe('resend rotates code', () => {
 // ============================================================
 
 describe('household conflict', () => {
-  test('blocks start when home has verified authority with active admin occupancy', async () => {
+  test('blocks start when the address already has an active occupant', async () => {
     seedDeliverableAddress();
     seedHome();
 
@@ -483,7 +483,7 @@ describe('household conflict', () => {
     const result = await service.startVerification('user-1', 'addr-1');
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/conflict|authority|household/i);
+    expect(result.error).toMatch(/already lives at this address/i);
   });
 
   test('does not block when authority exists but occupancy is inactive', async () => {

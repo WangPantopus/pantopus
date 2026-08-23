@@ -26,8 +26,11 @@ const { ownershipClaimLimiter, postcardLimiter, verificationAttemptLimiter } = r
 const logger = require('../utils/logger');
 const { findHomeOwnerRowForClaimant } = require('../utils/homeOwnerRowLookup');
 const { getClaimMergeRoleForClaim } = require('../utils/homeClaimMergeRoles');
-const mailVendorService = require('../services/addressValidation/mailVendorService');
-const addressConfig = require('../config/addressVerification');
+const {
+  generatePostcardCode,
+  hashPostcardCode,
+  dispatchPostcardCode,
+} = require('../utils/postcardDispatch');
 
 // ============================================================
 // VALIDATION SCHEMAS
@@ -2446,11 +2449,6 @@ async function processQuorumExpirations(homeId, actorUserId) {
 // POSTCARD VERIFICATION
 // ============================================================
 
-/** SHA-256 of a postcard code. Only the hash is ever persisted. */
-function hashPostcardCode(code) {
-  return crypto.createHash('sha256').update(String(code).toUpperCase()).digest('hex');
-}
-
 /**
  * May this user have a verification code mailed to this home?
  *
@@ -2479,28 +2477,6 @@ async function mayRequestPostcard(homeId, userId) {
   return (count || 0) === 0;
 }
 
-/**
- * Mail a legacy postcard code through the shared mail vendor.
- * The code is passed in memory and never persisted.
- */
-async function dispatchLegacyPostcard(home, code) {
-  try {
-    const provider = mailVendorService.getProvider();
-    const result = await provider.sendPostcard(
-      {
-        line1: home.address,
-        city: home.city,
-        state: home.state,
-        zip: home.zipcode,
-      },
-      code,
-      addressConfig.lob.postcardTemplateId || null,
-    );
-    return { success: true, vendorJobId: result?.vendorJobId || null };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-}
 
 /**
  * POST /:id/request-postcard - Request a verification code mailed to the home address.
@@ -2566,7 +2542,7 @@ router.post('/:id/request-postcard', verifyToken, postcardLimiter, async (req, r
 
     // Generate a 6-digit code with a cryptographic RNG and store only its
     // hash. The cleartext is held in memory just long enough to mail it.
-    const code = String(crypto.randomInt(100000, 1000000));
+    const code = generatePostcardCode();
     const codeHash = hashPostcardCode(code);
 
     const { data: postcard, error } = await supabaseAdmin
@@ -2589,7 +2565,7 @@ router.post('/:id/request-postcard', verifyToken, postcardLimiter, async (req, r
     // Actually mail it. Historically this endpoint wrote an audit row under the
     // comment "Log for admin/mailing pipeline" and returned 201 claiming the
     // code had been mailed — no dispatcher existed, so no code was ever sent.
-    const dispatch = await dispatchLegacyPostcard(home, code);
+    const dispatch = await dispatchPostcardCode(home, code);
     if (!dispatch.success) {
       // Retire the row so the user is not blocked by a pending code for a
       // card that was never sent.

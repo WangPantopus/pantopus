@@ -123,3 +123,55 @@ describe('SCN-03 — checkHomePermission return shape', () => {
     expect(body).not.toMatch(/return\s*\{\s*allowed/);
   });
 });
+
+describe('SCN-03 — an occupied address cannot be self-served by mail code', () => {
+  // The old gate keyed on HomeAuthority.status === 'verified', a status nothing
+  // in the codebase can set, so it always returned blocked:false and anyone
+  // holding a mailed code joined an occupied household with no approval.
+  function seedOccupiedHome(occupantId) {
+    seedTable('Home', [{ id: 'home-1', address_id: 'addr-1', owner_id: occupantId }]);
+    seedTable('HomeOccupancy', [{
+      id: 'occ-1', home_id: 'home-1', user_id: occupantId, is_active: true,
+      role_base: 'owner', verification_status: 'verified',
+    }]);
+  }
+
+  test('blocked even when no HomeAuthority row exists at all', async () => {
+    seedOccupiedHome('resident-1');
+    // deliberately no HomeAuthority rows — this is the real-world state
+    const res = await mailVerificationService.startVerification('stranger-1', 'addr-1');
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/already lives at this address/i);
+    expect(getTable('AddressVerificationAttempt')).toHaveLength(0);
+    expect(mockDispatchPostcard).not.toHaveBeenCalled();
+  });
+
+  test('blocked when the home has several active admins', async () => {
+    seedOccupiedHome('resident-1');
+    seedTable('HomeOccupancy', [
+      ...getTable('HomeOccupancy'),
+      {
+        id: 'occ-2', home_id: 'home-1', user_id: 'resident-2', is_active: true,
+        role_base: 'admin', verification_status: 'verified',
+      },
+    ]);
+
+    // The old implementation used .maybeSingle() here, which errors on more
+    // than one row and failed open exactly on the busiest households.
+    const res = await mailVerificationService.startVerification('stranger-1', 'addr-1');
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/already lives at this address/i);
+  });
+
+  test('an existing occupant may still re-verify their own address', async () => {
+    seedOccupiedHome('resident-1');
+    const res = await mailVerificationService.startVerification('resident-1', 'addr-1');
+    expect(res.success).toBe(true);
+  });
+
+  test('a genuinely unoccupied address still works (cold start)', async () => {
+    const res = await mailVerificationService.startVerification('new-user', 'addr-1');
+    expect(res.success).toBe(true);
+  });
+});

@@ -10,6 +10,11 @@ const Joi = require('joi');
 const logger = require('../utils/logger');
 const { computeAddressHash } = require('../utils/normalizeAddress');
 const {
+  generatePostcardCode,
+  hashPostcardCode,
+  dispatchPostcardCode,
+} = require('../utils/postcardDispatch');
+const {
   checkHomePermission,
   isVerifiedOwner,
   mapLegacyRole,
@@ -6485,7 +6490,7 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
     // Verify home exists
     const { data: home } = await supabaseAdmin
       .from('Home')
-      .select('id, address, city, state')
+      .select('id, address, address2, city, state, zipcode')
       .eq('id', homeId)
       .single();
 
@@ -6611,7 +6616,7 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
 
     } else if (authorityCount === 0) {
       // PATH 2 — External cold-start: no authorities, not the creator
-      const code = generateSafeCode(8);
+      const code = generatePostcardCode();
       const expiresAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
 
       const { data: postcard, error: pcError } = await supabaseAdmin
@@ -6628,6 +6633,24 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
 
       if (pcError) {
         logger.error('Failed to create postcard code for cold-start', { error: pcError.message });
+      }
+
+      // UX-01: actually mail it. This branch used to return "a verification
+      // code will be mailed to this address" while nothing dispatched.
+      const coldStartMail = await dispatchPostcardCode(home, code);
+      if (!coldStartMail.success) {
+        if (postcard?.id) {
+          await supabaseAdmin
+            .from('HomePostcardCode')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', postcard.id);
+        }
+        logger.error('Cold-start postcard dispatch failed', {
+          homeId, userId, error: coldStartMail.error,
+        });
+        return res.status(502).json({
+          error: 'We could not send mail to this address right now. Please try again later.',
+        });
       }
 
       await applyOccupancyTemplate(homeId, userId, 'member', 'pending_postcard');
@@ -6666,7 +6689,7 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
 
       if (authoritiesStale) {
         // All authorities are stale — treat as cold-start (PATH 2 fallback)
-        const code = generateSafeCode(8);
+        const code = generatePostcardCode();
         const expiresAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
 
         const { data: postcard, error: pcError } = await supabaseAdmin
@@ -6683,6 +6706,22 @@ router.post('/:id/claim', verifyToken, async (req, res) => {
 
         if (pcError) {
           logger.error('Failed to create postcard code for stale-authority cold-start', { error: pcError.message });
+        }
+
+        const staleMail = await dispatchPostcardCode(home, code);
+        if (!staleMail.success) {
+          if (postcard?.id) {
+            await supabaseAdmin
+              .from('HomePostcardCode')
+              .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+              .eq('id', postcard.id);
+          }
+          logger.error('Stale-authority postcard dispatch failed', {
+            homeId, userId, error: staleMail.error,
+          });
+          return res.status(502).json({
+            error: 'We could not send mail to this address right now. Please try again later.',
+          });
         }
 
         await applyOccupancyTemplate(homeId, userId, effectiveRole, 'pending_postcard');
@@ -6907,11 +6946,6 @@ router.post('/:id/claim/:claimId/reject', verifyToken, async (req, res) => {
  * Helper: Generate a safe alphanumeric code for postcard verification.
  * Excludes confusing characters: 0/O, 1/I/L.
  */
-/** SHA-256 of a postcard code; only the hash is persisted (migration 162). */
-function hashPostcardCode(code) {
-  return crypto.createHash('sha256').update(String(code).toUpperCase()).digest('hex');
-}
-
 /**
  * Are ALL of these users inactive for `days`?
  *
@@ -6943,15 +6977,6 @@ async function allAuthoritiesStale(userIds, days) {
   return true;
 }
 
-function generateSafeCode(length) {
-  const safeChars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-  const bytes = crypto.randomBytes(length);
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += safeChars[bytes[i] % safeChars.length];
-  }
-  return code;
-}
 
 /**
  * Helper: Notify home owners/admins about a new claim.

@@ -260,7 +260,7 @@ describe('startVerification', () => {
 
   // ── Household conflict ────────────────────────────────────
 
-  test('fails when address has verified household admin', async () => {
+  test('fails when the address already has an active occupant', async () => {
     seedAddress();
     seedHome();
     seedTable('HomeAuthority', [{
@@ -282,7 +282,7 @@ describe('startVerification', () => {
 
     const result = await service.startVerification('user-1', 'addr-1');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('verified household admin');
+    expect(result.error).toContain('already lives at this address');
   });
 
   test('succeeds when authority exists but is not verified', async () => {
