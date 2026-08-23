@@ -3186,8 +3186,22 @@ router.patch('/:id', verifyToken, validate(updateHomeSchema), async (req, res) =
     if (req.body.amenities) updates.amenities = req.body.amenities;
 
     if (req.body.location) {
-      const incomingMode = req.body.geocode_mode || (req.body.geocode_provider === 'google_validation' ? 'verified' : undefined);
-      const block = shouldBlockCoordinateOverwrite(existingHome, { geocode_mode: incomingMode }, 'PATCH /api/homes/:id');
+      // CRIT-05: provenance must never be self-asserted. This handler used to
+      // read geocode_mode straight from the request body and default it to
+      // 'verified' with 'rooftop' accuracy, so any member with home.edit could
+      // move a home to arbitrary coordinates and have that pin recorded as a
+      // verified rooftop fix. The overwrite guard then consulted the same
+      // field, so it protected the false value from every subsequent
+      // correction — inverting the guard's purpose.
+      //
+      // A coordinate that did not come from runValidationPipeline is
+      // user-asserted, full stop. 'verified' is reserved for writes originating
+      // in canonicalAddressService.
+      const block = shouldBlockCoordinateOverwrite(
+        existingHome,
+        { geocode_mode: 'user_asserted' },
+        'PATCH /api/homes/:id',
+      );
       if (block.blocked) {
         logger.warn('Home coordinate overwrite blocked', { homeId: id, userId, reason: block.reason });
         // Allow the rest of the update to proceed, just strip coordinate fields
@@ -3196,11 +3210,11 @@ router.patch('/:id', verifyToken, validate(updateHomeSchema), async (req, res) =
           req.body.location.latitude,
           req.body.location.longitude
         );
-        // Geocode provenance
-        updates.geocode_provider = req.body.geocode_provider || 'mapbox';
-        updates.geocode_mode = incomingMode || 'verified';
-        updates.geocode_accuracy = req.body.geocode_accuracy || 'rooftop';
-        updates.geocode_place_id = req.body.geocode_place_id || null;
+        // Geocode provenance — recorded, not accepted.
+        updates.geocode_provider = 'client';
+        updates.geocode_mode = 'user_asserted';
+        updates.geocode_accuracy = 'unknown';
+        updates.geocode_place_id = null;
         updates.geocode_source_flow = 'home_edit';
         updates.geocode_created_at = new Date().toISOString();
       }
