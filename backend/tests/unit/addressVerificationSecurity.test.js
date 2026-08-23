@@ -175,3 +175,54 @@ describe('SCN-03 — an occupied address cannot be self-served by mail code', ()
     expect(res.success).toBe(true);
   });
 });
+
+describe('PRV-09 — logs never carry codes or addresses', () => {
+  const { redactLogMeta: __redact } = require('../../utils/redactLogMeta');
+
+  test('redacts verification codes at any depth', () => {
+    const out = __redact({
+      code: '123456',
+      job: { metadata: { code: '654321' } },
+      letter_code: 'ABCD-EFGH-JKLM-NPQR',
+    });
+    const serialized = JSON.stringify(out);
+    expect(serialized).not.toContain('123456');
+    expect(serialized).not.toContain('654321');
+    expect(serialized).not.toContain('ABCD');
+  });
+
+  test('redacts street addresses but keeps coarse, non-identifying fields', () => {
+    const out = __redact({
+      address: '123 Main St',
+      address_line1: '123 Main St',
+      city: 'Portland',
+      state: 'OR',
+    });
+    expect(JSON.stringify(out)).not.toContain('123 Main St');
+    expect(out.city).toBe('Portland');
+    expect(out.state).toBe('OR');
+  });
+
+  test('survives cycles and arrays without throwing', () => {
+    const cyclic = { code: 'x' };
+    cyclic.self = cyclic;
+    expect(() => __redact({ items: [cyclic, { token: 't' }] })).not.toThrow();
+    expect(JSON.stringify(__redact({ items: [{ token: 'secret-token' }] })))
+      .not.toContain('secret-token');
+  });
+});
+
+describe('PRV-05 — residency is not an anonymous oracle', () => {
+  const { getPublicResidencySummary } = require('../../utils/publicResidencyProfile');
+
+  test('an anonymous viewer learns nothing about where someone lives', async () => {
+    seedTable('HomeOccupancy', [{
+      id: 'o1', home_id: 'h1', user_id: 'subject', is_active: true,
+      verification_status: 'verified', created_at: new Date().toISOString(),
+    }]);
+    seedTable('Home', [{ id: 'h1', city: 'Portland', state: 'OR' }]);
+
+    const res = await getPublicResidencySummary('subject', null);
+    expect(res).toEqual({ hasHome: false, city: null, state: null, verified: false });
+  });
+});

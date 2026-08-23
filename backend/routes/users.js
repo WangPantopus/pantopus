@@ -1990,7 +1990,7 @@ router.get('/profile', verifyToken, async (req, res) => {
 
     logger.info('Profile fetched', { userId });
 
-    const residency = await getPublicResidencySummary(userId);
+    const residency = await getPublicResidencySummary(userId, req.user?.id || null);
 
     res.json({
       user: {
@@ -2739,7 +2739,7 @@ router.get('/id/:id', optionalAuth, async (req, res) => {
       logger.warn('Could not fetch reviews', { error: reviewErr.message });
     }
 
-    const residency = await getPublicResidencySummary(userData.id);
+    const residency = await getPublicResidencySummary(userData.id, req.user?.id || null);
 
     res.json({
       id: publicUserData.id,
@@ -3482,7 +3482,7 @@ router.get('/username/:username', optionalAuth, async (req, res) => {
       logger.warn('Could not fetch reviews', { error: reviewErr.message });
     }
 
-    const residency = await getPublicResidencySummary(userData.id);
+    const residency = await getPublicResidencySummary(userData.id, req.user?.id || null);
 
     res.json({
       id: publicUserData.id,
