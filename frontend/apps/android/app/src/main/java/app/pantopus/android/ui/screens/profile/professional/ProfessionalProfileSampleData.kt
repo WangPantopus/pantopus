@@ -33,6 +33,12 @@ object ProfessionalProfileSampleData {
             certifications = publishedCertifications,
             portfolio = publishedPortfolio,
             visibility = publishedVisibility,
+            categories = listOf("carpentry", "plumber", "electrician"),
+            serviceCity = field("serviceCity", "Elm Park"),
+            serviceState = field("serviceState", "NY"),
+            serviceRadiusKm = field("serviceRadiusKm", "25"),
+            hourlyRate = field("hourlyRate", "85"),
+            verification = ProVerificationSummary(status = ProVerificationStatus.Verified, tier = 2),
         )
 
     private val publishedSkills: List<ProSkill>

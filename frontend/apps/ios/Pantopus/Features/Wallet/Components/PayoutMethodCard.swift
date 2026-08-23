@@ -126,8 +126,8 @@ struct PayoutMethodCard: View {
 
 #Preview("PayoutMethodCard variants") {
     VStack(spacing: Spacing.s4) {
-        PayoutMethodCard(method: WalletSampleData.populated.payoutMethod)
-        PayoutMethodCard(method: WalletSampleData.onHold.payoutMethod)
+        PayoutMethodCard(method: WalletSampleData.payoutMethodSample)
+        PayoutMethodCard(method: WalletSampleData.payoutMethodHoldSample)
     }
     .padding(Spacing.s4)
     .background(Theme.Color.appBg)

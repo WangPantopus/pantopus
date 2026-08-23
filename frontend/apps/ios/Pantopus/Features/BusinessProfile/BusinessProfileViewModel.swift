@@ -20,6 +20,15 @@ import Foundation
 import Logging
 import Observation
 
+/// C4 — state of the named custom page a `pantopus://b/:username/:slug`
+/// link asked for. `.none` when the profile was opened without a slug.
+public enum BusinessProfileNamedPageState: Sendable, Equatable {
+    case none
+    case loading(title: String)
+    case loaded(title: String, description: String?, blocks: [BusinessPageBlock])
+    case failed(title: String, message: String)
+}
+
 /// In-flight state for the Save action.
 public enum BusinessProfileActionState: Sendable, Equatable {
     case idle
@@ -44,13 +53,23 @@ public final class BusinessProfileViewModel {
     /// Transient toast surface.
     public var toastMessage: String?
 
+    /// C4 — the named custom page, when the entry point carried a slug.
+    public private(set) var namedPage: BusinessProfileNamedPageState = .none
+
     private let businessId: String
+    /// C4 — slug from `pantopus://b/:username/:slug` (RN's `?pageSlug=`).
+    private let pageSlug: String?
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.BusinessProfile")
+    private var isStartingInquiry = false
 
-    init(businessId: String, client: APIClient = .shared) {
+    init(businessId: String, pageSlug: String? = nil, client: APIClient = .shared) {
         self.businessId = businessId
+        self.pageSlug = pageSlug
         self.client = client
+        if let pageSlug, !pageSlug.isEmpty {
+            namedPage = .loading(title: pageSlug)
+        }
     }
 
     public func load() async {
@@ -83,6 +102,43 @@ public final class BusinessProfileViewModel {
         }
     }
 
+    /// Opens (or resumes) an inquiry chat via
+    /// `POST /api/businesses/:id/inbox/start` and returns a conversation
+    /// destination for the host to push. Mirrors RN/web
+    /// `startBusinessInquiry`.
+    public func resolveChatDestination() async -> InboxConversationDestination? {
+        guard case let .loaded(content) = state else { return nil }
+        guard !isStartingInquiry else { return nil }
+        isStartingInquiry = true
+        defer { isStartingInquiry = false }
+        let name = content.header.displayName
+        let handle = content.header.handle
+        let subject: String = {
+            if let handle, !handle.isEmpty {
+                return "Inquiry for @\(handle.trimmingCharacters(in: CharacterSet(charactersIn: "@")))"
+            }
+            return "Inquiry for \(name)"
+        }()
+        do {
+            let response: StartBusinessInquiryResponse = try await client.request(
+                BusinessesEndpoints.startInquiry(businessId: businessId, subject: subject)
+            )
+            return InboxConversationDestination(
+                mode: .room(id: response.roomId),
+                displayName: name,
+                initials: Self.initials(from: name),
+                identityKind: "business",
+                verified: content.header.isVerified
+            )
+        } catch let error as APIError {
+            toastMessage = friendlyMessage(for: error)
+            return nil
+        } catch {
+            toastMessage = "Couldn't open chat. Try again."
+            return nil
+        }
+    }
+
     private func fetch() async {
         do {
             let detail = try await client.request(
@@ -91,6 +147,7 @@ public final class BusinessProfileViewModel {
             )
             let publicResponse = await loadPublic(username: detail.business.username)
             let reviewsResponse = await loadReviewsAndStats()
+            await loadNamedPage(username: detail.business.username)
             let content = build(
                 from: detail,
                 publicResponse: publicResponse,
@@ -125,6 +182,53 @@ public final class BusinessProfileViewModel {
         }
     }
 
+    /// C4 — resolves `GET /api/b/:username/:slug` so the named custom page
+    /// opens with its published blocks. Mirrors RN `business/[username].tsx`'s
+    /// `fetchPublicPage`, including the two failure copies.
+    private func loadNamedPage(username: String?) async {
+        guard let pageSlug, !pageSlug.isEmpty else {
+            namedPage = .none
+            return
+        }
+        // `pantopus://b/:username/:slug` routes the *username* through as the
+        // id, so it is the right fallback when the detail read has no handle.
+        let handle = (username?.isEmpty == false ? username : nil) ?? businessId
+        guard !handle.isEmpty else {
+            namedPage = .failed(
+                title: pageSlug,
+                message: "This business page does not exist or is not published."
+            )
+            return
+        }
+        namedPage = .loading(title: pageSlug)
+        do {
+            let response: PublicBusinessPageResponse = try await client.request(
+                BusinessPagesEndpoints.publicPage(username: handle, slug: pageSlug)
+            )
+            guard let page = response.currentPage else {
+                namedPage = .failed(
+                    title: pageSlug,
+                    message: "This business page has no published content yet."
+                )
+                return
+            }
+            let blocks = (page.blocks ?? []).enumerated().map { index, dto in
+                BusinessPageBlock(dto: dto, index: index)
+            }
+            namedPage = .loaded(
+                title: page.title ?? pageSlug,
+                description: page.description,
+                blocks: blocks
+            )
+        } catch {
+            logger.debug("Named business page fetch failed: \(error)")
+            namedPage = .failed(
+                title: pageSlug,
+                message: "This business page does not exist or is not published."
+            )
+        }
+    }
+
     private func loadReviewsAndStats() async -> PublicProfile? {
         do {
             return try await client.request(
@@ -144,6 +248,14 @@ public final class BusinessProfileViewModel {
         case .transport: "Check your connection and try again."
         default: "Something went wrong. Try again."
         }
+    }
+
+    /// Two-letter initials derived from a display name. Falls back to
+    /// `··` when the input has no alphanumeric content.
+    private static func initials(from name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let joined = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return joined.isEmpty ? "··" : joined
     }
 }
 

@@ -10,6 +10,16 @@ import SwiftUI
 /// Mailbox Item Detail screen. Category-aware; each category renders its
 /// bespoke body, and any category without one renders `GenericMailBody`
 /// (the readable message surface) rather than a placeholder.
+///
+/// NOT ROUTED (M5 parity sweep): `HubTabRoot` / `YouTabRoot` push
+/// `MailDetailView` for `.mailItemDetail`, so nothing reaches this view at
+/// runtime — its `MailboxItemDetailViewModel` is therefore the only caller
+/// of `MailboxV2Endpoints.itemAction` outside the A17.1 ACTIONS row. Kept
+/// because its shell + category bodies remain the reference for the A17
+/// variant work and it carries its own snapshot coverage; the per-category
+/// actions were added to `MailDetail/Variants/GenericMailDetailLayout.swift`,
+/// the layout that actually renders. Mirrors Android
+/// `ui/screens/mailbox/item_detail/MailboxItemDetailScreen.kt`.
 /// Identifiable wrapper around `URL` so we can drive a `.sheet(item:)`.
 private struct TermsSheetItem: Identifiable {
     let id = UUID()

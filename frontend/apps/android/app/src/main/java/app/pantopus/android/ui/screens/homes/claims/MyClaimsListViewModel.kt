@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.OwnershipClaimDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
@@ -69,7 +70,7 @@ class MyClaimsListViewModel
                 when (val result = repo.myOwnershipClaims()) {
                     is NetworkResult.Success -> applySuccess(result.data.claims)
                     is NetworkResult.Failure ->
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                 }
             }
         }

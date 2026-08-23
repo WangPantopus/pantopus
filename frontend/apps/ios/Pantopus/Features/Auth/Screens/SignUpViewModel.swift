@@ -217,6 +217,57 @@ public final class SignUpViewModel {
         }
     }
 
+    /// Blocked because the OAuth callback can only ever produce a Personal
+    /// account: `backend/routes/users.js` `ensureOAuthUserProfile` inserts
+    /// `account_type: 'individual'` unconditionally. Mirrors Android
+    /// `SignUpViewModel.oauthBusinessMessage`.
+    public static let oauthBusinessMessage =
+        "Business accounts must be created with email. Switch Account type to Personal to continue with Google or Apple."
+
+    /// Blocked because the browser flow never sends the form, so the 18+
+    /// gate the email path enforces would be skipped. Mirrors Android
+    /// `SignUpViewModel.oauthTermsMessage`.
+    public static let oauthTermsMessage =
+        "Agree to the Terms and Privacy Policy before continuing with Google or Apple."
+
+    /// The subset of `submit`'s validation the OAuth path can still honour:
+    /// account type (the backend hardcodes Personal), the 18+ date-of-birth
+    /// gate, and the Terms agreement. Nothing else on the form is sent by
+    /// the browser flow, so nothing else is gated. Returns the banner copy
+    /// when the attempt must not start. Identical on Android
+    /// (`SignUpViewModel.oauthPrerequisiteMessage`).
+    func oauthPrerequisiteMessage() -> String? {
+        if accountType == .business { return Self.oauthBusinessMessage }
+        if let dateOfBirthError = AuthValidation.dateOfBirth(dateOfBirth) {
+            hasAttemptedSubmit = true
+            fieldErrors[.dateOfBirth] = dateOfBirthError
+            return dateOfBirthError
+        }
+        if !agreedToTerms { return Self.oauthTermsMessage }
+        return nil
+    }
+
+    func signIn(with provider: OAuthProvider, using auth: AuthManager) async {
+        topLevelError = nil
+        if let blocked = oauthPrerequisiteMessage() {
+            topLevelError = .serverError(blocked)
+            return
+        }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            try await auth.signIn(with: provider)
+        } catch OAuthWebAuthenticationError.cancelled {
+            return
+        } catch let error as AuthError {
+            topLevelError = error
+            Observability.shared.capture(error)
+        } catch {
+            topLevelError = .unknown
+            Observability.shared.capture(error)
+        }
+    }
+
     public func acknowledgeSuccess() {
         didSucceed = false
     }

@@ -78,6 +78,19 @@ data class MailDetail(
     val content: String? = null,
     @Json(name = "sender_business_name") val senderBusinessName: String? = null,
     @Json(name = "sender_address") val senderAddress: String? = null,
+    @Json(name = "sender_user_id") val senderUserId: String? = null,
+    /**
+     * `Mail.sender_trust` — `verified_gov` / `verified_utility` /
+     * `verified_business` / `pantopus_user` / `unknown`
+     * (`backend/database/schema.sql:7207`).
+     */
+    @Json(name = "sender_trust") val senderTrust: String? = null,
+    /**
+     * Free-text `Mail.category` (`bill` / `legal` / `notice` / `receipt` /
+     * `community` / `promo` / `other`). Distinct from [mailType]; drives the
+     * A17.1 per-category ACTIONS row.
+     */
+    val category: String? = null,
     @Json(name = "ack_required") val ackRequired: Boolean? = null,
     @Json(name = "ack_status") val ackStatus: String? = null,
     val viewed: Boolean = false,
@@ -90,7 +103,26 @@ data class MailDetail(
     val `object`: JsonValue?,
     @Json(name = "content_format") val contentFormat: String?,
     val links: JsonArrayValue = emptyList(),
+    /**
+     * `Mail.mail_extracted` (jsonb, `backend/database/schema.sql:7201`).
+     * Compose writes the ceremonial metadata here at send time —
+     * `stationeryTheme` / `inkSelection` / `voicePostscriptUri` /
+     * `outcomes` (`backend/routes/mailbox.js:586-603`, persisted at `:2017`).
+     * It is the V1 detail route's copy of the same values the V2 item route
+     * exposes under `object_payload`, and the backend itself falls back to
+     * it (`backend/routes/mailCompose.js:556`).
+     */
+    @Json(name = "mail_extracted") val mailExtracted: JsonValue? = null,
 ) {
+    /**
+     * Stationery theme when this mail came out of the Ceremonial Mail
+     * compose flow — the signal RN uses to redirect the generic detail into
+     * the ceremonial open experience (`src/app/mailbox/detail.tsx:43-49`).
+     * Null for ordinary mail.
+     */
+    val stationeryTheme: String?
+        get() = (mailExtracted?.get("stationeryTheme") as? String)?.takeIf { it.isNotEmpty() }
+
     @JsonClass(generateAdapter = true)
     data class Sender(
         val id: String,

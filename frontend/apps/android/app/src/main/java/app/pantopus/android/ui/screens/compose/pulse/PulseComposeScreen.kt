@@ -29,16 +29,19 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
@@ -97,6 +100,12 @@ fun PulseComposeScreen(
     onPosted: (String?) -> Unit = {},
     flowTarget: PulsePostingTarget? = null,
     flowPurpose: PulseComposePurpose? = null,
+    /**
+     * C2 — when non-null the create submit posts to
+     * `POST /api/businesses/:businessId/posts` so the row is authored by the
+     * business. Used by the Business owner dashboard's compose FAB.
+     */
+    businessAuthorId: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val activeIntent by viewModel.activeIntent.collectAsStateWithLifecycle()
@@ -106,6 +115,9 @@ fun PulseComposeScreen(
     val lostFoundContactPref by viewModel.lostFoundContactPref.collectAsStateWithLifecycle()
     val dealExpiresAt by viewModel.dealExpiresAt.collectAsStateWithLifecycle()
     val eligibilityWarning by viewModel.eligibilityWarning.collectAsStateWithLifecycle()
+    val precheckNudge by viewModel.precheckNudge.collectAsStateWithLifecycle()
+    val precheckCooldown by viewModel.precheckCooldown.collectAsStateWithLifecycle()
+    val isVisitorPost by viewModel.isVisitorPost.collectAsStateWithLifecycle()
     val announceAudience by viewModel.announceAudience.collectAsStateWithLifecycle()
     val safetyAlertKind by viewModel.safetyAlertKind.collectAsStateWithLifecycle()
     val askCategory by viewModel.askCategory.collectAsStateWithLifecycle()
@@ -119,6 +131,12 @@ fun PulseComposeScreen(
     LaunchedEffect(flowTarget, flowPurpose) {
         if (flowTarget != null) {
             viewModel.applyFlowContext(flowTarget, flowPurpose)
+        }
+    }
+
+    LaunchedEffect(businessAuthorId) {
+        if (businessAuthorId != null) {
+            viewModel.applyBusinessAuthor(businessAuthorId)
         }
     }
 
@@ -222,6 +240,9 @@ fun PulseComposeScreen(
                                 lostFoundContactPref = lostFoundContactPref,
                                 dealExpiresAt = dealExpiresAt,
                                 eligibilityWarning = eligibilityWarning,
+                                precheckNudge = precheckNudge,
+                                precheckCooldown = precheckCooldown,
+                                isVisitorPost = isVisitorPost,
                                 announceAudience = announceAudience,
                                 safetyAlertKind = safetyAlertKind,
                                 askCategory = askCategory,
@@ -255,6 +276,8 @@ fun PulseComposeScreen(
                                     )
                                 },
                                 onRemovePhoto = viewModel::removePhoto,
+                                onBodyEditingEnded = viewModel::runPrecheck,
+                                onDismissPrecheckNudge = viewModel::dismissPrecheckNudge,
                             ),
                     )
             }
@@ -304,6 +327,12 @@ internal data class PulseComposeContentState(
     val lostFoundContactPref: PulseLostFoundContactPref = PulseLostFoundContactPref.Dm,
     val dealExpiresAt: LocalDateTime = LocalDateTime.now().plusDays(7),
     val eligibilityWarning: String? = null,
+    /** Soft nudge from `POST /api/posts/precheck` — dismissible. */
+    val precheckNudge: String? = null,
+    /** Cooldown copy when the viewer is rate-limited / restricted. */
+    val precheckCooldown: String? = null,
+    /** True when the precheck classified this as a visitor post. */
+    val isVisitorPost: Boolean = false,
     val announceAudience: PulseAnnounceAudience = PulseAnnounceAudience.Neighbors,
     val safetyAlertKind: PulseSafetyAlertKind = PulseSafetyAlertKind.Theft,
     val askCategory: PulseAskCategory = PulseAskCategory.Handyman,
@@ -335,10 +364,31 @@ internal data class PulseComposeActions(
     val onUpdateField: (PulseComposeField, String) -> Unit,
     val onPickPhotos: () -> Unit,
     val onRemovePhoto: (String) -> Unit,
+    /** Body-field blur — runs `POST /api/posts/precheck`. */
+    val onBodyEditingEnded: () -> Unit = {},
+    /** X on the precheck nudge banner. */
+    val onDismissPrecheckNudge: () -> Unit = {},
 )
+
+/**
+ * Body-field blur hook. Provided by [PulseComposeBody] and consumed by
+ * every per-intent `BodyEditor`, so the pre-post safety precheck fires
+ * on blur without threading a callback through seven intent sections.
+ */
+internal val LocalPulseBodyEditingEnded = staticCompositionLocalOf<() -> Unit> { {} }
 
 @Composable
 internal fun PulseComposeBody(
+    state: PulseComposeContentState,
+    actions: PulseComposeActions,
+) {
+    CompositionLocalProvider(LocalPulseBodyEditingEnded provides actions.onBodyEditingEnded) {
+        PulseComposeBodySections(state, actions)
+    }
+}
+
+@Composable
+private fun PulseComposeBodySections(
     state: PulseComposeContentState,
     actions: PulseComposeActions,
 ) {
@@ -352,6 +402,12 @@ internal fun PulseComposeBody(
         )
         IdentitySection(active = state.identity, onSelect = actions.selection.onSelectIdentity)
     }
+    PrecheckBanners(
+        cooldown = state.precheckCooldown,
+        isVisitorPost = state.isVisitorPost,
+        nudge = state.precheckNudge,
+        onDismissNudge = actions.onDismissPrecheckNudge,
+    )
     IntentSpecificSection(
         state = state,
         onUpdateField = actions.onUpdateField,
@@ -416,6 +472,106 @@ private fun FlowContextHeader(
                 text = warning,
                 style = PantopusTextStyle.small.copy(fontSize = 13.sp, lineHeight = 18.sp),
                 color = PantopusColors.appText,
+            )
+        }
+    }
+}
+
+/**
+ * The three precheck outcomes RN renders above the body field: the hard
+ * cooldown block, the visitor badge, and the soft nudge
+ * (`PostComposerModal.tsx:617-657`).
+ */
+@Composable
+private fun PrecheckBanners(
+    cooldown: String?,
+    isVisitorPost: Boolean,
+    nudge: String?,
+    onDismissNudge: () -> Unit,
+) {
+    cooldown?.let { text ->
+        Row(
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s4)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.errorBg)
+                    .padding(Spacing.s3)
+                    .testTag("composePulsePrecheckCooldown"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Ban,
+                contentDescription = null,
+                size = 17.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.error,
+            )
+            Text(text = text, style = PantopusTextStyle.caption, color = PantopusColors.error)
+        }
+    }
+    if (isVisitorPost) {
+        Row(
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s4)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.successBg)
+                    .padding(Spacing.s3)
+                    .testTag("composePulseVisitorBanner"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Plane,
+                contentDescription = null,
+                size = 17.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.success,
+            )
+            Text(
+                text = "You're posting as a visitor. Your post will show a visitor badge.",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.success,
+            )
+        }
+    }
+    nudge?.let { text ->
+        Row(
+            modifier =
+                Modifier
+                    .padding(horizontal = Spacing.s4)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.warmAmberBg)
+                    .padding(Spacing.s3)
+                    .testTag("composePulsePrecheckNudge"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.Lightbulb,
+                contentDescription = null,
+                size = 17.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.warmAmber,
+            )
+            Text(
+                text = text,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appText,
+                modifier = Modifier.weight(1f),
+            )
+            PantopusIconImage(
+                icon = PantopusIcon.X,
+                contentDescription = "Dismiss suggestion",
+                size = 15.dp,
+                strokeWidth = 2f,
+                tint = PantopusColors.appTextSecondary,
+                modifier =
+                    Modifier
+                        .clickable { onDismissNudge() }
+                        .testTag("composePulsePrecheckNudgeDismiss"),
             )
         }
     }
@@ -1261,6 +1417,7 @@ private fun BodyEditor(
     onUpdate: (PulseComposeField, String) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
+    val onEditingEnded = LocalPulseBodyEditingEnded.current
     val snapshot = fields[PulseComposeField.Body] ?: FormFieldState(id = PulseComposeField.Body.key)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s1)) {
         Text(
@@ -1293,7 +1450,12 @@ private fun BodyEditor(
                 cursorBrush = SolidColor(PantopusColors.primary600),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                modifier = Modifier.fillMaxWidth(),
+                // RN runs the pre-post safety precheck on body blur
+                // (`PostComposerModal.tsx:801`).
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { if (!it.isFocused) onEditingEnded() },
             )
             if (snapshot.value.isEmpty()) {
                 Text(

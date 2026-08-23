@@ -27,6 +27,10 @@ SourcePackages/
 !Pantopus/Features/Scheduling/Routing/Stubs/Packages/
 Package.pins
 Package.resolved
+# Resolved dependency clones/checkouts/artifacts. `xcodebuild
+# -clonedSourcePackagesDirPath` and Xcode both land these here; it reaches
+# multiple GB, so an unguarded `git add -A` would stage the whole cache.
+SourcePackages/
 
 # CocoaPods — not used, but just in case
 Pods/

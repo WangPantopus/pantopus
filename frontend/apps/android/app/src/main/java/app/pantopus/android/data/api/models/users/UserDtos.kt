@@ -81,6 +81,13 @@ data class UserProfile(
     val profileVisibility: String?,
     val createdAt: String,
     val updatedAt: String,
+    /**
+     * `User.show_email` / `User.show_phone` — surface the account email /
+     * phone on the public profile. The route echoes each both camelCase and
+     * snake_case (`backend/routes/users.js:2024-2027`); we read camelCase.
+     */
+    val showEmail: Boolean? = null,
+    val showPhone: Boolean? = null,
 )
 
 /** Envelope for `GET /api/users/profile`. Route: `backend/routes/users.js:1427`. */
@@ -110,6 +117,14 @@ data class ProfileUpdateRequest(
     val bio: String? = null,
     val tagline: String? = null,
     val profileVisibility: String? = null,
+    /**
+     * The two contact-visibility booleans the PATCH handler maps onto
+     * `show_email` / `show_phone` (`backend/routes/users.js:2076-2083`). The
+     * Joi schema accepts camelCase and snake_case (`users.js:797-800`); we
+     * send camelCase. Null keys are omitted by Moshi.
+     */
+    val showEmail: Boolean? = null,
+    val showPhone: Boolean? = null,
     val website: String? = null,
     val linkedin: String? = null,
     val twitter: String? = null,
@@ -122,6 +137,26 @@ data class ProfileUpdateRequest(
 data class ProfileUpdateResponse(
     val message: String,
     val user: UserProfile,
+)
+
+/**
+ * Body for `PUT /api/users/skills` — replaces the caller's whole skill
+ * list. Route `backend/routes/users.js:2246`; mirror of iOS
+ * `UpdateSkillsRequest`.
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateSkillsRequest(
+    val skills: List<String>,
+)
+
+/**
+ * `{ skills: [...] }` echo from `PUT /api/users/skills`. The handler
+ * trims, dedupes, caps each entry at 100 chars and the list at 50, then
+ * returns the cleaned array (`backend/routes/users.js:2254`).
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateSkillsResponse(
+    val skills: List<String>,
 )
 
 /**

@@ -97,6 +97,13 @@ data class BeaconPostDto(
     val locked: Boolean? = null,
     val teaser: String? = null,
     @Json(name = "media_urls") val mediaUrls: List<String>? = null,
+    /**
+     * Set on Post rows published through a broadcast channel
+     * (`backend/routes/broadcastChannels.js:554`). Non-null is what makes a
+     * row eligible for a read receipt — RN gates on the same field
+     * (`src/app/persona/[personaHandle]/index.tsx:66`).
+     */
+    @Json(name = "broadcast_channel_id") val broadcastChannelId: String? = null,
 )
 
 // PATCH /api/personas/:id/follow/preferences

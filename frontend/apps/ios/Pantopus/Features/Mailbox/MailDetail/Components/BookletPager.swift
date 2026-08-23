@@ -29,17 +29,20 @@ public enum BookletPagerMode: Sendable, Hashable {
 public struct BookletPager: View {
     private let pages: [URL]
     private let pageCount: Int
+    private let ocrTexts: [String]
     @State private var currentIndex: Int
     @State private var mode: BookletPagerMode
 
     public init(
         pages: [URL],
         pageCount: Int? = nil,
+        ocrTexts: [String] = [],
         initialPage: Int = 0,
         initialMode: BookletPagerMode = .page
     ) {
         self.pages = pages
         self.pageCount = max(pageCount ?? pages.count, pages.count)
+        self.ocrTexts = ocrTexts
         _currentIndex = State(initialValue: max(0, min(initialPage, max(0, pages.count - 1))))
         _mode = State(initialValue: initialMode)
     }
@@ -75,7 +78,17 @@ public struct BookletPager: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .frame(height: 420)
+            if let ocrText = ocrText(for: currentIndex) {
+                BookletOCRCard(text: ocrText)
+            }
         }
+    }
+
+    /// A17.2 — per-page OCR transcript, when the sample data carries one.
+    private func ocrText(for index: Int) -> String? {
+        guard ocrTexts.indices.contains(index) else { return nil }
+        let text = ocrTexts[index]
+        return text.isEmpty ? nil : text
     }
 
     private var pageIndicator: some View {
@@ -340,6 +353,95 @@ private struct ThumbnailCell: View {
                     .padding(.bottom, Spacing.s1)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
+        }
+    }
+}
+
+/// OCR transcript card (booklet.jsx OCRCard): scan chip + "Text from this
+/// page" header with the OCR confidence pill, the per-page transcript
+/// (first line = overline, second = title, rest = body), and inert
+/// Copy / Translate / Read aloud actions.
+private struct BookletOCRCard: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            transcript
+            VStack(alignment: .leading, spacing: 10) {
+                Rectangle().fill(Theme.Color.appBorderSubtle).frame(height: 1)
+                HStack(spacing: 14) {
+                    action(icon: .copy, label: "Copy text", color: Theme.Color.primary600)
+                    action(icon: .globe, label: "Translate", color: Theme.Color.appTextMuted)
+                    action(icon: .megaphone, label: "Read aloud", color: Theme.Color.appTextMuted)
+                }
+            }
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("bookletPager_ocrCard")
+    }
+
+    private var header: some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.scanLine, size: 13, color: Theme.Color.appTextSecondary)
+                .frame(width: 22, height: 22)
+                .background(Theme.Color.appSurfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
+            Text("Text from this page")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+            Text("OCR · 99%")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.Color.success)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(Theme.Color.successBg)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+        }
+    }
+
+    /// Transcript lines map onto the JSX kinds by position: line 0 is the
+    /// overline, line 1 the title, the remainder body copy.
+    private var transcript: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(text.components(separatedBy: "\n").enumerated()), id: \.offset) { idx, line in
+                switch idx {
+                case 0:
+                    Text(line)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.8)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                case 1:
+                    Text(line)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.appText)
+                default:
+                    Text(line)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineSpacing(3)
+                }
+            }
+        }
+    }
+
+    private func action(icon: PantopusIcon, label: String, color: Color) -> some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(icon, size: 12, color: color)
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(color)
         }
     }
 }

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongParameterList")
+@file:Suppress("LongMethod", "LongParameterList", "PackageNaming")
 
 package app.pantopus.android.ui.screens.mailbox.mailbox_root
 
@@ -21,7 +21,6 @@ import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
-import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.TopBarAction
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -47,12 +46,19 @@ fun MailboxRootScreen(
     onOpenVacationHold: () -> Unit = {},
     onOpenStamps: () -> Unit = {},
     onOpenUnboxing: () -> Unit = {},
+    onOpenCompose: () -> Unit = {},
+    onOpenRoutingQueue: () -> Unit = {},
+    onOpenMailParty: () -> Unit = {},
+    onOpenCommunity: () -> Unit = {},
+    onOpenRecords: () -> Unit = {},
+    onOpenMailTasks: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: MailboxRootViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedDrawer by viewModel.selectedDrawer.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val pendingRoutingCount by viewModel.pendingRoutingCount.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(
@@ -76,20 +82,22 @@ fun MailboxRootScreen(
                 contentDescription = "Search mail",
                 onClick = onOpenSearch,
             ),
-        // Scan-line FAB (JSX `MailboxScreen` FAB). Wired to the Mailbox map
-        // so the physical-venue surface stays reachable now that the
-        // drawers root is gone. Hidden on the empty state, mirroring the
-        // design's `mode !== 'empty'` guard.
+        // Compose FAB — the canonical create action of the Mailbox,
+        // opening the four-moment Ceremonial Mail wizard (Porch Call →
+        // Address It → Write It → Seal & Send). Mirrors RN's compose FAB
+        // (`src/app/mailbox/index.tsx:300-307`).
+        //
+        // Shown in *every* state, including empty: an empty mailbox is
+        // exactly when a user wants to write. The design's
+        // `mode !== 'empty'` guard applied to the old scan-line FAB, which
+        // now lives in the overflow menu ("Find a mailbox") so the map
+        // surface stays reachable.
         fab =
-            if (state is ListOfRowsUiState.Loaded) {
-                FabAction(
-                    icon = PantopusIcon.ScanLine,
-                    contentDescription = "Find a mailbox",
-                    onClick = onOpenMap,
-                )
-            } else {
-                null
-            },
+            FabAction(
+                icon = PantopusIcon.Pencil,
+                contentDescription = "Write a letter",
+                onClick = onOpenCompose,
+            ),
         onBack = onBack,
         customHeader = {
             MailboxRootHeader(
@@ -102,6 +110,8 @@ fun MailboxRootScreen(
                 onSelectDrawer = viewModel::selectDrawer,
                 onSelectTab = viewModel::selectTab,
                 onOpenMailDay = onOpenMailDay,
+                pendingRoutingCount = pendingRoutingCount,
+                onOpenRoutingQueue = onOpenRoutingQueue,
             )
         },
         extraTopBarAction = {
@@ -114,9 +124,14 @@ fun MailboxRootScreen(
                 )
             }
             MailboxRootSettingsMenu(
+                onOpenMap = onOpenMap,
                 onOpenUnboxing = onOpenUnboxing,
                 onOpenVacationHold = onOpenVacationHold,
                 onOpenStamps = onOpenStamps,
+                onOpenMailParty = onOpenMailParty,
+                onOpenCommunity = onOpenCommunity,
+                onOpenRecords = onOpenRecords,
+                onOpenMailTasks = onOpenMailTasks,
             )
         },
     )
@@ -130,9 +145,14 @@ fun MailboxRootScreen(
  */
 @Composable
 private fun MailboxRootSettingsMenu(
+    onOpenMap: () -> Unit,
     onOpenUnboxing: () -> Unit,
     onOpenVacationHold: () -> Unit,
     onOpenStamps: () -> Unit,
+    onOpenMailParty: () -> Unit,
+    onOpenCommunity: () -> Unit,
+    onOpenRecords: () -> Unit,
+    onOpenMailTasks: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(
@@ -151,12 +171,52 @@ private fun MailboxRootSettingsMenu(
         onDismissRequest = { expanded = false },
     ) {
         DropdownMenuItem(
+            text = { Text("Find a mailbox", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenMap()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.map"),
+        )
+        DropdownMenuItem(
             text = { Text("Scan an item", color = PantopusColors.appText) },
             onClick = {
                 expanded = false
                 onOpenUnboxing()
             },
             modifier = Modifier.testTag("mailboxRootSettings.scanUnboxing"),
+        )
+        DropdownMenuItem(
+            text = { Text("Mail tasks", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenMailTasks()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.mailTasks"),
+        )
+        DropdownMenuItem(
+            text = { Text("Mail party", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenMailParty()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.mailParty"),
+        )
+        DropdownMenuItem(
+            text = { Text("Community mail", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenCommunity()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.community"),
+        )
+        DropdownMenuItem(
+            text = { Text("Home records", color = PantopusColors.appText) },
+            onClick = {
+                expanded = false
+                onOpenRecords()
+            },
+            modifier = Modifier.testTag("mailboxRootSettings.homeRecords"),
         )
         DropdownMenuItem(
             text = { Text("Stamps", color = PantopusColors.appText) },

@@ -39,6 +39,7 @@ struct AccessCodesSearchView: View {
         )
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("accessCodesSearch")
+        .sensitiveScreen()
         .task { await viewModel.load() }
     }
 }

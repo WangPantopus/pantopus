@@ -26,8 +26,7 @@ import javax.inject.Inject
  * Reads `user.verified` via `GET /api/identity-center`. Email row
  * offers a Resend CTA (`POST /api/users/resend-verification`).
  *
- * Phone / home / ID rows are display-only "Coming soon" until those
- * flows ship — see the per-row note.
+ * Phone / home rows hidden until those flows ship (WS5.2).
  */
 @HiltViewModel
 class VerificationCenterViewModel
@@ -132,45 +131,6 @@ class VerificationCenterViewModel
                         rows = listOf(emailRow, resendRow),
                     )
                 }
-            val phoneGroup =
-                GroupedListGroup(
-                    id = "phone",
-                    overline = "Phone",
-                    rows =
-                        listOf(
-                            GroupedListRow(
-                                id = "phone.status",
-                                label = "Phone number",
-                                subtext = "Coming soon",
-                                control =
-                                    RowControl.ChipStatus(
-                                        "Not started",
-                                        RowControl.ChipTone.Neutral,
-                                        includesChevron = false,
-                                    ),
-                            ),
-                        ),
-                )
-            val homeGroup =
-                GroupedListGroup(
-                    id = "home",
-                    overline = "Home address",
-                    helper = "Postcards land in your mailbox 5–10 days after starting.",
-                    rows =
-                        listOf(
-                            GroupedListRow(
-                                id = "home.status",
-                                label = "Address verification",
-                                subtext = "Coming soon",
-                                control =
-                                    RowControl.ChipStatus(
-                                        "Not started",
-                                        RowControl.ChipTone.Neutral,
-                                        includesChevron = false,
-                                    ),
-                            ),
-                        ),
-                )
             val idGroup =
                 GroupedListGroup(
                     id = "photoid",
@@ -192,7 +152,7 @@ class VerificationCenterViewModel
                 )
             _state.value =
                 GroupedListUiState.Loaded(
-                    groups = listOf(emailGroup, phoneGroup, homeGroup, idGroup),
+                    groups = listOf(emailGroup, idGroup),
                 )
         }
     }

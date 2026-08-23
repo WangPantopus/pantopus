@@ -13,6 +13,10 @@ navigationCompose = "2.8.4"
 datastore = "1.1.1"
 securityCrypto = "1.1.0-alpha06"
 camerax = "1.4.0"
+# On-device QR decoding for the Add-Home wizard's "Scan WiFi QR" step —
+# the Android counterpart of iOS's AVCaptureMetadataOutput. Bundled model,
+# no Play Services download at runtime.
+mlkitBarcode = "17.3.0"
 biometric = "1.1.0"
 browser = "1.8.0"
 exifinterface = "1.3.7"
@@ -88,6 +92,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 

@@ -44,6 +44,29 @@ public enum MailboxVaultEndpoints {
     public static func file(body: FileToVaultBody) -> Endpoint {
         Endpoint(method: .post, path: "/api/mailbox/v2/p2/vault/file", body: body)
     }
+
+    /// `GET /api/mailbox/v2/p2/vault/search` — route
+    /// `backend/routes/mailboxV2Phase2.js:1145`. Searches the whole
+    /// archive server-side: sender / subject / content by default, plus
+    /// two special forms the handler sniffs — an amount (`$87`, `$87.00`)
+    /// and a month (`March 2025`). Passing `drawer: nil` searches every
+    /// drawer, which is what the Vault search field does.
+    public static func search(
+        query: String,
+        drawer: String? = nil,
+        folderId: String? = nil,
+        limit: Int = 20,
+        offset: Int = 0
+    ) -> Endpoint {
+        var params: [String: String] = [
+            "q": query,
+            "limit": String(limit),
+            "offset": String(offset)
+        ]
+        if let drawer { params["drawer"] = drawer }
+        if let folderId { params["folderId"] = folderId }
+        return Endpoint(method: .get, path: "/api/mailbox/v2/p2/vault/search", query: params)
+    }
 }
 
 public struct CreateVaultFolderBody: Encodable, Sendable {

@@ -1,4 +1,11 @@
-@file:Suppress("MagicNumber", "PackageNaming", "TooManyFunctions", "LargeClass", "ComplexCondition")
+@file:Suppress(
+    "MagicNumber",
+    "PackageNaming",
+    "TooManyFunctions",
+    "LargeClass",
+    "ComplexCondition",
+    "LongParameterList",
+)
 
 package app.pantopus.android.ui.screens.compose.pulse
 
@@ -10,11 +17,14 @@ import app.pantopus.android.data.analytics.AnalyticsEvent
 import app.pantopus.android.data.analytics.AnalyticsResult
 import app.pantopus.android.data.api.models.posts.PostCreateRequest
 import app.pantopus.android.data.api.models.posts.PostDetailDto
+import app.pantopus.android.data.api.models.posts.PostPrecheckRequest
 import app.pantopus.android.data.api.models.posts.PostUpdateRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.businesses.BusinessPostsRepository
 import app.pantopus.android.data.location.LocationProvider
 import app.pantopus.android.data.location.UserCoordinate
 import app.pantopus.android.data.network.NetworkMonitor
+import app.pantopus.android.data.posts.PostPrecheckRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.data.upload.UploadRepository
@@ -59,14 +69,24 @@ enum class PulseComposeIntent(
     companion object {
         fun fromKey(key: String): PulseComposeIntent = entries.firstOrNull { it.key == key } ?: Ask
 
-        /** Bridge a feed-row intent into the compose subset. `All` → `Ask`. */
+        /**
+         * Bridge a feed-row intent into the compose subset. `All` → `Ask`.
+         * The four read-only lanes added for RN chip-row parity
+         * (`Alert` / `Deal` / `NeighborhoodWin` / `VisitorGuide`) have no
+         * dedicated compose form yet, so they pre-fill the generic
+         * Announce / Recommend composers.
+         */
         fun fromFeedIntent(feed: PulseIntent): PulseComposeIntent =
             when (feed) {
                 PulseIntent.All, PulseIntent.Ask -> Ask
-                PulseIntent.Recommend -> Recommend
+                PulseIntent.Recommend, PulseIntent.VisitorGuide -> Recommend
                 PulseIntent.Event -> Event
                 PulseIntent.Lost -> Lost
-                PulseIntent.Announce -> Announce
+                PulseIntent.Announce,
+                PulseIntent.Alert,
+                PulseIntent.Deal,
+                PulseIntent.NeighborhoodWin,
+                -> Announce
             }
     }
 }
@@ -208,6 +228,10 @@ class PulseComposeViewModel
         private val postsRefresh: PulsePostsRefreshNotifier,
         private val locationProvider: LocationProvider,
         savedStateHandle: SavedStateHandle,
+        /** C2 — "post as this business" create route. */
+        private val businessPosts: BusinessPostsRepository,
+        /** Pre-post safety precheck — `POST /api/posts/precheck`. */
+        private val precheckRepo: PostPrecheckRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<PulseComposeUiState>(PulseComposeUiState.Idle)
         val state: StateFlow<PulseComposeUiState> = _state.asStateFlow()
@@ -247,6 +271,36 @@ class PulseComposeViewModel
         private val _eligibilityWarning = MutableStateFlow<String?>(null)
         val eligibilityWarning: StateFlow<String?> = _eligibilityWarning.asStateFlow()
 
+        // Pre-post safety precheck (`POST /api/posts/precheck`).
+
+        /**
+         * Soft nudge from the precheck's first suggestion / flag. Rendered
+         * as a dismissible amber banner (RN `PostComposerModal.tsx:645`).
+         */
+        private val _precheckNudge = MutableStateFlow<String?>(null)
+        val precheckNudge: StateFlow<String?> = _precheckNudge.asStateFlow()
+
+        /**
+         * Cooldown copy when the viewer is rate-limited or restricted.
+         * Non-null blocks submit (RN gates on `canPost`).
+         */
+        private val _precheckCooldown = MutableStateFlow<String?>(null)
+        val precheckCooldown: StateFlow<String?> = _precheckCooldown.asStateFlow()
+
+        /**
+         * True when the backend classified this as a visitor post — the
+         * composer shows the visitor-badge banner (RN
+         * `PostComposerModal.tsx:631`).
+         */
+        private val _isVisitorPost = MutableStateFlow(false)
+        val isVisitorPost: StateFlow<Boolean> = _isVisitorPost.asStateFlow()
+
+        /**
+         * Guards the per-draft single run. Reset whenever the body text
+         * changes, mirroring RN's `precheckDone` flag.
+         */
+        private var precheckDone = false
+
         private val _announceAudience = MutableStateFlow(PulseAnnounceAudience.Neighbors)
         val announceAudience: StateFlow<PulseAnnounceAudience> = _announceAudience.asStateFlow()
 
@@ -259,10 +313,19 @@ class PulseComposeViewModel
         private val _recommendRating = MutableStateFlow(DEFAULT_RECOMMEND_RATING)
         val recommendRating: StateFlow<Int> = _recommendRating.asStateFlow()
 
+        /**
+         * Sports-lane starter prompts open the composer with the body
+         * pre-filled — RN `FeedScreen.tsx:296` (`setComposeText`). Seeded
+         * as the *current* value (not the original) so the form reads
+         * dirty and the CTA is live at once.
+         */
+        private val prefillBody: String? = savedStateHandle.get<String>(PREFILL_BODY_KEY)
+
         private val _fields =
             MutableStateFlow(
-                PulseComposeField.entries.associateWith {
-                    FormFieldState(id = it.key)
+                PulseComposeField.entries.associateWith { field ->
+                    val seed = prefillBody.takeIf { field == PulseComposeField.Body && !it.isNullOrEmpty() }
+                    FormFieldState(id = field.key, value = seed.orEmpty())
                 },
             )
         val fields: StateFlow<Map<PulseComposeField, FormFieldState>> = _fields.asStateFlow()
@@ -297,6 +360,15 @@ class PulseComposeViewModel
         private var flowConfigured = false
 
         /**
+         * C2 — when non-null the create submit goes to
+         * `POST /api/businesses/:businessId/posts` instead of `POST /api/posts`,
+         * so the row lands with `business_author_id` set. Set by the Business
+         * owner dashboard's "Post as this business" FAB; the backend gates it
+         * on `profile.edit` (owner / admin / editor).
+         */
+        private var businessAuthorId: String? = null
+
+        /**
          * Fresh device fix captured at submit time so the backend's
          * 5-minute GPS-freshness gate passes even when drafting takes a
          * while. Pick-time coordinates remain the fallback.
@@ -309,6 +381,20 @@ class PulseComposeViewModel
         val flowPurpose: PulseComposePurpose? get() = composePurpose
 
         val flowTargetLabel: String? get() = postingTarget?.displayLabel
+
+        /**
+         * C2 — route the create submit through the business-post endpoint.
+         * Idempotent; called from a `LaunchedEffect` on the compose screen.
+         */
+        fun applyBusinessAuthor(businessId: String) {
+            if (businessAuthorId == businessId) return
+            businessAuthorId = businessId
+            _identity.value = PulseComposeIdentity.Business
+            baselineIdentity = PulseComposeIdentity.Business
+        }
+
+        /** True when composing from the Business owner dashboard. */
+        val isBusinessAuthored: Boolean get() = businessAuthorId != null
 
         fun applyFlowContext(
             target: PulsePostingTarget,
@@ -361,8 +447,17 @@ class PulseComposeViewModel
         /** True iff this view-model is wired to edit an existing post. */
         val isEditing: Boolean get() = editingPostId != null
 
-        /** Top-bar title — "Edit post" in edit mode, "New post" otherwise. */
-        val displayTitle: String get() = if (isEditing) "Edit post" else "New post"
+        /**
+         * Top-bar title — "Edit post" in edit mode, "Post as business" when
+         * composing from the Business owner dashboard, "New post" otherwise.
+         */
+        val displayTitle: String
+            get() =
+                when {
+                    isEditing -> "Edit post"
+                    isBusinessAuthored -> "Post as business"
+                    else -> "New post"
+                }
 
         /** Right-action label — "Save" in edit mode, intent-driven otherwise. */
         val ctaLabel: String get() = if (isEditing) "Save" else _activeIntent.value.ctaLabel
@@ -420,6 +515,7 @@ class PulseComposeViewModel
         ) {
             val map = _fields.value.toMutableMap()
             val snapshot = map[field] ?: FormFieldState(id = field.key)
+            val changed = snapshot.value != value
             map[field] =
                 snapshot.copy(
                     value = value,
@@ -427,6 +523,60 @@ class PulseComposeViewModel
                     error = validator(field).validate(value),
                 )
             _fields.value = map
+            // RN re-arms the precheck whenever the body text changes
+            // (`PostComposerModal.tsx:789`).
+            if (field == PulseComposeField.Body && changed) precheckDone = false
+        }
+
+        /** X on the precheck nudge banner. */
+        fun dismissPrecheckNudge() {
+            _precheckNudge.value = null
+        }
+
+        /**
+         * Run `POST /api/posts/precheck` against the current draft and
+         * project the response onto the three banners RN renders: the
+         * cooldown block, the visitor badge, and the soft nudge.
+         *
+         * Mirrors RN `usePostComposer.ts:176-190` — Place surface only,
+         * skipped while the body is empty, and run at most once per draft
+         * revision. Transport failures are swallowed: the backend itself
+         * fails open, so a precheck must never be the reason a post can't
+         * be sent.
+         */
+        fun runPrecheck() {
+            viewModelScope.launch { runPrecheckSuspending() }
+        }
+
+        private suspend fun runPrecheckSuspending() {
+            if (isEditing) return
+            val target = postingTarget
+            if (target != null && !target.isPlaceTarget) return
+            val body = trimmedValue(PulseComposeField.Body)
+            if (body.isEmpty() || precheckDone) return
+            val result =
+                precheckRepo.precheck(
+                    PostPrecheckRequest(
+                        content = body,
+                        postType = _activeIntent.value.postType,
+                        purpose = _activeIntent.value.purpose,
+                        surface = "place",
+                        latitude = target?.targetLatitude ?: freshGpsFix?.latitude,
+                        longitude = target?.targetLongitude ?: freshGpsFix?.longitude,
+                    ),
+                )
+            precheckDone = true
+            // Fail open — never block the composer on a precheck error.
+            val data = (result as? NetworkResult.Success)?.data ?: return
+            if (data.isVisitor == true) _isVisitorPost.value = true
+            _precheckNudge.value = data.primaryNudge
+            _precheckCooldown.value =
+                if (data.canPost == false) {
+                    data.cooldown?.reason?.let { "You have a posting restriction: $it" }
+                        ?: "You have a posting restriction right now."
+                } else {
+                    null
+                }
         }
 
         fun setPhotos(photos: List<PulseComposePhoto>) {
@@ -652,6 +802,20 @@ class PulseComposeViewModel
                 )
                 return
             }
+            // The precheck runs on body blur (RN `PostComposerModal.tsx:801`).
+            // When it came back with a live posting restriction the draft is
+            // refused here instead of round-tripping into a server rejection.
+            val cooldown = _precheckCooldown.value
+            if (cooldown != null) {
+                _toast.value = PulseComposeToast(cooldown, isError = true)
+                Analytics.track(
+                    AnalyticsEvent.FormPulseComposeSubmit(
+                        intent = _activeIntent.value.key,
+                        result = AnalyticsResult.ERROR,
+                    ),
+                )
+                return
+            }
             _state.value = PulseComposeUiState.Submitting
             viewModelScope.launch {
                 val editingId = editingPostId
@@ -675,7 +839,16 @@ class PulseComposeViewModel
         }
 
         private suspend fun handleCreate() {
-            when (val result = repo.createPost(buildRequest())) {
+            val request = buildRequest()
+            val authorId = businessAuthorId
+            // C2 — "Post as this business": same body, business route.
+            val createResult =
+                if (authorId != null) {
+                    businessPosts.createBusinessPost(authorId, request)
+                } else {
+                    repo.createPost(request)
+                }
+            when (val result = createResult) {
                 is NetworkResult.Success -> {
                     val postId = result.data.post?.id ?: result.data.postId
                     val (toastText, toastError) = uploadPhotosIfNeeded(postId, isEditing = false)
@@ -1135,6 +1308,9 @@ class PulseComposeViewModel
         companion object {
             const val INTENT_KEY = "intent"
             const val POST_ID_KEY = "postId"
+
+            /** Nav arg carrying a Sports-lane starter's prompt text. */
+            const val PREFILL_BODY_KEY = "prefillBody"
             private const val TITLE_MAX = 255
             private const val BODY_MAX = 5000
             private const val LOCATION_MAX = 255

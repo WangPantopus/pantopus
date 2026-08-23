@@ -37,6 +37,12 @@ public final class InviteOwnerFormViewModel {
     public private(set) var owners: [InviteOwnerOwnerShare]
     public var fields: [InviteOwnerField: FormFieldState]
     public private(set) var grantPercent: Int
+    /// RN's "Fast track (vouch)" switch, defaulted ON
+    /// (`src/app/homes/[id]/owners/invite.tsx:22`). Sent as `fast_track`;
+    /// the handler files the claim as `method: 'vouch'` +
+    /// `state: 'pending_challenge_window'` instead of `invite` /
+    /// `submitted` (`backend/routes/homeOwnership.js:1473-1481`).
+    public var fastTrack = true
     public private(set) var isSaving = false
     public var toast: ToastMessage?
     public private(set) var shouldDismiss = false
@@ -223,7 +229,7 @@ public final class InviteOwnerFormViewModel {
             _ = try await api.request(
                 HomesEndpoints.inviteOwner(
                     homeId: homeId,
-                    request: InviteOwnerRequest(email: email, phone: phone)
+                    request: InviteOwnerRequest(email: email, phone: phone, fastTrack: fastTrack)
                 ),
                 as: InviteOwnerResponse.self
             )
@@ -281,6 +287,7 @@ public final class InviteOwnerFormViewModel {
     }
 
     private func apply(draft: InviteOwnerDraft, markDirty: Bool) {
+        fastTrack = true
         homeContext = draft.homeContext
         owners = draft.owners
         grantPercent = draft.grantPercent

@@ -158,11 +158,10 @@ class ReviewSignupsViewModel
         }
 
         /**
-         * Optimistic confirm — patches the local row to "confirmed" and
-         * hands the network round-trip off to the host via
-         * [onConfirmReservation]. The host is responsible for the
-         * POST + rollback; this keeps the VM platform-agnostic about
-         * retry behaviour and matches iOS exactly.
+         * Optimistic confirm — patches the local row to "confirmed",
+         * fires the real `POST /:id/reservations/:reservationId/confirm`
+         * (`backend/routes/supportTrains.js:3214`, S1) and still notifies
+         * the host via [onConfirmReservation] for navigation / analytics.
          */
         fun confirm(reservationId: String) {
             val idx = reservations.indexOfFirst { it.id == reservationId }
@@ -173,6 +172,7 @@ class ReviewSignupsViewModel
                     }
                 applyState()
             }
+            viewModelScope.launch { repo.confirmDelivery(supportTrainId, reservationId) }
             onConfirmReservation(reservationId)
         }
 

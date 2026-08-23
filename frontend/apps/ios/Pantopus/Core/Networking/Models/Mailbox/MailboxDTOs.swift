@@ -33,6 +33,10 @@ public struct MailItem: Decodable, Sendable, Hashable, Identifiable {
     public let senderUserId: String?
     public let senderBusinessName: String?
     public let senderAddress: String?
+    /// `Mail.sender_trust` — `verified_gov` / `verified_utility` /
+    /// `verified_business` / `pantopus_user` / `unknown`
+    /// (`backend/database/schema.sql:7207`).
+    public let senderTrust: String?
     public let viewed: Bool
     public let viewedAt: String?
     public let archived: Bool
@@ -67,6 +71,7 @@ public struct MailItem: Decodable, Sendable, Hashable, Identifiable {
         case senderUserId = "sender_user_id"
         case senderBusinessName = "sender_business_name"
         case senderAddress = "sender_address"
+        case senderTrust = "sender_trust"
         case viewed
         case viewedAt = "viewed_at"
         case archived, starred
@@ -101,6 +106,7 @@ public struct MailItem: Decodable, Sendable, Hashable, Identifiable {
         senderUserId = try c.decodeIfPresent(String.self, forKey: .senderUserId)
         senderBusinessName = try c.decodeIfPresent(String.self, forKey: .senderBusinessName)
         senderAddress = try c.decodeIfPresent(String.self, forKey: .senderAddress)
+        senderTrust = try c.decodeIfPresent(String.self, forKey: .senderTrust)
         viewed = try c.decodeIfPresent(Bool.self, forKey: .viewed) ?? false
         viewedAt = try c.decodeIfPresent(String.self, forKey: .viewedAt)
         archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
@@ -132,9 +138,28 @@ public struct MailDetailResponse: Decodable, Sendable, Hashable {
         public let object: JSONValue?
         public let contentFormat: String?
         public let links: [JSONValue]
+        /// `Mail.mail_extracted` (jsonb, `backend/database/schema.sql:7201`).
+        /// Compose writes the ceremonial metadata here at send time —
+        /// `stationeryTheme` / `inkSelection` / `voicePostscriptUri` /
+        /// `outcomes` (`backend/routes/mailbox.js:586-603`, persisted at
+        /// `:2017`). It is the V1 detail route's copy of the same values
+        /// the V2 item route exposes under `object_payload`, and the
+        /// backend itself falls back to it (`routes/mailCompose.js:556`).
+        public let mailExtracted: JSONValue?
 
         public var id: String {
             item.id
+        }
+
+        /// Stationery theme when this mail came out of the Ceremonial Mail
+        /// compose flow — the signal RN uses to redirect the generic
+        /// detail into the ceremonial open experience
+        /// (`src/app/mailbox/detail.tsx:43-49`). Nil for ordinary mail.
+        public var stationeryTheme: String? {
+            guard let theme = mailExtracted?.dictValue?["stationeryTheme"]?.stringValue else {
+                return nil
+            }
+            return theme.isEmpty ? nil : theme
         }
 
         public init(from decoder: any Decoder) throws {
@@ -144,6 +169,7 @@ public struct MailDetailResponse: Decodable, Sendable, Hashable {
             object = try c.decodeIfPresent(JSONValue.self, forKey: .object)
             contentFormat = try c.decodeIfPresent(String.self, forKey: .contentFormat)
             links = try c.decodeIfPresent([JSONValue].self, forKey: .links) ?? []
+            mailExtracted = try c.decodeIfPresent(JSONValue.self, forKey: .mailExtracted)
         }
 
         public struct Sender: Decodable, Sendable, Hashable, Identifiable {
@@ -156,6 +182,7 @@ public struct MailDetailResponse: Decodable, Sendable, Hashable {
             case sender, object
             case contentFormat = "content_format"
             case links
+            case mailExtracted = "mail_extracted"
         }
     }
 }

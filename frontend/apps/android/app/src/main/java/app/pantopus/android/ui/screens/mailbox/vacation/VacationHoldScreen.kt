@@ -21,12 +21,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +59,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Toast dwell time — matches iOS `VacationHoldView`'s 1.8s banner. */
+private const val TOAST_MILLIS = 1_800L
+
 /**
  * A14.8 — Vacation Hold screen. Mirrors
  * `Features/Mailbox/Vacation/VacationHoldView.swift`. Two variants:
@@ -66,8 +74,9 @@ import java.util.Locale
  *
  * - active — sky-gradient [HoldStatusHero] with pulsing pill + days-
  *   left + 3-cell stats grid, a "Currently held" ledger via [HeldList],
- *   read-only forwarding + emergency cards, and the trailing slot in
- *   the top bar swaps `Save` for a neutral `End hold` text button.
+ *   read-only forwarding + emergency cards, a destructive "End hold
+ *   early" row at the bottom, and the trailing slot in the top bar
+ *   swaps `Save` for a muted `Edit` text button.
  */
 @Composable
 fun VacationHoldScreen(
@@ -80,6 +89,20 @@ fun VacationHoldScreen(
     onEditEmergency: () -> Unit = {},
 ) {
     val mode by viewModel.mode.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
+
+    /**
+     * A14.8 — "End hold early" is destructive (the backend marks the hold
+     * `cancelled` and clears `User.vacation_mode`), so it confirms first.
+     */
+    var showEndHoldConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            kotlinx.coroutines.delay(TOAST_MILLIS)
+            viewModel.consumeToast()
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.load(seed)
@@ -94,24 +117,82 @@ fun VacationHoldScreen(
         Analytics.track(AnalyticsEvent.ScreenVacationHoldViewed(modeTag))
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PantopusColors.appBg)
-                .testTag("vacationHold"),
-    ) {
-        TopBar(viewModel = viewModel, mode = mode)
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = Spacing.s6),
+                    .background(PantopusColors.appBg)
+                    .testTag("vacationHold"),
         ) {
-            when (val m = mode) {
-                is VacationHoldMode.Scheduling -> SchedulingBody(viewModel = viewModel, draft = m.draft)
-                is VacationHoldMode.Active -> ActiveBody(viewModel = viewModel, hold = m.hold)
+            TopBar(viewModel = viewModel, mode = mode)
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = Spacing.s6),
+            ) {
+                when (val m = mode) {
+                    is VacationHoldMode.Scheduling -> SchedulingBody(viewModel = viewModel, draft = m.draft)
+                    is VacationHoldMode.Active ->
+                        ActiveBody(
+                            viewModel = viewModel,
+                            hold = m.hold,
+                            onEndHold = { showEndHoldConfirm = true },
+                        )
+                }
+            }
+        }
+
+        if (showEndHoldConfirm) {
+            AlertDialog(
+                onDismissRequest = { showEndHoldConfirm = false },
+                title = { Text(text = "End your vacation hold?") },
+                text = {
+                    Text(
+                        text = "Mail and packages resume delivery right away.",
+                        fontSize = 13.sp,
+                        color = PantopusColors.appTextSecondary,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showEndHoldConfirm = false
+                            viewModel.endHoldEarly()
+                        },
+                        modifier = Modifier.testTag("vacationHoldEndConfirm"),
+                    ) {
+                        Text(text = "End hold", color = PantopusColors.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEndHoldConfirm = false }) {
+                        Text(text = "Keep holding", color = PantopusColors.appTextSecondary)
+                    }
+                },
+            )
+        }
+
+        if (toast != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Spacing.s10),
+            ) {
+                Text(
+                    text = toast.orEmpty(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appTextInverse,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Radii.pill))
+                            .background(PantopusColors.appText.copy(alpha = 0.9f))
+                            .padding(horizontal = Spacing.s4, vertical = Spacing.s2),
+                )
             }
         }
     }
@@ -124,7 +205,7 @@ private fun TopBar(
     viewModel: VacationHoldViewModel,
     mode: VacationHoldMode,
 ) {
-    val trailingLabel = if (mode is VacationHoldMode.Active) "End hold" else "Save"
+    val trailingLabel = if (mode is VacationHoldMode.Active) "Edit" else "Save"
     val trailingEnabled =
         when (mode) {
             is VacationHoldMode.Scheduling -> mode.draft.isValid
@@ -134,7 +215,7 @@ private fun TopBar(
         when (mode) {
             is VacationHoldMode.Scheduling ->
                 if (trailingEnabled) PantopusColors.primary600 else PantopusColors.appTextMuted
-            is VacationHoldMode.Active -> PantopusColors.appText
+            is VacationHoldMode.Active -> PantopusColors.appTextSecondary
         }
 
     Box(
@@ -321,6 +402,7 @@ private fun SchedulingBody(
 private fun ActiveBody(
     viewModel: VacationHoldViewModel,
     hold: VacationActiveHold,
+    onEndHold: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -374,6 +456,15 @@ private fun ActiveBody(
                     tag = "vacationHoldActiveEmergency",
                 )
             }
+        }
+
+        VacationCard {
+            VacationDestructiveRow(
+                label = "End hold early",
+                sub = "Mail resumes tomorrow morning",
+                onTap = onEndHold,
+                tag = "vacationHoldEndEarly",
+            )
         }
 
         VacationMonoFooter(hold.activeSinceLabel)
@@ -440,6 +531,37 @@ private fun VacationMonoFooter(text: String) {
                 .padding(horizontal = Spacing.s4)
                 .padding(top = Spacing.s6, bottom = Spacing.s2),
     )
+}
+
+/** A14.8 — destructive card row ("End hold early") at the bottom of the active body. */
+@Composable
+private fun VacationDestructiveRow(
+    label: String,
+    sub: String,
+    onTap: () -> Unit,
+    tag: String,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onTap() }
+                .padding(horizontal = Spacing.s4, vertical = 14.dp)
+                .testTag(tag),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.error,
+        )
+        Text(
+            text = sub,
+            fontSize = 11.5.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+    }
 }
 
 @Composable

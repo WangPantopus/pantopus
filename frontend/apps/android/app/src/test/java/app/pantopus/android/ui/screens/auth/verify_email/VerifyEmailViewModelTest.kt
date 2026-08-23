@@ -127,6 +127,20 @@ class VerifyEmailViewModelTest {
             coVerify(exactly = 2) { repo.resendVerification(any()) }
         }
 
+    // ── A18.1 countdown label ─────────────────────────────────────────
+
+    @Test
+    fun `countdownLabel renders minutes and zero-padded seconds`() {
+        // Design frame reads "Resend in 0:42"; the label must round up so a
+        // 29.4s remainder never renders as "0:29" while the button is still
+        // disabled. Mirrors iOS `VerifyEmailView.countdownLabel`.
+        assertEquals("0:42", countdownLabel(42_000L))
+        assertEquals("0:30", countdownLabel(29_400L))
+        assertEquals("0:05", countdownLabel(5_000L))
+        assertEquals("1:05", countdownLabel(65_000L))
+        assertEquals("0:00", countdownLabel(0L))
+    }
+
     @Test
     fun `resend error surfaces rate limited message`() =
         runTest {

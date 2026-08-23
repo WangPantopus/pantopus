@@ -17,7 +17,7 @@ public enum PrivacyEndpoints {
     public static let settings = Endpoint(method: .get, path: "/api/privacy/settings")
 
     /// `PATCH /api/privacy/settings` — partial update. Route
-    /// `backend/routes/privacy.js:95`.
+    /// `backend/routes/privacy.js:92`. Returns `{ message, settings }`.
     public static func updateSettings(_ body: PrivacySettingsUpdate) -> Endpoint {
         Endpoint(method: .patch, path: "/api/privacy/settings", body: body)
     }
@@ -67,63 +67,65 @@ public enum AuthMethodsEndpoints {
         Endpoint(method: .post, path: "/api/users/resend-verification", body: body, authenticated: false)
     }
 
-    /// `DELETE /api/users/account` — schedule account deletion. Route
-    /// `backend/routes/users.js:3945`.
+    /// `DELETE /api/users/account` — permanently delete the signed-in
+    /// user and every cascading row. Route `backend/routes/users.js:3945`.
+    /// Takes **no body**. `200 { message }` on success; `409 { error }`
+    /// when the account still has in-progress gigs or escrowed payments
+    /// (`users.js:3958 / :3972 / :3986`).
     public static let deleteAccount = Endpoint(method: .delete, path: "/api/users/account")
 }
 
 // MARK: - Bodies
 
-/// Partial-update body for `PATCH /api/privacy/settings`. Only set the
-/// keys you intend to change; the backend ignores nil keys at the
-/// JSON level (each Optional encodes nothing when nil).
+/// Partial-update body for `PATCH /api/privacy/settings`.
+///
+/// The field list is exactly `updateSettingsSchema` at
+/// `backend/routes/privacy.js:28-37`. `middleware/validate.js:66` runs
+/// Joi with `allowUnknown: false`, so **any key outside that schema is a
+/// 400** — do not add speculative fields here. Only set the keys you
+/// intend to change; each Optional encodes nothing when nil, and the Joi
+/// schema requires at least one (`.min(1)`).
 public struct PrivacySettingsUpdate: Encodable, Sendable {
+    /// `everyone` · `mutuals` · `nobody`.
     public var searchVisibility: String?
-    public var addressPrecision: String?
-    public var hideFromSearch: Bool?
-    public var showOnlineStatus: Bool?
-    public var showLastActive: Bool?
-    public var showReadReceipts: Bool?
-    public var shareHomeCheckIns: Bool?
-    public var pushPreferences: [String: Bool]?
-    public var emailPreferences: [String: Bool]?
-    public var smsPreferences: [String: Bool]?
+    public var findableByName: Bool?
+    public var findableByEmail: Bool?
+    public var findableByPhone: Bool?
+    /// `public` · `followers` · `private`.
+    public var profileDefaultVisibility: String?
+    public var showGigHistory: String?
+    public var showNeighborhood: String?
+    public var showHomeAffiliation: String?
 
     public init(
         searchVisibility: String? = nil,
-        addressPrecision: String? = nil,
-        hideFromSearch: Bool? = nil,
-        showOnlineStatus: Bool? = nil,
-        showLastActive: Bool? = nil,
-        showReadReceipts: Bool? = nil,
-        shareHomeCheckIns: Bool? = nil,
-        pushPreferences: [String: Bool]? = nil,
-        emailPreferences: [String: Bool]? = nil,
-        smsPreferences: [String: Bool]? = nil
+        findableByName: Bool? = nil,
+        findableByEmail: Bool? = nil,
+        findableByPhone: Bool? = nil,
+        profileDefaultVisibility: String? = nil,
+        showGigHistory: String? = nil,
+        showNeighborhood: String? = nil,
+        showHomeAffiliation: String? = nil
     ) {
         self.searchVisibility = searchVisibility
-        self.addressPrecision = addressPrecision
-        self.hideFromSearch = hideFromSearch
-        self.showOnlineStatus = showOnlineStatus
-        self.showLastActive = showLastActive
-        self.showReadReceipts = showReadReceipts
-        self.shareHomeCheckIns = shareHomeCheckIns
-        self.pushPreferences = pushPreferences
-        self.emailPreferences = emailPreferences
-        self.smsPreferences = smsPreferences
+        self.findableByName = findableByName
+        self.findableByEmail = findableByEmail
+        self.findableByPhone = findableByPhone
+        self.profileDefaultVisibility = profileDefaultVisibility
+        self.showGigHistory = showGigHistory
+        self.showNeighborhood = showNeighborhood
+        self.showHomeAffiliation = showHomeAffiliation
     }
 
     enum CodingKeys: String, CodingKey {
         case searchVisibility = "search_visibility"
-        case addressPrecision = "address_precision"
-        case hideFromSearch = "hide_from_search"
-        case showOnlineStatus = "show_online_status"
-        case showLastActive = "show_last_active"
-        case showReadReceipts = "show_read_receipts"
-        case shareHomeCheckIns = "share_home_check_ins"
-        case pushPreferences = "push_preferences"
-        case emailPreferences = "email_preferences"
-        case smsPreferences = "sms_preferences"
+        case findableByName = "findable_by_name"
+        case findableByEmail = "findable_by_email"
+        case findableByPhone = "findable_by_phone"
+        case profileDefaultVisibility = "profile_default_visibility"
+        case showGigHistory = "show_gig_history"
+        case showNeighborhood = "show_neighborhood"
+        case showHomeAffiliation = "show_home_affiliation"
     }
 }
 

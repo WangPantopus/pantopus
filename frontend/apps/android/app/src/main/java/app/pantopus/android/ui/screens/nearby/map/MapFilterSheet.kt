@@ -85,7 +85,16 @@ data class MapFilterCriteria(
                         ),
                 ),
             )
-        return head + gig.toSections()
+        // The map contributes its own radius *range* and the gig criteria
+        // contribute radius *presets*; both are kept deliberately, and they
+        // intersect when filtering. Two headers reading "Distance" would be
+        // unreadable, so the gig-supplied one is retitled here only. The ids
+        // stay as they are — both parse sides discriminate on control type,
+        // and the shell iterates by index, so the repeat is harmless.
+        return head +
+            gig.toSections().map { section ->
+                if (section.id == "distance") section.copy(title = "Gig radius") else section
+            }
     }
 
     fun matchesDistance(miles: Double?): Boolean {

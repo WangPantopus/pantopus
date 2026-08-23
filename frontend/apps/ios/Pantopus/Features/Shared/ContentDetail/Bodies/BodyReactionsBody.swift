@@ -5,7 +5,7 @@
 //  `body_reactions` slot for the Pulse post detail. Body copy → media
 //  grid → reactions bar → inline composer → flattened comment thread.
 //
-// swiftlint:disable multiple_closures_with_trailing_closure
+// swiftlint:disable file_length multiple_closures_with_trailing_closure
 
 import SwiftUI
 
@@ -133,6 +133,11 @@ public struct BodyReactionsBody: View {
     /// Emoji flair on the active heart reaction (long-press popover pick).
     private let selectedReactionEmoji: String?
     private let onEmojiSelected: (@MainActor (String) -> Void)?
+    /// Optional card rendered between the reaction bar and the comment
+    /// composer. Pulse post detail passes the "Nearby Providers" card here;
+    /// every other caller leaves it nil. Type-erased so adding the slot
+    /// doesn't make this shared body generic.
+    private let belowReactions: AnyView?
 
     public init(
         body: String,
@@ -156,8 +161,10 @@ public struct BodyReactionsBody: View {
         onCommentReply: (@MainActor (PostCommentRow) -> Void)? = nil,
         onCommentLike: (@MainActor (String) -> Void)? = nil,
         onCommentDelete: (@MainActor (String) -> Void)? = nil,
+        belowReactions: AnyView? = nil,
         onCommentAvatarTap: @escaping @MainActor (String) -> Void = { _ in }
     ) {
+        self.belowReactions = belowReactions
         bodyText = body
         self.media = media
         self.intent = intent
@@ -217,6 +224,11 @@ public struct BodyReactionsBody: View {
                 .fill(Theme.Color.appBorder)
                 .frame(height: 1)
                 .padding(.horizontal, Spacing.s4)
+
+            if let belowReactions {
+                belowReactions
+                    .padding(.horizontal, Spacing.s4)
+            }
 
             if let replyingToName {
                 HStack(spacing: Spacing.s2) {

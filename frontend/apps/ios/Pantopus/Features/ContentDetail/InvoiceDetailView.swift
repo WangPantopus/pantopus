@@ -2,13 +2,14 @@
 //  InvoiceDetailView.swift
 //  Pantopus
 //
-//  T2.6 invoice detail. Wraps `TransactionalDetailShell` with the same
-//  vocabulary as gig + listing. Block 3B wires the "Pay" CTA to the real
-//  Stripe PaymentSheet via the view-model's `CheckoutCoordinator`:
-//  PaymentSheet (presented by the SDK over the current screen) collects the
-//  card + handles SCA/3-D Secure, and the result drives a success / declined /
-//  canceled toast. We never mark the invoice paid here — the VM re-reads
-//  server state on success.
+//  A09.4 invoice detail. Wraps `TransactionalDetailShell` with the same
+//  vocabulary as gig + listing. The invoice itself is read from
+//  `GET /api/businesses/invoices/{id}`; the "Pay" CTA runs the real
+//  pay → PaymentSheet → confirm sequence via the view-model. PaymentSheet
+//  (presented by the SDK over the current screen) collects the card + handles
+//  SCA/3-D Secure, and the result drives a success / declined / canceled
+//  toast. On success the VM re-reads the invoice, so the paid frame is
+//  whatever the backend says it is.
 //
 
 import SwiftUI
@@ -17,6 +18,7 @@ public struct InvoiceDetailView: View {
     @State private var viewModel: InvoiceDetailViewModel
     @State private var toast: ToastMessage?
     @State private var isPaying = false
+    @State private var shareItem: ShareTextItem?
     private let onBack: @MainActor () -> Void
 
     public init(
@@ -32,8 +34,10 @@ public struct InvoiceDetailView: View {
             state: viewModel.state,
             onBack: onBack,
             onPrimaryAction: { pay() },
-            onSecondaryAction: nil,
-            onRetry: { Task { await viewModel.load() } },
+            // Only the paid dock carries a secondary button ("Share") —
+            // the due dock's secondary slot is nil.
+            onSecondaryAction: { shareItem = ShareTextItem(text: viewModel.shareSummary) },
+            onRetry: { Task { await viewModel.refresh() } },
             onMessageCounterparty: nil
         )
         .task { await viewModel.load() }
@@ -43,6 +47,9 @@ public struct InvoiceDetailView: View {
         .overlay(alignment: .bottom) { toastOverlay }
         .onChange(of: viewModel.paymentStatus) { _, status in
             handle(status)
+        }
+        .sheet(item: $shareItem) { item in
+            SystemShareSheet(items: [item.text])
         }
     }
 
@@ -91,4 +98,9 @@ public struct InvoiceDetailView: View {
         case .neutral: "checkout.cancel"
         }
     }
+}
+
+private struct ShareTextItem: Identifiable {
+    let id = UUID()
+    let text: String
 }

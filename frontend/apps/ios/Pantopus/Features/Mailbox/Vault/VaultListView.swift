@@ -22,6 +22,7 @@ struct VaultListView: View {
         ListOfRowsView(dataSource: viewModel)
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
             .accessibilityIdentifier("vaultList")
+            .sensitiveScreen()
     }
 }
 

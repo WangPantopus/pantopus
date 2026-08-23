@@ -12,8 +12,9 @@
 //
 //  · active — sky-gradient `HoldStatusHero` with pulsing pill + days-
 //    left + 3-cell stats grid, a "Currently held" ledger via `HeldList`,
-//    read-only forwarding + emergency cards, and the trailing slot in
-//    the top bar swaps `Save` for a neutral `End hold` text button.
+//    read-only forwarding + emergency cards, a destructive "End hold
+//    early" row at the bottom, and the trailing slot in the top bar
+//    swaps `Save` for a muted `Edit` text button.
 //
 
 // swiftlint:disable file_length
@@ -22,6 +23,9 @@ import SwiftUI
 
 public struct VacationHoldView: View {
     @State private var viewModel: VacationHoldViewModel
+    /// A14.8 — "End hold early" is destructive (the backend marks the
+    /// hold `cancelled` and clears `User.vacation_mode`), so it confirms.
+    @State private var showsEndHoldConfirm = false
 
     public init(viewModel: VacationHoldViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -47,7 +51,8 @@ public struct VacationHoldView: View {
                         VacationActiveBody(
                             hold: hold,
                             onTapForwarding: { viewModel.tapForwarding() },
-                            onTapEmergency: { viewModel.tapEmergency() }
+                            onTapEmergency: { viewModel.tapEmergency() },
+                            onEndHold: { showsEndHoldConfirm = true }
                         )
                     }
                 }
@@ -57,7 +62,33 @@ public struct VacationHoldView: View {
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("vacationHold")
+        .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+        .task { await viewModel.load() }
         .onAppear { Analytics.track(.screenVacationHoldViewed(mode: modeAnalyticsTag)) }
+        .confirmationDialog(
+            "End your vacation hold?",
+            isPresented: $showsEndHoldConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("End hold", role: .destructive) {
+                Task { await viewModel.endHoldEarly() }
+            }
+            .accessibilityIdentifier("vacationHoldEndConfirm")
+            Button("Keep holding", role: .cancel) {}
+        } message: {
+            Text("Mail and packages resume delivery right away.")
+        }
+        .overlay(alignment: .bottom) {
+            if let toast = viewModel.toast {
+                ToastBanner(message: toast)
+                    .padding(.bottom, Spacing.s10)
+                    .task {
+                        try? await Task.sleep(nanoseconds: 1_800_000_000)
+                        viewModel.toast = nil
+                    }
+                    .transition(.opacity)
+            }
+        }
     }
 
     private var modeAnalyticsTag: String {
@@ -86,7 +117,7 @@ public struct VacationHoldView: View {
                 .accessibilityIdentifier("vacationHoldBack")
                 Spacer()
                 Button(
-                    action: { viewModel.tapTrailingAction() },
+                    action: { Task { await viewModel.tapTrailingAction() } },
                     label: {
                         Text(viewModel.trailingActionLabel)
                             .font(.system(size: 15, weight: .semibold))
@@ -245,6 +276,7 @@ private struct VacationActiveBody: View {
     let hold: VacationActiveHold
     let onTapForwarding: () -> Void
     let onTapEmergency: () -> Void
+    let onEndHold: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
@@ -293,6 +325,16 @@ private struct VacationActiveBody: View {
                     )
                 }
             }
+
+            VacationCard {
+                VacationDestructiveRow(
+                    label: "End hold early",
+                    sub: "Mail resumes tomorrow morning",
+                    onTap: onEndHold,
+                    identifier: "vacationHoldEndEarly"
+                )
+            }
+            .padding(.top, 18)
 
             VacationMonoFooter(hold.activeSinceLabel)
         }
@@ -550,6 +592,36 @@ private struct VacationChevronRow: View {
     }
 }
 
+/// A14.8 — destructive card row ("End hold early") at the bottom of the
+/// active body. Error-tinted label + secondary sub, no chevron, per the
+/// JSX active frame's `destructive` Row.
+private struct VacationDestructiveRow: View {
+    let label: String
+    let sub: String
+    let onTap: () -> Void
+    let identifier: String
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+                Text(sub)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel("\(label), \(sub)")
+    }
+}
+
 private struct VacationAvatar: View {
     let initials: String
 
@@ -584,6 +656,26 @@ enum VacationHoldFormatter {
         day.locale = Locale(identifier: "en_US_POSIX")
         day.dateFormat = "MMM d"
         return "\(weekday.string(from: date)) · \(day.string(from: date))"
+    }
+}
+
+// MARK: - Toast
+
+/// Local copy of the mailbox toast chrome. `MailDetailView` and
+/// `MailTranslationView` each declare their own `private` one; this mirrors
+/// them so the three stay visually identical without a cross-file dependency.
+private struct ToastBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Theme.Color.appTextInverse)
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, Spacing.s2)
+            .background(Theme.Color.appText.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: Radii.pill))
+            .accessibilityLabel(message)
     }
 }
 

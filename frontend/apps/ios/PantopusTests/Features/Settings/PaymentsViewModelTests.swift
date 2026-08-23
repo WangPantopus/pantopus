@@ -8,6 +8,8 @@
 //  collapse, and the destructive-card gate.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import XCTest
 @testable import Pantopus
 
@@ -52,12 +54,12 @@ final class PaymentsViewModelTests: XCTestCase {
             XCTFail("Tax row should show on-file chip + chevron")
         }
 
-        // Activity: 3 stat rows.
+        // Activity: 3 chevron rows.
         if case let .stats(stats) = loaded.activity {
             XCTAssertEqual(stats.count, 3)
-            XCTAssertEqual(stats[0].label, "Lifetime")
-            XCTAssertEqual(stats[1].label, "Year to date")
-            XCTAssertEqual(stats[2].label, "Last payout")
+            XCTAssertEqual(stats[0].label, "Transactions")
+            XCTAssertEqual(stats[1].label, "Statements")
+            XCTAssertEqual(stats[2].label, "Disputes")
         } else {
             XCTFail("Activity should be stats[]")
         }
@@ -111,6 +113,22 @@ final class PaymentsViewModelTests: XCTestCase {
     override func setUp() {
         super.setUp()
         SequencedURLProtocol.reset()
+        stubSupplementaryLoadRoutes()
+    }
+
+    /// `load()` fans out to five routes, but the ordered `sequence` below
+    /// describes only the two the tests actually assert on (methods, then
+    /// history) plus the add-card flow. The three supplementary reads —
+    /// earnings, spending and the Connect account — each degrade to `nil` on
+    /// their own and are not part of any assertion, so they are answered by
+    /// route instead. `routeResponses` is consulted before `sequence`, which
+    /// keeps them from eating the entries the add-card assertions depend on.
+    private func stubSupplementaryLoadRoutes() {
+        // Enough entries for the reloads a single test performs.
+        let empty = Array(repeating: SequencedURLProtocol.Response.status(200, body: "{}"), count: 4)
+        SequencedURLProtocol.routeResponses["/api/payments/earnings"] = empty
+        SequencedURLProtocol.routeResponses["/api/payments/spending"] = empty
+        SequencedURLProtocol.routeResponses["/api/payments/connect/account"] = empty
     }
 
     private func makeAPI() -> APIClient {
@@ -187,8 +205,29 @@ final class PaymentsViewModelTests: XCTestCase {
     {"setupIntent":"seti_123_secret_abc","ephemeralKey":"ek_test_123","customer":"cus_123","publishableKey":"pk_test_x"}
     """
 
+    /// `GET /api/payments/history` — every live `load()` reads it right after
+    /// the methods list.
+    private static let emptyHistoryJSON = "{\"transactions\":[],\"total\":0}"
+
+    private static let historyJSON = """
+    {"transactions":[\
+    {"id":"p1","entry_type":"payment","amount_cents":12000,"currency":"usd","direction":"credit",\
+    "status":"succeeded","payment_type":"gig_payment","created_at":"2026-03-04T17:00:00.000Z",\
+    "gig":{"id":"g1","title":"Gutter cleaning"},"payer":{"id":"u2","name":"Ana Ruiz"},"_isSender":false},\
+    {"id":"p2","entry_type":"payment","amount_cents":2500,"currency":"usd","direction":"debit",\
+    "status":"succeeded","payment_type":"tip","created_at":"2026-03-02T17:00:00.000Z",\
+    "payee":{"id":"u3","name":"Sam Cole"},"_isSender":true},\
+    {"id":"payout_1","entry_type":"payout","amount_cents":40000,"currency":"USD","direction":"debit",\
+    "status":"paid","destination_last4":"6789","description":"Payout to bank ••••6789",\
+    "created_at":"2026-03-01T17:00:00.000Z"}\
+    ],"total":3}
+    """
+
     func testLiveLoadProjectsRealMethods() async {
-        SequencedURLProtocol.sequence = [.status(200, body: Self.methodsJSON)]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
         await vm.load()
         guard case let .loaded(loaded) = vm.state else {
@@ -211,8 +250,69 @@ final class PaymentsViewModelTests: XCTestCase {
         }
     }
 
+    /// The Activity card renders the real history feed — type, status,
+    /// counterparty and signed amounts.
+    func testLiveLoadProjectsTransactionHistory() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.historyJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state,
+              case let .transactions(rows) = loaded.activity
+        else {
+            return XCTFail("Expected the Activity card to carry transactions, got \(vm.state)")
+        }
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].title, "Gutter cleaning")
+        XCTAssertEqual(rows[0].kind, .received)
+        XCTAssertEqual(rows[0].amount, "+$120.00")
+        XCTAssertFalse(rows[0].isOutgoing)
+        XCTAssertTrue(rows[0].meta.contains("from Ana Ruiz"))
+        XCTAssertTrue(rows[0].meta.contains("Succeeded"))
+        XCTAssertEqual(rows[1].kind, .tip, "tips carry the star treatment")
+        XCTAssertEqual(rows[1].amount, "-$25.00")
+        XCTAssertTrue(rows[1].meta.contains("to Sam Cole"))
+        XCTAssertEqual(rows[2].kind, .payout)
+        XCTAssertEqual(rows[2].title, "Payout to bank ••••6789")
+        XCTAssertEqual(rows[2].amount, "-$400.00")
+    }
+
+    /// A user with no payments keeps the genuine empty state.
+    func testLiveLoadEmptyHistoryKeepsEmptyState() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, case let .empty(title, _) = loaded.activity else {
+            return XCTFail("Expected the empty activity row, got \(vm.state)")
+        }
+        XCTAssertEqual(title, "No transactions yet")
+    }
+
+    /// A history failure must not sink the screen — methods still render.
+    func testHistoryFailureKeepsMethodsUsable() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(500, body: "{\"error\":\"boom\"}")
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, case let .empty(title, _) = loaded.activity else {
+            return XCTFail("Expected .loaded with an honest activity row, got \(vm.state)")
+        }
+        XCTAssertEqual(loaded.methods.count, 2)
+        XCTAssertEqual(title, "Couldn't load transactions")
+    }
+
     func testLiveLoadEmptyMethods() async {
-        SequencedURLProtocol.sequence = [.status(200, body: "{\"paymentMethods\":[]}")]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON)
+        ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
         await vm.load()
         guard case let .loaded(loaded) = vm.state else {
@@ -236,6 +336,7 @@ final class PaymentsViewModelTests: XCTestCase {
         // load (empty) → add-card params → reload (now one card).
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: Self.addCardParamsJSON),
             .status(200, body: Self.methodsJSON)
         ]
@@ -257,6 +358,7 @@ final class PaymentsViewModelTests: XCTestCase {
     func testAddCardCanceledDoesNotRefresh() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: "{\"paymentMethods\":[]}"),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: Self.addCardParamsJSON)
         ]
         let presenter = StubPaymentSheetPresenter()
@@ -280,6 +382,7 @@ final class PaymentsViewModelTests: XCTestCase {
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: "{\"message\":\"ok\"}"),
             .status(200, body: reorderedJSON)
         ]
@@ -297,6 +400,7 @@ final class PaymentsViewModelTests: XCTestCase {
     func testSetDefaultFailureRevertsAndSurfacesError() async {
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(500, body: "{\"error\":\"boom\"}")
         ]
         let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
@@ -317,6 +421,7 @@ final class PaymentsViewModelTests: XCTestCase {
         )
         SequencedURLProtocol.sequence = [
             .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
             .status(200, body: "{\"message\":\"ok\"}"),
             .status(200, body: afterRemovalJSON)
         ]
@@ -329,6 +434,59 @@ final class PaymentsViewModelTests: XCTestCase {
         }
         XCTAssertEqual(loaded.methods.count, 1)
         XCTAssertEqual(loaded.methods.first?.id, "pm_1")
+    }
+
+    /// The destructive path is gated behind a second step: tapping
+    /// "Remove Card" only queues the confirmation, and nothing reaches
+    /// `DELETE /api/payments/methods/{id}` until it is confirmed.
+    func testRemoveMethodRequiresConfirmationBeforeDelete() async {
+        let afterRemovalJSON = Self.methodsResponse(
+            Self.cardJSON(Self.defaultVisa)
+        )
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.methodsJSON),
+            .status(200, body: Self.emptyHistoryJSON),
+            .status(200, body: "{\"message\":\"ok\"}"),
+            .status(200, body: afterRemovalJSON)
+        ]
+        let vm = PaymentsViewModel(api: makeAPI(), sheetPresenter: StubPaymentSheetPresenter())
+        await vm.load()
+        guard case let .loaded(loaded) = vm.state, let method = loaded.methods.last else {
+            XCTFail("Expected .loaded with methods, got \(vm.state)")
+            return
+        }
+
+        // Tapping the action menu's destructive item only queues the card.
+        vm.requestRemoval(method)
+        XCTAssertEqual(vm.pendingRemoval?.id, "pm_2")
+        XCTAssertEqual(vm.pendingRemoval?.last4, "4444", "The confirmation names the card by its last4")
+        XCTAssertTrue(Self.deleteRequests().isEmpty, "No DELETE before the user confirms")
+        guard case let .loaded(queued) = vm.state else {
+            XCTFail("Queuing a removal shouldn't change the render state")
+            return
+        }
+        XCTAssertEqual(queued.methods.count, 2, "The row stays put until the removal is confirmed")
+
+        // Dismissing the confirmation still issues nothing.
+        vm.cancelRemoval()
+        XCTAssertNil(vm.pendingRemoval)
+        XCTAssertTrue(Self.deleteRequests().isEmpty, "Cancelling leaves the card on file")
+
+        // Confirming is the only path that reaches the backend.
+        vm.requestRemoval(method)
+        await vm.removeMethod(method.id)
+        XCTAssertNil(vm.pendingRemoval, "Confirming clears the queued removal")
+        XCTAssertEqual(Self.deleteRequests().count, 1)
+        XCTAssertEqual(Self.deleteRequests().first?.url?.path, "/api/payments/methods/pm_2")
+        guard case let .loaded(removed) = vm.state else {
+            XCTFail("Expected .loaded, got \(vm.state)")
+            return
+        }
+        XCTAssertEqual(removed.methods.map(\.id), ["pm_1"])
+    }
+
+    private static func deleteRequests() -> [URLRequest] {
+        SequencedURLProtocol.capturedRequests.filter { $0.httpMethod == "DELETE" }
     }
 }
 

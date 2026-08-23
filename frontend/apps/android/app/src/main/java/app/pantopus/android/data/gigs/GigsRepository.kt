@@ -78,6 +78,12 @@ class GigsRepository
             maxPrice: Double? = null,
             scheduleType: String? = null,
             payType: String? = null,
+            // RN feed chips: distance (+ includeRemote=false), deadline
+            // window, and task archetype (`app/(tabs)/gigs.tsx:87`).
+            includeRemote: Boolean? = null,
+            deadline: String? = null,
+            maxDistanceMeters: Int? = null,
+            taskArchetype: String? = null,
         ): NetworkResult<GigsListResponse> =
             safeApiCall {
                 api.list(
@@ -86,15 +92,31 @@ class GigsRepository
                     latitude = latitude,
                     longitude = longitude,
                     radiusMiles = radiusMiles,
+                    includeRemote = includeRemote,
                     minPrice = minPrice,
                     maxPrice = maxPrice,
                     scheduleType = scheduleType,
                     payType = payType,
+                    deadline = deadline,
+                    maxDistanceMeters = maxDistanceMeters,
+                    taskArchetype = taskArchetype,
                     search = search,
                     limit = limit,
                     offset = offset,
                 )
             }
+
+        /**
+         * `GET /api/gigs?user_id=…&limit=…` — the gigs one user posted,
+         * for the public-profile Gigs tab. Route
+         * `backend/routes/gigs.js:2089`; `user_id` both scopes the feed
+         * (`:2473`) and suppresses the "exclude my own gigs" branch
+         * (`:2125`). Mirrors iOS `ProfileTabsEndpoints.userGigs`.
+         */
+        suspend fun userGigs(
+            userId: String,
+            limit: Int = 20,
+        ): NetworkResult<GigsListResponse> = safeApiCall { api.list(userId = userId, limit = limit) }
 
         /** `GET /api/gigs/browse` — pre-sectioned browse feed. `radiusMeters` null ⇒ server default (~100 mi). */
         suspend fun browse(

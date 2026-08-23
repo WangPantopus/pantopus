@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.listings.ListingDto
 import app.pantopus.android.data.api.models.listings.MessageListingBody
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.listings.ListingsRepository
 import app.pantopus.android.ui.screens.marketplace.ListingGradient
@@ -66,7 +67,7 @@ class ListingDetailViewModel
                             )
                     }
                     is NetworkResult.Failure -> {
-                        _state.value = ContentDetailUiState.Error(result.error.message)
+                        _state.value = ContentDetailUiState.Error(result.error.displayMessage("Couldn't load detail."))
                     }
                 }
             }

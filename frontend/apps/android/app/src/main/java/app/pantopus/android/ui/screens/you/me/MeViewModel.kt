@@ -6,10 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.BuildConfig
 import app.pantopus.android.data.api.models.homes.MyHome
+import app.pantopus.android.data.api.models.users.InviteProgressDto
+import app.pantopus.android.data.api.models.users.MonthlyReceiptDto
 import app.pantopus.android.data.api.models.users.UserProfile
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
+import app.pantopus.android.data.profile.ProfileInsightsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.ui.theme.PantopusIcon
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 /** Top-level render state for the Me tab. */
@@ -40,12 +44,41 @@ class MeViewModel
     constructor(
         private val profileRepo: ProfileRepository,
         private val homesRepo: HomesRepository,
+        private val insightsRepo: ProfileInsightsRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<MeUiState>(MeUiState.Loading)
         val state: StateFlow<MeUiState> = _state.asStateFlow()
 
         private val _activeIdentity = MutableStateFlow(MeIdentity.Personal)
         val activeIdentity: StateFlow<MeIdentity> = _activeIdentity.asStateFlow()
+
+        /**
+         * Monthly Receipt for the completed month
+         * (`GET /api/users/me/monthly-receipt`). Null hides the card — RN does
+         * the same when the fetch fails.
+         */
+        private val _monthlyReceipt = MutableStateFlow<MonthlyReceiptDto?>(null)
+        val monthlyReceipt: StateFlow<MonthlyReceiptDto?> = _monthlyReceipt.asStateFlow()
+
+        /** Invite / referral progress (`GET /api/users/me/invite-progress`). */
+        private val _inviteProgress = MutableStateFlow<InviteProgressDto?>(null)
+        val inviteProgress: StateFlow<InviteProgressDto?> = _inviteProgress.asStateFlow()
+
+        /** Stable invite code (`GET /api/users/me/invite-code`) for the share link. */
+        private val _inviteCode = MutableStateFlow<String?>(null)
+        val inviteCode: StateFlow<String?> = _inviteCode.asStateFlow()
+
+        private var clock: () -> LocalDate = { LocalDate.now() }
+
+        /** Share text for the receipt card — RN `handleShareReceipt`. */
+        fun receiptShareMessage(): String? = _monthlyReceipt.value?.let(MonthlyReceiptFormat::shareMessage)
+
+        /** Share text for the invite CTA — RN `handleShareInvite`. */
+        fun inviteShareMessage(): String {
+            val code = _inviteCode.value?.takeIf { it.isNotEmpty() } ?: "INVITE"
+            return "Join me on Pantopus! Use my invite code to get started: " +
+                "https://pantopus.com/join/$code"
+        }
 
         fun load() {
             if (_state.value is MeUiState.Loaded) return
@@ -88,6 +121,39 @@ class MeViewModel
                         home = buildHome(homes, profileLocality = localityOf(profile)),
                         business = buildBusiness(profile),
                     )
+                fetchInsights()
+            }
+        }
+
+        /**
+         * Monthly Receipt + invite progress + invite code. All three degrade to
+         * a hidden card rather than failing the tab, matching RN's
+         * `Promise.allSettled` handling in `(tabs)/profile.tsx:117`.
+         */
+        private suspend fun fetchInsights() {
+            val (year, month) = receiptPeriod(clock())
+            _monthlyReceipt.value =
+                (insightsRepo.monthlyReceipt(year, month) as? NetworkResult.Success)?.data
+            _inviteProgress.value =
+                (insightsRepo.inviteProgress() as? NetworkResult.Success)?.data
+            _inviteCode.value =
+                (insightsRepo.inviteCode() as? NetworkResult.Success)?.data?.inviteCode
+        }
+
+        /** Test seam — pin the clock so the receipt period is deterministic. */
+        internal fun overrideClock(provider: () -> LocalDate) {
+            clock = provider
+        }
+
+        companion object {
+            /**
+             * The month the receipt covers: the previous calendar month,
+             * 1-based — mirrors RN `fetchReceipt`
+             * (`(tabs)/profile.tsx:102`).
+             */
+            fun receiptPeriod(today: LocalDate): Pair<Int, Int> {
+                val previous = today.minusMonths(1)
+                return previous.year to previous.monthValue
             }
         }
 

@@ -48,6 +48,24 @@ enum class AudienceMemberAction(val wire: String) {
     Unmute("unmute"),
 }
 
+/** Order the audience list is fetched in. `wire` matches the backend's
+ *  `audienceSortValues` (`backend/routes/personas.js:101`); the header
+ *  control cycles them in declaration order, matching RN's
+ *  `src/app/audience/members.tsx:216-219`. */
+enum class AudienceSort(val wire: String, val label: String) {
+    Recent("recent", "Newest first"),
+    Tenure("tenure", "Longest-tenured first"),
+    Tier("tier", "Highest tier first"),
+    Alpha("alpha", "Alphabetical"),
+    ;
+
+    /** Next entry in the cycle (wraps back to [Recent]). */
+    fun next(): AudienceSort {
+        val all = entries
+        return all[(ordinal + 1) % all.size]
+    }
+}
+
 // ── Tier styling (rank → semantic token) ──
 // Mirrors AudienceProfile's rank→token mapping so A22.2 reads identically
 // to its A22.1 sibling and to the iOS build. Tokens only — the design's
@@ -153,6 +171,18 @@ data class AudienceLoaded(
     val counts: AudienceCounts,
     val pending: List<AudienceMember>,
     val tierGroups: List<AudienceTierGroup>,
+)
+
+/**
+ * A destructive action (decline / remove) held open in its undo window. RN
+ * removes the row immediately, shows a 5-second "Tap to undo" toast, and
+ * only fires the `PATCH` once the window closes
+ * (`src/app/audience/members.tsx:95-121`).
+ */
+data class PendingAudienceUndo(
+    val membershipId: String,
+    /** "Removed @jane · Tap to undo". */
+    val message: String,
 )
 
 /** Single source of truth for the screen body. */

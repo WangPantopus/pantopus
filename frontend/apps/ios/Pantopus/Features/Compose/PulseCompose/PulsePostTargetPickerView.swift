@@ -19,13 +19,19 @@ public struct PulsePostTargetPickerView: View {
 
     private let onSelect: @MainActor (PulsePostingTarget) -> Void
     private let onCancel: @MainActor () -> Void
+    /// Hides the "Your network / Connections" card. RN's task-share
+    /// picker passes `allowedTargets={['current_location','home','business']}`
+    /// (`gig/[id].tsx:1478`) because a task share is always a place post.
+    private let hidesNetworkTarget: Bool
 
     public init(
         onSelect: @escaping @MainActor (PulsePostingTarget) -> Void,
-        onCancel: @escaping @MainActor () -> Void
+        onCancel: @escaping @MainActor () -> Void,
+        hidesNetworkTarget: Bool = false
     ) {
         self.onSelect = onSelect
         self.onCancel = onCancel
+        self.hidesNetworkTarget = hidesNetworkTarget
     }
 
     public var body: some View {
@@ -124,20 +130,22 @@ public struct PulsePostTargetPickerView: View {
                 businessSection
             }
 
-            sectionLabel("Your network")
-                .padding(.top, Spacing.s1)
+            if !hidesNetworkTarget {
+                sectionLabel("Your network")
+                    .padding(.top, Spacing.s1)
 
-            targetCard(
-                iconStyle: TargetCardIconStyle(
-                    icon: .link,
-                    background: Theme.Color.warmAmberBg,
-                    color: Theme.Color.warmAmber
-                ),
-                title: "Connections",
-                subtitle: "Share with people you trust, wherever they are",
-                identifier: "pulseTarget_connections"
-            ) {
-                onSelect(.connections)
+                targetCard(
+                    iconStyle: TargetCardIconStyle(
+                        icon: .link,
+                        background: Theme.Color.warmAmberBg,
+                        color: Theme.Color.warmAmber
+                    ),
+                    title: "Connections",
+                    subtitle: "Share with people you trust, wherever they are",
+                    identifier: "pulseTarget_connections"
+                ) {
+                    onSelect(.connections)
+                }
             }
         }
         .padding(.horizontal, Spacing.s4)

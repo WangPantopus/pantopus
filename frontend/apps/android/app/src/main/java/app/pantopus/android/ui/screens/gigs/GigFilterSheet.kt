@@ -1,4 +1,4 @@
-@file:Suppress("MagicNumber", "PackageNaming")
+@file:Suppress("CyclomaticComplexMethod", "MagicNumber", "PackageNaming", "ReturnCount")
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package app.pantopus.android.ui.screens.gigs
@@ -110,6 +110,87 @@ enum class GigPostedWithin(
 }
 
 /**
+ * Distance radius chips — RN `FilterChipBar.DISTANCE_CHIPS`. The wire
+ * value is **meters** on `max_distance`; selecting one also pins
+ * `includeRemote=false` so location-less remote tasks drop out.
+ */
+enum class GigDistanceFilter(
+    val key: String,
+    val label: String,
+    /** `max_distance` query value in meters — RN's exact constants. */
+    val meters: Int,
+) {
+    OneMile("oneMile", "Under 1 mi", 1_609),
+    ThreeMiles("threeMiles", "Under 3 mi", 4_828),
+    FiveMiles("fiveMiles", "Under 5 mi", 8_047),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): GigDistanceFilter? = entries.firstOrNull { it.key == key }
+    }
+}
+
+/**
+ * Deadline window chips — RN `FilterChipBar.TIME_CHIPS`. Rides the
+ * `deadline` query param the backend narrows on
+ * (`backend/routes/gigs.js:2209`).
+ */
+enum class GigDeadlineFilter(
+    val key: String,
+    val label: String,
+    val backendValue: String,
+) {
+    Today("today", "Today", "today"),
+    ThisWeek("thisWeek", "This week", "this_week"),
+    ;
+
+    /**
+     * Latest acceptable `deadline`, mirroring the backend's cutoff
+     * arithmetic (`backend/routes/gigs.js:2213-2244`): end of today, or
+     * end of the upcoming Sunday.
+     */
+    fun cutoffEpochSeconds(nowEpochSeconds: Long): Long {
+        val zone = java.time.ZoneId.systemDefault()
+        val today = Instant.ofEpochSecond(nowEpochSeconds).atZone(zone).toLocalDate()
+        val target =
+            when (this) {
+                Today -> today
+                // JS `getDay()` is 0=Sunday; java.time's is 7=Sunday.
+                ThisWeek -> today.plusDays((7 - (today.dayOfWeek.value % 7)).toLong())
+            }
+        return target.plusDays(1).atStartOfDay(zone).toEpochSecond() - 1
+    }
+
+    companion object {
+        fun fromKey(key: String?): GigDeadlineFilter? = entries.firstOrNull { it.key == key }
+    }
+}
+
+/**
+ * Task-archetype chips — RN `FilterChipBar.ARCHETYPE_CHIPS`. Values
+ * match the backend's `task_archetype` enum
+ * (`backend/routes/gigs.js:508`).
+ */
+enum class GigTaskArchetypeFilter(
+    val key: String,
+    val label: String,
+    val backendValue: String,
+) {
+    QuickHelp("quickHelp", "Quick help", "quick_help"),
+    DeliveryErrand("deliveryErrand", "Delivery", "delivery_errand"),
+    HomeService("homeService", "Home service", "home_service"),
+    ProServiceQuote("proServiceQuote", "Pro service", "pro_service_quote"),
+    CareTask("careTask", "Care", "care_task"),
+    EventShift("eventShift", "Event", "event_shift"),
+    RemoteTask("remoteTask", "Remote", "remote_task"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): GigTaskArchetypeFilter? = entries.firstOrNull { it.key == key }
+    }
+}
+
+/**
  * The applied Gig filter selection. The default value is the
  * "everything passes" position — [activeCount] is 0 and [matches]
  * returns `true` for every gig.
@@ -127,6 +208,12 @@ data class GigFilterCriteria(
     /** When `true`, keep only gigs still accepting bids (unassigned). */
     val openToBids: Boolean = false,
     val postedWithin: GigPostedWithin = GigPostedWithin.Anytime,
+    /** Distance radius chip (`max_distance` + `includeRemote=false`). */
+    val distance: GigDistanceFilter? = null,
+    /** Deadline window chip (`deadline`). */
+    val deadline: GigDeadlineFilter? = null,
+    /** Task-archetype chip (`task_archetype`). */
+    val archetype: GigTaskArchetypeFilter? = null,
 ) {
     val isBudgetActive: Boolean
         get() = budgetLower > BUDGET_MIN || budgetUpper < BUDGET_MAX
@@ -140,8 +227,31 @@ data class GigFilterCriteria(
             if (schedules.isNotEmpty()) count++
             if (openToBids) count++
             if (postedWithin != GigPostedWithin.Anytime) count++
+            if (distance != null) count++
+            if (deadline != null) count++
+            if (archetype != null) count++
             return count
         }
+
+    /** `max_distance` query value (meters) — `backend/routes/gigs.js:2112`. */
+    val serverMaxDistanceMeters: Int?
+        get() = distance?.meters
+
+    /**
+     * `includeRemote` query value. RN pins it to `false` while a distance
+     * chip is on so location-less remote tasks drop out
+     * (`app/(tabs)/gigs.tsx:88`); otherwise the param is omitted.
+     */
+    val serverIncludeRemote: Boolean?
+        get() = if (distance == null) null else false
+
+    /** `deadline` query value — `backend/routes/gigs.js:2209`. */
+    val serverDeadline: String?
+        get() = deadline?.backendValue
+
+    /** `task_archetype` query value — `backend/routes/gigs.js:2205`. */
+    val serverTaskArchetype: String?
+        get() = archetype?.backendValue
 
     fun toSections(): List<FilterSection> =
         listOf(
@@ -189,6 +299,33 @@ data class GigFilterCriteria(
                         selectedId = postedWithin.key,
                     ),
             ),
+            FilterSection(
+                id = "distance",
+                title = "Distance",
+                control =
+                    FilterControl.ChipGroup(
+                        options = GigDistanceFilter.entries.map { FilterOption(it.key, it.label) },
+                        selectedIds = setOfNotNull(distance?.key),
+                    ),
+            ),
+            FilterSection(
+                id = "deadline",
+                title = "Due by",
+                control =
+                    FilterControl.ChipGroup(
+                        options = GigDeadlineFilter.entries.map { FilterOption(it.key, it.label) },
+                        selectedIds = setOfNotNull(deadline?.key),
+                    ),
+            ),
+            FilterSection(
+                id = "archetype",
+                title = "Task type",
+                control =
+                    FilterControl.ChipGroup(
+                        options = GigTaskArchetypeFilter.entries.map { FilterOption(it.key, it.label) },
+                        selectedIds = setOfNotNull(archetype?.key),
+                    ),
+            ),
         )
 
     fun matchesCategory(category: GigsCategory): Boolean = categories.isEmpty() || category in categories
@@ -212,7 +349,36 @@ data class GigFilterCriteria(
             acceptedBy = gig.acceptedBy,
             createdAt = gig.createdAt,
             nowEpochSeconds = nowEpochSeconds,
-        )
+        ) &&
+            matchesFeedChips(gig, nowEpochSeconds)
+
+    /**
+     * The three RN chip-bar dimensions applied locally, for surfaces that
+     * filter an already-fetched list (Tasks map pins). The Gigs feed
+     * sends them as query params instead.
+     */
+    fun matchesFeedChips(
+        gig: GigDto,
+        nowEpochSeconds: Long,
+    ): Boolean {
+        distance?.let { chip ->
+            val miles = gig.distanceMiles ?: return false
+            if (miles * METERS_PER_MILE > chip.meters) return false
+        }
+        deadline?.let { chip ->
+            val due = parseEpochSeconds(gig.deadline)
+            if (due == null) {
+                // RN keeps urgent tasks in the "Today" bucket even without
+                // an explicit deadline (`backend/routes/gigs.js:2250`).
+                return chip == GigDeadlineFilter.Today && gig.isUrgent == true
+            }
+            if (due > chip.cutoffEpochSeconds(nowEpochSeconds)) return false
+        }
+        archetype?.let { chip ->
+            if (gig.taskArchetype != chip.backendValue) return false
+        }
+        return true
+    }
 
     /**
      * Primitive-field overload for surfaces that project away the DTO
@@ -307,6 +473,9 @@ data class GigFilterCriteria(
         const val BUDGET_STEP = 25f
         const val OPEN_TO_BIDS_OPTION_ID = "openToBids"
 
+        /** Meters per statute mile — converts `distance_miles` for the chips. */
+        const val METERS_PER_MILE = 1_609.344
+
         /** Concrete categories the chip group offers (`All` is a sentinel). */
         val categoryOptions: List<GigsCategory> = GigsCategory.entries.filter { it != GigsCategory.All }
 
@@ -325,6 +494,9 @@ data class GigFilterCriteria(
             var schedules = emptySet<GigScheduleFilter>()
             var openToBids = false
             var postedWithin = GigPostedWithin.Anytime
+            var distance: GigDistanceFilter? = null
+            var deadline: GigDeadlineFilter? = null
+            var archetype: GigTaskArchetypeFilter? = null
             sections.forEach { section ->
                 val control = section.control
                 when (section.id) {
@@ -352,9 +524,34 @@ data class GigFilterCriteria(
                         if (control is FilterControl.Radio) {
                             postedWithin = GigPostedWithin.fromKey(control.selectedId)
                         }
+                    // Single-valued dimensions: the backend takes one
+                    // `max_distance` / `deadline` / `task_archetype`, so
+                    // the last chip the user turned on wins.
+                    "distance" ->
+                        if (control is FilterControl.ChipGroup) {
+                            distance = control.selectedIds.firstNotNullOfOrNull { GigDistanceFilter.fromKey(it) }
+                        }
+                    "deadline" ->
+                        if (control is FilterControl.ChipGroup) {
+                            deadline = control.selectedIds.firstNotNullOfOrNull { GigDeadlineFilter.fromKey(it) }
+                        }
+                    "archetype" ->
+                        if (control is FilterControl.ChipGroup) {
+                            archetype = control.selectedIds.firstNotNullOfOrNull { GigTaskArchetypeFilter.fromKey(it) }
+                        }
                 }
             }
-            return GigFilterCriteria(categories, budgetLower, budgetUpper, schedules, openToBids, postedWithin)
+            return GigFilterCriteria(
+                categories = categories,
+                budgetLower = budgetLower,
+                budgetUpper = budgetUpper,
+                schedules = schedules,
+                openToBids = openToBids,
+                postedWithin = postedWithin,
+                distance = distance,
+                deadline = deadline,
+                archetype = archetype,
+            )
         }
 
         private fun parseEpochSeconds(iso: String?): Long? {

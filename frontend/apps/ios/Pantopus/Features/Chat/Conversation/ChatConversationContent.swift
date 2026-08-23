@@ -7,7 +7,7 @@
 //  / `ChatSystemPillContent` live in the view-model.
 //
 
-// swiftlint:disable enum_case_associated_values_count
+// swiftlint:disable enum_case_associated_values_count file_length
 
 import Foundation
 
@@ -25,24 +25,43 @@ public enum ChatConversationMode: String, Sendable, Hashable {
 
 /// Creator-side context rendered above a creator/fan DM thread.
 public struct ChatCreatorThreadContext: Sendable, Hashable {
-    public let personaName: String
-    public let audienceSummary: String
+    /// The persona whose creator inbox this thread belongs to. `nil` when
+    /// the caller hasn't resolved it — the audience strip then shows the
+    /// generic "Creator inbox" label rather than a placeholder name.
+    public let personaName: String?
+    /// Reach / engagement line under the strip title. `nil` unless the
+    /// caller has real audience analytics for this persona; there is no
+    /// per-thread analytics payload on the wire, so it normally stays nil.
+    public let audienceSummary: String?
     public let fanTierName: String
     /// Tier rank (1=Free, 2=Bronze, 3=Silver, 4=Gold). The visual
     /// palette intentionally mirrors Creator Inbox's semantic-token
     /// mapping; tier-specific color tokens do not exist in the app
     /// theme today.
     public let fanTierRank: Int
-    public let fanSubtitle: String
-    public let quota: ChatCreatorQuota
+    /// Header sub-line ("Member since …"). `nil` when the membership
+    /// join date / distance isn't known — the header then drops the line
+    /// instead of inventing one.
+    public let fanSubtitle: String?
+    /// `nil` when the backend hasn't reported a reply allowance for this
+    /// thread. There is no creator-side weekly reply quota on the wire yet
+    /// (`backend/routes/personaDms.js` only meters the fan), so the meter
+    /// and its lock stay hidden instead of showing invented counts.
+    public let quota: ChatCreatorQuota?
+    /// The real, creator-authored tier this fan can be invited up to.
+    /// `nil` when the caller hasn't loaded the persona's tier ladder — the
+    /// A15.4 upgrade card is then omitted rather than pitching an invented
+    /// tier name or invented perks.
+    public let upgradeOffer: ChatCreatorUpgradeOffer?
 
     public init(
-        personaName: String,
-        audienceSummary: String,
+        personaName: String? = nil,
+        audienceSummary: String? = nil,
         fanTierName: String,
         fanTierRank: Int,
-        fanSubtitle: String,
-        quota: ChatCreatorQuota
+        fanSubtitle: String? = nil,
+        quota: ChatCreatorQuota? = nil,
+        upgradeOffer: ChatCreatorUpgradeOffer? = nil
     ) {
         self.personaName = personaName
         self.audienceSummary = audienceSummary
@@ -50,17 +69,55 @@ public struct ChatCreatorThreadContext: Sendable, Hashable {
         self.fanTierRank = fanTierRank
         self.fanSubtitle = fanSubtitle
         self.quota = quota
+        self.upgradeOffer = upgradeOffer
     }
 
-    public static func defaults(fanTierName: String = "Bronze", fanTierRank: Int = 2) -> ChatCreatorThreadContext {
+    /// Context for a creator thread where only the fan's tier is known.
+    /// Everything else stays nil — the persona name, the audience summary,
+    /// the membership sub-line and the upgrade ladder all need data the
+    /// creator-inbox row does not carry, and inventing them would ship
+    /// another creator's copy to every creator.
+    public static func defaults(fanTierName: String = "Free", fanTierRank: Int = 1) -> ChatCreatorThreadContext {
         ChatCreatorThreadContext(
-            personaName: "The Sourdough Diary",
-            audienceSummary: "Reach: 2,340 · Engagement up 12% this week",
             fanTierName: fanTierName,
-            fanTierRank: fanTierRank,
-            fanSubtitle: fanTierRank <= 1 ? "Free member" : "Member since Aug · 0.4 mi",
-            quota: ChatCreatorQuota(used: 12, total: 30, resetCopy: "Resets Monday")
+            fanTierRank: fanTierRank
         )
+    }
+}
+
+/// A15.4 upgrade-fan card payload. Every string here is creator-authored
+/// tier data (`GET /api/personas/:handle/tiers` — name / description /
+/// price) or derived from the tier's published policy fields. Nothing in
+/// this struct may be synthesised by the UI.
+public struct ChatCreatorUpgradeOffer: Sendable, Hashable {
+    /// The tier's own name, exactly as the creator published it.
+    public let tierName: String
+    /// Formatted price, e.g. "$15/mo". `nil` when the tier has no price
+    /// on the wire.
+    public let priceLabel: String?
+    /// The tier's creator-authored description. `nil` hides the body
+    /// paragraph.
+    public let summary: String?
+    /// Perk lines built from the tier's published policy fields
+    /// (`msgThreadsPerPeriod`, `replyPolicy`, `creatorCanInitiateDm`).
+    /// Empty hides the perk block.
+    public let perks: [String]
+    /// False until a creator→fan upgrade-offer endpoint exists. The send
+    /// action renders disabled with an honest note while this is false.
+    public let canSendOffer: Bool
+
+    public init(
+        tierName: String,
+        priceLabel: String? = nil,
+        summary: String? = nil,
+        perks: [String] = [],
+        canSendOffer: Bool = false
+    ) {
+        self.tierName = tierName
+        self.priceLabel = priceLabel
+        self.summary = summary
+        self.perks = perks
+        self.canSendOffer = canSendOffer
     }
 }
 
@@ -73,6 +130,13 @@ public struct ChatCreatorQuota: Sendable, Hashable {
         self.used = used
         self.total = total
         self.resetCopy = resetCopy
+    }
+
+    /// True when the creator has used all weekly replies for this fan tier.
+    /// A `total` of zero means "no replies allowed", which is maxed — the
+    /// unknown case is modelled by a nil quota, not by a zero total.
+    public var isMaxed: Bool {
+        used >= total
     }
 }
 

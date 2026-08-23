@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,8 +12,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.pantopus.android.core.routing.DeepLinkRouter
+import app.pantopus.android.core.security.AppLockManager
+import app.pantopus.android.core.security.SecureWindowController
+import app.pantopus.android.data.auth.OAuthSessionStore
 import app.pantopus.android.data.chats.ActiveChatThread
 import app.pantopus.android.push.PushTokenSyncer
 import app.pantopus.android.ui.components.ToastController
@@ -30,14 +33,25 @@ import javax.inject.Inject
  * The single Activity that hosts the whole Compose UI tree.
  * Navigation is entirely in-Compose via [PantopusNavHost]; incoming
  * deep-link intents get forwarded into [DeepLinkRouter] for the
- * RootTabScreen to consume.
+ * RootTabScreen to consume — except the browser OAuth callback, which goes
+ * to [OAuthSessionStore] instead.
+ *
+ * Declared `singleTask` in the manifest so a browser redirect resumes this
+ * instance through [onNewIntent] rather than stacking a second copy.
+ *
+ * Extends [FragmentActivity] so [androidx.biometric.BiometricPrompt] (app
+ * lock + transfer-ownership) has a valid host.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     @Inject lateinit var pushTokenSyncer: PushTokenSyncer
 
     /** Chat-push suppression: notifications skip rooms the user is viewing. */
     @Inject lateinit var activeChatThread: ActiveChatThread
+
+    @Inject lateinit var appLockManager: AppLockManager
+
+    @Inject lateinit var secureWindowController: SecureWindowController
 
     /**
      * App-wide [ToastController]. Survives configuration changes via the
@@ -69,6 +83,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        secureWindowController.bind(this)
+        observeAppLockPrivacyHold()
         // Cold-start deep links arrive via the launch intent.
         forwardDeepLink(intent)
         setContent {
@@ -90,9 +106,16 @@ class MainActivity : ComponentActivity() {
         // Foreground marker for chat-push suppression — a notification
         // for the on-screen conversation is skipped only while visible.
         activeChatThread.isForeground = true
+        appLockManager.appDidBecomeActive()
     }
 
     override fun onStop() {
+        // `isChangingConfigurations` separates a real background from a
+        // rotation / locale change / multi-window resize, which destroy and
+        // recreate this Activity without the app ever leaving the foreground.
+        // iOS sees no `.background` for those at all, so arming here would
+        // lock the app in the user's hands on every rotation.
+        appLockManager.appDidEnterBackground(isConfigurationChange = isChangingConfigurations)
         activeChatThread.isForeground = false
         super.onStop()
     }
@@ -107,7 +130,30 @@ class MainActivity : ComponentActivity() {
     private fun forwardDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
         if (intent.action != Intent.ACTION_VIEW) return
+        // Browser OAuth callbacks belong to the in-flight sign-in attempt,
+        // not the router. Mirrors iOS `PantopusApp`'s
+        // `guard !AuthManager.isOAuthCallback(url) else { return }`.
+        if (OAuthSessionStore.isOAuthCallback(uri)) {
+            OAuthSessionStore.deliver(uri)
+            return
+        }
         DeepLinkRouter.handle(uri)
+    }
+
+    /**
+     * Hold `FLAG_SECURE` for as long as the signed-in user has app lock on,
+     * so the recents thumbnail (and screenshots) can't leak their account.
+     * This is Android's counterpart to iOS's `AppSwitcherPrivacyOverlay`,
+     * which iOS draws before the app-switcher snapshot under the same
+     * condition — `AppLockManager.preferenceEnabled` is only ever true for a
+     * configured (signed-in) user who turned the lock on.
+     */
+    private fun observeAppLockPrivacyHold() {
+        lifecycleScope.launch {
+            appLockManager.preferenceEnabled.collect { enabled ->
+                secureWindowController.setPrivacyHold(enabled)
+            }
+        }
     }
 
     private fun requestNotificationPermissionIfNeeded() {

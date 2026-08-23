@@ -5,12 +5,17 @@ package app.pantopus.android.ui.screens.profile
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.posts.MyPostDto
 import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.blocks.BlocksRepository
+import app.pantopus.android.data.connections.ConnectionsRepository
+import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.data.relationships.RelationshipsRepository
+import app.pantopus.android.data.social.UserSocialRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileReviewCard
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileStatCell
@@ -42,6 +47,24 @@ const val PUBLIC_PROFILE_USER_ID_KEY = "userId"
 enum class PublicProfileKind { Persona, Local }
 
 /**
+ * A21.2 — the tab strip on the Local Beacon profile archetype. Separate
+ * from [ProfileTab] so the persona path keeps its own body untouched.
+ *
+ * Posts · About are the designed pair; Portfolio · Gigs · Reviews carry
+ * the marketplace surfaces a verified neighbour actually has —
+ * `GET /api/files/portfolio/{userId}` (`backend/routes/files.js:526`),
+ * `GET /api/gigs?user_id=…` (`backend/routes/gigs.js:2089`) and
+ * `GET /api/reviews/user/{userId}` (`backend/routes/reviews.js:149`).
+ */
+enum class LocalProfileTab(val label: String) {
+    Posts("Posts"),
+    About("About"),
+    Portfolio("Portfolio"),
+    Gigs("Gigs"),
+    Reviews("Reviews"),
+}
+
+/**
  * One post rendered beneath the stats/tabs body. Persona profiles
  * carry creator-economy broadcasts (with tier visibility and the
  * optional locked-paywall overlay); Local profiles carry Pulse-style
@@ -58,6 +81,8 @@ data class PublicProfilePost(
     val visibility: Visibility? = null,
     /** Persona-only — `true` when this broadcast is gated. */
     val isLocked: Boolean = false,
+    /** Persona-only — tier rank required to unlock. */
+    val targetTierRank: Int? = null,
     /** Local-only — `null` on Persona broadcasts. */
     val intent: Intent? = null,
 ) {
@@ -92,6 +117,8 @@ data class PublicProfileContent(
      * canonical neighbor layout. `null` for Persona.
      */
     val neighbor: NeighborProfileContent? = null,
+    val isOwner: Boolean = false,
+    val personaHandle: String? = null,
 )
 
 /** Observed UI state for the Public profile screen. */
@@ -114,20 +141,98 @@ sealed interface PublicProfileActionState {
     data class Failed(val message: String) : PublicProfileActionState
 }
 
-/** Loads `GET /api/users/id/:id` and exposes a stable tab + toast surface. */
+/**
+ * The viewer↔profile connection edge, as reported by
+ * `GET api/users/:id/relationship`
+ * (`backend/routes/users.js:3685` → `visibilityPolicy.getRelationshipStatus`,
+ * `backend/utils/visibilityPolicy.js:37`). Drives the Connect control's
+ * label and what tapping it does — RN's `connectionState`
+ * (`pantopus/frontend/apps/mobile/src/app/user/[id].tsx:80,203-221,392`).
+ * Mirrors iOS `ProfileConnection`.
+ */
+enum class ProfileConnection(
+    val apiValue: String,
+) {
+    None("none"),
+    PendingSent("pending_sent"),
+    PendingReceived("pending_received"),
+    Connected("connected"),
+    Blocked("blocked"),
+    ;
+
+    /** Connect-button copy. Mirrors RN `getConnectLabel`. */
+    val label: String
+        get() =
+            when (this) {
+                Connected -> "Connected"
+                PendingSent -> "Requested"
+                PendingReceived -> "Accept"
+                None, Blocked -> "Connect"
+            }
+
+    /**
+     * RN disables the button only while a request is outstanding
+     * (`disabled={actionLoading || connectionState === 'pending_sent'}`).
+     */
+    val isActionable: Boolean
+        get() = this != PendingSent
+
+    /** TalkBack copy — mirrored as the iOS `accessibilityLabel`. */
+    val accessibilityLabel: String
+        get() =
+            when (this) {
+                Connected -> "Connected. Tap to remove this connection"
+                PendingSent -> "Connection requested"
+                PendingReceived -> "Accept connection request"
+                None, Blocked -> "Connect"
+            }
+
+    companion object {
+        /**
+         * Decode the server's string, defaulting anything unrecognised to
+         * [None] — the same fallback RN applies (`rel.relationship || 'none'`).
+         */
+        fun fromApi(value: String?): ProfileConnection = entries.firstOrNull { it.apiValue == value?.lowercase() } ?: None
+    }
+}
+
+/**
+ * Loads the public profile and exposes a stable tab + toast surface.
+ *
+ * T3 — the nav arg may be a UUID *or* a handle (`pantopus://u/mariak`,
+ * `https://pantopus.com/u/mariak`), because `DeepLinkRouter` maps
+ * `u/:handle` and `user/:handle` onto the same destination. We branch
+ * exactly like RN (`src/app/user/[id].tsx:27,53-58`): UUIDs resolve via
+ * `GET /api/users/id/:id`, handles via
+ * `GET /api/users/username/:username`. Both routes return the same body,
+ * and every follow-up call (relationship, follow, connect, block, posts)
+ * uses the *resolved* `profile.id`, never the raw nav arg.
+ */
 @HiltViewModel
 class PublicProfileViewModel
     @Inject
     constructor(
         private val repo: ProfileRepository,
+        private val social: UserSocialRepository,
         private val relationships: RelationshipsRepository,
+        /** Owns the disconnect half of `/api/relationships` (S5 split). */
+        private val connections: ConnectionsRepository,
         private val blocks: BlocksRepository,
+        private val authRepository: AuthRepository,
+        private val posts: PostsRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        private val userId: String =
+        /** The raw nav arg — may be a UUID or a `@handle`. */
+        private val routeIdentifier: String =
             requireNotNull(savedStateHandle[PUBLIC_PROFILE_USER_ID_KEY]) {
                 "PublicProfileViewModel requires a '$PUBLIC_PROFILE_USER_ID_KEY' nav arg."
             }
+
+        /**
+         * The resolved `User.id`, known only once the profile loads. Every
+         * user-scoped mutation must use this, never [routeIdentifier].
+         */
+        private var userId: String = routeIdentifier
 
         private val _state = MutableStateFlow<PublicProfileUiState>(PublicProfileUiState.Loading)
         val state: StateFlow<PublicProfileUiState> = _state.asStateFlow()
@@ -141,6 +246,11 @@ class PublicProfileViewModel
         private val _selectedNeighborTab = MutableStateFlow(NeighborProfileTab.About)
         val selectedNeighborTab: StateFlow<NeighborProfileTab> = _selectedNeighborTab.asStateFlow()
 
+        // A21.2 — selected tab on the Local Beacon profile archetype
+        // (Posts · About). Switching is local; no refetch.
+        private val _selectedLocalTab = MutableStateFlow(LocalProfileTab.Posts)
+        val selectedLocalTab: StateFlow<LocalProfileTab> = _selectedLocalTab.asStateFlow()
+
         private val _toastMessage = MutableStateFlow<String?>(null)
         val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
@@ -148,20 +258,50 @@ class PublicProfileViewModel
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
         val connectState: StateFlow<PublicProfileActionState> = _connectState.asStateFlow()
 
+        /**
+         * The existing connection edge, seeded by
+         * `GET api/users/:id/relationship` on load and kept current after
+         * every connect / accept / disconnect. Without it the Connect
+         * control is one-way; with it the button reads Connect / Requested /
+         * Accept / Connected exactly like RN.
+         */
+        private val _connection = MutableStateFlow(ProfileConnection.None)
+        val connection: StateFlow<ProfileConnection> = _connection.asStateFlow()
+
+        /**
+         * Drives the "Remove connection?" confirm. RN's Connections centre
+         * gates the same `DELETE /api/relationships/:id` behind an alert
+         * (`src/app/connections.tsx:69-77`).
+         */
+        private val _showDisconnectConfirm = MutableStateFlow(false)
+        val showDisconnectConfirm: StateFlow<Boolean> = _showDisconnectConfirm.asStateFlow()
+
         private val _blockState =
             MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
         val blockState: StateFlow<PublicProfileActionState> = _blockState.asStateFlow()
 
-        /**
-         * P6.5 — Follow button state for Persona profiles. Toggles
-         * `Idle` → `InFlight` → `Succeeded` once the request lands.
-         */
-        private val _followState =
-            MutableStateFlow<PublicProfileActionState>(PublicProfileActionState.Idle)
-        val followState: StateFlow<PublicProfileActionState> = _followState.asStateFlow()
-
         private val _showOverflow = MutableStateFlow(false)
         val showOverflow: StateFlow<Boolean> = _showOverflow.asStateFlow()
+
+        /**
+         * T3 — plain follow graph (`api/users/:id/follow`), distinct from the
+         * persona privacy handshake. `true` once the viewer follows this user.
+         */
+        private val _isFollowing = MutableStateFlow(false)
+        val isFollowing: StateFlow<Boolean> = _isFollowing.asStateFlow()
+
+        /** In-flight guard for the follow/unfollow toggle. */
+        private val _isFollowInFlight = MutableStateFlow(false)
+        val isFollowInFlight: StateFlow<Boolean> = _isFollowInFlight.asStateFlow()
+
+        /**
+         * `true` when a Follow affordance should render at all — someone
+         * else's profile, viewed by a signed-in user. Mirrors RN, which hides
+         * the whole action row on your own profile
+         * (`src/app/user/[id].tsx:522`).
+         */
+        private val _canFollow = MutableStateFlow(false)
+        val canFollow: StateFlow<Boolean> = _canFollow.asStateFlow()
 
         fun load() {
             if (_state.value is PublicProfileUiState.Loaded) return
@@ -181,6 +321,10 @@ class PublicProfileViewModel
             _selectedNeighborTab.value = tab
         }
 
+        fun selectLocalTab(tab: LocalProfileTab) {
+            _selectedLocalTab.value = tab
+        }
+
         fun dismissToast() {
             _toastMessage.value = null
         }
@@ -194,24 +338,149 @@ class PublicProfileViewModel
             _showOverflow.value = show
         }
 
-        /**
-         * P6.5 — Surface the placeholder "Subscribe flow coming soon"
-         * toast when the visitor taps the locked-broadcast paywall
-         * overlay. The real subscribe-to-tier flow lands in a follow-up.
-         */
-        fun showSubscribeToast() {
-            _toastMessage.value = "Subscribe flow coming soon"
+        private val _showFollowHandshake = MutableStateFlow(false)
+        val showFollowHandshake: StateFlow<Boolean> = _showFollowHandshake.asStateFlow()
+
+        private val _handshakePreselectedTierRank = MutableStateFlow<Int?>(null)
+        val handshakePreselectedTierRank: StateFlow<Int?> = _handshakePreselectedTierRank.asStateFlow()
+
+        fun setShowFollowHandshake(show: Boolean) {
+            _showFollowHandshake.value = show
         }
 
-        /** Send a connection request via `POST /api/relationships/requests`. */
+        fun clearHandshakeTier() {
+            _handshakePreselectedTierRank.value = null
+        }
+
+        /**
+         * Follow entry point behind every Follow affordance.
+         *
+         * A Beacon (persona with a resolvable handle) keeps the privacy
+         * handshake wizard — that flow owns tier selection and Stripe
+         * Checkout, so there is no in-flight pose to track for it. Everyone
+         * else (ordinary neighbours, personas with no Beacon bridge) now
+         * takes the plain `api/users/:id/follow` path instead of the old
+         * dead-end toast. Mirrors RN, whose profile screen only ever calls
+         * `followUser`/`unfollowUser` (`src/app/user/[id].tsx:184-199`), and
+         * iOS `PublicProfileViewModel.follow()`.
+         */
+        fun follow() {
+            if (canOpenHandshake()) {
+                _handshakePreselectedTierRank.value = null
+                _showFollowHandshake.value = true
+                return
+            }
+            toggleFollow()
+        }
+
+        /**
+         * T3 — plain follow / unfollow for an ordinary neighbour.
+         * `POST` / `DELETE api/users/:id/follow`
+         * (`backend/routes/users.js:3520` / `:3593`). Awaited, not optimistic,
+         * so a rejected follow (blocked, curator account) can't leave the
+         * button lying.
+         */
+        fun toggleFollow() {
+            if (!_canFollow.value || _isFollowInFlight.value) return
+            _isFollowInFlight.value = true
+            val wasFollowing = _isFollowing.value
+            viewModelScope.launch {
+                val result = if (wasFollowing) social.unfollow(userId) else social.follow(userId)
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isFollowing.value = result.data.following ?: !wasFollowing
+                        _toastMessage.value = if (_isFollowing.value) "Following" else "Unfollowed"
+                    }
+                    is NetworkResult.Failure -> {
+                        _toastMessage.value = followFailureMessage(result.error, wasFollowing)
+                    }
+                }
+                _isFollowInFlight.value = false
+            }
+        }
+
+        /**
+         * The backend sends readable copy on the 400/403 rejections
+         * ("You are already following this user", "Cannot follow curator
+         * accounts"); surface it rather than a generic failure.
+         */
+        private fun followFailureMessage(
+            error: NetworkError,
+            wasFollowing: Boolean,
+        ): String {
+            val fallback = if (wasFollowing) "Couldn't unfollow." else "Couldn't follow."
+            return when (error) {
+                is NetworkError.Transport -> "Check your connection and try again."
+                NetworkError.Forbidden -> "You can't follow this profile."
+                else -> error.message.ifBlank { fallback }
+            }
+        }
+
+        /** Unlock a tier-gated broadcast on a Persona profile. */
+        fun unlockBroadcast(tierRank: Int?) {
+            if (!canOpenHandshake()) {
+                _toastMessage.value = HANDSHAKE_UNAVAILABLE_MESSAGE
+                return
+            }
+            _handshakePreselectedTierRank.value = tierRank
+            _showFollowHandshake.value = true
+        }
+
+        fun loadedPersonaHandle(): String {
+            val loaded = _state.value as? PublicProfileUiState.Loaded ?: return ""
+            return loaded.content.personaHandle.orEmpty()
+        }
+
+        private fun canOpenHandshake(): Boolean {
+            val loaded = _state.value as? PublicProfileUiState.Loaded ?: return false
+            val content = loaded.content
+            return content.kind == PublicProfileKind.Persona &&
+                !content.isOwner &&
+                !content.personaHandle.isNullOrBlank()
+        }
+
+        // MARK: - Connect control (relationship-aware)
+
+        /**
+         * The control is hidden entirely on your own profile, for a
+         * signed-out viewer, and once the edge is `blocked` — RN drops the
+         * whole action row in those cases (`src/app/user/[id].tsx:522-523`).
+         */
+        fun showsConnectAction(): Boolean = _canFollow.value && _connection.value != ProfileConnection.Blocked
+
+        /** Tapping is a no-op while a request is outstanding or in flight. */
+        fun isConnectEnabled(): Boolean = _connection.value.isActionable && _connectState.value !is PublicProfileActionState.InFlight
+
+        /**
+         * The Connect affordance. What it does depends on the edge the
+         * server reported, mirroring RN's `handleConnect`
+         * (`src/app/user/[id].tsx:201-224`):
+         *
+         *  - `none` → `POST api/relationships/requests`
+         *  - `pending_received` → resolve the inbound row, then
+         *    `POST api/relationships/:id/accept`
+         *  - `connected` → raise the disconnect confirm, which then calls
+         *    `DELETE api/relationships/:id`
+         *  - `pending_sent` / `blocked` → inert
+         */
         fun connect() {
             if (_connectState.value is PublicProfileActionState.InFlight) return
-            if (_connectState.value is PublicProfileActionState.Succeeded) return
+            when (_connection.value) {
+                ProfileConnection.None -> sendConnectionRequest()
+                ProfileConnection.PendingReceived -> acceptConnectionRequest()
+                ProfileConnection.Connected -> _showDisconnectConfirm.value = true
+                ProfileConnection.PendingSent, ProfileConnection.Blocked -> Unit
+            }
+        }
+
+        /** `POST api/relationships/requests` (relationships.js:67). */
+        private fun sendConnectionRequest() {
             _connectState.value = PublicProfileActionState.InFlight
             viewModelScope.launch {
                 when (val result = relationships.sendRequest(userId)) {
                     is NetworkResult.Success -> {
                         _connectState.value = PublicProfileActionState.Succeeded
+                        _connection.value = ProfileConnection.PendingSent
                         _toastMessage.value = "Connection request sent"
                     }
                     is NetworkResult.Failure -> {
@@ -224,27 +493,82 @@ class PublicProfileViewModel
         }
 
         /**
-         * P6.5 — Follow a Persona profile. Reuses the connection-request
-         * endpoint as the closest existing wire op; backend wires a
-         * dedicated `POST /api/follows/:userId` later if/when it ships.
+         * Accept the inbound request. The relationship id isn't on the
+         * profile payload, so resolve it from
+         * `GET api/relationships/requests/pending` (relationships.js:669)
+         * first — exactly what RN does before calling accept.
          */
-        fun follow() {
-            if (_followState.value is PublicProfileActionState.InFlight) return
-            if (_followState.value is PublicProfileActionState.Succeeded) return
-            _followState.value = PublicProfileActionState.InFlight
+        private fun acceptConnectionRequest() {
+            _connectState.value = PublicProfileActionState.InFlight
             viewModelScope.launch {
-                when (val result = relationships.sendRequest(userId)) {
+                when (val pending = relationships.pendingRequests()) {
+                    is NetworkResult.Failure -> failConnect(pending.error)
                     is NetworkResult.Success -> {
-                        _followState.value = PublicProfileActionState.Succeeded
-                        _toastMessage.value = "Following"
-                    }
-                    is NetworkResult.Failure -> {
-                        val message = friendlyMessage(result.error)
-                        _followState.value = PublicProfileActionState.Failed(message)
-                        _toastMessage.value = message
+                        val match = pending.data.requests.firstOrNull { it.requester?.id == userId }
+                        if (match == null) {
+                            _connectState.value = PublicProfileActionState.Idle
+                            // The row moved (withdrawn / already handled) —
+                            // re-read the edge rather than leave the button lying.
+                            loadRelationship(userId)
+                            _toastMessage.value = "That request is no longer pending."
+                            return@launch
+                        }
+                        when (val accepted = relationships.accept(match.id)) {
+                            is NetworkResult.Success -> {
+                                _connectState.value = PublicProfileActionState.Succeeded
+                                _connection.value = ProfileConnection.Connected
+                                _toastMessage.value = "Connected"
+                            }
+                            is NetworkResult.Failure -> failConnect(accepted.error)
+                        }
                     }
                 }
             }
+        }
+
+        /**
+         * Confirmed disconnect. Resolves the accepted row from
+         * `GET api/relationships?status=accepted` (relationships.js:622) and
+         * deletes it (`DELETE api/relationships/:id`, relationships.js:578).
+         */
+        fun disconnect() {
+            _showDisconnectConfirm.value = false
+            if (_connection.value != ProfileConnection.Connected) return
+            if (_connectState.value is PublicProfileActionState.InFlight) return
+            _connectState.value = PublicProfileActionState.InFlight
+            viewModelScope.launch {
+                when (val list = relationships.list(status = "accepted")) {
+                    is NetworkResult.Failure -> failConnect(list.error)
+                    is NetworkResult.Success -> {
+                        val match = list.data.relationships.firstOrNull { it.otherUser?.id == userId }
+                        if (match == null) {
+                            _connectState.value = PublicProfileActionState.Idle
+                            loadRelationship(userId)
+                            _toastMessage.value = "You're not connected to this neighbor."
+                            return@launch
+                        }
+                        when (val removed = connections.disconnect(match.id)) {
+                            is NetworkResult.Success -> {
+                                _connectState.value = PublicProfileActionState.Idle
+                                _connection.value = ProfileConnection.None
+                                _toastMessage.value = "Connection removed"
+                            }
+                            is NetworkResult.Failure -> failConnect(removed.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Dismiss the confirm without disconnecting. */
+        fun cancelDisconnect() {
+            _showDisconnectConfirm.value = false
+        }
+
+        private fun failConnect(error: NetworkError) {
+            val message = friendlyMessage(error)
+            _connectState.value = PublicProfileActionState.Failed(message)
+            _toastMessage.value = message
         }
 
         /** Block this user via `POST /api/users/:userId/block`. */
@@ -255,6 +579,10 @@ class PublicProfileViewModel
                 when (val result = blocks.block(userId)) {
                     is NetworkResult.Success -> {
                         _blockState.value = PublicProfileActionState.Succeeded
+                        // RN flips `connectionState` to 'blocked' on the same
+                        // success, which drops the Connect / Follow row
+                        // (`src/app/user/[id].tsx:322`).
+                        _connection.value = ProfileConnection.Blocked
                         _toastMessage.value = "User blocked"
                     }
                     is NetworkResult.Failure -> {
@@ -266,10 +594,69 @@ class PublicProfileViewModel
             }
         }
 
-        private suspend fun fetch() {
-            when (val result = repo.publicProfile(userId)) {
+        /**
+         * UUIDs resolve by id; handles resolve by username. Mirrors RN's
+         * `fetchPublicProfileByIdentifier` (`src/app/user/[id].tsx:53-58`).
+         */
+        private suspend fun loadProfile(): NetworkResult<PublicProfileDto> {
+            val identifier = routeIdentifier.trim()
+            return if (UserSocialRepository.isUuid(identifier)) {
+                repo.publicProfile(identifier)
+            } else {
+                social.publicProfileByUsername(identifier)
+            }
+        }
+
+        /**
+         * `GET api/users/:id/relationship` — seeds the Follow and Connect
+         * poses. Requires auth, so a signed-out viewer just gets the resting
+         * state (and no Follow affordance).
+         */
+        private suspend fun loadRelationship(profileId: String) {
+            val signedInId = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+            _canFollow.value = signedInId != null && signedInId != profileId
+            if (!_canFollow.value) {
+                _isFollowing.value = false
+                return
+            }
+            when (val result = social.relationship(profileId)) {
                 is NetworkResult.Success -> {
-                    _state.value = PublicProfileUiState.Loaded(build(result.data))
+                    _isFollowing.value = result.data.following == true
+                    val connection = ProfileConnection.fromApi(result.data.relationship)
+                    _connection.value = connection
+                    _connectState.value =
+                        when (connection) {
+                            ProfileConnection.PendingSent, ProfileConnection.Connected ->
+                                PublicProfileActionState.Succeeded
+                            ProfileConnection.None,
+                            ProfileConnection.PendingReceived,
+                            ProfileConnection.Blocked,
+                            -> PublicProfileActionState.Idle
+                        }
+                }
+                // A failed relationship probe must not fail the profile —
+                // the buttons just stay in their resting pose.
+                is NetworkResult.Failure -> Unit
+            }
+        }
+
+        private suspend fun fetch() {
+            when (val result = loadProfile()) {
+                is NetworkResult.Success -> {
+                    val profile = result.data
+                    userId = profile.id
+                    val kind = derivedKind(profile)
+                    // A21.2 — the Local archetype renders a real neighbourhood
+                    // post feed, so pull the author's posts the way the RN
+                    // `PostsTab` does (`GET /api/posts/user/:id`). Persona
+                    // profiles keep an empty list on purpose: that endpoint
+                    // returns plain posts, not tier-gated broadcasts, and
+                    // feeding them into the broadcast card would invent a
+                    // visibility chip the API never sent.
+                    val feed =
+                        if (kind == PublicProfileKind.Local) loadUserPosts(profile.id) else emptyList()
+                    _state.value = PublicProfileUiState.Loaded(build(profile, kind, feed))
+                    loadRelationship(profile.id)
                 }
                 is NetworkResult.Failure -> {
                     _state.value = PublicProfileUiState.Error(friendlyMessage(result.error))
@@ -277,8 +664,37 @@ class PublicProfileViewModel
             }
         }
 
-        private fun build(profile: PublicProfileDto): PublicProfileContent {
-            val kind = derivedKind(profile)
+        /**
+         * A21.2 — the Local profile's post feed. Mirrors the RN
+         * `components/profile/PostsTab` fetch. Failures degrade to an empty
+         * feed (which renders the design's "Quiet for now" state) rather
+         * than failing the whole profile.
+         */
+        private suspend fun loadUserPosts(id: String): List<PublicProfilePost> =
+            when (val result = posts.userPosts(id)) {
+                is NetworkResult.Success -> result.data.posts.map { project(it) }
+                is NetworkResult.Failure -> emptyList()
+            }
+
+        private fun project(post: MyPostDto): PublicProfilePost =
+            PublicProfilePost(
+                id = post.id,
+                body = post.content?.takeIf { it.isNotEmpty() } ?: post.title.orEmpty(),
+                timeAgo = relativeTimestamp(post.createdAt),
+                locality = post.locationName,
+                reactions = post.likeCount,
+                replies = post.commentCount,
+                visibility = null,
+                isLocked = false,
+                targetTierRank = null,
+                intent = intentForPostType(post.postType),
+            )
+
+        private fun build(
+            profile: PublicProfileDto,
+            kind: PublicProfileKind,
+            feed: List<PublicProfilePost>,
+        ): PublicProfileContent {
             val header =
                 PublicProfileHeader(
                     displayName = profile.displayName,
@@ -290,6 +706,47 @@ class PublicProfileViewModel
                     tierLabel = if (kind == PublicProfileKind.Persona) "Persona · Verified" else null,
                     isVerifiedNeighbor = kind == PublicProfileKind.Local,
                 )
+            val stats = buildStatCells(profile)
+            val reviewCards = buildReviewCards(profile)
+
+            val neighbor =
+                if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards, feed) else null
+            val signedInId = (authRepository.state.value as? AuthRepository.State.SignedIn)?.user?.id
+            val isOwner = signedInId != null && signedInId == profile.id
+            // A Beacon (`PublicPersona.handle`) lives in a different namespace
+            // from `User.username` — persona handles are generated
+            // independently (`identityProfiles.generateUniqueAudienceHandle`)
+            // and the persona serializer deliberately never exposes the owning
+            // user. Passing the username here would hand the privacy handshake
+            // a handle that can resolve to a *different* creator's Beacon, so
+            // it stays null until `GET /api/users/id/:id` carries an approved
+            // Beacon bridge.
+            val personaHandle: String? = null
+
+            return PublicProfileContent(
+                profile = profile,
+                kind = kind,
+                header = header,
+                stats =
+                    StatsTabsContent(
+                        stats = stats,
+                        bio = profile.bio,
+                        skills = profile.skills,
+                        reviews = reviewCards,
+                    ),
+                posts = feed,
+                neighbor = neighbor,
+                isOwner = isOwner,
+                personaHandle = personaHandle,
+            )
+        }
+
+        /**
+         * Header stat cells — reviews / rating / gigs, whichever the DTO
+         * actually carries, falling back to a single placeholder cell so the
+         * strip never renders empty.
+         */
+        private fun buildStatCells(profile: PublicProfileDto): List<ProfileStatCell> {
             val stats = mutableListOf<ProfileStatCell>()
             val reviewCount = profile.reviewCount ?: 0
             if (reviewCount > 0 || profile.reviews.isNotEmpty()) {
@@ -320,35 +777,20 @@ class PublicProfileViewModel
             if (stats.isEmpty()) {
                 stats += ProfileStatCell(id = "placeholder", value = "—", label = "Activity")
             }
-
-            val reviewCards =
-                profile.reviews.map { r ->
-                    ProfileReviewCard(
-                        id = r.id ?: UUID.randomUUID().toString(),
-                        reviewerName = r.reviewerName ?: "Anonymous",
-                        reviewerAvatarUrl = r.reviewerAvatar,
-                        rating = r.rating.coerceIn(0, 5),
-                        body = r.content.orEmpty(),
-                        timestamp = relativeTimestamp(r.createdAt),
-                    )
-                }
-
-            val neighbor = if (kind == PublicProfileKind.Local) buildNeighbor(profile, reviewCards) else null
-
-            return PublicProfileContent(
-                profile = profile,
-                kind = kind,
-                header = header,
-                stats =
-                    StatsTabsContent(
-                        stats = stats,
-                        bio = profile.bio,
-                        skills = profile.skills,
-                        reviews = reviewCards,
-                    ),
-                neighbor = neighbor,
-            )
+            return stats
         }
+
+        private fun buildReviewCards(profile: PublicProfileDto): List<ProfileReviewCard> =
+            profile.reviews.map { r ->
+                ProfileReviewCard(
+                    id = r.id ?: UUID.randomUUID().toString(),
+                    reviewerName = r.reviewerName ?: "Anonymous",
+                    reviewerAvatarUrl = r.reviewerAvatar,
+                    rating = r.rating.coerceIn(0, MAX_REVIEW_RATING),
+                    body = r.content.orEmpty(),
+                    timestamp = relativeTimestamp(r.createdAt),
+                )
+            }
 
         /**
          * B.2 (A10.5) — project the live profile onto the canonical
@@ -359,6 +801,7 @@ class PublicProfileViewModel
         private fun buildNeighbor(
             profile: PublicProfileDto,
             reviews: List<ProfileReviewCard>,
+            feed: List<PublicProfilePost>,
         ): NeighborProfileContent {
             val reviewCount = profile.reviewCount ?: reviews.size
             val isNew = reviewCount == 0
@@ -415,7 +858,7 @@ class PublicProfileViewModel
                 reviewCount = reviewCount,
                 mutuals = if (isNew) neighborMutuals(profile) else null,
                 welcome = welcome,
-                posts = emptyList(),
+                posts = feed,
                 isNewNeighbor = isNew,
                 primaryCtaLabel = if (isNew) "Say hi" else "Message",
             )
@@ -544,4 +987,31 @@ class PublicProfileViewModel
                 is NetworkError.Transport -> "Check your connection and try again."
                 else -> "Something went wrong. Try again."
             }
+
+        private companion object {
+            /** Reviews are 1–5 stars; anything the API returns is clamped to it. */
+            const val MAX_REVIEW_RATING = 5
+
+            /**
+             * Maps the backend `post_type` onto the design's intent chip.
+             * Types with no honest counterpart (general, recommendation,
+             * lost & found, local update…) render with no chip rather than
+             * borrowing a misleading label. Mirrors iOS
+             * `PublicProfileViewModel.intent(forPostType:)`.
+             */
+            fun intentForPostType(type: String?): PublicProfilePost.Intent? =
+                when (type.orEmpty()) {
+                    "service_offer", "deal" -> PublicProfilePost.Intent.Offer
+                    "alert", "heads_up" -> PublicProfilePost.Intent.Alert
+                    "event" -> PublicProfilePost.Intent.Event
+                    "ask_local", "ask" -> PublicProfilePost.Intent.Ask
+                    else -> null
+                }
+
+            /**
+             * Shown instead of silently no-op'ing when this profile carries no
+             * resolvable Beacon handle. Mirrors the iOS string exactly.
+             */
+            const val HANDSHAKE_UNAVAILABLE_MESSAGE = "Following isn't available from this profile yet."
+        }
     }

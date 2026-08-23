@@ -34,7 +34,7 @@ struct PlaceMoneyDetailContent: View {
                         ForEach(data.programs) { p in IncentiveRow(program: p) }
                     }
                     Text("Eligibility is an estimate — verify with each provider.")
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.appTextMuted)
                         .padding(.top, 8)
                 } else {
@@ -66,7 +66,7 @@ struct PlaceMoneyDetailContent: View {
                     .lineSpacing(2)
                     .foregroundStyle(Theme.Color.appTextSecondary)
                     Text("Informational only — not legal or tax advice.")
-                        .font(.system(size: 12))
+                        .pantopusTextStyle(.caption)
                         .foregroundStyle(Theme.Color.warning)
                 }
             }

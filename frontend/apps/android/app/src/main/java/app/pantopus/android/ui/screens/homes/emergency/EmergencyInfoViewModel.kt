@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeEmergencyDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerConfig
@@ -104,6 +105,32 @@ class EmergencyInfoViewModel
         private val _chipStrip = MutableStateFlow(initialChipStrip())
         val chipStrip: StateFlow<ChipStripConfig> = _chipStrip.asStateFlow()
 
+        /**
+         * Phone number the user just asked to dial — either the standing
+         * "Emergency? Call 911" bar or a stored contact's tap-to-dial
+         * row. [EmergencyInfoScreen] observes it, fires `ACTION_DIAL`,
+         * and calls [consumeDialRequest]. Mirrors RN's `callPhone`
+         * (`emergency.tsx:80`), which dials both the banner (`:107`) and
+         * every contact's phone row (`:158`).
+         */
+        private val _dialRequest = MutableStateFlow<String?>(null)
+        val dialRequest: StateFlow<String?> = _dialRequest.asStateFlow()
+
+        /** Ask the screen to dial [number]; blank input is a no-op. */
+        fun dial(number: String?) {
+            if (number.isNullOrBlank()) return
+            _dialRequest.value = number
+        }
+
+        /** Dial emergency services from the standing red bar. */
+        fun dialEmergencyNumber() {
+            dial(EMERGENCY_NUMBER)
+        }
+
+        fun consumeDialRequest() {
+            _dialRequest.value = null
+        }
+
         private var emergencies: List<HomeEmergencyDto>? = null
         private var onAction: (HomeEmergencyDto) -> Unit = {}
         private var onAdd: () -> Unit = {}
@@ -134,7 +161,7 @@ class EmergencyInfoViewModel
                     is NetworkResult.Failure -> {
                         emergencies = null
                         _banner.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                     }
                 }
             }
@@ -327,7 +354,13 @@ class EmergencyInfoViewModel
                         accessibilityLabel = category.actionAccessibilityLabel,
                         background = category.background,
                         foreground = category.foreground,
-                        onClick = { onAction(dto) },
+                        // A stored phone number is a tap-to-dial
+                        // affordance (RN `emergency.tsx:157-162`);
+                        // everything else opens the item detail.
+                        onClick = {
+                            val phone = emergencyPhoneNumber(projection)
+                            if (phone != null) dial(phone) else onAction(dto)
+                        },
                     ),
                 onTap = { onAction(dto) },
                 body = projection.body.ifEmpty { null },
@@ -419,6 +452,26 @@ class EmergencyInfoViewModel
             )
 
         companion object {
+            /** The number the standing red bar dials (RN `emergency.tsx:107`). */
+            const val EMERGENCY_NUMBER: String = "911"
+
+            /** Bar copy — word-for-word with RN and the iOS screen. */
+            const val EMERGENCY_BANNER_TITLE: String = "Emergency? Call 911"
+
+            /**
+             * Dialable phone number carried by [projection], or null when
+             * the row has no number. Only contact / medical rows put a
+             * phone in `actionTarget`; shutoff / evac carry a map or
+             * photo URL instead.
+             */
+            @JvmStatic
+            fun emergencyPhoneNumber(projection: EmergencyRowProjection): String? =
+                when (projection.category) {
+                    EmergencyCategory.Contact, EmergencyCategory.Medical ->
+                        projection.actionTarget?.takeIf { it.isNotBlank() }
+                    EmergencyCategory.Shutoff, EmergencyCategory.Evac -> null
+                }
+
             private val allCategoriesInOrder =
                 listOf(
                     EmergencyCategory.Shutoff,

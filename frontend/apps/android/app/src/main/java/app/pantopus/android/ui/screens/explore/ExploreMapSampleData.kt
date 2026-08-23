@@ -329,6 +329,7 @@ object ExploreMapSampleData {
                 ExploreKind.Item to "For sale nearby",
                 ExploreKind.Post to "Neighbor asked a question",
                 ExploreKind.Spot to "Local spot",
+                ExploreKind.Home to "Neighborhood home",
             )
         val metas =
             mapOf(
@@ -336,6 +337,7 @@ object ExploreMapSampleData {
                 ExploreKind.Item to "$30",
                 ExploreKind.Post to "Asked today",
                 ExploreKind.Spot to "Open",
+                ExploreKind.Home to "Home",
             )
         val tones =
             mapOf(
@@ -343,6 +345,7 @@ object ExploreMapSampleData {
                 ExploreKind.Item to ExploreBadgeTone.New,
                 ExploreKind.Post to ExploreBadgeTone.Replies,
                 ExploreKind.Spot to ExploreBadgeTone.Rating,
+                ExploreKind.Home to ExploreBadgeTone.New,
             )
         val badgeText =
             mapOf(
@@ -350,6 +353,7 @@ object ExploreMapSampleData {
                 ExploreKind.Item to "New",
                 ExploreKind.Post to "2 replies",
                 ExploreKind.Spot to "4.5★",
+                ExploreKind.Home to "Home",
             )
         return (0 until count).map { i ->
             val global = startIndex + i

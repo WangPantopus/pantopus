@@ -16,6 +16,7 @@ import app.pantopus.android.ui.screens.businesses.create_business.steps.LegalInf
 import app.pantopus.android.ui.screens.businesses.create_business.steps.PickCategorySearchStep
 import app.pantopus.android.ui.screens.businesses.create_business.steps.PickCategoryStep
 import app.pantopus.android.ui.screens.businesses.create_business.steps.ProfileStep
+import app.pantopus.android.ui.screens.businesses.create_business.steps.ProfileStepCallbacks
 import app.pantopus.android.ui.screens.shared.wizard.WizardIdentity
 import app.pantopus.android.ui.screens.shared.wizard.WizardShell
 
@@ -81,9 +82,35 @@ fun CreateBusinessWizardScreen(
                     )
                 }
             }
-            CreateBusinessStep.LegalInfo -> LegalInfoStep()
-            CreateBusinessStep.Profile -> ProfileStep()
-            CreateBusinessStep.Confirm -> ConfirmStep()
+            CreateBusinessStep.LegalInfo ->
+                LegalInfoStep(
+                    state = state,
+                    onNameChange = viewModel::setBusinessName,
+                    onUsernameChange = viewModel::setUsername,
+                    onEmailChange = viewModel::setEmail,
+                    onDescriptionChange = viewModel::setDescription,
+                )
+            CreateBusinessStep.Profile ->
+                ProfileStep(
+                    state = state,
+                    callbacks =
+                        ProfileStepCallbacks(
+                            onAddressChange = viewModel::setAddress,
+                            onCityChange = viewModel::setCity,
+                            onStateChange = viewModel::setState,
+                            onZipChange = viewModel::setZip,
+                            onSkipLocation = viewModel::skipLocation,
+                            onUnskipLocation = viewModel::unskipLocation,
+                            onSkipHours = viewModel::skipHours,
+                            onUnskipHours = viewModel::unskipHours,
+                            onToggleDayClosed = viewModel::toggleDayClosed,
+                            onLogoPicked = viewModel::setLogoPick,
+                            onClearLogo = viewModel::clearLogoPick,
+                            onSkipLogo = viewModel::skipLogo,
+                            onUnskipLogo = viewModel::unskipLogo,
+                        ),
+                )
+            CreateBusinessStep.Confirm -> ConfirmStep(state = state)
         }
     }
 }

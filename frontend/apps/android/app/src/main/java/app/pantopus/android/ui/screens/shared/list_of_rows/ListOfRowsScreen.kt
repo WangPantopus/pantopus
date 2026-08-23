@@ -11,9 +11,11 @@
 
 package app.pantopus.android.ui.screens.shared.list_of_rows
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +71,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -137,6 +140,12 @@ fun ListOfRowsScreen(
      * in the `actions` row.
      */
     extraTopBarAction: (@Composable () -> Unit)? = null,
+    /**
+     * A14.4 — optional monospaced caption rendered after the last
+     * section (the design's `MonoFooter`, e.g. "Maria Lewin · ID 8174").
+     * Null renders nothing — preserving every existing call site.
+     */
+    monoFooter: String? = null,
 ) {
     val pullState =
         rememberPullRefreshState(
@@ -216,7 +225,7 @@ fun ListOfRowsScreen(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullState)) {
                 when (state) {
                     ListOfRowsUiState.Loading -> LoadingRows()
-                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, listingContext, onEndReached)
+                    is ListOfRowsUiState.Loaded -> LoadedList(state, banner, listingContext, monoFooter, onEndReached)
                     is ListOfRowsUiState.Empty ->
                         EmptyState(
                             icon = state.icon,
@@ -828,6 +837,7 @@ private fun LoadedList(
     state: ListOfRowsUiState.Loaded,
     banner: BannerConfig?,
     listingContext: ListingContextConfig?,
+    monoFooter: String?,
     onEndReached: () -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -885,6 +895,24 @@ private fun LoadedList(
                 ) {
                     CircularProgressIndicator(color = PantopusColors.primary600, strokeWidth = 2.dp)
                 }
+            }
+        }
+        if (monoFooter != null) {
+            // Same mono-footer treatment as GroupedListScreen / Payments
+            // so A14 settings screens read identically.
+            item(key = "monoFooter") {
+                Text(
+                    text = monoFooter,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = PantopusColors.appTextMuted,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 18.dp, start = Spacing.s4, end = Spacing.s4)
+                            .testTag("listOfRowsMonoFooter"),
+                )
             }
         }
     }
@@ -1012,6 +1040,7 @@ private fun ErrorBanner(
 
 internal enum class RowCardContext { Standalone, Grouped }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun RowView(
     row: RowModel,
@@ -1035,16 +1064,29 @@ internal fun RowView(
     val opacity =
         if (row.highlight is RowHighlight.Archived || row.highlight is RowHighlight.Muted) 0.78f else 1f
 
+    // S5 — long-press opens the destructive-action menu when the row
+    // carries one. Rows without one keep the plain `clickable` they had.
+    var destructiveMenuOpen by remember(row.id) { mutableStateOf(false) }
+    val destructive = row.destructiveAction
+    val tapModifier: Modifier =
+        if (destructive == null) {
+            Modifier.clickable(onClick = row.onTap)
+        } else {
+            Modifier.combinedClickable(
+                onClick = row.onTap,
+                onLongClick = { destructiveMenuOpen = true },
+            )
+        }
     val baseModifier =
         if (isGrouped) {
-            Modifier.fillMaxWidth().clickable(onClick = row.onTap)
+            Modifier.fillMaxWidth().then(tapModifier)
         } else {
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(cornerRadius))
                 .background(background)
                 .let { mod -> if (border != null) mod.border(1.dp, border, RoundedCornerShape(cornerRadius)) else mod }
-                .clickable(onClick = row.onTap)
+                .then(tapModifier)
         }
     val modifier = baseModifier.alpha(opacity)
 
@@ -1052,6 +1094,13 @@ internal fun RowView(
         modifier = modifier.padding(Spacing.s3).heightIn(min = 60.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
+        if (destructive != null) {
+            RowDestructiveMenu(
+                action = destructive,
+                expanded = destructiveMenuOpen,
+                onDismiss = { destructiveMenuOpen = false },
+            )
+        }
         if (row.highlight is RowHighlight.Leading) {
             LeadingBadge()
         }
@@ -1080,6 +1129,43 @@ internal fun RowView(
         if (row.footer != null) {
             FooterStack(row.footer)
         }
+    }
+}
+
+/**
+ * S5 — long-press dropdown carrying a row's single destructive action
+ * (Notifications "Delete", Connections "Remove"). Mirrors the iOS
+ * context-menu / swipe affordance.
+ */
+@Composable
+private fun RowDestructiveMenu(
+    action: RowDestructiveAction,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = action.label,
+                    style = PantopusTextStyle.small,
+                    color = PantopusColors.error,
+                )
+            },
+            leadingIcon = {
+                PantopusIconImage(
+                    icon = PantopusIcon.Trash2,
+                    contentDescription = null,
+                    size = Radii.xl,
+                    tint = PantopusColors.error,
+                )
+            },
+            onClick = {
+                onDismiss()
+                action.onClick()
+            },
+            modifier = Modifier.testTag(action.testTag ?: "rowDestructiveAction"),
+        )
     }
 }
 

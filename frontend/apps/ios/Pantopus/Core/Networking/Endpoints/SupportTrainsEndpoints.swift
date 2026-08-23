@@ -2,11 +2,20 @@
 //  SupportTrainsEndpoints.swift
 //  Pantopus
 //
-//  T6.6c (P26.5) — Support trains list endpoints. The full Support
+//  T6.6c (P26.5) — Support trains read endpoints. The full Support
 //  Trains backend exposes 39 routes under `backend/routes/supportTrains.js`;
 //  this file wires the two list-feed endpoints powering the My-trains
 //  and Nearby tabs, plus the helper-reservations feed driving the
-//  Review-signups screen.
+//  Review-signups screen. The write half lives in
+//  `SupportTrainActionsEndpoints.swift`.
+//
+//  S1 PREFIX FIX: these paths used to target `/api/support-trains/…`.
+//  `backend/app.js:404` mounts the router at
+//  `/api/activities/support-trains` and the backend carries no alias for
+//  the shorter prefix (`grep -rn "api/support-trains" backend` → no
+//  hits), so every one of these calls 404'd. They now compose the real
+//  mount, matching the RN client (`packages/api/src/endpoints/
+//  supportTrains.ts:30`).
 //
 
 import Foundation
@@ -16,7 +25,7 @@ public enum SupportTrainsEndpoints {
     /// (organizer or helper).
     ///
     /// Route: `backend/routes/supportTrains.js:445` —
-    /// `GET /api/support-trains/me/support-trains`.
+    /// `GET /api/activities/support-trains/me/support-trains`.
     public static func mine(
         role: SupportTrainRoleFilter? = nil,
         status: String? = nil,
@@ -31,7 +40,7 @@ public enum SupportTrainsEndpoints {
         if let status { query["status"] = status }
         return Endpoint(
             method: .get,
-            path: "/api/support-trains/me/support-trains",
+            path: "/api/activities/support-trains/me/support-trains",
             query: query
         )
     }
@@ -40,7 +49,7 @@ public enum SupportTrainsEndpoints {
     /// backend; pass an explicit `radiusMeters` to override).
     ///
     /// Route: `backend/routes/supportTrains.js:570` —
-    /// `GET /api/support-trains/nearby`.
+    /// `GET /api/activities/support-trains/nearby`.
     public static func nearby(
         latitude: Double,
         longitude: Double,
@@ -57,7 +66,7 @@ public enum SupportTrainsEndpoints {
         }
         return Endpoint(
             method: .get,
-            path: "/api/support-trains/nearby",
+            path: "/api/activities/support-trains/nearby",
             query: query
         )
     }
@@ -66,11 +75,11 @@ public enum SupportTrainsEndpoints {
     /// one Support Train. Powers the Review-signups screen.
     ///
     /// Route: `backend/routes/supportTrains.js:3306` —
-    /// `GET /api/support-trains/:id/reservations`.
+    /// `GET /api/activities/support-trains/:id/reservations`.
     public static func reservations(supportTrainId: String) -> Endpoint {
         Endpoint(
             method: .get,
-            path: "/api/support-trains/\(supportTrainId)/reservations"
+            path: "/api/activities/support-trains/\(supportTrainId)/reservations"
         )
     }
 
@@ -79,11 +88,11 @@ public enum SupportTrainsEndpoints {
     /// `addSlot` for each generated slot, then `publish`.
     ///
     /// Route: `backend/routes/supportTrains.js:639` —
-    /// `POST /api/support-trains/`.
+    /// `POST /api/activities/support-trains/`.
     public static func create(body: CreateSupportTrainBody) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/support-trains",
+            path: "/api/activities/support-trains",
             body: body
         )
     }
@@ -93,14 +102,14 @@ public enum SupportTrainsEndpoints {
     /// step 2 and see the preview rebuild before launch.
     ///
     /// Route: `backend/routes/supportTrains.js:921` —
-    /// `POST /api/support-trains/:id/slots`.
+    /// `POST /api/activities/support-trains/:id/slots`.
     public static func addSlot(
         supportTrainId: String,
         body: AddSupportTrainSlotBody
     ) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/support-trains/\(supportTrainId)/slots",
+            path: "/api/activities/support-trains/\(supportTrainId)/slots",
             body: body
         )
     }
@@ -109,11 +118,11 @@ public enum SupportTrainsEndpoints {
     /// sign up. Fires last in the wizard's launch sequence.
     ///
     /// Route: `backend/routes/supportTrains.js:1236` —
-    /// `POST /api/support-trains/:id/publish`.
+    /// `POST /api/activities/support-trains/:id/publish`.
     public static func publish(supportTrainId: String) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/support-trains/\(supportTrainId)/publish"
+            path: "/api/activities/support-trains/\(supportTrainId)/publish"
         )
     }
 
@@ -123,16 +132,13 @@ public enum SupportTrainsEndpoints {
     ///
     /// Route: `backend/routes/supportTrains.js:3444` — `GET /:id`.
     ///
-    /// PREFIX NOTE: this whole client family targets `/api/support-trains/*`
-    /// (the six list/create endpoints above and these three siblings),
-    /// while the Express router is mounted at `/api/activities/support-trains`
-    /// (`backend/app.js:398`). If the already-shipped list feeds resolve in
-    /// production, an API-gateway alias bridges the two prefixes; if they
-    /// don't, the whole family's base path needs flipping in one change.
-    /// Either way Detail/Manage stay consistent with their siblings rather
-    /// than diverging onto a second convention. See the P1-E delivery notes.
+    /// PREFIX NOTE (resolved in S1): the family used to target
+    /// `/api/support-trains/…`; the router is mounted at
+    /// `/api/activities/support-trains` (`backend/app.js:404`) and no
+    /// alias exists, so every helper in this file now composes the real
+    /// mount.
     public static func detail(supportTrainId: String) -> Endpoint {
-        Endpoint(method: .get, path: "/api/support-trains/\(supportTrainId)")
+        Endpoint(method: .get, path: "/api/activities/support-trains/\(supportTrainId)")
     }
 
     /// Broadcast an update to the train's helpers / followers (A13.13
@@ -143,7 +149,7 @@ public enum SupportTrainsEndpoints {
     public static func postUpdate(supportTrainId: String, body: SupportTrainUpdateBody) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/support-trains/\(supportTrainId)/updates",
+            path: "/api/activities/support-trains/\(supportTrainId)/updates",
             body: body
         )
     }
@@ -155,7 +161,7 @@ public enum SupportTrainsEndpoints {
     public static func complete(supportTrainId: String) -> Endpoint {
         Endpoint(
             method: .post,
-            path: "/api/support-trains/\(supportTrainId)/complete"
+            path: "/api/activities/support-trains/\(supportTrainId)/complete"
         )
     }
 }

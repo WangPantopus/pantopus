@@ -17,6 +17,13 @@ public enum MailDetailState {
 public struct MailDetailContent: Sendable {
     public let mailId: String
     public let category: MailItemCategory
+    /// Raw backend `Mail.category` (`bill` / `legal` / `notice` / `receipt`
+    /// / `community` / `promo` / `other`). Distinct from `category`, which
+    /// projects `mail_type`. Drives the A17.1 per-category ACTIONS row.
+    public let mailCategoryKey: String?
+    /// True when the sender resolves to RN's `unknown` trust bucket —
+    /// suppresses the `Pay` / `Sign` tiles (`detail.tsx:69-72`).
+    public let isSenderUnknown: Bool
     public let trust: MailTrust
     public let detailTrust: MailDetailTrust
     public let senderDisplayName: String
@@ -34,6 +41,10 @@ public struct MailDetailContent: Sendable {
     public let bodyParagraphs: [String]
     public let attachments: [String]
     public let aiSummary: String?
+    /// A17.1 — optional bullet list rendered below the elf summary
+    /// (`mail-detail.jsx` ELF.bullets). Empty for most items; sample
+    /// fixtures and future backend payloads may populate it.
+    public let aiBullets: [AIElfBullet]
     public let ackRequired: Bool
     public let isAcknowledged: Bool
     public let isArchived: Bool
@@ -50,6 +61,8 @@ public struct MailDetailContent: Sendable {
     public init(
         mailId: String,
         category: MailItemCategory,
+        mailCategoryKey: String? = nil,
+        isSenderUnknown: Bool = false,
         trust: MailTrust,
         detailTrust: MailDetailTrust,
         senderDisplayName: String,
@@ -67,6 +80,7 @@ public struct MailDetailContent: Sendable {
         bodyParagraphs: [String],
         attachments: [String],
         aiSummary: String?,
+        aiBullets: [AIElfBullet] = [],
         ackRequired: Bool,
         isAcknowledged: Bool,
         isArchived: Bool = false,
@@ -82,6 +96,8 @@ public struct MailDetailContent: Sendable {
     ) {
         self.mailId = mailId
         self.category = category
+        self.mailCategoryKey = mailCategoryKey
+        self.isSenderUnknown = isSenderUnknown
         self.trust = trust
         self.detailTrust = detailTrust
         self.senderDisplayName = senderDisplayName
@@ -99,6 +115,7 @@ public struct MailDetailContent: Sendable {
         self.bodyParagraphs = bodyParagraphs
         self.attachments = attachments
         self.aiSummary = aiSummary
+        self.aiBullets = aiBullets
         self.ackRequired = ackRequired
         self.isAcknowledged = isAcknowledged
         self.isArchived = isArchived

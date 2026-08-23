@@ -10,6 +10,88 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
+/// Which overflow actions a single Pulse card offers this viewer, and
+/// which of them are already applied. Mirrors RN's per-card gating in
+/// `src/components/feed/PostCard.tsx:97-101, 382-397, 445-470`.
+public struct PulsePostActions: Sendable, Hashable {
+    /// Cold-start neighborhood fact — dismissable, never reportable.
+    public let isSeeded: Bool
+    public let isSaved: Bool
+    public let isReposted: Bool
+    public let shareCount: Int
+    /// `state == "solved"` — renders the inline Solved badge.
+    public let isSolved: Bool
+    /// Viewer authored this post.
+    public let isOwner: Bool
+    /// Author-only + Ask post + not already solved.
+    public let canMarkSolved: Bool
+    /// Place surface only, and never on the viewer's own post.
+    public let canFlagNotHelpful: Bool
+    /// Author identity to mute — nil when the post has no mutable author
+    /// (seeded / system cards).
+    public let muteEntityType: FeedMuteEntityType?
+    public let muteEntityId: String?
+    /// Display name used in the mute row + its confirm copy.
+    public let muteEntityName: String
+    /// `post_type` fed to `POST /api/posts/mute/topic`.
+    public let postType: String?
+    /// Human label for the topic being muted ("Deals", "Alerts", …).
+    public let topicLabel: String?
+
+    public init(
+        isSeeded: Bool = false,
+        isSaved: Bool = false,
+        isReposted: Bool = false,
+        shareCount: Int = 0,
+        isSolved: Bool = false,
+        isOwner: Bool = false,
+        canMarkSolved: Bool = false,
+        canFlagNotHelpful: Bool = false,
+        muteEntityType: FeedMuteEntityType? = nil,
+        muteEntityId: String? = nil,
+        muteEntityName: String = "this author",
+        postType: String? = nil,
+        topicLabel: String? = nil
+    ) {
+        self.isSeeded = isSeeded
+        self.isSaved = isSaved
+        self.isReposted = isReposted
+        self.shareCount = shareCount
+        self.isSolved = isSolved
+        self.isOwner = isOwner
+        self.canMarkSolved = canMarkSolved
+        self.canFlagNotHelpful = canFlagNotHelpful
+        self.muteEntityType = muteEntityType
+        self.muteEntityId = muteEntityId
+        self.muteEntityName = muteEntityName
+        self.postType = postType
+        self.topicLabel = topicLabel
+    }
+
+    /// Report is offered to everyone except the author (RN
+    /// `PostCard.tsx:507`).
+    public var canReport: Bool {
+        !isOwner && !isSeeded
+    }
+
+    /// Delete is author-only (RN `PostCard.tsx:516`).
+    public var canDelete: Bool {
+        isOwner && !isSeeded
+    }
+
+    /// Muting needs a resolvable entity and never applies to your own post.
+    public var canMuteAuthor: Bool {
+        !isOwner && !isSeeded && muteEntityType != nil && muteEntityId != nil
+    }
+
+    /// Topic mute needs a concrete post type.
+    public var canMuteTopic: Bool {
+        !isSeeded && !(postType ?? "").isEmpty
+    }
+}
+
 /// VM-prepared content for a single Pulse card.
 public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
     public let id: String
@@ -27,6 +109,8 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
     public let media: [PostMediaItem]
     /// Number of comments — shown beside the Reply affordance.
     public let commentCount: Int
+    /// Overflow-menu capability set for this viewer.
+    public let actions: PulsePostActions
 
     /// Still-image URLs — kept for call sites (and tests) that only care
     /// about what the card displays, not the attachment kinds.
@@ -48,7 +132,8 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         attendees: PulseAttendeeStrip?,
         userHasReacted: Bool,
         media: [PostMediaItem] = [],
-        commentCount: Int = 0
+        commentCount: Int = 0,
+        actions: PulsePostActions = PulsePostActions()
     ) {
         self.id = id
         self.authorName = authorName
@@ -64,6 +149,7 @@ public struct PulsePostCardContent: Sendable, Hashable, Identifiable {
         self.userHasReacted = userHasReacted
         self.media = media
         self.commentCount = commentCount
+        self.actions = actions
     }
 }
 
@@ -86,17 +172,34 @@ public struct PulsePostCard: View {
     private let onTap: @MainActor () -> Void
     private let onPrimaryReaction: @MainActor () -> Void
     private let onRSVP: (@MainActor () -> Void)?
+    /// Opens the card's overflow menu (save / repost / share / hide /
+    /// mute / report / delete). `nil` hides the affordance.
+    private let onOverflow: (@MainActor () -> Void)?
+    /// Dismisses a cold-start seeded fact. `nil` hides the affordance.
+    private let onDismissSeeded: (@MainActor () -> Void)?
+    /// Bookmark toggle in the engagement strip. `nil` hides the affordance.
+    private let onToggleSave: (@MainActor () -> Void)?
+    /// Repost toggle in the engagement strip. `nil` hides the affordance.
+    private let onToggleRepost: (@MainActor () -> Void)?
 
     public init(
         content: PulsePostCardContent,
         onTap: @escaping @MainActor () -> Void,
         onPrimaryReaction: @escaping @MainActor () -> Void,
-        onRSVP: (@MainActor () -> Void)? = nil
+        onRSVP: (@MainActor () -> Void)? = nil,
+        onOverflow: (@MainActor () -> Void)? = nil,
+        onDismissSeeded: (@MainActor () -> Void)? = nil,
+        onToggleSave: (@MainActor () -> Void)? = nil,
+        onToggleRepost: (@MainActor () -> Void)? = nil
     ) {
         self.content = content
         self.onTap = onTap
         self.onPrimaryReaction = onPrimaryReaction
         self.onRSVP = onRSVP
+        self.onOverflow = onOverflow
+        self.onDismissSeeded = onDismissSeeded
+        self.onToggleSave = onToggleSave
+        self.onToggleRepost = onToggleRepost
     }
 
     public var body: some View {
@@ -162,6 +265,31 @@ public struct PulsePostCard: View {
             }
             Spacer(minLength: Spacing.s2)
             PulseIntentChip(intent: content.intent)
+            headerTrailingControl
+        }
+    }
+
+    /// Seeded facts get a dismiss "x"; every other card gets the overflow
+    /// menu. RN splits the same way (`PostCard.tsx:85-88`).
+    @ViewBuilder private var headerTrailingControl: some View {
+        if content.actions.isSeeded {
+            if let onDismissSeeded {
+                Button(action: onDismissSeeded) {
+                    Icon(.x, size: 15, color: Theme.Color.appTextMuted)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss this suggestion")
+                .accessibilityIdentifier("pulsePostDismissSeeded_\(content.id)")
+            }
+        } else if let onOverflow {
+            Button(action: onOverflow) {
+                Icon(.moreHorizontal, size: 16, color: Theme.Color.appTextMuted)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Post options")
+            .accessibilityIdentifier("pulsePostOverflow_\(content.id)")
         }
     }
 
@@ -220,7 +348,47 @@ public struct PulsePostCard: View {
             ForEach(content.reactions) { reaction in
                 reactionPill(reaction)
             }
+            if content.actions.isSolved {
+                solvedBadge
+            }
             Spacer()
+            if let onToggleSave {
+                Button(action: onToggleSave) {
+                    Icon(
+                        .bookmark,
+                        size: 12,
+                        color: content.actions.isSaved ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                    )
+                    .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(content.actions.isSaved ? "Remove bookmark" : "Save post")
+                .accessibilityIdentifier("pulsePostSave_\(content.id)")
+            }
+            if let onToggleRepost {
+                Button(action: onToggleRepost) {
+                    HStack(spacing: Spacing.s1) {
+                        Icon(
+                            .arrowsRepeat,
+                            size: 12,
+                            color: content.actions.isReposted ? Theme.Color.success : Theme.Color.appTextSecondary
+                        )
+                        if content.actions.shareCount > 0 {
+                            Text("\(content.actions.shareCount)")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(
+                                    content.actions.isReposted
+                                        ? Theme.Color.success
+                                        : Theme.Color.appTextSecondary
+                                )
+                        }
+                    }
+                    .frame(minWidth: 24, minHeight: 24)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(content.actions.isReposted ? "Undo repost" : "Repost")
+                .accessibilityIdentifier("pulsePostRepost_\(content.id)")
+            }
             HStack(spacing: Spacing.s1) {
                 Icon(.messageCircle, size: 12, color: Theme.Color.appTextSecondary)
                 Text(content.commentCount > 0 ? "Reply \(content.commentCount)" : "Reply")
@@ -235,6 +403,24 @@ public struct PulsePostCard: View {
             )
         }
         .padding(.top, Spacing.s2)
+    }
+
+    /// Inline "Solved" pill — RN renders the same badge once
+    /// `state === 'solved'` (`PostCard.tsx:474-479`).
+    private var solvedBadge: some View {
+        HStack(spacing: Spacing.s1) {
+            Icon(.checkCircle, size: 11, strokeWidth: 2.4, color: Theme.Color.success)
+            Text("Solved")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.Color.success)
+        }
+        .padding(.horizontal, Spacing.s2)
+        .frame(height: 22)
+        .background(Theme.Color.successLight)
+        .clipShape(Capsule())
+        .accessibilityElement()
+        .accessibilityLabel("Solved")
+        .accessibilityIdentifier("pulsePostSolvedBadge_\(content.id)")
     }
 
     /// Cycling tint palette for the Event attendee mini-avatars (decorative;
@@ -314,7 +500,11 @@ public struct PulseIntentChip: View {
         case .recommend: Theme.Color.success
         case .event: Theme.Color.magic
         case .lost: Theme.Color.rose
+        case .alert: Theme.Color.error
+        case .deal: Theme.Color.success
         case .announce: Theme.Color.slate
+        case .neighborhoodWin: Theme.Color.warning
+        case .visitorGuide: Theme.Color.info
         }
     }
 
@@ -325,7 +515,11 @@ public struct PulseIntentChip: View {
         case .recommend: Theme.Color.successLight
         case .event: Theme.Color.magicBg
         case .lost: Theme.Color.roseBg
+        case .alert: Theme.Color.errorBg
+        case .deal: Theme.Color.successBg
         case .announce: Theme.Color.slateBg
+        case .neighborhoodWin: Theme.Color.warningBg
+        case .visitorGuide: Theme.Color.infoBg
         }
     }
 }

@@ -5,15 +5,20 @@
 //  A11.2 Explore / P1-F — view-model for the cross-type discovery map.
 //
 //  The production path fetches live discovery results for the viewport
-//  around the user — `GET /api/gigs/in-bounds` (tasks) and
-//  `GET /api/listings/in-bounds` (items) — and fans them into a homogeneous
-//  `[ExploreEntity]`. Posts + Spots have no in-bounds endpoint yet, so the
-//  live map surfaces Tasks + Items; the type toggle still narrows the set
-//  client-side. Filtering, sorting, and clustering run locally over the
-//  fetched window (mirrors `NearbyMapViewModel`). Previews / snapshots /
-//  tests seed deterministic content via `init(scenario:)`, bypassing the
-//  network.
+//  around the user from three routes and fans them into a homogeneous
+//  `[ExploreEntity]`:
+//    • `GET /api/gigs/in-bounds`     → `.task`  (carries price + bid count)
+//    • `GET /api/listings/in-bounds` → `.item`
+//    • `GET /api/posts/map`          → `.post` / `.spot` / `.home`
+//      (`layers=posts,businesses,homes` — `backend/routes/posts.js:1646`)
+//  Tasks stay on the gigs route rather than the map route's `tasks` layer
+//  because only the former carries price + bid count for the rail card.
+//  Filtering, sorting, and clustering run locally over the fetched window
+//  (mirrors `NearbyMapViewModel`). Previews / snapshots / tests seed
+//  deterministic content via `init(scenario:)`, bypassing the network.
 //
+
+// swiftlint:disable file_length type_body_length
 
 import CoreLocation
 import Foundation
@@ -204,15 +209,27 @@ public final class ExploreMapViewModel {
             async let listingsResult: ListingsInBoundsResponse? = try? await api.request(
                 ListingsEndpoints.inBounds(south: minLat, west: minLon, north: maxLat, east: maxLon)
             )
+            async let markersResult: PostsMapResponse? = try? await api.request(
+                PostsMapEndpoints.markers(
+                    south: minLat,
+                    west: minLon,
+                    north: maxLat,
+                    east: maxLon,
+                    layers: [.posts, .businesses, .homes],
+                    limit: 200
+                )
+            )
             let gigs = await gigsResult
             let listings = await listingsResult
-            if gigs == nil, listings == nil {
+            let markers = await markersResult
+            if gigs == nil, listings == nil, markers == nil {
                 state = .error(message: "Couldn't load the map.")
                 return
             }
             allEntities = Self.project(
                 gigs: gigs?.gigs ?? [],
                 listings: listings?.listings ?? [],
+                markers: markers?.markers ?? [],
                 anchor: center
             )
             rebuild(selectedId: nil)
@@ -260,12 +277,15 @@ public final class ExploreMapViewModel {
         ))
     }
 
-    /// Map live gigs + listings into the unified entity vocabulary. Gigs →
-    /// `.task`, listings → `.item`. Rows without resolvable coordinates are
-    /// dropped (privacy-redacted remote items can't be placed on the map).
+    /// Map live gigs + listings + multi-layer markers into the unified
+    /// entity vocabulary. Gigs → `.task`, listings → `.item`, and
+    /// `/api/posts/map` rows → `.post` / `.spot` / `.home` by
+    /// `layer_type`. Rows without resolvable coordinates are dropped
+    /// (privacy-redacted remote items can't be placed on the map).
     static func project(
         gigs: [GigDTO],
         listings: [ListingDTO],
+        markers: [PostsMapMarkerDTO] = [],
         anchor: UserCoordinate
     ) -> [ExploreEntity] {
         var out: [ExploreEntity] = []
@@ -311,7 +331,105 @@ public final class ExploreMapViewModel {
                 openNow: true
             ))
         }
+        out.append(contentsOf: projectMarkers(markers, anchor: anchor))
         return out
+    }
+
+    /// Fan `/api/posts/map` markers onto the entity vocabulary. Task /
+    /// offer layers are skipped here — the gigs in-bounds route already
+    /// supplies richer task rows, and double-projecting would duplicate
+    /// pins.
+    static func projectMarkers(
+        _ markers: [PostsMapMarkerDTO],
+        anchor: UserCoordinate
+    ) -> [ExploreEntity] {
+        var out: [ExploreEntity] = []
+        out.reserveCapacity(markers.count)
+        for marker in markers {
+            guard let lat = marker.latitude, let lon = marker.longitude else { continue }
+            let miles = distanceMiles(from: anchor, to: (lat, lon))
+            switch marker.layerType {
+            case "post":
+                let replies = marker.commentCount ?? 0
+                out.append(ExploreEntity(
+                    id: marker.id,
+                    kind: .post,
+                    state: .confirmed,
+                    latitude: lat,
+                    longitude: lon,
+                    title: marker.title ?? marker.content ?? "Neighborhood post",
+                    metaLead: postMetaLead(marker),
+                    distanceLabel: distanceLabel(miles),
+                    distanceMiles: miles,
+                    badge: replies > 0
+                        ? ExploreBadge(text: "\(replies) replies", tone: .replies)
+                        : nil,
+                    city: marker.locationName,
+                    sourceId: marker.id,
+                    verified: false,
+                    openNow: true
+                ))
+            case "business":
+                out.append(ExploreEntity(
+                    id: marker.id,
+                    kind: .spot,
+                    state: .confirmed,
+                    latitude: lat,
+                    longitude: lon,
+                    title: marker.businessName ?? "Local business",
+                    metaLead: marker.category ?? "Open",
+                    distanceLabel: distanceLabel(miles),
+                    distanceMiles: miles,
+                    badge: marker.isVerified == true
+                        ? ExploreBadge(text: "Verified", tone: .rating)
+                        : nil,
+                    city: marker.address,
+                    sourceId: marker.id,
+                    verified: marker.isVerified ?? false,
+                    openNow: true
+                ))
+            case "home":
+                let locality = [marker.city, marker.state]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ", ")
+                out.append(ExploreEntity(
+                    id: marker.id,
+                    kind: .home,
+                    state: .confirmed,
+                    latitude: lat,
+                    longitude: lon,
+                    title: marker.address ?? "Home",
+                    metaLead: marker.homeType?.replacingOccurrences(of: "_", with: " ").capitalized ?? "Home",
+                    distanceLabel: distanceLabel(miles),
+                    distanceMiles: miles,
+                    badge: nil,
+                    city: locality.isEmpty ? nil : locality,
+                    stateName: marker.state,
+                    sourceId: marker.id,
+                    verified: false,
+                    openNow: true
+                ))
+            default:
+                continue
+            }
+        }
+        return out
+    }
+
+    /// Post rail-card lead — "Asked 2h ago" style, falling back to the
+    /// post type when the timestamp is unusable.
+    private static func postMetaLead(_ marker: PostsMapMarkerDTO) -> String {
+        let kind = (marker.postType ?? "post").replacingOccurrences(of: "_", with: " ").capitalized
+        guard let createdAt = marker.createdAt else { return kind }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = parser.date(from: createdAt) ?? ISO8601DateFormatter().date(from: createdAt) else {
+            return kind
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return "\(kind) · \(formatter.localizedString(for: date, relativeTo: Date()))"
     }
 
     // MARK: - Coordinate / distance helpers

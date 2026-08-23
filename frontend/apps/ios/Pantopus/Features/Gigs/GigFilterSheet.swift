@@ -88,6 +88,125 @@ public enum GigPostedWithin: String, CaseIterable, Sendable, Hashable, Identifia
     }
 }
 
+/// Distance radius chips — RN `FilterChipBar.DISTANCE_CHIPS`. The wire
+/// value is **meters** on `max_distance`; selecting one also pins
+/// `includeRemote=false` so location-less remote tasks drop out.
+public enum GigDistanceFilter: String, CaseIterable, Sendable, Hashable, Identifiable {
+    case oneMile
+    case threeMiles
+    case fiveMiles
+
+    public var id: String {
+        rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .oneMile: "Under 1 mi"
+        case .threeMiles: "Under 3 mi"
+        case .fiveMiles: "Under 5 mi"
+        }
+    }
+
+    /// `max_distance` query value, in meters. Matches RN's constants
+    /// exactly (1609 / 4828 / 8047).
+    public var meters: Int {
+        switch self {
+        case .oneMile: 1609
+        case .threeMiles: 4828
+        case .fiveMiles: 8047
+        }
+    }
+}
+
+/// Deadline window chips — RN `FilterChipBar.TIME_CHIPS`. Rides the
+/// `deadline` query param the backend narrows on
+/// (`backend/routes/gigs.js:2209`).
+public enum GigDeadlineFilter: String, CaseIterable, Sendable, Hashable, Identifiable {
+    case today
+    case thisWeek
+
+    public var id: String {
+        rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .today: "Today"
+        case .thisWeek: "This week"
+        }
+    }
+
+    public var backendValue: String {
+        switch self {
+        case .today: "today"
+        case .thisWeek: "this_week"
+        }
+    }
+
+    /// Latest acceptable `deadline`, mirroring the backend's cutoff
+    /// arithmetic (`backend/routes/gigs.js:2213-2244`): end of today, or
+    /// end of the upcoming Sunday.
+    public func cutoff(from now: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let startOfToday = calendar.startOfDay(for: now)
+        let dayOffset: Int
+        switch self {
+        case .today:
+            dayOffset = 0
+        case .thisWeek:
+            // JS `getDay()` is 0=Sunday; Foundation's weekday is 1=Sunday.
+            let weekday = calendar.component(.weekday, from: now) - 1
+            dayOffset = 7 - weekday
+        }
+        let dayStart = calendar.date(byAdding: .day, value: dayOffset, to: startOfToday) ?? startOfToday
+        // End of that day (23:59:59.999).
+        return dayStart.addingTimeInterval(86400 - 0.001)
+    }
+}
+
+/// Task-archetype chips — RN `FilterChipBar.ARCHETYPE_CHIPS`. Values
+/// match the backend's `task_archetype` enum
+/// (`backend/routes/gigs.js:508`).
+public enum GigTaskArchetypeFilter: String, CaseIterable, Sendable, Hashable, Identifiable {
+    case quickHelp
+    case deliveryErrand
+    case homeService
+    case proServiceQuote
+    case careTask
+    case eventShift
+    case remoteTask
+
+    public var id: String {
+        rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .quickHelp: "Quick help"
+        case .deliveryErrand: "Delivery"
+        case .homeService: "Home service"
+        case .proServiceQuote: "Pro service"
+        case .careTask: "Care"
+        case .eventShift: "Event"
+        case .remoteTask: "Remote"
+        }
+    }
+
+    public var backendValue: String {
+        switch self {
+        case .quickHelp: "quick_help"
+        case .deliveryErrand: "delivery_errand"
+        case .homeService: "home_service"
+        case .proServiceQuote: "pro_service_quote"
+        case .careTask: "care_task"
+        case .eventShift: "event_shift"
+        case .remoteTask: "remote_task"
+        }
+    }
+}
+
 // MARK: - Criteria
 
 /// The applied Gig filter selection. The default value is the
@@ -106,6 +225,12 @@ public struct GigFilterCriteria: Sendable, Hashable {
     /// When `true`, keep only gigs still accepting bids (unassigned).
     public var openToBids: Bool
     public var postedWithin: GigPostedWithin
+    /// Distance radius chip (`max_distance` + `includeRemote=false`).
+    public var distance: GigDistanceFilter?
+    /// Deadline window chip (`deadline`).
+    public var deadline: GigDeadlineFilter?
+    /// Task-archetype chip (`task_archetype`).
+    public var archetype: GigTaskArchetypeFilter?
 
     /// Budget slider domain. `budgetMax` doubles as the "$500+" ceiling.
     public static let budgetMin: Double = 0
@@ -121,7 +246,10 @@ public struct GigFilterCriteria: Sendable, Hashable {
         budgetUpper: Double = GigFilterCriteria.budgetMax,
         schedules: Set<GigScheduleFilter> = [],
         openToBids: Bool = false,
-        postedWithin: GigPostedWithin = .anytime
+        postedWithin: GigPostedWithin = .anytime,
+        distance: GigDistanceFilter? = nil,
+        deadline: GigDeadlineFilter? = nil,
+        archetype: GigTaskArchetypeFilter? = nil
     ) {
         self.categories = categories
         self.budgetLower = budgetLower
@@ -129,6 +257,9 @@ public struct GigFilterCriteria: Sendable, Hashable {
         self.schedules = schedules
         self.openToBids = openToBids
         self.postedWithin = postedWithin
+        self.distance = distance
+        self.deadline = deadline
+        self.archetype = archetype
     }
 
     /// Concrete categories the chip group offers (`all` is a sentinel
@@ -147,6 +278,9 @@ public struct GigFilterCriteria: Sendable, Hashable {
         if !schedules.isEmpty { count += 1 }
         if openToBids { count += 1 }
         if postedWithin != .anytime { count += 1 }
+        if distance != nil { count += 1 }
+        if deadline != nil { count += 1 }
+        if archetype != nil { count += 1 }
         return count
     }
 
@@ -198,6 +332,30 @@ public struct GigFilterCriteria: Sendable, Hashable {
                     options: GigPostedWithin.allCases.map { FilterOption(id: $0.rawValue, label: $0.label) },
                     selectedId: postedWithin.rawValue
                 )
+            ),
+            FilterSection(
+                id: "distance",
+                title: "Distance",
+                control: .chipGroup(
+                    options: GigDistanceFilter.allCases.map { FilterOption(id: $0.rawValue, label: $0.label) },
+                    selectedIds: distance.map { [$0.rawValue] } ?? []
+                )
+            ),
+            FilterSection(
+                id: "deadline",
+                title: "Due by",
+                control: .chipGroup(
+                    options: GigDeadlineFilter.allCases.map { FilterOption(id: $0.rawValue, label: $0.label) },
+                    selectedIds: deadline.map { [$0.rawValue] } ?? []
+                )
+            ),
+            FilterSection(
+                id: "archetype",
+                title: "Task type",
+                control: .chipGroup(
+                    options: GigTaskArchetypeFilter.allCases.map { FilterOption(id: $0.rawValue, label: $0.label) },
+                    selectedIds: archetype.map { [$0.rawValue] } ?? []
+                )
             )
         ]
     }
@@ -219,6 +377,15 @@ public struct GigFilterCriteria: Sendable, Hashable {
                 openToBids = ids.contains(Self.openToBidsOptionID)
             case let ("postedWithin", .radio(_, selectedId)):
                 postedWithin = selectedId.flatMap(GigPostedWithin.init(rawValue:)) ?? .anytime
+            case let ("distance", .chipGroup(_, ids)):
+                // Single-valued dimensions: the backend takes one
+                // `max_distance` / `deadline` / `task_archetype`, so the
+                // last chip the user turned on wins.
+                distance = ids.compactMap(GigDistanceFilter.init(rawValue:)).first
+            case let ("deadline", .chipGroup(_, ids)):
+                deadline = ids.compactMap(GigDeadlineFilter.init(rawValue:)).first
+            case let ("archetype", .chipGroup(_, ids)):
+                archetype = ids.compactMap(GigTaskArchetypeFilter.init(rawValue:)).first
             default:
                 break
             }
@@ -241,6 +408,31 @@ public struct GigFilterCriteria: Sendable, Hashable {
     /// `pay_type=offers` — the backend models "open to bids" as a pay type.
     public var serverPayType: String? {
         openToBids ? "offers" : nil
+    }
+
+    /// `max_distance` query value (meters). Route
+    /// `backend/routes/gigs.js:2112`.
+    public var serverMaxDistanceMeters: Int? {
+        distance?.meters
+    }
+
+    /// `includeRemote` query value. RN pins it to `false` while a
+    /// distance chip is on so location-less remote tasks drop out
+    /// (`app/(tabs)/gigs.tsx:88`); otherwise the param is omitted.
+    public var serverIncludeRemote: Bool? {
+        distance == nil ? nil : false
+    }
+
+    /// `deadline` query value ("today" | "this_week"). Route
+    /// `backend/routes/gigs.js:2209`.
+    public var serverDeadline: String? {
+        deadline?.backendValue
+    }
+
+    /// `task_archetype` query value. Route
+    /// `backend/routes/gigs.js:2205`.
+    public var serverTaskArchetype: String? {
+        archetype?.backendValue
     }
 
     /// `schedule_type` query param. The backend takes a single value, so
@@ -277,14 +469,37 @@ public struct GigFilterCriteria: Sendable, Hashable {
     /// Full gig predicate across every dimension. Used by surfaces that
     /// filter purely client-side (e.g. the Nearby map pins).
     public func matches(_ gig: GigDTO, now: Date = Date()) -> Bool {
-        matches(
+        guard matches(
             category: GigsCategory.from(backendKey: gig.category),
             price: gig.price,
             scheduleType: gig.scheduleType,
             acceptedBy: gig.acceptedBy,
             createdAt: gig.createdAt,
             now: now
-        )
+        ) else { return false }
+        return matchesFeedChips(gig, now: now)
+    }
+
+    /// The three RN chip-bar dimensions applied locally, for surfaces
+    /// that filter an already-fetched list (Tasks map pins). The Gigs
+    /// feed sends them as query params instead.
+    public func matchesFeedChips(_ gig: GigDTO, now: Date = Date()) -> Bool {
+        if let distance {
+            guard let miles = gig.distanceMiles else { return false }
+            guard miles * 1609.344 <= Double(distance.meters) else { return false }
+        }
+        if let deadline {
+            guard let due = Self.parseDate(gig.deadline) else {
+                // RN keeps urgent tasks in the "Today" bucket even when
+                // they carry no explicit deadline (`gigs.js:2250`).
+                return deadline == .today && gig.isUrgent == true
+            }
+            guard due <= deadline.cutoff(from: now) else { return false }
+        }
+        if let archetype {
+            guard gig.taskArchetype == archetype.backendValue else { return false }
+        }
+        return true
     }
 
     /// Primitive-field overload for surfaces that project away the DTO

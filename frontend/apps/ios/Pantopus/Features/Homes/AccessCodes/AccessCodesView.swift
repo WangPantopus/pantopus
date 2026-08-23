@@ -21,6 +21,7 @@ struct AccessCodesView: View {
     var body: some View {
         ListOfRowsView(dataSource: viewModel)
             .accessibilityIdentifier(AccessCodesA11y.screen)
+            .sensitiveScreen()
             .overlay(alignment: .bottom) {
                 if let message = viewModel.toastMessage {
                     AccessCodesToast(message: message)

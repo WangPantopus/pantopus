@@ -70,6 +70,9 @@ class YouViewModel
 @Composable
 fun YouScreen(
     viewModel: YouViewModel = hiltViewModel(),
+    /** True when opened from the `monthly_receipt` push (`?tab=receipt`) —
+     *  the Monthly Receipt card renders expanded. */
+    expandMonthlyReceipt: Boolean = false,
     onOpenPublicProfile: (String) -> Unit = {},
     onOpenPulsePost: (String) -> Unit = {},
     onInviteOwner: (String, String) -> Unit = { _, _ -> },
@@ -126,6 +129,7 @@ fun YouScreen(
     var debugInviteToken by remember { mutableStateOf("") }
 
     MeView(
+        expandMonthlyReceipt = expandMonthlyReceipt,
         onAction = { tile ->
             when (tile.routeKey) {
                 "me.mail" -> onOpenMailbox()

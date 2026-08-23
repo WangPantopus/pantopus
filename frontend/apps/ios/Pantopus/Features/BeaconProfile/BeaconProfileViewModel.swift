@@ -23,7 +23,7 @@ import Foundation
 import Logging
 import Observation
 
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 
 /// Which Beacon, and from whose vantage point.
 public enum BeaconProfileMode: Sendable, Equatable, Hashable {
@@ -166,10 +166,16 @@ public final class BeaconProfileViewModel {
 
     /// Drives the visitor follow handshake sheet.
     public var showFollowHandshake: Bool = false
+    /// Pre-selects a paid tier when unlocking a locked broadcast.
+    public var handshakePreselectedTierRank: Int?
 
     private let mode: BeaconProfileMode
     private let client: APIClient
     private let logger = Logger(label: "app.pantopus.ios.BeaconProfile")
+    /// Broadcast ids already reported as read this session, so a pull-to-
+    /// refresh doesn't double-count. RN keeps the same `Set` in a ref
+    /// (`src/app/persona/[personaHandle]/index.tsx:61`).
+    private var markedBroadcastIds: Set<String> = []
 
     init(mode: BeaconProfileMode, client: APIClient = .shared) {
         self.mode = mode
@@ -215,6 +221,7 @@ public final class BeaconProfileViewModel {
             let tiers = await loadTiers(handle: loadedHandle)
 
             state = .loaded(build(persona: persona, channel: envelope.channel, posts: posts, tiers: tiers))
+            markBroadcastsRead(posts, viewer: persona.viewer)
         } catch let error as APIError {
             logger.warning("Beacon load failed: \(error)")
             state = .error(message: friendlyMessage(for: error))
@@ -268,6 +275,44 @@ public final class BeaconProfileViewModel {
         }
     }
 
+    // MARK: - Read receipts
+
+    /// Report every broadcast the viewer just saw as read. Fire-and-forget:
+    /// the increment feeds the creator's read-count analytics, so a failure
+    /// must never surface to the fan. The owner's own views are skipped
+    /// (the backend ignores them anyway) and a locked / tier-gated row is
+    /// skipped because the viewer never actually read it.
+    ///
+    /// Mirrors RN `markBroadcastPostsRead`
+    /// (`src/app/persona/[personaHandle]/index.tsx:63-72`).
+    private func markBroadcastsRead(_ posts: [BeaconPostDTO], viewer: BeaconViewerDTO?) {
+        guard !isOwner, !(viewer?.isOwner ?? false) else { return }
+        let eligible = posts.filter { post in
+            guard let channelId = post.broadcastChannelId, !channelId.isEmpty else { return false }
+            guard post.locked != true else { return false }
+            return !markedBroadcastIds.contains(post.id)
+        }
+        guard !eligible.isEmpty else { return }
+        for post in eligible {
+            markedBroadcastIds.insert(post.id)
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            for post in eligible {
+                do {
+                    _ = try await client.request(
+                        BroadcastReadEndpoints.markRead(messageId: post.id),
+                        as: EmptyResponse.self
+                    )
+                } catch {
+                    // Let a later visit retry this one.
+                    markedBroadcastIds.remove(post.id)
+                    logger.debug("Broadcast read receipt failed for \(post.id): \(error)")
+                }
+            }
+        }
+    }
+
     // MARK: - Actions
 
     /// Visitor Follow. Tier-1 (free) follows route through the privacy
@@ -275,7 +320,20 @@ public final class BeaconProfileViewModel {
     /// Owner mode and already-following are no-ops.
     public func follow() {
         guard !isOwner, !followBusy, followStatus == .none else { return }
+        handshakePreselectedTierRank = nil
         showFollowHandshake = true
+    }
+
+    /// Visitor unlock on a tier-gated broadcast — opens the privacy
+    /// handshake with the post's target tier pre-selected.
+    public func unlockBroadcast(tierRank: Int?) {
+        guard !isOwner else { return }
+        handshakePreselectedTierRank = tierRank
+        showFollowHandshake = true
+    }
+
+    public func clearHandshakeTier() {
+        handshakePreselectedTierRank = nil
     }
 
     public func unfollow() async {
@@ -402,6 +460,7 @@ public final class BeaconProfileViewModel {
             replies: post.replies ?? 0,
             visibility: visibility(post.visibility, rank: post.targetTierRank),
             isLocked: !isOwner && (post.locked ?? false),
+            targetTierRank: post.targetTierRank,
             intent: nil
         )
     }

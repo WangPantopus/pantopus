@@ -68,6 +68,67 @@ public struct WaitingRoomInlineAction: Sendable, Hashable, Identifiable {
     }
 }
 
+/// Non-content frame the room falls back to when there is nothing real to
+/// show: the claims fetch failed, no claim exists for this home, or the claim
+/// is no longer in review. Mirrors Android `WaitingRoomNotice`.
+public struct WaitingRoomNotice: Sendable, Hashable {
+    public let headline: String
+    public let body: String
+    public let ctaLabel: String
+    /// `true` → the CTA retries the fetch; `false` → it leaves the room.
+    public let isRetry: Bool
+
+    public init(headline: String, body: String, ctaLabel: String, isRetry: Bool) {
+        self.headline = headline
+        self.body = body
+        self.ctaLabel = ctaLabel
+        self.isRetry = isRetry
+    }
+
+    /// `GET /api/homes/my-ownership-claims` failed — never fall back to the
+    /// seeded fixture, which would read as real claim data.
+    public static let loadFailed = WaitingRoomNotice(
+        headline: "Couldn't load your claim",
+        body: "We couldn't reach Pantopus. Check your connection and try again.",
+        ctaLabel: "Try again",
+        isRetry: true
+    )
+
+    /// No claim row for this home — the manage actions would be no-ops.
+    public static let noClaim = WaitingRoomNotice(
+        headline: "No claim in review",
+        body: "We couldn't find an ownership claim for this home.",
+        ctaLabel: "Back to home",
+        isRetry: false
+    )
+
+    /// The claim exists but the backend already returned a terminal status
+    /// (`approved` / `rejected` / `revoked`).
+    public static let claimDecided = WaitingRoomNotice(
+        headline: "This claim isn't in review",
+        body: "Your ownership claim has been decided. Check My Claims for the outcome.",
+        ctaLabel: "Back to home",
+        isRetry: false
+    )
+}
+
+/// Which frame the room is currently rendering. Mirrors Android
+/// `WaitingRoomPhase`.
+public enum WaitingRoomPhase: Sendable, Hashable {
+    case loading
+    case loaded
+    case notice(WaitingRoomNotice)
+    /// No ownership claim is in review but the caller's occupancy still
+    /// isn't verified — render RN's Verification Center frame instead of
+    /// the dead-end "No claim in review" notice
+    /// (`src/app/homes/[id]/waiting-room.tsx:67-70`).
+    case verification(HomeVerificationContent)
+    /// The claim resolved in the claimant's favour — render the A18.2
+    /// "You're the owner" frame instead of a dead-end notice. The payload is
+    /// built from the real claim row, so every date it prints is API-sourced.
+    case approved(StatusWaitingContent)
+}
+
 /// Snapshot the `WaitingRoomView` renders. Reuses the shared `StatusHalo`,
 /// `StatusWaitingPill`, `StatusTimelineStage`, and `StatusCTA` primitives so
 /// the halo / timeline / pill / dock stay identical to A18.2/A18.3.
@@ -158,15 +219,18 @@ public extension WaitingRoomContent {
     /// Active wait — `Under review`, info-toned pulsing halo, the Submitted →
     /// Under review → Approved timeline with "Under review" current, and the
     /// "within 24–48 hours" ETA pill.
-    static func active() -> WaitingRoomContent {
+    static func active(
+        address: String = sampleAddress,
+        claimRef: String = sampleClaimRef
+    ) -> WaitingRoomContent {
         WaitingRoomContent(
             title: roomTitle,
             halo: StatusHalo(tone: .info, icon: .hourglass, isPulsing: true),
             headline: "Under review",
             subcopy: "Pantopus is checking your documents against county records. " +
                 "You'll get a push the moment we decide.",
-            address: sampleAddress,
-            claimRef: sampleClaimRef,
+            address: address,
+            claimRef: claimRef,
             reviewerNote: nil,
             timeline: [
                 StatusTimelineStage(id: "submitted", label: "Submitted", sub: "Oct 24", state: .done),
@@ -199,15 +263,18 @@ public extension WaitingRoomContent {
     /// warning halo, a reviewer-note card, the timeline paused on "Under
     /// review" (current node shows `alert-circle`), the "Paused · respond
     /// within 7 days" ETA pill, and "Update evidence" promoted to primary.
-    static func moreInfoRequested() -> WaitingRoomContent {
+    static func moreInfoRequested(
+        address: String = sampleAddress,
+        claimRef: String = sampleClaimRef
+    ) -> WaitingRoomContent {
         WaitingRoomContent(
             title: roomTitle,
             halo: StatusHalo(tone: .warning, icon: .fileWarning),
             headline: "We need one more thing",
             subcopy: "Your utility bill is older than 90 days. " +
                 "Upload one from the last 60 days to continue the review.",
-            address: sampleAddress,
-            claimRef: sampleClaimRef,
+            address: address,
+            claimRef: claimRef,
             reviewerNote: WaitingRoomReviewerNote(
                 eyebrow: "Note from reviewer · Maya K.",
                 body: "\u{201C}The PG&E bill you uploaded is dated July 14. Please upload one from " +

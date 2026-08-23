@@ -2,16 +2,21 @@
 //  MailTranslationViewModel.swift
 //  Pantopus
 //
-//  A17.13 — Translation view-model. Drives the four DoD states off the
-//  sample letter, owns the machine → confirmed transition (optimistic,
-//  rolls back on failure), the `ViewToggle` selection, and the stubbed
-//  "Listen" affordance.
+//  A17.13 — Translation view-model. Fetches a real machine translation
+//  and drives the four DoD states off it, owns the machine → confirmed
+//  transition (optimistic, rolls back on failure), the `ViewToggle`
+//  selection, and the read-aloud affordance.
 //
-//  Translation/TTS are sample-driven (B2.3 out-of-scope) — the confirm
-//  call hits the real `MailboxEndpoints.translate` helper so the wiring
-//  exists, but a failure simply rolls the optimistic flip back.
+//  `load()` reads both halves of the screen:
+//   · `GET /api/mailbox/:id`              — the original letter + sender
+//   · `POST /api/mailbox/v2/p3/translate` — the translated text, the
+//     detected source language, the target, and whether it was cached
+//
+//  A failure on either leg lands in `.error(message:)`, which the view
+//  renders with a Retry wired to `refresh()`.
 //
 
+import AVFoundation
 import Foundation
 import Observation
 
@@ -27,27 +32,56 @@ public final class MailTranslationViewModel {
     private let mailId: String
     private let api: APIClient
     private let seedConfirmed: Bool
+    private let now: @Sendable () -> Date
+    /// Retained for the lifetime of the screen — a synthesizer created as a
+    /// local temporary deallocates the moment `listen` returns, which cancels
+    /// (or never starts) playback.
+    private let synthesizer = AVSpeechSynthesizer()
 
     init(
         mailId: String,
         api: APIClient = .shared,
-        seedConfirmed: Bool = false
+        seedConfirmed: Bool = false,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.mailId = mailId
         self.api = api
         self.seedConfirmed = seedConfirmed
+        self.now = now
     }
 
-    /// Load the (sample) translation. Real MT lands behind this seam later;
-    /// today the projection is deterministic so previews + snapshots are
-    /// stable. Still routed through a `do/catch` so the error state is real.
+    /// Fetch the mail item and its machine translation, then project them
+    /// into the screen content. Both legs are awaited — the side-by-side
+    /// view needs the original as much as the translation — so either
+    /// failing lands in `.error(message:)` with a Retry.
     public func load() async {
         state = .loading
-        let content = seedConfirmed
-            ? MailTranslationSampleData.confirmedLetter(mailId: mailId)
-            : MailTranslationSampleData.letter(mailId: mailId)
-        if Task.isCancelled { return }
-        state = .loaded(content)
+        do {
+            let detail: MailDetailResponse = try await api.request(
+                MailboxEndpoints.detail(mailId: mailId)
+            )
+            let translation: TranslationResultDTO = try await api.request(
+                MailboxV2Endpoints.translate(mailId: mailId)
+            )
+            if Task.isCancelled { return }
+            var content = MailTranslationProjection.project(
+                mailId: mailId,
+                detail: detail.mail,
+                translation: translation,
+                now: now()
+            )
+            if seedConfirmed {
+                content.confirmed = true
+                content.viewMode = .translated
+            }
+            state = .loaded(content)
+        } catch {
+            if Task.isCancelled { return }
+            state = .error(
+                message: (error as? APIError)?.errorDescription
+                    ?? "We couldn't translate this letter. Check your connection and try again."
+            )
+        }
     }
 
     public func refresh() async {
@@ -71,6 +105,7 @@ public final class MailTranslationViewModel {
         let previous = content
         content.confirmed = true
         content.viewMode = .translated
+        content.confirmedStamp = MailTranslationProjection.confirmedStamp(now: now())
         state = .loaded(content)
         do {
             // The translate endpoint doubles as the "confirm/trust" write
@@ -87,15 +122,51 @@ public final class MailTranslationViewModel {
         }
     }
 
-    /// Stubbed text-to-speech affordance. Real audio is out of scope (B2.3);
-    /// this surfaces a toast so the control is never a dead tap.
+    /// Read the selected column aloud via `AVSpeechSynthesizer`.
     public func listen(_ which: TranslationListenColumn) {
+        guard case let .loaded(content) = state else { return }
+        let text: String
+        let languageCode: String
+        switch which {
+        case .original:
+            text = content.paragraphs.map(\.original).joined(separator: "\n")
+            languageCode = content.languages.sourceCode
+        case .translated:
+            text = content.paragraphs.map(\.english).joined(separator: "\n")
+            languageCode = content.languages.targetCode
+        }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            toast = "Nothing to read aloud yet."
+            return
+        }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            toast = "Couldn't play audio on this device."
+            return
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = Self.voice(forLanguageCode: languageCode)
+        // Replace whatever is already playing rather than queueing behind it.
+        synthesizer.stopSpeaking(at: .immediate)
+        synthesizer.speak(utterance)
         switch which {
         case .original:
             toast = "Playing the original aloud…"
         case .translated:
             toast = "Playing the translation aloud…"
         }
+    }
+
+    /// Resolve the voice for the column's language, falling back to en-US when
+    /// the device carries no voice for it. Mirrors the Android locale lookup.
+    private static func voice(forLanguageCode code: String) -> AVSpeechSynthesisVoice? {
+        let normalized = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return AVSpeechSynthesisVoice(language: "en-US") }
+        return AVSpeechSynthesisVoice(language: normalized)
+            ?? AVSpeechSynthesisVoice(language: "en-US")
     }
 }
 

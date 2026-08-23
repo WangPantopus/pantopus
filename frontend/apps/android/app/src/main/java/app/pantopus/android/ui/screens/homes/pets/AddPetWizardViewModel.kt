@@ -39,7 +39,7 @@ enum class AddPetStep(
     Details(
         number = 3,
         title = "Anything else?",
-        subcopy = "Notes show in the row preview so sitters see the most important info first.",
+        subcopy = "Vet contact and notes show on the row so sitters see the most important info first.",
     ),
     ;
 
@@ -48,14 +48,27 @@ enum class AddPetStep(
     }
 }
 
-/** Form snapshot held by the VM. */
+/**
+ * Form snapshot held by the VM. The vet pair mirrors RN's "Vet name /
+ * phone" field (`src/app/homes/[id]/pets.tsx:108`) split across the two
+ * columns the backend stores (`vet_name` / `vet_phone`,
+ * `createPetSchema` at `backend/routes/home.js:6978-6979`).
+ */
 data class AddPetForm(
     val species: PetSpecies = PetSpecies.Dog,
     val name: String = "",
     val breed: String = "",
     val photoUrl: String = "",
+    val vetName: String = "",
+    val vetPhone: String = "",
     val notes: String = "",
 )
+
+/** `createPetSchema`'s `vet_name: Joi.string().max(200)`. */
+private const val VET_NAME_MAX_LENGTH = 200
+
+/** `createPetSchema`'s `vet_phone: Joi.string().max(30)`. */
+private const val VET_PHONE_MAX_LENGTH = 30
 
 /**
  * Combined state the screen observes. Carries the active step, form
@@ -126,6 +139,18 @@ class AddPetWizardViewModel(
 
     fun setPhotoUrl(value: String) {
         _state.update { it.copy(form = it.form.copy(photoUrl = value), errorMessage = null) }
+    }
+
+    fun setVetName(value: String) {
+        _state.update {
+            it.copy(form = it.form.copy(vetName = value.take(VET_NAME_MAX_LENGTH)), errorMessage = null)
+        }
+    }
+
+    fun setVetPhone(value: String) {
+        _state.update {
+            it.copy(form = it.form.copy(vetPhone = value.take(VET_PHONE_MAX_LENGTH)), errorMessage = null)
+        }
     }
 
     fun setNotes(value: String) {
@@ -201,6 +226,8 @@ class AddPetWizardViewModel(
             val trimmedName = form.name.trim()
             val trimmedBreed = form.breed.trim().ifEmpty { null }
             val trimmedPhoto = form.photoUrl.trim().ifEmpty { null }
+            val trimmedVetName = form.vetName.trim().ifEmpty { null }
+            val trimmedVetPhone = form.vetPhone.trim().ifEmpty { null }
             val trimmedNotes = form.notes.trim().ifEmpty { null }
             val result =
                 if (existing != null) {
@@ -212,6 +239,8 @@ class AddPetWizardViewModel(
                                 name = trimmedName,
                                 species = form.species.wire,
                                 breed = trimmedBreed,
+                                vetName = trimmedVetName,
+                                vetPhone = trimmedVetPhone,
                                 photoUrl = trimmedPhoto,
                                 notes = trimmedNotes,
                             ),
@@ -224,6 +253,8 @@ class AddPetWizardViewModel(
                                 name = trimmedName,
                                 species = form.species.wire,
                                 breed = trimmedBreed,
+                                vetName = trimmedVetName,
+                                vetPhone = trimmedVetPhone,
                                 photoUrl = trimmedPhoto,
                                 notes = trimmedNotes,
                             ),
@@ -253,6 +284,8 @@ class AddPetWizardViewModel(
                 name = it.name,
                 breed = it.breed.orEmpty(),
                 photoUrl = it.photoUrl.orEmpty(),
+                vetName = it.vetName.orEmpty(),
+                vetPhone = it.vetPhone.orEmpty(),
                 notes = it.notes.orEmpty(),
             )
         } ?: AddPetForm()

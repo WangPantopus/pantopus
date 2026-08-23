@@ -52,6 +52,66 @@ struct WaitingRoomTopBar: View {
     }
 }
 
+// MARK: - Loading skeleton (mirrors the loaded geometry)
+
+struct WaitingRoomLoadingFrame: View {
+    var body: some View {
+        VStack(spacing: Spacing.s5) {
+            Shimmer(width: 96, height: 96, cornerRadius: Radii.pill)
+                .padding(.top, Spacing.s2)
+            Shimmer(width: 200, height: 24, cornerRadius: Radii.sm)
+            Shimmer(width: 260, height: 14, cornerRadius: Radii.sm)
+            Shimmer(width: 240, height: 30, cornerRadius: Radii.pill)
+            Shimmer(height: 140, cornerRadius: Radii.lg)
+            Spacer(minLength: Spacing.s4)
+        }
+        .padding(.horizontal, Spacing.s5)
+        .padding(.vertical, Spacing.s4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityIdentifier("waitingRoomLoading")
+    }
+}
+
+// MARK: - Notice frame (load failure / no claim / decided claim)
+
+struct WaitingRoomNoticeFrame: View {
+    let notice: WaitingRoomNotice
+    let onCta: @MainActor () -> Void
+
+    var body: some View {
+        VStack(spacing: Spacing.s3) {
+            Icon(.alertCircle, size: 32, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+            Text(notice.headline)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("waitingRoomNoticeHeadline")
+            Text(notice.body)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 290)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("waitingRoomNoticeBody")
+            Button(action: onCta) {
+                Text(notice.ctaLabel)
+                    .font(.system(size: 14.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appTextInverse)
+                    .frame(maxWidth: 240)
+                    .frame(height: 50)
+                    .background(Theme.Color.primary600)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("waitingRoomNoticeCta")
+        }
+        .padding(.horizontal, Spacing.s5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("waitingRoomNotice")
+    }
+}
+
 // MARK: - Address row (home pin + mono claim ref)
 
 struct WaitingRoomAddressRow: View {

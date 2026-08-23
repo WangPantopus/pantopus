@@ -147,6 +147,85 @@ public struct VaultMailItemDTO: Decodable, Sendable, Hashable, Identifiable {
     }
 }
 
+/// `GET /api/mailbox/v2/p2/vault/search` envelope — route
+/// `backend/routes/mailboxV2Phase2.js:1145`. `{ results, total, query }`;
+/// each result is a `Mail` row decorated with the matched field and a
+/// short excerpt around the hit.
+public struct VaultSearchResponse: Decodable, Sendable, Hashable {
+    public let results: [VaultSearchResultDTO]
+    public let total: Int?
+    public let query: String?
+
+    public init(results: [VaultSearchResultDTO], total: Int?, query: String?) {
+        self.results = results
+        self.total = total
+        self.query = query
+    }
+}
+
+/// One server-side vault search hit. A thin slice of the `Mail` row plus
+/// the handler's `_matchField` / `_matchExcerpt` decorations
+/// (`backend/routes/mailboxV2Phase2.js:1196`).
+public struct VaultSearchResultDTO: Decodable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let drawer: String?
+    public let mailType: String?
+    public let type: String?
+    public let subject: String?
+    public let previewText: String?
+    public let senderDisplay: String?
+    public let senderBusinessName: String?
+    public let createdAt: String?
+    public let vaultFolderId: String?
+    /// `sender` / `subject` / `content` — which column produced the hit.
+    public let matchField: String?
+    /// ±30 characters of context around the hit.
+    public let matchExcerpt: String?
+
+    public init(
+        id: String,
+        drawer: String?,
+        mailType: String?,
+        type: String?,
+        subject: String?,
+        previewText: String?,
+        senderDisplay: String?,
+        senderBusinessName: String?,
+        createdAt: String?,
+        vaultFolderId: String?,
+        matchField: String?,
+        matchExcerpt: String?
+    ) {
+        self.id = id
+        self.drawer = drawer
+        self.mailType = mailType
+        self.type = type
+        self.subject = subject
+        self.previewText = previewText
+        self.senderDisplay = senderDisplay
+        self.senderBusinessName = senderBusinessName
+        self.createdAt = createdAt
+        self.vaultFolderId = vaultFolderId
+        self.matchField = matchField
+        self.matchExcerpt = matchExcerpt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case drawer
+        case mailType = "mail_type"
+        case type
+        case subject
+        case previewText = "preview_text"
+        case senderDisplay = "sender_display"
+        case senderBusinessName = "sender_business_name"
+        case createdAt = "created_at"
+        case vaultFolderId = "vault_folder_id"
+        case matchField = "_matchField"
+        case matchExcerpt = "_matchExcerpt"
+    }
+}
+
 /// `POST /api/mailbox/v2/p2/vault/file` envelope —
 /// `{ message, folderId }`.
 public struct FileToVaultResponse: Decodable, Sendable, Hashable {

@@ -26,13 +26,19 @@ public struct PulseComposeView: View {
     private let onCancel: @MainActor () -> Void
     private let managesDismiss: Bool
 
+    /// - Parameter businessAuthorId: C2 — when non-nil the submit posts to
+    ///   `POST /api/businesses/:businessId/posts` so the row is authored by
+    ///   the business. Used by the Business owner dashboard's compose FAB.
     public init(
         intent: PulseComposeIntent = .ask,
         identity: PulseComposeIdentity = .personal,
         postingTarget: PulsePostingTarget? = nil,
         composePurpose: PulseComposePurpose? = nil,
         postId: String? = nil,
+        businessAuthorId: String? = nil,
         managesDismiss: Bool = true,
+        taskShare: PulseTaskShare? = nil,
+        prefillBody: String? = nil,
         onCancel: @escaping @MainActor () -> Void = {},
         onPosted: @escaping @MainActor (String?) -> Void = { _ in }
     ) {
@@ -41,7 +47,10 @@ public struct PulseComposeView: View {
             identity: identity,
             postingTarget: postingTarget,
             composePurpose: composePurpose,
-            postId: postId
+            postId: postId,
+            businessAuthorId: businessAuthorId,
+            taskShare: taskShare,
+            prefillBody: prefillBody
         ))
         self.managesDismiss = managesDismiss
         self.onCancel = onCancel
@@ -167,7 +176,9 @@ public struct PulseComposeView: View {
             onSelectDealExpires: { viewModel.dealExpiresAt = $0 },
             onUpdateField: { viewModel.update($0, to: $1) },
             onPickPhotos: { showsPhotosPicker = true },
-            onRemovePhoto: { viewModel.remove(photo: $0) }
+            onRemovePhoto: { viewModel.remove(photo: $0) },
+            onBodyEditingEnded: { Task { await viewModel.runPrecheck() } },
+            onDismissPrecheckNudge: { viewModel.precheckNudge = nil }
         )
     }
 
@@ -205,6 +216,9 @@ public extension PulseComposeViewModel {
             recommendRating: recommendRating,
             dealExpiresAt: dealExpiresAt,
             eligibilityWarning: eligibilityWarning,
+            precheckNudge: precheckNudge,
+            precheckCooldown: precheckCooldown,
+            isVisitorPost: isVisitorPost,
             fields: fields,
             photos: photos,
             isIntentLocked: isIntentLocked,

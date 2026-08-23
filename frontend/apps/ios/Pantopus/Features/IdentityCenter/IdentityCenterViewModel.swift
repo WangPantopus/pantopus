@@ -140,11 +140,16 @@ public final class IdentityCenterViewModel {
                 subtext: "Download everything we know about your identities."
             )
         ]
+        let setupRemaining = identities.filter {
+            if case .setupNeeded = $0.status { return true }
+            return false
+        }.count
         return IdentityCenterLoaded(
             identities: identities,
             bridges: bridges,
             privacyRows: privacyRows,
-            disclosureRows: disclosureRows
+            disclosureRows: disclosureRows,
+            setupRemainingCount: setupRemaining
         )
     }
 

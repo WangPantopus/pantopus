@@ -29,6 +29,34 @@ data class LoginResponse(
 )
 
 /**
+ * `GET /api/users/oauth/:provider` response. Route:
+ * `backend/routes/users.js:3715`.
+ */
+@JsonClass(generateAdapter = true)
+data class OAuthUrlResponse(
+    val url: String,
+)
+
+/**
+ * `POST /api/users/oauth/callback` request. Route:
+ * `backend/routes/users.js:3862`.
+ */
+@JsonClass(generateAdapter = true)
+data class OAuthCodeExchangeRequest(
+    val code: String,
+)
+
+/**
+ * `POST /api/users/oauth/token` request — legacy fragment-token path.
+ * Route: `backend/routes/users.js:3792`.
+ */
+@JsonClass(generateAdapter = true)
+data class OAuthTokenExchangeRequest(
+    val accessToken: String,
+    val refreshToken: String,
+)
+
+/**
  * `POST /api/users/register` request body. Route:
  * `backend/routes/users.js:1177`.
  *
@@ -158,25 +186,26 @@ data class AuthErrorBody(
 )
 
 /**
- * User payload embedded in [LoginResponse]. Mirrors
- * `sanitizeUserForAuthResponse` at `backend/routes/users.js:1492`.
+ * User payload embedded in [LoginResponse]. Email login returns the full
+ * profile; OAuth callback/token return a thinner subset — defaults keep
+ * Moshi decoding resilient.
  */
 @JsonClass(generateAdapter = true)
 data class AuthenticatedUser(
     val id: String,
     val email: String,
-    val username: String,
-    val name: String,
-    val firstName: String,
-    val middleName: String?,
-    val lastName: String,
-    val phoneNumber: String?,
-    val address: String?,
-    val city: String?,
-    val state: String?,
-    val zipcode: String?,
-    val accountType: String,
-    val role: String,
-    val verified: Boolean,
-    val createdAt: String,
+    val username: String = "",
+    val name: String = "",
+    val firstName: String = "",
+    val middleName: String? = null,
+    val lastName: String = "",
+    val phoneNumber: String? = null,
+    val address: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val zipcode: String? = null,
+    val accountType: String = "individual",
+    val role: String = "user",
+    val verified: Boolean = false,
+    val createdAt: String = "",
 )

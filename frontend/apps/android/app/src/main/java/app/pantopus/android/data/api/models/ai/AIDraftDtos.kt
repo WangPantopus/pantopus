@@ -50,3 +50,36 @@ data class AIListingVisionResponse(
     val confidence: Double? = null,
     val priceSuggestion: AIPriceSuggestionDto? = null,
 )
+
+/**
+ * Body for `POST /api/ai/draft/post`. `text` is the free-text prompt
+ * (Joi `draftPostSchema` caps it at 2000 chars,
+ * `backend/routes/ai.js:81`); `surface` is `"place"` or `"connections"`
+ * when set. Mirror of iOS `AIDraftPostRequest`.
+ */
+@JsonClass(generateAdapter = true)
+data class AIDraftPostRequest(
+    val text: String,
+    val surface: String? = null,
+)
+
+/**
+ * One AI-drafted post. Mirrors `postDraftJsonSchema`
+ * (`backend/services/ai/schemas.js:99`) — `content` is the only key the
+ * schema marks required.
+ */
+@JsonClass(generateAdapter = true)
+data class AIPostDraftDto(
+    val content: String,
+    val title: String? = null,
+    val postType: String? = null,
+    val purpose: String? = null,
+    val visibility: String? = null,
+    val tags: List<String>? = null,
+)
+
+/** Envelope from `POST /api/ai/draft/post`. */
+@JsonClass(generateAdapter = true)
+data class AIPostDraftResponse(
+    val draft: AIPostDraftDto,
+)

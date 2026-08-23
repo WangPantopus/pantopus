@@ -13,6 +13,7 @@ import app.pantopus.android.data.api.models.posts.PostReactionKind
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
+import app.pantopus.android.data.posts.MatchedBusinessesRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
 import app.pantopus.android.ui.screens.shared.content_detail.headers.PostIntent
@@ -38,6 +39,10 @@ import org.junit.Test
 class PulsePostDetailViewModelTest {
     private val repo: PostsRepository = mockk()
     private val authRepo: AuthRepository = mockk()
+
+    // "Nearby Providers" degrades to a hidden card, so a relaxed mock is
+    // enough — these tests assert post/comment behaviour only.
+    private val matchedBusinessesRepo: MatchedBusinessesRepository = mockk(relaxed = true)
     private val authState = MutableStateFlow<AuthRepository.State>(AuthRepository.State.SignedOut)
 
     @Before fun setUp() {
@@ -55,6 +60,7 @@ class PulsePostDetailViewModelTest {
             repo = repo,
             authRepo = authRepo,
             postsRefresh = PulsePostsRefreshNotifier(),
+            matchedBusinessesRepo = matchedBusinessesRepo,
             savedStateHandle = SavedStateHandle(mapOf(PULSE_POST_DETAIL_ID_KEY to "p1")),
         )
 

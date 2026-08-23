@@ -168,10 +168,18 @@ public struct EditBusinessPageGalleryState: Sendable, Hashable {
     }
 }
 
-/// Address + map state. `error` is non-nil when the address fails
-/// validation (e.g. missing ZIP in the setup frame).
+/// Address + map state. The address travels as its component parts —
+/// `address` is the street line that maps 1:1 onto the backend
+/// `BusinessLocation.address` column, with `city` / `state` / `zip` in
+/// their own columns — so a save never folds the locality back into the
+/// street line. `error` is non-nil when the address fails validation
+/// (e.g. missing ZIP in the setup frame).
 public struct EditBusinessPageLocation: Sendable, Hashable {
+    /// Street line only — never the concatenated display address.
     public let address: EditBusinessPageField
+    public let city: EditBusinessPageField
+    public let state: EditBusinessPageField
+    public let zip: EditBusinessPageField
     public let error: String?
     public let mapVerified: Bool
     public let pinDirty: Bool
@@ -179,16 +187,41 @@ public struct EditBusinessPageLocation: Sendable, Hashable {
 
     public init(
         address: EditBusinessPageField,
+        city: EditBusinessPageField = EditBusinessPageField(original: "", current: ""),
+        state: EditBusinessPageField = EditBusinessPageField(original: "", current: ""),
+        zip: EditBusinessPageField = EditBusinessPageField(original: "", current: ""),
         error: String? = nil,
         mapVerified: Bool,
         pinDirty: Bool = false,
         hideExactAddress: Bool
     ) {
         self.address = address
+        self.city = city
+        self.state = state
+        self.zip = zip
         self.error = error
         self.mapVerified = mapVerified
         self.pinDirty = pinDirty
         self.hideExactAddress = hideExactAddress
+    }
+
+    /// `City, ST ZIP` — display-only projection of the locality parts.
+    /// Never written back to the server.
+    public var localityLabel: String {
+        var label = [city.current, state.current]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+        let zipValue = zip.current.trimmingCharacters(in: .whitespaces)
+        if !zipValue.isEmpty {
+            label = label.isEmpty ? zipValue : "\(label) \(zipValue)"
+        }
+        return label
+    }
+
+    /// True when any address component carries an unsaved edit.
+    public var hasAddressEdits: Bool {
+        address.isDirty || city.isDirty || state.isDirty || zip.isDirty
     }
 }
 
@@ -308,5 +341,6 @@ public struct EditBusinessPageContent: Sendable, Hashable {
 public enum EditBusinessPageState: Sendable, Equatable {
     case loading
     case loaded(EditBusinessPageContent)
+    case empty
     case error(message: String)
 }

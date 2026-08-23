@@ -59,8 +59,9 @@ import app.pantopus.android.ui.theme.Spacing
  * iOS `CreatorInboxView`: status banner counts, filter chip strip
  * (All / Unread / Bronze+ / Flagged) with live counts, avatar-first
  * thread rows reusing the chat-list visual language plus a tier chip
- * and flagged indicator. Tap a row to push the existing chat
- * conversation screen via [onOpenThread].
+ * and flagged indicator. Tap a row to push the persona-DM thread
+ * (`PersonaDmThreadScreen`) via [onOpenThread], addressed by thread id —
+ * not generic chat.
  */
 @Composable
 fun CreatorInboxScreen(

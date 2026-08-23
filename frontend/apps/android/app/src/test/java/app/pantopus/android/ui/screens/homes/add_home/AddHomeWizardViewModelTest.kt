@@ -10,8 +10,10 @@ import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
 import app.pantopus.android.data.api.models.homes.NormalizedAddressDto
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homediscovery.HomeDiscoveryRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
 import app.pantopus.android.ui.screens.shared.wizard.WizardLeadingControl
@@ -39,6 +41,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddHomeWizardViewModelTest {
     private val repo: HomesRepository = mockk(relaxed = true)
+    private val discoveryRepo: HomeDiscoveryRepository = mockk(relaxed = true)
     private val networkMonitor: NetworkMonitor =
         mockk<NetworkMonitor>(relaxed = true).also {
             every { it.isOnline } returns MutableStateFlow(true)
@@ -47,6 +50,12 @@ class AddHomeWizardViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // A12.2 — the Confirm step runs the property-suggestions lookup
+        // right after check-address clears. Stub it explicitly: a relaxed
+        // mock would hand back a proxy that is neither `Success` nor
+        // `Failure`, which the sealed `when` can't match.
+        coEvery { repo.propertySuggestions(any()) } returns
+            NetworkResult.Success(PropertySuggestionsResponse())
     }
 
     @After
@@ -55,7 +64,7 @@ class AddHomeWizardViewModelTest {
     }
 
     private fun makeVm(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
-        AddHomeWizardViewModel(repo, savedStateHandle, networkMonitor)
+        AddHomeWizardViewModel(repo, discoveryRepo, savedStateHandle, networkMonitor)
 
     private fun fillAddress(vm: AddHomeWizardViewModel) {
         vm.selectAddressCandidate(AddHomeSampleData.nearbyHomes[0])
@@ -96,18 +105,12 @@ class AddHomeWizardViewModelTest {
 
     private val checkAddressOk =
         CheckAddressResponse(
-            exists = false,
-            homeCount = 0,
-            hasVerifiedMembers = false,
-            verdictStatus = null,
+            status = CheckAddressResponse.STATUS_NOT_FOUND,
         )
 
     private val checkAddressZipMismatch =
         CheckAddressResponse(
-            exists = false,
-            homeCount = 0,
-            hasVerifiedMembers = false,
-            verdictStatus = null,
+            status = CheckAddressResponse.STATUS_NOT_FOUND,
             normalizedAddress =
                 NormalizedAddressDto(
                     street = "412 Elm Street",
@@ -412,7 +415,7 @@ class AddHomeWizardViewModelTest {
                     "addHome.role" to "Tenant",
                 ),
             )
-        val vm = AddHomeWizardViewModel(repo, handle, networkMonitor)
+        val vm = AddHomeWizardViewModel(repo, discoveryRepo, handle, networkMonitor)
         assertEquals(AddHomeStep.Role, vm.state.value.form.currentStep)
         assertEquals("412 Elm St", vm.state.value.form.address.street)
         assertEquals(AddHomeRole.Tenant, vm.state.value.form.role)

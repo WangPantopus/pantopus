@@ -10,13 +10,19 @@
 //  `content:` / `slaMissed:` seeds (previews + snapshot baselines), never on
 //  the live path.
 //
-//  Mutations: the single-tap Cancel posts to
-//  `/api/personas/:id/membership/cancel` (no charge — free memberships
-//  cancel immediately, paid memberships flip `cancel_at_period_end`).
-//  Upgrade / downgrade / change-tier / refund stay host callbacks — those
-//  are paid actions deferred to Phase 3. The `slaMissed` refund banner is a
-//  preview-only frame (the backend membership read carries no SLA flag).
+//  Mutations, all real round-trips:
+//    * Cancel   → `POST .../membership/cancel`   (`personaMembership.js:204`)
+//    * Upgrade  → `POST .../membership/upgrade`  (`personaMembership.js:121`)
+//                 — takes effect immediately.
+//    * Downgrade→ `POST .../membership/downgrade`(`personaMembership.js:162`)
+//                 — scheduled at `current_period_end`.
+//    * Refund   → `POST .../membership/refund-request`
+//                 (`personaMembership.js:251`) with `reason: sla_missed`.
+//  The tier ladder for the picker comes from
+//  `GET /api/personas/:handle/tiers` (`personas.js:1111`).
 //
+
+// swiftlint:disable type_body_length
 
 import Foundation
 import Observation
@@ -26,14 +32,32 @@ import Observation
 public final class MembershipDetailViewModel {
     public private(set) var state: MembershipDetailState = .loading
 
-    /// Transient error surfaced inline when a Cancel round-trip fails.
+    /// Transient error surfaced inline when a mutation round-trip fails.
     public var actionError: String?
     public private(set) var isCancelling = false
+
+    /// Change-tier picker. `tierOptions` excludes the current rank; empty
+    /// while the ladder is still loading or when the persona publishes a
+    /// single tier.
+    public var isTierPickerPresented = false
+    public private(set) var tierOptions: [MembershipTierOption] = []
+    public private(set) var isChangingTier = false
+    /// Success copy after a tier change ("Downgrade scheduled — takes
+    /// effect at the end of this period.").
+    public private(set) var tierChangeConfirmation: String?
+
+    /// Refund request sheet.
+    public var isRefundSheetPresented = false
+    public private(set) var isRequestingRefund = false
+    public private(set) var refundConfirmation: String?
+    public var refundError: String?
 
     private let api: APIClient
     private let personaId: String
     private let seededContent: MembershipDetailContent?
     private let startsSLAMissed: Bool
+    private var currentTierRank: Int = 1
+    private var personaHandle: String?
 
     /// - Parameters:
     ///   - personaId: Canonical route payload — the persona (UUID) whose
@@ -78,10 +102,129 @@ public final class MembershipDetailViewModel {
                 state = .error(message: "We couldn't find your membership.")
                 return
             }
-            state = .populated(Self.project(membership))
+            apply(membership)
+            await loadTierLadder()
         } catch {
             let message = (error as? APIError)?.errorDescription ?? "Couldn't load membership."
             state = .error(message: message)
+        }
+    }
+
+    public func refresh() async {
+        await load()
+    }
+
+    /// Settle the freshly-read membership into state + the picker inputs.
+    private func apply(_ membership: PersonaMembershipDTO) {
+        currentTierRank = membership.tier?.rank ?? 1
+        personaHandle = membership.persona?.handle
+        state = .populated(Self.project(membership, personaId: personaId))
+    }
+
+    /// Public tier ladder for the picker. Non-blocking: a failure here
+    /// leaves the picker empty rather than failing the whole screen
+    /// (mirrors RN, which swallows the tier-list error).
+    private func loadTierLadder() async {
+        guard let personaHandle else {
+            tierOptions = []
+            return
+        }
+        do {
+            let response: PersonaPublicTiersResponse = try await api.request(
+                MembershipEndpoints.publicTiers(handle: personaHandle)
+            )
+            tierOptions = Self.tierOptions(response.tiers, currentRank: currentTierRank)
+        } catch {
+            tierOptions = []
+        }
+    }
+
+    // MARK: - Change tier
+
+    public func presentTierPicker() {
+        actionError = nil
+        tierChangeConfirmation = nil
+        isTierPickerPresented = true
+    }
+
+    /// Upgrade (immediate) or downgrade (scheduled at period end),
+    /// selected by comparing the target rank with the current one — the
+    /// backend enforces the same split across two distinct routes.
+    public func changeTier(to option: MembershipTierOption) async {
+        guard !isChangingTier, option.rank != currentTierRank else { return }
+        isChangingTier = true
+        actionError = nil
+        tierChangeConfirmation = nil
+        defer { isChangingTier = false }
+        let endpoint = option.direction == .upgrade
+            ? MembershipEndpoints.upgrade(personaId: personaId, tierRank: option.rank)
+            : MembershipEndpoints.downgrade(personaId: personaId, tierRank: option.rank)
+        do {
+            let response: PersonaMembershipResponse = try await api.request(endpoint)
+            isTierPickerPresented = false
+            tierChangeConfirmation = option.direction == .upgrade
+                ? "Tier upgraded."
+                : "Downgrade scheduled — takes effect at the end of this period."
+            if let membership = response.membership, membership.persona != nil {
+                apply(membership)
+                // Re-derive the ladder so directions flip around the new rank.
+                await loadTierLadder()
+            } else {
+                await load()
+            }
+        } catch {
+            actionError = (error as? APIError)?.errorDescription
+                ?? "Couldn't change tier. Please try again."
+        }
+    }
+
+    // MARK: - Refund request
+
+    public func presentRefundSheet() {
+        refundError = nil
+        refundConfirmation = nil
+        isRefundSheetPresented = true
+    }
+
+    /// SLA-missed refund. The backend re-validates that one of the fan's
+    /// threads is genuinely past its reply window and answers
+    /// `400 no_sla_missed_thread` when it isn't — surfaced verbatim so the
+    /// fan understands why nothing was refunded.
+    public func requestRefund() async {
+        guard !isRequestingRefund else { return }
+        isRequestingRefund = true
+        refundError = nil
+        defer { isRequestingRefund = false }
+        do {
+            let response: PersonaMembershipResponse = try await api.request(
+                MembershipEndpoints.refundRequest(
+                    personaId: personaId,
+                    body: MembershipRefundRequestBody(reason: "sla_missed")
+                )
+            )
+            isRefundSheetPresented = false
+            refundConfirmation =
+                "Refund requested. You'll get a confirmation email shortly."
+            if let membership = response.membership, membership.persona != nil {
+                apply(membership)
+            } else {
+                await load()
+            }
+        } catch {
+            refundError = Self.refundErrorMessage(error)
+        }
+    }
+
+    static func refundErrorMessage(_ error: any Error) -> String {
+        guard let apiError = error as? APIError else { return "Couldn't request a refund." }
+        switch apiError {
+        case let .clientError(status, message):
+            if status == 409 {
+                return "You've already requested a refund for this membership."
+            }
+            return APIError.friendlyClientMessage(message) ?? "Couldn't request a refund."
+        default:
+            return apiError.errorDescription ?? "Couldn't request a refund."
         }
     }
 
@@ -116,7 +259,7 @@ public final class MembershipDetailViewModel {
 
     // MARK: - Projection
 
-    static func project(_ dto: PersonaMembershipDTO) -> MembershipDetailContent {
+    static func project(_ dto: PersonaMembershipDTO, personaId: String = "") -> MembershipDetailContent {
         MembershipDetailContent(
             persona: projectPersona(dto.persona),
             tier: MembershipTier(rank: dto.tier?.rank),
@@ -128,8 +271,43 @@ public final class MembershipDetailViewModel {
             paymentLabel: "Managed by Stripe",
             benefits: benefits(from: dto.tier),
             policyFootnote: MembershipSampleData.policyFootnote,
-            slaAlert: nil
+            slaAlert: nil,
+            personaId: dto.persona?.id ?? personaId,
+            inbox: MembershipInboxCard(
+                remainingThreads: dto.quotaRemaining?.msgThreads,
+                threadsPerPeriod: dto.tier?.msgThreadsPerPeriod
+            ),
+            hasScheduledTierChange: dto.scheduledTierChange?.tierId != nil,
+            isTerminal: ["canceled", "expired"].contains(dto.status ?? ""),
+            cancelAtPeriodEnd: dto.cancelAtPeriodEnd ?? false
         )
+    }
+
+    /// Ladder rows for the change-tier picker — current rank removed,
+    /// direction derived from the rank comparison so the sheet can state
+    /// "Takes effect immediately" vs "Scheduled for the end of this period".
+    static func tierOptions(
+        _ tiers: [PersonaPublicTierDTO],
+        currentRank: Int
+    ) -> [MembershipTierOption] {
+        tiers
+            .filter { $0.rank != currentRank }
+            .sorted { $0.rank < $1.rank }
+            .map { tier in
+                MembershipTierOption(
+                    id: tier.id,
+                    rank: tier.rank,
+                    name: tier.name ?? "Tier \(tier.rank)",
+                    priceLabel: tierPriceLabel(tier),
+                    direction: tier.rank > currentRank ? .upgrade : .downgrade
+                )
+            }
+    }
+
+    static func tierPriceLabel(_ tier: PersonaPublicTierDTO) -> String {
+        let price = priceLabel(cents: tier.priceCents, currency: tier.currency)
+        if price == "Free" { return price }
+        return "\(price) / \(periodLabel(interval: tier.billingInterval))"
     }
 
     private static func projectPersona(_ dto: MembershipPersonaDTO?) -> MembershipPersona {

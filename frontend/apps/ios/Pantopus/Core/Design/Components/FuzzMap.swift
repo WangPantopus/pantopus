@@ -4,8 +4,8 @@
 //
 //  Animated concentric-circle privacy fuzz preview used on A14.7 Privacy.
 //  A stylised street-grid canvas with a primary-tinted concentric ring
-//  that grows in five discrete stops — exact → building → block →
-//  block (default) → neighborhood. The label uppercases into a mono
+//  that grows in five discrete stops — exact → block → quarter mile →
+//  half mile (default) → neighborhood. The label uppercases into a mono
 //  corner tag. The radius transition runs through `Motion.componentState`
 //  (extended to 300ms per spec) and honours `reduceMotion`.
 //
@@ -15,9 +15,9 @@ import SwiftUI
 /// Discrete fuzz radius for the privacy slider on A14.7.
 public enum FuzzStop: String, Sendable, Hashable, CaseIterable {
     case exact
-    case building
     case block
-    case blockDefault
+    case quarterMile
+    case halfMile
     case neighborhood
 
     /// Ring radius (points) at this stop. `exact` collapses to 0 so the
@@ -25,9 +25,9 @@ public enum FuzzStop: String, Sendable, Hashable, CaseIterable {
     public var radius: CGFloat {
         switch self {
         case .exact: 0
-        case .building: 18
-        case .block: 42
-        case .blockDefault: 62
+        case .block: 18
+        case .quarterMile: 42
+        case .halfMile: 62
         case .neighborhood: 110
         }
     }
@@ -36,9 +36,9 @@ public enum FuzzStop: String, Sendable, Hashable, CaseIterable {
     public var label: String {
         switch self {
         case .exact: "Exact"
-        case .building: "Building"
         case .block: "Block"
-        case .blockDefault: "Block (default)"
+        case .quarterMile: "Quarter mile"
+        case .halfMile: "Half mile"
         case .neighborhood: "Neighborhood"
         }
     }

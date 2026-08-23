@@ -339,36 +339,81 @@ final class ContentDetailProjectionTests: XCTestCase {
 
     // MARK: - Invoice
 
+    /// A real `BusinessInvoice` row (`GET /api/businesses/invoices/{id}`).
+    /// Timestamps sit at 17:00Z so the short-date label is stable in both UTC
+    /// and US time zones.
+    private func makeInvoice(
+        status: String = "sent",
+        paidAt: String? = nil,
+        dueDate: String? = "2025-12-18T17:00:00.000Z",
+        subtotalCents: Int = 35400,
+        totalCents: Int = 35400
+    ) -> BusinessInvoiceDTO {
+        BusinessInvoiceDTO(
+            id: "7f3c1a24-1111-4000-8000-000000000001",
+            lineItems: [
+                BusinessInvoiceLineItemDTO(description: "Install labor", amountCents: 6500, quantity: 2),
+                BusinessInvoiceLineItemDTO(description: "LED string lights", amountCents: 2800, quantity: 8)
+            ],
+            subtotalCents: subtotalCents,
+            feeCents: 1062,
+            totalCents: totalCents,
+            currency: "usd",
+            status: status,
+            dueDate: dueDate,
+            memo: "Takedown is on the schedule for the first Tuesday in January.",
+            createdAt: "2025-12-04T17:00:00.000Z",
+            paidAt: paidAt,
+            business: BusinessInvoicePartyDTO(id: "b1", name: "Brightside Outdoor")
+        )
+    }
+
     func testInvoiceDueCarriesTotalHeroLineItemsAndPayDock() {
-        let content = InvoiceDetailViewModel.fixture(invoiceId: "INV-00318")
+        let content = InvoiceDetailViewModel.project(makeInvoice())
         XCTAssertEqual(content.kind, .invoice)
-        XCTAssertEqual(content.statusPill?.label, "Due in 7 days")
-        XCTAssertEqual(content.hero.priceLine, "$642.85", "total hero must be present")
+        XCTAssertEqual(content.statusPill?.label, "Due Dec 18")
+        XCTAssertEqual(content.hero.priceLine, "$354.00", "total hero must render the server's total_cents")
         XCTAssertEqual(content.hero.priceCaption, "total · USD")
         XCTAssertFalse(content.hero.priceCheckDisc)
-        XCTAssertTrue(content.hero.monoId?.contains("INV-00318") == true)
-        // Line items carry the fees + total footer.
+        XCTAssertTrue(content.hero.monoId?.contains("7F3C1A24") == true)
         let items = content.modules.compactMap { mod -> ContentDetailLineItems? in
             if case let .lineItems(m) = mod { return m } else { return nil }
         }.first
-        XCTAssertEqual(items?.fees.count, 3)
-        XCTAssertEqual(items?.totalValue, "$642.85")
+        XCTAssertEqual(items?.rows.count, 2)
+        XCTAssertEqual(items?.rows.first?.total, "$130.00", "unit × qty")
+        // Fee is deducted from the business payout, never billed to the payer.
+        XCTAssertTrue(items?.fees.isEmpty ?? false)
+        XCTAssertEqual(items?.totalValue, "$354.00")
         XCTAssertEqual(items?.totalTone, .primary)
         XCTAssertTrue(content.modules.contains { if case .fromTo = $0 { true } else { false } })
         XCTAssertNil(content.dock.secondary, "due invoice dock is full-width")
-        XCTAssertTrue(content.dock.primary.label.contains("Pay"))
+        XCTAssertEqual(content.dock.primary.label, "Pay $354.00")
+        XCTAssertTrue(content.dock.primary.enabled)
+    }
+
+    func testInvoiceSubtotalRowAppearsOnlyWhenItDiffersFromTotal() {
+        let content = InvoiceDetailViewModel.project(
+            makeInvoice(subtotalCents: 35400, totalCents: 30000)
+        )
+        let items = content.modules.compactMap { mod -> ContentDetailLineItems? in
+            if case let .lineItems(m) = mod { return m } else { return nil }
+        }.first
+        XCTAssertEqual(items?.fees.first?.label, "Subtotal")
+        XCTAssertEqual(items?.fees.first?.value, "$354.00")
+        XCTAssertEqual(items?.totalValue, "$300.00")
     }
 
     func testInvoicePaidRecolorsTotalAddsReceiptAndPivotsDock() {
-        let content = InvoiceDetailViewModel.paidFixture(invoiceId: "INV-00318")
+        let content = InvoiceDetailViewModel.project(
+            makeInvoice(status: "paid", paidAt: "2025-12-14T17:00:00.000Z")
+        )
         XCTAssertEqual(content.statusPill?.label, "Paid · Dec 14")
         XCTAssertEqual(content.statusPill?.tone, .success)
         XCTAssertEqual(content.hero.priceTone, .success)
         XCTAssertTrue(content.hero.priceCheckDisc)
         XCTAssertEqual(content.hero.priceTrailingLabel, "paid in full")
-        // Pantopus Pay receipt capsule.
         XCTAssertTrue(content.modules.contains {
-            if case let .callout(m) = $0 { m.identifier == "pantopus-pay-receipt" } else { false }
+            if case let .callout(m) = $0 { m.identifier == "invoice-paid" } else { false }
         })
         let items = content.modules.compactMap { mod -> ContentDetailLineItems? in
             if case let .lineItems(m) = mod { return m } else { return nil }
@@ -376,7 +421,16 @@ final class ContentDetailProjectionTests: XCTestCase {
         XCTAssertEqual(items?.totalLabel, "Paid")
         XCTAssertEqual(items?.totalTone, .success)
         XCTAssertEqual(content.dock.secondary?.label, "Share")
-        XCTAssertEqual(content.dock.primary.label, "Download receipt")
+        XCTAssertEqual(content.dock.primary.label, "Paid in full")
+        XCTAssertFalse(content.dock.primary.enabled, "a paid invoice can never re-run checkout")
+    }
+
+    func testInvoiceVoidLocksTheDock() {
+        let content = InvoiceDetailViewModel.project(makeInvoice(status: "void"))
+        XCTAssertEqual(content.statusPill?.label, "Voided")
+        XCTAssertEqual(content.statusPill?.tone, .error)
+        XCTAssertFalse(content.dock.primary.enabled)
+        XCTAssertEqual(content.dock.primary.label, "Invoice voided")
     }
 
     // MARK: - Sample frames
@@ -406,8 +460,10 @@ final class ContentDetailProjectionTests: XCTestCase {
         XCTAssertEqual(sold.cover?.sold, true)
         XCTAssertEqual(sold.hero.saleTag, "Sold for $385")
 
-        // Invoice paid sample.
-        let paid = InvoiceDetailViewModel.paidFixture(invoiceId: "INV-00318")
+        // Invoice paid projection.
+        let paid = InvoiceDetailViewModel.project(
+            makeInvoice(status: "paid", paidAt: "2025-12-14T17:00:00.000Z")
+        )
         XCTAssertEqual(paid.hero.priceTone, .success)
     }
 }

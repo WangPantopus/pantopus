@@ -66,6 +66,10 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.PantopusTextStyle
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** Test tag applied to the verify-landlord wizard root. */
 const val VERIFY_LANDLORD_SCREEN_TAG: String = "verifyLandlordWizard"
@@ -100,6 +104,14 @@ fun VerifyLandlordWizardScreen(
         when (state.currentStep) {
             VerifyLandlordStep.Start -> StartStep(content = state.startContent)
             VerifyLandlordStep.Details -> DetailsStep(state = state, viewModel = viewModel)
+            VerifyLandlordStep.Sent ->
+                state.approvalResult?.let { result ->
+                    SentStep(
+                        result = result,
+                        errorMessage =
+                            (state.submitState as? VerifyLandlordSubmitState.Error)?.message,
+                    )
+                }
         }
     }
 }
@@ -425,6 +437,7 @@ internal fun DetailsStep(
     BusinessInfoCard(form = state.form, errors = state.errors, viewModel = viewModel)
     LeaseUploadCard(form = state.form, errors = state.errors, viewModel = viewModel)
     PropertyManagerCard(form = state.form, errors = state.errors, viewModel = viewModel)
+    TenancyCard(form = state.form, errors = state.errors, viewModel = viewModel)
 
     EncryptionFootnote()
 
@@ -552,6 +565,282 @@ private fun PropertyManagerCard(
             )
         }
     }
+}
+
+/**
+ * A12.6 "Your tenancy" — the two fields the backend actually persists
+ * on `POST /api/v1/tenant/request-approval` (`start_at` + `message`).
+ */
+@Composable
+private fun TenancyCard(
+    form: VerifyLandlordForm,
+    errors: VerifyLandlordValidationErrors?,
+    viewModel: VerifyLandlordWizardViewModel,
+) {
+    VerifyCard {
+        SectionHeader(
+            overline = "Your tenancy",
+            title = "When did you move in?",
+            subtitle = "Optional, but it helps your landlord process the request faster.",
+        )
+        VerifyField(
+            label = "Move-in date",
+            value = form.moveInDate,
+            placeholder = "YYYY-MM-DD",
+            icon = PantopusIcon.Calendar,
+            keyboard = KeyboardType.Number,
+            optional = true,
+            hint = "When did you move in, or plan to?",
+            error = errors?.moveInDate,
+            onChange = viewModel::setMoveInDate,
+        )
+        MessageField(
+            value = form.messageToLandlord,
+            onChange = viewModel::setMessageToLandlord,
+        )
+    }
+}
+
+/** Multiline note forwarded to the landlord as the request `message`. */
+@Composable
+private fun MessageField(
+    value: String,
+    onChange: (String) -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val isFocused by interaction.collectIsFocusedAsState()
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s1)) {
+            Text(
+                text = "Message to landlord",
+                style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.SemiBold),
+                color = PantopusColors.appTextStrong,
+            )
+            Text(
+                text = "· optional",
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = false,
+            textStyle = PantopusTextStyle.body.copy(color = PantopusColors.appText),
+            cursorBrush = SolidColor(PantopusColors.primary600),
+            interactionSource = interaction,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 96.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurface)
+                    .border(
+                        width = if (isFocused) 1.5.dp else 1.dp,
+                        color = if (isFocused) PantopusColors.primary600 else PantopusColors.appBorder,
+                        shape = RoundedCornerShape(Radii.md),
+                    ).padding(Spacing.s2)
+                    .testTag("verifyLandlordMessageField"),
+            decorationBox = { inner ->
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "Hi, I'm a new tenant at…",
+                            style = PantopusTextStyle.body,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
+        Text(
+            text = "${value.length}/${VerifyLandlordForm.MESSAGE_MAX_LENGTH}",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextMuted,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("verifyLandlordMessageCount"),
+        )
+    }
+}
+
+// MARK: - A12.6 Sent (terminal)
+
+/**
+ * Terminal frame — the tenant approval request landed. Mirrors RN's
+ * `verify-landlord/index.tsx` "pending approval" state; every value is
+ * taken from the `HomeLease` row the backend returned.
+ *
+ * There is no `GET /api/v1/tenant/home/:id/status` route in
+ * `backend/routes/landlordTenant.js`, so this screen deliberately does
+ * not poll — it renders what the submit answered with and offers the
+ * mailed-code path as the alternative.
+ */
+@Composable
+internal fun SentStep(
+    result: VerifyLandlordApprovalResult,
+    errorMessage: String? = null,
+) {
+    val tint =
+        when (result.kind) {
+            VerifyLandlordApprovalResult.Kind.AlreadyActive -> PantopusColors.success
+            else -> PantopusColors.primary600
+        }
+    val discBg =
+        when (result.kind) {
+            VerifyLandlordApprovalResult.Kind.AlreadyActive -> PantopusColors.successBg
+            else -> PantopusColors.primary50
+        }
+    val icon =
+        when (result.kind) {
+            VerifyLandlordApprovalResult.Kind.AlreadyActive -> PantopusIcon.ShieldCheck
+            else -> PantopusIcon.Clock
+        }
+    val pillLabel =
+        when (result.kind) {
+            VerifyLandlordApprovalResult.Kind.AlreadyActive -> "Verified Tenant"
+            else -> "Pending Approval"
+        }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("verifyLandlordSentStep"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        Box(
+            modifier = Modifier.size(72.dp).clip(CircleShape).background(discBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = 32.dp,
+                tint = tint,
+            )
+        }
+        Text(
+            text = result.headline,
+            style = PantopusTextStyle.h2,
+            color = PantopusColors.appText,
+        )
+        Text(
+            text = result.body,
+            style = PantopusTextStyle.body,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Radii.pill))
+                    .background(discBg)
+                    .padding(horizontal = Spacing.s3, vertical = 6.dp)
+                    .testTag("verifyLandlordSentStatusPill"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PantopusIconImage(icon = icon, contentDescription = null, size = 13.dp, tint = tint)
+            Text(
+                text = pillLabel,
+                style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.SemiBold),
+                color = tint,
+            )
+        }
+        SentDetailCard(result = result)
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                style = PantopusTextStyle.caption,
+                color = PantopusColors.error,
+                modifier = Modifier.testTag("verifyLandlordSentError"),
+            )
+        }
+        Text(
+            text = "Your landlord will be notified and can approve or deny your request.",
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextMuted,
+        )
+    }
+}
+
+@Composable
+private fun SentDetailCard(result: VerifyLandlordApprovalResult) {
+    val submitted = formatSentDate(result.submittedAt)
+    val start = formatSentDate(result.requestedStartAt)
+    val message = result.message?.takeIf { it.isNotBlank() }
+    if (submitted == null && start == null && message == null) return
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurface)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .testTag("verifyLandlordSentDetails"),
+    ) {
+        if (submitted != null) SentDetailRow(label = "Submitted", value = submitted)
+        if (start != null) SentDetailRow(label = "Requested start", value = start)
+        if (message != null) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+            ) {
+                Text(
+                    text = "Your message",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+                Text(
+                    text = message,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextStrong,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SentDetailRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4, vertical = Spacing.s3),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+        )
+        Text(
+            text = value,
+            style = PantopusTextStyle.caption.copy(fontWeight = FontWeight.SemiBold),
+            color = PantopusColors.appText,
+        )
+    }
+}
+
+/** ISO-8601 -> "Mar 4, 2026". Null when absent or unparsable. */
+internal fun formatSentDate(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    return runCatching {
+        DateTimeFormatter
+            .ofPattern("MMM d, yyyy", Locale.US)
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.parse(iso))
+    }.getOrNull()
 }
 
 // MARK: - Atoms

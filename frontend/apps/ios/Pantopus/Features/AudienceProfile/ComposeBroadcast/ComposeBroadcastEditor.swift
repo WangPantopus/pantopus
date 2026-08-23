@@ -15,7 +15,7 @@ import SwiftUI
 struct ComposeBroadcastEditor: View {
     let persona: BroadcastPersona
     @Binding var text: String
-    let media: ComposeMediaPreview?
+    let media: [ComposeMediaPreview]
     let audience: BroadcastAudience
     let audienceReach: Int?
     let characterCount: Int
@@ -23,7 +23,7 @@ struct ComposeBroadcastEditor: View {
     let isOverLimit: Bool
     let placeholder: String
     let onAddMedia: @MainActor () -> Void
-    let onRemoveMedia: @MainActor () -> Void
+    let onRemoveMedia: @MainActor (String) -> Void
     let onChangeAudience: @MainActor () -> Void
 
     @State private var measuredHeight: CGFloat = 0
@@ -40,8 +40,8 @@ struct ComposeBroadcastEditor: View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             personaRow
             bodyEditor
-            if let media {
-                mediaPreview(media)
+            if !media.isEmpty {
+                mediaGrid
             }
             Rectangle()
                 .fill(Theme.Color.appBorderSubtle)
@@ -148,10 +148,28 @@ struct ComposeBroadcastEditor: View {
 
     // MARK: - Media
 
-    private func mediaPreview(_ media: ComposeMediaPreview) -> some View {
+    /// Up to nine attachments. One item keeps the full-bleed preview the
+    /// design shows; two or more tile into a 3-up grid.
+    @ViewBuilder private var mediaGrid: some View {
+        if media.count == 1, let only = media.first {
+            mediaTile(only, height: 160)
+        } else {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3),
+                spacing: Spacing.s2
+            ) {
+                ForEach(media) { item in
+                    mediaTile(item, height: 92)
+                }
+            }
+            .accessibilityIdentifier("composeBroadcastMediaGrid")
+        }
+    }
+
+    private func mediaTile(_ media: ComposeMediaPreview, height: CGFloat) -> some View {
         ZStack(alignment: .topTrailing) {
             Group {
-                if let data = media.imageData, let image = UIImage(data: data) {
+                if media.kind == .image, let data = media.data, let image = UIImage(data: data) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -167,14 +185,14 @@ struct ComposeBroadcastEditor: View {
                         }
                 }
             }
-            .frame(height: 160)
+            .frame(height: height)
             .frame(maxWidth: .infinity)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
             .accessibilityIdentifier("composeBroadcastMediaPreview")
             .accessibilityLabel(media.caption.map { "Attached media: \($0)" } ?? "Attached media")
 
-            Button(action: onRemoveMedia) {
+            Button { onRemoveMedia(media.id) } label: {
                 Icon(.x, size: 14, strokeWidth: 2.6, color: Theme.Color.appTextInverse)
                     .frame(width: 28, height: 28)
                     .background(Color.black.opacity(0.55))
@@ -185,7 +203,7 @@ struct ComposeBroadcastEditor: View {
             .accessibilityLabel("Remove media")
             .accessibilityIdentifier("composeBroadcastRemoveMedia")
 
-            if let caption = media.caption {
+            if let caption = media.caption, height > 120 {
                 captionOverlay(caption)
             }
         }
@@ -211,14 +229,35 @@ struct ComposeBroadcastEditor: View {
 
     // MARK: - Counter row
 
+    /// True once the nine-attachment cap is reached.
+    private var isFull: Bool {
+        media.count >= ComposeBroadcastDraft.mediaLimit
+    }
+
     private var counterRow: some View {
         HStack(spacing: Spacing.s2) {
             Button(action: onAddMedia) {
-                Icon(.imagePlus, size: 20, color: Theme.Color.appTextStrong)
-                    .frame(width: 44, height: 44)
+                HStack(spacing: 3) {
+                    Icon(.imagePlus, size: 20, color: isFull ? Theme.Color.appTextMuted : Theme.Color.appTextStrong)
+                    // Counter appears only once a second item is attached, so
+                    // the single-attachment frame stays visually unchanged.
+                    if media.count > 1 {
+                        Text("\(media.count)/\(ComposeBroadcastDraft.mediaLimit)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextMuted)
+                            .monospacedDigit()
+                            .accessibilityIdentifier("composeBroadcastMediaCount")
+                    }
+                }
+                .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add photo or video")
+            .disabled(isFull)
+            .accessibilityLabel(
+                isFull
+                    ? "Attachment limit reached, 9 of 9"
+                    : "Add photos or videos, \(media.count) of \(ComposeBroadcastDraft.mediaLimit) attached"
+            )
             .accessibilityIdentifier("composeBroadcastAddMedia")
 
             audienceChip

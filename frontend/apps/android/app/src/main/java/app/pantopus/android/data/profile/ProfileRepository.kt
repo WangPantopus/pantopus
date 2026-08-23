@@ -4,6 +4,8 @@ import app.pantopus.android.data.api.models.profile.PublicProfileDto
 import app.pantopus.android.data.api.models.users.ProfileResponse
 import app.pantopus.android.data.api.models.users.ProfileUpdateRequest
 import app.pantopus.android.data.api.models.users.ProfileUpdateResponse
+import app.pantopus.android.data.api.models.users.UpdateSkillsRequest
+import app.pantopus.android.data.api.models.users.UpdateSkillsResponse
 import app.pantopus.android.data.api.models.users.UserSearchResponse
 import app.pantopus.android.data.api.models.users.UserStatsDto
 import app.pantopus.android.data.api.net.NetworkResult
@@ -28,6 +30,14 @@ class ProfileRepository
         /** `PATCH /api/users/profile` — route `backend/routes/users.js:2052`. */
         suspend fun updateProfile(body: ProfileUpdateRequest): NetworkResult<ProfileUpdateResponse> =
             safeApiCall { api.updateProfile(body) }
+
+        /**
+         * `PUT /api/users/skills` — replace the caller's whole skill
+         * list. Route `backend/routes/users.js:2246`. The handler trims,
+         * dedupes and caps the list, then echoes the cleaned array.
+         */
+        suspend fun updateSkills(skills: List<String>): NetworkResult<UpdateSkillsResponse> =
+            safeApiCall { api.updateSkills(UpdateSkillsRequest(skills = skills)) }
 
         /** `GET /api/users/:id/stats` — route `backend/routes/users.js:2787`. */
         suspend fun stats(userId: String): NetworkResult<UserStatsDto> = safeApiCall { api.stats(userId) }

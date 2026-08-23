@@ -7,6 +7,8 @@
 //  survives process death (acceptance criterion #5).
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 /// Pushed onto the Hub stack from the MyHomes FAB / empty-CTA. On
@@ -19,20 +21,35 @@ public struct AddHomeWizardView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let onOpenHomeDashboard: (String) -> Void
+    /// `check-address` matched an already-claimed home and the user
+    /// picked "owner" — route to the ownership-claim wizard for that
+    /// existing home instead of creating a duplicate.
+    private let onOpenClaimOwnership: (String) -> Void
+    /// Residency claim filed against an existing home — route to the
+    /// waiting room.
+    private let onOpenWaitingRoom: (String) -> Void
 
     public init(
-        onOpenHomeDashboard: @escaping (String) -> Void
+        onOpenHomeDashboard: @escaping (String) -> Void,
+        onOpenClaimOwnership: @escaping (String) -> Void = { _ in },
+        onOpenWaitingRoom: @escaping (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: AddHomeWizardViewModel())
         self.onOpenHomeDashboard = onOpenHomeDashboard
+        self.onOpenClaimOwnership = onOpenClaimOwnership
+        self.onOpenWaitingRoom = onOpenWaitingRoom
     }
 
     init(
         viewModel: AddHomeWizardViewModel,
-        onOpenHomeDashboard: @escaping (String) -> Void
+        onOpenHomeDashboard: @escaping (String) -> Void,
+        onOpenClaimOwnership: @escaping (String) -> Void = { _ in },
+        onOpenWaitingRoom: @escaping (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onOpenHomeDashboard = onOpenHomeDashboard
+        self.onOpenClaimOwnership = onOpenClaimOwnership
+        self.onOpenWaitingRoom = onOpenWaitingRoom
     }
 
     public var body: some View {
@@ -58,6 +75,33 @@ public struct AddHomeWizardView: View {
         .onChange(of: viewModel.form) { _, _ in persist() }
         .onChange(of: viewModel.pendingEvent) { _, event in
             handle(event)
+        }
+        .overlay {
+            if viewModel.showsClaimedModal {
+                AddressClaimedModal(viewModel: viewModel)
+            }
+        }
+        // A12.2 Setup — the Wi-Fi QR scanner takes the whole screen so
+        // the viewfinder matches RN's full-screen `QrScannerModal`.
+        .fullScreenCover(isPresented: Binding(
+            get: { viewModel.scannerTargetItemID != nil },
+            set: { if !$0 { viewModel.closeWifiQRScanner() } }
+        )) {
+            WifiQRScannerSheet(
+                onScanned: { viewModel.applyScannedWifi($0) },
+                onClose: { viewModel.closeWifiQRScanner() }
+            )
+        }
+        .alert(
+            "Home created",
+            isPresented: Binding(
+                get: { viewModel.accessSecretWarning != nil },
+                set: { if !$0 { viewModel.acknowledgeAccessSecretWarning() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { viewModel.acknowledgeAccessSecretWarning() }
+        } message: {
+            Text(viewModel.accessSecretWarning ?? "")
         }
         .accessibilityIdentifier("addHomeWizard")
     }
@@ -98,8 +142,133 @@ public struct AddHomeWizardView: View {
         case let .openHomeDashboard(homeId):
             storedForm = ""
             onOpenHomeDashboard(homeId)
+        case let .openClaimOwnership(homeId):
+            storedForm = ""
+            onOpenClaimOwnership(homeId)
+        case let .openWaitingRoom(homeId):
+            storedForm = ""
+            onOpenWaitingRoom(homeId)
         }
         viewModel.pendingEvent = nil
+    }
+}
+
+// MARK: - Address-already-claimed modal (RN AddressClaimedModal)
+
+/// Two-page confirm modal shown when `POST /api/homes/check-address`
+/// returns `HOME_FOUND_CLAIMED`. Copy mirrors RN's `ADDRESS_CHECK`
+/// constants (`src/constants/ownershipCopy.ts:176-183`).
+private struct AddressClaimedModal: View {
+    @Bindable var viewModel: AddHomeWizardViewModel
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Theme.Color.appText.opacity(0.45))
+                .ignoresSafeArea()
+                .onTapGesture { viewModel.dismissClaimedModal() }
+            card
+                .padding(.horizontal, Spacing.s5)
+        }
+        .accessibilityIdentifier("addHomeAddressClaimedModal")
+    }
+
+    @ViewBuilder
+    private var card: some View {
+        if viewModel.showsConfirmAddressSheet {
+            modalCard {
+                Text("Confirm this is your address")
+                    .pantopusTextStyle(.h3)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                Text("You entered:")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                Text(viewModel.claimedAddressLabel)
+                    .pantopusTextStyle(.body)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(Spacing.s3)
+                    .background(Theme.Color.appSurfaceSunken)
+                    .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+                    .accessibilityIdentifier("addHomeClaimedAddressLabel")
+                primaryButton("Confirm address", identifier: "addHomeClaimedConfirmAddress") {
+                    viewModel.confirmClaimedAddress()
+                }
+                secondaryButton("Edit", identifier: "addHomeClaimedEditAddress") {
+                    viewModel.dismissClaimedModal()
+                }
+            }
+        } else {
+            modalCard {
+                Circle()
+                    .fill(Theme.Color.personalBg)
+                    .frame(width: 56, height: 56)
+                    .overlay {
+                        Icon(.shieldCheck, size: 28, color: Theme.Color.primary600)
+                    }
+                Text("This home already has verified members")
+                    .pantopusTextStyle(.h3)
+                    .foregroundStyle(Theme.Color.appText)
+                    .multilineTextAlignment(.center)
+                Text("To protect privacy, you’ll need verification to join this home.")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .multilineTextAlignment(.center)
+                primaryButton("This address is correct", identifier: "addHomeClaimedCorrect") {
+                    viewModel.showConfirmAddressStep()
+                }
+                secondaryButton("Change address", identifier: "addHomeClaimedChangeAddress") {
+                    viewModel.dismissClaimedModal()
+                }
+            }
+        }
+    }
+
+    private func modalCard(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: Spacing.s3) {
+            content()
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+    }
+
+    private func primaryButton(
+        _ title: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func secondaryButton(
+        _ title: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .pantopusTextStyle(.body)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -132,6 +301,14 @@ private struct AddHomeConfirmStep: View {
             PrimaryHomeToggle(isPrimary: viewModel.form.isPrimary) {
                 viewModel.setPrimaryHome($0)
             }
+            // A12.2 Details — nickname / type / beds / baths / sizes /
+            // year / description, pre-filled from public records. Hidden
+            // on the join-an-existing-home path, which RN skips too
+            // (`useHomeForm.ts:619-623, :700-705`).
+            if !viewModel.isClaimingExistingHome {
+                Divider().background(Theme.Color.appBorderSubtle)
+                AddHomeDetailsSection(viewModel: viewModel)
+            }
         }
     }
 }
@@ -151,6 +328,15 @@ private struct RoleStep: View {
                 }
             }
         }
+        // A12.2 Setup — RN's Setup step is role picker + "Networks &
+        // codes" in one screen (`SetupStep.tsx:33-174`), and the block is
+        // hidden when joining an existing home (`SetupStep.tsx:66`).
+        if viewModel.showsAccessSetup {
+            Divider()
+                .background(Theme.Color.appBorderSubtle)
+                .padding(.vertical, Spacing.s2)
+            AddHomeAccessSetupSection(viewModel: viewModel)
+        }
     }
 }
 
@@ -162,7 +348,15 @@ private struct ReviewStep: View {
     var body: some View {
         HeadlineBlock("Review and submit")
         SubcopyBlock("Make sure everything below looks right before submitting.")
-        ReviewSummaryBlock([
+        ReviewSummaryBlock(summaryRows)
+    }
+
+    /// Address / role / primary, plus everything the Details and Setup
+    /// blocks collected — the review step previously showed only the
+    /// first three, so nothing the user typed on those blocks was
+    /// verifiable before submit.
+    private var summaryRows: [ReviewSummaryRow] {
+        var rows: [ReviewSummaryRow] = [
             ReviewSummaryRow(
                 label: "Address",
                 value: composedAddress(viewModel.form.address)
@@ -175,7 +369,41 @@ private struct ReviewStep: View {
                 label: "Primary",
                 value: viewModel.form.isPrimary ? "Yes" : "No"
             )
-        ])
+        ]
+        guard !viewModel.isClaimingExistingHome else { return rows }
+        let details = viewModel.form.details
+        let nickname = details.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !nickname.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Nickname", value: nickname))
+        }
+        rows.append(ReviewSummaryRow(label: "Home type", value: details.homeType.label))
+        if let size = bedBathSummary(details) {
+            rows.append(ReviewSummaryRow(label: "Size", value: size))
+        }
+        if !details.sqFt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Home size", value: "\(details.sqFt) sq ft"))
+        }
+        if !details.lotSqFt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Lot size", value: "\(details.lotSqFt) sq ft"))
+        }
+        if !details.yearBuilt.isEmpty {
+            rows.append(ReviewSummaryRow(label: "Year built", value: details.yearBuilt))
+        }
+        let secretCount = viewModel.accessItems.filter(\.isComplete).count
+        if secretCount > 0 {
+            rows.append(ReviewSummaryRow(
+                label: "Networks & codes",
+                value: secretCount == 1 ? "1 entry" : "\(secretCount) entries"
+            ))
+        }
+        return rows
+    }
+
+    private func bedBathSummary(_ details: AddHomeDetailsFields) -> String? {
+        var parts: [String] = []
+        if !details.bedrooms.isEmpty { parts.append("\(details.bedrooms) bd") }
+        if !details.bathrooms.isEmpty { parts.append("\(details.bathrooms) ba") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func composedAddress(_ fields: AddHomeAddressFields) -> String {
@@ -194,7 +422,10 @@ private struct SuccessStep: View {
         // Re-use the T3.6 Status / Waiting screen so the home-added
         // terminal shares its chrome with the claim-submitted and
         // check-your-email frames.
-        StatusWaitingView(
+        // Dock-less body — `WizardShell` owns the sticky CTA dock here, so the
+        // full `StatusWaitingView` would render a second stacked pair. Mirrors
+        // Android's `AddHomeWizardScreen` using `StatusWaitingBody`.
+        StatusWaitingBodyView(
             content: .claimSubmitted(homeName: nil)
                 .withHeadline("Home added")
                 .withSubcopy("We'll email you when verification completes.")

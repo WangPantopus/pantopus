@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,10 +45,20 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.auth.AuthError
+import app.pantopus.android.data.auth.OAuthBrowserCommand
+import app.pantopus.android.data.auth.OAuthProvider
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
+import app.pantopus.android.ui.screens.auth.AuthLegalSentence
+import app.pantopus.android.ui.screens.auth.AuthOAuthTermsLine
+import app.pantopus.android.ui.screens.auth.OAuthButtonGroup
+import app.pantopus.android.ui.screens.auth.openOAuthUrl
+import app.pantopus.android.ui.screens.settings.legal.LegalDocument
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.theme.PantopusColors
@@ -76,19 +88,28 @@ object SignUpScreenTags {
     const val STATE = "signUpStateField"
     const val ZIPCODE = "signUpZipField"
     const val INVITE_CODE = "signUpInviteCodeField"
+    const val INVITED_BANNER = "signUpInvitedBanner"
     const val ACCOUNT_TYPE = "signUpAccountTypePicker"
     const val TERMS = "signUpTermsCheckbox"
     const val STRENGTH = "signUpPasswordStrengthMeter"
+    const val GOOGLE_BUTTON = "signUpGoogleButton"
+    const val APPLE_BUTTON = "signUpAppleButton"
+    const val LEGAL_TERMS_LINE = "signUpLegalTermsLine"
+    const val TERMS_TOGGLE = "signUpTermsCheckboxToggle"
+    const val TERMS_LINKS = "signUpTermsLinks"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
     onClose: () -> Unit = {},
+    onOpenLegal: (LegalDocument) -> Unit = {},
     onSuccess: (String) -> Unit = {},
     viewModel: SignUpViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(state.didSucceed) {
         if (state.didSucceed) {
@@ -96,6 +117,27 @@ fun SignUpScreen(
             viewModel.acknowledgeSuccess()
             onSuccess(email)
         }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.browserAuth.collect { command ->
+            when (command) {
+                is OAuthBrowserCommand.Open -> openOAuthUrl(context, command.url)
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE -> viewModel.onHostPaused()
+                    Lifecycle.Event.ON_RESUME -> viewModel.onHostResumed()
+                    else -> Unit
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     FormShell(
@@ -122,6 +164,25 @@ fun SignUpScreen(
                             .testTag(SignUpScreenTags.ERROR_BANNER),
                 )
             }
+
+            if (viewModel.arrivedByInvite) {
+                InvitedNote()
+            }
+
+            OAuthButtonGroup(
+                isLoading = state.isSubmitting,
+                onGoogle = { viewModel.signInWithOAuth(OAuthProvider.Google) },
+                onApple = { viewModel.signInWithOAuth(OAuthProvider.Apple) },
+                googleTag = SignUpScreenTags.GOOGLE_BUTTON,
+                appleTag = SignUpScreenTags.APPLE_BUTTON,
+                modifier = Modifier.padding(horizontal = Spacing.s4),
+            )
+
+            AuthOAuthTermsLine(
+                testTag = SignUpScreenTags.LEGAL_TERMS_LINE,
+                onOpenLegal = onOpenLegal,
+                modifier = Modifier.padding(horizontal = Spacing.s4),
+            )
 
             FormFieldGroup("Account") {
                 FieldWithLiveError(state, SignUpField.Email) {
@@ -280,12 +341,47 @@ fun SignUpScreen(
             TermsCheckbox(
                 isOn = state.agreedToTerms,
                 onToggle = viewModel::onTermsToggle,
+                onOpenLegal = onOpenLegal,
                 modifier =
                     Modifier
                         .padding(horizontal = Spacing.s4)
                         .testTag(SignUpScreenTags.TERMS),
             )
         }
+    }
+}
+
+/**
+ * RN swaps the sign-up subtitle for the invited copy when the register route
+ * carries `invite_code`
+ * (`pantopus/frontend/apps/mobile/src/app/(auth)/register.tsx:174`). Mirrors
+ * iOS `SignUpView.invitedNote`.
+ */
+@Composable
+private fun InvitedNote() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s4)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary50)
+                .padding(Spacing.s3)
+                .testTag(SignUpScreenTags.INVITED_BANNER),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.UserPlus,
+            contentDescription = null,
+            size = 16.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = SignUpViewModel.INVITED_MESSAGE,
+            style = PantopusTextStyle.small,
+            color = PantopusColors.appText,
+        )
     }
 }
 
@@ -587,20 +683,27 @@ private class MaxEighteenDates(
     override fun isSelectableYear(year: Int): Boolean = year <= LocalDate.now().year
 }
 
+/**
+ * Terms agreement checkbox with individually tappable Terms / Privacy
+ * links.
+ *
+ * The checkbox and the sentence are **separate** hit targets: tapping a
+ * link opens the A19 document and leaves [isOn] untouched, exactly like
+ * RN's register screen, where the checkbox is its own `TouchableOpacity`
+ * and the two link runs carry their own `onPress`
+ * (`src/app/(auth)/register.tsx:303-341`). Wrapping the whole row in one
+ * clickable (the previous native shape) is what made the documents
+ * unreachable before sign-in. Mirrors iOS `TermsCheckbox`.
+ */
 @Composable
 private fun TermsCheckbox(
     isOn: Boolean,
     onToggle: () -> Unit,
+    onOpenLegal: (LegalDocument) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier =
-            modifier
-                .clickable(onClick = onToggle)
-                .semantics {
-                    contentDescription =
-                        if (isOn) "Agreed to terms and privacy" else "Not agreed to terms and privacy"
-                },
+        modifier = modifier,
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -616,7 +719,13 @@ private fun TermsCheckbox(
                             color = if (isOn) PantopusColors.primary600 else PantopusColors.appBorderStrong,
                         ),
                         RoundedCornerShape(Radii.xs),
-                    ),
+                    )
+                    .clickable(onClick = onToggle)
+                    .testTag(SignUpScreenTags.TERMS_TOGGLE)
+                    .semantics {
+                        contentDescription =
+                            if (isOn) "Agreed to terms and privacy" else "Not agreed to terms and privacy"
+                    },
             contentAlignment = Alignment.Center,
         ) {
             if (isOn) {
@@ -628,10 +737,15 @@ private fun TermsCheckbox(
                 )
             }
         }
-        Text(
-            text = "I agree to the Terms and Privacy Policy.",
+        AuthLegalSentence(
+            lead = "I agree to the ",
+            termsLabel = "Terms",
+            privacyLabel = "Privacy Policy",
+            onOpenLegal = onOpenLegal,
+            testTag = SignUpScreenTags.TERMS_LINKS,
+            modifier = Modifier.weight(1f),
             style = PantopusTextStyle.small,
-            color = PantopusColors.appText,
+            plainColor = PantopusColors.appText,
         )
     }
 }

@@ -97,11 +97,17 @@ public struct MaintenanceRowProjection: Sendable, Equatable {
 final class MaintenanceListViewModel: ListOfRowsDataSource {
     let title = "Maintenance"
 
-    /// T6.3b: top-bar action is `null` by design — mirrors Bills T6.0a.
-    /// The FAB owns the canonical "Log maintenance" action and the
-    /// design's filter glyph isn't wired to a real filter sheet yet.
+    /// Trailing top-bar action routes to the per-home **issue tracker**
+    /// (`/api/homes/:id/issues`) — a different backend collection from
+    /// the maintenance-task log this screen renders. RN files both under
+    /// "Maintenance", so this is the least-surprising place to reach it.
+    /// Nil when the host didn't wire `onOpenIssues` (previews / tests).
     var topBarAction: TopBarAction? {
-        nil
+        guard let onOpenIssues else { return nil }
+        return TopBarAction(
+            icon: .alertCircle,
+            accessibilityLabel: "Home issues"
+        ) { onOpenIssues() }
     }
 
     var tabs: [ListOfRowsTab] {
@@ -153,6 +159,8 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
     private let api: APIClient
     private let onOpenTask: @Sendable (String) -> Void
     private let onAddTask: @Sendable () -> Void
+    /// Route to the per-home issue tracker. Nil hides the top-bar action.
+    private let onOpenIssues: (@Sendable () -> Void)?
     private let now: @Sendable () -> Date
 
     init(
@@ -160,12 +168,14 @@ final class MaintenanceListViewModel: ListOfRowsDataSource {
         api: APIClient = .shared,
         onOpenTask: @escaping @Sendable (String) -> Void = { _ in },
         onAddTask: @escaping @Sendable () -> Void = {},
+        onOpenIssues: (@Sendable () -> Void)? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.homeId = homeId
         self.api = api
         self.onOpenTask = onOpenTask
         self.onAddTask = onAddTask
+        self.onOpenIssues = onOpenIssues
         self.now = now
     }
 

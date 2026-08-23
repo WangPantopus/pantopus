@@ -2,6 +2,7 @@
 
 package app.pantopus.android.ui.screens.businesses.owner_dashboard
 
+import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,9 +10,11 @@ import app.pantopus.android.data.api.models.businesses.BusinessDashboardResponse
 import app.pantopus.android.data.api.models.businesses.BusinessInsightsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessOnboardingDto
 import app.pantopus.android.data.api.models.businesses.BusinessOwnerReviewDto
+import app.pantopus.android.data.api.models.businessfounding.FoundingOfferStatusDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.businesses.BusinessesRepository
+import app.pantopus.android.data.businessfounding.BusinessFoundingRepository
 import app.pantopus.android.data.profile.ProfileRepository
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileContent
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileMapper
@@ -52,6 +55,8 @@ class BusinessOwnerViewModel
     constructor(
         private val businesses: BusinessesRepository,
         private val profiles: ProfileRepository,
+        private val founding: BusinessFoundingRepository,
+        private val prefs: SharedPreferences,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val businessId: String =
@@ -59,8 +64,26 @@ class BusinessOwnerViewModel
                 "BusinessOwnerViewModel requires a '$BUSINESS_OWNER_BUSINESS_ID_KEY' nav arg."
             }
 
+        /**
+         * Per-business dismissal flag for the founding banner. Mirrors RN's
+         * `AsyncStorage` key `pantopus_founding_dismissed_<businessId>`
+         * (`src/app/businesses/[id]/index.tsx:109`).
+         */
+        private val foundingDismissedKey = "business.foundingBanner.dismissed.$businessId"
+
         private val _state = MutableStateFlow<BusinessOwnerUiState>(BusinessOwnerUiState.Loading)
         val state: StateFlow<BusinessOwnerUiState> = _state.asStateFlow()
+
+        /**
+         * Transient confirmation / error copy for the founding-offer claim.
+         * RN raises an `Alert`; native surfaces the same strings in a toast.
+         */
+        private val _toast = MutableStateFlow<String?>(null)
+        val toast: StateFlow<String?> = _toast.asStateFlow()
+
+        fun consumeToast() {
+            _toast.value = null
+        }
 
         fun load() {
             if (_state.value is BusinessOwnerUiState.Loaded) return
@@ -102,6 +125,71 @@ class BusinessOwnerViewModel
             }
         }
 
+        // MARK: - Founding offer
+
+        /**
+         * Dismiss the founding banner for this business — persisted so it
+         * stays hidden across launches (RN writes the same per-business flag
+         * to `AsyncStorage`).
+         */
+        fun dismissFoundingBanner() {
+            prefs.edit().putBoolean(foundingDismissedKey, true).apply()
+            val current = _state.value as? BusinessOwnerUiState.Loaded ?: return
+            _state.value = BusinessOwnerUiState.Loaded(current.content.copy(foundingOffer = null))
+        }
+
+        /**
+         * Claim a numbered founding slot. On success RN alerts
+         * "You claimed founding slot #N!", hides the banner, and refreshes
+         * the dashboard so the founding badge appears.
+         */
+        fun claimFoundingOffer() {
+            val current = _state.value as? BusinessOwnerUiState.Loaded ?: return
+            val offer = current.content.foundingOffer ?: return
+            if (offer.isClaiming) return
+            _state.value =
+                BusinessOwnerUiState.Loaded(
+                    current.content.copy(foundingOffer = offer.copy(isClaiming = true)),
+                )
+            viewModelScope.launch {
+                when (val result = founding.claim(businessId)) {
+                    is NetworkResult.Success -> {
+                        val number = result.data.slotNumber
+                        _toast.value =
+                            if (number != null) {
+                                "You claimed founding slot #$number!"
+                            } else {
+                                result.data.message ?: "You claimed a founding slot!"
+                            }
+                        // The banner is gone for good once claimed — persist
+                        // so a refresh race can't bring it back.
+                        prefs.edit().putBoolean(foundingDismissedKey, true).apply()
+                        refresh()
+                    }
+                    is NetworkResult.Failure -> {
+                        _toast.value =
+                            result.error.message.ifBlank { "Failed to claim founding offer" }
+                        val latest = _state.value as? BusinessOwnerUiState.Loaded ?: return@launch
+                        _state.value =
+                            BusinessOwnerUiState.Loaded(
+                                latest.content.copy(foundingOffer = offer.copy(isClaiming = false)),
+                            )
+                    }
+                }
+            }
+        }
+
+        /**
+         * `GET /founding-offer/status`, gated on the dismissal flag. Returns
+         * `null` (no banner) when dismissed, when the offer is over, or when
+         * this business already holds a slot — RN's exact three-way gate.
+         */
+        private suspend fun loadFoundingOffer(): OwnerFoundingOffer? {
+            if (prefs.getBoolean(foundingDismissedKey, false)) return null
+            val status = (founding.status() as? NetworkResult.Success)?.data ?: return null
+            return foundingOfferFrom(status, businessId)
+        }
+
         // MARK: - Fetch
 
         private suspend fun fetch() {
@@ -139,8 +227,14 @@ class BusinessOwnerViewModel
             val ownerReviews =
                 (businesses.reviews(businessId) as? NetworkResult.Success)?.data?.reviews ?: emptyList()
 
+            // 4. Founding-offer banner (best-effort; RN fetches it on the
+            //    same dashboard load and hides the banner on any failure).
+            val foundingOffer = loadFoundingOffer()
+
             _state.value =
-                BusinessOwnerUiState.Loaded(buildContent(publicProfile, dashboard, insights, ownerReviews))
+                BusinessOwnerUiState.Loaded(
+                    buildContent(publicProfile, dashboard, insights, ownerReviews, foundingOffer),
+                )
         }
 
         private fun mapDetailFailure(error: NetworkError): BusinessOwnerUiState =
@@ -164,6 +258,7 @@ class BusinessOwnerViewModel
             dashboard: BusinessDashboardResponse,
             insights: BusinessInsightsResponse?,
             reviews: List<BusinessOwnerReviewDto>,
+            foundingOffer: OwnerFoundingOffer? = null,
         ): BusinessOwnerContent {
             val isLive = dashboard.profile?.isPublished == true
             val mappedReviews = reviews.map { ownerReview(it) }
@@ -177,8 +272,16 @@ class BusinessOwnerViewModel
                 reviewsToReplyLabel = if (pending > 0) "$pending to reply" else null,
                 reviews = mappedReviews,
                 publicProfile = publicProfile,
+                canPostAsBusiness = canPost(dashboard.access?.roleBase),
+                foundingOffer = foundingOffer,
             )
         }
+
+        /**
+         * RN gate: `access.role_base && ['owner','admin','editor'].includes(...)`
+         * (`src/app/businesses/[id]/index.tsx:67`).
+         */
+        private fun canPost(roleBase: String?): Boolean = !roleBase.isNullOrEmpty() && roleBase in BusinessOwnerContent.POSTING_ROLES
 
         private fun insightTiles(insights: BusinessInsightsResponse?): List<OwnerInsightTile> {
             if (insights == null) return emptyList()
@@ -280,6 +383,20 @@ class BusinessOwnerViewModel
                 seconds < 86_400 -> "${seconds / 3_600}h ago"
                 seconds < 604_800 -> "${seconds / 86_400}d ago"
                 else -> "${seconds / 604_800}w ago"
+            }
+        }
+
+        companion object {
+            /** Pure projection of the status payload (exposed for unit tests). */
+            fun foundingOfferFrom(
+                status: FoundingOfferStatusDto,
+                businessId: String,
+            ): OwnerFoundingOffer? {
+                val alreadyClaimed =
+                    status.userBusinesses.orEmpty().any { it.businessUserId == businessId }
+                val remaining = status.slotsRemaining ?: 0
+                if (status.isOfferActive != true || alreadyClaimed || remaining <= 0) return null
+                return OwnerFoundingOffer(slotsRemaining = remaining)
             }
         }
     }

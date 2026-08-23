@@ -32,13 +32,18 @@ public struct ExploreMapFocus: Sendable, Hashable {
     }
 }
 
-/// The four discovery entity kinds the Explore map mixes. Each carries
-/// its accent color (token-only), pin glyph, and pin shape.
+/// The discovery entity kinds the Explore map mixes. Each carries its
+/// accent color (token-only), pin glyph, and pin shape.
+///
+/// `task` / `item` come from the gig + listing in-bounds routes; `post`,
+/// `spot` (business), and `home` come from the multi-layer viewport route
+/// `GET /api/posts/map` (`backend/routes/posts.js:1646`).
 public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable {
     case task
     case item
     case post
     case spot
+    case home
 
     public var id: String {
         rawValue
@@ -51,6 +56,7 @@ public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable 
         case .item: "Items"
         case .post: "Posts"
         case .spot: "Spots"
+        case .home: "Homes"
         }
     }
 
@@ -61,18 +67,21 @@ public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable 
         case .item: "Item"
         case .post: "Post"
         case .spot: "Spot"
+        case .home: "Home"
         }
     }
 
     /// Accent color. Sourced from the design's category palette mapped to
     /// existing tokens: task → gigs orange, item → business violet, post →
-    /// primary-500 sky, spot → home green. (No new tokens introduced.)
+    /// primary-500 sky, spot → home green, home → home-dark green. (No new
+    /// tokens introduced.)
     public var color: Color {
         switch self {
         case .task: Theme.Color.gigs
         case .item: Theme.Color.business
         case .post: Theme.Color.primary500
         case .spot: Theme.Color.home
+        case .home: Theme.Color.homeDark
         }
     }
 
@@ -85,6 +94,7 @@ public enum ExploreKind: String, CaseIterable, Sendable, Hashable, Identifiable 
         case .item: .tag
         case .post: .messageCircle
         case .spot: .building2
+        case .home: .home
         }
     }
 

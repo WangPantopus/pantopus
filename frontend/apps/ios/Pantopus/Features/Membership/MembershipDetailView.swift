@@ -7,7 +7,9 @@
 //  Top to bottom: 52pt top bar (back / "Membership" / share) → optional
 //  SLA-missed refund banner → persona card → tier card (silver-tone strip
 //  + renewal + payment) → verified benefits with the SLA promise inline →
-//  Change tier primary → single-tap Cancel link + policy footnote.
+//  Inbox card ("Open inbox" + remaining message-thread credits) → Change
+//  tier primary (opens the real tier picker) → single-tap Cancel link →
+//  "Reply window missed? Request a refund" → policy footnote.
 //
 
 // swiftlint:disable file_length type_body_length
@@ -19,29 +21,27 @@ public struct MembershipDetailView: View {
     private let onBack: @MainActor () -> Void
     private let onShare: @MainActor () -> Void
     private let onOpenPersona: @MainActor () -> Void
-    private let onChangeTier: @MainActor () -> Void
     private let onUpdatePayment: @MainActor () -> Void
     private let onCancel: @MainActor () -> Void
-    private let onRequestRefund: @MainActor () -> Void
+    /// Push the fan inbox for this persona (persona DMs, A15.5).
+    private let onOpenInbox: @MainActor (String) -> Void
 
     public init(
         viewModel: MembershipDetailViewModel,
         onBack: @escaping @MainActor () -> Void = {},
         onShare: @escaping @MainActor () -> Void = {},
         onOpenPersona: @escaping @MainActor () -> Void = {},
-        onChangeTier: @escaping @MainActor () -> Void = {},
         onUpdatePayment: @escaping @MainActor () -> Void = {},
         onCancel: @escaping @MainActor () -> Void = {},
-        onRequestRefund: @escaping @MainActor () -> Void = {}
+        onOpenInbox: @escaping @MainActor (String) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
         self.onShare = onShare
         self.onOpenPersona = onOpenPersona
-        self.onChangeTier = onChangeTier
         self.onUpdatePayment = onUpdatePayment
         self.onCancel = onCancel
-        self.onRequestRefund = onRequestRefund
+        self.onOpenInbox = onOpenInbox
     }
 
     public var body: some View {
@@ -52,6 +52,8 @@ public struct MembershipDetailView: View {
         .background(Theme.Color.appBg)
         .task { await viewModel.load() }
         .toolbar(.hidden, for: .tabBar)
+        .sheet(isPresented: $viewModel.isTierPickerPresented) { tierPickerSheet }
+        .sheet(isPresented: $viewModel.isRefundSheetPresented) { refundSheet }
         .accessibilityIdentifier("membershipDetail")
     }
 
@@ -175,9 +177,24 @@ public struct MembershipDetailView: View {
                 labeledSection("What you get") {
                     benefitsCard(loaded.benefits)
                 }
-                changeTierButton
-                    .padding(.top, Spacing.s1)
-                cancelBlock
+                labeledSection("Messages") {
+                    inboxCard(loaded)
+                }
+                if loaded.hasScheduledTierChange {
+                    scheduledChangeBanner(loaded)
+                }
+                if let confirmation = viewModel.tierChangeConfirmation {
+                    inlineNotice(confirmation, identifier: "membershipDetailTierChangeConfirmation")
+                }
+                if let confirmation = viewModel.refundConfirmation {
+                    inlineNotice(confirmation, identifier: "membershipDetailRefundConfirmation")
+                }
+                if !loaded.isTerminal {
+                    changeTierButton
+                        .padding(.top, Spacing.s1)
+                    cancelBlock
+                }
+                requestRefundLink
                 policyFootnote(loaded.policyFootnote)
             }
             .padding(.horizontal, Spacing.s4)
@@ -224,7 +241,9 @@ public struct MembershipDetailView: View {
                 }
             }
             HStack(spacing: Spacing.s2) {
-                Button(action: onRequestRefund) {
+                Button {
+                    viewModel.presentRefundSheet()
+                } label: {
                     HStack(spacing: Spacing.s1) {
                         Icon(.handCoins, size: 13, color: Theme.Color.appTextInverse)
                         Text(alert.refundCtaLabel)
@@ -466,10 +485,85 @@ public struct MembershipDetailView: View {
         return "\(benefit.label). \(benefit.meta)\(badge)"
     }
 
+    // MARK: - Inbox card (RN "Open inbox" + quota footnote)
+
+    private func inboxCard(_ loaded: MembershipDetailContent) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Inbox")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+            Text("DM the creator. Each new thread uses one of your monthly message credits.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                onOpenInbox(loaded.personaId)
+            } label: {
+                HStack(spacing: Spacing.s2) {
+                    Icon(.messageSquare, size: 15, color: Theme.Color.appTextInverse)
+                    Text("Open inbox")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.Color.appTextInverse)
+                }
+                .padding(.horizontal, Spacing.s4)
+                .frame(height: 42)
+                .background(Theme.Color.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(loaded.personaId.isEmpty)
+            .accessibilityLabel("Open inbox")
+            .accessibilityIdentifier("membershipDetailOpenInbox")
+            Text(loaded.inbox.footnote)
+                .font(.system(size: 10.5))
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .accessibilityIdentifier("membershipDetailInboxQuota")
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .accessibilityIdentifier("membershipDetailInboxCard")
+    }
+
+    private func scheduledChangeBanner(_: MembershipDetailContent) -> some View {
+        HStack(alignment: .top, spacing: Spacing.s2) {
+            Icon(.calendarClock, size: 15, color: Theme.Color.primary700)
+            Text("A tier change is scheduled — it takes effect at the end of this period.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.Color.primary700)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(Spacing.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.infoBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.infoLight, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityIdentifier("membershipDetailScheduledChange")
+    }
+
+    private func inlineNotice(_ text: String, identifier: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Theme.Color.success)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier(identifier)
+    }
+
     // MARK: - Change tier + cancel
 
     private var changeTierButton: some View {
-        Button(action: onChangeTier) {
+        Button {
+            viewModel.presentTierPicker()
+        } label: {
             HStack(spacing: Spacing.s2) {
                 Icon(.arrowDownUp, size: 17, color: Theme.Color.appTextInverse)
                 Text("Change tier")
@@ -541,6 +635,195 @@ public struct MembershipDetailView: View {
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("membershipDetailPolicyFootnote")
+    }
+
+    // MARK: - Refund request
+
+    private var requestRefundLink: some View {
+        Button {
+            viewModel.presentRefundSheet()
+        } label: {
+            Text("Reply window missed? Request a refund")
+                .font(.system(size: 13, weight: .medium))
+                .underline()
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Request a refund")
+        .accessibilityIdentifier("membershipDetailRequestRefund")
+    }
+
+    private var refundSheet: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            Text("Request a refund")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+            Text(
+                "If the creator missed the reply window they committed to, "
+                    + "the unused portion of this period is refunded to your card "
+                    + "and your membership is cancelled at the end of the period — "
+                    + "you keep access until then."
+            )
+            .pantopusTextStyle(.small)
+            .foregroundStyle(Theme.Color.appTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(alignment: .top, spacing: Spacing.s2) {
+                Icon(.info, size: 15, color: Theme.Color.primary700)
+                Text("Reason: the creator missed their reply-policy window.")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.primary700)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Spacing.s0)
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.infoBg)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+            .accessibilityIdentifier("membershipDetailRefundReason")
+
+            if let refundError = viewModel.refundError {
+                Text(refundError)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("membershipDetailRefundError")
+            }
+
+            PrimaryButton(
+                title: "Request refund",
+                isLoading: viewModel.isRequestingRefund,
+                isEnabled: !viewModel.isRequestingRefund
+            ) {
+                await viewModel.requestRefund()
+            }
+            .accessibilityIdentifier("membershipDetailRefundSubmit")
+
+            Button {
+                viewModel.isRefundSheetPresented = false
+            } label: {
+                Text("Not now")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("membershipDetailRefundDismiss")
+            Spacer(minLength: Spacing.s0)
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("membershipRefundSheet")
+    }
+
+    // MARK: - Change-tier picker
+
+    private var tierPickerSheet: some View {
+        VStack(alignment: .leading, spacing: Spacing.s3) {
+            Text("Change tier")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Theme.Color.appText)
+                .accessibilityAddTraits(.isHeader)
+            Text("Upgrades start right away. Downgrades take effect at the end of this period.")
+                .pantopusTextStyle(.caption)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let actionError = viewModel.actionError {
+                Text(actionError)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.Color.error)
+                    .accessibilityIdentifier("membershipTierPickerError")
+            }
+
+            if viewModel.tierOptions.isEmpty {
+                EmptyState(
+                    icon: .crown,
+                    headline: "No other tiers",
+                    subcopy: "This creator publishes a single tier right now."
+                )
+                .accessibilityIdentifier("membershipTierPickerEmpty")
+            } else {
+                ScrollView {
+                    VStack(spacing: Spacing.s2) {
+                        ForEach(viewModel.tierOptions) { option in
+                            tierOptionRow(option)
+                        }
+                    }
+                }
+            }
+
+            Button {
+                viewModel.isTierPickerPresented = false
+            } label: {
+                Text("Cancel")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("membershipTierPickerDismiss")
+        }
+        .padding(Spacing.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("membershipTierPicker")
+    }
+
+    private func tierOptionRow(_ option: MembershipTierOption) -> some View {
+        Button {
+            Task { @MainActor in await viewModel.changeTier(to: option) }
+        } label: {
+            HStack(alignment: .center, spacing: Spacing.s3) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(option.priceLabel)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                    Text(option.direction.timingNote)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextMuted)
+                }
+                Spacer(minLength: Spacing.s2)
+                VStack(alignment: .trailing, spacing: Spacing.s1) {
+                    Icon(
+                        option.direction == .upgrade ? .trendingUp : .trendingDown,
+                        size: 15,
+                        color: option.direction == .upgrade ? Theme.Color.success : Theme.Color.warning
+                    )
+                    Text(option.direction.label)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(
+                            option.direction == .upgrade ? Theme.Color.success : Theme.Color.warning
+                        )
+                }
+            }
+            .padding(Spacing.s3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.Color.appSurface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                    .stroke(Theme.Color.appBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isChangingTier)
+        .accessibilityLabel(
+            "\(option.direction.label) to \(option.name), \(option.priceLabel). "
+                + option.direction.timingNote
+        )
+        .accessibilityIdentifier("membershipTierOption_\(option.rank)")
     }
 }
 

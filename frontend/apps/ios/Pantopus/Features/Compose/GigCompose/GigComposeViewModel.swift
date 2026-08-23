@@ -72,7 +72,10 @@ enum GigModuleGroup: Equatable {
     case logistics
     case remote
     case event
-    case items
+    /// delivery_errand — pickup / drop-off route + the shopping list.
+    case delivery
+    /// pro_service_quote — licence / insurance / scope / deposit.
+    case proService
 }
 
 @Observable
@@ -858,6 +861,40 @@ extension GigComposeViewModel {
         if form.urgentDetails == nil { form.urgentDetails = draft.urgentDetails }
         if form.eventDetails == nil { form.eventDetails = draft.eventDetails }
         if form.items.isEmpty, let items = draft.items { form.items = Array(items.prefix(20)) }
+        prefillFlatModules(from: draft)
+    }
+
+    /// Fold the parser's flat delivery / pro-service suggestions into
+    /// the two module editors (RN `gig-v2/new.tsx:231-251`). Empty-only
+    /// so a user's own typing is never stomped.
+    private func prefillFlatModules(from draft: MagicDraftDTO) {
+        let hasDelivery = draft.pickupAddress != nil || draft.dropoffAddress != nil
+            || draft.pickupNotes != nil || draft.dropoffNotes != nil
+            || draft.deliveryProofRequired != nil
+        if form.deliveryDetails == nil, hasDelivery {
+            form.deliveryDetails = GigDeliveryDetails(
+                pickupAddress: draft.pickupAddress,
+                pickupNotes: draft.pickupNotes,
+                dropoffAddress: draft.dropoffAddress,
+                dropoffNotes: draft.dropoffNotes,
+                proofRequired: draft.deliveryProofRequired
+            )
+        }
+        let hasPro = draft.requiresLicense != nil || draft.scopeDescription != nil
+            || draft.licenseType != nil || draft.requiresInsurance != nil
+            || draft.depositRequired != nil || draft.depositAmount != nil
+        if form.proServiceDetails == nil, hasPro {
+            var depositText: String?
+            if let amount = draft.depositAmount { depositText = Self.formatBudgetValue(amount) }
+            form.proServiceDetails = GigProServiceDetails(
+                requiresLicense: draft.requiresLicense,
+                licenseType: draft.licenseType,
+                requiresInsurance: draft.requiresInsurance,
+                scopeDescription: draft.scopeDescription,
+                depositRequired: draft.depositRequired,
+                depositAmount: depositText
+            )
+        }
     }
 
     /// Render a draft dollar amount into the budget text fields —
@@ -1298,7 +1335,15 @@ private extension GigComposeViewModel {
             // P15.5 — Continue waits for in-flight photo uploads (the
             // grid shows an "uploading" hint while this gate is closed).
             && !hasUploadsInFlight
-        return basics && hasValidSchedule && hasValidLocation
+        return basics && hasValidSchedule && hasValidLocation && hasValidModules
+    }
+
+    /// Module-level gate. Only the pro-service deposit is conditional
+    /// today: toggling "Require deposit" on demands a positive amount
+    /// (mirrors RN's deposit validation).
+    var hasValidModules: Bool {
+        guard activeModuleGroup == .proService else { return true }
+        return form.proServiceDetails?.isDepositAmountMissing != true
     }
 
     var hasValidBudget: Bool {

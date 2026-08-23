@@ -257,11 +257,20 @@ public struct ContentDetailPhotoTile: Sendable, Hashable, Identifiable {
     public let id: String
     public let gradient: ListingGradient
     public let icon: PantopusIcon
+    /// Real attachment image. When set the tile renders the photo and
+    /// falls back to the gradient + glyph while loading / on failure.
+    public let imageURL: URL?
 
-    public init(id: String = UUID().uuidString, gradient: ListingGradient, icon: PantopusIcon) {
+    public init(
+        id: String = UUID().uuidString,
+        gradient: ListingGradient,
+        icon: PantopusIcon,
+        imageURL: URL? = nil
+    ) {
         self.id = id
         self.gradient = gradient
         self.icon = icon
+        self.imageURL = imageURL
     }
 }
 

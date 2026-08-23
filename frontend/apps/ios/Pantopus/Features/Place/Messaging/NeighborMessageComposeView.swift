@@ -288,7 +288,7 @@ private struct DeliveryPreview: View {
                 PlaceChip(model: PlaceChipModel(tone: .success, text: "Verified", icon: .shieldCheck))
             }
             Text(messageBody)
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .lineSpacing(2)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -302,7 +302,7 @@ private struct DeliveryPreview: View {
                 Spacer(minLength: 0)
             }
             Text("They can reply with a template or block you anytime.")
-                .font(.system(size: 12))
+                .pantopusTextStyle(.caption)
                 .foregroundStyle(Theme.Color.appTextMuted)
         }
     }
@@ -416,7 +416,7 @@ private struct SendBar: View {
             HStack(spacing: 6) {
                 Icon(.eyeOff, size: 13, strokeWidth: 2, color: Theme.Color.appTextMuted)
                 Text("Delivered anonymously · a few messages a week")
-                    .font(.system(size: 12))
+                    .pantopusTextStyle(.caption)
                     .foregroundStyle(Theme.Color.appTextMuted)
             }
         }

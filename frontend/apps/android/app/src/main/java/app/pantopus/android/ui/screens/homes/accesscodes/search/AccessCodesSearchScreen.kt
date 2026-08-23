@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.data.api.models.homes.HomeAccessSecretDto
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowView
 import app.pantopus.android.ui.screens.shared.search_list.EmptyStateContent
@@ -43,6 +44,8 @@ fun AccessCodesSearchScreen(
         viewModel.onOpenCode = onOpenCode
         viewModel.load()
     }
+
+    SecureScreenEffect()
 
     Box(modifier = Modifier.fillMaxSize().testTag(ACCESS_CODES_SEARCH_TAG)) {
         SearchListShell<HomeAccessSecretDto>(

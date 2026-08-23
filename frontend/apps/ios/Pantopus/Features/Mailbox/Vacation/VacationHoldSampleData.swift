@@ -5,8 +5,9 @@
 //  A14.8 — deterministic fixtures for the Vacation Hold screen. Mirrors
 //  the populated + active frames in `vacation-frames.jsx` so previews,
 //  snapshot tests, and the no-backend wiring render the same numbers
-//  the designer specified ("May 28 → Jun 9", "5 days left", "4 / 1 / 2"
-//  stats grid, "Mom's place" forwarding, "Sam (brother)" emergency).
+//  the designer specified ("May 28 → Jun 9", "5 days left", "4 / 12 / 1"
+//  stats grid, "142 Mulberry St" forwarding, "Sam Park (spouse)"
+//  emergency).
 //
 
 import Foundation
@@ -36,9 +37,9 @@ public enum VacationHoldSampleData {
                     isOn: true
                 ),
                 VacationHoldScope(
-                    kind: .magicTask,
-                    label: "Magic Task delivery",
-                    sub: "AI-resolved errands pause",
+                    kind: .marketplacePickups,
+                    label: "Marketplace pickups",
+                    sub: "Buyers see away status",
                     isOn: true
                 ),
                 VacationHoldScope(
@@ -51,14 +52,14 @@ public enum VacationHoldSampleData {
             ],
             forwardingEnabled: true,
             forwarding: VacationForwardingTarget(
-                title: "Forward to Mom's place",
-                sub: "1456 Cedar Pkwy"
+                title: "142 Mulberry St, Apt 3B",
+                sub: "New York, NY 10013 · Mom's place"
             ),
             emergency: VacationEmergencyContact(
-                name: "Sam",
-                initials: "S",
-                relation: "Brother",
-                phone: "(415) 555-0188"
+                name: "Sam Park",
+                initials: "SP",
+                relation: "Spouse",
+                phone: "(•••) 555-0247"
             ),
             footerBlurb: "14 Elm Park Lane · Last hold Jul 2023"
         )
@@ -68,31 +69,31 @@ public enum VacationHoldSampleData {
     public static var activeHold: VacationActiveHold {
         VacationActiveHold(
             daysLeft: 5,
-            untilLabel: "Dec 12",
-            resumeBlurb: "Everything held resumes delivery the morning of Dec 12.",
+            untilLabel: "Jun 9",
+            resumeBlurb: "Everything held resumes delivery the morning of Jun 9.",
             stats: [
-                VacationHoldStat(id: "letters", count: 4, label: "Letters"),
-                VacationHoldStat(id: "packages", count: 1, label: "Package"),
-                VacationHoldStat(id: "forwarded", count: 2, label: "Forwarded")
+                VacationHoldStat(id: "packages", count: 4, label: "Packages"),
+                VacationHoldStat(id: "mailItems", count: 12, label: "Mail items"),
+                VacationHoldStat(id: "forwarded", count: 1, label: "Forwarded")
             ],
             heldItems: [
                 VacationHeldItem(
                     icon: .packages,
                     label: "Packages",
                     sub: "Held at Park Slope hub",
-                    count: 1
+                    count: 4
                 ),
                 VacationHeldItem(
                     icon: .mail,
                     label: "Mail & flyers",
                     sub: "USPS holding",
-                    count: 4
+                    count: 12
                 ),
                 VacationHeldItem(
                     icon: .forwarded,
                     label: "Forwarded urgent",
-                    sub: "→ 1456 Cedar Pkwy",
-                    count: 2
+                    sub: "→ 142 Mulberry St",
+                    count: 1
                 ),
                 VacationHeldItem(
                     icon: .civic,
@@ -102,16 +103,16 @@ public enum VacationHoldSampleData {
                 )
             ],
             forwarding: VacationForwardingTarget(
-                title: "1456 Cedar Pkwy",
-                sub: "Mom's place · 2 items sent"
+                title: "142 Mulberry St, Apt 3B",
+                sub: "Mom's place · 1 item sent"
             ),
             emergency: VacationEmergencyContact(
-                name: "Sam",
-                initials: "S",
-                relation: "Brother",
-                phone: "(415) 555-0188"
+                name: "Sam Park",
+                initials: "SP",
+                relation: "Spouse",
+                phone: "(•••) 555-0247"
             ),
-            activeSinceLabel: "14 Elm Park Lane · Active since Dec 2"
+            activeSinceLabel: "14 Elm Park Lane · Active since May 28"
         )
     }
 

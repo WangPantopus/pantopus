@@ -73,6 +73,67 @@ public struct PostGigV1Photo: Identifiable, Equatable, Sendable {
     }
 }
 
+/// `cancellation_policy` — the three values `createGigSchema` /
+/// `updateGigSchema` accept (`backend/routes/gigs.js:438` / `:649`).
+/// Labels + blurbs mirror the backend's `CANCELLATION_POLICIES` table
+/// (`gigs.js:541`) so the picker states the real rule.
+public enum PostGigV1CancellationPolicy: String, CaseIterable, Identifiable, Sendable {
+    case flexible
+    case standard
+    case strict
+
+    public var id: String {
+        rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .flexible: "Flexible"
+        case .standard: "Standard"
+        case .strict: "Strict"
+        }
+    }
+
+    public var blurb: String {
+        switch self {
+        case .flexible: "Free cancellation anytime before work starts."
+        case .standard: "Free within 1 hour of acceptance. After that, 5% fee."
+        case .strict: "10% fee after acceptance. 50% after work starts."
+        }
+    }
+}
+
+/// One errand / shopping line item (`Gig.items` jsonb). Mirrors RN's
+/// `TaskItem` (`gig/_components/useGigForm.ts:68`).
+public struct PostGigV1Item: Identifiable, Equatable, Sendable {
+    public let id: String
+    public var name: String
+    public var notes: String
+    public var budgetCap: String
+    public var preferredStore: String
+
+    public init(
+        id: String = UUID().uuidString,
+        name: String = "",
+        notes: String = "",
+        budgetCap: String = "",
+        preferredStore: String = ""
+    ) {
+        self.id = id
+        self.name = name
+        self.notes = notes
+        self.budgetCap = budgetCap
+        self.preferredStore = preferredStore
+    }
+
+    public var isEmpty: Bool {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && budgetCap.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && preferredStore.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 public struct PostGigV1Form: Equatable, Sendable {
     public var category: GigsCategory
     public var title: String
@@ -82,6 +143,16 @@ public struct PostGigV1Form: Equatable, Sendable {
     public var scheduledAt: Date
     public var location: String
     public var photos: [PostGigV1Photo]
+    /// A13.8 P5 — the fields RN's editor has always carried.
+    public var cancellationPolicy: PostGigV1CancellationPolicy
+    public var isUrgent: Bool
+    /// Comma-separated, exactly like RN's single text input.
+    public var tags: String
+    /// Optional "must be done by" date (`deadline`). `nil` → omitted.
+    public var deadline: Date?
+    /// Hours, free-text so an empty field means "omit".
+    public var estimatedDuration: String
+    public var items: [PostGigV1Item]
 
     public init(
         category: GigsCategory = .all,
@@ -91,7 +162,13 @@ public struct PostGigV1Form: Equatable, Sendable {
         priceType: PostGigV1PriceType = .flat,
         scheduledAt: Date = Date().addingTimeInterval(86400),
         location: String = "",
-        photos: [PostGigV1Photo] = []
+        photos: [PostGigV1Photo] = [],
+        cancellationPolicy: PostGigV1CancellationPolicy = .standard,
+        isUrgent: Bool = false,
+        tags: String = "",
+        deadline: Date? = nil,
+        estimatedDuration: String = "",
+        items: [PostGigV1Item] = []
     ) {
         self.category = category
         self.title = title
@@ -101,6 +178,29 @@ public struct PostGigV1Form: Equatable, Sendable {
         self.scheduledAt = scheduledAt
         self.location = location
         self.photos = photos
+        self.cancellationPolicy = cancellationPolicy
+        self.isUrgent = isUrgent
+        self.tags = tags
+        self.deadline = deadline
+        self.estimatedDuration = estimatedDuration
+        self.items = items
+    }
+
+    /// Tags the backend will accept: trimmed, non-empty, capped at the
+    /// schema's five (`Joi.array().max(5)`).
+    public var parsedTags: [String] {
+        // `trimmingCharacters` already yields `String`, so a trailing
+        // `.map(String.init)` would be both redundant and ambiguous.
+        let trimmed = tags
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array(trimmed.prefix(PostGigV1SampleData.maxTags))
+    }
+
+    /// RN keeps only items with a name (`useGigForm.ts:346`).
+    public var validItems: [PostGigV1Item] {
+        items.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     public var hasAnyInput: Bool {
@@ -110,7 +210,13 @@ public struct PostGigV1Form: Equatable, Sendable {
             !price.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
             priceType != .flat ||
             !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            !photos.isEmpty
+            !photos.isEmpty ||
+            cancellationPolicy != .standard ||
+            isUrgent ||
+            !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            deadline != nil ||
+            !estimatedDuration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            items.contains { !$0.isEmpty }
     }
 }
 
@@ -121,6 +227,7 @@ public enum PostGigV1Field: String, Sendable {
     case price
     case dateTime
     case location
+    case estimatedDuration
 }
 
 public struct PostGigV1ValidationError: Identifiable, Equatable, Sendable {
@@ -314,6 +421,43 @@ public final class PostGigV1ViewModel {
         state.form.location = location
     }
 
+    // MARK: - A13.8 P5 — the rest of RN's editable field set
+
+    public func updateCancellationPolicy(_ policy: PostGigV1CancellationPolicy) {
+        state.form.cancellationPolicy = policy
+    }
+
+    public func updateIsUrgent(_ isUrgent: Bool) {
+        state.form.isUrgent = isUrgent
+    }
+
+    public func updateTags(_ tags: String) {
+        state.form.tags = tags
+    }
+
+    public func updateDeadline(_ deadline: Date?) {
+        state.form.deadline = deadline
+    }
+
+    public func updateEstimatedDuration(_ hours: String) {
+        state.form.estimatedDuration = hours.filter { $0.isNumber || $0 == "." }
+    }
+
+    public func addItem() {
+        guard state.form.items.count < PostGigV1SampleData.maxItems else { return }
+        state.form.items.append(PostGigV1Item())
+    }
+
+    /// Replace one item in place (the view hands back a mutated copy).
+    public func updateItem(_ item: PostGigV1Item) {
+        guard let index = state.form.items.firstIndex(where: { $0.id == item.id }) else { return }
+        state.form.items[index] = item
+    }
+
+    public func removeItem(id: String) {
+        state.form.items.removeAll { $0.id == id }
+    }
+
     // MARK: - Photo uploads (same pipeline as the V2 wizard's P15.5)
 
     /// Add a picked photo and immediately upload it in the background.
@@ -462,6 +606,8 @@ extension PostGigV1ViewModel {
     private func buildCreateBody(from form: PostGigV1Form) -> CreateGigBody {
         let pay = payTypeAndPrice(from: form)
         let attachments = uploadedAttachmentURLs(from: form)
+        let tags = form.parsedTags
+        let items = form.validItems
         return CreateGigBody(
             title: form.title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: form.description.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -472,6 +618,14 @@ extension PostGigV1ViewModel {
             scheduledStart: ISO8601DateFormatter().string(from: form.scheduledAt),
             taskFormat: nil,
             attachments: attachments.isEmpty ? nil : attachments,
+            // RN only sends these when the user filled them in
+            // (`useGigForm.ts:331-349`); `cancellation_policy` always rides.
+            deadline: form.deadline.map { ISO8601DateFormatter().string(from: $0) },
+            cancellationPolicy: form.cancellationPolicy.rawValue,
+            isUrgent: form.isUrgent ? true : nil,
+            tags: tags.isEmpty ? nil : tags,
+            estimatedDuration: Self.durationHours(form.estimatedDuration),
+            items: items.isEmpty ? nil : items.map(Self.itemDTO),
             location: CreateGigLocation(
                 mode: "custom",
                 latitude: 0,
@@ -481,10 +635,36 @@ extension PostGigV1ViewModel {
         )
     }
 
+    private static func durationHours(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let value = Double(trimmed), value > 0 else { return nil }
+        return value
+    }
+
+    private static func itemDTO(_ item: PostGigV1Item) -> GigItemDTO {
+        func clean(_ text: String) -> String? {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return GigItemDTO(
+            name: clean(item.name),
+            notes: clean(item.notes),
+            budgetCap: clean(item.budgetCap),
+            preferredStore: clean(item.preferredStore)
+        )
+    }
+
     /// Map the V1 form onto the `PATCH /api/gigs/:id` body — same field
     /// names as create. `attachments` always rides (an empty array
     /// clears removed photos); `location` only rides when edit-load
     /// captured real coordinates, so the stored point is preserved.
+    ///
+    /// The list-shaped fields (`tags`, `items`) and the two booleans
+    /// (`is_urgent`, `cancellation_policy`) always ride here — otherwise
+    /// the editor could add but never remove. `deadline` and
+    /// `estimated_duration` can only be *set*: the update schema takes
+    /// neither `null` (`gigs.js:646`), so clearing them is a backend gap,
+    /// not something the client can fake.
     private func buildUpdateBody(from form: PostGigV1Form) -> UpdateGigBody {
         let pay = payTypeAndPrice(from: form)
         var location: CreateGigLocation?
@@ -505,6 +685,12 @@ extension PostGigV1ViewModel {
             scheduleType: "scheduled",
             scheduledStart: ISO8601DateFormatter().string(from: form.scheduledAt),
             attachments: uploadedAttachmentURLs(from: form),
+            deadline: form.deadline.map { ISO8601DateFormatter().string(from: $0) },
+            cancellationPolicy: form.cancellationPolicy.rawValue,
+            isUrgent: form.isUrgent,
+            tags: form.parsedTags,
+            estimatedDuration: Self.durationHours(form.estimatedDuration),
+            items: form.validItems.map(Self.itemDTO),
             location: location
         )
     }
@@ -537,6 +723,14 @@ extension PostGigV1ViewModel {
         if form.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errors.append(.init(field: .location, message: "Add a pickup or meetup location."))
         }
+        // RN's exact rule (`useGigForm.ts:290`).
+        let duration = form.estimatedDuration.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !duration.isEmpty, (Double(duration) ?? 0) <= 0 {
+            errors.append(.init(
+                field: .estimatedDuration,
+                message: "Estimated duration must be a positive number."
+            ))
+        }
         return errors
     }
 
@@ -565,6 +759,24 @@ extension PostGigV1ViewModel {
         form.photos = (gig.attachments ?? [])
             .prefix(PostGigV1SampleData.maxPhotos)
             .map { PostGigV1Photo(id: $0, status: .uploaded(url: $0)) }
+        // A13.8 P5 — the rest of RN's prefill (`useGigForm.ts:90-116`).
+        form.cancellationPolicy = PostGigV1CancellationPolicy(rawValue: gig.cancellationPolicy ?? "") ?? .standard
+        form.isUrgent = gig.isUrgent ?? false
+        form.tags = (gig.tags ?? []).joined(separator: ", ")
+        form.deadline = gig.deadline.flatMap(Self.parseISO)
+        form.estimatedDuration = gig.estimatedDuration.map { hours in
+            hours.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(hours)) : String(hours)
+        } ?? ""
+        form.items = (gig.items ?? [])
+            .map {
+                PostGigV1Item(
+                    name: $0.name ?? "",
+                    notes: $0.notes ?? "",
+                    budgetCap: $0.budgetCap ?? "",
+                    preferredStore: $0.preferredStore ?? ""
+                )
+            }
+            .filter { !$0.isEmpty }
         if let latitude = gig.location?.latitude ?? gig.latitude,
            let longitude = gig.location?.longitude ?? gig.longitude {
             editOrigin = (latitude, longitude)

@@ -29,6 +29,7 @@
           "/notifications",
           "/wallet",
           "/invite/*",
+          "/join/*",
           "/auth/*",
           "/verify-email",
           "/verify-email/*",

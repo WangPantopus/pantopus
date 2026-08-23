@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.models.homes.CalendarEventDto
 import app.pantopus.android.data.api.models.homes.OccupantDto
 import app.pantopus.android.data.api.models.homes.OccupantsResponse
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.homes.HomeMembersRepository
 import app.pantopus.android.data.homes.HomesRepository
@@ -24,6 +25,7 @@ import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
 import app.pantopus.android.ui.screens.scheduling.bookings.BookingsOwnerRelay
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,16 @@ import javax.inject.Inject
 
 /** Nav arg key for the Home calendar route. */
 const val HOME_CALENDAR_HOME_ID_KEY = "homeId"
+
+/**
+ * `source` / `event_type` marker stamped on the synthetic rows that carry
+ * a derived task / bill / package due-date through the agenda projection.
+ * It is neither `event` nor `booking`, so [HomeAgendaItem.isBooking] stays
+ * false and the row never routes to A8; as an `event_type` it infers to
+ * [CalendarEventCategory.Generic], which no derived row ever renders.
+ * Client-only — never sent on the wire.
+ */
+private const val DERIVED_SOURCE = "derived"
 
 /** Render state for the bespoke Home calendar agenda (F1). */
 sealed interface HomeCalendarUiState {
@@ -57,6 +69,14 @@ sealed interface HomeCalendarUiState {
  *
  * Booking rows are read-only — tapping one routes to A8's Booking Detail
  * by route; never persisted as a `HomeCalendarEvent`.
+ *
+ * Task due-dates, bill due-dates and package expected-delivery dates are
+ * plotted alongside the events (see [fetchDerived] / [derivedRow]) so a
+ * household sees everything that lands on a day, not just calendar
+ * entries. Those rows are read-only, and — having no household owner —
+ * they are exempt from the member filter, so they stay visible under
+ * "All", "Mine" and every per-member chip. Anything else contradicts the
+ * month strip, which counts their dots unfiltered.
  */
 @HiltViewModel
 class HomeCalendarViewModel
@@ -70,8 +90,9 @@ class HomeCalendarViewModel
         private val clock: () -> Instant = Instant::now,
         // Device-local display zone — agenda rows and the month strip render
         // the same wall time the event form composes instants from (iOS
-        // parity). Tests inject a fixed zone; the all-day heuristic stays
-        // pinned to UTC inside HomeAgendaBuilder.
+        // parity), and a bare `yyyy-MM-dd` due date anchors to midnight in it.
+        // Tests inject a fixed zone; the all-day heuristic for *timestamped*
+        // events stays pinned to UTC inside HomeAgendaBuilder.
         private val zone: ZoneId = ZoneId.systemDefault(),
     ) : ViewModel() {
         @Inject
@@ -113,6 +134,32 @@ class HomeCalendarViewModel
         val memberFilter: StateFlow<MemberFilter> = _memberFilter.asStateFlow()
 
         private var events: List<CalendarEventDto> = emptyList()
+
+        /**
+         * Task due-dates, bill due-dates and package expected-delivery
+         * dates plotted alongside the home events, already projected into
+         * the agenda's own entry shape. RN's month grid does the same
+         * (`src/app/homes/[id]/calendar.tsx:48-74`) so a household can see
+         * everything that lands on a day, not just calendar entries.
+         *
+         * Kept as rows (rather than as the raw [HomeCalendarDerivedItem]
+         * feed) so events and derived due-dates share exactly one grouping
+         * pass through [HomeAgendaBuilder] — the same single-pass contract
+         * the list-of-rows projection expressed with its `AgendaEntry`.
+         */
+        private var derivedRows: List<CalendarEventDto> = emptyList()
+
+        /**
+         * The [HomeCalendarDerivedItem] behind each row in [derivedRows],
+         * keyed by the synthetic DTO id. Travelling alongside the rows — not
+         * folded into them — is what lets the projection render each row
+         * with its kind's own label / icon / background / foreground and its
+         * `detail ?: kind.label` subtitle, exempt it from the member filter
+         * and mark it read-only, instead of re-deriving any of that from an
+         * `event_type` string.
+         */
+        private var derivedIndex: HomeAgendaDerivedIndex = emptyMap()
+
         private var membersMap: Map<String, HomeMember> = emptyMap()
         private var resolvedUserId: String? = null
         private var weekAnchorIso: String = HomeAgendaBuilder.weekAnchorIso(clock(), zone)
@@ -153,22 +200,53 @@ class HomeCalendarViewModel
                 when (eventsResult) {
                     is NetworkResult.Success -> {
                         events = eventsResult.data.events
+                        // Events are the primary read — the three derived
+                        // feeds are best-effort side-reads that must never
+                        // fail the calendar.
+                        fetchDerived()
                         rebuild()
                     }
                     is NetworkResult.Failure -> {
                         events = emptyList()
+                        derivedRows = emptyList()
+                        derivedIndex = emptyMap()
                         // Keep the last-built month strip so a refresh failure
                         // after a successful load retains the chrome (design
                         // FrameError keeps the strip; mirrors iOS, which never
                         // clears `monthStrip` on error).
                         _state.value =
                             HomeCalendarUiState.Error(
-                                eventsResult.error.message ?: "Couldn't load your calendar.",
+                                eventsResult.error.displayMessage("Couldn't load your calendar."),
                             )
                     }
                 }
             }
         }
+
+        /**
+         * `GET /api/homes/:id/tasks`, `…/bills`, `…/packages`. Each is
+         * optional: a member without `tasks.view` / `finance.view` /
+         * `mailbox.view` simply gets fewer dots.
+         */
+        private suspend fun fetchDerived() =
+            coroutineScope {
+                val tasksDeferred = async { repo.getHomeTasks(homeId) }
+                val billsDeferred = async { repo.getHomeBills(homeId) }
+                val packagesDeferred = async { repo.getHomePackages(homeId) }
+                val items =
+                    HomeCalendarDerivedItem.build(
+                        tasks = (tasksDeferred.await() as? NetworkResult.Success)?.data?.tasks.orEmpty(),
+                        bills = (billsDeferred.await() as? NetworkResult.Success)?.data?.bills.orEmpty(),
+                        packages = (packagesDeferred.await() as? NetworkResult.Success)?.data?.packages.orEmpty(),
+                    )
+                // Anything the agenda can't place is dropped here — it would be
+                // skipped silently downstream and must not count towards "the
+                // household has nothing at all". Bare `yyyy-MM-dd` values are
+                // resolved in the display zone, exactly as the projection does.
+                val placeable = items.filter { HomeAgendaBuilder.parseInstant(it.dateIso, zone) != null }
+                derivedRows = placeable.map(::derivedRow)
+                derivedIndex = placeable.associateBy { it.id }
+            }
 
         private fun applyMembers(result: NetworkResult<OccupantsResponse>) {
             val occupants =
@@ -198,6 +276,41 @@ class HomeCalendarViewModel
                 isYou = occupant.userId == resolvedUserId,
             )
         }
+
+        /**
+         * Project one derived due-date into the agenda's wire shape so the
+         * single [HomeAgendaBuilder] pass buckets it, headers it, counts its
+         * month-strip dot and honours the selected day exactly like an event.
+         * The row's *presentation* does not come from this DTO — the
+         * [HomeCalendarDerivedItem] travels alongside it in [derivedIndex],
+         * and the row reads its kind's own label / icon / background /
+         * foreground plus `detail ?: kind.label`.
+         *
+         *  - `source` is [DERIVED_SOURCE], so the row is not a booking; the
+         *    screen renders it disabled and [openAgendaItem] refuses it.
+         *  - `eventType` is [DERIVED_SOURCE] too — a client-only marker that
+         *    infers to [CalendarEventCategory.Generic] and is never rendered.
+         *    Borrowing a real `event_type` here would route a bill through the
+         *    category palette and paint an unpaid bill green.
+         *  - `assignedTo` is null: a task / bill / package due-date has no
+         *    household owner. The projection therefore *exempts* derived
+         *    entries from the member predicate instead of letting them be
+         *    filtered out. Documented parity contract — iOS applies the same
+         *    rule.
+         *  - `endAt` is null; `startAt` carries the raw `dateIso`, so a bare
+         *    `yyyy-MM-dd` is recognised as date-only and reads "All day".
+         */
+        private fun derivedRow(item: HomeCalendarDerivedItem): CalendarEventDto =
+            CalendarEventDto(
+                id = item.id,
+                homeId = homeId,
+                eventType = DERIVED_SOURCE,
+                title = item.title,
+                startAt = item.dateIso,
+                endAt = null,
+                assignedTo = null,
+                source = DERIVED_SOURCE,
+            )
 
         // MARK: - Mutators
 
@@ -239,6 +352,12 @@ class HomeCalendarViewModel
         // MARK: - Navigation
 
         fun openAgendaItem(item: HomeAgendaItem) {
+            if (isDerived(item)) {
+                // Derived task / bill / package due-dates mirror surfaces that
+                // own their own screens, so tapping is a no-op exactly as in
+                // RN's calendar.
+                return
+            }
             if (item.isBooking && item.bookingId != null) {
                 // Booking-union rows belong to THIS home — stash the home owner
                 // for the arg-less detail route (iOS parity:
@@ -250,6 +369,13 @@ class HomeCalendarViewModel
                 onOpenEvent(item.eventId ?: item.id)
             }
         }
+
+        /**
+         * True for the read-only task / bill / package due-date rows. The row
+         * carries its own kind, so this is a property of the row rather than a
+         * lookup — the screen uses the same signal to render it disabled.
+         */
+        internal fun isDerived(item: HomeAgendaItem): Boolean = item.derived != null
 
         fun openWhosFree() {
             onNavigate(SchedulingRoutes.WHOS_FREE)
@@ -273,9 +399,12 @@ class HomeCalendarViewModel
 
         private fun rebuild() {
             val now = clock()
+            // Every dated thing that belongs on this week's strip and in the
+            // agenda: calendar events plus task / bill / package due dates.
+            val agenda = events + derivedRows
             _monthStrip.value =
                 HomeAgendaBuilder.weekStrip(
-                    events = events,
+                    events = agenda,
                     anchorIso = weekAnchorIso,
                     selectedIso = selectedIsoDate,
                     now = now,
@@ -289,19 +418,20 @@ class HomeCalendarViewModel
                 }
             val sections =
                 HomeAgendaBuilder.sections(
-                    events = events,
+                    events = agenda,
                     members = membersMap,
                     now = now,
                     zone = zone,
                     selectedIsoDate = selectedIsoDate,
                     onlyUserId = onlyUser,
+                    derived = derivedIndex,
                 )
             _state.value = HomeCalendarUiState.Loaded(sections = sections, empty = resolveEmpty(sections))
         }
 
         private fun resolveEmpty(sections: List<HomeAgendaSection>): AgendaEmpty? {
             if (sections.isNotEmpty()) return null
-            if (events.isEmpty()) return AgendaEmpty.FirstRun
+            if (events.isEmpty() && derivedRows.isEmpty()) return AgendaEmpty.FirstRun
             return when (val filter = _memberFilter.value) {
                 is MemberFilter.Member -> AgendaEmpty.FilteredMember(filter.name)
                 MemberFilter.Mine -> AgendaEmpty.FilteredMember("you")

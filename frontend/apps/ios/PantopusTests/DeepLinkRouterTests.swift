@@ -3,14 +3,33 @@
 //  PantopusTests
 //
 
+// One file per router, split into classes by concern (routing table /
+// batch-2 seam / aliases / signed-out gate) so no single type body grows
+// past the limit. Mirrors Android `DeepLinkRouterTest`.
+// swiftlint:disable file_length
+
 import XCTest
 @testable import Pantopus
 
 @MainActor
 final class DeepLinkRouterTests: XCTestCase {
+    /// WS1.4 gated `.content` destinations behind the session check: signed-out
+    /// links are stashed for post-login replay instead of published to
+    /// `pending`. These cases describe a signed-in user's routing, so bind the
+    /// seam rather than depending on whatever session the test host happens to
+    /// hold. Mirrors Android `DeepLinkRouterTest.setUp`.
     override func setUp() {
         super.setUp()
-        _ = DeepLinkRouter.shared.consume() // clear any leftover state
+        DeepLinkRouter.bindSignedInProvider { true }
+        DeepLinkRouter.shared.clearPending() // pending + prefersLoginPresentation
+        PendingDeepLinkStore.clear()
+    }
+
+    override func tearDown() {
+        DeepLinkRouter.bindSignedInProvider(nil)
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+        super.tearDown()
     }
 
     func testCustomSchemeFeed() throws {
@@ -39,8 +58,7 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testUnknownPathFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://wat"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case let .unknown(captured) = DeepLinkRouter.shared.pending {
+        if case let .unknown(captured) = DeepLinkRouter.shared.resolve(url: url) {
             XCTAssertEqual(captured, url)
         } else {
             XCTFail("Expected .unknown")
@@ -69,8 +87,10 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testInviteWithoutTokenFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://invite"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok
         } else {
             XCTFail("Expected .unknown when /invite is missing the token")
@@ -216,8 +236,7 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testSettingsWithoutSubrouteFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://settings"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case let .unknown(captured) = DeepLinkRouter.shared.pending {
+        if case let .unknown(captured) = DeepLinkRouter.shared.resolve(url: url) {
             XCTAssertEqual(captured, url)
         } else {
             XCTFail("Bare /settings should fall back to .unknown")
@@ -238,8 +257,10 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testMailboxRootWithoutVacationFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://mailbox"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok — only the `/vacation` sub-path is wired today.
         } else {
             XCTFail("Expected .unknown for bare /mailbox path")
@@ -262,8 +283,10 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testResetPasswordWithoutTokenFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://auth/reset-password"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok
         } else {
             XCTFail("Expected .unknown when /auth/reset-password is missing the token")
@@ -305,8 +328,10 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testVerifyEmailWithoutTokenFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://auth/verify-email"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok
         } else {
             XCTFail("Expected .unknown when /auth/verify-email is missing the token")
@@ -329,8 +354,10 @@ final class DeepLinkRouterTests: XCTestCase {
 
     func testMailboxRootWithoutSubrouteFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://mailbox"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok — bare `pantopus://mailbox` is not a typed destination today.
         } else {
             XCTFail("Expected .unknown for bare /mailbox")
@@ -387,7 +414,16 @@ final class DeepLinkRouterTests: XCTestCase {
 final class DeepLinkRouterBatch2Tests: XCTestCase {
     override func setUp() {
         super.setUp()
-        _ = DeepLinkRouter.shared.consume() // clear any leftover state
+        DeepLinkRouter.bindSignedInProvider { true }
+        DeepLinkRouter.shared.clearPending() // pending + prefersLoginPresentation
+        PendingDeepLinkStore.clear()
+    }
+
+    override func tearDown() {
+        DeepLinkRouter.bindSignedInProvider(nil)
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+        super.tearDown()
     }
 
     func testStampsRoute() throws {
@@ -407,8 +443,10 @@ final class DeepLinkRouterBatch2Tests: XCTestCase {
 
     func testMailTaskWithoutIdFallsBack() throws {
         let url = try XCTUnwrap(URL(string: "pantopus://mailbox/tasks"))
-        DeepLinkRouter.shared.handle(url: url)
-        if case .unknown = DeepLinkRouter.shared.pending {
+        // WS1.4 classifies `.unknown` as `.discard`, so it is deliberately
+        // never published to `pending`. Assert the classification itself —
+        // this mirrors Android, whose equivalent cases assert `resolveString`.
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
             // ok — `mailbox/tasks` with no id has no typed destination.
         } else {
             XCTFail("Expected .unknown when /mailbox/tasks is missing the id")
@@ -470,5 +508,166 @@ final class DeepLinkRouterBatch2Tests: XCTestCase {
     func testWaitingRoomRouteHTTPSHost() throws {
         try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/homes/h_5/waiting-room")))
         XCTAssertEqual(DeepLinkRouter.shared.pending, .waitingRoom(id: "h_5"))
+    }
+}
+
+/// Short-link aliases (`/@handle`, `/persona/:handle`, `/u/:username`,
+/// `/b/:username`, `/broadcast/:id`, `/join/:code`). Mirrors the Android
+/// alias cases in `DeepLinkRouterTest`.
+@MainActor
+final class DeepLinkRouterAliasTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        DeepLinkRouter.bindSignedInProvider { true }
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+    }
+
+    override func tearDown() {
+        DeepLinkRouter.bindSignedInProvider(nil)
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+        super.tearDown()
+    }
+
+    /// `/persona/:handle` is the public Beacon profile on both platforms —
+    /// it must not fall through to the generic `.user` surface.
+    func testPersonaRouteResolvesToBeaconProfile() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://persona/mariak")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .beaconProfile(handle: "mariak"))
+    }
+
+    func testPersonaRouteHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/persona/mariak")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .beaconProfile(handle: "mariak"))
+    }
+
+    /// `URL(string:)` reads `@` as the userinfo delimiter, so the custom-scheme
+    /// alias only survives because the router parses the raw authority.
+    func testHandleAliasCustomScheme() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://@mariak")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .beaconProfile(handle: "mariak"))
+    }
+
+    func testHandleAliasHTTPSHost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/@mariak")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .beaconProfile(handle: "mariak"))
+    }
+
+    func testJoinRouteResolvesToJoinInvite() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://join/CODE-7")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .joinInvite(code: "CODE-7"))
+    }
+
+    /// The invite the backend hands out is an `https://pantopus.com/join/<code>`
+    /// link. Until that domain was claimed and `/join/*` was added to the AASA,
+    /// tapping one only ever opened a browser.
+    func testHTTPSJoinLinkResolvesToJoinInvite() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.com/join/CODE-7")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .joinInvite(code: "CODE-7"))
+    }
+
+    /// Share links are built on the claimed domain — see `GigDetailViewModel.shareURL`.
+    func testHTTPSGigShareLinkResolvesToGig() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.com/gigs/g_3")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .gig(id: "g_3"))
+    }
+
+    func testShortUserAlias() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://u/u_demo")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .user(id: "u_demo"))
+    }
+
+    func testShortBusinessAlias() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://b/biz_42")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .businessProfile(businessId: "biz_42"))
+    }
+
+    func testBroadcastAliasResolvesToPost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://broadcast/p_1")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .post(id: "p_1"))
+    }
+
+    func testBroadcastsAliasResolvesToPost() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://broadcasts/p_1")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .post(id: "p_1"))
+    }
+
+    /// There is no `/local/:handle` route on either platform.
+    func testLocalRouteFallsBackToUnknown() throws {
+        let url = try XCTUnwrap(URL(string: "pantopus://local/mariak"))
+        if case .unknown = DeepLinkRouter.shared.resolve(url: url) {
+            // ok
+        } else {
+            XCTFail("`/local` is not a route on either platform")
+        }
+    }
+}
+
+/// WS1.4 — the signed-out gate on `.content` destinations. Mirrors the
+/// Android cases in `DeepLinkRouterTest`.
+@MainActor
+final class DeepLinkRouterSignedOutTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        DeepLinkRouter.bindSignedInProvider { false }
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+    }
+
+    override func tearDown() {
+        DeepLinkRouter.bindSignedInProvider(nil)
+        DeepLinkRouter.shared.clearPending()
+        PendingDeepLinkStore.clear()
+        super.tearDown()
+    }
+
+    func testSignedOutContentIsStashedAndNotPending() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://post/abc-123")))
+        XCTAssertNil(DeepLinkRouter.shared.pending, "content must not publish while signed out")
+        XCTAssertEqual(PendingDeepLinkStore.peek(), "pantopus://post/abc-123")
+        XCTAssertTrue(DeepLinkRouter.shared.prefersLoginPresentation)
+    }
+
+    func testSignedOutHTTPSContentIsStashedInNormalizedForm() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/post/abc-123")))
+        XCTAssertNil(DeepLinkRouter.shared.pending)
+        XCTAssertEqual(PendingDeepLinkStore.peek(), "pantopus://post/abc-123")
+    }
+
+    /// The stashed form must stay percent-encoded — rebuilding it from the
+    /// decoded path components would turn an encoded `/` inside an id into a
+    /// real separator and replay a different link.
+    func testSignedOutHTTPSContentKeepsPercentEncoding() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "https://pantopus.app/post/a%2Fb")))
+        XCTAssertEqual(PendingDeepLinkStore.peek(), "pantopus://post/a%2Fb")
+    }
+
+    func testSignedOutAuthOwnedPublishesAndIsNotPersisted() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://reset-password?token=t_1")))
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .resetPassword(token: "t_1"))
+        XCTAssertTrue(DeepLinkRouter.shared.prefersLoginPresentation)
+        XCTAssertNil(PendingDeepLinkStore.peek(), "auth-owned links must not survive process death")
+    }
+
+    func testSignedOutUnknownIsDiscardedEntirely() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://not-a-real-route")))
+        XCTAssertNil(DeepLinkRouter.shared.pending)
+        XCTAssertNil(PendingDeepLinkStore.peek())
+        XCTAssertFalse(DeepLinkRouter.shared.prefersLoginPresentation)
+    }
+
+    /// The `!signedIn -> signedIn` replay that `RootView` performs.
+    func testStashedLinkReplaysOnceSignedIn() throws {
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: "pantopus://post/abc-123")))
+        XCTAssertNil(DeepLinkRouter.shared.pending)
+
+        DeepLinkRouter.bindSignedInProvider { true }
+        DeepLinkRouter.shared.acknowledgeLoginPresentation()
+        let replayed = try XCTUnwrap(PendingDeepLinkStore.take())
+        try DeepLinkRouter.shared.handle(url: XCTUnwrap(URL(string: replayed)))
+
+        XCTAssertEqual(DeepLinkRouter.shared.pending, .post(id: "abc-123"))
+        XCTAssertNil(PendingDeepLinkStore.peek(), "the stash is one-shot")
     }
 }

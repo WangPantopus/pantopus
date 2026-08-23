@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.HomeTaskDto
 import app.pantopus.android.data.api.models.homes.UpdateHomeTaskRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomeTasksRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.components.StatusChipVariant
@@ -20,6 +21,7 @@ import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsTab
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowHighlight
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowIconAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowModel
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowSection
@@ -96,6 +98,21 @@ data class HouseholdTaskRowProjection(
     val highlight: RowHighlight?,
 )
 
+/**
+ * One-shot event the screen turns into a confirm dialog. The VM never
+ * presents UI itself — same contract as `MyHomesListEvent`.
+ */
+sealed interface HouseholdTasksListEvent {
+    /**
+     * The row's trash affordance was tapped — the screen opens the
+     * destructive confirm naming [title].
+     */
+    data class ConfirmDelete(
+        val taskId: String,
+        val title: String,
+    ) : HouseholdTasksListEvent
+}
+
 /** Nav arg key for the Household tasks list route. */
 const val HOUSEHOLD_TASKS_HOME_ID_KEY = "homeId"
 
@@ -166,6 +183,17 @@ class HouseholdTasksListViewModel
         private val _banner = MutableStateFlow<BannerConfig?>(null)
         val banner: StateFlow<BannerConfig?> = _banner.asStateFlow()
 
+        /**
+         * Set when a row's trash affordance fires. The screen drains it
+         * into an `AlertDialog` and calls [acknowledgeEvent].
+         */
+        private val _pendingEvent = MutableStateFlow<HouseholdTasksListEvent?>(null)
+        val pendingEvent: StateFlow<HouseholdTasksListEvent?> = _pendingEvent.asStateFlow()
+
+        /** Surfaced by the screen as an alert when a delete fails. */
+        private val _actionError = MutableStateFlow<String?>(null)
+        val actionError: StateFlow<String?> = _actionError.asStateFlow()
+
         private var tasks: List<HomeTaskDto>? = null
         private var onOpenTask: (String) -> Unit = {}
         private var onAddTask: () -> Unit = {}
@@ -193,7 +221,7 @@ class HouseholdTasksListViewModel
                     is NetworkResult.Failure -> {
                         tasks = null
                         _banner.value = null
-                        _state.value = ListOfRowsUiState.Error(result.error.message)
+                        _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                     }
                 }
             }
@@ -271,6 +299,57 @@ class HouseholdTasksListViewModel
                         _tabs.value = tabsWithCounts(rolled)
                         renderForCurrentTab(rolled)
                     }
+                }
+            }
+        }
+
+        /**
+         * Row trash tapped — hand the confirm to the screen. RN raises
+         * the same confirm from the row's trash glyph
+         * (`src/app/homes/[id]/tasks.tsx:76-84`).
+         */
+        fun requestDelete(taskId: String) {
+            val task = tasks?.firstOrNull { it.id == taskId } ?: return
+            _pendingEvent.value = HouseholdTasksListEvent.ConfirmDelete(taskId, task.title)
+        }
+
+        /** Clears [pendingEvent] once the screen has opened its dialog. */
+        fun acknowledgeEvent() {
+            _pendingEvent.value = null
+        }
+
+        /** Clears the delete-failure alert. */
+        fun clearActionError() {
+            _actionError.value = null
+        }
+
+        /**
+         * `DELETE /api/homes/:id/tasks/:taskId` — route
+         * `backend/routes/home.js:4354`. Optimistically drops the row,
+         * then restores it (and surfaces [actionError]) if the server
+         * refuses.
+         */
+        fun deleteTask(taskId: String) {
+            val loaded = tasks ?: return
+            val idx = loaded.indexOfFirst { it.id == taskId }
+            if (idx < 0) return
+            val original = loaded[idx]
+            val pruned = loaded.toMutableList().apply { removeAt(idx) }
+            tasks = pruned
+            _tabs.value = tabsWithCounts(pruned)
+            renderForCurrentTab(pruned)
+            viewModelScope.launch {
+                val result = repo.deleteHomeTask(homeId = homeId, taskId = taskId)
+                if (result is NetworkResult.Failure) {
+                    val rolled =
+                        (tasks ?: emptyList())
+                            .toMutableList()
+                            .apply { add(idx.coerceAtMost(size), original) }
+                    tasks = rolled
+                    _tabs.value = tabsWithCounts(rolled)
+                    renderForCurrentTab(rolled)
+                    _actionError.value =
+                        result.error.displayMessage("Couldn't delete that task. Try again.")
                 }
             }
         }
@@ -419,23 +498,41 @@ class HouseholdTasksListViewModel
             }
         }
 
+        /**
+         * Active + Done rows carry a two-button trailing: the checkbox
+         * that toggles the task **both ways** (RN's checkbox does
+         * `done → open` as well, `src/app/homes/[id]/tasks.tsx:52-58`)
+         * and the trash affordance RN puts on every row (`:167-169`).
+         * Recurring keeps its kebab — a recurring chore is still
+         * deletable from the Active tab, where the same row appears.
+         */
         private fun trailingFor(
             task: HomeTaskDto,
             tab: HouseholdTasksTab,
             taskId: String,
         ): RowTrailing =
             when (tab) {
-                HouseholdTasksTab.Active -> {
+                HouseholdTasksTab.Active, HouseholdTasksTab.Done -> {
                     val isDone = task.status == "done"
-                    RowTrailing.CircularAction(
-                        icon = if (isDone) PantopusIcon.Check else PantopusIcon.Circle,
-                        accessibilityLabel = if (isDone) "Mark not done" else "Mark done",
-                        background = if (isDone) PantopusColors.homeBg else PantopusColors.appSurface,
-                        foreground = if (isDone) PantopusColors.home else PantopusColors.appTextMuted,
-                        onClick = { toggleDone(taskId) },
+                    RowTrailing.IconActions(
+                        primary =
+                            RowIconAction(
+                                icon = if (isDone) PantopusIcon.Check else PantopusIcon.Circle,
+                                accessibilityLabel = if (isDone) "Mark not done" else "Mark done",
+                                background = if (isDone) PantopusColors.homeBg else PantopusColors.appSurface,
+                                foreground = if (isDone) PantopusColors.home else PantopusColors.appTextMuted,
+                                onClick = { toggleDone(taskId) },
+                            ),
+                        secondary =
+                            RowIconAction(
+                                icon = PantopusIcon.Trash,
+                                accessibilityLabel = "Delete task",
+                                background = PantopusColors.appSurfaceSunken,
+                                foreground = PantopusColors.error,
+                                onClick = { requestDelete(taskId) },
+                            ),
                     )
                 }
-                HouseholdTasksTab.Done -> RowTrailing.Status("Done", StatusChipVariant.Success)
                 HouseholdTasksTab.Recurring -> RowTrailing.Kebab
             }
 

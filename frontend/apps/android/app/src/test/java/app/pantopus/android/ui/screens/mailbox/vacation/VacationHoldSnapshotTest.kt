@@ -73,7 +73,7 @@ class VacationHoldSnapshotTest {
             Root {
                 HoldStatusHero(
                     daysLeft = 5,
-                    untilLabel = "Dec 12",
+                    untilLabel = "Jun 9",
                     stats = VacationHoldSampleData.activeHold.stats,
                     reduceMotionOverride = true,
                 )

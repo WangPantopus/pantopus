@@ -2,11 +2,14 @@
 //  InvoiceCheckoutTests.swift
 //  PantopusTests
 //
-//  Block 3B — the invoice "Pay" CTA wires the shared `CheckoutCoordinator`:
-//  create a PaymentIntent (`POST /api/payments/intent`) → present
-//  PaymentSheet → re-read server state. These tests drive the success /
-//  declined / canceled / intent-failure branches with a stub presenter +
-//  `SequencedURLProtocol`, so the round-trip is exercised without the SDK.
+//  The invoice "Pay" CTA runs the real backend sequence:
+//    POST /api/businesses/invoices/{id}/pay      → PaymentIntent client secret
+//    → Stripe PaymentSheet
+//    → POST /api/businesses/invoices/{id}/confirm
+//    → GET /api/businesses/invoices/{id}         (server is the source of truth)
+//  These tests drive the success / declined / canceled / pay-failure branches
+//  with a stub presenter + `SequencedURLProtocol`, so the round-trip is
+//  exercised without the Stripe SDK.
 //
 
 import XCTest
@@ -19,9 +22,22 @@ final class InvoiceCheckoutTests: XCTestCase {
         SequencedURLProtocol.reset()
     }
 
-    private static let intentJSON = """
-    {"clientSecret":"pi_secret_1","paymentIntentId":"pi_1","customer":"cus_1",\
-    "ephemeralKey":"ek_1","publishableKey":"pk_test"}
+    private static func invoiceJSON(status: String, paidAt: String? = nil) -> String {
+        let paid = paidAt.map { "\"\($0)\"" } ?? "null"
+        return """
+        {"invoice":{"id":"7f3c1a24-1111-4000-8000-000000000001","business_user_id":"b1",\
+        "recipient_user_id":"u1","line_items":[{"description":"Install labor",\
+        "amount_cents":6500,"quantity":2}],"subtotal_cents":13000,"fee_cents":390,\
+        "total_cents":13000,"currency":"usd","status":"\(status)",\
+        "due_date":"2025-12-18T17:00:00.000Z","memo":null,\
+        "created_at":"2025-12-04T17:00:00.000Z","paid_at":\(paid),\
+        "business":{"id":"b1","name":"Brightside Outdoor","username":"brightside"}}}
+        """
+    }
+
+    private static let payJSON = """
+    {"client_secret":"pi_secret_1","payment_intent_id":"pi_1","payment_id":"pay_1",\
+    "amount_cents":13000,"fee_cents":390}
     """
 
     private func makeAPI() -> APIClient {
@@ -33,22 +49,44 @@ final class InvoiceCheckoutTests: XCTestCase {
     }
 
     private func makeVM(presenter: StubCheckoutPresenter) -> InvoiceDetailViewModel {
-        InvoiceDetailViewModel(
-            invoiceId: "inv-1",
-            paid: false,
-            checkout: CheckoutCoordinator(api: makeAPI(), presenter: presenter),
-            checkoutRequest: CheckoutRequest(
-                listingId: "listing-1",
-                offerId: "offer-1"
-            )
+        let api = makeAPI()
+        return InvoiceDetailViewModel(
+            invoiceId: "7f3c1a24-1111-4000-8000-000000000001",
+            api: api,
+            checkout: CheckoutCoordinator(api: api, presenter: presenter)
         )
     }
 
-    /// checkout.paySuccess
-    func testPayCompletesAndRefreshes() async {
-        // Only the create-intent call hits the network; load() re-reads the
-        // invoice from the fixture frame (no request).
-        SequencedURLProtocol.sequence = [.status(201, body: Self.intentJSON)]
+    /// The invoice is read from the backend — never from a fixture.
+    func testLoadRendersTheServerInvoice() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.invoiceJSON(status: "sent"))]
+        let vm = makeVM(presenter: StubCheckoutPresenter())
+        await vm.load()
+        guard case let .loaded(content) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(content.hero.priceLine, "$130.00")
+        XCTAssertEqual(content.dock.primary.label, "Pay $130.00")
+    }
+
+    /// A backend failure surfaces the error frame (with Retry), not a fixture.
+    func testLoadFailureSurfacesErrorFrame() async {
+        SequencedURLProtocol.sequence = [.status(404, body: "{\"error\":\"Invoice not found\"}")]
+        let vm = makeVM(presenter: StubCheckoutPresenter())
+        await vm.load()
+        guard case .error = vm.state else {
+            return XCTFail("Expected .error, got \(vm.state)")
+        }
+    }
+
+    /// checkout.paySuccess — pay → sheet → confirm → re-read.
+    func testPayCompletesConfirmsAndRefreshes() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.invoiceJSON(status: "sent")),
+            .status(200, body: Self.payJSON),
+            .status(200, body: Self.invoiceJSON(status: "paid", paidAt: "2025-12-14T17:00:00.000Z")),
+            .status(200, body: Self.invoiceJSON(status: "paid", paidAt: "2025-12-14T17:00:00.000Z"))
+        ]
         let presenter = StubCheckoutPresenter()
         presenter.outcome = .completed
         let vm = makeVM(presenter: presenter)
@@ -57,43 +95,70 @@ final class InvoiceCheckoutTests: XCTestCase {
 
         XCTAssertEqual(presenter.presentPaymentCallCount, 1)
         XCTAssertEqual(presenter.lastClientSecret, "pi_secret_1")
-        XCTAssertEqual(presenter.lastPublishableKey, "pk_test")
+        XCTAssertNil(presenter.lastPublishableKey, "the invoice pay route returns no publishable key")
         XCTAssertEqual(vm.paymentStatus, .paid)
-        guard case .loaded = vm.state else {
+        guard case let .loaded(content) = vm.state else {
             return XCTFail("Expected the invoice to re-load after payment, got \(vm.state)")
         }
+        XCTAssertEqual(content.dock.primary.label, "Paid in full")
+        XCTAssertFalse(content.dock.primary.enabled)
     }
 
-    /// checkout.payDeclined — card declined / SCA failed
+    /// checkout.payDeclined — card declined / SCA failed.
     func testPayDeclinedSurfacesMessage() async {
-        SequencedURLProtocol.sequence = [.status(201, body: Self.intentJSON)]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.invoiceJSON(status: "sent")),
+            .status(200, body: Self.payJSON)
+        ]
         let presenter = StubCheckoutPresenter()
         presenter.outcome = .failed(message: "Your card was declined.")
         let vm = makeVM(presenter: presenter)
+        await vm.load()
         await vm.payNow()
         XCTAssertEqual(vm.paymentStatus, .declined(message: "Your card was declined."))
     }
 
-    /// checkout.cancel — buyer dismissed the sheet
+    /// checkout.cancel — buyer dismissed the sheet.
     func testPayCanceledLeavesInvoiceUnpaid() async {
-        SequencedURLProtocol.sequence = [.status(201, body: Self.intentJSON)]
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.invoiceJSON(status: "sent")),
+            .status(200, body: Self.payJSON)
+        ]
         let presenter = StubCheckoutPresenter()
         presenter.outcome = .canceled
         let vm = makeVM(presenter: presenter)
+        await vm.load()
         await vm.payNow()
         XCTAssertEqual(vm.paymentStatus, .canceled)
     }
 
-    /// Intent creation fails → never presents the sheet, surfaces an error.
-    func testIntentFailureDoesNotPresentSheet() async {
-        SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
+    /// `/pay` fails → never presents the sheet, surfaces the server's message.
+    func testPayFailureDoesNotPresentSheet() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.invoiceJSON(status: "sent")),
+            .status(400, body: "{\"error\":\"This invoice has already been paid\"}")
+        ]
         let presenter = StubCheckoutPresenter()
         let vm = makeVM(presenter: presenter)
+        await vm.load()
         await vm.payNow()
         XCTAssertEqual(presenter.presentPaymentCallCount, 0)
         guard case .declined = vm.paymentStatus else {
             return XCTFail("Expected .declined, got \(vm.paymentStatus)")
         }
+    }
+
+    /// A paid invoice never re-runs checkout.
+    func testPaidInvoiceRefusesToPayAgain() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: Self.invoiceJSON(status: "paid", paidAt: "2025-12-14T17:00:00.000Z"))
+        ]
+        let presenter = StubCheckoutPresenter()
+        let vm = makeVM(presenter: presenter)
+        await vm.load()
+        await vm.payNow()
+        XCTAssertEqual(presenter.presentPaymentCallCount, 0)
+        XCTAssertEqual(vm.paymentStatus, .declined(message: "This invoice has already been paid."))
     }
 
     /// The coordinator maps a missing client secret to .failed (no present).

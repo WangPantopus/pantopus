@@ -274,6 +274,9 @@ class ReviewSignupsViewModelTest {
                 NetworkResult.Success(
                     SupportTrainReservationsResponse(reservations = listOf(reservation("r1", "pending"))),
                 )
+            // S1 — confirm now also fires the real POST alongside the
+            // optimistic row flip.
+            coEvery { repo.confirmDelivery("st1", "r1") } returns NetworkResult.Success(Unit)
             val vm = makeVM()
             var captured: String? = null
             vm.onConfirmReservation = { captured = it }

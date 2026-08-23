@@ -192,6 +192,26 @@ private struct DetailsStep: View {
                 keyboardType: .URL,
                 identifier: "addPet_photoUrl"
             )
+            PantopusTextField(
+                "Vet name (optional)",
+                text: Binding(
+                    get: { viewModel.form.vetName },
+                    set: { viewModel.setVetName($0) }
+                ),
+                placeholder: "Bay Area Animal Hospital",
+                identifier: "addPet_vetName"
+            )
+            PantopusTextField(
+                "Vet phone (optional)",
+                text: Binding(
+                    get: { viewModel.form.vetPhone },
+                    set: { viewModel.setVetPhone($0) }
+                ),
+                placeholder: "(415) 555-0142",
+                keyboardType: .phonePad,
+                contentType: .telephoneNumber,
+                identifier: "addPet_vetPhone"
+            )
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 Text("Notes")
                     .pantopusTextStyle(.caption)

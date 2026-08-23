@@ -74,6 +74,17 @@ final class ChatConversationSnapshotTests: XCTestCase {
         )
     }
 
+    /// A15.4 secondary frame — quota exhausted: warning pill, full
+    /// upgrade-fan card (head / body / perks / actions) and the locked
+    /// composer with its lock row.
+    func test_creator_thread_quota_exhausted_renders() {
+        assertRenders(
+            viewModel: ChatConversationSampleData.creatorThreadViewModel(),
+            mode: .creatorThread,
+            creatorContext: ChatConversationSampleData.creatorMaxedContext
+        )
+    }
+
     private func assertRenders(
         viewModel: ChatConversationViewModel,
         mode: ChatConversationMode = .aiAssistant,

@@ -15,6 +15,7 @@ import app.pantopus.android.data.api.models.gigs.GigChangeOrderType
 import app.pantopus.android.data.api.models.gigs.GigChangeOrdersResponse
 import app.pantopus.android.data.api.models.gigs.GigDetailResponse
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigMyBidResponse
 import app.pantopus.android.data.api.models.gigs.GigPaymentDto
 import app.pantopus.android.data.api.models.gigs.GigPaymentResponse
 import app.pantopus.android.data.api.models.gigs.GigQuestionsResponse
@@ -22,12 +23,16 @@ import app.pantopus.android.data.api.models.gigs.GigSaveResponse
 import app.pantopus.android.data.api.models.gigs.NoShowCheckResponse
 import app.pantopus.android.data.api.models.gigs.RescheduleGigResponse
 import app.pantopus.android.data.api.models.gigs.WorkerAckResponse
+import app.pantopus.android.data.api.models.offers.MyBidsResponse
 import app.pantopus.android.data.api.models.users.UserDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.files.FilesRepository
+import app.pantopus.android.data.gigs.GigReassignmentRepository
+import app.pantopus.android.data.gigs.GigViewerBidRepository
 import app.pantopus.android.data.gigs.GigsRepository
+import app.pantopus.android.data.offers.OffersRepository
 import app.pantopus.android.data.payments.PaymentsRepository
 import app.pantopus.android.data.realtime.SocketManager
 import app.pantopus.android.data.reviews.ReviewsRepository
@@ -78,10 +83,16 @@ private class RecordingActiveNotifier : GigActiveNotifier {
 @OptIn(ExperimentalCoroutinesApi::class)
 class GigDetailSaveViewModelTest {
     private val repo: GigsRepository = mockk()
+    private val extrasRepo: app.pantopus.android.data.gigs.GigExtrasRepository = mockk()
+    private val reassignmentRepo: GigReassignmentRepository = mockk()
+    private val viewerBidRepo: GigViewerBidRepository = mockk()
+    private val ownerActionsRepo: app.pantopus.android.data.gigs.GigOwnerActionsRepository = mockk()
+    private val offersRepo: OffersRepository = mockk()
     private val authRepo: AuthRepository = mockk()
     private val filesRepo: FilesRepository = mockk()
     private val paymentsRepo: PaymentsRepository = mockk()
     private val reviewsRepo: ReviewsRepository = mockk()
+    private val gigsV2Repo: app.pantopus.android.data.gigs.GigsV2Repository = mockk(relaxed = true)
     private val socket: SocketManager = mockk(relaxed = true)
     private val activeNotifier = RecordingActiveNotifier()
 
@@ -93,6 +104,10 @@ class GigDetailSaveViewModelTest {
                 user = UserDto(id = "viewer-1", email = "v@example.com", displayName = "Viewer", avatarUrl = null),
             )
         every { authRepo.state } returns MutableStateFlow<AuthRepository.State>(signed)
+        // Bidder-side lookup: unless a test says otherwise, this viewer has
+        // no bid of their own on the gig.
+        coEvery { viewerBidRepo.myBid(any()) } returns NetworkResult.Success(GigMyBidResponse(bid = null))
+        coEvery { offersRepo.myBids(any()) } returns NetworkResult.Success(MyBidsResponse(bids = emptyList()))
     }
 
     @After
@@ -116,12 +131,18 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                extrasRepo,
+                reassignmentRepo,
+                viewerBidRepo,
+                ownerActionsRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -220,7 +241,9 @@ class GigDetailSaveViewModelTest {
         assertTrue(GigDetailViewModel.viewerCanReview(markedDone, "worker-9"))
         assertFalse(GigDetailViewModel.viewerCanReview(markedDone, "stranger"))
         assertFalse(GigDetailViewModel.viewerCanReview(markedDone.copy(status = "open"), "poster-1"))
-        assertEquals("https://pantopus.app/gigs/g1", GigDetailViewModel.shareUrl("g1"))
+        // The share link must sit on the domain the app actually claims —
+        // pantopus.com, per the manifest's autoVerify filter.
+        assertEquals("https://pantopus.com/gigs/g1", GigDetailViewModel.shareUrl("g1"))
     }
 
     // MARK: - Phase 5 · owner bids panel + instant accept (flows)
@@ -233,12 +256,18 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                extrasRepo,
+                reassignmentRepo,
+                viewerBidRepo,
+                ownerActionsRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()
@@ -308,12 +337,18 @@ class GigDetailSaveViewModelTest {
             val vm =
                 GigDetailViewModel(
                     repo,
+                    extrasRepo,
+                    reassignmentRepo,
+                    viewerBidRepo,
+                    ownerActionsRepo,
+                    offersRepo,
                     authRepo,
                     filesRepo,
                     paymentsRepo,
                     reviewsRepo,
                     socket,
                     activeNotifier,
+                    gigsV2Repo,
                     SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
                 )
             vm.load()
@@ -358,12 +393,18 @@ class GigDetailSaveViewModelTest {
         val vm =
             GigDetailViewModel(
                 repo,
+                extrasRepo,
+                reassignmentRepo,
+                viewerBidRepo,
+                ownerActionsRepo,
+                offersRepo,
                 authRepo,
                 filesRepo,
                 paymentsRepo,
                 reviewsRepo,
                 socket,
                 activeNotifier,
+                gigsV2Repo,
                 SavedStateHandle(mapOf(GigDetailViewModel.GIG_ID_KEY to "g1")),
             )
         vm.load()

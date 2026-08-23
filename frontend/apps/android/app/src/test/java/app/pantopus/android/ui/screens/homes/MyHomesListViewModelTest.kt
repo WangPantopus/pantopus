@@ -1,18 +1,22 @@
 package app.pantopus.android.ui.screens.homes
 
 import app.cash.turbine.test
+import app.pantopus.android.data.api.models.homes.DeleteHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeOccupancy
 import app.pantopus.android.data.api.models.homes.MyHome
 import app.pantopus.android.data.api.models.homes.MyHomesResponse
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.homes.HomeAdminRepository
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.ui.components.IdentityPillar
 import app.pantopus.android.ui.screens.shared.list_of_rows.BannerCtaTint
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsUiState
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowChip
 import app.pantopus.android.ui.screens.shared.list_of_rows.RowLeading
+import app.pantopus.android.ui.screens.shared.list_of_rows.RowTrailing
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +35,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class MyHomesListViewModelTest {
     private val repo: HomesRepository = mockk()
+    private val adminRepo: HomeAdminRepository = mockk()
 
     @Before
     fun setUp() {
@@ -49,6 +54,7 @@ class MyHomesListViewModelTest {
         ownership: String? = "verified",
         roleBase: String? = null,
         isPrimary: Boolean? = true,
+        canDeleteHome: Boolean? = null,
     ) = MyHome(
         id = id,
         name = name,
@@ -77,6 +83,7 @@ class MyHomesListViewModelTest {
         verificationTier = "attom",
         isPrimaryOwner = isPrimary,
         pendingClaimId = null,
+        canDeleteHome = canDeleteHome,
     )
 
     @Test
@@ -100,7 +107,7 @@ class MyHomesListViewModelTest {
                         message = null,
                     ),
                 )
-            val vm = MyHomesListViewModel(repo)
+            val vm = MyHomesListViewModel(repo, adminRepo)
             vm.load()
             val loaded = vm.state.value as ListOfRowsUiState.Loaded
             val rows = loaded.sections.first().rows
@@ -132,7 +139,7 @@ class MyHomesListViewModelTest {
     fun empty_response_surfaces_empty_state_and_clears_banner() =
         runTest {
             coEvery { repo.myHomes() } returns NetworkResult.Success(MyHomesResponse(homes = emptyList(), message = null))
-            val vm = MyHomesListViewModel(repo)
+            val vm = MyHomesListViewModel(repo, adminRepo)
             vm.state.test {
                 awaitItem() // Loading
                 vm.load()
@@ -148,7 +155,7 @@ class MyHomesListViewModelTest {
     fun failure_surfaces_error_state() =
         runTest {
             coEvery { repo.myHomes() } returns NetworkResult.Failure(NetworkError.NotFound)
-            val vm = MyHomesListViewModel(repo)
+            val vm = MyHomesListViewModel(repo, adminRepo)
             vm.state.test {
                 awaitItem()
                 vm.load()
@@ -157,13 +164,76 @@ class MyHomesListViewModelTest {
             }
         }
 
+    // ─── Delete home (RN parity: `src/app/homes/index.tsx:249`) ───
+
+    @Test
+    fun rows_without_can_delete_home_keep_the_plain_chevron() =
+        runTest {
+            coEvery { repo.myHomes() } returns
+                NetworkResult.Success(MyHomesResponse(homes = listOf(makeHome("h1")), message = null))
+            val vm = MyHomesListViewModel(repo, adminRepo)
+            vm.load()
+            val row = (vm.state.value as ListOfRowsUiState.Loaded).sections.first().rows.first()
+            assertEquals(RowTrailing.Chevron, row.trailing)
+            assertNull(row.onSecondary)
+        }
+
+    @Test
+    fun rows_with_can_delete_home_expose_a_kebab_that_asks_for_confirmation() =
+        runTest {
+            coEvery { repo.myHomes() } returns
+                NetworkResult.Success(
+                    MyHomesResponse(homes = listOf(makeHome("h1", canDeleteHome = true)), message = null),
+                )
+            val vm = MyHomesListViewModel(repo, adminRepo)
+            vm.load()
+            val row = (vm.state.value as ListOfRowsUiState.Loaded).sections.first().rows.first()
+            assertEquals(RowTrailing.Kebab, row.trailing)
+            assertNotNull(row.onSecondary)
+            row.onSecondary!!.invoke()
+            assertEquals(MyHomesListEvent.ConfirmDelete("h1", "Main"), vm.pendingEvent.value)
+        }
+
+    @Test
+    fun delete_home_calls_the_delete_route_and_refetches() =
+        runTest {
+            coEvery { repo.myHomes() } returns
+                NetworkResult.Success(
+                    MyHomesResponse(homes = listOf(makeHome("h1", canDeleteHome = true)), message = null),
+                )
+            coEvery { adminRepo.deleteHome("h1") } returns
+                NetworkResult.Success(DeleteHomeResponse(message = "Home deleted successfully"))
+            val vm = MyHomesListViewModel(repo, adminRepo)
+            vm.load()
+            vm.deleteHome("h1")
+            coVerify { adminRepo.deleteHome("h1") }
+            assertNull(vm.actionError.value)
+        }
+
+    @Test
+    fun delete_home_failure_surfaces_the_server_message() =
+        runTest {
+            coEvery { repo.myHomes() } returns
+                NetworkResult.Success(
+                    MyHomesResponse(homes = listOf(makeHome("h1", canDeleteHome = true)), message = null),
+                )
+            coEvery { adminRepo.deleteHome("h1") } returns
+                NetworkResult.Failure(NetworkError.Server(403, "Only the primary owner can delete this home."))
+            val vm = MyHomesListViewModel(repo, adminRepo)
+            vm.load()
+            vm.deleteHome("h1")
+            assertNotNull(vm.actionError.value)
+            // The row survives — the delete was awaited, not optimistic.
+            assertEquals(1, (vm.state.value as ListOfRowsUiState.Loaded).sections.first().rows.size)
+        }
+
     @Test
     fun empty_state_cta_fires_onAddHome() =
         runTest {
             coEvery { repo.myHomes() } returns NetworkResult.Success(MyHomesResponse(homes = emptyList(), message = null))
             var added = false
             val vm =
-                MyHomesListViewModel(repo).apply {
+                MyHomesListViewModel(repo, adminRepo).apply {
                     configureNavigation(onOpenHome = {}, onAddHome = { added = true })
                 }
             vm.load()

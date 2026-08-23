@@ -45,6 +45,34 @@ public struct LoginResponse: Decodable, Sendable, Hashable {
     }
 }
 
+/// `GET /api/users/oauth/:provider` response — see
+/// `backend/routes/users.js:3715`.
+public struct OAuthURLResponse: Decodable, Sendable, Hashable {
+    public let url: URL
+}
+
+/// `POST /api/users/oauth/callback` request — see
+/// `backend/routes/users.js:3862`.
+public struct OAuthCodeExchangeRequest: Encodable, Sendable, Hashable {
+    public let code: String
+
+    public init(code: String) {
+        self.code = code
+    }
+}
+
+/// `POST /api/users/oauth/token` request — legacy fragment-token path.
+/// Route: `backend/routes/users.js:3792`.
+public struct OAuthTokenExchangeRequest: Encodable, Sendable, Hashable {
+    public let accessToken: String
+    public let refreshToken: String
+
+    public init(accessToken: String, refreshToken: String) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+    }
+}
+
 /// `POST /api/users/register` request body — see `backend/routes/users.js:1177`.
 ///
 /// `accountType` maps the iOS `AccountType` enum into the backend's
@@ -217,8 +245,9 @@ public struct AuthErrorBody: Decodable, Sendable, Hashable {
     public let needsVerification: Bool?
 }
 
-/// User payload embedded in `LoginResponse`. Mirrors the shape emitted
-/// by `sanitizeUserForAuthResponse` in `backend/routes/users.js:955`.
+/// User payload embedded in `LoginResponse`. Email login returns the full
+/// profile (`backend/routes/users.js:1614`); OAuth callback/token return a
+/// thinner subset (`:3844` / `:3912`). Decode tolerates missing fields.
 public struct AuthenticatedUser: Decodable, Sendable, Hashable, Identifiable {
     public let id: String
     public let email: String
@@ -247,5 +276,25 @@ public struct AuthenticatedUser: Decodable, Sendable, Hashable, Identifiable {
         case accountType
         case role, verified
         case createdAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        email = try container.decode(String.self, forKey: .email)
+        username = try container.decodeIfPresent(String.self, forKey: .username) ?? ""
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        firstName = try container.decodeIfPresent(String.self, forKey: .firstName) ?? ""
+        middleName = try container.decodeIfPresent(String.self, forKey: .middleName)
+        lastName = try container.decodeIfPresent(String.self, forKey: .lastName) ?? ""
+        phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        zipcode = try container.decodeIfPresent(String.self, forKey: .zipcode)
+        accountType = try container.decodeIfPresent(String.self, forKey: .accountType) ?? "individual"
+        role = try container.decodeIfPresent(String.self, forKey: .role) ?? "user"
+        verified = try container.decodeIfPresent(Bool.self, forKey: .verified) ?? false
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
     }
 }

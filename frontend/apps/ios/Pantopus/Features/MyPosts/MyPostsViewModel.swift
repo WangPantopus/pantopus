@@ -335,7 +335,11 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         case .recommend: "recommend"
         case .event: "event"
         case .lost: "lost"
+        case .alert: "alert"
+        case .deal: "deal"
         case .announce: "announce"
+        case .neighborhoodWin: "neighborhoodWin"
+        case .visitorGuide: "visitorGuide"
         }
     }
 
@@ -627,7 +631,11 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
         case .recommend: "Recommend"
         case .event: "Event"
         case .lost: "Lost & Found"
+        case .alert: "Alerts"
+        case .deal: "Deals"
         case .announce: "Announce"
+        case .neighborhoodWin: "Wins"
+        case .visitorGuide: "Guide"
         }
     }
 
@@ -651,8 +659,16 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
             IntentPalette(foreground: Theme.Color.business, background: Theme.Color.businessBg)
         case .lost:
             IntentPalette(foreground: Theme.Color.error, background: Theme.Color.errorBg)
+        case .alert:
+            IntentPalette(foreground: Theme.Color.error, background: Theme.Color.errorBg)
+        case .deal:
+            IntentPalette(foreground: Theme.Color.success, background: Theme.Color.successBg)
         case .announce:
             IntentPalette(foreground: Theme.Color.appTextStrong, background: Theme.Color.appSurfaceSunken)
+        case .neighborhoodWin:
+            IntentPalette(foreground: Theme.Color.warning, background: Theme.Color.warningBg)
+        case .visitorGuide:
+            IntentPalette(foreground: Theme.Color.info, background: Theme.Color.infoBg)
         }
     }
 
@@ -704,7 +720,7 @@ public final class MyPostsViewModel: ListOfRowsDataSource {
                     label: "\(dto.likeCount) seen"
                 )
             ]
-        case .ask, .announce, .all:
+        case .ask, .announce, .all, .alert, .deal, .neighborhoodWin, .visitorGuide:
             return [replies, likes]
         }
     }

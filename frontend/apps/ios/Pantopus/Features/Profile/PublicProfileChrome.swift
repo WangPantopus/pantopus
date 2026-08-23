@@ -15,6 +15,8 @@
 //  All colors come from the token set — never raw hex.
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 
 // MARK: - Banner
@@ -373,6 +375,10 @@ struct PublicProfilePostsFeed: View {
     /// the host wires this to `follow()` (persona) or open-messages
     /// (local). Defaults to a no-op so previews / tests can opt out.
     var onEmptyCTA: @MainActor () -> Void = {}
+    /// A21.2 — the profile owner's display name, so the Local empty state
+    /// can name the neighbour ("… — Priya just moved in."). `nil` falls
+    /// back to the un-personalised copy.
+    var localName: String?
 
     var body: some View {
         if posts.isEmpty {
@@ -475,10 +481,24 @@ struct PublicProfilePostsFeed: View {
         kind == .persona ? "No broadcasts yet" : "Quiet for now"
     }
 
+    /// A21.2 names the neighbour when we know them ("No posts yet — Priya
+    /// just moved in. …"); without a name we fall back to the neutral
+    /// sentence rather than printing an empty gap.
     private var emptyBody: String {
-        kind == .persona
-            ? "Be the first to follow — you'll get a ping the moment they go live."
-            : "No posts yet — say hi or send a message to break the ice."
+        if kind == .persona {
+            return "Be the first to follow — you'll get a ping the moment they go live."
+        }
+        guard let first = Self.firstName(localName) else {
+            return "No posts yet — say hi or send a message to break the ice."
+        }
+        return "No posts yet — \(first) just moved in. Say hi or send a message to break the ice."
+    }
+
+    /// First word of a display name, or `nil` when there isn't one.
+    static func firstName(_ name: String?) -> String? {
+        guard let name else { return nil }
+        let first = name.split(separator: " ").first.map(String.init) ?? name
+        return first.isEmpty ? nil : first
     }
 
     private var emptyCTALabel: String {
@@ -487,5 +507,126 @@ struct PublicProfilePostsFeed: View {
 
     private var emptyCTAIcon: PantopusIcon {
         kind == .persona ? .plus : .messageSquare
+    }
+}
+
+// MARK: - A21.2 Local tab strip
+
+/// Underline-active tab strip for the Local Beacon profile archetype
+/// (Posts · About · Portfolio · Gigs · Reviews). Mirrors the design's
+/// `TabStrip` — and the persona `BeaconProfileTabStrip` — so both
+/// archetypes read identically. Scrolls horizontally so the marketplace
+/// tabs survive the larger dynamic-type sizes.
+@MainActor
+struct LocalProfileTabStrip: View {
+    let postCount: Int?
+    /// Server-side review total, badged on the Reviews tab the way
+    /// `postCount` badges Posts. `nil` hides the badge.
+    var reviewCount: Int?
+    let selected: LocalProfileTab
+    let onSelect: @MainActor (LocalProfileTab) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.s6) {
+                ForEach(LocalProfileTab.allCases) { tab in
+                    let isActive = tab == selected
+                    Button {
+                        onSelect(tab)
+                    } label: {
+                        VStack(spacing: Spacing.s2) {
+                            HStack(spacing: Spacing.s1) {
+                                Text(tab.label)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(isActive ? Theme.Color.primary700 : Theme.Color.appTextSecondary)
+                                if let count = badgeCount(for: tab) {
+                                    Text("\(count)")
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(Theme.Color.appTextMuted)
+                                }
+                            }
+                            Rectangle()
+                                .fill(isActive ? Theme.Color.primary600 : Color.clear)
+                                .frame(height: 2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("publicProfileLocalTab_\(tab.rawValue)")
+                    .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+                }
+                Spacer(minLength: Spacing.s0)
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.Color.appBorder)
+                .frame(height: 1)
+        }
+        .accessibilityIdentifier("publicProfileLocalTabStrip")
+    }
+
+    private func badgeCount(for tab: LocalProfileTab) -> Int? {
+        switch tab {
+        case .posts: postCount
+        case .reviews: reviewCount
+        default: nil
+        }
+    }
+}
+
+// MARK: - A21.2 Local About tab
+
+/// About tab of the Local Beacon profile. Carries the neighbourhood
+/// substance the older four-tab neighbour layout spread across
+/// About / Reviews / Verifications, so nothing is lost when the designed
+/// two-tab archetype takes over.
+@MainActor
+struct LocalProfileAboutSection: View {
+    let content: NeighborProfileContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s0) {
+            NeighborSectionTitle("Bio")
+            Text(content.bio ?? "No bio yet")
+                .font(.system(size: PantopusTextStyle.body.size))
+                .foregroundStyle(content.bio == nil ? Theme.Color.appTextSecondary : Theme.Color.appTextStrong)
+                .lineSpacing(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !content.skills.isEmpty {
+                NeighborSectionTitle("Helps with")
+                NeighborSkillChips(skills: content.skills)
+            }
+
+            NeighborSectionTitle("Verifications")
+            NeighborVerificationLedger(items: content.verifications)
+
+            reviews
+
+            if let mutuals = content.mutuals {
+                NeighborSectionTitle("Neighbors in common")
+                NeighborMutualsStrip(mutuals: mutuals)
+            }
+
+            if let welcome = content.welcome {
+                NeighborWelcomeCard(welcome: welcome)
+                    .padding(.top, Spacing.s3)
+            }
+        }
+        .padding(.bottom, Spacing.s5)
+        .accessibilityIdentifier("publicProfileLocalAbout")
+    }
+
+    @ViewBuilder private var reviews: some View {
+        if content.reviews.isEmpty {
+            NeighborSectionTitle("Reviews")
+            NeighborReviewsEmptyCard(name: content.hero.name)
+        } else {
+            NeighborSectionTitle("Reviews", action: "\(content.reviewCount)")
+            VStack(alignment: .leading, spacing: Spacing.s3) {
+                ForEach(content.reviews) { NeighborReviewCard(card: $0) }
+            }
+        }
     }
 }

@@ -65,7 +65,38 @@ data class HomeAgendaItem(
     val bookingStatus: String?,
     val bookingId: String?,
     val eventId: String?,
+    /**
+     * Non-null for the read-only derived task / bill / package due-date
+     * rows. Such a row's whole visual identity — label, icon, background,
+     * foreground — comes from this kind and never from [category]: a bill
+     * must read in the Home pillar's unpaid red, not the category
+     * palette's paid-green. It is also the row's read-only marker, so the
+     * screen renders it with `enabled = false` (no click, no ripple).
+     *
+     * Parity contract — mirrored in iOS `HomeAgendaItem.derived`.
+     */
+    val derived: HomeCalendarDerivedKind? = null,
+    /**
+     * Secondary line under the title. Derived rows carry
+     * `detail ?: kind.label` here rather than folded into [title], which
+     * is `maxLines = 1` and would ellipsise it away first.
+     */
+    val subtitle: String? = null,
 )
+
+/**
+ * The derived task / bill / package due-dates riding along with a batch of
+ * calendar-event DTOs, keyed by the synthetic DTO's id.
+ *
+ * The projection takes this as a side-table rather than re-deriving a kind
+ * from an `event_type` string: a derived row's label, icon, background,
+ * foreground and subtitle all come from its own
+ * [HomeCalendarDerivedItem], and its presence in the table is what exempts
+ * the row from the member filter and marks it read-only.
+ *
+ * Parity contract — mirrored in iOS `HomeAgendaBuilder`'s `derived:` map.
+ */
+typealias HomeAgendaDerivedIndex = Map<String, HomeCalendarDerivedItem>
 
 /** A day-grouped agenda section. */
 @Immutable
@@ -99,7 +130,9 @@ sealed interface AgendaEmpty {
  * Pure agenda/month-strip projection. Mirrors iOS `HomeAgendaBuilder` —
  * zone-parameterised (callers pass their display zone; production uses the
  * device zone, tests pin UTC), Sunday-first, deterministic for unit tests.
- * The all-day heuristic is always UTC-anchored (wire stores 00:00Z).
+ * For *timestamped* rows the all-day heuristic is always UTC-anchored (wire
+ * stores 00:00Z); a bare wire date carries no zone at all and instead
+ * anchors to midnight in the display zone (see [parseInstant]).
  */
 object HomeAgendaBuilder {
     private val isoDate = DateTimeFormatter.ISO_DATE
@@ -115,11 +148,38 @@ object HomeAgendaBuilder {
 
     private val utcZone = ZoneId.of("UTC")
 
-    fun parseInstant(iso: String?): Instant? {
+    /** Length of a bare wire date, `yyyy-MM-dd`. */
+    private const val DATE_ONLY_LENGTH = 10
+
+    private fun bareDate(iso: String): LocalDate? =
+        if (iso.length == DATE_ONLY_LENGTH) runCatching { LocalDate.parse(iso) }.getOrNull() else null
+
+    /**
+     * True when [iso] is a bare wire date (`"2025-10-14"`) — a Postgres
+     * `date` column such as a bill's `due_date`, which carries no time and
+     * no zone. Mirrors iOS `HomeAgendaBuilder.isDateOnly`.
+     */
+    fun isDateOnly(iso: String?): Boolean = iso != null && bareDate(iso) != null
+
+    /**
+     * Resolve a wire date into an instant.
+     *
+     * A bare `yyyy-MM-dd` has no zone on the wire, so it anchors to
+     * **midnight in the display [zone]**, not midnight UTC: pinning it to
+     * UTC renders every date-only row one day early west of UTC and drops
+     * an item due today out of the agenda's "not before today" window.
+     * Timestamped values are unaffected. Mirrors iOS `parseInstant`.
+     *
+     * The default zone keeps the callers that only ever see timestamps
+     * (event detail, the gated scheduler) on their previous behaviour.
+     */
+    fun parseInstant(
+        iso: String?,
+        zone: ZoneId = utcZone,
+    ): Instant? {
         if (iso.isNullOrBlank()) return null
-        return runCatching { Instant.parse(iso) }
-            .recoverCatching { LocalDate.parse(iso).atStartOfDay(ZoneId.of("UTC")).toInstant() }
-            .getOrNull()
+        bareDate(iso)?.let { return it.atStartOfDay(zone).toInstant() }
+        return runCatching { Instant.parse(iso) }.getOrNull()
     }
 
     private fun isoDay(
@@ -129,17 +189,25 @@ object HomeAgendaBuilder {
 
     private fun isMidnight(zoned: ZonedDateTime): Boolean = zoned.hour == 0 && zoned.minute == 0 && zoned.second == 0
 
-    /** Project a single DTO into an agenda item. */
+    /**
+     * Project a single DTO into an agenda item. Pass [derived] for a
+     * synthetic derived-due-date row so the row renders that kind's own
+     * identity instead of a [CalendarEventCategory] swatch.
+     */
     fun item(
         dto: CalendarEventDto,
         start: Instant,
         members: Map<String, HomeMember>,
         zone: ZoneId,
+        derived: HomeCalendarDerivedItem? = null,
     ): HomeAgendaItem {
         val zoned = start.atZone(zone)
-        // All-day rows are stored at midnight UTC + nil end — the heuristic
-        // is pinned to UTC no matter which zone the agenda displays in.
-        val allDay = dto.endAt == null && isMidnight(start.atZone(utcZone))
+        // Timestamped all-day rows are stored at midnight UTC + nil end — that
+        // heuristic stays pinned to UTC no matter which zone the agenda
+        // displays in. A bare `yyyy-MM-dd` (a bill's Postgres `date`) is all-day
+        // by definition, and says so explicitly rather than relying on the zone
+        // its midnight happens to land in.
+        val allDay = isDateOnly(dto.startAt) || (dto.endAt == null && isMidnight(start.atZone(utcZone)))
         val time = if (allDay) "All day" else timeFmt.format(zoned)
         val ampm = if (allDay) "" else ampmFmt.format(zoned)
         val assigned = dto.assignedTo.orEmpty().mapNotNull { members[it] }
@@ -147,18 +215,34 @@ object HomeAgendaBuilder {
             id = dto.id,
             time = time,
             ampm = ampm,
-            title = dto.title,
+            title = derived?.title ?: dto.title,
             category = CalendarEventCategory.from(dto.eventType),
             location = dto.locationNotes?.takeIf { it.isNotBlank() },
             members = assigned,
             isBooking = dto.isBooking,
             bookingStatus = dto.bookingStatus,
             bookingId = dto.bookingId,
-            eventId = if (dto.isBooking) null else dto.id,
+            // Derived rows mirror surfaces that own their own screens: they
+            // expose no id to route with, on top of being rendered disabled.
+            eventId = if (dto.isBooking || derived != null) null else dto.id,
+            derived = derived?.kind,
+            // Master's documented fallback — "Null for empty statuses so the
+            // row falls back to its type label".
+            subtitle = derived?.let { it.detail?.takeIf(String::isNotBlank) ?: it.kind.label },
         )
     }
 
-    /** Day-grouped sections. `selectedIsoDate` pins one day; else past events drop. */
+    /**
+     * Day-grouped sections. `selectedIsoDate` pins one day; else past events
+     * drop.
+     *
+     * Rows listed in [derived] are **exempt from [onlyUserId]**: a task /
+     * bill / package due-date carries no household owner, so filtering it by
+     * owner would hide it under "Mine" and under every per-member chip —
+     * the empty-looking month the derived feed exists to prevent, and
+     * self-inconsistent with the month strip, which counts its dots
+     * unfiltered. Parity contract — iOS applies the same exemption.
+     */
     fun sections(
         events: List<CalendarEventDto>,
         members: Map<String, HomeMember>,
@@ -166,12 +250,16 @@ object HomeAgendaBuilder {
         zone: ZoneId,
         selectedIsoDate: String? = null,
         onlyUserId: String? = null,
+        derived: HomeAgendaDerivedIndex = emptyMap(),
     ): List<HomeAgendaSection> {
         val parsed =
             events
-                .mapNotNull { dto -> parseInstant(dto.startAt)?.let { dto to it } }
-                .filter { (dto, _) -> onlyUserId == null || dto.assignedTo.orEmpty().contains(onlyUserId) }
-                .sortedBy { it.second }
+                .mapNotNull { dto -> parseInstant(dto.startAt, zone)?.let { dto to it } }
+                .filter { (dto, _) ->
+                    onlyUserId == null ||
+                        dto.id in derived ||
+                        dto.assignedTo.orEmpty().contains(onlyUserId)
+                }.sortedBy { it.second }
         val todayStart = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant()
         val kept =
             if (selectedIsoDate != null) {
@@ -186,7 +274,7 @@ object HomeAgendaBuilder {
                 HomeAgendaSection(
                     id = iso,
                     header = header(iso, now, zone),
-                    items = bucket.map { (dto, start) -> item(dto, start, members, zone) },
+                    items = bucket.map { (dto, start) -> item(dto, start, members, zone, derived[dto.id]) },
                 )
             }
     }
@@ -225,7 +313,11 @@ object HomeAgendaBuilder {
         return date.minusDays(back.toLong()).format(isoDate)
     }
 
-    /** Build the 7-day month-strip state from the visible week anchor. */
+    /**
+     * Build the 7-day month-strip state from the visible week anchor. Dots
+     * are counted unfiltered — every dated thing the agenda can place,
+     * derived due-dates included.
+     */
     fun weekStrip(
         events: List<CalendarEventDto>,
         anchorIso: String,
@@ -236,7 +328,7 @@ object HomeAgendaBuilder {
         val anchor = runCatching { LocalDate.parse(anchorIso) }.getOrNull() ?: now.atZone(zone).toLocalDate()
         val dotCounts = mutableMapOf<String, Int>()
         for (dto in events) {
-            val start = parseInstant(dto.startAt) ?: continue
+            val start = parseInstant(dto.startAt, zone) ?: continue
             val iso = isoDay(start, zone)
             dotCounts[iso] = (dotCounts[iso] ?: 0) + 1
         }
@@ -273,8 +365,9 @@ fun HomeAgendaRowCard(
 ) {
     val rowLabel =
         buildString {
-            append("${item.time} ${item.ampm}, ${item.title}, ${item.category.label}")
+            append("${item.time} ${item.ampm}, ${item.title}, ${item.derived?.label ?: item.category.label}")
             if (item.isBooking) append(", Booking")
+            item.subtitle?.let { append(", $it") }
             item.location?.let { append(", $it") }
         }
     Row(
@@ -284,7 +377,13 @@ fun HomeAgendaRowCard(
                 .clip(RoundedCornerShape(Radii.xl))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.xl))
-                .then(if (enabled) Modifier.clickable(onClick = onTap) else Modifier)
+                // A derived due-date row is read-only by construction, not by
+                // call-site discipline: no clickable node at all, so no click
+                // target and no ripple. Mirrors iOS, which drops the Button
+                // wrapper for `item.derived != nil`.
+                .then(
+                    if (enabled && item.derived == null) Modifier.clickable(onClick = onTap) else Modifier,
+                )
                 .padding(horizontal = Spacing.s3, vertical = 11.dp)
                 .alpha(if (dimmed) 0.55f else 1f)
                 .testTag("homeAgendaRow_${item.id}")
@@ -311,11 +410,20 @@ fun HomeAgendaRowCard(
                 color = PantopusColors.appText,
                 maxLines = 1,
             )
+            item.subtitle?.let { subtitle ->
+                Text(
+                    text = subtitle,
+                    fontSize = 11.5.sp,
+                    color = PantopusColors.appTextSecondary,
+                    maxLines = 1,
+                )
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s1),
             ) {
-                CategoryChipMini(category = item.category)
+                val kind = item.derived
+                if (kind != null) DerivedKindChipMini(kind = kind) else CategoryChipMini(category = item.category)
                 if (item.isBooking) {
                     HomeBookingTag()
                     item.bookingStatus?.let { SchedulingStatusBadge(status = it) }
@@ -359,6 +467,35 @@ fun CategoryChipMini(
     ) {
         Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(category.dotColor))
         Text(text = category.label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appTextStrong)
+    }
+}
+
+/**
+ * Mini chip for a derived task / bill / package due-date. Draws the kind's
+ * OWN label / icon / background / foreground — the Home dashboard's
+ * per-feature accents (tasks = warning, bills = error, deliveries =
+ * business) — instead of a [CalendarEventCategory] swatch, which would
+ * render an unpaid bill in the category palette's paid-green.
+ *
+ * Parity contract — mirrored in iOS `DerivedKindChipMini`.
+ */
+@Composable
+fun DerivedKindChipMini(
+    kind: HomeCalendarDerivedKind,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .background(kind.background)
+                .padding(horizontal = 7.dp, vertical = 2.dp)
+                .testTag("homeAgendaDerivedChip_${kind.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        PantopusIconImage(icon = kind.icon, contentDescription = null, size = 10.dp, tint = kind.foreground)
+        Text(text = kind.label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = kind.foreground)
     }
 }
 

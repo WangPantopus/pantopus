@@ -26,10 +26,12 @@ object ProfessionalProfileMapper {
             listOfNotNull(dto?.serviceArea?.city, dto?.serviceArea?.state)
                 .filter { it.isNotEmpty() }
                 .joinToString(", ")
+        val categories = dto?.categories ?: emptyList()
         val skills =
-            (dto?.categories ?: emptyList()).map {
+            categories.map {
                 ProSkill(id = it, label = categoryLabel(it), icon = categoryIcon(it))
             }
+        val rate = dto?.pricingMeta?.hourlyRate
         return ProfessionalProfileContent(
             proName = proName,
             strength = strength(dto),
@@ -40,8 +42,27 @@ object ProfessionalProfileMapper {
             certifications = emptyList(),
             portfolio = emptyList(),
             visibility = visibilityRows(dto?.isPublic ?: false, dto?.isActive ?: false),
+            categories = categories,
+            serviceCity = seeded("serviceCity", dto?.serviceArea?.city.orEmpty()),
+            serviceState = seeded("serviceState", dto?.serviceArea?.state.orEmpty()),
+            serviceRadiusKm = seeded("serviceRadiusKm", dto?.serviceArea?.radiusKm?.toInt()?.toString() ?: ""),
+            hourlyRate =
+                seeded(
+                    "hourlyRate",
+                    rate?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "",
+                ),
+            verification =
+                ProVerificationSummary(
+                    status = status,
+                    tier = dto?.verificationTier ?: verification?.tier,
+                ),
         )
     }
+
+    private fun seeded(
+        id: String,
+        value: String,
+    ): FormFieldState = FormFieldState(id = id, value = value, originalValue = value)
 
     fun verificationStatus(raw: String?): ProVerificationStatus =
         when (raw) {
@@ -50,8 +71,28 @@ object ProfessionalProfileMapper {
             else -> ProVerificationStatus.Unverified
         }
 
-    /** `pet_care` → `Pet Care`. */
-    fun categoryLabel(key: String): String = key.split("_").joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+    /**
+     * Seed an enable draft from an existing (disabled) backend record so
+     * re-enabling keeps what the user already wrote.
+     */
+    fun draft(dto: ProfessionalProfileDto?): ProfessionalEnableDraft {
+        if (dto == null) return ProfessionalEnableDraft()
+        val rate = dto.pricingMeta?.hourlyRate
+        return ProfessionalEnableDraft(
+            headline = dto.headline.orEmpty(),
+            bio = dto.bio.orEmpty(),
+            categories = dto.categories ?: emptyList(),
+            city = dto.serviceArea?.city.orEmpty(),
+            state = dto.serviceArea?.state.orEmpty(),
+            radiusKm = dto.serviceArea?.radiusKm?.toInt()?.toString() ?: "50",
+            hourlyRate = rate?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "",
+            isPublic = dto.isPublic ?: true,
+            isReEnable = true,
+        )
+    }
+
+    /** `pet_care` → `Pet Care`, via the server's category catalogue. */
+    fun categoryLabel(key: String): String = ProfessionalCategory.label(key)
 
     fun categoryIcon(key: String): PantopusIcon =
         when (key) {

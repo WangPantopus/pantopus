@@ -14,6 +14,8 @@ import app.pantopus.android.data.api.models.homes.CheckAddressResponse
 import app.pantopus.android.data.api.models.homes.CreateHomeRequest
 import app.pantopus.android.data.api.models.homes.CreateHomeResponse
 import app.pantopus.android.data.api.models.homes.HomeDto
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsRequest
+import app.pantopus.android.data.api.models.homes.PropertySuggestionsResponse
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.homes.HomesRepository
 import app.pantopus.android.data.network.NetworkMonitor
@@ -44,10 +46,7 @@ class AddHomeWizardScreenTest {
 
     private val checkAddressOk =
         CheckAddressResponse(
-            exists = false,
-            homeCount = 0,
-            hasVerifiedMembers = false,
-            verdictStatus = null,
+            status = CheckAddressResponse.STATUS_NOT_FOUND,
         )
 
     private val createHomeResponse =
@@ -75,11 +74,17 @@ class AddHomeWizardScreenTest {
     private fun makeViewModel(): AddHomeWizardViewModel {
         coEvery { repo.checkAddress(any<CheckAddressRequest>()) } returns NetworkResult.Success(checkAddressOk)
         coEvery { repo.create(any<CreateHomeRequest>()) } returns NetworkResult.Success(createHomeResponse)
+        // `runCheckAddress` also fans out to the ATTOM public-records lookup.
+        // Unstubbed, the relaxed mock hands back an instance that is neither
+        // Success nor Failure, and the exhaustive `when` in
+        // `loadPropertySuggestions` throws NoWhenBranchMatchedException.
+        coEvery { repo.propertySuggestions(any<PropertySuggestionsRequest>()) } returns
+            NetworkResult.Success(PropertySuggestionsResponse())
         val networkMonitor =
             mockk<NetworkMonitor>(relaxed = true).also {
                 every { it.isOnline } returns MutableStateFlow(true)
             }
-        return AddHomeWizardViewModel(repo, SavedStateHandle(), networkMonitor)
+        return AddHomeWizardViewModel(repo, mockk(relaxed = true), SavedStateHandle(), networkMonitor)
     }
 
     private fun AddHomeWizardViewModel.fillAddress() {

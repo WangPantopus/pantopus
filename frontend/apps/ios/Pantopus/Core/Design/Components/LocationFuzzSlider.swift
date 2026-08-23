@@ -6,7 +6,7 @@
 //  five-stop stepped slider (white thumb, primary fill, tick dots), the
 //  stop labels, and the live `FuzzMap` preview (P1.3) that grows its
 //  concentric ring as the slider drags. The five stops are the
-//  `FuzzStop` cases — Exact · Building · Block · Block (default) ·
+//  `FuzzStop` cases — Exact · Block · Quarter mile · Half mile ·
 //  Neighborhood. Lives beside `FuzzMap` so the shared `GroupedListView`
 //  can render it without reaching into a feature folder.
 //
@@ -179,7 +179,7 @@ public struct LocationFuzzSlider: View {
 #Preview("Location fuzz slider") {
     LocationFuzzSlider(
         leadIn: "How exact your task and listing pins appear on the map.",
-        stop: .blockDefault
+        stop: .halfMile
     ) { _ in }
         .background(Theme.Color.appSurface)
         .padding(Spacing.s3)

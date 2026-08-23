@@ -2,6 +2,10 @@
 
 package app.pantopus.android.ui.screens.mailbox.unboxing
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,10 +28,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,10 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.ui.components.EmptyState
+import app.pantopus.android.ui.components.ErrorState
 import app.pantopus.android.ui.components.OcrFact
 import app.pantopus.android.ui.components.OcrFactsList
 import app.pantopus.android.ui.components.OcrFactsStatus
 import app.pantopus.android.ui.components.OcrFactsTone
+import app.pantopus.android.ui.components.Shimmer
 import app.pantopus.android.ui.screens.mailbox.unboxing.components.CaptureFilmstrip
 import app.pantopus.android.ui.screens.mailbox.unboxing.components.DrawerSuggestionCard
 import app.pantopus.android.ui.screens.mailbox.unboxing.components.FiledSummary
@@ -50,6 +59,10 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A17.14 — Unboxing scan-capture flow. A scan-first surface in the A17
@@ -75,19 +88,74 @@ fun UnboxingScreen(
     viewModel: UnboxingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
+    val toast by viewModel.toast.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Real image source: the photo picker hands back a content Uri, we read
+    // the bytes and the view-model uploads + attaches them to the package.
+    val picker =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val bytes =
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    }
+                if (bytes != null) viewModel.capture(bytes)
+            }
+        }
+
     LaunchedEffect(Unit) {
         viewModel.configure(onScanNext = onScanNext, onOpenDrawer = onOpenDrawer)
+        viewModel.load()
     }
-    UnboxingScaffold(
-        state = state,
-        onBack = onBack,
-        onCapture = viewModel::capture,
-        onConfirm = viewModel::confirm,
-        onUndo = viewModel::undo,
-        onScanNext = viewModel::scanNext,
-        onOpenDrawer = viewModel::openDrawer,
-    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        UnboxingScaffold(
+            state = state,
+            isBusy = isBusy,
+            onBack = onBack,
+            onRetry = viewModel::retry,
+            onCapture = {
+                picker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onConfirm = viewModel::confirm,
+            onSaveManual = viewModel::saveManual,
+            onUndo = viewModel::undo,
+            onScanNext = viewModel::scanNext,
+            onOpenDrawer = viewModel::openDrawer,
+            onPostAssemblyGig = viewModel::postAssemblyGig,
+        )
+        toast?.let { message ->
+            LaunchedEffect(message) {
+                delay(TOAST_MILLIS)
+                viewModel.consumeToast()
+            }
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextInverse,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 160.dp)
+                        .clip(RoundedCornerShape(Radii.pill))
+                        .background(PantopusColors.appText)
+                        .padding(horizontal = Spacing.s4, vertical = Spacing.s2)
+                        .testTag("unboxing_toast"),
+            )
+        }
+    }
 }
+
+private const val TOAST_MILLIS = 1_800L
 
 private val accent get() = PantopusColors.categoryUnboxing
 private val accentDark get() = PantopusColors.categoryUnboxingDark
@@ -103,6 +171,10 @@ private fun UnboxingScaffold(
     onUndo: () -> Unit,
     onScanNext: () -> Unit,
     onOpenDrawer: () -> Unit,
+    isBusy: Boolean = false,
+    onRetry: () -> Unit = {},
+    onSaveManual: () -> Unit = {},
+    onPostAssemblyGig: () -> Unit = {},
     cameraPreviewEnabled: Boolean = true,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg).testTag("unboxing")) {
@@ -117,29 +189,72 @@ private fun UnboxingScaffold(
                 verticalArrangement = Arrangement.spacedBy(Spacing.s4),
             ) {
                 when (state) {
+                    is UnboxingUiState.Loading -> LoadingBody()
                     is UnboxingUiState.Capture ->
                         CaptureBody(
                             content = state.content,
+                            isBusy = isBusy,
                             onCapture = onCapture,
+                            onPostAssemblyGig = onPostAssemblyGig,
                             cameraPreviewEnabled = cameraPreviewEnabled,
                         )
                     is UnboxingUiState.Filed ->
-                        FiledBody(content = state.content, onUndo = onUndo, onScanNext = onScanNext)
+                        FiledBody(
+                            content = state.content,
+                            isBusy = isBusy,
+                            onUndo = onUndo,
+                            onScanNext = onScanNext,
+                            onPostAssemblyGig = onPostAssemblyGig,
+                        )
+                    is UnboxingUiState.Error ->
+                        ErrorState(
+                            headline = "Couldn't load this package",
+                            message = state.message,
+                            modifier = Modifier.testTag("unboxing_error"),
+                            onRetry = onRetry,
+                        )
+                    is UnboxingUiState.Unavailable ->
+                        EmptyState(
+                            icon = PantopusIcon.Package,
+                            headline = "Nothing to unbox yet",
+                            subcopy =
+                                "Open a delivered package from your mailbox and tap Virtual unboxing to start.",
+                            modifier = Modifier.testTag("unboxing_unavailable"),
+                            ctaTitle = "Back to Mailbox",
+                            onCta = onBack,
+                        )
                 }
                 Spacer(Modifier.height(128.dp))
             }
         }
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(PantopusColors.appSurface),
-        ) {
-            HorizontalDivider(color = PantopusColors.appBorderSubtle)
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
-                when (state) {
-                    is UnboxingUiState.Capture -> CaptureActions(onConfirm = onConfirm)
-                    is UnboxingUiState.Filed -> FiledActions(onOpenDrawer = onOpenDrawer)
+        if (state is UnboxingUiState.Capture || state is UnboxingUiState.Filed) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(PantopusColors.appSurface),
+            ) {
+                HorizontalDivider(color = PantopusColors.appBorderSubtle)
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s4, vertical = Spacing.s3)) {
+                    when (state) {
+                        is UnboxingUiState.Capture ->
+                            CaptureActions(
+                                isBusy = isBusy,
+                                onConfirm = onConfirm,
+                                onAddPhoto = onCapture,
+                                onSaveManual = onSaveManual,
+                            )
+                        else -> FiledActions(onOpenDrawer = onOpenDrawer)
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LoadingBody() {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s4), modifier = Modifier.testTag("unboxing_loading")) {
+        Shimmer(width = 320.dp, height = 220.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 320.dp, height = 132.dp, cornerRadius = Radii.xl)
+        Shimmer(width = 320.dp, height = 150.dp, cornerRadius = Radii.xl)
     }
 }
 
@@ -148,7 +263,9 @@ private fun UnboxingScaffold(
 @Composable
 private fun CaptureBody(
     content: UnboxingContent,
+    isBusy: Boolean,
     onCapture: () -> Unit,
+    onPostAssemblyGig: () -> Unit,
     cameraPreviewEnabled: Boolean,
 ) {
     HeaderRow(content = content, filed = false)
@@ -169,14 +286,17 @@ private fun CaptureBody(
         onSelectAlternate = {},
         onChooseAnother = {},
     )
-    FactsList(facts = content.facts, locked = false)
+    if (content.facts.isNotEmpty()) FactsList(facts = content.facts, locked = false)
+    AssemblyGigCard(isBusy = isBusy, onPost = onPostAssemblyGig)
 }
 
 @Composable
 private fun FiledBody(
     content: UnboxingContent,
+    isBusy: Boolean,
     onUndo: () -> Unit,
     onScanNext: () -> Unit,
+    onPostAssemblyGig: () -> Unit,
 ) {
     HeaderRow(content = content, filed = true)
     FiledSummary(
@@ -188,7 +308,8 @@ private fun FiledBody(
         onViewPhotos = {},
     )
     Box(modifier = Modifier.testTag("unboxing_elf")) { AIElfStripView(content = content.filedElf) }
-    FactsList(facts = content.facts, locked = true)
+    if (content.facts.isNotEmpty()) FactsList(facts = content.facts, locked = true)
+    AssemblyGigCard(isBusy = isBusy, onPost = onPostAssemblyGig)
     ScanNextCard(accent = accent, accentDark = accentDark, accentBg = accentBg, onTap = onScanNext)
 }
 
@@ -199,15 +320,75 @@ private fun FactsList(
 ) {
     Box(modifier = Modifier.testTag("unboxing_facts")) {
         OcrFactsList(
-            title = "Read from your scans",
+            title = "On this package",
             status =
                 if (locked) {
                     OcrFactsStatus(PantopusIcon.Lock, "Saved", OcrFactsTone.Success)
                 } else {
-                    OcrFactsStatus(PantopusIcon.ScanLine, "Tap to edit", OcrFactsTone.Neutral)
+                    OcrFactsStatus(PantopusIcon.Package, "From the carrier", OcrFactsTone.Neutral)
                 },
             facts = facts,
         )
+    }
+}
+
+/**
+ * "Need help assembling?" — RN's package gig card
+ * (`src/app/mailbox/unboxing.tsx:141-158`), posting
+ * `POST api/mailbox/v2/p2/package/:mailId/gig` with `gigType = "assembly"`.
+ */
+@Composable
+private fun AssemblyGigCard(
+    isBusy: Boolean,
+    onPost: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.xl))
+                .background(PantopusColors.businessBg)
+                .padding(14.dp)
+                .testTag("unboxing_assemblyCard"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        Text(
+            text = "Need help assembling?",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appTextStrong,
+        )
+        Text(
+            text = "Post a task and a Verified Neighbor will help. Package details are pre-filled.",
+            fontSize = 12.sp,
+            color = PantopusColors.appTextSecondary,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.business)
+                    .clickable(enabled = !isBusy, onClick = onPost)
+                    .testTag("unboxing_assemblyGig"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            PantopusIconImage(
+                icon = PantopusIcon.UsersRound,
+                contentDescription = null,
+                size = 17.dp,
+                tint = PantopusColors.appTextInverse,
+            )
+            Spacer(Modifier.size(Spacing.s2))
+            Text(
+                text = "Create Task Request",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appTextInverse,
+            )
+        }
     }
 }
 
@@ -346,20 +527,33 @@ private fun CategoryChip(label: String) {
 // ─── Action shelves ───────────────────────────────────────────
 
 @Composable
-private fun CaptureActions(onConfirm: () -> Unit) {
+private fun CaptureActions(
+    isBusy: Boolean,
+    onConfirm: () -> Unit,
+    onAddPhoto: () -> Unit,
+    onSaveManual: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
         UnboxPrimaryButton(
             icon = PantopusIcon.CheckCheck,
             label = "Confirm — file to Home",
             background = accent,
-            onClick = onConfirm,
+            onClick = { if (!isBusy) onConfirm() },
             testTag = "unboxing_confirm",
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2), modifier = Modifier.fillMaxWidth()) {
-            UbChip(icon = PantopusIcon.ArrowsRepeat, label = "Retake", modifier = Modifier.weight(1f))
-            UbChip(icon = PantopusIcon.Pencil, label = "Edit facts", modifier = Modifier.weight(1f))
-            UbChip(icon = PantopusIcon.MessageSquare, label = "Add note", modifier = Modifier.weight(1f))
-            UbChip(icon = PantopusIcon.Trash2, label = "Discard", modifier = Modifier.weight(1f))
+            UbChip(
+                icon = PantopusIcon.Camera,
+                label = "Add photo",
+                onClick = { if (!isBusy) onAddPhoto() },
+                modifier = Modifier.weight(1f).testTag("unboxing_addPhoto"),
+            )
+            UbChip(
+                icon = PantopusIcon.FileText,
+                label = "Save manual",
+                onClick = { if (!isBusy) onSaveManual() },
+                modifier = Modifier.weight(1f).testTag("unboxing_saveManual"),
+            )
         }
     }
 }
@@ -421,6 +615,7 @@ private fun UbChip(
     icon: PantopusIcon,
     label: String,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -428,7 +623,7 @@ private fun UbChip(
                 .clip(RoundedCornerShape(Radii.md))
                 .background(PantopusColors.appSurface)
                 .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.md))
-                .clickable {}
+                .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.s1, vertical = 10.dp)
                 .semantics { contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -461,6 +656,21 @@ internal fun UnboxingCaptureFrame(content: UnboxingContent) {
 internal fun UnboxingFiledFrame(content: UnboxingContent) {
     UnboxingScaffold(
         state = UnboxingUiState.Filed(content),
+        onBack = {},
+        onCapture = {},
+        onConfirm = {},
+        onUndo = {},
+        onScanNext = {},
+        onOpenDrawer = {},
+        cameraPreviewEnabled = false,
+    )
+}
+
+/** VM-free "no package" frame for Paparazzi snapshots. */
+@Composable
+internal fun UnboxingUnavailableFrame() {
+    UnboxingScaffold(
+        state = UnboxingUiState.Unavailable,
         onBack = {},
         onCapture = {},
         onConfirm = {},

@@ -339,8 +339,16 @@ public struct BusinessProfileDetailDTO: Decodable, Sendable, Hashable {
     public let serviceArea: BusinessServiceAreaDTO?
     public let foundingBadge: Bool?
     public let isPublished: Bool?
+    public let publishedAt: String?
     public let verificationStatus: String?
     public let primaryLocation: BusinessLocationDTO?
+    /// Free-form profile attributes (e.g. `price_level`).
+    public let attributes: [String: JSONValue]?
+    /// Social / booking links keyed by network name. Untyped for the same
+    /// reason as `attributes` — `social_links` is user-writable jsonb, so a
+    /// null or non-string member must not fail the whole decode. Callers
+    /// coerce with `EditBusinessPageMapper.stringMap`.
+    public let socialLinks: [String: JSONValue]?
 
     private enum CodingKeys: String, CodingKey {
         case businessUserId = "business_user_id"
@@ -356,8 +364,11 @@ public struct BusinessProfileDetailDTO: Decodable, Sendable, Hashable {
         case serviceArea = "service_area"
         case foundingBadge = "founding_badge"
         case isPublished = "is_published"
+        case publishedAt = "published_at"
         case verificationStatus = "verification_status"
         case primaryLocation = "primary_location"
+        case attributes
+        case socialLinks = "social_links"
     }
 }
 
@@ -442,6 +453,21 @@ public struct BusinessCatalogItemDTO: Decodable, Sendable, Hashable, Identifiabl
         case currency
         case imageURL = "image_url"
         case isFeatured = "is_featured"
+    }
+}
+
+/// `GET /api/businesses/:businessId/catalog/items` envelope — the
+/// owner/staff catalog read. Route `backend/routes/businesses.js:2386`.
+public struct BusinessCatalogItemsResponse: Decodable, Sendable, Hashable {
+    public let items: [BusinessCatalogItemDTO]
+
+    private enum CodingKeys: String, CodingKey {
+        case items
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decodeIfPresent([BusinessCatalogItemDTO].self, forKey: .items) ?? []
     }
 }
 
@@ -588,4 +614,325 @@ public struct BusinessOwnerReviewsResponse: Decodable, Sendable, Hashable {
 /// `POST /api/businesses/:businessId/follow` response.
 public struct BusinessFollowResponse: Decodable, Sendable, Hashable {
     public let following: Bool
+}
+
+/// Body for `POST /api/businesses/:businessId/inbox/start`.
+/// Route `backend/routes/businesses.js:3939`.
+public struct StartBusinessInquiryBody: Encodable, Sendable {
+    public let subject: String?
+
+    public init(subject: String? = nil) {
+        self.subject = subject
+    }
+}
+
+/// Response from `POST /api/businesses/:businessId/inbox/start`.
+/// Backend returns camelCase (`roomId`, `existing`).
+public struct StartBusinessInquiryResponse: Decodable, Sendable, Hashable {
+    public let roomId: String
+    public let existing: Bool?
+}
+
+/// `GET /api/businesses/:businessId/locations` response.
+/// Route `backend/routes/businesses.js:1742`.
+public struct BusinessLocationsResponse: Decodable, Sendable, Hashable {
+    public let locations: [BusinessLocationDTO]
+}
+
+// MARK: - Create business wizard (check-username + create-full)
+
+/// `GET /api/businesses/check-username` response.
+/// Route `backend/routes/businesses.js:358`.
+public struct UsernameAvailabilityDTO: Decodable, Sendable, Hashable {
+    public let available: Bool
+    /// `reserved` | `taken` | `invalid` | `error` when unavailable.
+    public let reason: String?
+}
+
+/// Optional location block for `POST /api/businesses/create-full`.
+/// Route `backend/routes/businesses.js:554`.
+public struct CreateBusinessLocationPayload: Encodable, Sendable, Hashable {
+    public let address: String
+    public let city: String
+    public let state: String?
+    public let zipcode: String?
+    public let country: String
+
+    public init(
+        address: String,
+        city: String,
+        state: String? = nil,
+        zipcode: String? = nil,
+        country: String = "US"
+    ) {
+        self.address = address
+        self.city = city
+        self.state = state
+        self.zipcode = zipcode
+        self.country = country
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(address, forKey: .address)
+        try c.encode(city, forKey: .city)
+        try c.encodeIfPresent(state, forKey: .state)
+        try c.encodeIfPresent(zipcode, forKey: .zipcode)
+        try c.encode(country, forKey: .country)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case address, city, state, zipcode, country
+    }
+}
+
+/// One hours row for `POST /api/businesses/create-full`.
+/// Route `backend/routes/businesses.js:554`.
+public struct CreateBusinessHoursPayload: Encodable, Sendable, Hashable {
+    public let dayOfWeek: Int
+    public let openTime: String?
+    public let closeTime: String?
+    public let isClosed: Bool
+
+    public init(dayOfWeek: Int, openTime: String?, closeTime: String?, isClosed: Bool) {
+        self.dayOfWeek = dayOfWeek
+        self.openTime = openTime
+        self.closeTime = closeTime
+        self.isClosed = isClosed
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(dayOfWeek, forKey: .dayOfWeek)
+        try c.encodeIfPresent(openTime, forKey: .openTime)
+        try c.encodeIfPresent(closeTime, forKey: .closeTime)
+        try c.encode(isClosed, forKey: .isClosed)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case dayOfWeek = "day_of_week"
+        case openTime = "open_time"
+        case closeTime = "close_time"
+        case isClosed = "is_closed"
+    }
+}
+
+/// Body for `POST /api/businesses/create-full`.
+/// Route `backend/routes/businesses.js:554`.
+public struct CreateBusinessFullRequest: Encodable, Sendable, Hashable {
+    public let name: String
+    public let username: String
+    public let email: String
+    public let businessType: String?
+    public let categories: [String]?
+    public let description: String?
+    public let location: CreateBusinessLocationPayload?
+    public let hours: [CreateBusinessHoursPayload]?
+
+    public init(
+        name: String,
+        username: String,
+        email: String,
+        businessType: String? = nil,
+        categories: [String]? = nil,
+        description: String? = nil,
+        location: CreateBusinessLocationPayload? = nil,
+        hours: [CreateBusinessHoursPayload]? = nil
+    ) {
+        self.name = name
+        self.username = username
+        self.email = email
+        self.businessType = businessType
+        self.categories = categories
+        self.description = description
+        self.location = location
+        self.hours = hours
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(username, forKey: .username)
+        try c.encode(email, forKey: .email)
+        try c.encodeIfPresent(businessType, forKey: .businessType)
+        try c.encodeIfPresent(categories, forKey: .categories)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encodeIfPresent(location, forKey: .location)
+        try c.encodeIfPresent(hours, forKey: .hours)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, username, email, categories, description, location, hours
+        case businessType = "business_type"
+    }
+}
+
+/// `POST /api/businesses/create-full` response.
+/// Route `backend/routes/businesses.js:554`.
+public struct CreateBusinessFullResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let business: BusinessUserDTO
+    public let locationId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case message, business
+        case locationId = "location_id"
+    }
+}
+
+// MARK: - Edit business page mutations (A13.10)
+
+/// `PATCH /api/businesses/:businessId` body — `updateBusinessSchema`
+/// (`backend/routes/businesses.js:124`). Only non-nil keys are encoded.
+public struct UpdateBusinessRequest: Encodable, Sendable {
+    public var name: String?
+    public var tagline: String?
+    public var description: String?
+    public var categories: [String]?
+    public var publicEmail: String?
+    public var publicPhone: String?
+    public var website: String?
+    public var socialLinks: [String: String]?
+    public var attributes: [String: JSONValue]?
+    public var isPublished: Bool?
+
+    public init(
+        name: String? = nil,
+        tagline: String? = nil,
+        description: String? = nil,
+        categories: [String]? = nil,
+        publicEmail: String? = nil,
+        publicPhone: String? = nil,
+        website: String? = nil,
+        socialLinks: [String: String]? = nil,
+        attributes: [String: JSONValue]? = nil,
+        isPublished: Bool? = nil
+    ) {
+        self.name = name
+        self.tagline = tagline
+        self.description = description
+        self.categories = categories
+        self.publicEmail = publicEmail
+        self.publicPhone = publicPhone
+        self.website = website
+        self.socialLinks = socialLinks
+        self.attributes = attributes
+        self.isPublished = isPublished
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, tagline, description, categories, website, attributes
+        case publicEmail = "public_email"
+        case publicPhone = "public_phone"
+        case socialLinks = "social_links"
+        case isPublished = "is_published"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(tagline, forKey: .tagline)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(categories, forKey: .categories)
+        try container.encodeIfPresent(publicEmail, forKey: .publicEmail)
+        try container.encodeIfPresent(publicPhone, forKey: .publicPhone)
+        try container.encodeIfPresent(website, forKey: .website)
+        try container.encodeIfPresent(socialLinks, forKey: .socialLinks)
+        try container.encodeIfPresent(attributes, forKey: .attributes)
+        try container.encodeIfPresent(isPublished, forKey: .isPublished)
+    }
+}
+
+/// Generic `{ message }` envelope from publish / update success paths.
+public struct BusinessMutationMessageResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+}
+
+/// One day row for `PUT …/hours` — `weeklyHoursSchema`
+/// (`backend/routes/businesses.js:207`).
+public struct SetBusinessHoursDayRequest: Encodable, Sendable, Hashable {
+    public let dayOfWeek: Int
+    public let openTime: String?
+    public let closeTime: String?
+    public let isClosed: Bool
+
+    public init(dayOfWeek: Int, openTime: String?, closeTime: String?, isClosed: Bool) {
+        self.dayOfWeek = dayOfWeek
+        self.openTime = openTime
+        self.closeTime = closeTime
+        self.isClosed = isClosed
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case dayOfWeek = "day_of_week"
+        case openTime = "open_time"
+        case closeTime = "close_time"
+        case isClosed = "is_closed"
+    }
+}
+
+/// Body for `PUT /api/businesses/:businessId/locations/:locationId/hours`.
+public struct SetBusinessHoursRequest: Encodable, Sendable {
+    public let hours: [SetBusinessHoursDayRequest]
+
+    public init(hours: [SetBusinessHoursDayRequest]) {
+        self.hours = hours
+    }
+}
+
+/// `GET/PUT …/hours` response envelope.
+public struct BusinessLocationHoursResponse: Decodable, Sendable, Hashable {
+    public let hours: [BusinessHoursDTO]
+}
+
+/// `PATCH /api/businesses/:businessId/locations/:locationId` body —
+/// `updateLocationSchema` (`backend/routes/businesses.js:190`).
+public struct UpdateBusinessLocationRequest: Encodable, Sendable {
+    public var address: String?
+    public var city: String?
+    public var state: String?
+    public var zipcode: String?
+
+    public init(
+        address: String? = nil,
+        city: String? = nil,
+        state: String? = nil,
+        zipcode: String? = nil
+    ) {
+        self.address = address
+        self.city = city
+        self.state = state
+        self.zipcode = zipcode
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(address, forKey: .address)
+        try container.encodeIfPresent(city, forKey: .city)
+        try container.encodeIfPresent(state, forKey: .state)
+        try container.encodeIfPresent(zipcode, forKey: .zipcode)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case address, city, state, zipcode
+    }
+}
+
+// MARK: - Business media upload (A12.10 Create Business — logo)
+
+/// Which slot a business-media upload fills. Matches the route's
+/// `type` query param (`backend/routes/upload.js:1683`).
+public enum BusinessMediaKind: String, Sendable, Hashable {
+    case logo
+    case banner
+}
+
+/// `POST /api/upload/business-media/:businessId?type=logo|banner` response
+/// (`backend/routes/upload.js:1797`). The server has already written the
+/// URL onto the business profile, so callers only need the echoed `url`
+/// to render the freshly-uploaded image.
+public struct BusinessMediaUploadResponse: Decodable, Sendable, Hashable {
+    public let message: String?
+    public let url: String
+    public let key: String?
 }

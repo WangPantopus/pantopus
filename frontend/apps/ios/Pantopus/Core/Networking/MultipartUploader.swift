@@ -9,6 +9,8 @@
 //  registering the resulting URL via the evidence endpoint.
 //
 
+// swiftlint:disable file_length type_body_length
+
 import Foundation
 import Logging
 
@@ -267,6 +269,174 @@ public final class MultipartUploader: @unchecked Sendable {
             throw APIError.unauthorized
         case 413:
             throw APIError.clientError(status: 413, message: "Audio file exceeds the 25MB limit.")
+        case 400..<500:
+            throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    /// Replace the signed-in user's avatar via
+    /// `POST /api/upload/profile-picture` (`backend/routes/upload.js:236`).
+    /// Single file, field name `file`; the server resizes to 800×800 webp,
+    /// writes `User.profile_picture_url`, and echoes the new URL back.
+    /// Mirrors RN `api.upload.uploadProfilePicture`.
+    public func uploadProfilePicture(_ file: MultipartFile) async throws -> ProfilePictureUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/upload/profile-picture")
+        let body = Self.buildBody(boundary: boundary, file: file)
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(ProfilePictureUploadResponse.self, from: data)
+            } catch {
+                logger.error("Profile picture upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "That photo is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Profile picture must be an image.")
+        case 400..<500:
+            let message = String(data: data, encoding: .utf8)
+            throw APIError.clientError(status: http.statusCode, message: message)
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    /// Add one portfolio item via `POST /api/files/portfolio`
+    /// (`backend/routes/files.js:362`). Single file, field name `file`;
+    /// `category` / `title` / `description` ride alongside as form fields
+    /// and land in `File.file_context` + `File.metadata`. Mirrors RN's
+    /// `api.files.uploadPortfolio`
+    /// (`packages/api/src/endpoints/files.ts:29`).
+    public func uploadPortfolio(
+        file: MultipartFile,
+        title: String,
+        description: String?,
+        category: String?
+    ) async throws -> PortfolioUploadResponse {
+        var fields: [String: String] = ["title": title]
+        if let description, !description.isEmpty { fields["description"] = description }
+        if let category, !category.isEmpty { fields["category"] = category }
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        let url = environment.apiBaseURL.appendingPathComponent("/api/files/portfolio")
+        let body = Self.buildBody(boundary: boundary, file: file, fields: fields)
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(PortfolioUploadResponse.self, from: data)
+            } catch {
+                logger.error("Portfolio upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 413:
+            throw APIError.clientError(status: 413, message: "That file is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "That file type isn't supported.")
+        case 400..<500:
+            let message = String(data: data, encoding: .utf8)
+            throw APIError.clientError(status: http.statusCode, message: message)
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    /// Upload a Beacon avatar or banner via
+    /// `POST /api/upload/persona-media/:personaId?type=avatar|banner`
+    /// (`backend/routes/upload.js:312`). Single file, field name `file`,
+    /// images only — the route resizes (800×800 for avatars, 1600×600 for
+    /// banners), writes `avatar_url` / `banner_url` on the persona row and
+    /// echoes the new URL. Owner-only: 403 when the Beacon isn't yours.
+    /// Mirrors RN `api.upload.uploadPersonaMedia`.
+    public func uploadPersonaMedia(
+        personaId: String,
+        kind: PersonaMediaKind,
+        file: MultipartFile
+    ) async throws -> PersonaMediaUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        var components = URLComponents(
+            url: environment.apiBaseURL.appendingPathComponent("/api/upload/persona-media/\(personaId)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "type", value: kind.rawValue)]
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        // The route also accepts `type` as a form field; send both so a
+        // proxy that strips the query string still resolves the slot.
+        let body = Self.buildBody(boundary: boundary, file: file, fields: ["type": kind.rawValue])
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(PersonaMediaUploadResponse.self, from: data)
+            } catch {
+                logger.error("Beacon media upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 403:
+            throw APIError.clientError(status: 403, message: "You do not have permission to edit this Beacon.")
+        case 413:
+            throw APIError.clientError(status: 413, message: "That image is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Beacon media must be an image.")
+        case 400..<500:
+            throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        default:
+            throw APIError.server(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    /// Upload a business logo or banner via
+    /// `POST /api/upload/business-media/:businessId?type=logo|banner`
+    /// (`backend/routes/upload.js:1679`). Single file, field name `file`,
+    /// images only — the route resizes (800×800 for logos, 1600×900 for
+    /// banners), writes `BusinessProfile.logo_file_id` / `banner_file_id`
+    /// plus the mirrored `User.profile_picture_url` / `cover_photo_url`,
+    /// and echoes the new URL. Requires the `profile.edit` permission on
+    /// the business (403 otherwise).
+    /// Mirrors RN `api.upload.uploadBusinessMedia`
+    /// (`packages/api/src/endpoints/upload.ts:498`).
+    public func uploadBusinessMedia(
+        businessId: String,
+        kind: BusinessMediaKind,
+        file: MultipartFile
+    ) async throws -> BusinessMediaUploadResponse {
+        let boundary = "PantopusBoundary-\(UUID().uuidString)"
+        var components = URLComponents(
+            url: environment.apiBaseURL.appendingPathComponent("/api/upload/business-media/\(businessId)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "type", value: kind.rawValue)]
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        // The route reads `type` from the query string or the form body —
+        // send both so a proxy that strips the query still resolves the slot.
+        let body = Self.buildBody(boundary: boundary, file: file, fields: ["type": kind.rawValue])
+        let (data, http) = try await performUpload(to: url, boundary: boundary, body: body)
+        switch http.statusCode {
+        case 200..<300:
+            do {
+                return try JSONDecoder().decode(BusinessMediaUploadResponse.self, from: data)
+            } catch {
+                logger.error("Business media upload decode failed: \(error)")
+                throw APIError.decoding(underlying: error)
+            }
+        case 401:
+            throw APIError.unauthorized
+        case 403:
+            throw APIError.clientError(status: 403, message: "You do not have permission to edit this business profile.")
+        case 413:
+            throw APIError.clientError(status: 413, message: "That image is too large.")
+        case 415:
+            throw APIError.clientError(status: 415, message: "Business media must be an image.")
         case 400..<500:
             throw APIError.clientError(status: http.statusCode, message: String(data: data, encoding: .utf8))
         default:

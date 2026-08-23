@@ -30,12 +30,14 @@ final class OwnersListViewModelTests: XCTestCase {
 
     private func makeVM(
         homeId: String = "home_1",
-        currentUserId: String? = "user_1"
+        currentUserId: String? = "user_1",
+        showsClaimReview: Bool = true
     ) -> OwnersListViewModel {
         OwnersListViewModel(
             homeId: homeId,
             currentUserId: currentUserId,
-            api: makeAPI()
+            api: makeAPI(),
+            showsClaimReview: showsClaimReview
         )
     }
 
@@ -335,12 +337,16 @@ final class OwnersListViewModelTests: XCTestCase {
         XCTAssertEqual(fab.tint, .home)
     }
 
-    func testNoTopBarActionByDesign() {
+    func testTopBarActionOpensClaimReview() {
         let vm = makeVM()
-        // Per the P15 brief the top bar only carries the back chevron +
-        // title + home subtitle. No top-bar action; the FAB owns the
-        // create affordance.
-        XCTAssertNil(vm.topBarAction)
+        // H6 — the top bar now carries the per-home claim-review gavel;
+        // the FAB still owns the create (invite) affordance.
+        let action = vm.topBarAction
+        XCTAssertNotNil(action)
+        XCTAssertEqual(action?.icon, .gavel)
+        XCTAssertEqual(action?.accessibilityLabel, "Review claims on this home")
+        // …and stays hidden when the host has no claim-review route.
+        XCTAssertNil(makeVM(showsClaimReview: false).topBarAction)
     }
 
     func testNoTabsByDesign() {

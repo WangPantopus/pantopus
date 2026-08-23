@@ -62,7 +62,6 @@ data class ConfirmSheetParty(
 @Composable
 fun BiometricConfirmSheet(
     parties: List<ConfirmSheetParty>,
-    amount: Int,
     recipientName: String,
     homeAddress: String,
     coOwnerNames: String,
@@ -97,7 +96,6 @@ fun BiometricConfirmSheet(
         LegalBlock(
             biometryLabel = biometryLabel,
             recipientName = recipientName,
-            amount = amount,
             homeAddress = homeAddress,
             coOwnerNames = coOwnerNames,
             timestamp = timestamp,
@@ -259,7 +257,6 @@ private fun Percentage(party: ConfirmSheetParty) {
 private fun LegalBlock(
     biometryLabel: String,
     recipientName: String,
-    amount: Int,
     homeAddress: String,
     coOwnerNames: String,
     timestamp: String,
@@ -268,8 +265,12 @@ private fun LegalBlock(
     val text =
         buildString {
             append("By confirming with $biometryLabel: ")
-            append("you grant $recipientName $amount% ownership of $homeAddress and forfeit that share. ")
-            append("$coOwnerNames keep their stakes. Recorded on chain at ")
+            append("you grant $recipientName ownership of $homeAddress and forfeit your own ")
+            append("owner record. They must verify ownership before the transfer completes. ")
+            if (coOwnerNames.isNotEmpty()) {
+                append("$coOwnerNames must approve before it takes effect. ")
+            }
+            append("Recorded on chain at ")
             append(timestamp)
             append(".")
         }

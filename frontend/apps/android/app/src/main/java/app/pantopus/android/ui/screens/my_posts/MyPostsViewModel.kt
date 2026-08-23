@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.posts.MyPostDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.auth.AuthRepository
 import app.pantopus.android.data.posts.PostsRepository
 import app.pantopus.android.data.posts.PulsePostsRefreshNotifier
@@ -145,7 +146,11 @@ class MyPostsViewModel
                 PulseIntent.Recommend,
                 PulseIntent.Event,
                 PulseIntent.Lost,
+                PulseIntent.Alert,
+                PulseIntent.Deal,
                 PulseIntent.Announce,
+                PulseIntent.NeighborhoodWin,
+                PulseIntent.VisitorGuide,
             ).map { FilterOption(id = intentFilterId(it), label = intentLabel(it)) }
 
         /** Posts have no per-row value — only date ordering applies. */
@@ -242,7 +247,7 @@ class MyPostsViewModel
                     }
                     is NetworkResult.Failure -> {
                         if (!loadedAtLeastOnce) {
-                            _state.value = ListOfRowsUiState.Error(result.error.message)
+                            _state.value = ListOfRowsUiState.Error(result.error.displayMessage("Couldn't load the list."))
                         }
                     }
                 }
@@ -541,7 +546,11 @@ class MyPostsViewModel
                     PulseIntent.Recommend -> "recommend"
                     PulseIntent.Event -> "event"
                     PulseIntent.Lost -> "lost"
+                    PulseIntent.Alert -> "alert"
+                    PulseIntent.Deal -> "deal"
                     PulseIntent.Announce -> "announce"
+                    PulseIntent.NeighborhoodWin -> "neighborhoodWin"
+                    PulseIntent.VisitorGuide -> "visitorGuide"
                 }
 
             /** Intent → display label per design (`Lost & Found` not `Lost`). */
@@ -552,7 +561,11 @@ class MyPostsViewModel
                     PulseIntent.Recommend -> "Recommend"
                     PulseIntent.Event -> "Event"
                     PulseIntent.Lost -> "Lost & Found"
+                    PulseIntent.Alert -> "Alerts"
+                    PulseIntent.Deal -> "Deals"
                     PulseIntent.Announce -> "Announce"
+                    PulseIntent.NeighborhoodWin -> "Wins"
+                    PulseIntent.VisitorGuide -> "Guide"
                 }
 
             private data class IntentPalette(
@@ -587,10 +600,30 @@ class MyPostsViewModel
                             foreground = PantopusColors.error,
                             background = PantopusColors.errorBg,
                         )
+                    PulseIntent.Alert ->
+                        IntentPalette(
+                            foreground = PantopusColors.error,
+                            background = PantopusColors.errorBg,
+                        )
+                    PulseIntent.Deal ->
+                        IntentPalette(
+                            foreground = PantopusColors.success,
+                            background = PantopusColors.successBg,
+                        )
                     PulseIntent.Announce ->
                         IntentPalette(
                             foreground = PantopusColors.appTextStrong,
                             background = PantopusColors.appSurfaceSunken,
+                        )
+                    PulseIntent.NeighborhoodWin ->
+                        IntentPalette(
+                            foreground = PantopusColors.warning,
+                            background = PantopusColors.warningBg,
+                        )
+                    PulseIntent.VisitorGuide ->
+                        IntentPalette(
+                            foreground = PantopusColors.info,
+                            background = PantopusColors.infoBg,
                         )
                 }
 
@@ -638,7 +671,14 @@ class MyPostsViewModel
                                 label = "${dto.likeCount} seen",
                             ),
                         )
-                    PulseIntent.Ask, PulseIntent.Announce, PulseIntent.All ->
+                    PulseIntent.Ask,
+                    PulseIntent.Alert,
+                    PulseIntent.Deal,
+                    PulseIntent.Announce,
+                    PulseIntent.NeighborhoodWin,
+                    PulseIntent.VisitorGuide,
+                    PulseIntent.All,
+                    ->
                         listOf(replies, likes)
                 }
             }

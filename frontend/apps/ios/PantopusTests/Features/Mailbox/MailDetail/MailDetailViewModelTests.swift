@@ -73,6 +73,71 @@ final class MailDetailViewModelTests: XCTestCase {
         XCTAssertEqual(content.detailTrust, .neutral)
     }
 
+    /// Ceremonial mail (carrying `mail_extracted.stationeryTheme`) is
+    /// redirected out of the generic detail into the ceremonial open
+    /// experience, and the plain layout never renders — mirroring RN
+    /// `src/app/mailbox/detail.tsx:43-49`.
+    func testStationeryMailRedirectsToCeremonialOpen() async {
+        let body = """
+        {
+          "mail": {
+            "id": "m-letter",
+            "type": "letter",
+            "mail_type": "letter",
+            "display_title": "A letter from Ada",
+            "content": "Dear you,",
+            "viewed": false,
+            "archived": false,
+            "starred": false,
+            "tags": [],
+            "priority": "normal",
+            "created_at": "2026-05-15T12:00:00Z",
+            "mail_extracted": {"stationeryTheme": "linen", "inkSelection": "indigo"}
+          }
+        }
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: body)]
+        let vm = MailDetailViewModel(mailId: "m-letter", api: makeAPI())
+        await vm.load()
+
+        XCTAssertEqual(vm.ceremonialRedirectMailId, "m-letter")
+        guard case .loading = vm.state else {
+            return XCTFail("The generic detail must not render for ceremonial mail; got \(vm.state)")
+        }
+        vm.acknowledgeCeremonialRedirect()
+        XCTAssertNil(vm.ceremonialRedirectMailId)
+    }
+
+    /// Ordinary mail (no stationery) stays on the generic detail.
+    func testMailWithoutStationeryDoesNotRedirect() async {
+        let body = """
+        {
+          "mail": {
+            "id": "m1",
+            "type": "notice",
+            "mail_type": "notice",
+            "display_title": "Notice",
+            "content": "Body",
+            "viewed": false,
+            "archived": false,
+            "starred": false,
+            "tags": [],
+            "priority": "normal",
+            "created_at": "2026-05-15T12:00:00Z",
+            "mail_extracted": {}
+          }
+        }
+        """
+        SequencedURLProtocol.sequence = [.status(200, body: body)]
+        let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())
+        await vm.load()
+
+        XCTAssertNil(vm.ceremonialRedirectMailId)
+        guard case .loaded = vm.state else {
+            return XCTFail("Expected loaded, got \(vm.state)")
+        }
+    }
+
     func testLoadErrorRendersErrorState() async {
         SequencedURLProtocol.sequence = [.status(500, body: "{\"error\":\"boom\"}")]
         let vm = MailDetailViewModel(mailId: "m1", api: makeAPI())

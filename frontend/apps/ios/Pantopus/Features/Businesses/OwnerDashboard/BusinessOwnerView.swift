@@ -28,7 +28,10 @@ import SwiftUI
 public struct BusinessOwnerView: View {
     @State private var viewModel: BusinessOwnerViewModel
     @State private var mode: OwnerViewMode = .owner
+    /// C2 — "Post as this business" composer sheet (role-gated).
+    @State private var showsComposer = false
 
+    private let businessId: String
     private let onBack: @MainActor () -> Void
     /// Opens Edit Business Page (A13.10) — the "Edit page" primary + every
     /// owner edit affordance.
@@ -38,6 +41,17 @@ public struct BusinessOwnerView: View {
     private let onOpenSettings: @MainActor () -> Void
     /// B2C — opens the Team & roles management screen.
     private let onOpenTeam: @MainActor () -> Void
+    /// C4 — opens the custom Pages CMS (block builder + revision history).
+    private let onOpenPages: @MainActor () -> Void
+    /// C3 — owner money + legal surfaces: Stripe Connect payouts, invoicing,
+    /// and the private legal record + verification.
+    private let onOpenPayments: @MainActor () -> Void
+    private let onOpenInvoices: @MainActor () -> Void
+    private let onOpenLegal: @MainActor () -> Void
+    /// Business-inbox row taps — opens a chat room (`roomId`, counterpart
+    /// name, counterpart handle) or a matched neighborhood post.
+    private let onOpenChatRoom: @MainActor (String, String, String) -> Void
+    private let onOpenPost: @MainActor (String) -> Void
 
     public init(
         businessId: String,
@@ -46,21 +60,45 @@ public struct BusinessOwnerView: View {
         onOpenInsights: @escaping @MainActor () -> Void = {},
         onOpenSettings: @escaping @MainActor () -> Void = {},
         onOpenTeam: @escaping @MainActor () -> Void = {},
+        onOpenPages: @escaping @MainActor () -> Void = {},
+        onOpenPayments: @escaping @MainActor () -> Void = {},
+        onOpenInvoices: @escaping @MainActor () -> Void = {},
+        onOpenLegal: @escaping @MainActor () -> Void = {},
+        onOpenChatRoom: @escaping @MainActor (String, String, String) -> Void = { _, _, _ in },
+        onOpenPost: @escaping @MainActor (String) -> Void = { _ in },
         content: BusinessOwnerContent? = nil
     ) {
         _viewModel = State(initialValue: BusinessOwnerViewModel(businessId: businessId, content: content))
+        self.businessId = businessId
         self.onBack = onBack
         self.onEditPage = onEditPage
         self.onOpenInsights = onOpenInsights
         self.onOpenSettings = onOpenSettings
         self.onOpenTeam = onOpenTeam
+        self.onOpenPages = onOpenPages
+        self.onOpenPayments = onOpenPayments
+        self.onOpenInvoices = onOpenInvoices
+        self.onOpenLegal = onOpenLegal
+        self.onOpenChatRoom = onOpenChatRoom
+        self.onOpenPost = onOpenPost
     }
 
     public var body: some View {
         content
             .offlineBanner(isOffline: !NetworkMonitor.shared.isOnline)
+            .overlay(alignment: .bottom) { toastOverlay }
             .accessibilityIdentifier("businessOwner")
             .task { await viewModel.load() }
+            .sheet(isPresented: $showsComposer) {
+                // C2 — reuse the shared Pulse composer, pointed at
+                // `POST /api/businesses/:businessId/posts`.
+                PulseComposeView(
+                    intent: .announce,
+                    identity: .business,
+                    businessAuthorId: businessId,
+                    managesDismiss: true
+                ) { _ in Task { await viewModel.refresh() } }
+            }
     }
 
     @ViewBuilder private var content: some View {
@@ -69,7 +107,8 @@ public struct BusinessOwnerView: View {
             OwnerLoadingLayout(onBack: onBack)
         case let .loaded(payload):
             ZStack {
-                if mode == .owner {
+                switch mode {
+                case .owner:
                     OwnerEditFrame(
                         content: payload,
                         onBack: onBack,
@@ -77,16 +116,39 @@ public struct BusinessOwnerView: View {
                         onOpenInsights: onOpenInsights,
                         onOpenSettings: onOpenSettings,
                         onOpenTeam: onOpenTeam,
+                        onOpenPages: onOpenPages,
+                        onOpenPayments: onOpenPayments,
+                        onOpenInvoices: onOpenInvoices,
+                        onOpenLegal: onOpenLegal,
                         onPreview: { mode = .preview },
+                        onManageCatalog: { mode = .catalog },
+                        onOpenInbox: { mode = .inbox },
+                        onComposePost: { showsComposer = true },
                         onSubmitReply: { reviewId, text in
                             viewModel.submitReply(reviewId: reviewId, text: text)
-                        }
+                        },
+                        onClaimFounding: { Task { await viewModel.claimFoundingOffer() } },
+                        onDismissFounding: { viewModel.dismissFoundingBanner() }
                     )
                     .transition(.opacity)
-                } else {
+                case .preview:
                     OwnerPreviewFrame(content: payload.publicProfile) {
                         mode = .owner
                     }
+                    .transition(.opacity)
+                case .catalog:
+                    BusinessCatalogView(businessId: payload.businessId) {
+                        mode = .owner
+                        Task { await viewModel.refresh() }
+                    }
+                    .transition(.opacity)
+                case .inbox:
+                    BusinessInboxView(
+                        businessId: payload.businessId,
+                        onBack: { mode = .owner },
+                        onOpenRoom: onOpenChatRoom,
+                        onOpenPost: onOpenPost
+                    )
                     .transition(.opacity)
                 }
             }
@@ -107,12 +169,40 @@ public struct BusinessOwnerView: View {
             ) { Task { await viewModel.refresh() } }
         }
     }
+
+    /// Founding-claim confirmation / error copy. RN raises an `Alert`;
+    /// native uses the same transient toast idiom as the rest of the app.
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = viewModel.toast {
+            Text(toast)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextInverse)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.s4)
+                .padding(.vertical, Spacing.s3)
+                .background(Theme.Color.appText)
+                .clipShape(Capsule())
+                .padding(.horizontal, Spacing.s4)
+                .padding(.bottom, 140)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: toast) {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    viewModel.toast = nil
+                }
+                .accessibilityIdentifier("businessOwner.toast")
+        }
+    }
 }
 
 /// Which frame the owner dashboard is showing.
 enum OwnerViewMode: Hashable {
     case owner
     case preview
+    /// C2 — the catalog manager (services / products CRUD + reorder).
+    case catalog
+    /// The business-side inbox — rooms addressed to the business identity
+    /// plus neighborhood posts matched to it.
+    case inbox
 }
 
 // MARK: - Owner / edit frame
@@ -125,8 +215,24 @@ struct OwnerEditFrame: View {
     let onOpenInsights: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
     let onOpenTeam: @MainActor () -> Void
+    /// C4 — opens the custom Pages CMS.
+    let onOpenPages: @MainActor () -> Void
+    /// C3 — money + legal owner surfaces.
+    var onOpenPayments: @MainActor () -> Void = {}
+    var onOpenInvoices: @MainActor () -> Void = {}
+    var onOpenLegal: @MainActor () -> Void = {}
     let onPreview: @MainActor () -> Void
+    /// C2 — opens the catalog manager frame ("Manage" / "Add a service").
+    var onManageCatalog: @MainActor () -> Void = {}
+    /// Opens the business inbox frame (Messages + Mentions).
+    var onOpenInbox: @MainActor () -> Void = {}
+    /// C2 — opens the "Post as this business" composer. Only reachable
+    /// when `content.canPostAsBusiness`.
+    var onComposePost: @MainActor () -> Void = {}
     let onSubmitReply: @MainActor (String, String) -> Void
+    /// Founding-business offer banner actions.
+    var onClaimFounding: @MainActor () -> Void = {}
+    var onDismissFounding: @MainActor () -> Void = {}
 
     private var profile: BusinessProfileContent {
         content.publicProfile
@@ -161,6 +267,15 @@ struct OwnerEditFrame: View {
             }
         }
         .background(Theme.Color.appBg)
+        .overlay(alignment: .bottomTrailing) {
+            // C2 — "Post as this business". RN floats the same FAB above
+            // its dock, gated on `access.role_base`.
+            if content.canPostAsBusiness {
+                OwnerComposeFab(action: onComposePost)
+                    .padding(.trailing, Spacing.s4)
+                    .padding(.bottom, 88)
+            }
+        }
         .overlay(alignment: .bottom) {
             OwnerDock(onPreview: onPreview, onEditPage: onEditPage)
         }
@@ -174,6 +289,14 @@ struct OwnerEditFrame: View {
 
     private func scrollBody(in profile: BusinessProfileContent) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s0) {
+            if let offer = content.foundingOffer {
+                FoundingOfferBanner(
+                    offer: offer,
+                    onClaim: onClaimFounding,
+                    onDismiss: onDismissFounding
+                )
+                .padding(.top, 14)
+            }
             InsightTiles(insights: content.insights, onOpenInsights: onOpenInsights)
                 .padding(.top, 14)
             ProfileStrengthCard(strength: content.profileStrength) { _ in onEditPage() }
@@ -191,14 +314,56 @@ struct OwnerEditFrame: View {
             OwnerSectionHeader(title: "Service area", actionLabel: "Edit", actionIcon: .pencil, onAction: onEditPage)
             serviceAreaSection
 
-            OwnerSectionHeader(title: "Services", actionLabel: "Manage", actionIcon: .slidersHorizontal, onAction: onEditPage)
-            ManageServicesList(services: profile.services, onManage: onEditPage)
+            OwnerSectionHeader(
+                title: "Services",
+                actionLabel: "Manage",
+                actionIcon: .slidersHorizontal,
+                onAction: onManageCatalog
+            )
+            ManageServicesList(services: profile.services, onManage: onManageCatalog)
 
             OwnerSectionHeader(title: "Photos")
             ManageGalleryRail(gallery: profile.gallery, onAdd: onEditPage, onEditTile: onEditPage)
 
             OwnerSectionHeader(title: "Team", actionLabel: "Manage", actionIcon: .users, onAction: onOpenTeam)
             TeamSummaryRow(onOpen: onOpenTeam)
+
+            OwnerSectionHeader(title: "Pages", actionLabel: "Manage", actionIcon: .fileText, onAction: onOpenPages)
+            PagesSummaryRow(onOpen: onOpenPages)
+
+            OwnerSectionHeader(title: "Inbox", actionLabel: "Open", actionIcon: .inbox, onAction: onOpenInbox)
+            OwnerNavRow(
+                icon: .inbox,
+                title: "Messages & mentions",
+                subtitle: "Conversations with this business and posts that mention it",
+                identifier: "businessOwner.inboxRow",
+                onOpen: onOpenInbox
+            )
+
+            OwnerSectionHeader(title: "Money & legal")
+            VStack(spacing: Spacing.s2) {
+                OwnerNavRow(
+                    icon: .creditCard,
+                    title: "Payments",
+                    subtitle: "Connect Stripe so this business can get paid",
+                    identifier: "businessOwner.paymentsRow",
+                    onOpen: onOpenPayments
+                )
+                OwnerNavRow(
+                    icon: .receiptText,
+                    title: "Invoices",
+                    subtitle: "Bill a customer and track what's been paid",
+                    identifier: "businessOwner.invoicesRow",
+                    onOpen: onOpenInvoices
+                )
+                OwnerNavRow(
+                    icon: .shieldCheck,
+                    title: "Legal & verification",
+                    subtitle: "Legal name, tax ID and verification documents",
+                    identifier: "businessOwner.legalRow",
+                    onOpen: onOpenLegal
+                )
+            }
 
             OwnerSectionHeader(
                 title: "Reviews",
@@ -597,6 +762,49 @@ struct OwnerServiceAreaCard: View {
 
 // MARK: - Team summary row
 
+/// C4 — entry-point card that opens the custom Pages CMS (page list, block
+/// builder, revision history). Mirrors RN's business-dashboard "Pages" tab.
+@MainActor
+struct PagesSummaryRow: View {
+    let onOpen: @MainActor () -> Void
+
+    var body: some View {
+        Button { onOpen() } label: {
+            HStack(spacing: Spacing.s3) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                        .fill(Theme.Color.businessBg)
+                        .frame(width: 34, height: 34)
+                    Icon(.fileText, size: 16, strokeWidth: 2, color: Theme.Color.business)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Custom pages")
+                        .font(.system(size: 13, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(Theme.Color.appText)
+                    Text("Build menus, about pages and more with content blocks")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: Spacing.s2)
+                Icon(.chevronRight, size: 16, color: Theme.Color.appTextMuted)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, Spacing.s3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .accessibilityIdentifier("businessOwner.pagesRow")
+    }
+}
+
 /// B2C — entry-point card on the owner dashboard that opens the Team &
 /// roles management screen.
 @MainActor
@@ -765,6 +973,7 @@ private struct OwnerMessageLayout: View {
         onOpenInsights: {},
         onOpenSettings: {},
         onOpenTeam: {},
+        onOpenPages: {},
         onPreview: {},
         onSubmitReply: { _, _ in }
     )

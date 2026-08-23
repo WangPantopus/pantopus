@@ -2,7 +2,9 @@ package app.pantopus.android.data.api.services
 
 import app.pantopus.android.data.api.models.ai.AIConversationsResponse
 import app.pantopus.android.data.api.models.ai.AIDraftListingVisionRequest
+import app.pantopus.android.data.api.models.ai.AIDraftPostRequest
 import app.pantopus.android.data.api.models.ai.AIListingVisionResponse
+import app.pantopus.android.data.api.models.ai.AIPostDraftResponse
 import app.pantopus.android.data.api.models.ai.TranscriptionResponse
 import app.pantopus.android.data.api.models.place.NeighborhoodPulse
 import okhttp3.MultipartBody
@@ -55,4 +57,15 @@ interface AIApi {
     suspend fun draftListingVision(
         @Body body: AIDraftListingVisionRequest,
     ): AIListingVisionResponse
+
+    /**
+     * Single-turn post draft from a free-text prompt. Edit Profile's
+     * "Generate with AI" bio action feeds it the name / skills / tagline
+     * / city the user already entered and writes `draft.content` back
+     * into the bio field. Route `backend/routes/ai.js:218`.
+     */
+    @POST("api/ai/draft/post")
+    suspend fun draftPost(
+        @Body body: AIDraftPostRequest,
+    ): AIPostDraftResponse
 }

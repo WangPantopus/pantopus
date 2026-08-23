@@ -1,8 +1,12 @@
-@file:Suppress("LongMethod", "ktlint:standard:import-ordering")
+@file:Suppress("LargeClass", "LongMethod")
 
 package app.pantopus.android.ui.screens.root
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,7 +46,6 @@ import app.pantopus.android.ui.components.NavigationDrawer
 import app.pantopus.android.ui.components.NavigationDrawerContext
 import app.pantopus.android.ui.components.NavigationDrawerDestination
 import app.pantopus.android.ui.components.composeEmail
-import kotlinx.coroutines.launch
 import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens._internal.TokenGalleryScreen
 import app.pantopus.android.ui.screens.audience_profile.AudienceProfileScreen
@@ -50,18 +53,29 @@ import app.pantopus.android.ui.screens.audience_profile.AudienceProfileViewModel
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BROADCAST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.audience_profile.broadcast_detail.BroadcastDetailScreen
 import app.pantopus.android.ui.screens.audience_profile.compose_broadcast.ComposeBroadcastScreen
-import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaSampleData
+import app.pantopus.android.ui.screens.audience_profile.edit_persona.EDIT_PERSONA_CREATE_ARG
 import app.pantopus.android.ui.screens.audience_profile.edit_persona.EditPersonaScreen
 import app.pantopus.android.ui.screens.beacon_profile.BEACON_HANDLE_KEY
 import app.pantopus.android.ui.screens.beacon_profile.BeaconProfileScreen
 import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.business_profile.BUSINESS_PROFILE_PAGE_SLUG_KEY
 import app.pantopus.android.ui.screens.business_profile.BusinessProfileScreen
-import app.pantopus.android.ui.screens.businesses.BusinessWaitlistScreen
 import app.pantopus.android.ui.screens.businesses.MyBusinessesScreen
 import app.pantopus.android.ui.screens.businesses.create_business.CreateBusinessWizardScreen
+import app.pantopus.android.ui.screens.businesses.invoices.BusinessInvoicesScreen
+import app.pantopus.android.ui.screens.businesses.legal.BusinessLegalScreen
+import app.pantopus.android.ui.screens.businesses.locations.BUSINESS_LOCATIONS_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.locations.BusinessLocationsScreen
 import app.pantopus.android.ui.screens.businesses.owner_dashboard.BusinessOwnerScreen
+import app.pantopus.android.ui.screens.businesses.page_blocks.BusinessPageBlocksScreen
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_PAGE_ID_KEY
+import app.pantopus.android.ui.screens.businesses.page_blocks.PAGE_BLOCKS_PAGE_TITLE_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EDIT_BUSINESS_PAGE_BUSINESS_ID_KEY
 import app.pantopus.android.ui.screens.businesses.page_editor.EditBusinessPageScreen
+import app.pantopus.android.ui.screens.businesses.pages.BUSINESS_PAGES_BUSINESS_ID_KEY
+import app.pantopus.android.ui.screens.businesses.pages.BusinessPagesScreen
+import app.pantopus.android.ui.screens.businesses.payments.BusinessPaymentsScreen
 import app.pantopus.android.ui.screens.businesses.team.BusinessTeamScreen
 import app.pantopus.android.ui.screens.ceremonial_mail.CeremonialMailWizardScreen
 import app.pantopus.android.ui.screens.ceremonial_mail_open.CeremonialMailOpenScreen
@@ -75,7 +89,6 @@ import app.pantopus.android.ui.screens.contentdetail.GigDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.InvoiceDetailScreen
 import app.pantopus.android.ui.screens.contentdetail.ListingDetailScreen
 import app.pantopus.android.ui.screens.creator_audience.YourAudienceScreen
-import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxRowContent
 import app.pantopus.android.ui.screens.creator_inbox.CreatorInboxScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesScreen
 import app.pantopus.android.ui.screens.discoverbusinesses.DiscoverBusinessesTarget
@@ -98,26 +111,6 @@ import app.pantopus.android.ui.screens.gigs.tasks_map.TasksMapScreen
 import app.pantopus.android.ui.screens.handshake.PrivacyHandshakeScreen
 import app.pantopus.android.ui.screens.homes.HOME_DASHBOARD_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.HomeDashboardScreen
-import app.pantopus.android.ui.screens.place.HomeLanding
-import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
-import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
-import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
-import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_ADDRESS_KEY
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_MESSAGE_ID_KEY
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageComposeScreen
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageInboxScreen
-import app.pantopus.android.ui.screens.place.messaging.NeighborMessageReceivedScreen
-import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_HOME_ID_KEY
-import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_METHOD_KEY
-import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
-import app.pantopus.android.ui.screens.place.verify.PlaceVerifyStatusScreen
 import app.pantopus.android.ui.screens.homes.MyHomesListScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.AccessCodesScreen
 import app.pantopus.android.ui.screens.homes.accesscodes.EDIT_ACCESS_CODE_CATEGORY_KEY
@@ -145,7 +138,10 @@ import app.pantopus.android.ui.screens.homes.calendar.EventDetailScreen
 import app.pantopus.android.ui.screens.homes.calendar.HOME_CALENDAR_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.calendar.HomeCalendarScreen
 import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_OWNERSHIP_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_ownership.CLAIM_VERIFICATION_TYPE_KEY
 import app.pantopus.android.ui.screens.homes.claim_ownership.ClaimOwnershipWizardScreen
+import app.pantopus.android.ui.screens.homes.claim_review.HOME_CLAIM_REVIEW_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.claim_review.HomeClaimReviewScreen
 import app.pantopus.android.ui.screens.homes.claims.MyClaimsListScreen
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENTS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.documents.DOCUMENT_DETAIL_DOC_ID_KEY
@@ -163,11 +159,16 @@ import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_DETAIL_ITEM_ID_
 import app.pantopus.android.ui.screens.homes.emergency.EMERGENCY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoDetailScreen
 import app.pantopus.android.ui.screens.homes.emergency.EmergencyInfoScreen
+import app.pantopus.android.ui.screens.homes.find_home.FindHomeScreen
 import app.pantopus.android.ui.screens.homes.guests.ADD_GUEST_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.guests.AddGuestFormScreen
+import app.pantopus.android.ui.screens.homes.guests.GUEST_PASSES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.guests.GuestPassesListScreen
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_CURRENT_EMAIL_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.INVITE_OWNER_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.invite_owner.InviteOwnerFormScreen
+import app.pantopus.android.ui.screens.homes.issues.HOME_ISSUES_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.issues.HomeIssuesListScreen
 import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.LOG_MAINTENANCE_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.maintenance.LogMaintenanceFormScreen
@@ -198,12 +199,23 @@ import app.pantopus.android.ui.screens.homes.polls.PollDetailScreen
 import app.pantopus.android.ui.screens.homes.polls.PollsListScreen
 import app.pantopus.android.ui.screens.homes.polls.START_POLL_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.polls.StartPollFormScreen
+import app.pantopus.android.ui.screens.homes.property_correction.PROPERTY_CORRECTION_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.property_correction.PropertyCorrectionScreen
 import app.pantopus.android.ui.screens.homes.property_details.PropertyDetailsScreen
 import app.pantopus.android.ui.screens.homes.settings.HOME_SETTINGS_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.HomeSettingsRoute
 import app.pantopus.android.ui.screens.homes.settings.HomeSettingsScreen
+import app.pantopus.android.ui.screens.homes.settings.cancel_claim.CANCEL_CLAIM_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.cancel_claim.CancelClaimScreen
+import app.pantopus.android.ui.screens.homes.settings.leave_home.LEAVE_HOME_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.leave_home.LeaveHomeScreen
+import app.pantopus.android.ui.screens.homes.settings.notifications.HomeNotificationsScreen
+import app.pantopus.android.ui.screens.homes.settings.ownership_security.HOME_OWNERSHIP_SECURITY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.homes.settings.ownership_security.HomeOwnershipSecurityScreen
+import app.pantopus.android.ui.screens.homes.settings.photos.HomePhotosScreen
 import app.pantopus.android.ui.screens.homes.settings.security.HOME_SECURITY_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.settings.security.HomeSecurityScreen
+import app.pantopus.android.ui.screens.homes.settings.trusted_neighbors.TrustedNeighborsScreen
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_HOME_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.ADD_HOUSEHOLD_TASK_TASK_ID_KEY
 import app.pantopus.android.ui.screens.homes.tasks.AddHouseholdTaskFormScreen
@@ -228,13 +240,13 @@ import app.pantopus.android.ui.screens.inbox.InboxScreen
 import app.pantopus.android.ui.screens.inbox.chat.ConversationIdentityChip
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowContent
 import app.pantopus.android.ui.screens.inbox.chat.ConversationRowVariant
+import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationHost
 import app.pantopus.android.ui.screens.inbox.conversation.ChatConversationMode
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCounterparty
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadChrome
 import app.pantopus.android.ui.screens.inbox.conversation.ChatCreatorThreadContext
-import app.pantopus.android.ui.screens.inbox.conversation.ChatAIDraftCard
 import app.pantopus.android.ui.screens.inbox.conversation.ChatInitialTopic
 import app.pantopus.android.ui.screens.inbox.conversation.ChatThreadMode
 import app.pantopus.android.ui.screens.inbox.newmessage.NewMessageScreen
@@ -243,19 +255,36 @@ import app.pantopus.android.ui.screens.inbox.search.ChatSearchResultKind
 import app.pantopus.android.ui.screens.inbox.search.ChatSearchScreen
 import app.pantopus.android.ui.screens.listing_offers.ListingOffersScreen
 import app.pantopus.android.ui.screens.listings.MyListingsScreen
+import app.pantopus.android.ui.screens.mailbox.community.CommunityMailScreen
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DISAMBIGUATE_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.disambiguate.DisambiguateMailFormScreen
 import app.pantopus.android.ui.screens.mailbox.earn.EarnScreen
+import app.pantopus.android.ui.screens.mailbox.home_records.HomeRecordsScreen
 import app.pantopus.android.ui.screens.mailbox.item_detail.MAILBOX_ITEM_DETAIL_MAIL_ID_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MAIL_DAY_VARIANT_KEY
 import app.pantopus.android.ui.screens.mailbox.mail_day.MailDayScreen
 import app.pantopus.android.ui.screens.mailbox.mail_detail.MailDetailScreen
+import app.pantopus.android.ui.screens.mailbox.mail_party.MailPartyScreen
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_NONE
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_SENDER_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MAIL_TASK_LIST_SUBJECT_KEY
+import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskListScreen
 import app.pantopus.android.ui.screens.mailbox.mail_task.MailTaskScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_map.MailboxMapScreen
 import app.pantopus.android.ui.screens.mailbox.mailbox_root.MailboxRootScreen
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MAIL_ID_NONE
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_KEY
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_POST
+import app.pantopus.android.ui.screens.mailbox.package_gig.PACKAGE_GIG_MODE_PRE
+import app.pantopus.android.ui.screens.mailbox.package_gig.PackageGigScreen
+import app.pantopus.android.ui.screens.mailbox.routing_queue.MailRoutingQueueScreen
 import app.pantopus.android.ui.screens.mailbox.search.MailboxSearchScreen
 import app.pantopus.android.ui.screens.mailbox.stamps.StampsScreen
 import app.pantopus.android.ui.screens.mailbox.translation.MailTranslationScreen
+import app.pantopus.android.ui.screens.mailbox.unboxing.UNBOXING_MAIL_ID_KEY
+import app.pantopus.android.ui.screens.mailbox.unboxing.UNBOXING_MAIL_ID_NONE
 import app.pantopus.android.ui.screens.mailbox.unboxing.UnboxingScreen
 import app.pantopus.android.ui.screens.mailbox.vacation.VacationHoldScreen
 import app.pantopus.android.ui.screens.mailbox.vault.VaultListScreen
@@ -265,7 +294,30 @@ import app.pantopus.android.ui.screens.my_bids.MyBidsScreen
 import app.pantopus.android.ui.screens.my_posts.MyPostsScreen
 import app.pantopus.android.ui.screens.my_tasks.MyTasksScreen
 import app.pantopus.android.ui.screens.notifications.NotificationsScreen
+import app.pantopus.android.ui.screens.notifications.NotificationsZone
 import app.pantopus.android.ui.screens.offers.OffersScreen
+import app.pantopus.android.ui.screens.persona_dm.FanInboxScreen
+import app.pantopus.android.ui.screens.persona_dm.PersonaDmThreadScreen
+import app.pantopus.android.ui.screens.place.HomeLanding
+import app.pantopus.android.ui.screens.place.HomeTabHostViewModel
+import app.pantopus.android.ui.screens.place.PLACE_DASHBOARD_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.PlaceDashboardScreen
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.detail.PLACE_DETAIL_SLUG_KEY
+import app.pantopus.android.ui.screens.place.detail.PlaceDetailScreen
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_COMPOSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NEIGHBOR_MESSAGE_ID_KEY
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageComposeScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageInboxScreen
+import app.pantopus.android.ui.screens.place.messaging.NeighborMessageReceivedScreen
+import app.pantopus.android.ui.screens.place.pulse.PLACE_PULSE_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.pulse.PlacePulseScreen
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_ADDRESS_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_HOME_ID_KEY
+import app.pantopus.android.ui.screens.place.verify.PLACE_VERIFY_METHOD_KEY
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyMethod
+import app.pantopus.android.ui.screens.place.verify.PlaceVerifyStatusScreen
 import app.pantopus.android.ui.screens.posts.PULSE_POST_DETAIL_ID_KEY
 import app.pantopus.android.ui.screens.posts.PulsePostDetailScreen
 import app.pantopus.android.ui.screens.profile.EditProfileScreen
@@ -278,12 +330,74 @@ import app.pantopus.android.ui.screens.review_claims.ReviewClaimDetailScreen
 import app.pantopus.android.ui.screens.review_claims.ReviewClaimsScreen
 import app.pantopus.android.ui.screens.review_signups.ReviewSignupsScreen
 import app.pantopus.android.ui.screens.saved_places.SavedPlacesScreen
+import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
+import app.pantopus.android.ui.screens.scheduling.automations.MessageTemplateEditorScreen
+import app.pantopus.android.ui.screens.scheduling.automations.RemindersQuickSetupScreen
+import app.pantopus.android.ui.screens.scheduling.automations.TemplateLibraryScreen
+import app.pantopus.android.ui.screens.scheduling.automations.WorkflowEditorScreen
+import app.pantopus.android.ui.screens.scheduling.automations.WorkflowsListScreen
+import app.pantopus.android.ui.screens.scheduling.availability.AvailabilityListScreen
+import app.pantopus.android.ui.screens.scheduling.availability.BlockOffTimeScreen
+import app.pantopus.android.ui.screens.scheduling.availability.BookingLimitsScreen
+import app.pantopus.android.ui.screens.scheduling.availability.DateOverridesScreen
+import app.pantopus.android.ui.screens.scheduling.availability.WeeklyHoursEditorScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.BookingPageManageScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.OneOffLinkGeneratorScreen
+import app.pantopus.android.ui.screens.scheduling.bookingpage.PublicPagePreviewScreen
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingDetailScreen
+import app.pantopus.android.ui.screens.scheduling.bookings.BookingsInboxScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.BookingSearchFilterScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.GroupRosterScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.ManualBookingScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.PostMeetingFollowupScreen
+import app.pantopus.android.ui.screens.scheduling.bookings_extra.WaitlistScreen
+import app.pantopus.android.ui.screens.scheduling.business.BusinessSchedulingSettingsScreen
+import app.pantopus.android.ui.screens.scheduling.business.CollectiveEventSetupScreen
+import app.pantopus.android.ui.screens.scheduling.business.MemberWorkingHoursScreen
+import app.pantopus.android.ui.screens.scheduling.business.TeamBookingAvailabilityScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.ConnectedCalendarsScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeEditorScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeListScreen
+import app.pantopus.android.ui.screens.scheduling.eventtypes.IntakeQuestionsEditorScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.FindATimeSetupScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.MemberPollResponseScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.SuggestedSlotsScreen
+import app.pantopus.android.ui.screens.scheduling.findatime.WhosFreeScreen
+import app.pantopus.android.ui.screens.scheduling.home.HouseholdAvailabilityScreen
+import app.pantopus.android.ui.screens.scheduling.home.PermissionGatedSchedulerScreen
+import app.pantopus.android.ui.screens.scheduling.hub.SchedulingHubScreen
+import app.pantopus.android.ui.screens.scheduling.insights.EventTypePerformanceScreen
+import app.pantopus.android.ui.screens.scheduling.insights.InsightsDashboardScreen
+import app.pantopus.android.ui.screens.scheduling.insights.NoShowReportScreen
+import app.pantopus.android.ui.screens.scheduling.insights.TeamPerformanceScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.confirm.ManageBookingScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.customer.MyBookingsScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.customer.RecurringSetupScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.discovery.BookerLandingScreen
+import app.pantopus.android.ui.screens.scheduling.invitee.edge.OpenInAppInterstitialScreen
+import app.pantopus.android.ui.screens.scheduling.invoices.InvoicesListScreen
+import app.pantopus.android.ui.screens.scheduling.packages.BuyPackageScreen
+import app.pantopus.android.ui.screens.scheduling.packages.MyPackagesScreen
+import app.pantopus.android.ui.screens.scheduling.packages.PackageEditorScreen
+import app.pantopus.android.ui.screens.scheduling.payments.CancellationRefundPolicyScreen
+import app.pantopus.android.ui.screens.scheduling.polish.NotificationPermissionPromptScreen
+import app.pantopus.android.ui.screens.scheduling.resources.BookResourceScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceDetailScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceEditorScreen
+import app.pantopus.android.ui.screens.scheduling.resources.ResourceListScreen
+import app.pantopus.android.ui.screens.scheduling.settings.NotificationPrefsScreen
+import app.pantopus.android.ui.screens.scheduling.settings.SchedulingSettingsRootScreen
+import app.pantopus.android.ui.screens.scheduling.setup.FirstRunWizardScreen
+import app.pantopus.android.ui.screens.scheduling.setup.OnboardingHomeBusinessScreen
+import app.pantopus.android.ui.screens.scheduling.visits.VisitDetailScreen
+import app.pantopus.android.ui.screens.scheduling.visits.VisitSetupScreen
 import app.pantopus.android.ui.screens.settings.NotificationSettingsScreen
 import app.pantopus.android.ui.screens.settings.PrivacySettingsScreen
 import app.pantopus.android.ui.screens.settings.SettingsIndexScreen
 import app.pantopus.android.ui.screens.settings.SettingsRoute
 import app.pantopus.android.ui.screens.settings.about.AboutScreen
 import app.pantopus.android.ui.screens.settings.blocks.BlockedUsersScreen
+import app.pantopus.android.ui.screens.settings.data_export.DataExportScreen
 import app.pantopus.android.ui.screens.settings.help.HelpCenterScreen
 import app.pantopus.android.ui.screens.settings.legal.LegalContentScreen
 import app.pantopus.android.ui.screens.settings.legal.LegalDocument
@@ -292,6 +406,9 @@ import app.pantopus.android.ui.screens.settings.legal.LegalIndexScreen
 import app.pantopus.android.ui.screens.settings.password.PasswordChangeScreen
 import app.pantopus.android.ui.screens.settings.payments.PaymentsScreen
 import app.pantopus.android.ui.screens.settings.verification.VerificationCenterScreen
+import app.pantopus.android.ui.screens.status.StatusWaitingContent
+import app.pantopus.android.ui.screens.status.StatusWaitingScreen
+import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomNav
 import app.pantopus.android.ui.screens.status.waiting_room.WaitingRoomRoute
 import app.pantopus.android.ui.screens.support_trains.SupportTrainsScreen
 import app.pantopus.android.ui.screens.support_trains.detail.SupportTrainDetailActions
@@ -301,74 +418,17 @@ import app.pantopus.android.ui.screens.support_trains.manage.ManageTrainScreen
 import app.pantopus.android.ui.screens.support_trains.search.SupportTrainsSearchScreen
 import app.pantopus.android.ui.screens.support_trains.start_train.StartSupportTrainWizardScreen
 import app.pantopus.android.ui.screens.token_accept.TokenAcceptScreen
+import app.pantopus.android.ui.screens.universal_search.UniversalSearchDestination
+import app.pantopus.android.ui.screens.universal_search.UniversalSearchScreen
+import app.pantopus.android.ui.screens.wallet.WalletActivityListScreen
 import app.pantopus.android.ui.screens.wallet.WalletScreen
-import app.pantopus.android.ui.screens.you.YouScreen
-import app.pantopus.android.ui.screens.scheduling._shared.SchedulingRoutes
-import app.pantopus.android.ui.screens.scheduling.hub.SchedulingHubScreen
-import app.pantopus.android.ui.screens.scheduling.setup.FirstRunWizardScreen
-import app.pantopus.android.ui.screens.scheduling.setup.OnboardingHomeBusinessScreen
-import app.pantopus.android.ui.screens.scheduling.settings.SchedulingSettingsRootScreen
-import app.pantopus.android.ui.screens.scheduling.settings.NotificationPrefsScreen
-import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeListScreen
-import app.pantopus.android.ui.screens.scheduling.eventtypes.EventTypeEditorScreen
-import app.pantopus.android.ui.screens.scheduling.eventtypes.IntakeQuestionsEditorScreen
-import app.pantopus.android.ui.screens.scheduling.eventtypes.ConnectedCalendarsScreen
-import app.pantopus.android.ui.screens.scheduling.availability.AvailabilityListScreen
-import app.pantopus.android.ui.screens.scheduling.availability.WeeklyHoursEditorScreen
-import app.pantopus.android.ui.screens.scheduling.availability.DateOverridesScreen
-import app.pantopus.android.ui.screens.scheduling.availability.BookingLimitsScreen
-import app.pantopus.android.ui.screens.scheduling.availability.BlockOffTimeScreen
-import app.pantopus.android.ui.screens.scheduling.bookingpage.BookingPageManageScreen
-import app.pantopus.android.ui.screens.scheduling.bookingpage.PublicPagePreviewScreen
-import app.pantopus.android.ui.screens.scheduling.bookingpage.OneOffLinkGeneratorScreen
-import app.pantopus.android.ui.screens.scheduling.invitee.discovery.BookerLandingScreen
-import app.pantopus.android.ui.screens.scheduling.invitee.confirm.ManageBookingScreen
-import app.pantopus.android.ui.screens.scheduling.invitee.customer.MyBookingsScreen
-import app.pantopus.android.ui.screens.scheduling.invitee.customer.RecurringSetupScreen
-import app.pantopus.android.ui.screens.scheduling.invitee.edge.OpenInAppInterstitialScreen
-import app.pantopus.android.ui.screens.scheduling.bookings.BookingsInboxScreen
-import app.pantopus.android.ui.screens.scheduling.bookings.BookingDetailScreen
-import app.pantopus.android.ui.screens.scheduling.bookings_extra.BookingSearchFilterScreen
-import app.pantopus.android.ui.screens.scheduling.bookings_extra.GroupRosterScreen
-import app.pantopus.android.ui.screens.scheduling.bookings_extra.ManualBookingScreen
-import app.pantopus.android.ui.screens.scheduling.bookings_extra.WaitlistScreen
-import app.pantopus.android.ui.screens.scheduling.bookings_extra.PostMeetingFollowupScreen
-import app.pantopus.android.ui.screens.scheduling.home.HouseholdAvailabilityScreen
-import app.pantopus.android.ui.screens.scheduling.home.PermissionGatedSchedulerScreen
-import app.pantopus.android.ui.screens.scheduling.findatime.FindATimeSetupScreen
-import app.pantopus.android.ui.screens.scheduling.findatime.SuggestedSlotsScreen
-import app.pantopus.android.ui.screens.scheduling.findatime.MemberPollResponseScreen
-import app.pantopus.android.ui.screens.scheduling.findatime.WhosFreeScreen
-import app.pantopus.android.ui.screens.scheduling.resources.ResourceListScreen
-import app.pantopus.android.ui.screens.scheduling.resources.ResourceEditorScreen
-import app.pantopus.android.ui.screens.scheduling.resources.ResourceDetailScreen
-import app.pantopus.android.ui.screens.scheduling.resources.BookResourceScreen
-import app.pantopus.android.ui.screens.scheduling.visits.VisitSetupScreen
-import app.pantopus.android.ui.screens.scheduling.visits.VisitDetailScreen
-import app.pantopus.android.ui.screens.scheduling.business.BusinessSchedulingSettingsScreen
-import app.pantopus.android.ui.screens.scheduling.business.TeamBookingAvailabilityScreen
-import app.pantopus.android.ui.screens.scheduling.business.CollectiveEventSetupScreen
-import app.pantopus.android.ui.screens.scheduling.business.MemberWorkingHoursScreen
 import app.pantopus.android.ui.screens.wallet.scheduling.PaymentsSetupScreen
 import app.pantopus.android.ui.screens.wallet.scheduling.PayoutsEarningsScreen
-import app.pantopus.android.ui.screens.scheduling.payments.CancellationRefundPolicyScreen
-import app.pantopus.android.ui.screens.scheduling.packages.PackagesListScreen as SchedulingPackagesListScreen
-import app.pantopus.android.ui.screens.scheduling.packages.PackageEditorScreen
-import app.pantopus.android.ui.screens.scheduling.packages.BuyPackageScreen
-import app.pantopus.android.ui.screens.scheduling.packages.MyPackagesScreen
-import app.pantopus.android.ui.screens.scheduling.invoices.InvoicesListScreen
-import app.pantopus.android.ui.screens.scheduling.invoices.InvoiceDetailScreen as SchedulingInvoiceDetailScreen
-import app.pantopus.android.ui.screens.scheduling.automations.RemindersQuickSetupScreen
-import app.pantopus.android.ui.screens.scheduling.automations.WorkflowsListScreen
-import app.pantopus.android.ui.screens.scheduling.automations.WorkflowEditorScreen
-import app.pantopus.android.ui.screens.scheduling.automations.MessageTemplateEditorScreen
-import app.pantopus.android.ui.screens.scheduling.automations.TemplateLibraryScreen
-import app.pantopus.android.ui.screens.scheduling.insights.InsightsDashboardScreen
-import app.pantopus.android.ui.screens.scheduling.insights.EventTypePerformanceScreen
-import app.pantopus.android.ui.screens.scheduling.insights.NoShowReportScreen
-import app.pantopus.android.ui.screens.scheduling.insights.TeamPerformanceScreen
-import app.pantopus.android.ui.screens.scheduling.polish.NotificationPermissionPromptScreen
+import app.pantopus.android.ui.screens.you.YouScreen
 import app.pantopus.android.ui.theme.PantopusIcon
+import kotlinx.coroutines.launch
+import app.pantopus.android.ui.screens.scheduling.invoices.InvoiceDetailScreen as SchedulingInvoiceDetailScreen
+import app.pantopus.android.ui.screens.scheduling.packages.PackagesListScreen as SchedulingPackagesListScreen
 
 /** Non-tab routes reachable from within the Hub stack. */
 private object ChildRoutes {
@@ -376,12 +436,25 @@ private object ChildRoutes {
     const val MY_CLAIMS = "homes/my-claims"
     const val ADD_HOME = "homes/add"
 
-    /** P6.6 — "Register a business · coming soon" waitlist surface. */
+    /**
+     * A12.1 — "Find or Add Home" discovery. Search public-preview homes,
+     * start a claim on one, add a missing address, or paste an invite
+     * code. Mirrors RN `src/app/homes/find.tsx`.
+     */
+    const val FIND_HOME = "homes/find"
+
+    /** Legacy waitlist route — redirects to [CREATE_BUSINESS]. */
     const val BUSINESS_WAITLIST = "businesses/waitlist"
 
     /** A12.10 — Create Business wizard route. */
     const val CREATE_BUSINESS = "businesses/new"
     const val CLAIM_OWNERSHIP = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/claim"
+
+    /** Residency-verification variant of the evidence wizard. */
+    const val VERIFY_RESIDENCY = "homes/{$CLAIM_OWNERSHIP_HOME_ID_KEY}/verify-residency"
+
+    /** Per-home issue tracker (`HomeIssue`) — distinct from maintenance. */
+    const val HOME_ISSUES = "homes/{$HOME_ISSUES_HOME_ID_KEY}/issues"
 
     /** A12.5 / A12.6 — Verify landlord wizard. Pushed from the home
      *  dashboard's ownership-claim CTA when the home record marks
@@ -734,6 +807,14 @@ private object ChildRoutes {
     /** Build the concrete path for a home owners list. */
     fun homeOwners(homeId: String): String = "homes/$homeId/owners"
 
+    /** H6 — per-home **owner** claim review (ownership + residency
+     *  claims on this home). Distinct from the admin `review-claims`
+     *  queue mounted elsewhere in this file. */
+    const val HOME_CLAIM_REVIEW = "homes/{$HOME_CLAIM_REVIEW_HOME_ID_KEY}/owners/review-claims"
+
+    /** Build the concrete path for the per-home claim-review screen. */
+    fun homeClaimReview(homeId: String): String = "homes/$homeId/owners/review-claims"
+
     /** Members list per home (T6.3a / P9). */
     const val HOME_MEMBERS = "homes/{$MEMBERS_LIST_HOME_ID_KEY}/members"
 
@@ -751,6 +832,37 @@ private object ChildRoutes {
 
     /** Build the concrete path for the per-home Security screen. */
     fun homeSecurity(homeId: String): String = "homes/$homeId/settings/security"
+
+    /** A14.2 (policy variant) — per-home ownership security policy. */
+    const val HOME_OWNERSHIP_SECURITY =
+        "homes/{$HOME_OWNERSHIP_SECURITY_HOME_ID_KEY}/settings/ownership-security"
+
+    /** Build the concrete path for the per-home Ownership & Security screen. */
+    fun homeOwnershipSecurity(homeId: String): String = "homes/$homeId/settings/ownership-security"
+
+    const val LEAVE_HOME = "homes/{$LEAVE_HOME_HOME_ID_KEY}/settings/leave"
+
+    fun leaveHome(homeId: String): String = "homes/$homeId/settings/leave"
+
+    const val CANCEL_CLAIM = "homes/{$CANCEL_CLAIM_HOME_ID_KEY}/settings/cancel-claim"
+
+    fun cancelClaim(homeId: String): String = "homes/$homeId/settings/cancel-claim"
+
+    const val HOME_PHOTOS = "homes/{$HOME_SETTINGS_HOME_ID_KEY}/settings/photos"
+
+    fun homePhotos(homeId: String): String = "homes/$homeId/settings/photos"
+
+    const val TRUSTED_NEIGHBORS = "homes/{$HOME_SETTINGS_HOME_ID_KEY}/settings/trusted-neighbors"
+
+    fun trustedNeighbors(homeId: String): String = "homes/$homeId/settings/trusted-neighbors"
+
+    const val HOME_NOTIFICATIONS = "homes/{$HOME_SETTINGS_HOME_ID_KEY}/settings/notifications"
+
+    fun homeNotifications(homeId: String): String = "homes/$homeId/settings/notifications"
+
+    const val PROPERTY_CORRECTION = "homes/{$PROPERTY_CORRECTION_HOME_ID_KEY}/property/correction"
+
+    fun propertyCorrection(homeId: String): String = "homes/$homeId/property/correction"
 
     const val PUBLIC_PROFILE = "users/{$PUBLIC_PROFILE_USER_ID_KEY}"
 
@@ -770,14 +882,61 @@ private object ChildRoutes {
     /** Build the concrete path for the Edit Business Page editor. */
     fun editBusinessPage(businessId: String): String = "businesses/$businessId/page-editor"
 
+    /** C4 — the custom Pages CMS index (create / delete / revision history).
+     *  Distinct from [EDIT_BUSINESS_PAGE], which edits business profile fields. */
+    const val BUSINESS_PAGES = "businesses/{$BUSINESS_PAGES_BUSINESS_ID_KEY}/pages"
+
+    fun businessPages(businessId: String): String = "businesses/$businessId/pages"
+
+    /** C4 — the block builder for one custom page. */
+    const val BUSINESS_PAGE_BLOCKS =
+        "businesses/{$PAGE_BLOCKS_BUSINESS_ID_KEY}/pages/{$PAGE_BLOCKS_PAGE_ID_KEY}/blocks" +
+            "?pageTitle={$PAGE_BLOCKS_PAGE_TITLE_KEY}"
+
+    fun businessPageBlocks(
+        businessId: String,
+        pageId: String,
+        pageTitle: String,
+    ): String = "businesses/$businessId/pages/$pageId/blocks?pageTitle=${Uri.encode(pageTitle)}"
+
+    /** C4 — the public profile opened on a named custom page, reached from
+     *  `pantopus://b/:username/:slug`. */
+    const val BUSINESS_PROFILE_PAGE =
+        "business/{$BUSINESS_PROFILE_BUSINESS_ID_KEY}/page/{$BUSINESS_PROFILE_PAGE_SLUG_KEY}"
+
+    fun businessProfilePage(
+        businessId: String,
+        pageSlug: String,
+    ): String = "business/$businessId/page/${Uri.encode(pageSlug)}"
+
     const val PULSE_POST = "posts/{$PULSE_POST_DETAIL_ID_KEY}"
 
     const val INVITE_OWNER =
         "homes/{$INVITE_OWNER_HOME_ID_KEY}/invite?email={$INVITE_OWNER_CURRENT_EMAIL_KEY}"
     const val DISAMBIGUATE_MAIL = "mailbox/disambiguate/{$DISAMBIGUATE_MAIL_ID_KEY}"
 
+    /** Mail routing queue — the disambiguation lane behind the Mailbox
+     *  root's "N items need routing" banner. Walks
+     *  `GET /api/mailbox/v2/pending` and resolves each row. */
+    const val MAIL_ROUTING_QUEUE = "mailbox/routing-queue"
+
     /** Notifications center (T4.1). Reached from the Hub bell icon. */
     const val NOTIFICATIONS = "notifications"
+
+    /**
+     * S5 — the same screen with the optional identity-firewall zone arg.
+     * The NavHost registers this pattern, so a plain `NOTIFICATIONS`
+     * navigate still matches with `context == null`. The Hub megaphone
+     * navigates with `context=audience` so the Beacon stream opens
+     * directly (RN `?context=audience`).
+     */
+    const val NOTIFICATIONS_ROUTE = "notifications?context={context}"
+
+    /** Query-arg key for [NOTIFICATIONS_ROUTE]. */
+    const val NOTIFICATIONS_CONTEXT_KEY = "context"
+
+    /** Builder for the zone-scoped notifications route. */
+    fun notificationsZone(context: String): String = "notifications?context=$context"
 
     /** P1.5 — Recent activity log. Reached from the Hub
      *  `HubRecentActivity` "See all" CTA. */
@@ -851,8 +1010,17 @@ private object ChildRoutes {
      *  · payout routing). Distinct from `pantopus://wallet` (earnings-in). */
     const val SETTINGS_PAYMENTS = "settings/payments"
 
-    /** Profile / account hub — reached from the Hub avatar (no longer a bottom tab). */
-    const val PROFILE = "profile"
+    /**
+     * Profile / account hub — reached from the Hub avatar (no longer a bottom
+     * tab). `?tab=receipt` is the `monthly_receipt` push target and opens with
+     * the Monthly Receipt card expanded (RN `/(tabs)/profile?tab=receipt`).
+     */
+    const val PROFILE = "profile?tab={tab}"
+
+    /** Nav arg key for [PROFILE]'s `?tab=`. */
+    const val PROFILE_TAB_KEY = "tab"
+
+    fun profile(tab: String? = null): String = "profile?tab=${Uri.encode(tab.orEmpty())}"
 
     /** Profiles & Privacy / Identity Center (T3.2). */
     const val IDENTITY_CENTER = "identity-center"
@@ -901,9 +1069,22 @@ private object ChildRoutes {
 
     /** Privacy Handshake wizard (T3.4). `:handle` is the persona being followed. */
     const val PRIVACY_HANDSHAKE_HANDLE_KEY = "personaHandle"
-    const val PRIVACY_HANDSHAKE = "handshake/{$PRIVACY_HANDSHAKE_HANDLE_KEY}"
+    const val PRIVACY_HANDSHAKE_PRESELECTED_TIER_KEY = "preselectedTierRank"
+    const val PRIVACY_HANDSHAKE =
+        "handshake/{$PRIVACY_HANDSHAKE_HANDLE_KEY}?" +
+            "$PRIVACY_HANDSHAKE_PRESELECTED_TIER_KEY={$PRIVACY_HANDSHAKE_PRESELECTED_TIER_KEY}"
 
-    fun privacyHandshake(handle: String): String = "handshake/${java.net.URLEncoder.encode(handle, "UTF-8")}"
+    fun privacyHandshake(
+        handle: String,
+        preselectedTierRank: Int? = null,
+    ): String {
+        val encoded = java.net.URLEncoder.encode(handle, "UTF-8")
+        return if (preselectedTierRank != null) {
+            "handshake/$encoded?$PRIVACY_HANDSHAKE_PRESELECTED_TIER_KEY=$preselectedTierRank"
+        } else {
+            "handshake/$encoded"
+        }
+    }
 
     /** Token / Accept screen (T3.5). Resolves the token then accepts
      *  via the matching backend route. Mirrors iOS DeepLinkRouter's
@@ -1002,6 +1183,14 @@ private object ChildRoutes {
 
     /** Gig Search (P4.4). Pushed from the Gigs feed search bar. */
     const val GIG_SEARCH = "gigs/search"
+
+    /**
+     * S2 — Universal search (All / Tasks / People / Beacons /
+     * Businesses / Homes). Pushed from the navigation drawer's "Search"
+     * row; gig-only search stays reachable from its Tasks tab and from
+     * the Gigs feed search bar.
+     */
+    const val UNIVERSAL_SEARCH = "search"
 
     /** Gig detail target — placeholder until T2.6 Transactional Detail. */
     const val GIG_DETAIL_ID_KEY = "gigId"
@@ -1125,7 +1314,11 @@ private object ChildRoutes {
 
     /** Compose post target — placeholder until the compose flow ships. */
     const val COMPOSE_INTENT_KEY = "intent"
-    const val COMPOSE_POST = "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}"
+
+    /** Optional Sports-lane starter prompt seeded into the draft body. */
+    const val COMPOSE_BODY_KEY = "prefillBody"
+    const val COMPOSE_POST =
+        "feed/compose?$COMPOSE_INTENT_KEY={$COMPOSE_INTENT_KEY}&$COMPOSE_BODY_KEY={$COMPOSE_BODY_KEY}"
 
     /** P3.5 — Edit an existing Pulse post. Re-uses the compose flow. */
     const val EDIT_POST_POST_ID_KEY = "postId"
@@ -1179,6 +1372,16 @@ private object ChildRoutes {
     /** Build the claim-ownership wizard path. */
     fun claimOwnership(homeId: String): String = "homes/$homeId/claim"
 
+    /**
+     * Build the residency-verification path — the same wizard driven by
+     * `verificationType=residency`, which sends `claim_type: 'resident'`
+     * and offers the lease / utility-bill / tax-bill document set.
+     */
+    fun verifyResidency(homeId: String): String = "homes/$homeId/verify-residency"
+
+    /** Build the per-home issue-tracker path. */
+    fun homeIssues(homeId: String): String = "homes/$homeId/issues"
+
     /** Build the verify-landlord wizard path. */
     fun verifyLandlord(homeId: String): String = "homes/$homeId/verify-landlord"
 
@@ -1189,7 +1392,12 @@ private object ChildRoutes {
     fun placeholder(label: String): String = "_placeholder/generic?$PLACEHOLDER_LABEL_KEY=${java.net.URLEncoder.encode(label, "UTF-8")}"
 
     /** Build the compose-post path with the pre-fill intent encoded. */
-    fun composePost(intent: String): String = "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}"
+    fun composePost(
+        intent: String,
+        prefillBody: String = "",
+    ): String =
+        "feed/compose?$COMPOSE_INTENT_KEY=${java.net.URLEncoder.encode(intent, "UTF-8")}" +
+            "&$COMPOSE_BODY_KEY=${java.net.URLEncoder.encode(prefillBody, "UTF-8")}"
 
     /** Build the edit-post path. The VM reads `postId` via SavedStateHandle. */
     fun editPost(postId: String): String = "feed/edit/${java.net.URLEncoder.encode(postId, "UTF-8")}"
@@ -1250,25 +1458,11 @@ private object ChildRoutes {
             "&$CHAT_GIG_ID_KEY=${enc(row.gigId ?: "")}"
     }
 
-    /** Build the creator-side fan thread path from a Creator Inbox row. */
-    fun creatorThreadConversation(row: CreatorInboxRowContent): String {
-        val userId = row.counterpartyUserId ?: row.id
-
-        fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
-        return "chat/creator/${enc(userId)}?" +
-            "$CHAT_NAME_KEY=${enc(row.displayName.ifEmpty { row.handle })}" +
-            "&$CHAT_INITIALS_KEY=${enc(row.initials)}" +
-            "&$CHAT_VERIFIED_KEY=${row.verifiedLocal}" +
-            "&$CHAT_IDENTITY_KEY=business" +
-            "&$CHAT_LOCALITY_KEY=" +
-            "&$CHAT_ONLINE_KEY=false" +
-            "&$CHAT_TIER_NAME_KEY=${enc(row.tierName ?: "Free")}" +
-            "&$CHAT_TIER_RANK_KEY=${row.tierRank}" +
-            "&$CHAT_SCROLL_TO_KEY=" +
-            "&$CHAT_TOPIC_TYPE_KEY=" +
-            "&$CHAT_TOPIC_REF_ID_KEY=" +
-            "&$CHAT_TOPIC_TITLE_KEY="
-    }
+    // A Creator Inbox row no longer builds a generic-chat path. Persona DMs
+    // are addressed by thread id (`personaDmThread`) because the DM
+    // serializer emits no user_id for either party — the previous
+    // `counterpartyUserId ?: row.id` fallback pushed a thread/membership id
+    // into chat as if it were a user id.
 
     /** Build the chat-conversation path for a New Message picker
      *  selection. The picker emits `userId / displayName / initials /
@@ -1361,15 +1555,35 @@ private object ChildRoutes {
     // the NavHost below; when an A.x screen ships, swap that one composable
     // body for the real screen (the route + builder here are already correct).
 
-    /** A10.3 — Full "Today" briefing (weather, air, daylight, signals). */
-    const val TODAY_DETAIL = "hub/today/detail"
+    /**
+     * A10.3 — Full "Today" briefing (weather, air, daylight, signals).
+     *
+     * `briefingDeliveryId` / `briefingKind` are non-empty only when opened
+     * from a Morning/Evening Briefing push, whose metadata carries
+     * `briefing_delivery_id` + `briefing_kind`. With an id the screen resolves
+     * that stored delivery (`GET /api/hub/briefings/:id`) instead of showing
+     * only the live `/api/hub/today` snapshot.
+     */
+    const val TODAY_DETAIL =
+        "hub/today/detail?briefingDeliveryId={briefingDeliveryId}&briefingKind={briefingKind}"
+
+    fun todayDetail(
+        briefingDeliveryId: String? = null,
+        briefingKind: String? = null,
+    ): String =
+        "hub/today/detail?briefingDeliveryId=${Uri.encode(briefingDeliveryId.orEmpty())}" +
+            "&briefingKind=${Uri.encode(briefingKind.orEmpty())}"
 
     /** A10.10 — Wallet (earnings-side surface). Reached from the
      *  Settings → "Payments & payouts" row and the
      *  `pantopus://wallet` deep link. */
     const val WALLET = "wallet"
 
-    /** A.4 — Property details for a home. */
+    /** WS5.1 — full wallet transaction history. */
+    const val WALLET_ACTIVITY = "wallet/activity"
+
+    /** WS5.3 — GDPR data-export request (mailto until backend job ships). */
+    const val SETTINGS_DATA_EXPORT = "settings/data-export"
     const val PROPERTY_DETAILS_HOME_ID_KEY = "homeId"
     const val PROPERTY_DETAILS = "homes/{$PROPERTY_DETAILS_HOME_ID_KEY}/property"
 
@@ -1380,6 +1594,14 @@ private object ChildRoutes {
     const val ADD_GUEST = "homes/{$ADD_GUEST_HOME_ID_KEY}/guests/new"
 
     fun addGuest(homeId: String): String = "homes/$homeId/guests/new"
+
+    /** A13.6 — Guest-pass manager for a home (Active / Past + revoke).
+     *  Pushed from Home settings → "Invite link"; its FAB opens
+     *  [ADD_GUEST]. */
+    const val GUEST_PASSES_HOME_ID_KEY = "homeId"
+    const val GUEST_PASSES = "homes/{$GUEST_PASSES_HOME_ID_KEY}/guests"
+
+    fun guestPasses(homeId: String): String = "homes/$homeId/guests"
 
     /** A13.4 — Transfer Ownership form. Pushed from the Owners list
      *  "Transfer" action and from `pantopus://homes/:id/owners/transfer`
@@ -1418,6 +1640,15 @@ private object ChildRoutes {
     /** A.x — Mailbox map. */
     const val MAILBOX_MAP = "mailbox/map"
 
+    /** A17.4 — Community mail feed (neighborhood / civic). */
+    const val MAILBOX_COMMUNITY = "mailbox/community"
+
+    /** Family Mail Party — household co-opening (discover / live session). */
+    const val MAILBOX_PARTY = "mailbox/party"
+
+    /** Home Records — the linked-asset hub behind the Mailbox. */
+    const val MAILBOX_HOME_RECORDS = "mailbox/records"
+
     /** A14.8 — Vacation hold (scheduling + active variants). */
     const val MAILBOX_VACATION = "mailbox/vacation"
 
@@ -1436,6 +1667,27 @@ private object ChildRoutes {
     const val MEMBERSHIP_DETAIL = "personas/{$MEMBERSHIP_DETAIL_PERSONA_ID_KEY}/membership"
 
     fun membershipDetail(personaId: String): String = "personas/$personaId/membership"
+
+    /**
+     * C5 — Persona DM thread (A15.4 creator side / A15.5 fan side). Addressed
+     * by thread id: persona DMs carry no counterparty user id on the wire, so
+     * there is nothing else to route on.
+     */
+    const val PERSONA_DM_PERSONA_ID_KEY = "personaId"
+    const val PERSONA_DM_THREAD_ID_KEY = "threadId"
+    const val PERSONA_DM_THREAD =
+        "personas/{$PERSONA_DM_PERSONA_ID_KEY}/dms/{$PERSONA_DM_THREAD_ID_KEY}"
+
+    fun personaDmThread(
+        personaId: String,
+        threadId: String,
+    ): String = "personas/$personaId/dms/$threadId"
+
+    /** C5 — Fan-side persona inbox for one persona (A15.5). */
+    const val FAN_INBOX_PERSONA_ID_KEY = "personaId"
+    const val FAN_INBOX = "personas/{$FAN_INBOX_PERSONA_ID_KEY}/inbox"
+
+    fun fanInbox(personaId: String): String = "personas/$personaId/inbox"
 
     /** A.5 — Professional profile. */
     const val PROFESSIONAL_PROFILE = "professional-profile"
@@ -1467,14 +1719,55 @@ private object ChildRoutes {
 
     fun mailTask(taskId: String): String = "mailbox/tasks/$taskId"
 
+    /**
+     * A17.12 (list) — every mail-linked task. All three legs are optional;
+     * absent ones travel as the `-` sentinel. When `mailId` is present the
+     * screen opens in its create frame for that mail.
+     */
+    const val MAIL_TASK_LIST =
+        "mailbox/tasks?mailId={mailId}&mailSubject={mailSubject}&mailSender={mailSender}"
+
+    fun mailTaskList(
+        mailId: String? = null,
+        mailSubject: String? = null,
+        mailSender: String? = null,
+    ): String {
+        fun leg(value: String?) = Uri.encode(value?.takeIf { it.isNotBlank() } ?: MAIL_TASK_LIST_NONE)
+        return "mailbox/tasks?mailId=${leg(mailId)}" +
+            "&mailSubject=${leg(mailSubject)}&mailSender=${leg(mailSender)}"
+    }
+
     /** A17.13 — Auto-translated mail view. `:mailId` is the source Mail UUID. */
     const val TRANSLATION_MAIL_ID_KEY = "mailId"
     const val TRANSLATION = "mailbox/translation/{$TRANSLATION_MAIL_ID_KEY}"
 
     fun translation(mailId: String): String = "mailbox/translation/$mailId"
 
-    /** A17.14 — Scan-first capture (unboxing) flow. */
-    const val UNBOXING = "mailbox/unboxing"
+    /**
+     * A17.14 — Unboxing capture flow for a delivered package. The route
+     * carries the originating mail id; without one the screen has nothing
+     * to persist and says so. Absent ids travel as the `-` sentinel.
+     */
+    const val UNBOXING = "mailbox/unboxing?mailId={mailId}"
+
+    fun unboxing(mailId: String? = null): String =
+        "mailbox/unboxing?mailId=" + Uri.encode(mailId?.takeIf { it.isNotBlank() } ?: UNBOXING_MAIL_ID_NONE)
+
+    /**
+     * A17.8 → "Ask a Neighbor" — the package-help gig created from a mailbox
+     * package. Carries the source mail id plus RN's `mode=pre|post` leg
+     * (`src/app/mailbox/gig.tsx`).
+     */
+    const val PACKAGE_GIG = "mailbox/gig?mailId={mailId}&mode={mode}"
+
+    fun packageGig(
+        mailId: String,
+        isPreDelivery: Boolean,
+    ): String {
+        val mode = if (isPreDelivery) PACKAGE_GIG_MODE_PRE else PACKAGE_GIG_MODE_POST
+        val leg = Uri.encode(mailId.takeIf { it.isNotBlank() } ?: PACKAGE_GIG_MAIL_ID_NONE)
+        return "mailbox/gig?mailId=$leg&mode=$mode"
+    }
 
     /** A10.11 — Earn dashboard (Wallet sibling). */
     const val EARN = "mailbox/earn"
@@ -1492,6 +1785,26 @@ private object ChildRoutes {
 
     fun businessTeam(businessId: String): String = "businesses/$businessId/team"
 
+    /** C3 — Business Stripe Connect payouts. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_PAYMENTS_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}/payments"
+
+    fun businessPaymentsOwner(businessId: String): String = "businesses/$businessId/payments"
+
+    /** C3 — Business invoicing (list / create / void). Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_INVOICES_OWNER = "businesses/{$BUSINESS_OWNER_ID_KEY}/invoices"
+
+    fun businessInvoicesOwner(businessId: String): String = "businesses/$businessId/invoices"
+
+    /** C3 — Business legal record + verification. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_LEGAL = "businesses/{$BUSINESS_OWNER_ID_KEY}/legal"
+
+    fun businessLegal(businessId: String): String = "businesses/$businessId/legal"
+
+    /** Locations & Hours list MVP. Reuses [BUSINESS_OWNER_ID_KEY]. */
+    const val BUSINESS_LOCATIONS = "businesses/{$BUSINESS_LOCATIONS_BUSINESS_ID_KEY}/locations"
+
+    fun businessLocations(businessId: String): String = "businesses/$businessId/locations"
+
     /** A18.5 — "View as" identity preview. */
     const val VIEW_AS = "identity/preview"
 
@@ -1500,6 +1813,30 @@ private object ChildRoutes {
     const val WAITING_ROOM = "homes/{$WAITING_ROOM_HOME_ID_KEY}/waiting-room"
 
     fun waitingRoom(homeId: String): String = "homes/$homeId/waiting-room"
+
+    /**
+     * A18 — claim status / waiting surface for a single ownership claim,
+     * opened from a My Claims row. Mirrors iOS `HubRoute.claimStatus`.
+     */
+    const val CLAIM_STATUS_CLAIM_ID_KEY = "claimId"
+    const val CLAIM_STATUS = "homes/claims/{$CLAIM_STATUS_CLAIM_ID_KEY}/status"
+
+    fun claimStatus(claimId: String): String = "homes/claims/$claimId/status"
+}
+
+/**
+ * Fire a `mailto:` intent, swallowing [ActivityNotFoundException] when the
+ * device has no mail client. iOS degrades silently here (`openURL` on a
+ * `mailto:` URL is a no-op without a mail app), so the CTA does nothing on
+ * both platforms rather than crashing on Android.
+ */
+private fun Context.openMailto(uri: String) {
+    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse(uri))
+    try {
+        startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Log.i("RootTabScreen", "mailto ignored: no mail client installed")
+    }
 }
 
 private fun NavHostController.navigateToRootTab(route: PantopusRoute) {
@@ -1583,6 +1920,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             null -> Unit
             is DeepLinkRouter.Destination.Invite -> {
                 navController.navigate(ChildRoutes.tokenAccept(pending.token))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.JoinInvite -> {
+                navController.navigate(ChildRoutes.tokenAccept(pending.code))
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Notifications -> {
@@ -1697,7 +2038,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.HomeMemberRequests -> {
-                navController.navigate(ChildRoutes.placeholder("Member requests · ${pending.id}"))
+                navController.navigate(ChildRoutes.homeMembers(pending.id))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.HomeOwnersTransfer -> {
@@ -1718,6 +2059,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.User -> {
                 navController.navigate(ChildRoutes.publicProfile(pending.id))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.BeaconProfile -> {
+                navController.navigate(ChildRoutes.beaconProfile(pending.handle))
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.VacationHold -> {
@@ -1755,7 +2100,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
             }
             is DeepLinkRouter.Destination.Unboxing -> {
                 navController.navigate(ChildRoutes.MAILBOX_ROOT)
-                navController.navigate(ChildRoutes.UNBOXING)
+                navController.navigate(ChildRoutes.unboxing(pending.mailId))
                 DeepLinkRouter.consume()
             }
             DeepLinkRouter.Destination.Earn -> {
@@ -1771,6 +2116,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 navController.navigate(ChildRoutes.businessProfile(pending.businessId))
                 DeepLinkRouter.consume()
             }
+            is DeepLinkRouter.Destination.BusinessPage -> {
+                // C4 — `pantopus://b/:username/:slug` keeps the slug so the
+                // named custom page opens, matching RN's `?pageSlug=` redirect.
+                navController.navigate(
+                    ChildRoutes.businessProfilePage(pending.businessId, pending.pageSlug),
+                )
+                DeepLinkRouter.consume()
+            }
             is DeepLinkRouter.Destination.EditBusinessPage -> {
                 navController.navigate(ChildRoutes.editBusinessPage(pending.businessId))
                 DeepLinkRouter.consume()
@@ -1784,6 +2137,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 // waiting room lands on the home, mirroring HomeOwnersTransfer.
                 navController.navigate(ChildRoutes.homeDashboard(pending.homeId))
                 navController.navigate(ChildRoutes.waitingRoom(pending.homeId))
+                DeepLinkRouter.consume()
+            }
+            is DeepLinkRouter.Destination.HubToday -> {
+                // Morning/Evening Briefing push → the stored delivery, not just
+                // the live `/api/hub/today` snapshot.
+                navController.navigate(
+                    ChildRoutes.todayDetail(pending.briefingDeliveryId, pending.kind),
+                )
+                DeepLinkRouter.consume()
+            }
+            DeepLinkRouter.Destination.MonthlyReceipt -> {
+                // `monthly_receipt` push → profile with the receipt expanded.
+                navController.navigate(ChildRoutes.profile(tab = "receipt"))
                 DeepLinkRouter.consume()
             }
             is DeepLinkRouter.Destination.ResetPassword,
@@ -1803,7 +2169,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 context = NavigationDrawerContext.Personal(name = currentHandle),
                 onSelect = { destination ->
                     navDrawerScope.launch { navDrawerState.close() }
-                    navController.navigate(routeForDrawer(destination))
+                    navController.navigate(
+                        routeForDrawer(
+                            destination,
+                            NavigationDrawerContext.Personal(name = currentHandle),
+                        ),
+                    )
                 },
                 onOpenIdentityCenter = {
                     navDrawerScope.launch { navDrawerState.close() }
@@ -1856,10 +2227,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             when (intent) {
                                 HubNavigationIntent.OpenNotifications ->
                                     navController.navigate(ChildRoutes.NOTIFICATIONS)
+                                HubNavigationIntent.OpenAudienceNotifications ->
+                                    navController.navigate(
+                                        ChildRoutes.notificationsZone(NotificationsZone.Audience.rawValue),
+                                    )
                                 HubNavigationIntent.OpenMenu ->
                                     navDrawerScope.launch { navDrawerState.open() }
                                 HubNavigationIntent.OpenProfile ->
-                                    navController.navigate(ChildRoutes.PROFILE)
+                                    navController.navigate(ChildRoutes.profile())
                                 HubNavigationIntent.StartVerification ->
                                     navController.navigate(ChildRoutes.ADD_HOME)
                                 is HubNavigationIntent.ActionTapped ->
@@ -1888,10 +2263,36 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                     routeForDiscovery(intent.item).also { navController.navigate(it) }
                                 HubNavigationIntent.OpenDiscoverHub ->
                                     navController.navigate(ChildRoutes.DISCOVER_HUB)
+                                HubNavigationIntent.OpenExploreMap ->
+                                    navController.navigate(ChildRoutes.EXPLORE)
+                                HubNavigationIntent.OpenFindBusinesses ->
+                                    navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
                                 is HubNavigationIntent.JumpBackTapped ->
-                                    routeForJumpBackIn(intent.item).also { navController.navigate(it) }
+                                    if (intent.item.route.startsWith("/app/chat")) {
+                                        navController.navigateToRootTab(PantopusRoute.Messages)
+                                    } else {
+                                        navController.navigate(routeForJumpBackIn(intent.item))
+                                    }
+                                // `statusItems[].route` uses the same canonical web
+                                // paths as `jumpBackIn[].route`, so they share one
+                                // resolver.
+                                is HubNavigationIntent.StatusItemTapped ->
+                                    if (intent.item.route.startsWith("/app/chat")) {
+                                        navController.navigateToRootTab(PantopusRoute.Messages)
+                                    } else {
+                                        navController.navigate(
+                                            routeForJumpBackIn(
+                                                JumpBackItem(
+                                                    id = intent.item.id,
+                                                    title = intent.item.title,
+                                                    icon = intent.item.icon,
+                                                    route = intent.item.route,
+                                                ),
+                                            ),
+                                        )
+                                    }
                                 HubNavigationIntent.OpenToday ->
-                                    navController.navigate(ChildRoutes.TODAY_DETAIL)
+                                    navController.navigate(ChildRoutes.todayDetail())
                                 HubNavigationIntent.OpenRecentActivity ->
                                     navController.navigate(ChildRoutes.RECENT_ACTIVITY)
                             }
@@ -1902,6 +2303,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     FeedScreen(
                         onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                         onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
+                        onComposeStarter = { starter ->
+                            navController.navigate(
+                                ChildRoutes.composePost(PulseIntent.Ask.key, starter.placeholder),
+                            )
+                        },
                     )
                 }
                 composable(PantopusRoute.Tasks.path) {
@@ -1910,6 +2316,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onCompose = { category -> navController.navigate(ChildRoutes.composeGig(category.key)) },
                         onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
                         onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
+                        onOpenSupportTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                        onOpenMySupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     )
                 }
                 composable(PantopusRoute.Marketplace.path) {
@@ -1927,8 +2338,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenSearch = { navController.navigate(ChildRoutes.CHAT_SEARCH) },
                     )
                 }
-                composable(ChildRoutes.PROFILE) {
+                composable(
+                    ChildRoutes.PROFILE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PROFILE_TAB_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) { profileEntry ->
                     YouScreen(
+                        expandMonthlyReceipt =
+                            profileEntry.arguments
+                                ?.getString(ChildRoutes.PROFILE_TAB_KEY)
+                                ?.lowercase() == "receipt",
                         onOpenPublicProfile = { userId ->
                             navController.navigate(ChildRoutes.publicProfile(userId))
                         },
@@ -2000,7 +2424,14 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     MyHomesListScreen(
                         onOpenHome = { homeId -> navController.navigate(ChildRoutes.homeDashboard(homeId)) },
                         onAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onFindHome = { navController.navigate(ChildRoutes.FIND_HOME) },
                         onBack = { navController.popBackStack() },
+                        onUploadOwnershipEvidence = { homeId ->
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onVerifyResidency = { homeId ->
+                            navController.navigate(ChildRoutes.verifyResidency(homeId))
+                        },
                     )
                 }
                 composable(ChildRoutes.MY_LISTINGS) {
@@ -2022,9 +2453,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 composable(ChildRoutes.CREATE_BUSINESS) {
                     CreateBusinessWizardScreen(
                         onDismiss = { navController.popBackStack() },
-                        onOpenBusiness = { _ ->
+                        onOpenBusiness = { businessId ->
                             navController.popBackStack(ChildRoutes.CREATE_BUSINESS, inclusive = true)
-                            navController.navigate(ChildRoutes.placeholder("Business dashboard"))
+                            navController.navigate(ChildRoutes.businessOwner(businessId))
                         },
                     )
                 }
@@ -2182,6 +2613,24 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         },
                         onOpenSettings = { homeId ->
                             navController.navigate(ChildRoutes.homeSettings(homeId))
+                        },
+                        onHireHelp = { categoryKey ->
+                            // H1 — "Hire" on a seasonal-checklist item opens
+                            // the gig composer pre-filtered to the item's
+                            // category.
+                            navController.navigate(ChildRoutes.composeGig(categoryKey))
+                        },
+                        onAddTask = { homeId ->
+                            navController.navigate(ChildRoutes.addHouseholdTask(homeId))
+                        },
+                        onTrackBill = { homeId ->
+                            navController.navigate(ChildRoutes.addBill(homeId))
+                        },
+                        onTrackPackage = { homeId ->
+                            navController.navigate(ChildRoutes.logPackage(homeId))
+                        },
+                        onSendMail = {
+                            navController.navigate(ChildRoutes.CEREMONIAL_MAIL)
                         },
                     )
                 }
@@ -3181,6 +3630,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.navigate(ChildRoutes.logMaintenance(homeId))
                         },
                         onBack = { navController.popBackStack() },
+                        onOpenIssues = {
+                            navController.navigate(ChildRoutes.homeIssues(homeId))
+                        },
                     )
                 }
                 composable(
@@ -3238,8 +3690,23 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenInvite = { homeId ->
                             navController.navigate(ChildRoutes.inviteOwner(homeId, ""))
                         },
+                        onOpenTransfer = { homeId ->
+                            navController.navigate(ChildRoutes.transferOwnership(homeId))
+                        },
+                        onOpenClaimReview = { homeId ->
+                            navController.navigate(ChildRoutes.homeClaimReview(homeId))
+                        },
                         onBack = { navController.popBackStack() },
                     )
+                }
+                composable(
+                    route = ChildRoutes.HOME_CLAIM_REVIEW,
+                    arguments =
+                        listOf(
+                            navArgument(HOME_CLAIM_REVIEW_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    HomeClaimReviewScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.PACKAGE_DETAIL,
@@ -3289,25 +3756,30 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 HomeSettingsRoute.Address, HomeSettingsRoute.PropertyDetails ->
                                     navController.navigate(ChildRoutes.propertyDetails(homeId))
                                 HomeSettingsRoute.Photos ->
-                                    navController.navigate(ChildRoutes.placeholder("Photos"))
+                                    navController.navigate(ChildRoutes.homePhotos(homeId))
                                 HomeSettingsRoute.Documents ->
                                     navController.navigate(ChildRoutes.homeDocs(homeId))
                                 HomeSettingsRoute.AccessCodes ->
                                     navController.navigate(ChildRoutes.accessCodes(homeId, null))
                                 HomeSettingsRoute.TrustedNeighbors ->
-                                    navController.navigate(ChildRoutes.placeholder("Trusted neighbors"))
+                                    navController.navigate(ChildRoutes.trustedNeighbors(homeId))
                                 HomeSettingsRoute.Security ->
                                     navController.navigate(ChildRoutes.homeSecurity(homeId))
+                                HomeSettingsRoute.OwnershipSecurity ->
+                                    navController.navigate(ChildRoutes.homeOwnershipSecurity(homeId))
                                 HomeSettingsRoute.People ->
                                     navController.navigate(ChildRoutes.homeMembers(homeId))
                                 HomeSettingsRoute.InviteLink ->
-                                    navController.navigate(ChildRoutes.placeholder("Invite link"))
+                                    // A13.6 — the guest-pass manager
+                                    // (Active / Past + revoke). The Add
+                                    // Guest form is reachable from its FAB.
+                                    navController.navigate(ChildRoutes.guestPasses(homeId))
                                 HomeSettingsRoute.HomeNotifications ->
-                                    navController.navigate(ChildRoutes.placeholder("Home notifications"))
+                                    navController.navigate(ChildRoutes.homeNotifications(homeId))
                                 HomeSettingsRoute.LeaveHome ->
-                                    navController.navigate(ChildRoutes.placeholder("Leave home"))
+                                    navController.navigate(ChildRoutes.leaveHome(homeId))
                                 HomeSettingsRoute.CancelClaim ->
-                                    navController.navigate(ChildRoutes.placeholder("Cancel claim"))
+                                    navController.navigate(ChildRoutes.cancelClaim(homeId))
                             }
                         },
                     )
@@ -3317,6 +3789,70 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(HOME_SECURITY_HOME_ID_KEY) { type = NavType.StringType }),
                 ) {
                     HomeSecurityScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.HOME_OWNERSHIP_SECURITY,
+                    arguments =
+                        listOf(
+                            navArgument(HOME_OWNERSHIP_SECURITY_HOME_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    HomeOwnershipSecurityScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.LEAVE_HOME,
+                    arguments = listOf(navArgument(LEAVE_HOME_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    LeaveHomeScreen(
+                        onBack = { navController.popBackStack() },
+                        onLeft = {
+                            // Move-out revokes membership, so the dashboard for
+                            // this home now 403s — drop it along with the
+                            // settings stack. Mirrors iOS `HubTabRoot`.
+                            val poppedToHomes =
+                                navController.popBackStack(ChildRoutes.HOME_DASHBOARD, inclusive = true)
+                            if (!poppedToHomes) {
+                                navController.popBackStack(ChildRoutes.HOME_SETTINGS, inclusive = true)
+                            }
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CANCEL_CLAIM,
+                    arguments = listOf(navArgument(CANCEL_CLAIM_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    CancelClaimScreen(
+                        onBack = { navController.popBackStack() },
+                        onCancelled = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_PHOTOS,
+                    arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(HOME_SETTINGS_HOME_ID_KEY).orEmpty()
+                    HomePhotosScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDocuments = { navController.navigate(ChildRoutes.homeDocs(homeId)) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.TRUSTED_NEIGHBORS,
+                    arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    TrustedNeighborsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.HOME_NOTIFICATIONS,
+                    arguments = listOf(navArgument(HOME_SETTINGS_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    HomeNotificationsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.PROPERTY_CORRECTION,
+                    arguments = listOf(navArgument(PROPERTY_CORRECTION_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    PropertyCorrectionScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.MAILBOX_ITEM_DETAIL,
@@ -3337,6 +3873,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             // opens the mail-derived task keyed by its source mail.
                             navController.navigate(ChildRoutes.mailTask(sourceMailId))
                         },
+                        onOpenCeremonialMail = { ceremonialId ->
+                            // Replace (not push) so Back returns to the Mailbox,
+                            // matching RN's `router.replace`.
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.ceremonialMailOpen(ceremonialId))
+                        },
+                        onCreateTask = { sourceMailId ->
+                            // A17.12 — RN's "Create Task" in the detail MORE row
+                            // (`src/app/mailbox/detail.tsx:221-227`).
+                            navController.navigate(ChildRoutes.mailTaskList(mailId = sourceMailId))
+                        },
+                        onOpenUnboxing = { sourceMailId ->
+                            navController.navigate(ChildRoutes.unboxing(sourceMailId))
+                        },
+                        onAskNeighbor = { sourceMailId, isPreDelivery ->
+                            // A17.8 → "Ask a Neighbor" (RN `mailbox/package.tsx:204`).
+                            navController.navigate(
+                                ChildRoutes.packageGig(mailId = sourceMailId, isPreDelivery = isPreDelivery),
+                            )
+                        },
                     )
                 }
                 composable(
@@ -3345,6 +3901,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) {
                     PublicProfileScreen(
                         onBack = { navController.popBackStack() },
+                        onOpenHandshake = { handle, tierRank ->
+                            navController.navigate(ChildRoutes.privacyHandshake(handle, tierRank))
+                        },
                         onOpenMessages = { profile ->
                             navController.navigate(
                                 ChildRoutes.chatConversationFromPicker(
@@ -3356,6 +3915,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ),
                             )
                         },
+                        // Gigs tab rows open gig detail; review cards open the
+                        // reviewer's own public profile.
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onOpenProfile = { reviewerId ->
+                            navController.navigate(ChildRoutes.publicProfile(reviewerId))
+                        },
                     )
                 }
                 composable(
@@ -3366,7 +3931,16 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
                     BusinessProfileScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenMessages = { navController.navigate(ChildRoutes.placeholder("Messages")) },
+                        onOpenMessages = { roomId, displayName, initials, verified ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = displayName,
+                                    initials = initials,
+                                    verified = verified,
+                                ),
+                            )
+                        },
                         onShare = {
                             appContext.shareText(
                                 "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
@@ -3388,6 +3962,76 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onPreview = { navController.popBackStack() },
                     )
                 }
+                // C4 — public profile opened on a named custom page
+                // (`pantopus://b/:username/:slug`).
+                composable(
+                    route = ChildRoutes.BUSINESS_PROFILE_PAGE,
+                    arguments =
+                        listOf(
+                            navArgument(BUSINESS_PROFILE_BUSINESS_ID_KEY) { type = NavType.StringType },
+                            navArgument(BUSINESS_PROFILE_PAGE_SLUG_KEY) { type = NavType.StringType },
+                        ),
+                ) { backStackEntry ->
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    val businessId = backStackEntry.arguments?.getString(BUSINESS_PROFILE_BUSINESS_ID_KEY) ?: ""
+                    BusinessProfileScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMessages = { roomId, displayName, initials, verified ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = displayName,
+                                    initials = initials,
+                                    verified = verified,
+                                ),
+                            )
+                        },
+                        onShare = {
+                            appContext.shareText(
+                                "Check out this business on Pantopus — ${InviteLinks.DOWNLOAD_URL}",
+                                "Share business",
+                            )
+                        },
+                        onOpenReport = { navController.navigate(ChildRoutes.placeholder("Report business")) },
+                        onOpenWebsite = { uri -> runCatching { uriHandler.openUri(uri) } },
+                        onBook = { navController.navigate(ChildRoutes.placeholder("Book")) },
+                        onEdit = { navController.navigate(ChildRoutes.editBusinessPage(businessId)) },
+                    )
+                }
+                // C4 — custom Pages CMS index.
+                composable(
+                    route = ChildRoutes.BUSINESS_PAGES,
+                    arguments = listOf(navArgument(BUSINESS_PAGES_BUSINESS_ID_KEY) { type = NavType.StringType }),
+                ) { backStackEntry ->
+                    val businessId = backStackEntry.arguments?.getString(BUSINESS_PAGES_BUSINESS_ID_KEY) ?: ""
+                    BusinessPagesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenPage = { row ->
+                            navController.navigate(
+                                ChildRoutes.businessPageBlocks(
+                                    businessId = businessId,
+                                    pageId = row.id,
+                                    pageTitle = row.title,
+                                ),
+                            )
+                        },
+                    )
+                }
+                // C4 — block builder for one custom page.
+                composable(
+                    route = ChildRoutes.BUSINESS_PAGE_BLOCKS,
+                    arguments =
+                        listOf(
+                            navArgument(PAGE_BLOCKS_BUSINESS_ID_KEY) { type = NavType.StringType },
+                            navArgument(PAGE_BLOCKS_PAGE_ID_KEY) { type = NavType.StringType },
+                            navArgument(PAGE_BLOCKS_PAGE_TITLE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
+                    BusinessPageBlocksScreen(onBack = { navController.popBackStack() })
+                }
                 composable(
                     route = ChildRoutes.PULSE_POST,
                     arguments = listOf(navArgument(PULSE_POST_DETAIL_ID_KEY) { type = NavType.StringType }),
@@ -3399,6 +4043,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         },
                         onEdit = { postId ->
                             navController.navigate(ChildRoutes.editPost(postId))
+                        },
+                        onOpenBusiness = { username ->
+                            // "Nearby Providers" row → `/business/:username`.
+                            navController.navigate(ChildRoutes.businessProfile(username))
                         },
                     )
                 }
@@ -3420,6 +4068,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(DISAMBIGUATE_MAIL_ID_KEY) { type = NavType.StringType }),
                 ) {
                     DisambiguateMailFormScreen(onClose = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAIL_ROUTING_QUEUE) {
+                    MailRoutingQueueScreen(onClose = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.MAILBOX_VAULT) {
                     // T6.5e (P19.5) — Mailbox Vault list-of-rows surface.
@@ -3625,6 +4276,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                         onCompose = { intent -> navController.navigate(ChildRoutes.composePost(intent.key)) },
                         onBack = { navController.popBackStack() },
+                        onComposeStarter = { starter ->
+                            navController.navigate(
+                                ChildRoutes.composePost(PulseIntent.Ask.key, starter.placeholder),
+                            )
+                        },
                     )
                 }
                 composable(ChildRoutes.BEACONS_FEED) {
@@ -3757,11 +4413,27 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenMap = { category -> navController.navigate(ChildRoutes.tasksMap(category.key)) },
                         onOpenSearch = { navController.navigate(ChildRoutes.GIG_SEARCH) },
                         onBack = { navController.popBackStack() },
+                        onOpenSupportTrain = { trainId ->
+                            navController.navigate(ChildRoutes.supportTrainDetail(trainId))
+                        },
+                        onOpenMyTasks = { navController.navigate(ChildRoutes.MY_TASKS) },
+                        onOpenMySupportTrains = { navController.navigate(ChildRoutes.SUPPORT_TRAINS) },
                     )
                 }
                 composable(ChildRoutes.GIG_SEARCH) {
                     GigSearchScreen(
                         onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.UNIVERSAL_SEARCH) {
+                    UniversalSearchScreen(
+                        onOpen = { destination ->
+                            navController.navigate(routeForUniversalSearch(destination))
+                        },
+                        onBrowseNearbyBusinesses = {
+                            navController.navigate(ChildRoutes.DISCOVER_BUSINESSES)
+                        },
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -3856,6 +4528,10 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 type = NavType.StringType
                                 defaultValue = PulseIntent.All.key
                             },
+                            navArgument(ChildRoutes.COMPOSE_BODY_KEY) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
                         ),
                 ) { entry ->
                     val raw = entry.arguments?.getString(ChildRoutes.COMPOSE_INTENT_KEY) ?: PulseIntent.All.key
@@ -3879,7 +4555,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         editingPostId = entry.arguments?.getString(ChildRoutes.EDIT_POST_POST_ID_KEY),
                     )
                 }
-                composable(ChildRoutes.NOTIFICATIONS) {
+                composable(
+                    route = ChildRoutes.NOTIFICATIONS_ROUTE,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.NOTIFICATIONS_CONTEXT_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                ) {
+                    // The VM reads `context` from SavedStateHandle; a plain
+                    // `notifications` navigate leaves it null (unscoped list).
                     NotificationsScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.RECENT_ACTIVITY) {
@@ -4025,6 +4713,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onLeaveReview = { dto -> navController.navigate(ChildRoutes.gigDetail(dto.id)) },
                         onPostTask = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
                         onRepost = { navController.navigate(ChildRoutes.COMPOSE_TASK) },
+                        onRebook = { categoryKey ->
+                            navController.navigate(ChildRoutes.composeGig(categoryKey))
+                        },
                     )
                 }
                 composable(ChildRoutes.COMPOSE_TASK) {
@@ -4058,7 +4749,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 SettingsRoute.Verification -> navController.navigate(ChildRoutes.SETTINGS_VERIFICATION)
                                 SettingsRoute.Blocks -> navController.navigate(ChildRoutes.SETTINGS_BLOCKED_USERS)
                                 // Parked until P8.5 — see docs/t6-open-questions-decisions.md Q7.
-                                SettingsRoute.DataExport -> navController.navigate(ChildRoutes.placeholder("Data export"))
+                                SettingsRoute.DataExport -> navController.navigate(ChildRoutes.SETTINGS_DATA_EXPORT)
                                 // P5.2 / A14.6 — Settings → Payments (payments-out · Stripe
                                 // setup · payout routing). Distinct from A10.10 Wallet
                                 // (earnings-in) which lives at `ChildRoutes.WALLET` and
@@ -4096,17 +4787,21 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 composable(ChildRoutes.SETTINGS_VERIFICATION) {
                     VerificationCenterScreen(onBack = { navController.popBackStack() })
                 }
+                composable(ChildRoutes.SETTINGS_DATA_EXPORT) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    DataExportScreen(
+                        onBack = { navController.popBackStack() },
+                        onEmailPrivacy = {
+                            context.openMailto("mailto:privacy@pantopus.com?subject=Data%20export%20request")
+                        },
+                    )
+                }
                 composable(ChildRoutes.SETTINGS_HELP) {
                     val context = androidx.compose.ui.platform.LocalContext.current
                     HelpCenterScreen(
                         onBack = { navController.popBackStack() },
                         onEmailSupport = {
-                            val intent =
-                                android.content.Intent(
-                                    android.content.Intent.ACTION_SENDTO,
-                                    android.net.Uri.parse("mailto:support@pantopus.app?subject=Help"),
-                                )
-                            context.startActivity(intent)
+                            context.openMailto("mailto:support@pantopus.app?subject=Help")
                         },
                     )
                 }
@@ -4150,6 +4845,11 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         listOf(
                             navArgument(ChildRoutes.PRIVACY_HANDSHAKE_HANDLE_KEY) {
                                 type = NavType.StringType
+                            },
+                            navArgument(ChildRoutes.PRIVACY_HANDSHAKE_PRESELECTED_TIER_KEY) {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
                             },
                         ),
                 ) {
@@ -4215,14 +4915,13 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenCreatorInbox = {
                             navController.navigate(ChildRoutes.CREATOR_INBOX)
                         },
-                        onOpenMembership = { personaId ->
-                            navController.navigate(ChildRoutes.membershipDetail(personaId))
-                        },
                         onComposeBroadcast = { personaId ->
                             navController.navigate(ChildRoutes.composeBroadcast(personaId))
                         },
                         onOpenEditPersona = {
-                            navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID))
+                            // The editor resolves the signed-in user's Beacon from
+                            // GET /api/personas/me, so the arg is advisory only.
+                            navController.navigate(ChildRoutes.editPersona(EDIT_PERSONA_CREATE_ARG))
                         },
                         onOpenBeacons = {
                             navController.navigate(ChildRoutes.BEACONS_FEED)
@@ -4245,28 +4944,52 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) {
                     BroadcastDetailScreen(
                         onBack = { navController.popBackStack() },
-                        onOverflow = {
-                            navController.navigate(ChildRoutes.placeholder("Broadcast actions"))
-                        },
-                        onReply = {
-                            navController.navigate(ChildRoutes.placeholder("Reply to broadcast"))
-                        },
-                        onBoost = {
-                            navController.navigate(ChildRoutes.placeholder("Boost broadcast"))
-                        },
-                        onPin = {
-                            navController.navigate(ChildRoutes.placeholder("Pin broadcast"))
-                        },
+                        onOverflow = {},
+                        onReply = { navController.navigate(ChildRoutes.CREATOR_INBOX) },
+                        onBoost = null,
+                        onPin = null,
                     )
                 }
                 composable(ChildRoutes.CREATOR_INBOX) {
                     CreatorInboxScreen(
                         onBack = { navController.popBackStack() },
                         onOpenThread = { row ->
-                            navController.navigate(ChildRoutes.creatorThreadConversation(row))
+                            // The row id IS the PersonaDmThread id — persona DMs
+                            // carry no counterparty user id to fall back to.
+                            navController.navigate(
+                                ChildRoutes.personaDmThread(row.personaId, row.id),
+                            )
                         },
                         onOpenBroadcast = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
                         onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Inbox settings")) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PERSONA_DM_THREAD,
+                    arguments =
+                        listOf(
+                            navArgument(ChildRoutes.PERSONA_DM_PERSONA_ID_KEY) { type = NavType.StringType },
+                            navArgument(ChildRoutes.PERSONA_DM_THREAD_ID_KEY) { type = NavType.StringType },
+                        ),
+                ) {
+                    PersonaDmThreadScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.FAN_INBOX,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.FAN_INBOX_PERSONA_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    val personaId = entry.arguments?.getString(ChildRoutes.FAN_INBOX_PERSONA_ID_KEY).orEmpty()
+                    FanInboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onChangeTier = { navController.popBackStack() },
+                        onOpenThread = { threadId ->
+                            // Replace the resolver so Back lands on the
+                            // membership screen, not on this screen again.
+                            navController.navigate(ChildRoutes.personaDmThread(personaId, threadId)) {
+                                popUpTo(ChildRoutes.FAN_INBOX) { inclusive = true }
+                            }
+                        },
                     )
                 }
                 composable(ChildRoutes.IDENTITY_CENTER) {
@@ -4481,7 +5204,20 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 }
                 // ---- Wave A bootstrap placeholders. Swap each body for the real
                 // screen when the matching A.x screen ships. ----
-                composable(ChildRoutes.TODAY_DETAIL) {
+                composable(
+                    ChildRoutes.TODAY_DETAIL,
+                    arguments =
+                        listOf(
+                            navArgument("briefingDeliveryId") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument("briefingKind") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                ) {
                     TodayDetailScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.WALLET) {
@@ -4490,26 +5226,26 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     // dashboard / withdraw); only navigation stays as callbacks.
                     WalletScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenHistory = {
-                            navController.navigate(ChildRoutes.placeholder("Wallet history"))
-                        },
+                        onOpenHistory = { navController.navigate(ChildRoutes.WALLET_ACTIVITY) },
                         onOpenTaxDocs = {
                             navController.navigate(ChildRoutes.placeholder("Tax documents"))
                         },
-                        onSeeAllActivity = {
-                            navController.navigate(ChildRoutes.placeholder("All activity"))
-                        },
+                        onSeeAllActivity = { navController.navigate(ChildRoutes.WALLET_ACTIVITY) },
                     )
+                }
+                composable(ChildRoutes.WALLET_ACTIVITY) {
+                    WalletActivityListScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = ChildRoutes.PROPERTY_DETAILS,
                     arguments =
                         listOf(navArgument(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY) { type = NavType.StringType }),
-                ) {
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(ChildRoutes.PROPERTY_DETAILS_HOME_ID_KEY).orEmpty()
                     PropertyDetailsScreen(
                         onBack = { navController.popBackStack() },
                         onRequestCorrection = {
-                            navController.navigate(ChildRoutes.placeholder("Request correction"))
+                            navController.navigate(ChildRoutes.propertyCorrection(homeId))
                         },
                     )
                 }
@@ -4520,6 +5256,19 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     AddGuestFormScreen(
                         onClose = { navController.popBackStack() },
                         onSent = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.GUEST_PASSES,
+                    arguments = listOf(navArgument(GUEST_PASSES_HOME_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    // A13.6 — Guest-pass manager. The FAB pushes the Add
+                    // Guest form; popping back re-fetches so the new pass
+                    // appears.
+                    val homeId = entry.arguments?.getString(GUEST_PASSES_HOME_ID_KEY).orEmpty()
+                    GuestPassesListScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddGuest = { navController.navigate(ChildRoutes.addGuest(homeId)) },
                     )
                 }
                 composable(
@@ -4587,6 +5336,12 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                                 ExploreKind.Item -> navController.navigate(ChildRoutes.listingDetail(entity.id))
                                 ExploreKind.Post -> navController.navigate(ChildRoutes.pulsePost(entity.id))
                                 ExploreKind.Spot -> navController.navigate(ChildRoutes.businessProfile(entity.id))
+                                // `homes` markers are neighborhood addresses,
+                                // not homes the viewer owns — the backend has
+                                // no viewer-facing detail route for someone
+                                // else's home, so the tap selects the pin and
+                                // the rail card carries the address.
+                                ExploreKind.Home -> Unit
                             }
                         },
                         onOpenSaved = { navController.navigate(ChildRoutes.SAVED_PLACES) },
@@ -4621,8 +5376,35 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenEarn = { navController.navigate(ChildRoutes.EARN) },
                         onOpenVacationHold = { navController.navigate(ChildRoutes.MAILBOX_VACATION) },
                         onOpenStamps = { navController.navigate(ChildRoutes.STAMPS) },
-                        onOpenUnboxing = { navController.navigate(ChildRoutes.UNBOXING) },
+                        onOpenUnboxing = { navController.navigate(ChildRoutes.unboxing()) },
+                        onOpenCompose = { navController.navigate(ChildRoutes.CEREMONIAL_MAIL) },
+                        onOpenRoutingQueue = { navController.navigate(ChildRoutes.MAIL_ROUTING_QUEUE) },
+                        onOpenMailParty = { navController.navigate(ChildRoutes.MAILBOX_PARTY) },
+                        onOpenCommunity = { navController.navigate(ChildRoutes.MAILBOX_COMMUNITY) },
+                        onOpenRecords = { navController.navigate(ChildRoutes.MAILBOX_HOME_RECORDS) },
+                        onOpenMailTasks = { navController.navigate(ChildRoutes.mailTaskList()) },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_PARTY) {
+                    MailPartyScreen(
+                        onBack = { navController.popBackStack() },
+                        // Declining a party opens the item solo — the same
+                        // mail detail the drawer rows push.
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
+                    )
+                }
+                composable(ChildRoutes.MAILBOX_COMMUNITY) {
+                    CommunityMailScreen(onBack = { navController.popBackStack() })
+                }
+                composable(ChildRoutes.MAILBOX_HOME_RECORDS) {
+                    HomeRecordsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMail = { mailId ->
+                            navController.navigate(ChildRoutes.mailboxItemDetail(mailId))
+                        },
                     )
                 }
                 composable(ChildRoutes.MAILBOX_MAP) {
@@ -4661,6 +5443,39 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     )
                 }
                 composable(
+                    route = ChildRoutes.MAIL_TASK_LIST,
+                    arguments =
+                        listOf(
+                            navArgument(MAIL_TASK_LIST_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                            navArgument(MAIL_TASK_LIST_SUBJECT_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                            navArgument(MAIL_TASK_LIST_SENDER_KEY) {
+                                type = NavType.StringType
+                                defaultValue = MAIL_TASK_LIST_NONE
+                            },
+                        ),
+                ) {
+                    // A17.12 (list) — every mail-linked task, plus the
+                    // create-from-mail form when the route carries a mail id.
+                    MailTaskListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTask = { taskId -> navController.navigate(ChildRoutes.mailTask(taskId)) },
+                        onPostAsNeighborTask = { sourceMailId ->
+                            // A17.8 — RN's "Post as Neighbor Task Instead"
+                            // (`mailbox/tasks.tsx:236`) always escalates in
+                            // post-delivery mode.
+                            navController.navigate(
+                                ChildRoutes.packageGig(mailId = sourceMailId, isPreDelivery = false),
+                            )
+                        },
+                    )
+                }
+                composable(
                     route = ChildRoutes.TRANSLATION,
                     arguments = listOf(navArgument(ChildRoutes.TRANSLATION_MAIL_ID_KEY) { type = NavType.StringType }),
                 ) {
@@ -4669,14 +5484,46 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onReply = { navController.navigate(ChildRoutes.placeholder("Reply in English")) },
                     )
                 }
-                composable(ChildRoutes.UNBOXING) {
-                    // A17.14 — the scan-capture flow seeds from `UnboxingSampleData`
-                    // (OCR / classification / vault upload are out of scope), so the
-                    // route carries no mail id today.
+                composable(
+                    route = ChildRoutes.UNBOXING,
+                    arguments =
+                        listOf(
+                            navArgument(UNBOXING_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = UNBOXING_MAIL_ID_NONE
+                            },
+                        ),
+                ) {
+                    // A17.14 — the capture flow loads the real `MailPackage` row for
+                    // the routed mail id and every action writes to the p2 package
+                    // routes. Without a mail id there is nothing to persist, and the
+                    // screen says so rather than projecting a fixture.
                     UnboxingScreen(
                         onBack = { navController.popBackStack() },
                         onScanNext = { /* re-arms capture in-place — stays on this screen */ },
-                        onOpenDrawer = { navController.navigate(ChildRoutes.placeholder("Home drawer")) },
+                        onOpenDrawer = { navController.navigate(ChildRoutes.MAILBOX_VAULT) },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.PACKAGE_GIG,
+                    arguments =
+                        listOf(
+                            navArgument(PACKAGE_GIG_MAIL_ID_KEY) {
+                                type = NavType.StringType
+                                defaultValue = PACKAGE_GIG_MAIL_ID_NONE
+                            },
+                            navArgument(PACKAGE_GIG_MODE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = PACKAGE_GIG_MODE_POST
+                            },
+                        ),
+                ) {
+                    // A17.8 → "Ask a Neighbor" — posts the package-help gig via
+                    // `POST api/mailbox/v2/p2/package/:mailId/gig` and deep-links
+                    // into the created gig, matching RN `mailbox/gig.tsx`.
+                    PackageGigScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenGig = { gigId -> navController.navigate(ChildRoutes.gigDetail(gigId)) },
                     )
                 }
                 composable(ChildRoutes.EARN) {
@@ -4704,6 +5551,25 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenInsights = { navController.navigate(ChildRoutes.placeholder("Insights")) },
                         onOpenSettings = { navController.navigate(ChildRoutes.placeholder("Business settings")) },
                         onOpenTeam = { navController.navigate(ChildRoutes.businessTeam(businessId)) },
+                        onOpenPages = { navController.navigate(ChildRoutes.businessPages(businessId)) },
+                        onOpenPayments = {
+                            navController.navigate(ChildRoutes.businessPaymentsOwner(businessId))
+                        },
+                        onOpenInvoices = {
+                            navController.navigate(ChildRoutes.businessInvoicesOwner(businessId))
+                        },
+                        onOpenLegal = { navController.navigate(ChildRoutes.businessLegal(businessId)) },
+                        onOpenChatRoom = { roomId, name, _ ->
+                            navController.navigate(
+                                ChildRoutes.chatConversationRoom(
+                                    roomId = roomId,
+                                    displayName = name,
+                                    initials = initialsFromName(name),
+                                    verified = false,
+                                ),
+                            )
+                        },
+                        onOpenPost = { postId -> navController.navigate(ChildRoutes.pulsePost(postId)) },
                     )
                 }
                 composable(
@@ -4711,6 +5577,31 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                     arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
                 ) {
                     BusinessTeamScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_PAYMENTS_OWNER,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessPaymentsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_INVOICES_OWNER,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessInvoicesScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_LEGAL,
+                    arguments = listOf(navArgument(ChildRoutes.BUSINESS_OWNER_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessLegalScreen(onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = ChildRoutes.BUSINESS_LOCATIONS,
+                    arguments =
+                        listOf(navArgument(BUSINESS_LOCATIONS_BUSINESS_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    BusinessLocationsScreen(onBack = { navController.popBackStack() })
                 }
                 composable(ChildRoutes.VIEW_AS) {
                     ViewAsScreen(
@@ -4722,8 +5613,38 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 composable(
                     route = ChildRoutes.WAITING_ROOM,
                     arguments = listOf(navArgument(ChildRoutes.WAITING_ROOM_HOME_ID_KEY) { type = NavType.StringType }),
-                ) {
-                    WaitingRoomRoute(onBack = { navController.popBackStack() })
+                ) { entry ->
+                    val homeId = entry.arguments?.getString(ChildRoutes.WAITING_ROOM_HOME_ID_KEY).orEmpty()
+                    WaitingRoomRoute(
+                        onBack = { navController.popBackStack() },
+                        onNav = { nav ->
+                            when (nav) {
+                                WaitingRoomNav.Notifications ->
+                                    navController.navigate(ChildRoutes.NOTIFICATIONS)
+                                is WaitingRoomNav.BackToHome ->
+                                    navController.navigate(ChildRoutes.homeDashboard(nav.homeId)) {
+                                        popUpTo(ChildRoutes.homeDashboard(nav.homeId)) { inclusive = true }
+                                    }
+                                is WaitingRoomNav.ViewClaim ->
+                                    navController.navigate(ChildRoutes.MY_CLAIMS)
+                                is WaitingRoomNav.UpdateEvidence ->
+                                    navController.navigate(ChildRoutes.claimOwnership(nav.homeId))
+                                is WaitingRoomNav.CancelClaim ->
+                                    navController.navigate(ChildRoutes.cancelClaim(nav.homeId))
+                                // Verification Center action cards.
+                                is WaitingRoomNav.VerifyPostcard ->
+                                    navController.navigate(ChildRoutes.postcardVerification(nav.homeId))
+                                is WaitingRoomNav.UploadProof ->
+                                    navController.navigate(ChildRoutes.verifyResidency(nav.homeId))
+                                is WaitingRoomNav.LandlordVerification ->
+                                    navController.navigate(ChildRoutes.verifyLandlord(nav.homeId))
+                                is WaitingRoomNav.LeaveHome ->
+                                    navController.navigate(ChildRoutes.leaveHome(nav.homeId))
+                                WaitingRoomNav.RequestHelp ->
+                                    navController.navigate(ChildRoutes.SETTINGS_HELP)
+                            }
+                        },
+                    )
                 }
                 composable(
                     route = ChildRoutes.MEMBERSHIP_DETAIL,
@@ -4741,17 +5662,17 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onOpenPersona = {
                             navController.navigate(ChildRoutes.AUDIENCE_PROFILE)
                         },
-                        onChangeTier = {
-                            navController.navigate(ChildRoutes.placeholder("Change tier"))
-                        },
                         onUpdatePayment = {
                             navController.navigate(ChildRoutes.placeholder("Update payment"))
                         },
                         onCancel = {
                             navController.navigate(ChildRoutes.placeholder("Membership cancelled"))
                         },
-                        onRequestRefund = {
-                            navController.navigate(ChildRoutes.placeholder("Request refund"))
+                        // Change tier + refund request are real in-screen flows
+                        // now (tier picker sheet / refund sheet), not
+                        // placeholder pushes.
+                        onOpenInbox = { resolvedPersonaId ->
+                            navController.navigate(ChildRoutes.fanInbox(resolvedPersonaId))
                         },
                     )
                 }
@@ -4765,6 +5686,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 ) {
                     EditPersonaScreen(
                         onClose = { navController.popBackStack() },
+                        onViewBeacon = { handle -> navController.navigate(ChildRoutes.beaconProfile(handle)) },
                     )
                 }
                 composable(
@@ -4783,7 +5705,7 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onEditPersona = { personaId -> navController.navigate(ChildRoutes.editPersona(personaId)) },
                         onComposeBroadcast = { personaId -> navController.navigate(ChildRoutes.composeBroadcast(personaId)) },
                         onOpenInsights = { navController.navigate(ChildRoutes.AUDIENCE_PROFILE) },
-                        onCreateBeacon = { navController.navigate(ChildRoutes.editPersona(EditPersonaSampleData.PERSONA_ID)) },
+                        onCreateBeacon = { navController.navigate(ChildRoutes.editPersona(EDIT_PERSONA_CREATE_ARG)) },
                     )
                 }
                 composable(
@@ -4794,7 +5716,9 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                         onBack = { navController.popBackStack() },
                         onEditPersona = { personaId -> navController.navigate(ChildRoutes.editPersona(personaId)) },
                         onComposeBroadcast = { personaId -> navController.navigate(ChildRoutes.composeBroadcast(personaId)) },
-                        onFollowHandshake = { handle -> navController.navigate(ChildRoutes.privacyHandshake(handle)) },
+                        onFollowHandshake = { handle, tierRank ->
+                            navController.navigate(ChildRoutes.privacyHandshake(handle, tierRank))
+                        },
                     )
                 }
                 composable(ChildRoutes.ADD_HOME) {
@@ -4806,10 +5730,35 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.popBackStack()
                             navController.navigate(ChildRoutes.homeDashboard(homeId))
                         },
+                        onOpenClaimOwnership = { homeId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onOpenWaitingRoom = { homeId ->
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.waitingRoom(homeId))
+                        },
+                    )
+                }
+                composable(ChildRoutes.FIND_HOME) {
+                    FindHomeScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenClaimOwnership = { homeId ->
+                            navController.navigate(ChildRoutes.claimOwnership(homeId))
+                        },
+                        onOpenAddHome = { navController.navigate(ChildRoutes.ADD_HOME) },
+                        onOpenInviteToken = { token ->
+                            navController.navigate(ChildRoutes.tokenAccept(token))
+                        },
                     )
                 }
                 composable(ChildRoutes.BUSINESS_WAITLIST) {
-                    BusinessWaitlistScreen(onBack = { navController.popBackStack() })
+                    // Waitlist is retired — immediately forward to create wizard.
+                    LaunchedEffect(Unit) {
+                        navController.navigate(ChildRoutes.CREATE_BUSINESS) {
+                            popUpTo(ChildRoutes.BUSINESS_WAITLIST) { inclusive = true }
+                        }
+                    }
                 }
                 composable(
                     route = ChildRoutes.CLAIM_OWNERSHIP,
@@ -4821,6 +5770,43 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                             navController.popBackStack()
                             navController.navigate(ChildRoutes.MY_CLAIMS)
                         },
+                        onOpenFindHome = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.FIND_HOME)
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.VERIFY_RESIDENCY,
+                    arguments =
+                        listOf(
+                            navArgument(CLAIM_OWNERSHIP_HOME_ID_KEY) { type = NavType.StringType },
+                            // Not part of the path — the default flips the
+                            // wizard into its residency variant.
+                            navArgument(CLAIM_VERIFICATION_TYPE_KEY) {
+                                type = NavType.StringType
+                                defaultValue = "residency"
+                            },
+                        ),
+                ) {
+                    ClaimOwnershipWizardScreen(
+                        onDismiss = { navController.popBackStack() },
+                        onOpenClaimsList = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.MY_CLAIMS)
+                        },
+                        onOpenFindHome = {
+                            navController.popBackStack()
+                            navController.navigate(ChildRoutes.FIND_HOME)
+                        },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.HOME_ISSUES,
+                    arguments = listOf(navArgument(HOME_ISSUES_HOME_ID_KEY) { type = NavType.StringType }),
+                ) {
+                    HomeIssuesListScreen(
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable(
@@ -4857,10 +5843,28 @@ fun RootTabScreen(inboxBadgeCount: Int = 0) {
                 composable(ChildRoutes.MY_CLAIMS) {
                     MyClaimsListScreen(
                         onStartNewClaim = { navController.navigate(ChildRoutes.ADD_HOME) },
-                        onOpenClaim = { _ ->
-                            navController.navigate(ChildRoutes.placeholder("Claim status"))
+                        onOpenClaim = { claimId ->
+                            navController.navigate(ChildRoutes.claimStatus(claimId))
                         },
                         onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = ChildRoutes.CLAIM_STATUS,
+                    arguments =
+                        listOf(navArgument(ChildRoutes.CLAIM_STATUS_CLAIM_ID_KEY) { type = NavType.StringType }),
+                ) { entry ->
+                    // Mirrors iOS `HubTabRoot`/`YouTabRoot` `.claimStatus`:
+                    // the A18 "Under review" frame, not a placeholder. The
+                    // backend masks every in-flight claim to `under_review`
+                    // (`backend/routes/homeOwnership.js:2107`), so there is no
+                    // per-claim detail beyond what the list row already shows.
+                    val claimId = entry.arguments?.getString(ChildRoutes.CLAIM_STATUS_CLAIM_ID_KEY).orEmpty()
+                    StatusWaitingScreen(
+                        content = StatusWaitingContent.underReview(homeName = null),
+                        onAction = { card -> if (card.id == "addEvidence") navController.popBackStack() },
+                        onPrimary = { navController.popBackStack() },
+                        onSecondary = { if (claimId.isNotEmpty()) navController.popBackStack() },
                     )
                 }
                 if (BuildConfig.DEBUG) {
@@ -4932,21 +5936,25 @@ private fun routeForDiscovery(item: DiscoveryCardContent): String =
 /**
  * §1C-b — maps a navigation-drawer destination onto an existing route.
  * Destinations with no shipped native route fall back to the NotYetAvailable
- * placeholder. The drawer is opened from the personal Hub, so the Home /
- * Business rows (rendered for previews + tests) resolve to placeholders until
- * a home / business dashboard adopts the drawer with its own id-aware mapper.
+ * placeholder. Home / Business destinations read the active id from [context]
+ * (mirrors iOS `HubTabRoot.route(forDrawer:context:)`).
  */
 @Suppress("CyclomaticComplexMethod")
-private fun routeForDrawer(destination: NavigationDrawerDestination): String =
-    when (destination) {
+private fun routeForDrawer(
+    destination: NavigationDrawerDestination,
+    context: NavigationDrawerContext,
+): String {
+    val businessId = (context as? NavigationDrawerContext.Business)?.id.orEmpty()
+    val homeId = (context as? NavigationDrawerContext.Home)?.id.orEmpty()
+    return when (destination) {
         NavigationDrawerDestination.MyHomes -> ChildRoutes.MY_HOMES
         NavigationDrawerDestination.MyBusinesses -> ChildRoutes.MY_BUSINESSES
         NavigationDrawerDestination.Connections -> ChildRoutes.CONNECTIONS
         NavigationDrawerDestination.Mailbox -> ChildRoutes.MAILBOX_ROOT
         NavigationDrawerDestination.ProfileAndPrivacy -> ChildRoutes.IDENTITY_CENTER
         NavigationDrawerDestination.BeaconUpdates -> ChildRoutes.BEACONS_FEED
-        NavigationDrawerDestination.Search -> ChildRoutes.GIG_SEARCH
-        NavigationDrawerDestination.DiscoverNeighbors -> ChildRoutes.placeholder("Discover Neighbors")
+        NavigationDrawerDestination.Search -> ChildRoutes.UNIVERSAL_SEARCH
+        NavigationDrawerDestination.DiscoverNeighbors -> ChildRoutes.DISCOVER_HUB
         NavigationDrawerDestination.MyBeacon -> ChildRoutes.MY_BEACON
         NavigationDrawerDestination.MyListings -> ChildRoutes.MY_LISTINGS
         NavigationDrawerDestination.MyPulse -> ChildRoutes.MY_POSTS
@@ -4957,30 +5965,100 @@ private fun routeForDrawer(destination: NavigationDrawerDestination): String =
         NavigationDrawerDestination.WalletAndPayments -> ChildRoutes.WALLET
         NavigationDrawerDestination.Settings -> ChildRoutes.MENU
         NavigationDrawerDestination.HelpSupport -> ChildRoutes.SETTINGS_HELP
-        NavigationDrawerDestination.BusinessPayments -> ChildRoutes.SETTINGS_PAYMENTS
-        NavigationDrawerDestination.HomeProperty,
-        NavigationDrawerDestination.HomeOverview,
-        NavigationDrawerDestination.HomeTasks,
-        NavigationDrawerDestination.HomeIssues,
-        NavigationDrawerDestination.HomeBills,
-        NavigationDrawerDestination.HomeMembers,
-        NavigationDrawerDestination.HomeMailbox,
-        NavigationDrawerDestination.HomePackages,
-        NavigationDrawerDestination.HomeDocuments,
-        NavigationDrawerDestination.HomeVendors,
-        NavigationDrawerDestination.HomeEmergency,
-        NavigationDrawerDestination.HomeSettings,
-        NavigationDrawerDestination.BusinessOverview,
-        NavigationDrawerDestination.BusinessProfileRow,
-        NavigationDrawerDestination.BusinessLocations,
+        // C3 — the business drawer's Payments row belongs on the business's
+        // own Stripe Connect surface, not on the personal payout settings.
+        NavigationDrawerDestination.BusinessPayments ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessPaymentsOwner(businessId)
+            } else {
+                ChildRoutes.SETTINGS_PAYMENTS
+            }
+        NavigationDrawerDestination.HomeProperty ->
+            if (homeId.isNotEmpty()) {
+                ChildRoutes.propertyDetails(homeId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.HomeOverview ->
+            if (homeId.isNotEmpty()) {
+                ChildRoutes.homeDashboard(homeId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.HomeTasks ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeTasks(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeIssues ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeIssues(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeBills ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeBills(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeMembers ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeMembers(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeMailbox -> ChildRoutes.MAILBOX_ROOT
+        NavigationDrawerDestination.HomePackages ->
+            if (homeId.isNotEmpty()) ChildRoutes.homePackages(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeDocuments ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeDocs(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeVendors -> ChildRoutes.placeholder("Vendors")
+        NavigationDrawerDestination.HomeEmergency ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeEmergency(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.HomeSettings ->
+            if (homeId.isNotEmpty()) ChildRoutes.homeSettings(homeId) else ChildRoutes.placeholder("Coming soon")
+        NavigationDrawerDestination.BusinessOverview ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessOwner(businessId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.BusinessProfileRow ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessProfile(businessId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.BusinessPages ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.editBusinessPage(businessId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.BusinessTeam ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessTeam(businessId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
+        NavigationDrawerDestination.BusinessPostTask ->
+            ChildRoutes.quickPostGig(GigsCategory.All.key)
+        NavigationDrawerDestination.BusinessLocations ->
+            if (businessId.isNotEmpty()) {
+                ChildRoutes.businessLocations(businessId)
+            } else {
+                ChildRoutes.placeholder("Coming soon")
+            }
         NavigationDrawerDestination.BusinessCatalog,
-        NavigationDrawerDestination.BusinessPages,
-        NavigationDrawerDestination.BusinessPostTask,
         NavigationDrawerDestination.BusinessChat,
-        NavigationDrawerDestination.BusinessTeam,
         NavigationDrawerDestination.BusinessReviews,
         NavigationDrawerDestination.BusinessSettings,
         -> ChildRoutes.placeholder("Coming soon")
+    }
+}
+
+/**
+ * S2 — maps a universal-search result onto the route that opens it.
+ * Mirrors iOS `HubTabRoot.route(forUniversalSearch:)`.
+ *
+ * Home rows come from `api/homes/discover`, which only returns
+ * `public_preview` homes the viewer may not belong to. The home
+ * dashboard falls back to the public profile for non-members, so it is
+ * the correct landing surface for both cases.
+ */
+private fun routeForUniversalSearch(destination: UniversalSearchDestination): String =
+    when (destination) {
+        is UniversalSearchDestination.Task -> ChildRoutes.gigDetail(destination.gigId)
+        is UniversalSearchDestination.Person -> ChildRoutes.publicProfile(destination.userId)
+        is UniversalSearchDestination.Beacon -> ChildRoutes.beaconProfile(destination.handle)
+        is UniversalSearchDestination.Business -> ChildRoutes.businessProfile(destination.businessId)
+        is UniversalSearchDestination.Home -> ChildRoutes.homeDashboard(destination.homeId)
     }
 
 /**

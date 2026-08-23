@@ -434,6 +434,43 @@ open class GigComposeViewModel
                 remoteDetails = prefill(FIELD_MODULES, draft.remoteDetails, form.remoteDetails),
                 eventDetails = prefill(FIELD_MODULES, draft.eventDetails, form.eventDetails),
                 items = prefill(FIELD_MODULES, draftItems, form.items),
+                // Flat delivery / pro-service suggestions (RN
+                // `gig-v2/new.tsx:231-251`).
+                deliveryDetails = prefill(FIELD_MODULES, deliveryFromDraft(draft), form.deliveryDetails),
+                proServiceDetails = prefill(FIELD_MODULES, proServiceFromDraft(draft), form.proServiceDetails),
+            )
+        }
+
+        /** Delivery editor seed, or null when the parse carried none. */
+        private fun deliveryFromDraft(draft: MagicDraftDto): GigDeliveryDetails? {
+            val hasAny =
+                draft.pickupAddress != null || draft.pickupNotes != null ||
+                    draft.dropoffAddress != null || draft.dropoffNotes != null ||
+                    draft.deliveryProofRequired != null
+            if (!hasAny) return null
+            return GigDeliveryDetails(
+                pickupAddress = draft.pickupAddress.orEmpty(),
+                pickupNotes = draft.pickupNotes.orEmpty(),
+                dropoffAddress = draft.dropoffAddress.orEmpty(),
+                dropoffNotes = draft.dropoffNotes.orEmpty(),
+                proofRequired = draft.deliveryProofRequired == true,
+            )
+        }
+
+        /** Pro-service editor seed, or null when the parse carried none. */
+        private fun proServiceFromDraft(draft: MagicDraftDto): GigProServiceDetails? {
+            val hasAny =
+                draft.requiresLicense != null || draft.licenseType != null ||
+                    draft.requiresInsurance != null || draft.scopeDescription != null ||
+                    draft.depositRequired != null || draft.depositAmount != null
+            if (!hasAny) return null
+            return GigProServiceDetails(
+                requiresLicense = draft.requiresLicense == true,
+                licenseType = draft.licenseType.orEmpty(),
+                requiresInsurance = draft.requiresInsurance == true,
+                scopeDescription = draft.scopeDescription.orEmpty(),
+                depositRequired = draft.depositRequired == true,
+                depositAmount = formatBudgetValue(draft.depositAmount).orEmpty(),
             )
         }
 
@@ -528,6 +565,18 @@ open class GigComposeViewModel
         fun updateEventDetails(details: EventDetailsDto?) {
             markTouched(FIELD_MODULES)
             _state.update { it.copy(form = it.form.copy(eventDetails = details)) }
+        }
+
+        /** delivery_errand — pickup / drop-off route + proof toggle. */
+        fun updateDeliveryDetails(details: GigDeliveryDetails) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(deliveryDetails = details)) }
+        }
+
+        /** pro_service_quote — licence / insurance / scope / deposit. */
+        fun updateProServiceDetails(details: GigProServiceDetails) {
+            markTouched(FIELD_MODULES)
+            _state.update { it.copy(form = it.form.copy(proServiceDetails = details)) }
         }
 
         /** delivery_errand — add an empty item row (≤[GigComposeLimits.MAX_ITEMS]). */
@@ -1093,7 +1142,7 @@ open class GigComposeViewModel
                 // P0.2 — photo uploads in flight gate Continue / Post so a
                 // submit never races a half-done upload.
                 GigComposeStep.FillGaps ->
-                    hasValidBasics(state) && hasValidSchedule(form) && hasValidLocation(form)
+                    hasValidBasics(state) && hasValidSchedule(form) && hasValidLocation(form) && hasValidModules(form)
                 GigComposeStep.BudgetMode -> hasValidBudget(form)
                 GigComposeStep.Review -> buildMagicPostBody() != null && !hasUploadsInFlight(state)
                 GigComposeStep.Success -> state.createdGigId != null
@@ -1118,6 +1167,17 @@ open class GigComposeViewModel
                 GigComposeScheduleType.OneTime -> isFutureInstant(form.scheduledStartISO)
                 GigComposeScheduleType.Recurring, GigComposeScheduleType.Flexible -> true
             }
+
+        /**
+         * Module-level gate. Only the pro-service deposit is conditional
+         * today: toggling "Require deposit" on demands a positive amount
+         * (mirrors RN's deposit validation).
+         */
+        private fun hasValidModules(form: GigComposeFormState): Boolean {
+            val archetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory)
+            if (archetype != ARCHETYPE_PRO_SERVICE) return true
+            return form.proServiceDetails?.isDepositAmountMissing != true
+        }
 
         private fun hasValidLocation(form: GigComposeFormState): Boolean =
             when (form.locationMode) {
@@ -1216,6 +1276,12 @@ open class GigComposeViewModel
                     scheduleType == "asap" || isUrgent -> GigEngagementMode.InstantAccept.wireValue
                     else -> GigEngagementMode.CuratedOffers.wireValue
                 }
+
+            /** Backend `task_archetype` that owns the delivery module. */
+            internal const val ARCHETYPE_DELIVERY = "delivery_errand"
+
+            /** Backend `task_archetype` that owns the pro-service module. */
+            internal const val ARCHETYPE_PRO_SERVICE = "pro_service_quote"
 
             /**
              * A12.8 — manual-path default `task_archetype` for a category
@@ -1500,7 +1566,7 @@ open class GigComposeViewModel
              * field is missing or invalid (e.g. a queued draft whose
              * scheduled start slipped into the past).
              */
-            @Suppress("ReturnCount")
+            @Suppress("ReturnCount", "LongMethod")
             internal fun bodyFromForm(
                 form: GigComposeFormState,
                 aiConfidence: Double? = null,
@@ -1518,12 +1584,19 @@ open class GigComposeViewModel
                 val amount = form.budgetMin.toDoubleOrNull()
                 val scheduleWire = scheduleWireValue(form)
                 val urgentDetails = resolvedUrgentDetails(form, aiDraft)
+                // Flat module columns only ride when their module is the
+                // active one — mirrors RN's `showDelivery` /
+                // `showProServices` gates (`gig-v2/new.tsx:325-343`).
+                val archetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory)
+                val delivery = form.deliveryDetails.takeIf { archetype == ARCHETYPE_DELIVERY }
+                val pro = form.proServiceDetails.takeIf { archetype == ARCHETYPE_PRO_SERVICE }
+                if (pro?.isDepositAmountMissing == true) return null
                 val draft =
                     MagicDraftDto(
                         title = title,
                         description = description,
                         category = form.category?.key,
-                        taskArchetype = form.taskArchetype ?: form.category?.let(::archetypeForCategory),
+                        taskArchetype = archetype,
                         payType = budgetType.wireValue,
                         budgetFixed = if (budgetType == GigComposeBudgetType.Fixed) amount else null,
                         hourlyRate = if (budgetType == GigComposeBudgetType.Hourly) amount else null,
@@ -1546,6 +1619,17 @@ open class GigComposeViewModel
                         remoteDetails = form.remoteDetails,
                         urgentDetails = urgentDetails,
                         eventDetails = form.eventDetails,
+                        pickupAddress = delivery?.pickupAddress?.trim()?.ifEmpty { null },
+                        pickupNotes = delivery?.pickupNotes?.trim()?.ifEmpty { null },
+                        dropoffAddress = delivery?.dropoffAddress?.trim()?.ifEmpty { null },
+                        dropoffNotes = delivery?.dropoffNotes?.trim()?.ifEmpty { null },
+                        deliveryProofRequired = delivery?.proofRequired,
+                        requiresLicense = pro?.requiresLicense,
+                        licenseType = pro?.licenseType?.trim()?.ifEmpty { null },
+                        requiresInsurance = pro?.requiresInsurance,
+                        scopeDescription = pro?.scopeDescription?.trim()?.ifEmpty { null },
+                        depositRequired = pro?.depositRequired,
+                        depositAmount = pro?.takeIf { it.depositRequired }?.depositAmount?.toDoubleOrNull(),
                     )
                 return MagicPostBody(
                     text = magicPostText(form, title, description),

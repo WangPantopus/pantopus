@@ -83,6 +83,62 @@ object MailItemSampleData {
             finePrint = "This offer expired before redemption.",
         )
 
+    /**
+     * A17.5 SimilarOffers rail entry — decorative mini-coupon card
+     * (coupon.jsx SIMILAR). No backend feed yet, so the rail is
+     * fixture-driven like the rest of the coupon body.
+     */
+    data class SimilarOffer(
+        val id: String,
+        val brand: String,
+        val initials: String,
+        val distance: String,
+        val amount: String,
+        val subline: String,
+        val expires: String,
+    )
+
+    /** A17.5 "Similar offers near you" fixtures, per coupon.jsx SIMILAR. */
+    val couponSimilarOffers =
+        listOf(
+            SimilarOffer(
+                id = "hazel-coffee",
+                brand = "Hazel Coffee",
+                initials = "HC",
+                distance = "0.2 mi",
+                amount = "$2 off",
+                subline = "any drip + pastry",
+                expires = "Fri",
+            ),
+            SimilarOffer(
+                id = "pier-florals",
+                brand = "Pier Florals",
+                initials = "PF",
+                distance = "0.6 mi",
+                amount = "BOGO",
+                subline = "cut-flower bunches",
+                expires = "May 28",
+            ),
+            SimilarOffer(
+                id = "north-bay-tackle",
+                brand = "North Bay Tackle",
+                initials = "NT",
+                distance = "1.1 mi",
+                amount = "15% off",
+                subline = "all bait & line",
+                expires = "Jun 10",
+            ),
+        )
+
+    /**
+     * A17.5 wallet-pass helper-chip fixtures (coupon.jsx WalletPreview).
+     * Previews / snapshots only — the live body leaves these null so the
+     * redeemed pass never claims a reminder or geofence the user never set.
+     */
+    const val COUPON_WALLET_REMINDER_DETAIL = "Sat Jun 27"
+
+    const val COUPON_WALLET_ARRIVAL_DETAIL = "On · 200 ft"
+
     /** A17.2 primary booklet sample — neighborhood civic guide. */
     val bookletVoterGuide =
         BookletDetailDto(
@@ -96,6 +152,18 @@ object MailItemSampleData {
             summary =
                 "Nonpartisan voter guide for the June 2026 primary, including local races and ballot measures.",
             pageCount = 4,
+            ocrTexts =
+                listOf(
+                    "LEAGUE OF WOMEN VOTERS\nJune 2026 primary voter guide\nVolume 47\n" +
+                        "Polls open 7 AM – 8 PM · Tuesday, June 2, 2026\nAlameda County · Nonpartisan",
+                    "HOW TO VOTE\nFour steps to a ballot you trust.\n1. Check that you are registered.\n" +
+                        "2. Find your polling place.\n3. Bring your ID — or vote by mail.\n" +
+                        "4. Mark, sign, and return your ballot.",
+                    "ON YOUR BALLOT\nCity Council · District 3\nThree candidates are running. " +
+                        "Statements appear exactly as submitted.",
+                    "MEASURE K\nParks parcel tax renewal\nRenews the existing $48 parcel tax " +
+                        "for park maintenance. No rate increase.",
+                ),
         )
 
     /** A17.2 secondary booklet sample — merchant catalog mailed to a neighborhood. */
@@ -109,6 +177,12 @@ object MailItemSampleData {
                 ),
             summary = "Spring catalog with seasonal services, repair windows, and neighborhood-only pricing.",
             pageCount = 3,
+            ocrTexts =
+                listOf(
+                    "SPRING CATALOG\nNeighborhood services & seasonal pricing\nValid through June 15",
+                    "GUTTER & ROOF\nSpring repair windows now booking\nNeighborhood-only pricing on inspections",
+                    "GARDEN & YARD\nWeekly and one-time visits\nBundle two services and save 10%",
+                ),
         )
 
     val packageContents =

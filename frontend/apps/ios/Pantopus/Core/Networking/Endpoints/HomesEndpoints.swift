@@ -121,6 +121,21 @@ public enum HomesEndpoints {
         Endpoint(method: .get, path: "/api/homes/my-ownership-claims")
     }
 
+    /// `DELETE /api/homes/:id/ownership-claims/:claimId` — route
+    /// `backend/routes/homeOwnership.js:603`.
+    public static func deleteOwnershipClaim(homeId: String, claimId: String) -> Endpoint {
+        Endpoint(
+            method: .delete,
+            path: "/api/homes/\(homeId)/ownership-claims/\(claimId)"
+        )
+    }
+
+    /// `POST /api/homes/:id/move-out` — route `backend/routes/home.js:3391`.
+    /// Self-initiated leave for any occupant.
+    public static func moveOut(homeId: String) -> Endpoint {
+        Endpoint(method: .post, path: "/api/homes/\(homeId)/move-out")
+    }
+
     /// `GET /api/homes/:id/bills` — route `backend/routes/home.js:4506`.
     public static func bills(homeId: String, status: String? = nil) -> Endpoint {
         var query: [String: String] = [:]

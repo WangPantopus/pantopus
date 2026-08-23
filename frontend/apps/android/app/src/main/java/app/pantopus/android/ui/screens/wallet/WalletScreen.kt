@@ -24,10 +24,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,19 +38,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +62,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.AppLockManager
+import app.pantopus.android.core.security.SecureScreenEffect
+import app.pantopus.android.core.security.SensitiveScreenGuard
+import app.pantopus.android.core.security.rememberSensitiveActionGuard
 import app.pantopus.android.ui.components.BalanceHero
 import app.pantopus.android.ui.components.BalanceHeroSplitCell
 import app.pantopus.android.ui.components.BalanceHeroTone
@@ -63,7 +74,10 @@ import app.pantopus.android.ui.components.ToastController
 import app.pantopus.android.ui.components.ToastHost
 import app.pantopus.android.ui.screens.wallet.components.ActivityRow
 import app.pantopus.android.ui.screens.wallet.components.HoldBanner
+import app.pantopus.android.ui.screens.wallet.components.LifetimeTotalsCard
+import app.pantopus.android.ui.screens.wallet.components.PayoutAccountCard
 import app.pantopus.android.ui.screens.wallet.components.PayoutMethodCard
+import app.pantopus.android.ui.screens.wallet.components.PendingReleaseCard
 import app.pantopus.android.ui.screens.wallet.components.TaxDocsRow
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusElevations
@@ -72,6 +86,7 @@ import app.pantopus.android.ui.theme.PantopusIconImage
 import app.pantopus.android.ui.theme.Radii
 import app.pantopus.android.ui.theme.Spacing
 import app.pantopus.android.ui.theme.pantopusShadow
+import kotlinx.coroutines.launch
 
 /**
  * A10.10 — earnings wallet. Top-level destination distinct from
@@ -96,11 +111,19 @@ fun WalletScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val action by viewModel.action.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val withdrawError by viewModel.withdrawError.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val toastController = remember { ToastController() }
     var showWithdrawSheet by remember { mutableStateOf(false) }
+    var withdrawAmount by remember { mutableStateOf("") }
     var awaitingConnectReturn by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    // RN re-verifies identity at the moment of withdrawal on top of the screen
+    // guard (`components/payments/WalletTab.tsx:88`). The prompt needs the host
+    // Activity, so it is raised here; iOS mirrors the same call site.
+    val verifyIdentity = rememberSensitiveActionGuard()
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -147,21 +170,38 @@ fun WalletScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        WalletScreenContent(
-            state = state,
-            onBack = onBack,
-            onOpenHistory = onOpenHistory,
-            onWithdraw = { showWithdrawSheet = true },
-            onSetupPayouts = { viewModel.setupPayouts() },
-            onManagePayout = { viewModel.openDashboard() },
-            onReverifyPayout = { viewModel.setupPayouts() },
-            onOpenTaxDocs = onOpenTaxDocs,
-            onSeeAllActivity = onSeeAllActivity,
-            onRetry = { viewModel.refresh() },
-        )
-        PayoutResultMarker(action)
-        ToastHost(controller = toastController)
+    SecureScreenEffect()
+
+    // Money surface — RN wraps this route in `SensitiveScreenGuard`
+    // (`app/wallet.tsx:195`), so the device credential is checked before any
+    // balance is composed. A 5-minute grace means Wallet → Payments doesn't
+    // prompt twice.
+    SensitiveScreenGuard(reason = "Verify to access your Wallet", onRejected = onBack) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // RN keeps a `RefreshControl` on the wallet route
+            // (`app/wallet.tsx:50`) — without it the balance can only be
+            // re-read by leaving and re-entering the screen.
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                WalletScreenContent(
+                    state = state,
+                    onBack = onBack,
+                    onOpenHistory = onOpenHistory,
+                    onWithdraw = { showWithdrawSheet = true },
+                    onSetupPayouts = { viewModel.setupPayouts() },
+                    onManagePayout = { viewModel.openDashboard() },
+                    onReverifyPayout = { viewModel.setupPayouts() },
+                    onOpenTaxDocs = onOpenTaxDocs,
+                    onSeeAllActivity = onSeeAllActivity,
+                    onRetry = { viewModel.refresh() },
+                )
+            }
+            PayoutResultMarker(action)
+            ToastHost(controller = toastController)
+        }
     }
 
     if (showWithdrawSheet) {
@@ -171,8 +211,27 @@ fun WalletScreen(
         ) {
             WithdrawConfirmSheet(
                 amount = currentAvailable(state),
+                amountText = withdrawAmount,
+                amountError = withdrawError,
                 processing = action is WalletAction.Withdrawing,
-                onConfirm = { viewModel.withdraw() },
+                onAmountChange = {
+                    withdrawAmount = it
+                    viewModel.clearWithdrawError()
+                },
+                onUseMax = { withdrawAmount = currentAvailable(state) },
+                onConfirm = {
+                    scope.launch {
+                        when (val outcome = verifyIdentity("Approve wallet withdrawal")) {
+                            is AppLockManager.SensitiveActionOutcome.Verified -> {
+                                val trimmed = withdrawAmount.trim()
+                                viewModel.withdraw(if (trimmed.isEmpty()) null else trimmed)
+                            }
+                            is AppLockManager.SensitiveActionOutcome.Cancelled -> Unit
+                            is AppLockManager.SensitiveActionOutcome.Failed ->
+                                toastController.error(outcome.message)
+                        }
+                    }
+                },
                 onCancel = { showWithdrawSheet = false },
             )
         }
@@ -208,7 +267,11 @@ private fun currentAvailable(state: WalletUiState): String =
 @Composable
 private fun WithdrawConfirmSheet(
     amount: String,
+    amountText: String,
+    amountError: String?,
     processing: Boolean,
+    onAmountChange: (String) -> Unit,
+    onUseMax: () -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -234,10 +297,20 @@ private fun WithdrawConfirmSheet(
             color = PantopusColors.appText,
         )
         Text(
-            text = "\$$amount transfers to your bank account. Funds arrive in 2–3 business days.",
+            text = "Funds arrive in 2–3 business days. Available to withdraw: \$$amount.",
             fontSize = 13.sp,
             color = PantopusColors.appTextSecondary,
             textAlign = TextAlign.Center,
+        )
+        // RN gives the user a decimal-pad amount field and posts *that* amount
+        // (`components/payments/WalletTab.tsx:193`) — leaving it blank keeps
+        // the whole-balance shortcut.
+        WithdrawAmountField(
+            amountText = amountText,
+            amountError = amountError,
+            enabled = !processing,
+            onAmountChange = onAmountChange,
+            onUseMax = onUseMax,
         )
         Box(
             modifier =
@@ -265,6 +338,95 @@ private fun WithdrawConfirmSheet(
             modifier = Modifier.clickable(onClick = onCancel),
         )
         Spacer(Modifier.height(Spacing.s5))
+    }
+}
+
+/**
+ * Decimal-pad amount input for a partial withdrawal, with an inline
+ * validation line. Mirrors iOS `WalletView.withdrawSheet`'s field.
+ */
+@Composable
+private fun WithdrawAmountField(
+    amountText: String,
+    amountError: String?,
+    enabled: Boolean,
+    onAmountChange: (String) -> Unit,
+    onUseMax: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceSunken)
+                    .border(
+                        BorderStroke(
+                            1.dp,
+                            if (amountError == null) PantopusColors.appBorder else PantopusColors.error,
+                        ),
+                        RoundedCornerShape(Radii.md),
+                    ).heightIn(min = 48.dp)
+                    .padding(horizontal = Spacing.s3),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            Text(
+                text = "$",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appTextSecondary,
+            )
+            BasicTextField(
+                value = amountText,
+                onValueChange = onAmountChange,
+                enabled = enabled,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle =
+                    TextStyle(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.appText,
+                    ),
+                cursorBrush = SolidColor(PantopusColors.primary600),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .testTag("wallet.withdrawAmountField"),
+                decorationBox = { inner ->
+                    if (amountText.isEmpty()) {
+                        Text(
+                            text = "Amount",
+                            fontSize = 17.sp,
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    inner()
+                },
+            )
+            Text(
+                text = "Max",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.primary600,
+                modifier =
+                    Modifier
+                        .clickable(enabled = enabled, onClick = onUseMax)
+                        .testTag("wallet.withdrawMaxBtn"),
+            )
+        }
+        if (amountError != null) {
+            Text(
+                text = amountError,
+                fontSize = 12.sp,
+                color = PantopusColors.error,
+                modifier = Modifier.testTag("wallet.withdrawAmountError"),
+            )
+        }
     }
 }
 
@@ -431,7 +593,7 @@ private fun WalletBody(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = Spacing.s4)
-                    .padding(top = Spacing.s3, bottom = if (content.isOnHold) 140.dp else 116.dp),
+                    .padding(top = Spacing.s3, bottom = if (content.canWithdraw) 116.dp else 140.dp),
         ) {
             if (content.holdState != null) {
                 HoldBanner(
@@ -441,6 +603,23 @@ private fun WalletBody(
                 Spacer(Modifier.height(Spacing.s3))
             }
             Hero(content)
+            content.pendingBreakdown?.let { breakdown ->
+                // RN splits the escrow total into "In review" / "Releasing
+                // soon" (`WalletTab.tsx:161-173`); the hero's single Pending
+                // figure can't say which is which.
+                SectionOverline(title = "Pending release")
+                PendingReleaseCard(breakdown = breakdown)
+            }
+            if (content.hasLifetimeTotals) {
+                // `GET api/wallet` returns lifetime_received /
+                // lifetime_withdrawals alongside the balance; RN shows both
+                // beside it (`WalletTab.tsx:150-159`).
+                SectionOverline(title = "Lifetime")
+                LifetimeTotalsCard(
+                    earned = content.lifetimeEarned,
+                    withdrawn = content.lifetimeWithdrawn,
+                )
+            }
             SectionOverline(
                 title = "Recent activity",
                 actionLabel = "See all",
@@ -448,14 +627,28 @@ private fun WalletBody(
                 actionTag = "walletSeeAllActivity",
             )
             ActivityList(items = content.activity)
-            SectionOverline(title = "Payout method")
-            PayoutMethodCard(
-                method = content.payoutMethod,
-                onManage = onManagePayout,
-                onReverify = onReverifyPayout,
-            )
-            SectionOverline(title = "Taxes")
-            TaxDocsRow(docs = content.taxDocs, onClick = onOpenTaxDocs)
+            if (content.payoutMethod != null) {
+                SectionOverline(title = "Payout method")
+                PayoutMethodCard(
+                    method = content.payoutMethod,
+                    onManage = onManagePayout,
+                    onReverify = onReverifyPayout,
+                )
+            } else if (content.payoutAccount != null) {
+                // Live path: Stripe gives us no bank detail for an Express
+                // account, so the connected *account* is what we render — and
+                // it carries the only reachable "Open Stripe Dashboard".
+                val account = content.payoutAccount
+                SectionOverline(title = "Payout account")
+                PayoutAccountCard(
+                    account = account,
+                    onAction = { if (account.warn) onReverifyPayout() else onManagePayout() },
+                )
+            }
+            content.taxDocs?.let { docs ->
+                SectionOverline(title = "Taxes")
+                TaxDocsRow(docs = docs, onClick = onOpenTaxDocs)
+            }
         }
         WalletBottomBar(
             content = content,
@@ -627,6 +820,32 @@ private fun WalletBottomBar(
                     Modifier
                         .fillMaxWidth()
                         .testTag("wallet.connectStatus"),
+            )
+        } else if (content.frozen) {
+            // `Wallet.frozen` — the server answers this withdraw with 403
+            // "Wallet is frozen", so the CTA must not look live.
+            WithdrawLockedCta(amount = content.available)
+            Text(
+                text = "Your wallet is frozen. Contact support to release your funds.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 10.5.sp,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("wallet.frozenNote"),
+            )
+        } else if (!content.hasBalance) {
+            WithdrawLockedCta(amount = content.available)
+            Text(
+                text = "No funds to withdraw yet.",
+                color = PantopusColors.appTextSecondary,
+                fontSize = 10.5.sp,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("wallet.noFundsNote"),
             )
         } else {
             WithdrawCta(amount = content.available, onClick = onWithdraw)

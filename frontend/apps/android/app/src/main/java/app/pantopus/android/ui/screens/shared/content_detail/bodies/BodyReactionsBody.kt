@@ -127,6 +127,12 @@ fun BodyReactionsBody(
     onCommentReply: ((PostCommentRow) -> Unit)? = null,
     onCommentLike: ((PostCommentRow) -> Unit)? = null,
     onCommentDelete: ((PostCommentRow) -> Unit)? = null,
+    /**
+     * Optional card rendered between the reaction bar and the comment
+     * composer. Pulse post detail passes the "Nearby Providers" card here;
+     * every other caller leaves it null.
+     */
+    belowReactions: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -165,6 +171,9 @@ fun BodyReactionsBody(
             thickness = 1.dp,
             modifier = Modifier.padding(horizontal = Spacing.s4),
         )
+        belowReactions?.let { slot ->
+            Box(modifier = Modifier.padding(horizontal = Spacing.s4)) { slot() }
+        }
         if (replyingToName != null) {
             Row(
                 modifier =

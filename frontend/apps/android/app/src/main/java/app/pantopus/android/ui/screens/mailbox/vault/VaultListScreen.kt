@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabAction
 import app.pantopus.android.ui.screens.shared.list_of_rows.FabVariant
 import app.pantopus.android.ui.screens.shared.list_of_rows.ListOfRowsScreen
@@ -29,6 +30,7 @@ fun VaultListScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val selectedDrawer by viewModel.selectedDrawer.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.configureNavigation(
             onOpenItem = onOpenItem,
@@ -37,6 +39,7 @@ fun VaultListScreen(
         )
         viewModel.load()
     }
+    SecureScreenEffect()
     ListOfRowsScreen(
         title = "Vault",
         subtitle = subtitle,
@@ -44,9 +47,12 @@ fun VaultListScreen(
         onRefresh = { viewModel.refresh() },
         onEndReached = {},
         onBack = onBack,
+        tabs = VaultListViewModel.DRAWER_TABS,
+        selectedTab = selectedDrawer,
+        onSelectTab = { viewModel.onSelectDrawer(it) },
         searchBar =
             SearchBarConfig(
-                placeholder = "Search vault",
+                placeholder = "Search sender, amount, date…",
                 text = query,
                 onChange = { viewModel.onQueryChange(it) },
             ),

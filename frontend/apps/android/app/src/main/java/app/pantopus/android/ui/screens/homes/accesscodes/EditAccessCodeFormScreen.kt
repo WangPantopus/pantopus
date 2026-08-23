@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.pantopus.android.core.security.SecureScreenEffect
 import app.pantopus.android.ui.components.PantopusFieldState
 import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
@@ -106,6 +107,8 @@ fun EditAccessCodeFormScreen(
             onClose()
         }
     }
+
+    SecureScreenEffect()
 
     EditAccessCodeFormContent(
         state = state,

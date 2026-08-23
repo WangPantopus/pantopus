@@ -37,7 +37,7 @@ public enum ComposeBroadcastSampleData {
         id: "media_boule",
         kind: .image,
         caption: "boule-crumb.jpg",
-        imageData: nil
+        data: nil
     )
 
     /// Deterministic "scheduled" instant so the scheduled-state baseline
@@ -126,7 +126,7 @@ public extension ComposeBroadcastViewModel {
             draft: ComposeBroadcastDraft(
                 body: ComposeBroadcastSampleData.draftText,
                 audience: .allBeacons,
-                media: ComposeBroadcastSampleData.mediaPreview
+                media: [ComposeBroadcastSampleData.mediaPreview]
             )
         )
     }
@@ -151,7 +151,7 @@ public extension ComposeBroadcastViewModel {
             draft: ComposeBroadcastDraft(
                 body: ComposeBroadcastSampleData.draftText,
                 audience: .bronzePlus,
-                media: ComposeBroadcastSampleData.mediaPreview
+                media: [ComposeBroadcastSampleData.mediaPreview]
             ),
             scheduledAt: ComposeBroadcastSampleData.scheduledAt
         )

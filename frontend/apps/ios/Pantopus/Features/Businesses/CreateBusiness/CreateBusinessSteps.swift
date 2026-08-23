@@ -8,11 +8,9 @@
 import Foundation
 import SwiftUI
 
-/// Steps the Create Business wizard advances through. Step 1 is the only
-/// step the new design ships frames for — steps 2-4 are stubs the wizard
-/// still routes through so the progress rail and step readouts read as
-/// "1 of 4 / 2 of 4 / …". A follow-on prompt replaces the stubs once
-/// design hands off those frames.
+/// Steps the Create Business wizard advances through.
+/// - Step 1: designed A12.10 category picker
+/// - Steps 2–4: Form/Wizard token composition (basic info → location/hours → confirm)
 public enum CreateBusinessStep: String, CaseIterable, Sendable {
     case pickCategory
     case legalInfo
@@ -120,9 +118,8 @@ public extension BusinessCategory {
         }
     }
 
-    /// Backend `business_category` slug used when the wizard eventually
-    /// POSTs the selection. Kept distinct from `rawValue` so the wire
-    /// format isn't coupled to the Swift case name.
+    /// Backend `categories[]` slug for create-full. Kept distinct from
+    /// `rawValue` so the wire format isn't coupled to the Swift case name.
     var backendSlug: String {
         switch self {
         case .home: "home_services"
@@ -134,6 +131,72 @@ public extension BusinessCategory {
         case .vehicles: "vehicles_rideshare"
         case .other: "other"
         }
+    }
+
+    /// Sensible `business_type` entity for create-full. Home maps to
+    /// `home_service`; everything else defaults to `for_profit`.
+    var entityType: String {
+        switch self {
+        case .home: "home_service"
+        default: "for_profit"
+        }
+    }
+}
+
+/// A logo picked in the wizard, held in memory until create-full returns a
+/// business id (`POST /api/upload/business-media/:businessId` needs one).
+/// The filename is randomised at pick time so the photo library's
+/// `IMG_xxxx` name never reaches S3 — same firewall RN applies in
+/// `src/utils/mediaFirewall.ts`.
+public struct CreateBusinessLogoPick: Sendable, Equatable {
+    public let data: Data
+    public let fileName: String
+    public let mimeType: String
+
+    public init(data: Data, fileName: String, mimeType: String) {
+        self.data = data
+        self.fileName = fileName
+        self.mimeType = mimeType
+    }
+}
+
+/// Live username-availability state for the basic-info step.
+public enum UsernameCheckStatus: Sendable, Equatable {
+    case idle
+    case checking
+    case available
+    case unavailable(reason: String?)
+}
+
+/// One weekday row in the create-business hours editor (Sun=0 … Sat=6).
+public struct BusinessHoursDay: Sendable, Equatable, Identifiable, Hashable {
+    public var dayOfWeek: Int
+    public var openTime: String
+    public var closeTime: String
+    public var isClosed: Bool
+
+    public var id: Int {
+        dayOfWeek
+    }
+
+    public static let shortLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    /// Weekdays 09:00–17:00; weekends closed — matches RN defaults.
+    public static func defaultWeek() -> [BusinessHoursDay] {
+        (0..<7).map { day in
+            let weekday = day >= 1 && day <= 5
+            return BusinessHoursDay(
+                dayOfWeek: day,
+                openTime: weekday ? "09:00" : "",
+                closeTime: weekday ? "17:00" : "",
+                isClosed: !weekday
+            )
+        }
+    }
+
+    public var shortLabel: String {
+        guard dayOfWeek >= 0, dayOfWeek < Self.shortLabels.count else { return "?" }
+        return Self.shortLabels[dayOfWeek]
     }
 }
 

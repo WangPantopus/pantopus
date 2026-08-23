@@ -11,9 +11,12 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Model
 
-/// One agenda row, projected from a `CalendarEventDTO` (+ the member lookup).
+/// One agenda row, projected from a `CalendarEventDTO` (+ the member lookup),
+/// or from a `HomeCalendarDerivedItem` (task / bill / package due date).
 public struct HomeAgendaItem: Sendable, Hashable, Identifiable {
     public let id: String
     /// "6:30" / "All day".
@@ -32,6 +35,50 @@ public struct HomeAgendaItem: Sendable, Hashable, Identifiable {
     public let bookingId: String?
     /// The home-event id (normal rows) — for the F2 detail push.
     public let eventId: String?
+    /// Non-null for the read-only derived task / bill / package due-date rows.
+    /// Such a row's whole visual identity — label, icon, background,
+    /// foreground — comes from this kind and never from `category`: a bill
+    /// must read in the Home pillar's unpaid red, not the category palette's
+    /// paid-green. It is also the row's read-only marker, so the row card
+    /// renders it with no tap affordance at all (no button, no highlight, no
+    /// `.isButton` trait).
+    ///
+    /// Parity contract — mirrored in Android `HomeAgendaItem.derived`.
+    public let derived: HomeCalendarDerivedKind?
+    /// Secondary line under the title. Derived rows carry
+    /// `detail ?? kind.label` here rather than folded into `title`, which is
+    /// `lineLimit(1)` and would ellipsise it away first.
+    public let subtitle: String?
+
+    public init(
+        id: String,
+        time: String,
+        ampm: String,
+        title: String,
+        category: CalendarEventCategory,
+        location: String?,
+        members: [HomeMember],
+        isBooking: Bool,
+        bookingStatus: String?,
+        bookingId: String?,
+        eventId: String?,
+        derived: HomeCalendarDerivedKind? = nil,
+        subtitle: String? = nil
+    ) {
+        self.id = id
+        self.time = time
+        self.ampm = ampm
+        self.title = title
+        self.category = category
+        self.location = location
+        self.members = members
+        self.isBooking = isBooking
+        self.bookingStatus = bookingStatus
+        self.bookingId = bookingId
+        self.eventId = eventId
+        self.derived = derived
+        self.subtitle = subtitle
+    }
 }
 
 /// A day section in the agenda, with a relative header ("Today · Mon Jun 16").
@@ -63,7 +110,10 @@ public enum HomeAgendaBuilder {
 
         let parsed: [(date: Date, dto: CalendarEventDTO)] = events
             .compactMap { dto in
-                guard let date = parseInstant(dto.startAt) else { return nil }
+                // `zone: cal.timeZone` — a value with no zone on the wire
+                // anchors to local midnight in the display zone. Timestamped
+                // `start_at` values (every real home event) are unaffected.
+                guard let date = parseInstant(dto.startAt, zone: cal.timeZone) else { return nil }
                 return (date, dto)
             }
             .filter { entry in
@@ -106,9 +156,12 @@ public enum HomeAgendaBuilder {
         members: [String: HomeMember],
         calendar cal: Calendar
     ) -> HomeAgendaItem {
-        // All-day rows are stored at midnight UTC + nil end — the heuristic
-        // is pinned to UTC no matter which zone the agenda displays in.
-        let allDay = dto.endAt == nil && isMidnight(start, calendar: utcHeuristicCalendar)
+        // Timestamped all-day rows are stored at midnight UTC + nil end — that
+        // heuristic stays pinned to UTC no matter which zone the agenda
+        // displays in. A bare `yyyy-MM-dd` is all-day by definition, and says
+        // so explicitly rather than relying on the zone its midnight lands in.
+        let allDay = isDateOnly(dto.startAt)
+            || (dto.endAt == nil && isMidnight(start, calendar: utcHeuristicCalendar))
         let (time, ampm) = timeParts(start, allDay: allDay, calendar: cal)
         let assignees = (dto.assignedTo ?? []).compactMap { members[$0] }
         let isBooking = dto.source == "booking"
@@ -189,7 +242,35 @@ public enum HomeAgendaBuilder {
         return fmt.date(from: iso)
     }
 
-    static func parseInstant(_ iso: String) -> Date? {
+    /// True when a wire value is a bare `yyyy-MM-dd` calendar date — no clock
+    /// time, no zone. Postgres `date` columns serialise this way
+    /// (`home_bills.due_date`, `backend/database/schema.sql:6194`), and a bare
+    /// date means "this day wherever you read it", not an instant. Callers use
+    /// it both to pick the anchor zone below and to mark the row all-day
+    /// without asking the UTC-pinned midnight heuristic, which would see a
+    /// local-midnight anchor as 07:00Z and print "12:00 AM".
+    /// Mirrors Android `HomeAgendaBuilder.isDateOnly`.
+    static func isDateOnly(_ iso: String) -> Bool {
+        guard iso.count == 10 else { return false }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.date(from: iso) != nil
+    }
+
+    /// Resolve a wire date into an instant.
+    ///
+    /// A bare `yyyy-MM-dd` has no zone on the wire, so it anchors to **midnight
+    /// in the display `zone`**, not midnight UTC: pinning it to UTC renders
+    /// every date-only row one day early west of UTC and drops an item due
+    /// today out of the agenda's "not before today" window. Timestamped values
+    /// are unaffected — they carry their own offset.
+    ///
+    /// The default zone keeps the callers that only ever see timestamps (event
+    /// detail, the gated scheduler) on their previous behaviour.
+    /// Mirrors Android `HomeAgendaBuilder.parseInstant(iso, zone)`.
+    static func parseInstant(_ iso: String, zone: TimeZone? = nil) -> Date? {
         let withFrac = ISO8601DateFormatter()
         withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = withFrac.date(from: iso) { return d }
@@ -198,7 +279,7 @@ public enum HomeAgendaBuilder {
         if let d = plain.date(from: iso) { return d }
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
-        dayFmt.timeZone = TimeZone(identifier: "UTC")
+        dayFmt.timeZone = zone ?? TimeZone(identifier: "UTC")
         dayFmt.dateFormat = "yyyy-MM-dd"
         return dayFmt.date(from: iso)
     }
@@ -232,7 +313,7 @@ public enum HomeAgendaBuilder {
 
         var dotCounts: [String: Int] = [:]
         for dto in events {
-            guard let date = parseInstant(dto.startAt) else { continue }
+            guard let date = parseInstant(dto.startAt, zone: cal.timeZone) else { continue }
             dotCounts[isoDay(date, calendar: cal), default: 0] += 1
         }
 
@@ -287,75 +368,137 @@ public struct HomeAgendaRowCard: View {
     }
 
     public var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.s3) {
-                VStack(spacing: 1) {
-                    Text(item.time)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                        .monospacedDigit()
-                    if !item.ampm.isEmpty {
-                        Text(item.ampm)
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appTextMuted)
-                    }
-                }
-                .frame(width: 42)
+        // Derived task / bill / package rows are read-only: they render as a
+        // plain container, NOT a `Button` with a no-op action. A no-op button
+        // still takes the press, flashes, and carries the `.isButton` trait,
+        // which reads as "this opens something" when nothing does. Mirrors
+        // Android, where the derived row is rendered with `enabled = false`.
+        if item.derived != nil {
+            card
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityIdentifier("homeAgendaRow_\(item.id)")
+        } else {
+            Button(action: onTap) { card }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityIdentifier("homeAgendaRow_\(item.id)")
+        }
+    }
 
-                Rectangle().fill(Theme.Color.appBorder).frame(width: 1)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                        .font(.system(size: 13.5, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                        .lineLimit(1)
-                    HStack(spacing: Spacing.s1) {
-                        CategoryChipMini(category: item.category)
-                        if item.isBooking {
-                            HomeBookingTag()
-                            if let status = item.bookingStatus {
-                                SchedulingStatusPill(status: status)
-                            }
-                        }
-                        if let location = item.location {
-                            HStack(spacing: 3) {
-                                Icon(.mapPin, size: 10, color: Theme.Color.appTextSecondary)
-                                Text(location)
-                                    .font(.system(size: 10.5))
-                                    .foregroundStyle(Theme.Color.appTextSecondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-                Spacer(minLength: Spacing.s1)
-                if !item.members.isEmpty {
-                    HomeAvatarStack(members: item.members, size: 26)
+    private var card: some View {
+        HStack(spacing: Spacing.s3) {
+            VStack(spacing: 1) {
+                Text(item.time)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .monospacedDigit()
+                if !item.ampm.isEmpty {
+                    Text(item.ampm)
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appTextMuted)
                 }
             }
-            .padding(.horizontal, Spacing.s3)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
-                    .stroke(Theme.Color.appBorder, lineWidth: 1)
-            )
-            .opacity(dimmed ? 0.55 : 1)
-            .contentShape(Rectangle())
+            .frame(width: 42)
+
+            Rectangle().fill(Theme.Color.appBorder).frame(width: 1)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                    .lineLimit(1)
+                // A derived row's `detail ?? kind.label` rides its own line
+                // between the title and the chip row — never folded into the
+                // title, which is lineLimit(1) and would ellipsise the amount
+                // away first. 11.5pt mirrors Android's HomeAgendaRowCard.
+                if let subtitle = item.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                        .lineLimit(1)
+                }
+                HStack(spacing: Spacing.s1) {
+                    // A derived row's identity comes from its own kind, never
+                    // from `CalendarEventCategory` (which paints a bill green).
+                    if let kind = item.derived {
+                        DerivedKindChipMini(kind: kind)
+                    } else {
+                        CategoryChipMini(category: item.category)
+                    }
+                    if item.isBooking {
+                        HomeBookingTag()
+                        if let status = item.bookingStatus {
+                            SchedulingStatusPill(status: status)
+                        }
+                    }
+                    if let location = item.location {
+                        HStack(spacing: 3) {
+                            Icon(.mapPin, size: 10, color: Theme.Color.appTextSecondary)
+                            Text(location)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(Theme.Color.appTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: Spacing.s1)
+            if !item.members.isEmpty {
+                HomeAvatarStack(members: item.members, size: 26)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier("homeAgendaRow_\(item.id)")
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.xl, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .opacity(dimmed ? 0.55 : 1)
+        .contentShape(Rectangle())
     }
 
     private var accessibilityLabel: String {
-        var parts = ["\(item.time) \(item.ampm)", item.title, item.category.label]
+        var parts = [
+            "\(item.time) \(item.ampm)",
+            item.title,
+            item.derived?.label ?? item.category.label
+        ]
         if item.isBooking { parts.append("Booking") }
+        if let subtitle = item.subtitle { parts.append(subtitle) }
         if let location = item.location { parts.append(location) }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// The derived-feed chip. `HomeCalendarDerivedKind` owns its own label, icon
+/// and tint — tasks = warning, bills = error, deliveries = business — so the
+/// colour-coding reads the same across the Home pillar. That palette is a
+/// documented cross-platform contract; routing a derived row through
+/// `CalendarEventCategory` instead renders an unpaid bill in the "paid / ok"
+/// green. Mirrors Android's `DerivedKindChipMini`.
+public struct DerivedKindChipMini: View {
+    let kind: HomeCalendarDerivedKind
+
+    public init(kind: HomeCalendarDerivedKind) {
+        self.kind = kind
+    }
+
+    public var body: some View {
+        HStack(spacing: 4) {
+            Icon(kind.icon, size: 9, color: kind.foreground)
+            Text(kind.label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(kind.foreground)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(kind.background)
+        .clipShape(Capsule())
     }
 }
 

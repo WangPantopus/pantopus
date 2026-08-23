@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.audience.PersonaThreadDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.audience.AudienceProfileRepository
+import app.pantopus.android.data.personadm.PersonaDmRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,12 +24,18 @@ import javax.inject.Inject
  * and projects them into filter-aware row models. Filter chip counts
  * derive from the loaded thread list so they always match what the
  * user sees.
+ *
+ * Row taps route into `PersonaDmThreadScreen` by (personaId, threadId).
+ * They do NOT push generic chat: the persona-DM serializer carries no
+ * `user_id` for either side, so there is no counterparty user id to route on
+ * (`backend/routes/personaDms.js:56`).
  */
 @HiltViewModel
 class CreatorInboxViewModel
     @Inject
     constructor(
         private val repository: AudienceProfileRepository,
+        private val dmRepository: PersonaDmRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow<CreatorInboxUiState>(CreatorInboxUiState.Loading)
         val state: StateFlow<CreatorInboxUiState> = _state.asStateFlow()
@@ -37,6 +44,12 @@ class CreatorInboxViewModel
         val activeFilter: StateFlow<CreatorInboxFilter> = _activeFilter.asStateFlow()
 
         private var threads: List<PersonaThreadDto> = emptyList()
+
+        /**
+         * Persona whose inbox this is — the `:id` path segment every
+         * `/api/personas/:id/dms/…` call from a row needs.
+         */
+        private var personaId: String = ""
         private var header: CreatorInboxHeader =
             CreatorInboxHeader(title = "Creator inbox", handle = null, isCrossPersona = false)
 
@@ -57,12 +70,17 @@ class CreatorInboxViewModel
             rebuild()
         }
 
-        /** Resolve a thread row's counterparty for the chat conversation
-         *  push — prefer the explicit `counterpartyUserId`, fall back to
-         *  the row id (server defaults that to the membership id today). */
-        fun conversationPeer(row: CreatorInboxRowContent): ConversationPeer =
-            ConversationPeer(
-                userId = row.counterpartyUserId ?: row.id,
+        /**
+         * Resolve a row into the persona-DM thread push.
+         *
+         * The row id IS the `PersonaDmThread` id — persona DMs carry no
+         * counterparty user id, so there is nothing to fall back to and
+         * nothing that could masquerade as one.
+         */
+        fun threadDestination(row: CreatorInboxRowContent): ThreadDestination =
+            ThreadDestination(
+                personaId = row.personaId.ifEmpty { personaId },
+                threadId = row.id,
                 displayName = row.displayName.ifEmpty { row.handle },
                 initials = row.initials,
                 verified = row.verifiedLocal,
@@ -92,8 +110,9 @@ class CreatorInboxViewModel
                     handle = "@$handle",
                     isCrossPersona = false,
                 )
+            personaId = persona.id
             val resp =
-                when (val r = repository.threads(persona.id)) {
+                when (val r = dmRepository.threads(persona.id)) {
                     is NetworkResult.Success -> r.data
                     is NetworkResult.Failure -> {
                         _state.value = CreatorInboxUiState.Error("Couldn't load your inbox.")
@@ -109,7 +128,7 @@ class CreatorInboxViewModel
                 _state.value = CreatorInboxUiState.Empty(header)
                 return
             }
-            val rows = threads.map { row(it) }
+            val rows = threads.map { row(it, personaId) }
             val counts =
                 CreatorInboxCounts(
                     total = rows.size,
@@ -175,7 +194,10 @@ class CreatorInboxViewModel
                     CreatorInboxFilter.Flagged -> row.flagged
                 }
 
-            internal fun row(dto: PersonaThreadDto): CreatorInboxRowContent {
+            internal fun row(
+                dto: PersonaThreadDto,
+                personaId: String,
+            ): CreatorInboxRowContent {
                 val handle = dto.fanHandle.orEmpty()
                 val displayName = dto.fanDisplayName ?: handle.ifEmpty { "Follower" }
                 return CreatorInboxRowContent(
@@ -193,6 +215,8 @@ class CreatorInboxViewModel
                     verifiedLocal = dto.verifiedLocal ?: false,
                     counterpartyUserId = dto.counterpartyUserId,
                     personaChip = null,
+                    personaId = personaId,
+                    membershipId = dto.membershipId,
                 )
             }
 
@@ -231,11 +255,12 @@ class CreatorInboxViewModel
             }
         }
 
-        /** Counterparty payload handed back to the host so it can build
-         *  the existing chat-conversation route without re-introspecting
-         *  the row. Mirrors iOS `CreatorInboxConversationDestination`. */
-        data class ConversationPeer(
-            val userId: String,
+        /** Routing payload handed back to the host so it can build the
+         *  persona-DM thread route without re-introspecting the row.
+         *  Mirrors iOS `CreatorInboxThreadDestination`. */
+        data class ThreadDestination(
+            val personaId: String,
+            val threadId: String,
             val displayName: String,
             val initials: String,
             val verified: Boolean,

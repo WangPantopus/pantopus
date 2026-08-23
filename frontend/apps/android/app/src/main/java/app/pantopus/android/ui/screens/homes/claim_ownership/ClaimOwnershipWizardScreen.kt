@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming", "LongMethod", "MagicNumber", "TooManyFunctions")
+@file:Suppress("LongMethod", "LongParameterList", "MagicNumber", "PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.homes.claim_ownership
 
@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
 import app.pantopus.android.data.analytics.AnalyticsEvent
+import app.pantopus.android.ui.screens.homes.claim_ownership.components.ClaimDocumentTypePicker
 import app.pantopus.android.ui.screens.homes.claim_ownership.components.ClaimHomeChip
 import app.pantopus.android.ui.screens.homes.claim_ownership.components.ClaimStatement
 import app.pantopus.android.ui.screens.homes.claim_ownership.components.UploadSlot
@@ -72,6 +75,7 @@ fun ClaimOwnershipWizardScreen(
     onDismiss: () -> Unit,
     onOpenClaimsList: () -> Unit,
     viewModel: ClaimOwnershipWizardViewModel = hiltViewModel(),
+    onOpenFindHome: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
@@ -85,6 +89,10 @@ fun ClaimOwnershipWizardScreen(
             ClaimOwnershipOutboundEvent.OpenClaimsList -> {
                 viewModel.acknowledgeEvent()
                 onOpenClaimsList()
+            }
+            ClaimOwnershipOutboundEvent.OpenFindHome -> {
+                viewModel.acknowledgeEvent()
+                onOpenFindHome()
             }
             null -> Unit
         }
@@ -101,17 +109,104 @@ fun ClaimOwnershipWizardScreen(
         modifier = Modifier.testTag(CLAIM_OWNERSHIP_SCREEN_TAG),
     ) {
         when (state.currentStep) {
-            ClaimOwnershipStep.Start -> StartStep(content = state.startContent)
+            ClaimOwnershipStep.Start ->
+                StartStep(
+                    content = state.startContent,
+                    showsAskVerifiedOwner = state.showsAskVerifiedOwner,
+                    selectedMethod = state.selectedStartMethod,
+                    onSelectMethod = viewModel::selectStartMethod,
+                )
             ClaimOwnershipStep.Upload -> UploadStep(state, viewModel)
-            ClaimOwnershipStep.Success -> SuccessStep()
+            ClaimOwnershipStep.Success -> SuccessStep(outcomeNote = state.submissionOutcomeNote)
         }
     }
+
+    state.askRequestConfirmation?.let { message ->
+        ClaimAlertDialog(
+            title = "Request sent",
+            message = message,
+            confirmLabel = "OK",
+            onConfirm = viewModel::acknowledgeAskConfirmation,
+            onDismiss = viewModel::acknowledgeAskConfirmation,
+            testTag = "claimOwnershipAskRequestSent",
+        )
+    }
+    state.askRequestError?.let { message ->
+        ClaimAlertDialog(
+            title = "Could not send request",
+            message = message,
+            confirmLabel = "OK",
+            onConfirm = viewModel::acknowledgeAskError,
+            onDismiss = viewModel::acknowledgeAskError,
+            testTag = "claimOwnershipAskRequestError",
+        )
+    }
+    state.blockedByOtherClaimPrompt?.let { message ->
+        ClaimAlertDialog(
+            title = "Unable to submit",
+            message = message,
+            confirmLabel = "Search homes",
+            onConfirm = viewModel::openFindHomeFromBlockedClaim,
+            dismissLabel = "OK",
+            onDismiss = viewModel::dismissBlockedByOtherClaim,
+            testTag = "claimOwnershipBlockedByOtherClaim",
+        )
+    }
+    // Backend `routing_classification` acknowledgement — single
+    // "Continue" action, matching RN's blocking alert
+    // (`claim-owner/evidence.tsx:223-241`).
+    state.routingWarning?.let { warning ->
+        ClaimAlertDialog(
+            title = warning.title,
+            message = warning.message,
+            confirmLabel = "Continue",
+            onConfirm = viewModel::acknowledgeRoutingWarning,
+            onDismiss = viewModel::acknowledgeRoutingWarning,
+            testTag = "claimOwnershipRoutingWarning",
+        )
+    }
+}
+
+@Composable
+private fun ClaimAlertDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    testTag: String,
+    dismissLabel: String? = null,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(testTag),
+        title = { Text(text = title, style = PantopusTextStyle.h3, color = PantopusColors.appText) },
+        text = { Text(text = message, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(text = confirmLabel, style = PantopusTextStyle.body, color = PantopusColors.primary600)
+            }
+        },
+        dismissButton =
+            dismissLabel?.let {
+                {
+                    TextButton(onClick = onDismiss) {
+                        Text(text = it, style = PantopusTextStyle.body, color = PantopusColors.appTextSecondary)
+                    }
+                }
+            },
+    )
 }
 
 // MARK: - Step 1
 
 @Composable
-internal fun StartStep(content: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart) {
+internal fun StartStep(
+    content: ClaimOwnershipStartContent = ClaimOwnershipSampleData.canonicalStart,
+    showsAskVerifiedOwner: Boolean = false,
+    selectedMethod: ClaimStartMethod = ClaimStartMethod.VerifyOwnership,
+    onSelectMethod: (ClaimStartMethod) -> Unit = {},
+) {
     ClaimHomeChip(label = content.homeLabel)
     content.contestedClaim?.let { ContestedClaimNotice(it) }
     HeadlineBlock(if (content.isContested) "File a competing claim" else "Let's verify you own this home")
@@ -123,10 +218,132 @@ internal fun StartStep(content: ClaimOwnershipStartContent = ClaimOwnershipSampl
                 "command center. Verification is a one-time step."
         },
     )
-    RequirementsCardBlock(
-        rows = requirementsRows(content.isContested),
-    )
-    WhyWeAskSection()
+    if (showsAskVerifiedOwner) {
+        ClaimMethodPicker(selected = selectedMethod, onSelect = onSelectMethod)
+    }
+    if (selectedMethod == ClaimStartMethod.VerifyOwnership) {
+        RequirementsCardBlock(
+            rows = requirementsRows(content.isContested),
+        )
+        WhyWeAskSection()
+    }
+}
+
+/**
+ * A12.3 method picker. Rendered only when the home already has a
+ * verified owner and the viewer is not a member, so a non-member can
+ * ask the owners to add them instead of filing an ownership claim.
+ */
+@Composable
+private fun ClaimMethodPicker(
+    selected: ClaimStartMethod,
+    onSelect: (ClaimStartMethod) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("claimOwnershipMethodPicker"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        Text(
+            text = "Verification method",
+            style = PantopusTextStyle.overline,
+            color = PantopusColors.appTextSecondary,
+        )
+        ClaimMethodRow(
+            selected = selected == ClaimStartMethod.VerifyOwnership,
+            icon = PantopusIcon.FileText,
+            label = "Upload ownership document",
+            subcopy = "Deed, tax bill, or closing disclosure.",
+            testTag = "claimOwnershipMethod.verifyOwnership",
+            onClick = { onSelect(ClaimStartMethod.VerifyOwnership) },
+        )
+        ClaimMethodRow(
+            selected = selected == ClaimStartMethod.AskVerifiedOwner,
+            icon = PantopusIcon.Users,
+            label = "Ask a verified owner to add me",
+            subcopy =
+                "Sends a notification to verified owner(s). They can add you from Members " +
+                    "with the role you need.",
+            testTag = "claimOwnershipMethod.askVerifiedOwner",
+            onClick = { onSelect(ClaimStartMethod.AskVerifiedOwner) },
+        )
+    }
+}
+
+@Composable
+private fun ClaimMethodRow(
+    selected: Boolean,
+    icon: PantopusIcon,
+    label: String,
+    subcopy: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(if (selected) PantopusColors.primary50 else PantopusColors.appSurface)
+                .border(
+                    1.dp,
+                    if (selected) PantopusColors.primary600 else PantopusColors.appBorder,
+                    RoundedCornerShape(Radii.lg),
+                ).clickable(role = Role.RadioButton, onClick = onClick)
+                .padding(Spacing.s3)
+                .testTag(testTag)
+                .semantics { contentDescription = "$label. $subcopy" },
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(if (selected) PantopusColors.personalBg else PantopusColors.appSurfaceSunken),
+            contentAlignment = Alignment.Center,
+        ) {
+            PantopusIconImage(
+                icon = icon,
+                contentDescription = null,
+                size = Radii.xl2,
+                tint = if (selected) PantopusColors.primary600 else PantopusColors.appTextSecondary,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s1),
+        ) {
+            Text(
+                text = label,
+                style = PantopusTextStyle.body,
+                color = if (selected) PantopusColors.primary600 else PantopusColors.appText,
+            )
+            Text(text = subcopy, style = PantopusTextStyle.caption, color = PantopusColors.appTextSecondary)
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .border(
+                        2.dp,
+                        if (selected) PantopusColors.primary600 else PantopusColors.appBorderStrong,
+                        CircleShape,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(PantopusColors.primary600),
+                )
+            }
+        }
+    }
 }
 
 private fun requirementsRows(isContested: Boolean): List<RequirementsRow> =
@@ -378,10 +595,15 @@ private fun UploadStep(
     UploadStepContent(
         homeLabel = state.startContent.homeLabel,
         slots =
-            ClaimEvidenceSlot.entries.map { slot ->
+            state.activeSlots.map { slot ->
+                // A chooser slot takes the label of the document kind the
+                // user picked, so the tile reads "Utility Bill" rather
+                // than a generic "Proof of residency".
+                val pickedLabel =
+                    slot.documentOptions.firstOrNull { it.id == state.selectedDocumentType }?.label
                 ClaimUploadSlotModel(
                     id = slot.name,
-                    label = slot.title,
+                    label = pickedLabel ?: slot.title,
                     required = true,
                     hint = slot.acceptHint,
                     state =
@@ -391,6 +613,9 @@ private fun UploadStep(
             },
         note = state.note,
         onNoteChange = vm::setNote,
+        verificationType = state.verificationType,
+        documentOptions = state.documentOptions,
+        selectedDocumentType = state.selectedDocumentType,
         submitError = state.submitError,
         onPick = { id ->
             val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadStepContent
@@ -401,6 +626,7 @@ private fun UploadStep(
             val slot = ClaimEvidenceSlot.entries.firstOrNull { it.name == id } ?: return@UploadStepContent
             vm.remove(slot)
         },
+        onSelectDocumentType = vm::selectDocumentType,
     )
 }
 
@@ -427,33 +653,79 @@ internal fun UploadStepContent(
     submitError: String?,
     onPick: (String) -> Unit,
     onRemove: (String) -> Unit,
+    verificationType: ClaimVerificationType = ClaimVerificationType.Owner,
+    documentOptions: List<ClaimDocumentOption> = emptyList(),
+    selectedDocumentType: String? = null,
+    onSelectDocumentType: (String) -> Unit = {},
 ) {
     val attached = slots.count { it.state.isAttached }
+    val isResidency = verificationType == ClaimVerificationType.Residency
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.s4),
     ) {
         ClaimHomeChip(label = homeLabel)
-        HeadlineBlock("Upload your evidence")
+        HeadlineBlock(if (isResidency) "Verify you live here" else "Upload your evidence")
         SubcopyBlock(
-            "Two documents help us verify you own $homeLabel. We auto-check the address against your account.",
+            if (isResidency) {
+                "Upload a document that proves you live at $homeLabel. " +
+                    "Your access will be limited until verified."
+            } else {
+                "Two documents help us verify you own $homeLabel. We auto-check the address against your account."
+            },
         )
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-            Text(
-                text = "Documents · $attached of ${slots.size} attached",
-                style = PantopusTextStyle.overline,
-                color = PantopusColors.appTextSecondary,
-            )
-            slots.forEach { slot ->
-                UploadSlot(
-                    id = slot.id,
-                    label = slot.label,
-                    hint = slot.hint,
-                    state = slot.state,
-                    required = slot.required,
-                    onPick = { onPick(slot.id) },
-                    onRemove = { onRemove(slot.id) },
+        // Copy lifted from RN's info banner (`evidence.tsx:283-289`).
+        InfoBanner(
+            if (isResidency) {
+                "For residency verification, please upload a lease agreement, utility bill " +
+                    "(electric, gas, water, internet), or similar document showing your name at this address."
+            } else {
+                "For ownership verification, please upload a deed, closing disclosure, or property " +
+                    "tax statement. Utility bills and leases can only be used for residency verification."
+            },
+        )
+        if (documentOptions.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                Text(
+                    text = "1. Select document type",
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.appTextSecondary,
                 )
+                ClaimDocumentTypePicker(
+                    options = documentOptions,
+                    selected = selectedDocumentType,
+                    onSelect = onSelectDocumentType,
+                )
+            }
+        }
+        if (documentOptions.isEmpty() || selectedDocumentType != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                val heading =
+                    if (documentOptions.isEmpty()) "Documents" else "2. Upload your document"
+                Text(
+                    // Multi-slot variants (owner: ID + ownership proof)
+                    // keep the attached-count readout; the single-slot
+                    // residency variant matches RN's plain heading.
+                    text =
+                        if (slots.size > 1) {
+                            "$heading · $attached of ${slots.size} attached"
+                        } else {
+                            heading
+                        },
+                    style = PantopusTextStyle.overline,
+                    color = PantopusColors.appTextSecondary,
+                )
+                slots.forEach { slot ->
+                    UploadSlot(
+                        id = slot.id,
+                        label = slot.label,
+                        hint = slot.hint,
+                        state = slot.state,
+                        required = slot.required,
+                        onPick = { onPick(slot.id) },
+                        onRemove = { onRemove(slot.id) },
+                    )
+                }
             }
         }
         ClaimStatement(
@@ -466,14 +738,62 @@ internal fun UploadStepContent(
     }
 }
 
+@Composable
+private fun InfoBanner(text: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary50)
+                .padding(Spacing.s3)
+                .testTag("claimOwnership_infoBanner"),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Info,
+            contentDescription = null,
+            size = Radii.lg,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = text,
+            color = PantopusColors.primary700,
+            fontSize = 12.5.sp,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 // MARK: - Step 3
 
 @Composable
-private fun SuccessStep() {
+private fun SuccessStep(outcomeNote: String? = null) {
     // Route through the shared T3.6 Status / Waiting body so the
     // claim-submitted state shares its hero, timeline, action cards,
     // and explainer bullets with every other "submitted" surface.
     StatusWaitingBody(content = StatusWaitingContent.claimSubmitted())
+    // Extra line describing what the submission actually did — a
+    // parallel claim, or a challenge that opened against the current
+    // verified household. Derived from the backend's
+    // `routing_classification` (RN passes the same signal into its
+    // `submitted` screen as `?parallel=1` / `?challenge=1`).
+    outcomeNote?.let { note ->
+        Text(
+            text = note,
+            style = PantopusTextStyle.caption,
+            color = PantopusColors.appTextSecondary,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.s3)
+                    .clip(RoundedCornerShape(Radii.md))
+                    .background(PantopusColors.appSurfaceMuted)
+                    .padding(Spacing.s3)
+                    .testTag("claimOwnershipOutcomeNote"),
+        )
+    }
 }
 
 // MARK: - Helpers

@@ -141,7 +141,140 @@ final class YourAudienceViewModelTests: XCTestCase {
         XCTAssertEqual(vm.tierChips.map(\.rank), [4, 3])
     }
 
+    // MARK: - Sort
+
+    func testCycleSortAdvancesAndToasts() async {
+        SequencedURLProtocol.sequence = [
+            .status(200, body: populatedBody),
+            .status(200, body: populatedBody)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertEqual(vm.sort, .recent)
+
+        await vm.cycleSort()
+
+        XCTAssertEqual(vm.sort, .tenure)
+        XCTAssertEqual(vm.toast, "Sort: Longest-tenured first")
+    }
+
+    // MARK: - Pagination
+
+    func testLoadMoreAppendsSecondPage() async {
+        let page1 = """
+        {
+          "persona": {"id":"p1","handle":"maya"},
+          "items": [
+            {"membershipId":"m1","fanHandle":"a","fanDisplayName":"A","fanAvatarUrl":null,
+             "tier":{"rank":4,"name":"VIP"},"status":"active","verifiedLocal":false,
+             "joinedMonth":"2025-01","tenureMonths":1,"cancelAtPeriodEnd":false}
+          ],
+          "counts": {"totalActive":2,"pending":0,"byTier":{"1":0,"2":0,"3":0,"4":2}},
+          "pagination": {"nextOffset":1,"hasMore":true}
+        }
+        """
+        let page2 = """
+        {
+          "persona": {"id":"p1","handle":"maya"},
+          "items": [
+            {"membershipId":"m2","fanHandle":"b","fanDisplayName":"B","fanAvatarUrl":null,
+             "tier":{"rank":4,"name":"VIP"},"status":"active","verifiedLocal":false,
+             "joinedMonth":"2025-02","tenureMonths":1,"cancelAtPeriodEnd":false}
+          ],
+          "counts": {"totalActive":2,"pending":0,"byTier":{"1":0,"2":0,"3":0,"4":2}},
+          "pagination": {"nextOffset":null,"hasMore":false}
+        }
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: page1),
+            .status(200, body: page2)
+        ]
+        let vm = makeVM()
+        await vm.load()
+        XCTAssertTrue(vm.hasMore)
+
+        await vm.loadMore()
+
+        guard case let .loaded(loaded) = vm.state else {
+            return XCTFail("Expected .loaded, got \(vm.state)")
+        }
+        XCTAssertEqual(loaded.tierGroups.first?.members.map(\.membershipId), ["m1", "m2"])
+        XCTAssertFalse(vm.hasMore)
+    }
+
     // MARK: - Actions
+
+    func testBlockCommitsFollowerStatusAndReFetches() async throws {
+        let withPersona = """
+        {
+          "persona": {"id":"p1","handle":"maya"},
+          "items": [
+            {"membershipId":"m2","fanHandle":"priyanair","fanDisplayName":"Priya Nair","fanAvatarUrl":null,
+             "tier":{"rank":4,"name":"VIP"},"status":"active","verifiedLocal":true,
+             "joinedMonth":"2025-01","tenureMonths":4,"cancelAtPeriodEnd":false}
+          ],
+          "counts": {"totalActive":1,"pending":0,"byTier":{"1":0,"2":0,"3":0,"4":1}}
+        }
+        """
+        let afterBlock = """
+        {
+          "persona": {"id":"p1","handle":"maya"},
+          "items": [],
+          "counts": {"totalActive":0,"pending":0,"byTier":{"1":0,"2":0,"3":0,"4":0}}
+        }
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: withPersona),
+            .status(200, body: "{\"follower\":{\"id\":\"m2\",\"status\":\"blocked\"}}"),
+            .status(200, body: afterBlock)
+        ]
+        let vm = makeVM()
+        await vm.load()
+
+        guard case let .loaded(before) = vm.state else {
+            return XCTFail("Expected .loaded before block")
+        }
+        let member = try XCTUnwrap(before.tierGroups.first?.members.first)
+        vm.requestBlock(member)
+        XCTAssertEqual(vm.blockTarget?.membershipId, "m2")
+
+        await vm.confirmBlock(member)
+
+        XCTAssertNil(vm.blockTarget)
+        XCTAssertEqual(vm.toast, "Blocked Priya Nair.")
+        guard case .empty = vm.state else {
+            return XCTFail("Expected .empty after block, got \(vm.state)")
+        }
+    }
+
+    func testMuteReportsConfirmation() async throws {
+        let afterMute = """
+        {
+          "items": [
+            {"membershipId":"m2","fanHandle":"priyanair","fanDisplayName":"Priya Nair","fanAvatarUrl":null,
+             "tier":{"rank":4,"name":"VIP"},"status":"muted","verifiedLocal":true,
+             "joinedMonth":"2025-01","tenureMonths":4,"cancelAtPeriodEnd":false}
+          ],
+          "counts": {"totalActive":3,"pending":1,"byTier":{"1":0,"2":0,"3":2,"4":2}}
+        }
+        """
+        SequencedURLProtocol.sequence = [
+            .status(200, body: populatedBody),
+            .status(200, body: "{\"membershipId\":\"m2\",\"status\":\"muted\"}"),
+            .status(200, body: afterMute)
+        ]
+        let vm = makeVM()
+        await vm.load()
+
+        guard case let .loaded(loaded) = vm.state else {
+            return XCTFail("Expected .loaded")
+        }
+        let member = try XCTUnwrap(loaded.tierGroups.first?.members.first)
+        await vm.mute(member)
+
+        XCTAssertEqual(vm.toast, "Muted \(member.displayName).")
+        XCTAssertNil(vm.overflowTarget)
+    }
 
     func testApproveReFetchesAndClearsPending() async throws {
         let afterApprove = """

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -47,6 +50,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -112,6 +116,13 @@ fun EditBusinessPageScreen(
                     onSave = viewModel::save,
                     onSaveDraft = viewModel::saveDraft,
                     onPublish = viewModel::publish,
+                    onFieldChange = viewModel::update,
+                    onBeginDescription = viewModel::beginDescriptionEditing,
+                )
+            EditBusinessPageUiState.Empty ->
+                EmptyLayout(
+                    onBack = onBack,
+                    onRetry = viewModel::refresh,
                 )
             is EditBusinessPageUiState.Error ->
                 ErrorLayout(
@@ -170,6 +181,8 @@ internal fun EditBusinessPageLoadedFrame(
     onSave: () -> Unit,
     onSaveDraft: () -> Unit,
     onPublish: () -> Unit,
+    onFieldChange: (EditBusinessPageFieldKey, String) -> Unit = { _, _ -> },
+    onBeginDescription: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isSetup = content.mode is EditBusinessPageMode.Setup
@@ -206,13 +219,17 @@ internal fun EditBusinessPageLoadedFrame(
                     logo = content.logo,
                     modifier = Modifier.padding(horizontal = Spacing.s4).padding(top = Spacing.s4),
                 )
-                NameAndTaglineSection(content = content)
-                DescriptionSection(content = content)
+                NameAndTaglineSection(content = content, onFieldChange = onFieldChange)
+                DescriptionSection(
+                    content = content,
+                    onFieldChange = onFieldChange,
+                    onBeginDescription = onBeginDescription,
+                )
                 HoursSection(content = content)
                 ServicesSection(content = content)
                 GallerySection(content = content)
-                ContactSection(content = content)
-                LocationSection(content = content)
+                ContactSection(content = content, onFieldChange = onFieldChange)
+                LocationSection(content = content, onFieldChange = onFieldChange)
                 Spacer(modifier = Modifier.height(40.dp))
             }
         }
@@ -328,7 +345,10 @@ private fun SectionWrapper(
 }
 
 @Composable
-private fun NameAndTaglineSection(content: EditBusinessPageContent) {
+private fun NameAndTaglineSection(
+    content: EditBusinessPageContent,
+    onFieldChange: (EditBusinessPageFieldKey, String) -> Unit,
+) {
     SectionWrapper(overline = "Business name & tagline") {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             BizField(
@@ -336,11 +356,13 @@ private fun NameAndTaglineSection(content: EditBusinessPageContent) {
                 required = true,
                 field = content.name,
                 state = BizFieldState.Valid,
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Name, it) },
             )
             BizField(
                 label = "Tagline",
                 hint = "Shows in search and on map pins",
                 field = content.tagline,
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Tagline, it) },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                 Box(modifier = Modifier.weight(1f)) {
@@ -349,10 +371,15 @@ private fun NameAndTaglineSection(content: EditBusinessPageContent) {
                         required = content.categoryRequired,
                         field = content.category,
                         trailing = BizFieldTrailing.Chevron,
+                        onValueChange = { onFieldChange(EditBusinessPageFieldKey.Category, it) },
                     )
                 }
                 Box(modifier = Modifier.width(110.dp)) {
-                    BizField(label = "Price", field = content.price)
+                    BizField(
+                        label = "Price",
+                        field = content.price,
+                        onValueChange = { onFieldChange(EditBusinessPageFieldKey.Price, it) },
+                    )
                 }
             }
         }
@@ -360,16 +387,25 @@ private fun NameAndTaglineSection(content: EditBusinessPageContent) {
 }
 
 @Composable
-private fun DescriptionSection(content: EditBusinessPageContent) {
+private fun DescriptionSection(
+    content: EditBusinessPageContent,
+    onFieldChange: (EditBusinessPageFieldKey, String) -> Unit,
+    onBeginDescription: () -> Unit,
+) {
     SectionWrapper(overline = "Description") {
         when (val desc = content.description) {
             is EditBusinessPageDescriptionState.Field -> {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BizLabel(label = "About", hint = "Markdown supported")
-                    BizTextarea(field = desc.field, charLimit = desc.charLimit)
+                    BizLabel(label = "About", dirty = desc.field.isDirty, hint = "Markdown supported")
+                    BizTextarea(
+                        field = desc.field,
+                        charLimit = desc.charLimit,
+                        onValueChange = { onFieldChange(EditBusinessPageFieldKey.Description, it) },
+                    )
                 }
             }
-            is EditBusinessPageDescriptionState.Prompt -> PromptBlock(prompt = desc.prompt)
+            is EditBusinessPageDescriptionState.Prompt ->
+                PromptBlock(prompt = desc.prompt, onTap = onBeginDescription)
         }
     }
 }
@@ -407,18 +443,38 @@ private fun GallerySection(content: EditBusinessPageContent) {
 }
 
 @Composable
-private fun ContactSection(content: EditBusinessPageContent) {
+private fun ContactSection(
+    content: EditBusinessPageContent,
+    onFieldChange: (EditBusinessPageFieldKey, String) -> Unit,
+) {
     SectionWrapper(overline = "Contact") {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-            BizField(label = "Phone", field = content.phone, leading = "+1", state = BizFieldState.Valid)
-            BizField(label = "Email", field = content.email, state = BizFieldState.Valid)
-            BizField(label = "Website", field = content.website, leading = "https://")
+            BizField(
+                label = "Phone",
+                field = content.phone,
+                leading = "+1",
+                state = BizFieldState.Valid,
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Phone, it) },
+            )
+            BizField(
+                label = "Email",
+                field = content.email,
+                state = BizFieldState.Valid,
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Email, it) },
+            )
+            BizField(
+                label = "Website",
+                field = content.website,
+                leading = "https://",
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Website, it) },
+            )
             content.bookingLink?.let { booking ->
                 BizField(
                     label = "Booking link",
                     hint = "Public on profile",
                     field = booking,
                     leading = "https://",
+                    onValueChange = { onFieldChange(EditBusinessPageFieldKey.BookingLink, it) },
                 )
             }
         }
@@ -426,7 +482,10 @@ private fun ContactSection(content: EditBusinessPageContent) {
 }
 
 @Composable
-private fun LocationSection(content: EditBusinessPageContent) {
+private fun LocationSection(
+    content: EditBusinessPageContent,
+    onFieldChange: (EditBusinessPageFieldKey, String) -> Unit,
+) {
     SectionWrapper(overline = "Location") {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             BizField(
@@ -437,7 +496,36 @@ private fun LocationSection(content: EditBusinessPageContent) {
                     content.location.error?.let { BizFieldState.Error(it) }
                         ?: BizFieldState.Valid,
                 trailing = BizFieldTrailing.MapPin,
+                testTag = "editBusinessPage.field.address",
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.Address, it) },
             )
+            BizField(
+                label = "City",
+                required = true,
+                field = content.location.city,
+                state = BizFieldState.Valid,
+                testTag = "editBusinessPage.field.city",
+                onValueChange = { onFieldChange(EditBusinessPageFieldKey.City, it) },
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    BizField(
+                        label = "State",
+                        field = content.location.state,
+                        testTag = "editBusinessPage.field.state",
+                        onValueChange = { onFieldChange(EditBusinessPageFieldKey.State, it) },
+                    )
+                }
+                Box(modifier = Modifier.width(110.dp)) {
+                    BizField(
+                        label = "ZIP code",
+                        field = content.location.zip,
+                        keyboardType = KeyboardType.Number,
+                        testTag = "editBusinessPage.field.zip",
+                        onValueChange = { onFieldChange(EditBusinessPageFieldKey.Zip, it) },
+                    )
+                }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 BizLabel(label = "Map", hint = "Drag the pin to refine")
                 EditBusinessMapPreview(
@@ -516,6 +604,9 @@ private fun BizField(
     state: BizFieldState = BizFieldState.Default,
     leading: String? = null,
     trailing: BizFieldTrailing = BizFieldTrailing.None,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    testTag: String? = null,
+    onValueChange: ((String) -> Unit)? = null,
 ) {
     val borderColor =
         when (state) {
@@ -535,6 +626,7 @@ private fun BizField(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
                 .semantics { contentDescription = a11y },
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -557,13 +649,23 @@ private fun BizField(
                     modifier = Modifier.padding(start = 10.dp),
                 )
             }
-            val displayText = if (field.current.isEmpty()) field.placeholder else field.current
-            val displayColor =
-                if (field.current.isEmpty()) PantopusColors.appTextMuted else PantopusColors.appText
-            Text(
-                text = displayText,
-                style = TextStyle(fontSize = 14.sp),
-                color = displayColor,
+            BasicTextField(
+                value = field.current,
+                onValueChange = { onValueChange?.invoke(it) },
+                enabled = onValueChange != null,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                textStyle = TextStyle(fontSize = 14.sp, color = PantopusColors.appText),
+                cursorBrush = SolidColor(PantopusColors.business),
+                decorationBox = { inner ->
+                    if (field.current.isEmpty()) {
+                        Text(
+                            text = field.placeholder,
+                            style = TextStyle(fontSize = 14.sp),
+                            color = PantopusColors.appTextMuted,
+                        )
+                    }
+                    inner()
+                },
                 modifier =
                     Modifier
                         .weight(1f)
@@ -631,6 +733,7 @@ private fun TrailingIcon(
 private fun BizTextarea(
     field: EditBusinessPageField,
     charLimit: Int,
+    onValueChange: (String) -> Unit,
 ) {
     Box(
         modifier =
@@ -646,11 +749,17 @@ private fun BizTextarea(
                         "Description, ${field.current.length} of $charLimit characters"
                 },
     ) {
-        Text(
-            text = field.current,
-            style = TextStyle(fontSize = 13.sp),
-            color = PantopusColors.appText,
-            modifier = Modifier.align(Alignment.TopStart),
+        BasicTextField(
+            value = field.current,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(fontSize = 13.sp, color = PantopusColors.appText),
+            cursorBrush = SolidColor(PantopusColors.business),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 72.dp)
+                    .align(Alignment.TopStart)
+                    .padding(bottom = 20.dp),
         )
         Text(
             text = "${field.current.length} / $charLimit",
@@ -662,7 +771,10 @@ private fun BizTextarea(
 }
 
 @Composable
-private fun PromptBlock(prompt: EditBusinessPagePrompt) {
+private fun PromptBlock(
+    prompt: EditBusinessPagePrompt,
+    onTap: (() -> Unit)? = null,
+) {
     Row(
         modifier =
             Modifier
@@ -674,6 +786,7 @@ private fun PromptBlock(prompt: EditBusinessPagePrompt) {
                     color = PantopusColors.appBorderStrong,
                     shape = RoundedCornerShape(Radii.md),
                 )
+                .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier)
                 .padding(14.dp)
                 .semantics {
                     contentDescription = "${prompt.title}. ${prompt.subtitle}"
@@ -788,6 +901,24 @@ private fun LoadingLayout(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = PantopusColors.business)
         }
+    }
+}
+
+@Composable
+private fun EmptyLayout(
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().testTag("editBusinessPage.empty")) {
+        EditBusinessTopBar(rightEnabled = false, onBack = onBack, onRight = {})
+        EmptyState(
+            icon = PantopusIcon.Building2,
+            headline = "Business not found",
+            subcopy = "This business page isn't available to edit.",
+            ctaTitle = "Try again",
+            onCta = onRetry,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

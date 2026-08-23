@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -54,6 +55,7 @@ import app.pantopus.android.ui.components.PantopusTextField
 import app.pantopus.android.ui.components.Toast
 import app.pantopus.android.ui.components.ToastKind
 import app.pantopus.android.ui.components.ToastMessage
+import app.pantopus.android.ui.components.shareText
 import app.pantopus.android.ui.screens.shared.form.FormFieldGroup
 import app.pantopus.android.ui.screens.shared.form.FormShell
 import app.pantopus.android.ui.theme.PantopusColors
@@ -82,6 +84,16 @@ fun AddGuestFormScreen(
     val today = remember { LocalDate.now() }
     var customStartEpochDay by rememberSaveable { mutableLongStateOf(today.toEpochDay()) }
     var customEndEpochDay by rememberSaveable { mutableLongStateOf(today.plusDays(1).toEpochDay()) }
+
+    // A13.6 — "Share this pass now?" confirm, raised the moment the create
+    // call returns the one-time token (RN parity:
+    // `src/app/homes/[id]/share.tsx:60-70`).
+    val context = LocalContext.current
+    var shareOffer by remember { mutableStateOf<GuestPassShare?>(null) }
+
+    LaunchedEffect(state.createdShare) {
+        state.createdShare?.let { shareOffer = it }
+    }
 
     LaunchedEffect(state.toast) {
         if (state.toast != null) {
@@ -130,6 +142,36 @@ fun AddGuestFormScreen(
                         .padding(bottom = Spacing.s12),
             )
         }
+    }
+
+    shareOffer?.let { offer ->
+        AlertDialog(
+            onDismissRequest = {
+                shareOffer = null
+                viewModel.acknowledgeShare()
+            },
+            title = { Text("Guest pass created") },
+            text = { Text("Share this pass now?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        shareOffer = null
+                        context.shareText(offer.message, chooserTitle = "Share guest pass")
+                        viewModel.acknowledgeShare()
+                    },
+                    modifier = Modifier.testTag("addGuest_shareNow"),
+                ) { Text("Share") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        shareOffer = null
+                        viewModel.acknowledgeShare()
+                    },
+                    modifier = Modifier.testTag("addGuest_shareLater"),
+                ) { Text("Later") }
+            },
+        )
     }
 
     if (showsCustomRange) {

@@ -80,8 +80,8 @@ struct TaxDocsRow: View {
 
 #Preview("TaxDocsRow variants") {
     VStack(spacing: Spacing.s4) {
-        TaxDocsRow(docs: WalletSampleData.populated.taxDocs)
-        TaxDocsRow(docs: WalletSampleData.onHold.taxDocs)
+        TaxDocsRow(docs: WalletSampleData.taxDocsSample)
+        TaxDocsRow(docs: WalletSampleData.taxDocsHoldSample)
     }
     .padding(Spacing.s4)
     .background(Theme.Color.appBg)

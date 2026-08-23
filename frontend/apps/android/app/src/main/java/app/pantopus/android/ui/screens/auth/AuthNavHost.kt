@@ -17,8 +17,11 @@ import app.pantopus.android.ui.screens.auth.forgot_password.ForgotPasswordScreen
 import app.pantopus.android.ui.screens.auth.set_password.SetNewPasswordScreen
 import app.pantopus.android.ui.screens.auth.set_password.SetNewPasswordViewModel
 import app.pantopus.android.ui.screens.auth.sign_up.SignUpScreen
+import app.pantopus.android.ui.screens.auth.sign_up.SignUpViewModel
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailScreen
 import app.pantopus.android.ui.screens.auth.verify_email.VerifyEmailViewModel
+import app.pantopus.android.ui.screens.settings.legal.LegalContentScreen
+import app.pantopus.android.ui.screens.settings.legal.LegalDocument
 import app.pantopus.android.ui.screens.status.verify_email.VerifyEmailLandingScreen
 import app.pantopus.android.ui.screens.status.verify_email.VerifyEmailLandingViewModel
 
@@ -36,8 +39,8 @@ fun AuthNavHost() {
     val navController = rememberNavController()
     val pendingDeepLink by DeepLinkRouter.pending.collectAsStateWithLifecycle()
 
-    // Pull auth deep links (reset / verify) off DeepLinkRouter and push
-    // them onto the nav stack. Anything else stays pending for the
+    // Pull auth deep links (reset / verify / join-invite) off DeepLinkRouter
+    // and push them onto the nav stack. Anything else stays pending for the
     // signed-in tab tree to consume after sign-in.
     LaunchedEffect(pendingDeepLink) {
         when (val pending = pendingDeepLink) {
@@ -58,6 +61,16 @@ fun AuthNavHost() {
                     popUpTo(AuthRoutes.LOGIN)
                 }
             }
+            is DeepLinkRouter.Destination.JoinInvite -> {
+                // A referral link opened by a signed-out visitor. RN replaces
+                // the login redirect with `/(auth)/register?invite_code=CODE`
+                // (`src/app/_layout.tsx:76`), so land straight on Create
+                // account with the code carried into the form.
+                DeepLinkRouter.consume()
+                navController.navigate(AuthRoutes.signUp(pending.code)) {
+                    popUpTo(AuthRoutes.LOGIN)
+                }
+            }
             else -> Unit
         }
     }
@@ -66,9 +79,20 @@ fun AuthNavHost() {
         navController = navController,
         startDestination = AuthRoutes.LOGIN,
     ) {
+        composable(
+            route = AuthRoutes.LEGAL_PATTERN,
+            arguments = listOf(navArgument(AuthRoutes.LEGAL_DOCUMENT_KEY) { type = NavType.StringType }),
+        ) { entry ->
+            val rowId = entry.arguments?.getString(AuthRoutes.LEGAL_DOCUMENT_KEY).orEmpty()
+            LegalContentScreen(
+                document = LegalDocument.entries.firstOrNull { it.rowId == rowId } ?: LegalDocument.Terms,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable(AuthRoutes.LOGIN) {
             LoginScreen(
-                onNavigateToSignUp = { navController.navigate(AuthRoutes.SIGN_UP) },
+                onOpenLegal = { document -> navController.navigate(AuthRoutes.legal(document.rowId)) },
+                onNavigateToSignUp = { navController.navigate(AuthRoutes.signUp()) },
                 onNavigateToForgotPassword = { navController.navigate(AuthRoutes.FORGOT_PASSWORD) },
                 onNavigateToVerifyEmail = { navController.navigate(AuthRoutes.verifyEmail()) },
                 onNavigateToResetPassword = { token ->
@@ -77,9 +101,20 @@ fun AuthNavHost() {
                 onNavigateToAuthError = { navController.navigate(AuthRoutes.AUTH_ERROR) },
             )
         }
-        composable(AuthRoutes.SIGN_UP) {
+        composable(
+            route = AuthRoutes.SIGN_UP_PATTERN,
+            arguments =
+                listOf(
+                    navArgument(SignUpViewModel.INVITE_CODE_KEY) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) {
             SignUpScreen(
                 onClose = { navController.popBackStack() },
+                onOpenLegal = { document -> navController.navigate(AuthRoutes.legal(document.rowId)) },
                 onSuccess = { email ->
                     // Backend hard-gates login on email_confirmed_at today
                     // (see docs/mobile/auth-backend-contracts.md
@@ -129,7 +164,7 @@ fun AuthNavHost() {
                     navController.popBackStack(AuthRoutes.LOGIN, inclusive = false)
                 },
                 onChangeEmail = { _ ->
-                    navController.navigate(AuthRoutes.SIGN_UP) {
+                    navController.navigate(AuthRoutes.signUp()) {
                         popUpTo(AuthRoutes.LOGIN)
                     }
                 },
@@ -158,7 +193,7 @@ fun AuthNavHost() {
                     navController.popBackStack(AuthRoutes.LOGIN, inclusive = false)
                 },
                 onUseDifferentEmail = {
-                    navController.navigate(AuthRoutes.SIGN_UP) {
+                    navController.navigate(AuthRoutes.signUp()) {
                         popUpTo(AuthRoutes.LOGIN)
                     }
                 },

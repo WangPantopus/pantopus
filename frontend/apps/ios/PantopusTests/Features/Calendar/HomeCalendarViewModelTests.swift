@@ -353,6 +353,63 @@ final class HomeCalendarViewModelTests: XCTestCase {
         XCTAssertEqual(row.chips?.last?.text, "3 attendees")
     }
 
+    // MARK: - Derived due-date rows
+
+    /// A derived row's visual identity comes from `HomeCalendarDerivedKind`'s
+    /// own label / icon / background / foreground — the documented
+    /// cross-platform palette (tasks = warning, bills = error, deliveries =
+    /// business). Routing it through `CalendarEventCategory` instead paints an
+    /// unpaid bill in the "paid / ok" green.
+    func testDerivedRowUsesTheDerivedKindPaletteNotTheEventCategory() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let item = HomeCalendarDerivedItem(
+            id: "bill-b1",
+            kind: .bill,
+            title: "PG&E bill due",
+            detail: nil,
+            dateISO: "2025-10-12"
+        )
+        let start = try XCTUnwrap(
+            HomeCalendarViewModel.parseIsoInstant("2025-10-12", zone: cal.timeZone)
+        )
+        let row = HomeCalendarViewModel.derivedRow(item, start: start, calendar: cal)
+
+        XCTAssertEqual(row.title, "PG&E bill due")
+        // Null detail falls back to the type label on its own line — never
+        // appended to the (single-line) title.
+        XCTAssertEqual(row.subtitle, HomeCalendarDerivedKind.bill.label)
+        guard case let .typeIcon(icon, background, foreground) = row.leading else {
+            XCTFail("Expected typeIcon leading, got \(row.leading)")
+            return
+        }
+        XCTAssertEqual(icon, HomeCalendarDerivedKind.bill.icon)
+        XCTAssertEqual(background, HomeCalendarDerivedKind.bill.background)
+        XCTAssertEqual(foreground, HomeCalendarDerivedKind.bill.foreground)
+        XCTAssertNotEqual(foreground, CalendarEventCategory.bill.foreground)
+        XCTAssertEqual(row.chips?.first?.text, HomeCalendarDerivedKind.bill.label)
+        // Bare `yyyy-MM-dd` values have no clock time — the row must not read
+        // "12:00 AM" once the date is anchored to local midnight.
+        XCTAssertEqual(row.timeMeta, "All day")
+    }
+
+    /// Derived rows that DO carry a real timestamp keep their clock time.
+    func testDerivedRowKeepsTheClockTimeForTimestampedDueDates() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let item = HomeCalendarDerivedItem(
+            id: "task-t1",
+            kind: .task,
+            title: "Change filters",
+            detail: "In progress",
+            dateISO: "2025-10-13T17:00:00Z"
+        )
+        let start = try XCTUnwrap(HomeCalendarViewModel.parseIsoInstant(item.dateISO))
+        let row = HomeCalendarViewModel.derivedRow(item, start: start, calendar: cal)
+        XCTAssertEqual(row.timeMeta, "10:00 AM")
+        XCTAssertEqual(row.subtitle, "In progress")
+    }
+
     func testCategoryInferenceFallsBackToGenericForUnknownType() {
         XCTAssertEqual(CalendarEventCategory.from(eventType: "qq_unknown"), .generic)
         XCTAssertEqual(CalendarEventCategory.from(eventType: nil), .generic)

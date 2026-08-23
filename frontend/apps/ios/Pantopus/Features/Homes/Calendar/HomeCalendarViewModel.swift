@@ -96,6 +96,11 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     private let timeZone: TimeZone
 
     private var events: [CalendarEventDTO] = []
+    /// Task due-dates, bill due-dates and package expected-delivery
+    /// dates plotted alongside the home events. RN's month grid does the
+    /// same (`src/app/homes/[id]/calendar.tsx:48-74`) so a household can
+    /// see everything that lands on a day, not just calendar entries.
+    private var derived: [HomeCalendarDerivedItem] = []
     /// ISO yyyy-MM-dd anchor for the visible week strip. Defaults to
     /// "the start of the week containing `now()`". Prev / Next chevrons
     /// roll it ±7 days. Selecting a day outside the current strip
@@ -229,23 +234,59 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
                 HomesEndpoints.homeEvents(homeId: homeId)
             )
             events = response.events
-            // Members are best-effort (sequential so the events stub is
-            // consumed first in tests). Avatar stacks + filter chips degrade
-            // gracefully when the roster can't be fetched.
+            // Members are best-effort (sequential, and *before* the derived
+            // fan-out, so the roster is the second request the stub sees in
+            // tests). Avatar stacks + filter chips degrade gracefully when
+            // the roster can't be fetched.
             let occupants: OccupantsResponse? = try? await api.request(
                 HomesEndpoints.listOccupants(homeId: homeId)
             )
             if let occupants {
                 applyMembers(occupants.occupants)
             }
+            // Events are the primary read — the three derived feeds are
+            // best-effort side-reads that must never fail the calendar.
+            await fetchDerived()
             rebuild()
         } catch {
             events = []
+            derived = []
             state = .error(
                 message: (error as? APIError)?.errorDescription
                     ?? "Couldn't load your calendar."
             )
         }
+    }
+
+    /// `GET /api/homes/:id/tasks` (`backend/routes/home.js` via
+    /// `HomesEndpoints.tasks`), `…/bills`, and `…/packages`. Each is
+    /// optional: a member without `tasks.view` / `finance.view` /
+    /// `mailbox.view` simply gets fewer dots.
+    private func fetchDerived() async {
+        async let tasksResult: GetHomeTasksResponse? = try? await api.request(
+            HomesEndpoints.tasks(homeId: homeId),
+            as: GetHomeTasksResponse.self
+        )
+        async let billsResult: GetHomeBillsResponse? = try? await api.request(
+            HomesEndpoints.bills(homeId: homeId),
+            as: GetHomeBillsResponse.self
+        )
+        async let packagesResult: GetHomePackagesResponse? = try? await api.request(
+            HomesEndpoints.packages(homeId: homeId),
+            as: GetHomePackagesResponse.self
+        )
+        let tasks = await tasksResult
+        let bills = await billsResult
+        let packages = await packagesResult
+        // Drop anything whose due date will not resolve — an unplaceable row
+        // can never reach the agenda, and keeping it would make `derived`
+        // non-empty and so suppress the first-run empty state. Mirrors
+        // Android's `placeable` filter in `fetchDerived`.
+        derived = HomeCalendarDerivedItem.build(
+            tasks: tasks?.tasks ?? [],
+            bills: bills?.bills ?? [],
+            packages: packages?.packages ?? []
+        ).filter { HomeAgendaBuilder.parseInstant($0.dateISO, zone: timeZone) != nil }
     }
 
     // MARK: - State projection
@@ -260,9 +301,34 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
             return ParsedEvent(dto: dto, start: date, isoDate: Self.isoDay(date, calendar: cal))
         }.sorted { $0.start < $1.start }
 
-        monthStrip = makeMonthStripState(events: parsed, now: nowDate, calendar: cal)
+        // Every dated thing that belongs on this month's grid: calendar
+        // events plus task / bill / package due dates.
+        var agenda: [AgendaEntry] = parsed.map { event in
+            AgendaEntry(
+                date: event.start,
+                isoDate: event.isoDate,
+                row: Self.row(for: event, calendar: cal) { [weak self] eventId in
+                    Task { @MainActor in self?.handleTap(eventId: eventId) }
+                }
+            )
+        }
+        agenda += derived.compactMap { item in
+            // Bare `yyyy-MM-dd` due dates anchor to midnight in the DISPLAY
+            // zone — see `derivedRow`.
+            guard let date = Self.parseIsoInstant(item.dateISO, zone: cal.timeZone) else {
+                return nil
+            }
+            return AgendaEntry(
+                date: date,
+                isoDate: Self.isoDay(date, calendar: cal),
+                row: Self.derivedRow(item, start: date, calendar: cal)
+            )
+        }
+        agenda.sort { $0.date < $1.date }
 
-        if events.isEmpty {
+        monthStrip = makeMonthStripState(entries: agenda, now: nowDate, calendar: cal)
+
+        if agenda.isEmpty {
             state = .empty(
                 ListOfRowsState.EmptyContent(
                     icon: .calendarDays,
@@ -276,9 +342,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
             return
         }
 
-        let filtered: [ParsedEvent]
+        let filtered: [AgendaEntry]
         if let selected = selectedIsoDate {
-            filtered = parsed.filter { $0.isoDate == selected }
+            filtered = agenda.filter { $0.isoDate == selected }
             if filtered.isEmpty {
                 state = .empty(
                     ListOfRowsState.EmptyContent(
@@ -291,22 +357,50 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
                 return
             }
         } else {
-            filtered = parsed
+            filtered = agenda
         }
 
         let sections = Self.makeSections(
-            events: filtered,
+            entries: filtered,
             now: nowDate,
             calendar: cal,
             selectedIsoDate: selectedIsoDate
-        ) { [weak self] eventId in
-            Task { @MainActor in self?.handleTap(eventId: eventId) }
-        }
+        )
         state = .loaded(sections: sections, hasMore: false)
     }
 
     private func handleTap(eventId: String) {
         onOpenEvent(eventId)
+    }
+
+    /// Project one derived due-date into a `RowModel` for the `ListOfRowsState`
+    /// projection. `HomeCalendarDerivedItem.row` is the contract source for the
+    /// derived palette (its own label / icon / background / foreground) and for
+    /// the `detail ?? kind.label` subtitle, so it is reused wholesale; only the
+    /// time stamp is overridden. A bare `yyyy-MM-dd` due date is anchored to
+    /// midnight in the display zone, which the row's own UTC-pinned all-day
+    /// heuristic would then read as 07:00Z and print as "12:00 AM". A date-only
+    /// value has no clock time at all, so the row is all-day by construction.
+    /// Mirrors Android's `derivedRow`.
+    static func derivedRow(
+        _ item: HomeCalendarDerivedItem,
+        start: Date,
+        calendar cal: Calendar
+    ) -> RowModel {
+        let base = item.row(calendar: cal)
+        let timeLabel = HomeAgendaBuilder.isDateOnly(item.dateISO)
+            ? "All day"
+            : formatTime(start: start, endIso: nil, calendar: cal)
+        return RowModel(
+            id: base.id,
+            title: base.title,
+            subtitle: base.subtitle,
+            template: base.template,
+            leading: base.leading,
+            trailing: base.trailing,
+            chips: base.chips,
+            timeMeta: timeLabel
+        )
     }
 
     // MARK: - Pure projections (test surface)
@@ -316,7 +410,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// list. `selectedIsoDate` flows straight through so the strip
     /// highlights the user's selection.
     func makeMonthStripState(
-        events parsed: [ParsedEvent],
+        entries: [AgendaEntry],
         now: Date,
         calendar cal: Calendar
     ) -> MonthStripState? {
@@ -337,8 +431,8 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         dayFmt.dateFormat = "d"
 
         var dotCounts: [String: Int] = [:]
-        for ev in parsed {
-            dotCounts[ev.isoDate, default: 0] += 1
+        for entry in entries {
+            dotCounts[entry.isoDate, default: 0] += 1
         }
 
         var days: [MonthStripState.Day] = []
@@ -372,6 +466,28 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         selectedIsoDate: String?,
         onTap: @escaping @MainActor @Sendable (String) -> Void
     ) -> [RowSection] {
+        makeSections(
+            entries: events.map { event in
+                AgendaEntry(
+                    date: event.start,
+                    isoDate: event.isoDate,
+                    row: row(for: event, calendar: calendar, onTap: onTap)
+                )
+            },
+            now: now,
+            calendar: calendar,
+            selectedIsoDate: selectedIsoDate
+        )
+    }
+
+    /// Bucketing over already-projected rows, so calendar events and
+    /// derived task / bill / package due dates share one grouping pass.
+    public static func makeSections(
+        entries: [AgendaEntry],
+        now: Date,
+        calendar: Calendar,
+        selectedIsoDate: String?
+    ) -> [RowSection] {
         var cal = calendar
         cal.timeZone = calendar.timeZone
         let todayStart = cal.startOfDay(for: now)
@@ -382,12 +498,11 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
         if let selected = selectedIsoDate {
             // Single-day filter — one section labelled by the date.
-            let rows = events.map { row(for: $0, calendar: cal, onTap: onTap) }
             return [
                 RowSection(
                     id: "day-\(selected)",
                     header: dayHeader(forIso: selected, calendar: cal),
-                    rows: rows
+                    rows: entries.map(\.row)
                 )
             ]
         }
@@ -398,14 +513,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         var nextWeek: [RowModel] = []
         var later: [RowModel] = []
 
-        for ev in events {
-            let start = ev.start
-            // Skip events from earlier calendar days — the agenda only
-            // surfaces today's remaining events plus everything in the
-            // future. (Past events that happen to be earlier in TODAY
+        for entry in entries {
+            let start = entry.date
+            // Skip items from earlier calendar days — the agenda only
+            // surfaces today's remaining items plus everything in the
+            // future. (Past items that happen to be earlier in TODAY
             // still pass through the `start < tomorrowStart` branch.)
             if start < todayStart { continue }
-            let row = Self.row(for: ev, calendar: cal, onTap: onTap)
+            let row = entry.row
             switch start {
             case _ where start < tomorrowStart:
                 today.append(row)
@@ -578,6 +693,21 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         public let isoDate: String
     }
 
+    /// A dated agenda item after projection — either a home event or a
+    /// derived task / bill / package due date. Bucketing works over
+    /// these so both kinds share one grouping pass.
+    public struct AgendaEntry: Sendable {
+        public let date: Date
+        public let isoDate: String
+        public let row: RowModel
+
+        public init(date: Date, isoDate: String, row: RowModel) {
+            self.date = date
+            self.isoDate = isoDate
+            self.row = row
+        }
+    }
+
     public enum WeekShift: Sendable, Equatable {
         case previous
         case next
@@ -626,7 +756,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// Parse a full ISO-8601 timestamp (with or without fractional
     /// seconds). Accepts bare yyyy-MM-dd as a fallback so all-day events
     /// stored without a time component still flow through.
-    public static func parseIsoInstant(_ iso: String) -> Date? {
+    ///
+    /// A bare `yyyy-MM-dd` carries no zone (Postgres `date` columns —
+    /// `home_bills.due_date`), so `zone` decides which midnight it anchors to:
+    /// pass the display zone for derived due-dates so they bucket onto the day
+    /// the reader sees. Defaults to UTC, the wire convention timestamped
+    /// events are pinned to, so event parsing is unchanged. Same contract as
+    /// `HomeAgendaBuilder.parseInstant(_:zone:)`.
+    public static func parseIsoInstant(_ iso: String, zone: TimeZone? = nil) -> Date? {
         let withFrac = ISO8601DateFormatter()
         withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = withFrac.date(from: iso) { return d }
@@ -635,7 +772,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         if let d = plain.date(from: iso) { return d }
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
-        dayFmt.timeZone = TimeZone(identifier: "UTC")
+        dayFmt.timeZone = zone ?? TimeZone(identifier: "UTC")
         dayFmt.dateFormat = "yyyy-MM-dd"
         return dayFmt.date(from: iso)
     }
@@ -764,19 +901,28 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         case .mine: resolvedUserId
         case let .member(id, _): id
         }
-        let sections = HomeAgendaBuilder.sections(
+        let nowDate = now()
+        let eventSections = HomeAgendaBuilder.sections(
             events: events,
             members: members,
-            now: now(),
+            now: nowDate,
             calendar: cal,
             timeZone: timeZone,
             selectedIsoDate: selectedIsoDate,
             onlyUserId: onlyUser
         )
+        // Derived task / bill / package due dates share the agenda with the
+        // home's own events, under EVERY member filter including "Mine".
+        // They carry no household owner, so scoping them by assignee would
+        // hide them behind any chip but "All" — the empty-looking month the
+        // feed exists to prevent. It would also contradict the month strip,
+        // which counts its dots with no member filter applied: a day would
+        // show a dot while its agenda section came back empty.
+        let sections = agendaSectionsWithDerived(eventSections, now: nowDate, calendar: cal)
         agendaSections = sections
         if !sections.isEmpty {
             agendaEmpty = nil
-        } else if events.isEmpty {
+        } else if events.isEmpty, derived.isEmpty {
             agendaEmpty = .firstRun
         } else if case let .member(_, name) = memberFilter {
             agendaEmpty = .filteredMember(name: name)
@@ -787,6 +933,125 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         } else {
             agendaEmpty = .firstRun
         }
+    }
+
+    /// Fold the derived task / bill / package due dates into the bespoke
+    /// agenda. `HomeAgendaBuilder` only speaks `CalendarEventDTO` (it is
+    /// shared with the gated scheduler, F15), so the derived rows are
+    /// projected here and merged into their day's section, time-ordered
+    /// alongside the events. Without this the derived feeds would only
+    /// reach the month-strip dots — the design's list renders
+    /// `agendaSections`, not the `ListOfRowsState` projection.
+    private func agendaSectionsWithDerived(
+        _ eventSections: [HomeAgendaSection],
+        now nowDate: Date,
+        calendar cal: Calendar
+    ) -> [HomeAgendaSection] {
+        guard !derived.isEmpty else { return eventSections }
+        let todayStart = cal.startOfDay(for: nowDate)
+        // Sort keys for the merge — events by `start_at`, derived rows by
+        // their due date, both keyed on the row id.
+        var instants: [String: Date] = [:]
+        for dto in events {
+            // Same anchor `HomeAgendaBuilder.sections` bucketed with — a bare
+            // date resolved at UTC here would sort against a locally-bucketed
+            // section and interleave wrongly.
+            guard let date = HomeAgendaBuilder.parseInstant(dto.startAt, zone: cal.timeZone) else { continue }
+            instants[dto.id] = date
+        }
+
+        var buckets: [String: [HomeAgendaItem]] = [:]
+        var order: [String] = []
+        for section in eventSections {
+            buckets[section.id] = section.items
+            order.append(section.id)
+        }
+        for item in derived {
+            // `zone: cal.timeZone` — a bill's `due_date` is a bare
+            // Postgres `date`, so it has no zone on the wire. Anchoring it at
+            // UTC midnight and then bucketing with the device-local calendar
+            // renders it a day early west of UTC, and drops an item due today
+            // through the `date >= todayStart` window below.
+            guard let date = HomeAgendaBuilder.parseInstant(
+                item.dateISO,
+                zone: cal.timeZone
+            ) else { continue }
+            let iso = Self.isoDay(date, calendar: cal)
+            // Same windowing the builder applies to events: the selected
+            // day when one is picked, otherwise today-forward only.
+            if let selected = selectedIsoDate {
+                guard iso == selected else { continue }
+            } else {
+                guard date >= todayStart else { continue }
+            }
+            instants[item.id] = date
+            if buckets[iso] == nil { order.append(iso) }
+            buckets[iso, default: []].append(
+                derivedAgendaItem(item, start: date, calendar: cal)
+            )
+        }
+
+        return order.sorted().map { iso in
+            let items = (buckets[iso] ?? []).enumerated().sorted { lhs, rhs in
+                let left = instants[lhs.element.id] ?? .distantPast
+                let right = instants[rhs.element.id] ?? .distantPast
+                if left == right { return lhs.offset < rhs.offset }
+                return left < right
+            }
+            return HomeAgendaSection(
+                id: iso,
+                header: HomeAgendaBuilder.header(forIso: iso, now: nowDate, calendar: cal),
+                items: items.map(\.element)
+            )
+        }
+    }
+
+    /// Project one derived due-date into the design's agenda row.
+    ///
+    /// - The status / amount rides the row's own `detail` slot, falling back to
+    ///   the kind label exactly as the `ListOfRowsState` subtitle does. It is
+    ///   never appended to the title: the title is `lineLimit(1)`, so the
+    ///   appended text would be the first thing ellipsised away.
+    /// - `derived` carries the kind through so the row renders its own
+    ///   label / icon / tint. `category` is inert on these rows — it exists
+    ///   only because the field is non-optional, hence `.generic`.
+    /// - A non-nil `derived` is also the read-only marker: the row card gives
+    ///   these rows no tap affordance at all (no button, no ripple), because
+    ///   they mirror surfaces that own their own screens.
+    private func derivedAgendaItem(
+        _ item: HomeCalendarDerivedItem,
+        start: Date,
+        calendar cal: Calendar
+    ) -> HomeAgendaItem {
+        // A bare `yyyy-MM-dd` due date carries no clock time, so the row is
+        // all-day by construction. Re-deriving it would ask the UTC-pinned
+        // midnight heuristic about a local-midnight anchor and get "12:00 AM".
+        // Timestamped derived dates (task `due_at`, package `expected_at`)
+        // still go through that shared heuristic, unchanged.
+        let allDay = HomeAgendaBuilder.isDateOnly(item.dateISO)
+            || Self.isAllDay(start: start, calendar: cal)
+        let (time, ampm) = HomeAgendaBuilder.timeParts(start, allDay: allDay, calendar: cal)
+        // `detail ?? kind.label`, blank-safe — the same predicate Android's
+        // `detail?.takeIf(String::isNotBlank) ?: kind.label` applies, so a
+        // whitespace-only status falls back to the kind label on both platforms.
+        let subtitle = item.detail.flatMap {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0
+        } ?? item.kind.label
+        return HomeAgendaItem(
+            id: item.id,
+            time: time,
+            ampm: ampm,
+            title: item.title,
+            category: .generic,
+            location: nil,
+            members: [],
+            isBooking: false,
+            bookingStatus: nil,
+            bookingId: nil,
+            eventId: nil,
+            derived: item.kind,
+            subtitle: subtitle
+        )
     }
 
     /// The filter chips: All · Mine · <each member>.
@@ -808,7 +1073,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
     /// Tap an agenda row: booking-union rows deep-link to the Scheduling
     /// Booking Detail (E2) via the router; normal events open the home detail.
+    /// Derived task / bill / package rows are mirrors of surfaces that own
+    /// their own screens, so they stay read-only exactly as in RN's calendar —
+    /// they are the only rows that are neither a booking nor an event. The row
+    /// card also renders them without any tap affordance, so this guard is the
+    /// belt to that view-layer braces.
     func openAgendaItem(_ item: HomeAgendaItem) {
+        guard item.derived == nil else { return }
+        guard item.isBooking || item.eventId != nil else { return }
         if item.isBooking, let bookingId = item.bookingId {
             presentedRoute = PresentedHomeRoute(
                 .bookingDetail(owner: .home(homeId: homeId), bookingId: bookingId)

@@ -83,12 +83,36 @@ fun PackageDetailLayout(
     onAcknowledgeDelivery: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
     onSaveToVault: () -> Unit = {},
+    // A17.14 — when set (and the package is delivered), the overflow
+    // surfaces "Virtual unboxing", which opens the Unboxing capture flow.
+    // Mirrors RN's delivered-only CTA in `src/app/mailbox/package.tsx:180`.
+    onOpenUnboxing: (() -> Unit)? = null,
+    // A17.8 → "Ask a Neighbor". Opens the package-gig form pre-filled from
+    // this package; the flag mirrors RN's `?mode=pre|post`
+    // (`src/app/mailbox/package.tsx:196-204`).
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
+    // A17.8 → "Share ETA with household" — RN's primary package-dashboard
+    // CTA (`src/app/mailbox/package.tsx:189-194`).
+    onShareEta: () -> Unit = {},
+    // A17.8 → "Report issue" — RN's tertiary CTA
+    // (`src/app/mailbox/package.tsx:212-214`).
+    onReportIssue: () -> Unit = {},
 ) {
     val isReceived =
         content.isAcknowledged || (packageDetail.deliveryPhoto?.isReceived == true)
     Box(modifier = Modifier.testTag("mailDetail_package")) {
         MailItemDetailShell(
-            topBar = makeTopBar(packageDetail = packageDetail, content = content, onBack = onBack, onSaveToVault = onSaveToVault),
+            topBar =
+                makeTopBar(
+                    packageDetail = packageDetail,
+                    content = content,
+                    onBack = onBack,
+                    onSaveToVault = onSaveToVault,
+                    onOpenUnboxing = onOpenUnboxing,
+                    onAskNeighbor = onAskNeighbor,
+                    onShareEta = onShareEta,
+                    onReportIssue = onReportIssue,
+                ),
             aiElf = makeAIElf(packageDetail = packageDetail),
             attachments = makeAttachments(content = content),
             hero = { PackageHeroCard(content = content, packageDetail = packageDetail) },
@@ -122,6 +146,10 @@ private fun makeTopBar(
     content: MailDetailContent,
     onBack: () -> Unit,
     onSaveToVault: () -> Unit,
+    onOpenUnboxing: (() -> Unit)? = null,
+    onAskNeighbor: ((Boolean) -> Unit)? = null,
+    onShareEta: () -> Unit = {},
+    onReportIssue: () -> Unit = {},
 ): MailTopBarConfig =
     MailTopBarConfig(
         eyebrow = packageDetail.carrier,
@@ -134,13 +162,51 @@ private fun makeTopBar(
                 onClick = onSaveToVault,
             ),
         overflowItems =
-            listOf(
-                MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {},
-                MailOverflowItem("handoff", PantopusIcon.UserPlus, "Hand-off") {},
-                MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() },
-                MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {},
-                MailOverflowItem("report", PantopusIcon.AlertTriangle, "Report issue") {},
-            ),
+            buildList {
+                // RN only offers the unboxing flow once the package is delivered.
+                if (onOpenUnboxing != null && packageDetail.status == PackageDeliveryStatus.Delivered) {
+                    add(
+                        MailOverflowItem(
+                            "unboxing",
+                            PantopusIcon.ScanLine,
+                            "Virtual unboxing",
+                        ) { onOpenUnboxing() },
+                    )
+                }
+                // RN offers the neighbor gig at every stage — pre-delivery
+                // before the drop, post-delivery after (`package.tsx:196-204`).
+                if (onAskNeighbor != null) {
+                    val isPreDelivery = packageDetail.status != PackageDeliveryStatus.Delivered
+                    add(
+                        MailOverflowItem(
+                            "askNeighbor",
+                            PantopusIcon.UsersRound,
+                            "Ask a Verified Neighbor",
+                        ) { onAskNeighbor(isPreDelivery) },
+                    )
+                }
+                // RN's primary package-dashboard CTA — notifies every
+                // other resident that the package is on its way
+                // (`package.tsx:189-194`).
+                add(
+                    MailOverflowItem(
+                        "shareEta",
+                        PantopusIcon.Send,
+                        "Share ETA with household",
+                    ) { onShareEta() },
+                )
+                add(MailOverflowItem("openMap", PantopusIcon.Map, "Track map") {})
+                add(MailOverflowItem("handoff", PantopusIcon.UserPlus, "Hand-off") {})
+                add(MailOverflowItem("saveToVault", PantopusIcon.Bookmark, "Save to vault") { onSaveToVault() })
+                add(MailOverflowItem("archive", PantopusIcon.Archive, "Archive") {})
+                add(
+                    MailOverflowItem(
+                        "report",
+                        PantopusIcon.AlertTriangle,
+                        "Report issue",
+                    ) { onReportIssue() },
+                )
+            },
     )
 
 private fun makeAIElf(packageDetail: PackageBodyContent): AIElfStripContent {

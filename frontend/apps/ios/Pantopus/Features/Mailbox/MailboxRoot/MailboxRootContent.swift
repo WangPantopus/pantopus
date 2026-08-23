@@ -21,9 +21,40 @@ struct MailboxRootHeader: View {
         VStack(spacing: Spacing.s0) {
             mailDayCTA
             drawerRow
+            if viewModel.pendingRoutingCount > 0 {
+                pendingRoutingBanner
+            }
             tabBar
         }
         .background(Theme.Color.appSurface)
+    }
+
+    /// "N items need routing" — opens the disambiguation queue. Rendered
+    /// only when `GET /api/mailbox/v2/pending` returned rows. Mirrors RN
+    /// (`src/app/mailbox/index.tsx:176-188`).
+    private var pendingRoutingBanner: some View {
+        Button(action: viewModel.openRoutingQueue) {
+            HStack(spacing: Spacing.s2) {
+                Icon(.helpCircle, size: 16, strokeWidth: 2.2, color: Theme.Color.warning)
+                Text(viewModel.pendingRoutingLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Color.warning)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: Spacing.s0)
+                Icon(.chevronRight, size: 14, strokeWidth: 2.2, color: Theme.Color.warning)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Color.warningBg)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.Color.warningLight).frame(height: 1)
+        }
+        .accessibilityLabel("\(viewModel.pendingRoutingLabel). Opens the routing queue.")
+        .accessibilityIdentifier("mailboxRootPendingBanner")
     }
 
     private var mailDayCTA: some View {

@@ -14,6 +14,11 @@ data class BookletDetailDto(
     val pages: List<String>,
     val summary: String?,
     val pageCount: Int,
+    /**
+     * Per-page OCR transcripts, index-aligned with [pages]. Optional —
+     * the A17.2 OCR card only renders for pages that carry text.
+     */
+    val ocrTexts: List<String> = emptyList(),
 ) {
     companion object {
         fun decodeFromObjectPayload(payload: JsonValue?): BookletDetailDto? {
@@ -23,10 +28,13 @@ data class BookletDetailDto(
             if (pages.isEmpty()) return null
             val pageCount =
                 (payload["page_count"] as? Number)?.toInt() ?: pages.size
+            val ocrTexts =
+                (payload["ocr_texts"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
             return BookletDetailDto(
                 pages = pages,
                 summary = payload["summary"] as? String,
                 pageCount = pageCount,
+                ocrTexts = ocrTexts,
             )
         }
     }

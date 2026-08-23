@@ -104,7 +104,7 @@ public final class CeremonialMailOpenViewModel {
         mailId: String
     ) -> CeremonialMailLetter {
         let item = response.mail
-        let payload = item.objectPayload?.dictValue ?? [:]
+        let payload = composePayload(in: item.objectPayload)
         let stationery = CeremonialMailStationeryTone(
             wire: payload["stationeryTheme"]?.stringValue
         )
@@ -136,6 +136,31 @@ public final class CeremonialMailOpenViewModel {
             receivedAt: item.base.createdAt,
             outcomeCtas: CeremonialMailLetter.defaultOutcomeCtas()
         )
+    }
+
+    /// Locate the compose metadata inside `object_payload`.
+    ///
+    /// `POST /api/mailbox/send` writes the object as
+    /// `{ version, objectFormat, envelope, recipient, policy, body: {
+    /// content, payload } }` (`backend/routes/mailbox.js:605-638`), so the
+    /// ceremonial keys (`stationeryTheme`, `inkSelection`,
+    /// `voicePostscriptUri`) live under `body.payload` — **not** at the
+    /// top level. Older / hand-written objects put them under `payload`
+    /// or at the root, so probe all three in the same order RN does
+    /// (`src/app/mailbox/detail.tsx:44`).
+    static func composePayload(in objectPayload: JSONValue?) -> [String: JSONValue] {
+        guard let root = objectPayload?.dictValue else { return [:] }
+        if let nested = root["payload"]?.dictValue, nested["stationeryTheme"] != nil {
+            return nested
+        }
+        if let body = root["body"]?.dictValue,
+           let nested = body["payload"]?.dictValue {
+            return nested
+        }
+        if let nested = root["payload"]?.dictValue {
+            return nested
+        }
+        return root
     }
 
     static func trustLabel(for raw: String?) -> String? {

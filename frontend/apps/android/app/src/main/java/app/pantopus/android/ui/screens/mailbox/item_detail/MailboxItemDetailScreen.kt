@@ -31,8 +31,9 @@ import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.BookletBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CertifiedBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CommunityBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.CouponBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GenericMailBody
+import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GenericMailBodyContent
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.GigBody
-import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MailItemPlaceholderBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.MemoryBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.PackageBody
 import app.pantopus.android.ui.screens.mailbox.item_detail.bodies.components.CertifiedConfirmGate
@@ -52,6 +53,15 @@ import java.util.Locale
 /**
  * Hub → MailboxList → MailboxItemDetail screen. The ViewModel reads the
  * mail id via the nav-backstack [androidx.lifecycle.SavedStateHandle].
+ *
+ * NOT ROUTED (M5 parity sweep): `RootTabScreen.kt` renders
+ * `MailDetailScreen` for `MAILBOX_ITEM_DETAIL`, so nothing reaches this
+ * composable at runtime. It is kept because its shell + category bodies are
+ * still the reference for the A17 variant work and it carries its own unit /
+ * snapshot coverage; the A17.1 per-category ACTIONS row was added to the
+ * screen that actually renders (`mail_detail/variants/GenericMailDetailLayout.kt`)
+ * rather than by routing this one. Delete both this file and
+ * `MailboxItemDetailViewModel` together if the shell is ever retired.
  */
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -246,44 +256,94 @@ private fun CategoryBody(
     onAcceptGig: () -> Unit,
     onReceiveAtDoor: () -> Unit,
 ) {
-    when {
-        content.category == MailItemCategory.Package && content.packageInfo != null ->
-            PackageBody(
-                content = content.packageInfo,
-                isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
-                isReceiveLoading = ctaFlags.primaryLoading,
-                isReceived = ctaFlags.primaryCompleted,
-                onReceiveAtDoor = onReceiveAtDoor,
-            )
-        content.payload is MailboxCategoryPayload.Coupon ->
-            CouponBody(coupon = content.payload.detail)
-        content.payload is MailboxCategoryPayload.Booklet ->
-            BookletBody(booklet = content.payload.detail)
-        content.payload is MailboxCategoryPayload.Certified ->
-            CertifiedBody(
-                certified = content.payload.detail,
-                onViewTerms = onViewTerms,
-            )
-        content.payload is MailboxCategoryPayload.Community ->
-            CommunityBody(
-                community = content.payload.detail,
-                authorName = content.sender.displayName,
-                authorInitials = content.sender.initials,
-            )
-        content.payload is MailboxCategoryPayload.Gig ->
-            GigBody(
-                gig = content.payload.detail,
-                onAccept = onAcceptGig,
-            )
-        content.payload is MailboxCategoryPayload.Memory ->
-            MemoryBody(
-                memory = content.payload.detail,
-                isSaved = content.payload.detail.isSaved,
-            )
-        content.category != MailItemCategory.Package ->
-            MailItemPlaceholderBody(category = content.category)
-        else -> Unit
+    // Category first, payload second — mirrors iOS `categoryBody(for:)`. Every
+    // branch that can't render its bespoke body (package enrichment missing, a
+    // payload that failed to decode) falls through to the generic readable
+    // body, so no known category ever renders an empty surface. Split across
+    // two dispatchers purely to keep each under detekt's complexity ceiling.
+    val payload = content.payload
+    when (content.category) {
+        MailItemCategory.Package ->
+            if (content.packageInfo != null) {
+                PackageBody(
+                    content = content.packageInfo,
+                    isReceiveEnabled = content.ctaEnabled && !ctaFlags.primaryCompleted,
+                    isReceiveLoading = ctaFlags.primaryLoading,
+                    isReceived = ctaFlags.primaryCompleted,
+                    onReceiveAtDoor = onReceiveAtDoor,
+                )
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Coupon ->
+            if (payload is MailboxCategoryPayload.Coupon) {
+                CouponBody(coupon = payload.detail)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Booklet ->
+            if (payload is MailboxCategoryPayload.Booklet) {
+                BookletBody(booklet = payload.detail)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Certified ->
+            if (payload is MailboxCategoryPayload.Certified) {
+                CertifiedBody(certified = payload.detail, onViewTerms = onViewTerms)
+            } else {
+                GenericCategoryBody(content)
+            }
+        else -> SocialCategoryBody(content = content, onAcceptGig = onAcceptGig)
     }
+}
+
+/**
+ * Second half of the [CategoryBody] dispatch: the person-authored categories
+ * (community / gig / memory) plus the generic fallback for every other case.
+ */
+@Composable
+private fun SocialCategoryBody(
+    content: MailboxItemDetailContent,
+    onAcceptGig: () -> Unit,
+) {
+    val payload = content.payload
+    when (content.category) {
+        MailItemCategory.Community ->
+            if (payload is MailboxCategoryPayload.Community) {
+                CommunityBody(
+                    community = payload.detail,
+                    authorName = content.sender.displayName,
+                    authorInitials = content.sender.initials,
+                )
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Gig ->
+            if (payload is MailboxCategoryPayload.Gig) {
+                GigBody(gig = payload.detail, onAccept = onAcceptGig)
+            } else {
+                GenericCategoryBody(content)
+            }
+        MailItemCategory.Memory ->
+            if (payload is MailboxCategoryPayload.Memory) {
+                MemoryBody(memory = payload.detail, isSaved = payload.detail.isSaved)
+            } else {
+                GenericCategoryBody(content)
+            }
+        else -> GenericCategoryBody(content)
+    }
+}
+
+/**
+ * Generic readable body for any category without a bespoke layout, or whose
+ * bespoke payload is missing. Falls back to the category explainer so no known
+ * category ever renders an empty surface. Mirrors iOS `genericBody(for:)`.
+ */
+@Composable
+private fun GenericCategoryBody(content: MailboxItemDetailContent) {
+    GenericMailBody(
+        content = content.genericBody ?: GenericMailBodyContent(category = content.category),
+    )
 }
 
 private fun formatCertifiedDeadline(iso: String?): String? {

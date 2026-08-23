@@ -29,14 +29,19 @@ public struct PaymentsLoaded: Sendable, Hashable {
     public let methods: [PaymentMethod]
     /// Payouts card — Stripe Connect row + payout method row + tax row.
     public let payouts: PaymentsPayouts
-    /// Activity card — populated has 3 stat rows (lifetime · YTD ·
-    /// last payout); empty collapses to one muted "No transactions" row.
+    /// Activity card — populated has 3 chevron rows (Transactions ·
+    /// Statements · Disputes); empty collapses to one muted
+    /// "No transactions" row.
     public let activity: PaymentsActivity
     /// Surfaces the "Close payment account" destructive card.
     /// `false` on the empty frame (no account to close yet).
     public let canCloseAccount: Bool
     /// Monospaced footer caption rendered below the destructive card.
     public let footerCaption: String
+    /// Lifetime TOTAL EARNED / TOTAL SPENT tiles
+    /// (`GET /api/payments/earnings` + `/spending`). `nil` when neither
+    /// figure could be read — the card is hidden rather than showing "$0".
+    public let earnings: PaymentsEarnings?
 
     public init(
         balance: PaymentsBalance?,
@@ -44,7 +49,8 @@ public struct PaymentsLoaded: Sendable, Hashable {
         payouts: PaymentsPayouts,
         activity: PaymentsActivity,
         canCloseAccount: Bool,
-        footerCaption: String
+        footerCaption: String,
+        earnings: PaymentsEarnings? = nil
     ) {
         self.balance = balance
         self.methods = methods
@@ -52,6 +58,26 @@ public struct PaymentsLoaded: Sendable, Hashable {
         self.activity = activity
         self.canCloseAccount = canCloseAccount
         self.footerCaption = footerCaption
+        self.earnings = earnings
+    }
+}
+
+/// "Earnings & Spending" card — the two lifetime totals RN renders at the
+/// bottom of the Payouts tab (`components/payments/PayoutsTab.tsx:251`).
+/// Values are pre-formatted from the server's integer cents; an unreadable
+/// figure stays as the em-dash RN uses rather than a misleading "$0.00".
+public struct PaymentsEarnings: Sendable, Hashable {
+    /// `"$1,284.50"` or `"—"` when `GET /api/payments/earnings` failed.
+    public let totalEarned: String
+    /// `"$318.00"` or `"—"` when `GET /api/payments/spending` failed.
+    public let totalSpent: String
+    /// Caption clarifying that earned includes funds still in review.
+    public let caption: String
+
+    public init(totalEarned: String, totalSpent: String, caption: String) {
+        self.totalEarned = totalEarned
+        self.totalSpent = totalSpent
+        self.caption = caption
     }
 }
 
@@ -92,19 +118,25 @@ public struct PaymentMethod: Identifiable, Sendable, Hashable {
     /// Optional chip rendered before the trailing chevron — used for
     /// the "Default" badge on the active method.
     public let chip: PaymentMethodChip?
+    /// Last four digits of the card / bank account, when the server sent
+    /// them. Only used to name the method in the destructive remove
+    /// confirmation ("…ending in 4421").
+    public let last4: String?
 
     public init(
         id: String,
         brand: PaymentMethodBrand,
         label: String,
         subtext: String? = nil,
-        chip: PaymentMethodChip? = nil
+        chip: PaymentMethodChip? = nil,
+        last4: String? = nil
     ) {
         self.id = id
         self.brand = brand
         self.label = label
         self.subtext = subtext
         self.chip = chip
+        self.last4 = last4
     }
 }
 
@@ -150,8 +182,8 @@ public struct PaymentsPayouts: Sendable, Hashable {
     /// "Connected" chip; empty frame shows a primary "Connect" CTA chip.
     public let stripe: PaymentsPayoutRow
     /// Payout method row (e.g. "Payout to Chase •• 1023"). On the
-    /// empty frame this renders gated with a lock glyph + "Available
-    /// after Stripe connect" sub.
+    /// empty frame this renders gated with an em-dash + "Add after
+    /// connecting Stripe" sub.
     public let payoutMethod: PaymentsPayoutRow
     /// Payout schedule row (only rendered on the populated frame —
     /// nil hides the row).
@@ -210,17 +242,19 @@ public enum PaymentsRowTrailing: Sendable, Hashable {
     /// Primary CTA chip without a chevron (e.g. blue "Connect" chip
     /// on Stripe Connect in the empty frame).
     case ctaChip(label: String, tone: PaymentsChipTone)
-    /// Em-dash glyph used to mark a gated row (empty frame's payout
-    /// method / tax info — locked behind Stripe Connect).
+    /// Em-dash "—" value used to mark a gated row (empty frame's
+    /// payout method / tax info — gated behind Stripe Connect).
     case gatedDash
 }
 
 /// Activity card content.
 public enum PaymentsActivity: Sendable, Hashable {
-    /// Three stat rows: lifetime · YTD · last payout.
+    /// Three chevron rows: Transactions · Statements · Disputes.
     case stats([PaymentsActivityStat])
-    /// Single muted "No transactions yet" row. Used on the empty
-    /// frame when there's no Stripe history.
+    /// The real transaction-history feed from `GET /api/payments/history`.
+    case transactions([PaymentsTransaction])
+    /// Single muted "No transactions yet" row. Used when the history feed
+    /// came back empty (or couldn't be read — with the honest copy).
     case empty(title: String, body: String)
 }
 
@@ -234,5 +268,46 @@ public struct PaymentsActivityStat: Identifiable, Sendable, Hashable {
         self.id = id
         self.label = label
         self.subtext = subtext
+    }
+}
+
+/// One row of the Transaction-history feed (`GET /api/payments/history`).
+/// Amounts are pre-formatted from the server's `amount_cents`; `isOutgoing`
+/// drives the sign and the red/green treatment.
+public struct PaymentsTransaction: Identifiable, Sendable, Hashable {
+    /// Drives the leading icon disc, mirroring RN's `HistoryTab`
+    /// iconography: tip → star, payout → arrow-up disc, money out → arrow-up,
+    /// money in → arrow-down.
+    public enum Kind: String, Sendable, Hashable {
+        case tip
+        case payout
+        case sent
+        case received
+    }
+
+    public let id: String
+    public let kind: Kind
+    /// Gig title / description / humanised payment type.
+    public let title: String
+    /// "Mar 4 · succeeded · to Ana Ruiz" — date, status and counterparty.
+    public let meta: String
+    /// Signed, formatted amount — e.g. `"-$40.00"` / `"+$120.00"`.
+    public let amount: String
+    public let isOutgoing: Bool
+
+    public init(
+        id: String,
+        kind: Kind,
+        title: String,
+        meta: String,
+        amount: String,
+        isOutgoing: Bool
+    ) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.meta = meta
+        self.amount = amount
+        self.isOutgoing = isOutgoing
     }
 }

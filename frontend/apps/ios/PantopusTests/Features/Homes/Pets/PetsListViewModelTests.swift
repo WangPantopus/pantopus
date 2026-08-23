@@ -47,6 +47,40 @@ final class PetsListViewModelTests: XCTestCase {
     {"pets":[]}
     """
 
+    private static let vetPetJSON = """
+    {"pets":[
+      {"id":"p1","home_id":"home_1","name":"Mango","species":"dog",
+       "breed":"Golden Retriever","notes":"Allergic to chicken.","photo_url":null,
+       "vet_name":"Bay Area Animal Hospital","vet_phone":"(415) 555-0142",
+       "created_at":"2026-05-15T10:00:00Z"}
+    ]}
+    """
+
+    func testVetContactRendersAsAChip() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.vetPetJSON)]
+        let vm = makeVM()
+        await vm.load()
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertEqual(
+            sections.first?.rows.first?.chips?.first?.text,
+            "Bay Area Animal Hospital · (415) 555-0142"
+        )
+    }
+
+    func testRowsWithoutVetContactCarryNoChipRow() async {
+        SequencedURLProtocol.sequence = [.status(200, body: Self.twoPetsJSON)]
+        let vm = makeVM()
+        await vm.load()
+        guard case let .loaded(sections, _) = vm.state else {
+            XCTFail("Expected .loaded")
+            return
+        }
+        XCTAssertNil(sections.first?.rows.first?.chips)
+    }
+
     // MARK: - Lifecycle
 
     func testLoadEmptyTransitionsToEmpty() async {

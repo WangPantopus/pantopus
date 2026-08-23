@@ -87,7 +87,11 @@ public struct MailTranslationView: View {
                 AIElfStripView(content: elfContent(content.elf))
                     .accessibilityIdentifier("translation_elf")
 
-                TranslatorNotes(notes: content.glossary)
+                // The translate route carries no glossary; the card only
+                // appears when the payload actually has notes.
+                if !content.glossary.isEmpty {
+                    TranslatorNotes(notes: content.glossary)
+                }
 
                 TranslationSenderCard(sender: content.sender)
 
@@ -129,7 +133,10 @@ public struct MailTranslationView: View {
             TranslationConfirmedActions(
                 replyName: content.sender.replyName,
                 onReply: { handleReply(content.mailId) },
-                onRetranslate: { viewModel.toast = "Re-translating…" },
+                onRetranslate: {
+                    viewModel.toast = "Re-translating…"
+                    Task { await viewModel.refresh() }
+                },
                 onShowOriginal: { viewModel.selectViewMode(.original) },
                 onShare: { viewModel.toast = "Sharing translation…" },
                 onArchive: { viewModel.toast = "Archived" }

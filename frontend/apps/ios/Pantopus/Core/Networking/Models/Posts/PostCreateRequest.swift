@@ -53,6 +53,12 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
     public let audience: String?
     /// v1.2 purpose tag (mirrors postType for sortability)
     public let purpose: String?
+    /// "Share this task to the feed" — the gig this post references.
+    /// Backend `createPostSchema` key `refTaskId`
+    /// (`backend/routes/posts.js:252`), persisted as `ref_task_id`
+    /// (`posts.js:1237`) and rendered as a "View task" ref card
+    /// (`posts.js:654`).
+    public var refTaskId: String?
 
     public init(
         content: String,
@@ -85,7 +91,8 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         businessName: String? = nil,
         serviceCategory: String? = nil,
         audience: String? = nil,
-        purpose: String? = nil
+        purpose: String? = nil,
+        refTaskId: String? = nil
     ) {
         self.content = content
         self.title = title
@@ -118,6 +125,7 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         self.serviceCategory = serviceCategory
         self.audience = audience
         self.purpose = purpose
+        self.refTaskId = refTaskId
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -133,6 +141,7 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         case dealExpiresAt
         case lostFoundType, contactPref, contactPhone
         case businessName, serviceCategory, audience, purpose
+        case refTaskId
     }
 
     /// Encode dropping `nil` keys so optional fields aren't sent as
@@ -170,6 +179,7 @@ public struct PostCreateRequest: Encodable, Sendable, Hashable {
         try container.encodeIfPresent(serviceCategory, forKey: .serviceCategory)
         try container.encodeIfPresent(audience, forKey: .audience)
         try container.encodeIfPresent(purpose, forKey: .purpose)
+        try container.encodeIfPresent(refTaskId, forKey: .refTaskId)
     }
 }
 

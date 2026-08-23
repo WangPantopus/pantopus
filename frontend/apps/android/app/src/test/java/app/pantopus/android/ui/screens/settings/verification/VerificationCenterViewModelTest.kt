@@ -65,7 +65,10 @@ class VerificationCenterViewModelTest {
             val chip = emailGroup.rows.first().control as RowControl.ChipStatus
             assertEquals("Verified", chip.label)
             assertEquals(RowControl.ChipTone.Success, chip.tone)
-            assertEquals(listOf("email", "phone", "home", "photoid"), loaded.groups.map { it.id })
+            // WS5.2 hid the phone / home "Coming soon" rows until those flows
+            // ship, so only email + photo ID remain. iOS
+            // `VerificationCenterViewModel` emits the same two groups.
+            assertEquals(listOf("email", "photoid"), loaded.groups.map { it.id })
         }
 
     @Test fun loadUnverifiedShowsResendRow() =

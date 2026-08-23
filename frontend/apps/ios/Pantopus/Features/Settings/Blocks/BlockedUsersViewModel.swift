@@ -35,11 +35,21 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
 
     public private(set) var state: ListOfRowsState = .loading
 
+    /// A14.4 MonoFooter — signed-in user's name · short ID, same
+    /// pattern as the Settings index / Payments mono footers.
+    public var monoFooter: String? {
+        guard case let .signedIn(user) = auth.state else { return nil }
+        let name = user.displayName ?? user.email
+        return "\(name) · ID \(String(user.id.prefix(8)))"
+    }
+
     private let api: APIClient
+    private let auth: AuthManager
     private var blocks: [PrivacyBlock] = []
 
-    init(api: APIClient = .shared) {
+    init(api: APIClient = .shared, auth: AuthManager = .shared) {
         self.api = api
+        self.auth = auth
     }
 
     public func load() async {
@@ -119,6 +129,7 @@ public final class BlockedUsersViewModel: ListOfRowsDataSource {
             sections: [
                 RowSection(
                     id: "blocked",
+                    header: "Blocked · \(blocks.count)",
                     footer: "Blocked people can't message you, see your profile, or bid on "
                         + "your tasks. Unblocking doesn't notify them.",
                     rows: rows,

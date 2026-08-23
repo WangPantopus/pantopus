@@ -15,6 +15,9 @@ struct DayHeader: View {
     let streakDays: Int
     let done: Int
     let total: Int
+    /// A13.16 — gear that opens the Mail Day settings sub-view. `nil` (the
+    /// default) hides it, so the VM-free snapshot frames stay unchanged.
+    var onOpenSettings: (@MainActor () -> Void)?
 
     private var remaining: Int {
         total - done
@@ -22,17 +25,31 @@ struct DayHeader: View {
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            MailDayProgressRing(done: done, total: total)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(dateLabel)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.Color.appText)
-                    StreakChip(days: streakDays)
+            HStack(spacing: Spacing.s3) {
+                MailDayProgressRing(done: done, total: total)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(dateLabel)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.Color.appText)
+                        StreakChip(days: streakDays)
+                    }
+                    metaLine
                 }
-                metaLine
+                Spacer(minLength: Spacing.s0)
             }
-            Spacer(minLength: Spacing.s0)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel)
+            if let onOpenSettings {
+                Button(action: onOpenSettings) {
+                    Icon(.slidersHorizontal, size: 16, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Theme.Color.appSurfaceSunken))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Mail Day settings")
+                .accessibilityIdentifier("mailDaySettingsButton")
+            }
         }
         .padding(14)
         .background(Theme.Color.appSurface)
@@ -42,8 +59,7 @@ struct DayHeader: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .shadow(color: .black.opacity(0.04), radius: 3, x: 0, y: 1)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mailDayHeader")
     }
 

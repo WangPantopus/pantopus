@@ -233,15 +233,87 @@ internal fun LoadedFrame(
                 .testTag("identityCenterContent"),
     ) {
         IdentityCards(cards = loaded.identities, onTap = onOpenIdentity)
-        if (loaded.bridges.isNotEmpty()) {
-            SectionOverline("Profile links")
+        SectionOverline("Profile links")
+        if (loaded.bridges.isEmpty()) {
+            EmptyBridgesCard()
+        } else {
             BridgesCard(rows = loaded.bridges, onToggle = onBridgeToggle)
+        }
+        if (loaded.setupRemainingCount > 0) {
+            FirstRunHintCard(remaining = loaded.setupRemainingCount)
         }
         SectionOverline("Privacy")
         RowsCard(rows = loaded.privacyRows, idPrefix = "privacy", onRowTap = onRowTap)
         SectionOverline("Identities")
         RowsCard(rows = loaded.disclosureRows, idPrefix = "disclosure", onRowTap = onRowTap)
         Spacer(modifier = Modifier.height(Spacing.s6))
+    }
+}
+
+@Composable
+private fun EmptyBridgesCard() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s3)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.appSurfaceSunken)
+                .border(1.dp, PantopusColors.appBorder, RoundedCornerShape(Radii.lg))
+                .padding(Spacing.s4)
+                .testTag("identityCenterEmptyBridges"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Link,
+            contentDescription = null,
+            size = 18.dp,
+            tint = PantopusColors.appTextMuted,
+        )
+        Column {
+            Text(
+                text = "Nothing to link yet",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = PantopusColors.appTextMuted,
+            )
+            Text(
+                text = "Set up Persona or Professional to connect profile links.",
+                fontSize = 11.5.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FirstRunHintCard(remaining: Int) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .clip(RoundedCornerShape(Radii.lg))
+                .background(PantopusColors.primary50)
+                .border(1.dp, PantopusColors.primary200, RoundedCornerShape(Radii.lg))
+                .padding(horizontal = Spacing.s3, vertical = Spacing.s2)
+                .testTag("identityCenterFirstRunHint"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+    ) {
+        PantopusIconImage(
+            icon = PantopusIcon.Info,
+            contentDescription = null,
+            size = 14.dp,
+            tint = PantopusColors.primary600,
+        )
+        Text(
+            text = if (remaining == 1) "One more profile to go" else "$remaining more profiles to go",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = PantopusColors.primary700,
+        )
     }
 }
 

@@ -2,32 +2,49 @@
 
 package app.pantopus.android.ui.screens.mailbox.translation
 
+import android.content.Context
+import android.speech.tts.TextToSpeech
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.mailbox.MailboxRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
+
+/** Utterance id for the read-aloud job. */
+private const val TTS_UTTERANCE_ID = "mail-translation"
+
+/** Error copy when either leg of the translation fetch fails. */
+private const val TRANSLATION_ERROR_FALLBACK =
+    "We couldn't translate this letter. Check your connection and try again."
 
 /**
  * A17.13 — Translation view-model. Mirror of iOS `MailTranslationViewModel`.
- * Drives the four DoD states off the sample letter, owns the machine →
- * confirmed transition (optimistic, rolls back on failure), the
- * [TranslationViewToggle] selection, and the stubbed "Listen" affordance.
+ * Fetches a real machine translation and drives the four DoD states off it,
+ * owns the machine → confirmed transition (optimistic, rolls back on
+ * failure), the view-toggle selection, and the read-aloud affordance.
  *
- * Translation / TTS are sample-driven (B2.3 out-of-scope) — the confirm
- * call hits the real translate endpoint so the wiring exists, but a failure
- * simply rolls the optimistic flip back.
+ * [load] reads both halves of the screen:
+ *  - `GET api/mailbox/:id` — the original letter + sender
+ *  - `POST api/mailbox/v2/p3/translate` — the translated text, the
+ *    detected source language, the target, and whether it was cached
+ *
+ * A failure on either leg lands in [MailTranslationUiState.Error], which
+ * the screen renders with a Retry wired to [refresh].
  */
 @HiltViewModel
 class MailTranslationViewModel
     @Inject
     constructor(
+        @ApplicationContext private val appContext: Context,
         private val repo: MailboxRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
@@ -50,20 +67,52 @@ class MailTranslationViewModel
         val confirmInFlight: StateFlow<Boolean> = _confirmInFlight.asStateFlow()
 
         /**
-         * Load the (sample) translation. Real MT lands behind this seam
-         * later; today the projection is deterministic so previews +
-         * snapshots are stable.
+         * One TTS engine for the lifetime of the screen. `onInit` fires on a
+         * binder thread, hence the volatile flags.
+         */
+        @Volatile private var tts: TextToSpeech? = null
+
+        @Volatile private var ttsReady: Boolean = false
+
+        @Volatile private var pendingUtterance: Pair<String, Locale>? = null
+
+        /**
+         * Fetch the mail item and its machine translation, then project them
+         * into the screen content. Both legs are awaited — the side-by-side
+         * view needs the original as much as the translation — so either
+         * failing lands in [MailTranslationUiState.Error] with a Retry.
          */
         fun load() {
             _state.value = MailTranslationUiState.Loading
-            val content =
-                if (seedConfirmed) {
-                    MailTranslationSampleData.confirmedLetter(mailId.ifEmpty { "mail-translation-sample" })
-                } else {
-                    MailTranslationSampleData.letter(mailId.ifEmpty { "mail-translation-sample" })
+            viewModelScope.launch {
+                val detail = repo.detail(mailId)
+                if (detail !is NetworkResult.Success) {
+                    _state.value = MailTranslationUiState.Error(errorMessage(detail))
+                    return@launch
                 }
-            _state.value = MailTranslationUiState.Loaded(content)
+                val translation = repo.translate(mailId)
+                if (translation !is NetworkResult.Success) {
+                    _state.value = MailTranslationUiState.Error(errorMessage(translation))
+                    return@launch
+                }
+                var content =
+                    MailTranslationProjection.project(
+                        mailId = mailId,
+                        detail = detail.data.mail,
+                        translation = translation.data,
+                    )
+                if (seedConfirmed) {
+                    content = content.copy(confirmed = true, viewMode = TranslationViewMode.Translated)
+                }
+                _state.value = MailTranslationUiState.Loaded(content)
+            }
         }
+
+        private fun errorMessage(result: NetworkResult<*>): String =
+            (result as? NetworkResult.Failure)
+                ?.error
+                ?.displayMessage(TRANSLATION_ERROR_FALLBACK)
+                ?: TRANSLATION_ERROR_FALLBACK
 
         fun refresh() = load()
 
@@ -97,7 +146,11 @@ class MailTranslationViewModel
             _confirmInFlight.value = true
             _state.value =
                 MailTranslationUiState.Loaded(
-                    previous.copy(confirmed = true, viewMode = TranslationViewMode.Translated),
+                    previous.copy(
+                        confirmed = true,
+                        viewMode = TranslationViewMode.Translated,
+                        confirmedStamp = MailTranslationProjection.confirmedStamp(),
+                    ),
                 )
             viewModelScope.launch {
                 // The translate endpoint doubles as the "confirm/trust" write
@@ -114,16 +167,97 @@ class MailTranslationViewModel
             }
         }
 
-        /**
-         * Stubbed text-to-speech affordance. Real audio is out of scope
-         * (B2.3); this surfaces a toast so the control is never a dead tap.
-         */
+        /** Read the selected column aloud via platform TTS. */
         fun listen(which: TranslationListenColumn) {
+            val current = _state.value as? MailTranslationUiState.Loaded ?: return
+            val text =
+                when (which) {
+                    TranslationListenColumn.Original ->
+                        current.content.paragraphs.joinToString("\n") { it.original }
+                    TranslationListenColumn.Translated ->
+                        current.content.paragraphs.joinToString("\n") { it.english }
+                }
+            if (text.isBlank()) {
+                _toast.value = "Nothing to read aloud yet."
+                return
+            }
+            val languageCode =
+                when (which) {
+                    TranslationListenColumn.Original -> current.content.languages.sourceCode
+                    TranslationListenColumn.Translated -> current.content.languages.targetCode
+                }
+            speak(text, localeFor(languageCode))
             _toast.value =
                 when (which) {
                     TranslationListenColumn.Original -> "Playing the original aloud…"
                     TranslationListenColumn.Translated -> "Playing the translation aloud…"
                 }
+        }
+
+        /**
+         * Speak through a single engine owned by the view-model. The previous
+         * shape built a second [TextToSpeech] *inside* the first one's `onInit`
+         * and spoke through it before it had initialised, so nothing ever
+         * played; utterances now queue until the one engine reports ready.
+         */
+        private fun speak(
+            text: String,
+            locale: Locale,
+        ) {
+            val engine = tts
+            if (engine != null && ttsReady) {
+                engine.applyLanguage(locale)
+                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, TTS_UTTERANCE_ID)
+                return
+            }
+            pendingUtterance = text to locale
+            // An engine already exists but is still initialising — the pending
+            // utterance above will be picked up by its onInit callback.
+            if (engine != null) return
+            tts =
+                TextToSpeech(appContext) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        ttsReady = true
+                        val pending = pendingUtterance
+                        pendingUtterance = null
+                        if (pending != null) {
+                            tts?.applyLanguage(pending.second)
+                            tts?.speak(pending.first, TextToSpeech.QUEUE_FLUSH, null, TTS_UTTERANCE_ID)
+                        }
+                    } else {
+                        ttsReady = false
+                        pendingUtterance = null
+                        _toast.value = "Couldn't play audio on this device."
+                    }
+                }
+        }
+
+        /**
+         * Resolve the locale for the column's language, falling back to the
+         * device default when the engine carries no voice for it. Mirrors the
+         * iOS voice lookup.
+         */
+        private fun localeFor(code: String): Locale {
+            val trimmed = code.trim()
+            if (trimmed.isEmpty()) return Locale.getDefault()
+            return runCatching { Locale.forLanguageTag(trimmed) }
+                .getOrNull()
+                ?.takeIf { it.language.isNotEmpty() }
+                ?: Locale.getDefault()
+        }
+
+        private fun TextToSpeech.applyLanguage(locale: Locale) {
+            val availability = runCatching { isLanguageAvailable(locale) }.getOrDefault(TextToSpeech.LANG_MISSING_DATA)
+            setLanguage(if (availability >= TextToSpeech.LANG_AVAILABLE) locale else Locale.getDefault())
+        }
+
+        override fun onCleared() {
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+            ttsReady = false
+            pendingUtterance = null
+            super.onCleared()
         }
 
         /** One-off toast for the stubbed overflow / chip affordances. */

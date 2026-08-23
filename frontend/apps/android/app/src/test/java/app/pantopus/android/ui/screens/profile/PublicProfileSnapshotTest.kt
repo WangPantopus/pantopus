@@ -28,9 +28,8 @@ import org.junit.Test
  *
  *  - loading / error chrome (kind-agnostic)
  *  - Persona populated (sky banner, "Persona · Verified" gold chip,
- *    Follow sticky CTA, tier visibility chips, locked-broadcast
+ *    Follow header CTA, tier visibility chips, locked-broadcast
  *    paywall overlay)
- *  - Persona follow-succeeded (Follow CTA flipped to "Following")
  *  - Persona empty-broadcasts
  *  - Local populated (green banner, "Verified neighbor" shield chip,
  *    Message + Connect sticky CTAs, Pulse-style intent chips)
@@ -73,28 +72,6 @@ class PublicProfileSnapshotTest {
                 PublicProfileLoadedFrame(
                     content = personaPopulated(),
                     selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Idle,
-                    connectState = PublicProfileActionState.Idle,
-                    onBack = {},
-                    onSelectTab = {},
-                    onFollow = {},
-                    onMessage = {},
-                    onConnect = {},
-                    onOverflow = {},
-                    onUnlock = {},
-                )
-            }
-        }
-    }
-
-    @Test
-    fun public_profile_persona_following() {
-        paparazzi.snapshot {
-            Frame {
-                PublicProfileLoadedFrame(
-                    content = personaPopulated(),
-                    selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Succeeded,
                     connectState = PublicProfileActionState.Idle,
                     onBack = {},
                     onSelectTab = {},
@@ -115,7 +92,6 @@ class PublicProfileSnapshotTest {
                 PublicProfileLoadedFrame(
                     content = personaPopulated().copy(posts = emptyList()),
                     selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Idle,
                     connectState = PublicProfileActionState.Idle,
                     onBack = {},
                     onSelectTab = {},
@@ -138,7 +114,6 @@ class PublicProfileSnapshotTest {
                 PublicProfileLoadedFrame(
                     content = localPopulated(),
                     selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Idle,
                     connectState = PublicProfileActionState.Idle,
                     onBack = {},
                     onSelectTab = {},
@@ -147,6 +122,9 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    // The Connect control only renders for a signed-in
+                    // viewer on someone else's profile.
+                    follow = ProfileFollowState(canFollow = true),
                 )
             }
         }
@@ -159,7 +137,6 @@ class PublicProfileSnapshotTest {
                 PublicProfileLoadedFrame(
                     content = localPopulated(),
                     selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Idle,
                     connectState = PublicProfileActionState.Succeeded,
                     onBack = {},
                     onSelectTab = {},
@@ -168,6 +145,9 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    follow = ProfileFollowState(canFollow = true),
+                    // An outstanding request: "Requested", clock glyph, inert.
+                    connection = ProfileConnection.PendingSent,
                 )
             }
         }
@@ -180,7 +160,6 @@ class PublicProfileSnapshotTest {
                 PublicProfileLoadedFrame(
                     content = localPopulated().copy(posts = emptyList()),
                     selectedTab = ProfileTab.About,
-                    followState = PublicProfileActionState.Idle,
                     connectState = PublicProfileActionState.Idle,
                     onBack = {},
                     onSelectTab = {},
@@ -189,6 +168,7 @@ class PublicProfileSnapshotTest {
                     onConnect = {},
                     onOverflow = {},
                     onUnlock = {},
+                    follow = ProfileFollowState(canFollow = true),
                 )
             }
         }

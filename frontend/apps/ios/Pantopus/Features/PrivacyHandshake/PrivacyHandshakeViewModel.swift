@@ -22,16 +22,21 @@ public final class PrivacyHandshakeViewModel: WizardModel {
     private let api: APIClient
     private let onDismiss: @MainActor () -> Void
     private let personaHandle: String
+    /// When opening from a locked broadcast, pre-select the post's
+    /// `target_tier_rank` on the tier-selection step.
+    private let preselectedTierRank: Int?
 
     private var ready: HandshakeReadyContent?
     private var isSubmitting: Bool = false
 
     init(
         personaHandle: String,
+        preselectedTierRank: Int? = nil,
         api: APIClient = .shared,
         onDismiss: @escaping @MainActor () -> Void = {}
     ) {
         self.personaHandle = personaHandle
+        self.preselectedTierRank = preselectedTierRank
         self.api = api
         self.onDismiss = onDismiss
     }
@@ -60,7 +65,8 @@ public final class PrivacyHandshakeViewModel: WizardModel {
                 value: suggestion.suggestion ?? "",
                 locked: suggestion.locked ?? false
             )
-            let defaultRank = tierOptions.first { $0.rank == 1 }?.rank
+            let defaultRank = preselectedTierRank
+                ?? tierOptions.first { $0.rank == 1 }?.rank
                 ?? tierOptions.first?.rank ?? 1
             let content = HandshakeReadyContent(
                 persona: preview,

@@ -1,4 +1,4 @@
-@file:Suppress("PackageNaming")
+@file:Suppress("PackageNaming", "TooManyFunctions")
 
 package app.pantopus.android.ui.screens.membership
 
@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.membership.MembershipPersonaDto
 import app.pantopus.android.data.api.models.membership.MembershipTierDto
 import app.pantopus.android.data.api.models.membership.PersonaMembershipDto
+import app.pantopus.android.data.api.models.membership.PersonaPublicTierDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.membership.MembershipRepository
@@ -41,10 +42,17 @@ const val MEMBERSHIP_DETAIL_PERSONA_ID_KEY = "personaId"
  * remain the preview/snapshot seam (the Paparazzi tests render
  * `MembershipLoadedContent` with the sample directly).
  *
- * Mutations: the single-tap Cancel posts to `.../membership/cancel` (no
- * charge). Upgrade / downgrade / change-tier / refund stay host callbacks —
- * paid actions deferred to Phase 3. "Give it a week" snoozes the SLA banner,
- * which is a preview-only frame (the read carries no SLA flag).
+ * Mutations, all real round-trips:
+ *  * Cancel    → `POST .../membership/cancel`    (`personaMembership.js:204`)
+ *  * Upgrade   → `POST .../membership/upgrade`   (`personaMembership.js:121`)
+ *                — takes effect immediately.
+ *  * Downgrade → `POST .../membership/downgrade` (`personaMembership.js:162`)
+ *                — scheduled at `current_period_end`.
+ *  * Refund    → `POST .../membership/refund-request`
+ *                (`personaMembership.js:251`) with `reason: sla_missed`.
+ *
+ * The tier ladder for the picker comes from `GET /api/personas/:handle/tiers`
+ * (`personas.js:1111`).
  */
 @HiltViewModel
 class MembershipDetailViewModel
@@ -65,6 +73,35 @@ class MembershipDetailViewModel
         private val _isCancelling = MutableStateFlow(false)
         val isCancelling: StateFlow<Boolean> = _isCancelling.asStateFlow()
 
+        /** Change-tier picker. */
+        private val _isTierPickerOpen = MutableStateFlow(false)
+        val isTierPickerOpen: StateFlow<Boolean> = _isTierPickerOpen.asStateFlow()
+
+        private val _tierOptions = MutableStateFlow<List<MembershipTierOption>>(emptyList())
+        val tierOptions: StateFlow<List<MembershipTierOption>> = _tierOptions.asStateFlow()
+
+        private val _isChangingTier = MutableStateFlow(false)
+        val isChangingTier: StateFlow<Boolean> = _isChangingTier.asStateFlow()
+
+        private val _tierChangeConfirmation = MutableStateFlow<String?>(null)
+        val tierChangeConfirmation: StateFlow<String?> = _tierChangeConfirmation.asStateFlow()
+
+        /** Refund request sheet. */
+        private val _isRefundSheetOpen = MutableStateFlow(false)
+        val isRefundSheetOpen: StateFlow<Boolean> = _isRefundSheetOpen.asStateFlow()
+
+        private val _isRequestingRefund = MutableStateFlow(false)
+        val isRequestingRefund: StateFlow<Boolean> = _isRequestingRefund.asStateFlow()
+
+        private val _refundConfirmation = MutableStateFlow<String?>(null)
+        val refundConfirmation: StateFlow<String?> = _refundConfirmation.asStateFlow()
+
+        private val _refundError = MutableStateFlow<String?>(null)
+        val refundError: StateFlow<String?> = _refundError.asStateFlow()
+
+        private var currentTierRank: Int = 1
+        private var personaHandle: String? = null
+
         fun load() {
             _state.value = MembershipDetailUiState.Loading
             _actionError.value = null
@@ -72,12 +109,13 @@ class MembershipDetailViewModel
                 when (val result = repository.membership(personaId)) {
                     is NetworkResult.Success -> {
                         val membership = result.data.membership
-                        _state.value =
-                            if (membership?.persona != null) {
-                                MembershipDetailUiState.Populated(MembershipProjection.project(membership))
-                            } else {
+                        if (membership?.persona != null) {
+                            apply(membership)
+                            loadTierLadder()
+                        } else {
+                            _state.value =
                                 MembershipDetailUiState.Error("We couldn't find your membership.")
-                            }
+                        }
                     }
                     is NetworkResult.Failure -> {
                         _state.value =
@@ -89,6 +127,129 @@ class MembershipDetailViewModel
                                 },
                             )
                     }
+                }
+            }
+        }
+
+        fun refresh() = load()
+
+        /** Settle a freshly-read membership into state + the picker inputs. */
+        private fun apply(membership: PersonaMembershipDto) {
+            currentTierRank = membership.tier?.rank ?: 1
+            personaHandle = membership.persona?.handle
+            _state.value =
+                MembershipDetailUiState.Populated(MembershipProjection.project(membership, personaId))
+        }
+
+        /**
+         * Public tier ladder for the picker. Non-blocking: a failure here
+         * leaves the picker empty rather than failing the whole screen
+         * (mirrors RN, which swallows the tier-list error).
+         */
+        private suspend fun loadTierLadder() {
+            val handle = personaHandle
+            if (handle.isNullOrEmpty()) {
+                _tierOptions.value = emptyList()
+                return
+            }
+            _tierOptions.value =
+                when (val result = repository.publicTiers(handle)) {
+                    is NetworkResult.Success ->
+                        MembershipProjection.tierOptions(result.data.tiers, currentTierRank)
+                    is NetworkResult.Failure -> emptyList()
+                }
+        }
+
+        // --- Change tier ---------------------------------------------------
+
+        fun presentTierPicker() {
+            _actionError.value = null
+            _tierChangeConfirmation.value = null
+            _isTierPickerOpen.value = true
+        }
+
+        fun dismissTierPicker() {
+            _isTierPickerOpen.value = false
+        }
+
+        /**
+         * Upgrade (immediate) or downgrade (scheduled at period end), chosen
+         * by comparing the target rank with the current one — the backend
+         * enforces the same split across two distinct routes.
+         */
+        fun changeTier(option: MembershipTierOption) {
+            if (_isChangingTier.value || option.rank == currentTierRank) return
+            _isChangingTier.value = true
+            _actionError.value = null
+            _tierChangeConfirmation.value = null
+            viewModelScope.launch {
+                val result =
+                    if (option.direction == MembershipTierDirection.Upgrade) {
+                        repository.upgrade(personaId, option.rank)
+                    } else {
+                        repository.downgrade(personaId, option.rank)
+                    }
+                _isChangingTier.value = false
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isTierPickerOpen.value = false
+                        _tierChangeConfirmation.value =
+                            if (option.direction == MembershipTierDirection.Upgrade) {
+                                "Tier upgraded."
+                            } else {
+                                "Downgrade scheduled — takes effect at the end of this period."
+                            }
+                        val membership = result.data.membership
+                        if (membership?.persona != null) {
+                            apply(membership)
+                            // Re-derive the ladder so directions flip around
+                            // the new rank.
+                            loadTierLadder()
+                        } else {
+                            load()
+                        }
+                    }
+                    is NetworkResult.Failure ->
+                        _actionError.value = "Couldn't change tier. Please try again."
+                }
+            }
+        }
+
+        // --- Refund request ------------------------------------------------
+
+        fun presentRefundSheet() {
+            _refundError.value = null
+            _refundConfirmation.value = null
+            _isRefundSheetOpen.value = true
+        }
+
+        fun dismissRefundSheet() {
+            _isRefundSheetOpen.value = false
+        }
+
+        /**
+         * SLA-missed refund. The backend re-validates that one of the fan's
+         * threads is genuinely past its reply window and answers
+         * `400 no_sla_missed_thread` when it isn't — surfaced verbatim so the
+         * fan understands why nothing was refunded.
+         */
+        fun requestRefund() {
+            if (_isRequestingRefund.value) return
+            _isRequestingRefund.value = true
+            _refundError.value = null
+            viewModelScope.launch {
+                val result = repository.requestRefund(personaId)
+                _isRequestingRefund.value = false
+                when (result) {
+                    is NetworkResult.Success -> {
+                        _isRefundSheetOpen.value = false
+                        _refundConfirmation.value =
+                            "Refund requested. You'll get a confirmation email shortly."
+                        val membership = result.data.membership
+                        if (membership?.persona != null) apply(membership) else load()
+                    }
+                    is NetworkResult.Failure ->
+                        _refundError.value = refundErrorMessage(result.error)
                 }
             }
         }
@@ -123,6 +284,18 @@ class MembershipDetailViewModel
                 }
             }
         }
+
+        companion object {
+            private const val REFUND_ALREADY_REQUESTED_STATUS = 409
+
+            internal fun refundErrorMessage(error: NetworkError): String =
+                when {
+                    error is NetworkError.ClientError && error.code == REFUND_ALREADY_REQUESTED_STATUS ->
+                        "You've already requested a refund for this membership."
+                    error is NetworkError.ClientError -> error.message
+                    else -> "Couldn't request a refund."
+                }
+        }
     }
 
 /**
@@ -132,7 +305,10 @@ class MembershipDetailViewModel
  */
 @Suppress("MagicNumber", "ReturnCount")
 internal object MembershipProjection {
-    fun project(dto: PersonaMembershipDto): MembershipDetailContent =
+    fun project(
+        dto: PersonaMembershipDto,
+        personaId: String = "",
+    ): MembershipDetailContent =
         MembershipDetailContent(
             persona = projectPersona(dto.persona),
             tier = tierForRank(dto.tier?.rank),
@@ -145,7 +321,49 @@ internal object MembershipProjection {
             benefits = benefits(dto.tier),
             policyFootnote = MembershipSampleData.POLICY_FOOTNOTE,
             slaAlert = null,
+            personaId = dto.persona?.id ?: personaId,
+            inbox =
+                MembershipInboxCard(
+                    remainingThreads = dto.quotaRemaining?.msgThreads,
+                    threadsPerPeriod = dto.tier?.msgThreadsPerPeriod,
+                ),
+            hasScheduledTierChange = dto.scheduledTierChange?.tierId != null,
+            isTerminal = dto.status == "canceled" || dto.status == "expired",
+            cancelAtPeriodEnd = dto.cancelAtPeriodEnd == true,
         )
+
+    /**
+     * Ladder rows for the change-tier picker — current rank removed,
+     * direction derived from the rank comparison so the sheet can state
+     * "Takes effect immediately" vs "Scheduled for the end of this period".
+     */
+    fun tierOptions(
+        tiers: List<PersonaPublicTierDto>,
+        currentRank: Int,
+    ): List<MembershipTierOption> =
+        tiers
+            .filter { it.rank != currentRank }
+            .sortedBy { it.rank }
+            .map { tier ->
+                MembershipTierOption(
+                    id = tier.id,
+                    rank = tier.rank,
+                    name = tier.name ?: "Tier ${tier.rank}",
+                    priceLabel = tierPriceLabel(tier),
+                    direction =
+                        if (tier.rank > currentRank) {
+                            MembershipTierDirection.Upgrade
+                        } else {
+                            MembershipTierDirection.Downgrade
+                        },
+                )
+            }
+
+    private fun tierPriceLabel(tier: PersonaPublicTierDto): String {
+        val price = priceLabel(tier.priceCents, tier.currency)
+        if (price == "Free") return price
+        return "$price / ${periodLabel(tier.billingInterval)}"
+    }
 
     private fun projectPersona(dto: MembershipPersonaDto?): MembershipPersona {
         val name = dto?.displayName ?: dto?.handle ?: "Creator"

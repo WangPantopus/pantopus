@@ -18,54 +18,108 @@ import SwiftUI
 public struct WaitingRoomView: View {
     @State private var viewModel: WaitingRoomViewModel
     private let onBack: @MainActor () -> Void
+    private let onNav: @MainActor (WaitingRoomNav) -> Void
 
     public init(
         viewModel: WaitingRoomViewModel,
-        onBack: @escaping @MainActor () -> Void = {}
+        onBack: @escaping @MainActor () -> Void = {},
+        onNav: @escaping @MainActor (WaitingRoomNav) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onBack = onBack
+        self.onNav = onNav
     }
 
     public var body: some View {
         VStack(spacing: Spacing.s0) {
             WaitingRoomTopBar(
-                title: viewModel.content.title,
+                title: topBarTitle,
                 onBack: onBack
             ) {
                 viewModel.openNotifications()
             }
-            ScrollView {
-                VStack(spacing: Spacing.s5) {
-                    HaloCircle(
-                        tone: viewModel.content.halo.tone,
-                        icon: viewModel.content.halo.icon,
-                        isPulsing: viewModel.content.halo.isPulsing
-                    )
-                    .padding(.top, Spacing.s2)
-                    headlineBlock
-                    addressRow
-                    if let note = viewModel.content.reviewerNote {
-                        WaitingRoomReviewerNoteCard(note: note)
+            switch viewModel.phase {
+            case .loading:
+                WaitingRoomLoadingFrame()
+            case let .verification(content):
+                // RN's Verification Center — served on the same route
+                // when the caller has no claim in review but their
+                // occupancy still isn't verified.
+                HomeVerificationFrame(
+                    content: content,
+                    onAction: { viewModel.handleVerificationAction($0) },
+                    onDone: onBack
+                )
+            case let .notice(notice):
+                WaitingRoomNoticeFrame(notice: notice) {
+                    if notice.isRetry {
+                        Task { await viewModel.refresh() }
+                    } else {
+                        onBack()
                     }
-                    timelineCard
-                    StatusPillView(pill: viewModel.content.etaPill)
-                    manageSection
-                    Spacer(minLength: Spacing.s4)
                 }
-                .padding(.horizontal, Spacing.s5)
-                .padding(.vertical, Spacing.s4)
-                .frame(maxWidth: .infinity)
+            case let .approved(content):
+                // A18.2 "You're the owner". `StatusWaitingView` carries its
+                // own sticky dock, so no extra chrome is added here.
+                StatusWaitingView(
+                    content: content,
+                    onPrimary: { viewModel.handlePrimary($0) },
+                    onSecondary: { viewModel.handleSecondary($0) }
+                )
+                .accessibilityIdentifier("waitingRoomApproved")
+            case .loaded:
+                loadedFrame
             }
-            stickyDock
         }
         .background(Theme.Color.appBg)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("waitingRoom")
+        .task { await viewModel.refresh() }
+        .onChange(of: viewModel.pendingNav) { _, nav in
+            guard let nav else { return }
+            onNav(nav)
+            viewModel.consumeNav()
+        }
     }
 
     // MARK: - Body slots
+
+    /// The Verification Center frame retitles the bar; every other phase
+    /// keeps the claim room's "Waiting for approval".
+    private var topBarTitle: String {
+        if case .verification = viewModel.phase {
+            return HomeVerificationContent.screenTitle
+        }
+        return viewModel.content.title
+    }
+
+    @ViewBuilder
+    private var loadedFrame: some View {
+        ScrollView {
+            VStack(spacing: Spacing.s5) {
+                HaloCircle(
+                    tone: viewModel.content.halo.tone,
+                    icon: viewModel.content.halo.icon,
+                    isPulsing: viewModel.content.halo.isPulsing
+                )
+                .padding(.top, Spacing.s2)
+                headlineBlock
+                addressRow
+                if let note = viewModel.content.reviewerNote {
+                    WaitingRoomReviewerNoteCard(note: note)
+                }
+                timelineCard
+                StatusPillView(pill: viewModel.content.etaPill)
+                manageSection
+                Spacer(minLength: Spacing.s4)
+            }
+            .padding(.horizontal, Spacing.s5)
+            .padding(.vertical, Spacing.s4)
+            .frame(maxWidth: .infinity)
+        }
+        stickyDock
+    }
 
     private var headlineBlock: some View {
         VStack(spacing: Spacing.s2) {

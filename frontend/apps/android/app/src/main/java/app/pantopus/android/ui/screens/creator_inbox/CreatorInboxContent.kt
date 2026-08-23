@@ -32,10 +32,22 @@ data class CreatorInboxRowContent(
     val unread: Boolean,
     val flagged: Boolean,
     val verifiedLocal: Boolean,
-    /** Counterparty user id preferred for the conversation push. */
+    /**
+     * Counterparty user id, when the serializer happens to emit one. NEVER
+     * used as a routing key for the DM thread — persona DMs carry no user id
+     * by design (`backend/routes/personaDms.js:12`), so the row routes on
+     * [id] (the `PersonaDmThread` id) instead.
+     */
     val counterpartyUserId: String?,
     /** Optional persona chip when the inbox spans multiple personas. */
     val personaChip: String?,
+    /**
+     * Persona that owns this thread — the `:id` path segment of every
+     * `/api/personas/:id/dms/…` call made from the thread surface.
+     */
+    val personaId: String = "",
+    /** `PersonaMembership` id the thread hangs off. Display/audit only. */
+    val membershipId: String? = null,
 )
 
 /** Filter chip render model — live count + matching filter case. */

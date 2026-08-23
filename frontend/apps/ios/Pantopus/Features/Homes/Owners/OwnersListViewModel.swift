@@ -20,6 +20,9 @@ import SwiftUI
 public enum OwnersListEvent: Sendable, Equatable {
     case openInvite
     case confirmRemove(ownerId: String, displayName: String)
+    /// H6 — push the per-home owner claim-review surface
+    /// (`HomeClaimReviewView`). Fired by the top-bar gavel.
+    case openClaimReview
 }
 
 /// `@Observable` data source for the Owners list screen.
@@ -28,8 +31,20 @@ public enum OwnersListEvent: Sendable, Equatable {
 final class OwnersListViewModel: ListOfRowsDataSource {
     let title = "Owners"
 
+    /// H6 — entry point to the per-home claim-review surface
+    /// (`HomeClaimReviewView`). Deliberately un-badged: counting pending
+    /// claims would mean two extra owner-scoped reads on every roster
+    /// load, and the review screen already shows per-tab counts.
+    /// Nil when the host didn't wire a claim-review destination
+    /// (previews / tests) so the gavel is never a dead button.
     var topBarAction: TopBarAction? {
-        nil
+        guard showsClaimReview else { return nil }
+        return TopBarAction(
+            icon: .gavel,
+            accessibilityLabel: "Review claims on this home"
+        ) { @Sendable [weak self] in
+            Task { @MainActor in self?.pendingEvent = .openClaimReview }
+        }
     }
 
     let tabs: [ListOfRowsTab] = []
@@ -59,14 +74,19 @@ final class OwnersListViewModel: ListOfRowsDataSource {
     /// drives optimistic-remove rollback.
     private var owners: [OwnerDTO] = []
 
+    /// True only when the host supplied an `onOpenClaimReview` handler.
+    private let showsClaimReview: Bool
+
     init(
         homeId: String,
         currentUserId: String? = nil,
-        api: APIClient = .shared
+        api: APIClient = .shared,
+        showsClaimReview: Bool = false
     ) {
         self.homeId = homeId
         self.currentUserId = currentUserId
         self.api = api
+        self.showsClaimReview = showsClaimReview
     }
 
     // MARK: - ListOfRowsDataSource

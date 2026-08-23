@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.gigs.CreateGigBody
 import app.pantopus.android.data.api.models.gigs.CreateGigLocation
 import app.pantopus.android.data.api.models.gigs.GigDto
+import app.pantopus.android.data.api.models.gigs.GigItemDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.files.FilesRepository
 import app.pantopus.android.data.gigs.GigsRepository
@@ -47,6 +48,42 @@ data class PostGigV1Photo(
     val url: String? = null,
 )
 
+/**
+ * `cancellation_policy` — the three values `createGigSchema` /
+ * `updateGigSchema` accept (`backend/routes/gigs.js:438` / `:649`).
+ * Labels + blurbs mirror the backend's `CANCELLATION_POLICIES` table
+ * (`gigs.js:541`) so the picker states the real rule.
+ */
+enum class PostGigV1CancellationPolicy(
+    val wire: String,
+    val label: String,
+    val blurb: String,
+) {
+    Flexible("flexible", "Flexible", "Free cancellation anytime before work starts."),
+    Standard("standard", "Standard", "Free within 1 hour of acceptance. After that, 5% fee."),
+    Strict("strict", "Strict", "10% fee after acceptance. 50% after work starts."),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): PostGigV1CancellationPolicy = entries.firstOrNull { it.wire == value } ?: Standard
+    }
+}
+
+/**
+ * One errand / shopping line item (`Gig.items` jsonb). Mirrors RN's
+ * `TaskItem` (`gig/_components/useGigForm.ts:68`).
+ */
+data class PostGigV1Item(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val notes: String = "",
+    val budgetCap: String = "",
+    val preferredStore: String = "",
+) {
+    val isEmpty: Boolean
+        get() = name.isBlank() && notes.isBlank() && budgetCap.isBlank() && preferredStore.isBlank()
+}
+
 data class PostGigV1Form(
     val category: GigsCategory = GigsCategory.All,
     val title: String = "",
@@ -56,7 +93,30 @@ data class PostGigV1Form(
     val scheduledAt: LocalDateTime = LocalDateTime.now().plusDays(1),
     val location: String = "",
     val photos: List<PostGigV1Photo> = emptyList(),
+    // A13.8 P5 — the fields RN's editor has always carried.
+    val cancellationPolicy: PostGigV1CancellationPolicy = PostGigV1CancellationPolicy.Standard,
+    val isUrgent: Boolean = false,
+    /** Comma-separated, exactly like RN's single text input. */
+    val tags: String = "",
+    /** Optional "must be done by" date (`deadline`). Null ⇒ omitted. */
+    val deadline: LocalDateTime? = null,
+    /** Hours, free-text so an empty field means "omit". */
+    val estimatedDuration: String = "",
+    val items: List<PostGigV1Item> = emptyList(),
 ) {
+    /** Trimmed, non-empty, capped at the schema's five. */
+    val parsedTags: List<String>
+        get() =
+            tags
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .take(PostGigV1SampleData.MAX_TAGS)
+
+    /** RN keeps only items with a name (`useGigForm.ts:346`). */
+    val validItems: List<PostGigV1Item>
+        get() = items.filter { it.name.isNotBlank() }
+
     val hasAnyInput: Boolean
         get() =
             category != GigsCategory.All ||
@@ -65,10 +125,16 @@ data class PostGigV1Form(
                 price.isNotBlank() ||
                 priceType != PostGigV1PriceType.Flat ||
                 location.isNotBlank() ||
-                photos.isNotEmpty()
+                photos.isNotEmpty() ||
+                cancellationPolicy != PostGigV1CancellationPolicy.Standard ||
+                isUrgent ||
+                tags.isNotBlank() ||
+                deadline != null ||
+                estimatedDuration.isNotBlank() ||
+                items.any { !it.isEmpty }
 }
 
-enum class PostGigV1Field { Category, Title, Description, Price, DateTime, Location }
+enum class PostGigV1Field { Category, Title, Description, Price, DateTime, Location, EstimatedDuration }
 
 data class PostGigV1ValidationError(
     val field: PostGigV1Field,
@@ -212,6 +278,47 @@ class PostGigV1ViewModel
             updateForm { it.copy(location = location) }
         }
 
+        // MARK: - A13.8 P5 — the rest of RN's editable field set
+
+        fun updateCancellationPolicy(policy: PostGigV1CancellationPolicy) {
+            updateForm { it.copy(cancellationPolicy = policy) }
+        }
+
+        fun updateIsUrgent(isUrgent: Boolean) {
+            updateForm { it.copy(isUrgent = isUrgent) }
+        }
+
+        fun updateTags(tags: String) {
+            updateForm { it.copy(tags = tags) }
+        }
+
+        fun updateDeadline(deadline: LocalDateTime?) {
+            updateForm { it.copy(deadline = deadline) }
+        }
+
+        fun updateEstimatedDuration(hours: String) {
+            updateForm { it.copy(estimatedDuration = hours.filter { c -> c.isDigit() || c == '.' }) }
+        }
+
+        fun addItem() {
+            updateForm { form ->
+                if (form.items.size >= PostGigV1SampleData.MAX_ITEMS) form else form.copy(items = form.items + PostGigV1Item())
+            }
+        }
+
+        fun updateItem(
+            id: String,
+            transform: (PostGigV1Item) -> PostGigV1Item,
+        ) {
+            updateForm { form ->
+                form.copy(items = form.items.map { if (it.id == id) transform(it) else it })
+            }
+        }
+
+        fun removeItem(id: String) {
+            updateForm { form -> form.copy(items = form.items.filterNot { it.id == id }) }
+        }
+
         /**
          * P0.2 — accept a picked photo and upload it immediately via
          * `POST /api/files/upload` (`FilesRepository`). The tile tracks
@@ -326,8 +433,32 @@ class PostGigV1ViewModel
                             url = url,
                         )
                     },
+                // A13.8 P5 — the rest of RN's prefill (`useGigForm.ts:90-116`).
+                cancellationPolicy = PostGigV1CancellationPolicy.fromWire(gig.cancellationPolicy),
+                isUrgent = gig.isUrgent == true,
+                tags = gig.tags.orEmpty().joinToString(", "),
+                deadline = parseScheduledStart(gig.deadline),
+                estimatedDuration = formatDuration(gig.estimatedDuration),
+                items =
+                    gig.items
+                        .orEmpty()
+                        .map {
+                            PostGigV1Item(
+                                name = it.name.orEmpty(),
+                                notes = it.notes.orEmpty(),
+                                budgetCap = it.budgetCapText.orEmpty(),
+                                preferredStore = it.preferredStore.orEmpty(),
+                            )
+                        }.filterNot { it.isEmpty },
             )
         }
+
+        private fun formatDuration(hours: Double?): String =
+            when {
+                hours == null || hours <= 0.0 -> ""
+                hours % 1.0 == 0.0 -> hours.toLong().toString()
+                else -> hours.toString()
+            }
 
         private fun formatPrice(price: Double?): String =
             when {
@@ -412,6 +543,8 @@ class PostGigV1ViewModel
                     price = 0.0
                 }
             }
+            val tags = form.parsedTags
+            val items = form.validItems.map { it.toDto() }
             return CreateGigBody(
                 title = form.title.trim(),
                 description = form.description.trim(),
@@ -427,6 +560,17 @@ class PostGigV1ViewModel
                     form.photos.mapNotNull { it.url }.let { urls ->
                         if (forEdit) urls else urls.ifEmpty { null }
                     },
+                // `deadline` / `estimated_duration` can only be *set*: the
+                // update schema takes neither `null` (`gigs.js:646`), so an
+                // empty field is omitted rather than cleared. The list-shaped
+                // fields and the two flags always ride on an edit, otherwise
+                // the editor could add but never remove.
+                deadline = form.deadline?.atZone(ZoneId.systemDefault())?.toInstant()?.toString(),
+                cancellationPolicy = form.cancellationPolicy.wire,
+                isUrgent = if (forEdit) form.isUrgent else form.isUrgent.takeIf { it },
+                tags = if (forEdit) tags else tags.ifEmpty { null },
+                estimatedDuration = form.estimatedDuration.trim().toDoubleOrNull()?.takeIf { it > 0.0 },
+                items = if (forEdit) items else items.ifEmpty { null },
                 location =
                     CreateGigLocation(
                         mode = "custom",
@@ -436,6 +580,14 @@ class PostGigV1ViewModel
                     ),
             )
         }
+
+        private fun PostGigV1Item.toDto(): GigItemDto =
+            GigItemDto(
+                name = name.trim().takeIf { it.isNotEmpty() },
+                notes = notes.trim().takeIf { it.isNotEmpty() },
+                budgetCap = budgetCap.trim().takeIf { it.isNotEmpty() },
+                preferredStore = preferredStore.trim().takeIf { it.isNotEmpty() },
+            )
 
         private fun updateForm(transform: (PostGigV1Form) -> PostGigV1Form) {
             updateContent { content -> content.copy(form = transform(content.form)) }
@@ -477,6 +629,15 @@ class PostGigV1ViewModel
             }
             if (form.location.isBlank()) {
                 errors += PostGigV1ValidationError(PostGigV1Field.Location, "Add a pickup or meetup location.")
+            }
+            // RN's exact rule (`useGigForm.ts:290`).
+            val duration = form.estimatedDuration.trim()
+            if (duration.isNotEmpty() && (duration.toDoubleOrNull() ?: 0.0) <= 0.0) {
+                errors +=
+                    PostGigV1ValidationError(
+                        PostGigV1Field.EstimatedDuration,
+                        "Estimated duration must be a positive number.",
+                    )
             }
             return errors
         }

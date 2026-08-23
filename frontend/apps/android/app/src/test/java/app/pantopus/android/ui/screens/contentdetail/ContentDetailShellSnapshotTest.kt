@@ -43,9 +43,9 @@ class ContentDetailShellSnapshotTest {
 
     @Test fun listing_sold() = snapshot(ListingDetailSampleData.sold)
 
-    @Test fun invoice_due() = snapshot(InvoiceDetailViewModel.Projection.fixture("INV-00318"))
+    @Test fun invoice_due() = snapshot(InvoiceDetailSampleData.due)
 
-    @Test fun invoice_paid() = snapshot(InvoiceDetailViewModel.Projection.paidFixture("INV-00318"))
+    @Test fun invoice_paid() = snapshot(InvoiceDetailSampleData.paid)
 
     private fun snapshot(content: ContentDetailContent) {
         paparazzi.snapshot {

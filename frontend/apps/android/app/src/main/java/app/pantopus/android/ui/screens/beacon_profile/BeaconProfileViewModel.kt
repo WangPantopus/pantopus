@@ -13,6 +13,7 @@ import app.pantopus.android.data.api.models.beacon.BeaconViewerDto
 import app.pantopus.android.data.api.net.NetworkError
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.beacon.BeaconProfileRepository
+import app.pantopus.android.data.broadcast.BroadcastReadRepository
 import app.pantopus.android.ui.screens.profile.PublicProfileHeader
 import app.pantopus.android.ui.screens.profile.PublicProfilePost
 import app.pantopus.android.ui.screens.shared.content_detail.bodies.ProfileStatCell
@@ -92,6 +93,7 @@ class BeaconProfileViewModel
     @Inject
     constructor(
         private val repo: BeaconProfileRepository,
+        private val broadcastReads: BroadcastReadRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val handleArg: String? =
@@ -123,6 +125,13 @@ class BeaconProfileViewModel
         private var loadedHandle: String = ""
         private var loadedPersonaId: String = ""
 
+        /**
+         * Broadcast ids already reported as read this session, so a
+         * pull-to-refresh doesn't double-count. RN keeps the same `Set` in a
+         * ref (`src/app/persona/[personaHandle]/index.tsx:61`).
+         */
+        private val markedBroadcastIds = mutableSetOf<String>()
+
         fun load() {
             if (_state.value is BeaconProfileUiState.Loaded) return
             refresh()
@@ -141,13 +150,24 @@ class BeaconProfileViewModel
             _toastMessage.value = null
         }
 
-        fun showSubscribeToast() {
-            _toastMessage.value = "Subscribe flow coming soon"
+        private val _handshakePreselectedTierRank = MutableStateFlow<Int?>(null)
+        val handshakePreselectedTierRank: StateFlow<Int?> = _handshakePreselectedTierRank.asStateFlow()
+
+        /** Visitor unlock on a tier-gated broadcast. */
+        fun unlockBroadcast(tierRank: Int?) {
+            if (isOwner) return
+            _handshakePreselectedTierRank.value = tierRank
+            _showFollowHandshake.value = true
+        }
+
+        fun clearHandshakeTier() {
+            _handshakePreselectedTierRank.value = null
         }
 
         /** Visitor Follow → route through the privacy handshake wizard. */
         fun follow() {
             if (isOwner || _followBusy.value || _followStatus.value != BeaconFollowStatus.None) return
+            _handshakePreselectedTierRank.value = null
             _showFollowHandshake.value = true
         }
 
@@ -196,6 +216,42 @@ class BeaconProfileViewModel
             val tiers = if (loadedHandle.isEmpty()) emptyList() else loadTiers(loadedHandle)
 
             _state.value = BeaconProfileUiState.Loaded(build(persona, envelope.channel?.id, posts, tiers))
+            markBroadcastsRead(posts, persona.viewer)
+        }
+
+        /**
+         * Report every broadcast the viewer just saw as read. Fire-and-forget:
+         * the increment feeds the creator's read-count analytics, so a failure
+         * must never surface to the fan. The owner's own views are skipped
+         * (the backend ignores them anyway) and a locked / tier-gated row is
+         * skipped because the viewer never actually read it.
+         *
+         * Mirrors RN `markBroadcastPostsRead`
+         * (`src/app/persona/[personaHandle]/index.tsx:63-72`).
+         */
+        private fun markBroadcastsRead(
+            posts: List<BeaconPostDto>,
+            viewer: BeaconViewerDto?,
+        ) {
+            if (isOwner || viewer?.isOwner == true) return
+            val eligible =
+                posts.filter { post ->
+                    val id = post.id
+                    !id.isNullOrEmpty() &&
+                        !post.broadcastChannelId.isNullOrEmpty() &&
+                        post.locked != true &&
+                        markedBroadcastIds.add(id)
+                }
+            if (eligible.isEmpty()) return
+            viewModelScope.launch {
+                eligible.forEach { post ->
+                    val id = post.id ?: return@forEach
+                    if (broadcastReads.markRead(id) is NetworkResult.Failure) {
+                        // Let a later visit retry this one.
+                        markedBroadcastIds.remove(id)
+                    }
+                }
+            }
         }
 
         private suspend fun loadPosts(handle: String): List<BeaconPostDto> =
@@ -294,6 +350,7 @@ class BeaconProfileViewModel
                 visibility = visibility(post.visibility, post.targetTierRank),
                 isLocked = locked,
                 intent = null,
+                targetTierRank = post.targetTierRank,
             )
         }
 

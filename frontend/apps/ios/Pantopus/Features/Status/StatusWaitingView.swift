@@ -41,15 +41,11 @@ public struct StatusWaitingView: View {
         VStack(spacing: Spacing.s0) {
             ScrollView {
                 VStack(spacing: Spacing.s5) {
-                    HaloCircle(tone: content.halo.tone, icon: content.halo.icon, isPulsing: content.halo.isPulsing)
-                        .padding(.top, Spacing.s4)
-                    headlineBlock
-                    if let chip = content.addressChip { addressChip(chip) }
-                    if !content.timeline.isEmpty { timelineBlock }
-                    if let pill = content.statusPill { StatusPillView(pill: pill) }
-                    if !content.actionStack.isEmpty { actionStack }
-                    if !content.actionCards.isEmpty { actionCards }
-                    if !content.explainerBullets.isEmpty { explainerBlock }
+                    StatusWaitingBodyView(
+                        content: content,
+                        onAction: onAction,
+                        onStackAction: onStackAction
+                    )
                     Spacer(minLength: Spacing.s6)
                 }
                 .padding(Spacing.s4)
@@ -59,6 +55,110 @@ public struct StatusWaitingView: View {
         }
         .background(Theme.Color.appBg)
         .accessibilityIdentifier("statusWaiting")
+    }
+
+    // MARK: - Bottom chrome (footer OR sticky dock)
+
+    @ViewBuilder
+    private var bottomChrome: some View {
+        if !content.actionStack.isEmpty {
+            if let footnote = content.footnote { footnoteFooter(footnote) }
+        } else if content.primaryCta != nil || content.secondaryCta != nil {
+            stickyDock
+        }
+    }
+
+    private func footnoteFooter(_ text: String) -> some View {
+        HStack(spacing: Spacing.s2) {
+            Icon(.info, size: 11, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.Color.appTextSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.top, Spacing.s2)
+        .padding(.bottom, Spacing.s6)
+        .frame(maxWidth: .infinity)
+        .background(Theme.Color.appSurface)
+        .accessibilityIdentifier("statusFootnote")
+    }
+
+    private var stickyDock: some View {
+        VStack(spacing: Spacing.s0) {
+            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
+            VStack(spacing: Spacing.s2) {
+                if let primary = content.primaryCta {
+                    Button { onPrimary(primary) } label: {
+                        HStack(spacing: 7) {
+                            if let icon = primary.icon {
+                                Icon(icon, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
+                            }
+                            Text(primary.label)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(Theme.Color.appTextInverse)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Theme.Color.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
+                        .shadow(color: Theme.Color.primary600.opacity(0.3), radius: 9, x: 0, y: 8)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("statusPrimaryCta")
+                }
+                if let secondary = content.secondaryCta {
+                    Button { onSecondary(secondary) } label: {
+                        Text(secondary.label)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.Color.appTextSecondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("statusSecondaryCta")
+                }
+            }
+            .padding(.horizontal, Spacing.s4)
+            .padding(.top, Spacing.s3)
+            .padding(.bottom, Spacing.s6)
+            .background(Theme.Color.appSurface)
+        }
+    }
+}
+
+/// Status / waiting body used INSIDE another scaffold (e.g. the Homes
+/// wizards' success step). Renders the centred body minus the bottom
+/// chrome — the wizard's own sticky CTA row replaces it. Mirrors Android
+/// `StatusWaitingBody`.
+public struct StatusWaitingBodyView: View {
+    private let content: StatusWaitingContent
+    private let onAction: @MainActor (StatusActionCard) -> Void
+    private let onStackAction: @MainActor (StatusActionButton) -> Void
+
+    public init(
+        content: StatusWaitingContent,
+        onAction: @escaping @MainActor (StatusActionCard) -> Void = { _ in },
+        onStackAction: @escaping @MainActor (StatusActionButton) -> Void = { _ in }
+    ) {
+        self.content = content
+        self.onAction = onAction
+        self.onStackAction = onStackAction
+    }
+
+    public var body: some View {
+        VStack(spacing: Spacing.s5) {
+            HaloCircle(tone: content.halo.tone, icon: content.halo.icon, isPulsing: content.halo.isPulsing)
+            headlineBlock
+            if let chip = content.addressChip { addressChip(chip) }
+            if !content.timeline.isEmpty { timelineBlock }
+            if let pill = content.statusPill { StatusPillView(pill: pill) }
+            if !content.actionStack.isEmpty { actionStack }
+            if !content.actionCards.isEmpty { actionCards }
+            if !content.explainerBullets.isEmpty { explainerBlock }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("statusWaitingBody")
     }
 
     // MARK: - Body slots
@@ -203,75 +303,6 @@ public struct StatusWaitingView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
         .accessibilityIdentifier("statusExplainer")
-    }
-
-    // MARK: - Bottom chrome (footer OR sticky dock)
-
-    @ViewBuilder
-    private var bottomChrome: some View {
-        if !content.actionStack.isEmpty {
-            if let footnote = content.footnote { footnoteFooter(footnote) }
-        } else if content.primaryCta != nil || content.secondaryCta != nil {
-            stickyDock
-        }
-    }
-
-    private func footnoteFooter(_ text: String) -> some View {
-        HStack(spacing: Spacing.s2) {
-            Icon(.info, size: 11, strokeWidth: 2.2, color: Theme.Color.appTextSecondary)
-            Text(text)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.Color.appTextSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, Spacing.s4)
-        .padding(.top, Spacing.s2)
-        .padding(.bottom, Spacing.s6)
-        .frame(maxWidth: .infinity)
-        .background(Theme.Color.appSurface)
-        .accessibilityIdentifier("statusFootnote")
-    }
-
-    private var stickyDock: some View {
-        VStack(spacing: Spacing.s0) {
-            Rectangle().fill(Theme.Color.appBorder).frame(height: 1)
-            VStack(spacing: Spacing.s2) {
-                if let primary = content.primaryCta {
-                    Button { onPrimary(primary) } label: {
-                        HStack(spacing: 7) {
-                            if let icon = primary.icon {
-                                Icon(icon, size: 15, strokeWidth: 2.4, color: Theme.Color.appTextInverse)
-                            }
-                            Text(primary.label)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Theme.Color.appTextInverse)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Theme.Color.primary600)
-                        .clipShape(RoundedRectangle(cornerRadius: Radii.lg, style: .continuous))
-                        .shadow(color: Theme.Color.primary600.opacity(0.3), radius: 9, x: 0, y: 8)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("statusPrimaryCta")
-                }
-                if let secondary = content.secondaryCta {
-                    Button { onSecondary(secondary) } label: {
-                        Text(secondary.label)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.Color.appTextSecondary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("statusSecondaryCta")
-                }
-            }
-            .padding(.horizontal, Spacing.s4)
-            .padding(.top, Spacing.s3)
-            .padding(.bottom, Spacing.s6)
-            .background(Theme.Color.appSurface)
-        }
     }
 }
 

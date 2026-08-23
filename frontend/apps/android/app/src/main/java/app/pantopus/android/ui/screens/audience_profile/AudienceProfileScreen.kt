@@ -63,7 +63,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.components.Shimmer
-import app.pantopus.android.ui.screens.membership.MembershipSampleData
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
@@ -79,7 +78,6 @@ fun AudienceProfileScreen(
     onOpenBroadcast: (UpdateCardContent, List<TierBreakdownContent.TierSegment>) -> Unit = { _, _ -> },
     onOpenSetup: () -> Unit = {},
     onOpenCreatorInbox: () -> Unit = {},
-    onOpenMembership: (String) -> Unit = {},
     onComposeBroadcast: (String) -> Unit = {},
     onOpenEditPersona: () -> Unit = {},
     onOpenBeacons: () -> Unit = {},
@@ -160,7 +158,12 @@ fun AudienceProfileScreen(
                 }
                 BeaconsFooter(onOpenBeacons = onOpenBeacons)
                 FollowingFooter(onOpenFollowing = onOpenFollowing)
-                MemberFooter(onOpenMembership = onOpenMembership)
+                // The "You're a member of <persona>, <tier> tier" footer is
+                // gone: it rendered `MembershipSampleData.audienceFooter`,
+                // a fixture persona ("Lara Chen · Silver"), to every viewer
+                // of their own beacon hub. `/api/personas/me` carries no
+                // viewer-membership payload, so there is nothing real to
+                // put here — see the report for the endpoint gap.
             }
         }
     }
@@ -168,7 +171,7 @@ fun AudienceProfileScreen(
 
 /**
  * A03.2 — entry into the Beacon Updates feed (broadcasts from beacons the
- * user follows). Mirrors [MemberFooter]'s row recipe.
+ * user follows). Mirrors [FollowingFooter]'s row recipe.
  */
 @Composable
 private fun BeaconsFooter(onOpenBeacons: () -> Unit) {
@@ -266,61 +269,6 @@ private fun FollowingFooter(onOpenFollowing: () -> Unit) {
         }
         Text(
             text = "Open",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PantopusColors.primary700,
-        )
-        PantopusIconImage(
-            icon = PantopusIcon.ChevronRight,
-            contentDescription = null,
-            size = 14.dp,
-            strokeWidth = 2f,
-            tint = PantopusColors.primary600,
-        )
-    }
-}
-
-@Composable
-private fun MemberFooter(onOpenMembership: (String) -> Unit) {
-    val footer = MembershipSampleData.audienceFooter
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(PantopusColors.appSurface)
-                .clickable { onOpenMembership(footer.personaId) }
-                .padding(horizontal = Spacing.s4, vertical = 10.dp)
-                .heightIn(min = 48.dp)
-                .testTag("audienceProfileMemberFooter")
-                .semantics {
-                    contentDescription =
-                        "You're a member of ${footer.personaName}, ${footer.tierName} tier. Manage membership."
-                },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
-    ) {
-        PantopusIconImage(
-            icon = PantopusIcon.Crown,
-            contentDescription = null,
-            size = Radii.xl,
-            strokeWidth = 2.3f,
-            tint = PantopusColors.primary600,
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                text = "You're a member",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = PantopusColors.appText,
-            )
-            Text(
-                text = "${footer.personaName} · ${footer.tierName} tier",
-                fontSize = 11.sp,
-                color = PantopusColors.appTextSecondary,
-            )
-        }
-        Text(
-            text = "Manage",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = PantopusColors.primary700,

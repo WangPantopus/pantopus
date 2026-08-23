@@ -50,7 +50,17 @@ class GigFilterCriteriaTest {
 
     @Test fun sections_cover_every_dimension_in_order() {
         assertEquals(
-            listOf("category", "budget", "schedule", "openToBids", "postedWithin"),
+            listOf(
+                "category",
+                "budget",
+                "schedule",
+                "openToBids",
+                "postedWithin",
+                // Wave B added the three RN chip dimensions.
+                "distance",
+                "deadline",
+                "archetype",
+            ),
             GigFilterCriteria().toSections().map { it.id },
         )
     }

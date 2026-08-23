@@ -104,3 +104,34 @@ public struct AIListingVisionResponse: Decodable, Sendable {
     public let confidence: Double?
     public let priceSuggestion: AIPriceSuggestionDTO?
 }
+
+/// Body for `POST /api/ai/draft/post`. `text` is the free-text prompt
+/// (Joi `draftPostSchema` caps it at 2000 chars,
+/// `backend/routes/ai.js:81`); `surface` is `"place"` or `"connections"`
+/// when set and is omitted for prompts that aren't feed-bound.
+public struct AIDraftPostRequest: Encodable, Sendable {
+    public let text: String
+    public let surface: String?
+
+    public init(text: String, surface: String? = nil) {
+        self.text = text
+        self.surface = surface
+    }
+}
+
+/// One AI-drafted post. Mirrors `postDraftJsonSchema`
+/// (`backend/services/ai/schemas.js:99`) — `content` is the only key the
+/// schema marks required; the model emits camelCase natively.
+public struct AIPostDraftDTO: Decodable, Sendable, Hashable {
+    public let content: String
+    public let title: String?
+    public let postType: String?
+    public let purpose: String?
+    public let visibility: String?
+    public let tags: [String]?
+}
+
+/// Envelope from `POST /api/ai/draft/post` (`backend/routes/ai.js:218`).
+public struct AIPostDraftResponse: Decodable, Sendable, Hashable {
+    public let draft: AIPostDraftDTO
+}

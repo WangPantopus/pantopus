@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,9 +43,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.analytics.Analytics
@@ -80,6 +84,8 @@ fun AddHomeWizardScreen(
     onDismiss: () -> Unit,
     onOpenHomeDashboard: (String) -> Unit,
     viewModel: AddHomeWizardViewModel = hiltViewModel(),
+    onOpenClaimOwnership: (String) -> Unit = {},
+    onOpenWaitingRoom: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pendingEvent by viewModel.pendingEvent.collectAsStateWithLifecycle()
@@ -93,6 +99,14 @@ fun AddHomeWizardScreen(
             is AddHomeOutboundEvent.OpenHomeDashboard -> {
                 viewModel.acknowledgeEvent()
                 onOpenHomeDashboard(event.homeId)
+            }
+            is AddHomeOutboundEvent.OpenClaimOwnership -> {
+                viewModel.acknowledgeEvent()
+                onOpenClaimOwnership(event.homeId)
+            }
+            is AddHomeOutboundEvent.OpenWaitingRoom -> {
+                viewModel.acknowledgeEvent()
+                onOpenWaitingRoom(event.homeId)
             }
             null -> Unit
         }
@@ -123,12 +137,192 @@ fun AddHomeWizardScreen(
                     state = state,
                     onApplyGeocodedZip = viewModel::applyGeocodedZip,
                     onPrimaryHomeChange = viewModel::setPrimaryHome,
+                    detailsSection = { AddHomeDetailsSection(state = state, vm = viewModel) },
                 )
             AddHomeStep.Role -> RoleStep(state, viewModel)
             AddHomeStep.Review -> ReviewStep(state)
             AddHomeStep.Success -> SuccessStep()
         }
         state.errorMessage?.let { ErrorBanner(it) }
+    }
+
+    if (state.showsClaimedModal) {
+        AddressClaimedModal(
+            showsConfirmAddressSheet = state.showsConfirmAddressSheet,
+            addressLabel = state.claimedAddressLabel,
+            onDismiss = viewModel::dismissClaimedModal,
+            onThisIsCorrect = viewModel::showConfirmAddressStep,
+            onConfirmAddress = viewModel::confirmClaimedAddress,
+        )
+    }
+
+    // A12.2 Setup — the Wi-Fi QR scanner takes the whole screen so the
+    // viewfinder matches RN's full-screen `QrScannerModal`.
+    if (state.scannerTargetItemId != null) {
+        WifiQrScannerDialog(
+            onScanned = viewModel::applyScannedWifi,
+            onClose = viewModel::closeWifiQrScanner,
+        )
+    }
+
+    state.accessSecretWarning?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::acknowledgeAccessSecretWarning,
+            modifier = Modifier.testTag("addHomeAccessSecretWarning"),
+            title = {
+                Text(
+                    text = "Home created",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                )
+            },
+            text = {
+                Text(
+                    text = message,
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::acknowledgeAccessSecretWarning) {
+                    Text(
+                        text = "OK",
+                        style = PantopusTextStyle.body,
+                        color = PantopusColors.primary600,
+                    )
+                }
+            },
+        )
+    }
+}
+
+// MARK: - Address-already-claimed modal (RN AddressClaimedModal)
+
+/**
+ * Two-page confirm dialog shown when `POST /api/homes/check-address`
+ * returns `HOME_FOUND_CLAIMED`. Copy mirrors RN's `ADDRESS_CHECK`
+ * constants (`src/constants/ownershipCopy.ts:176-183`).
+ */
+@Composable
+internal fun AddressClaimedModal(
+    showsConfirmAddressSheet: Boolean,
+    addressLabel: String,
+    onDismiss: () -> Unit,
+    onThisIsCorrect: () -> Unit,
+    onConfirmAddress: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radii.lg))
+                    .background(PantopusColors.appSurface)
+                    .padding(Spacing.s5)
+                    .testTag("addHomeAddressClaimedModal"),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s3),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (showsConfirmAddressSheet) {
+                Text(
+                    text = "Confirm this is your address",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "You entered:",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = addressLabel,
+                    style = PantopusTextStyle.body,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radii.md))
+                            .background(PantopusColors.appSurfaceSunken)
+                            .padding(Spacing.s3)
+                            .testTag("addHomeClaimedAddressLabel"),
+                )
+                ModalPrimaryButton("Confirm address", "addHomeClaimedConfirmAddress", onConfirmAddress)
+                ModalSecondaryButton("Edit", "addHomeClaimedEditAddress", onDismiss)
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(Spacing.s12)
+                            .clip(CircleShape)
+                            .background(PantopusColors.personalBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PantopusIconImage(
+                        icon = PantopusIcon.ShieldCheck,
+                        contentDescription = null,
+                        size = Spacing.s6,
+                        tint = PantopusColors.primary600,
+                    )
+                }
+                Text(
+                    text = "This home already has verified members",
+                    style = PantopusTextStyle.h3,
+                    color = PantopusColors.appText,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "To protect privacy, you’ll need verification to join this home.",
+                    style = PantopusTextStyle.caption,
+                    color = PantopusColors.appTextSecondary,
+                    textAlign = TextAlign.Center,
+                )
+                ModalPrimaryButton("This address is correct", "addHomeClaimedCorrect", onThisIsCorrect)
+                ModalSecondaryButton("Change address", "addHomeClaimedChangeAddress", onDismiss)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModalPrimaryButton(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Spacing.s12)
+                .clip(RoundedCornerShape(Radii.md))
+                .background(PantopusColors.primary600)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, style = PantopusTextStyle.body, color = PantopusColors.appTextInverse)
+    }
+}
+
+@Composable
+private fun ModalSecondaryButton(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Spacing.s12)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, style = PantopusTextStyle.body, color = PantopusColors.appTextSecondary)
     }
 }
 
@@ -173,6 +367,12 @@ private fun ConfirmStep(
     state: AddHomeUiState,
     onApplyGeocodedZip: () -> Unit,
     onPrimaryHomeChange: (Boolean) -> Unit,
+    /**
+     * A12.2 Details block, supplied by the live screen. The Paparazzi
+     * geocode-confirmation preview omits it so its golden frames keep
+     * locking the address-confirmation geometry on its own.
+     */
+    detailsSection: (@Composable () -> Unit)? = null,
 ) {
     HeadlineBlock("Confirm the property")
     SubcopyBlock(
@@ -194,6 +394,14 @@ private fun ConfirmStep(
             isPrimary = state.form.isPrimary,
             onChange = onPrimaryHomeChange,
         )
+        // A12.2 Details — nickname / type / beds / baths / sizes / year /
+        // description, pre-filled from public records. Hidden on the
+        // join-an-existing-home path, which RN skips too
+        // (`useHomeForm.ts:619-623, :700-705`).
+        if (detailsSection != null && !state.isClaimingExistingHome) {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            detailsSection()
+        }
     }
 }
 
@@ -213,6 +421,13 @@ private fun RoleStep(
                 isSelected = state.form.role == role,
                 onTap = { vm.selectRole(role) },
             )
+        }
+        // A12.2 Setup — RN's Setup step is role picker + "Networks &
+        // codes" in one screen (`SetupStep.tsx:33-174`), and the block is
+        // hidden when joining an existing home (`SetupStep.tsx:66`).
+        if (state.showsAccessSetup) {
+            HorizontalDivider(color = PantopusColors.appBorderSubtle)
+            AddHomeAccessSetupSection(state = state, vm = vm)
         }
     }
 }
@@ -234,14 +449,47 @@ private fun ReviewStep(state: AddHomeUiState) {
             append(", ${state.form.address.city}")
             append(", ${state.form.address.state} ${state.form.address.zipCode}")
         }
-    ReviewSummaryBlock(
-        rows =
-            listOf(
-                ReviewSummaryRow("Address", composedAddress),
-                ReviewSummaryRow("Role", state.form.role?.label ?: "—"),
-                ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"),
-            ),
-    )
+    // Address / role / primary, plus everything the Details and Setup
+    // blocks collected — the review step previously showed only the first
+    // three, so nothing the user typed on those blocks was verifiable
+    // before submit.
+    val rows =
+        buildList {
+            add(ReviewSummaryRow("Address", composedAddress))
+            add(ReviewSummaryRow("Role", state.form.role?.label ?: "—"))
+            add(ReviewSummaryRow("Primary", if (state.form.isPrimary) "Yes" else "No"))
+            if (state.isClaimingExistingHome) return@buildList
+            val details = state.form.details
+            if (details.nickname.isNotBlank()) {
+                add(ReviewSummaryRow("Nickname", details.nickname.trim()))
+            }
+            add(ReviewSummaryRow("Home type", details.homeType.label))
+            val size =
+                listOfNotNull(
+                    details.bedrooms.takeIf { it.isNotEmpty() }?.let { "$it bd" },
+                    details.bathrooms.takeIf { it.isNotEmpty() }?.let { "$it ba" },
+                ).joinToString(" · ")
+            if (size.isNotEmpty()) add(ReviewSummaryRow("Size", size))
+            if (details.sqFt.isNotEmpty()) {
+                add(ReviewSummaryRow("Home size", "${details.sqFt} sq ft"))
+            }
+            if (details.lotSqFt.isNotEmpty()) {
+                add(ReviewSummaryRow("Lot size", "${details.lotSqFt} sq ft"))
+            }
+            if (details.yearBuilt.isNotEmpty()) {
+                add(ReviewSummaryRow("Year built", details.yearBuilt))
+            }
+            val secretCount = state.accessItems.count { it.isComplete }
+            if (secretCount > 0) {
+                add(
+                    ReviewSummaryRow(
+                        "Networks & codes",
+                        if (secretCount == 1) "1 entry" else "$secretCount entries",
+                    ),
+                )
+            }
+        }
+    ReviewSummaryBlock(rows = rows)
 }
 
 @Composable

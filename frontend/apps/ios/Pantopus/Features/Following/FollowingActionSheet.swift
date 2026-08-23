@@ -15,6 +15,7 @@ struct FollowingActionSheet: View {
     let onMarkSeen: @MainActor () -> Void
     let onMute: @MainActor (Int?) -> Void
     let onUnfollow: @MainActor () -> Void
+    var onNotificationLevel: @MainActor (FollowingNotificationLevel) -> Void = { _ in }
     let onCancel: @MainActor () -> Void
 
     private enum Step { case actions, mute }
@@ -44,6 +45,8 @@ struct FollowingActionSheet: View {
         VStack(spacing: 0) {
             contextHeader
             divider
+            notificationLevelPicker
+            divider
             sheetRow(icon: .checkCheck, label: "Mark seen", id: "followingAction.markSeen") {
                 onMarkSeen()
             }
@@ -64,6 +67,52 @@ struct FollowingActionSheet: View {
         }
         .background(card)
         .accessibilityIdentifier("followingActionSheet")
+    }
+
+    /// All / Highlights / Off segmented picker — the same three levels the
+    /// inline row bell cycles, spelled out. Mirrors RN `FollowingRowSheet`'s
+    /// notification section.
+    private var notificationLevelPicker: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text("Notifications")
+                .font(.system(size: 12, weight: .bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.Color.appTextMuted)
+            HStack(spacing: 2) {
+                ForEach(FollowingNotificationLevel.allCases, id: \.self) { level in
+                    let active = level == target.notificationLevel
+                    Button { onNotificationLevel(level) } label: {
+                        HStack(spacing: Spacing.s1) {
+                            Icon(
+                                level.icon,
+                                size: 13,
+                                color: active ? Theme.Color.primary600 : Theme.Color.appTextSecondary
+                            )
+                            Text(level.label)
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(active ? Theme.Color.appText : Theme.Color.appTextSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                                .fill(active ? Theme.Color.appSurface : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("followingNotify.\(level.rawValue)")
+                }
+            }
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: Radii.lg, style: .continuous)
+                    .fill(Theme.Color.appSurfaceSunken)
+            )
+        }
+        .padding(.horizontal, Spacing.s4)
+        .padding(.vertical, Spacing.s3)
+        .accessibilityIdentifier("followingNotifyPicker")
     }
 
     private var contextHeader: some View {

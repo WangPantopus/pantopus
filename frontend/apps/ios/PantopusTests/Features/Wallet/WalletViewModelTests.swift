@@ -31,8 +31,8 @@ final class WalletViewModelTests: XCTestCase {
         }
         XCTAssertEqual(content.available, "847.50")
         XCTAssertFalse(content.isOnHold)
-        XCTAssertFalse(content.payoutMethod.warn)
-        XCTAssertFalse(content.taxDocs.ready)
+        XCTAssertEqual(content.payoutMethod?.warn, false)
+        XCTAssertEqual(content.taxDocs?.ready, false)
     }
 
     func testLoadResolvesToHoldWhenStatePresent() async {
@@ -42,8 +42,8 @@ final class WalletViewModelTests: XCTestCase {
             return XCTFail("Expected hold, got \(vm.state)")
         }
         XCTAssertNotNil(content.holdState)
-        XCTAssertTrue(content.payoutMethod.warn)
-        XCTAssertTrue(content.taxDocs.ready)
+        XCTAssertEqual(content.payoutMethod?.warn, true)
+        XCTAssertEqual(content.taxDocs?.ready, true)
         XCTAssertEqual(content.holdState?.bannerHeadline, "Bank verification expired")
     }
 
@@ -69,8 +69,8 @@ final class WalletViewModelTests: XCTestCase {
     func testPopulatedFixtureShape() {
         let content = WalletSampleData.populated
         XCTAssertEqual(content.activity.count, 7)
-        XCTAssertEqual(content.payoutMethod.last4, "7421")
-        XCTAssertEqual(content.payoutMethod.bodyText, "Instant payout · 1–3 minutes")
+        XCTAssertEqual(content.payoutMethod?.last4, "7421")
+        XCTAssertEqual(content.payoutMethod?.bodyText, "Instant payout · 1–3 minutes")
         XCTAssertEqual(content.monthValue, "$1,284.50")
         XCTAssertTrue(content.monthMeta.contains("22%"))
         // First two rows fall on "Today" — same-day grouping renders one header.
@@ -83,8 +83,8 @@ final class WalletViewModelTests: XCTestCase {
         let content = WalletSampleData.onHold
         XCTAssertNotNil(content.holdState)
         XCTAssertEqual(content.activity.count, 4)
-        XCTAssertEqual(content.payoutMethod.bodyText, "Verification expired Nov 30")
-        XCTAssertTrue(content.taxDocs.bodyText.contains("1099-NEC"))
+        XCTAssertEqual(content.payoutMethod?.bodyText, "Verification expired Nov 30")
+        XCTAssertEqual(content.taxDocs?.bodyText.contains("1099-NEC"), true)
         XCTAssertEqual(
             content.holdState?.withdrawFootnote,
             "Re-verify your bank above to unlock payouts."

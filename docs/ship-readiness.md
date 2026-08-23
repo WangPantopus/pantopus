@@ -403,6 +403,33 @@
 
 ---
 
+## WS5 + WS6 (2026-07-29 closeout)
+
+### Shipped in-repo (both platforms)
+
+- **5.4 Help & Support drawer** — iOS `helpSupport` → `HelpCenterView`; Android already on `SETTINGS_HELP`.
+- **5.6 Placeholder rewires** — Offers & Bids (iOS Hub), Discover Neighbors + home-drawer destinations (Android), jumpBackIn `/app/chat` → Messages tab, You-tab Earn payout CTAs → Payments.
+- **5.1 Wallet activity** — History + All activity → `WalletActivityList*` over `GET /api/wallet/transactions` (tax docs still deferred — no API).
+- **5.2 Verification** — Phone / home “Coming soon” rows hidden until flows exist.
+- **5.3 Data export** — Mailto `privacy@pantopus.com` request UI (no backend GDPR ZIP route).
+- **5.5 Chat** — Removed stale ctx-strip TODO; AI message restore remains blocked on backend (no messages endpoint).
+- **6.2 Deep links** — Aliases `u/`, `b/`, `persona/`, `broadcast/`, `join/`, `@handle` in both `DeepLinkRouter`s.
+- **6.4 Mailbox orphans** — Deleted `MailboxDrawers*` / `MailboxList*` screens; kept `MailboxListViewModel.makeRow`.
+- **6.5 P6.8 error-copy** — Android `NetworkError.displayMessage()` + ~50 fetchable VMs normalized.
+
+### External blockers (do not commit secrets)
+
+| Item | Blocker |
+|---|---|
+| **6.1 FCM** | Replace stub `google-services.json` + Firebase console project for `app.pantopus.android`. |
+| **6.3 Prod secrets** | CI/console: live Stripe (`pk_live_*`), Sentry DSN, PostHog, Maps keys — `REPLACE_ME` guards stay until injected. |
+| **5.1 Tax documents** | Backend 1099 / tax-docs API + product design. |
+| **5.3 GDPR export** | Backend async export job (`POST /api/users/export` or equivalent). |
+| **5.5 AI history** | Backend message persistence + `GET /api/ai/conversations/:id/messages`. |
+| **6.2 Domain parity** | **Resolved 2026-08-18: `pantopus.com` is the product domain.** Both apps now claim it — iOS `applinks:pantopus.com` / `www.pantopus.com`, Android an `autoVerify` filter on the same two hosts — and the web app serves AASA + assetlinks.json there. `pantopus.app` stays claimed on iOS and keeps a non-`autoVerify` Android filter so links already shared still open the app; it is deliberately excluded from Android verification because below API 31 that is all-or-nothing across hosts. Share and invite links are built on `.com` on both platforms. |
+
+---
+
 ## Closeout summary
 
 **Greens:** 27 boxes — every Wave A/B/C/D screen ships on both platforms,
@@ -418,15 +445,12 @@ has snapshot coverage on both platforms.
 4. **12 mailbox categories using `MailItemPlaceholderBody` fallback** (Screens) — expected design deferral, ship as-is.
 5. **Token drift on color / spacing / radii / typography** (Style — 4 boxes) — design-call on extending tokens vs accept-bespoke per row; CI gate already blocks new drift.
 6. **VoiceOver / TalkBack manual screen-reader walk** (Accessibility) — pre-release UAT slot.
-7. **Cross-platform copy-string drift on ~30 error fallbacks** (Cross-platform) — `P6.8-followup-error-copy`.
+7. **Cross-platform copy-string drift on error fallbacks** (Cross-platform) — **Resolved (P6.8, 2026-07-29)** for Android fetchable VMs; iOS already used feature fallbacks.
 8. **Performance baselines on iPhone 12 / Pixel 6** (4 boxes) — real-device measurement before TestFlight / Play.
 9. **Flake check across 3 consecutive iOS / Android runs** (Tests) — next iOS/Android-touching PR.
 10. **App-size budget gates** (Build) — wire size assertions into CI or accept measuring at upload.
 
-**Dead-code cleanup (nice-to-have):** the orphan
-`MailboxDrawersView` / `MailboxListView` (+ Android counterparts) can be
-deleted in a one-line follow-up — they have zero call sites today but
-remain in the working tree.
+**Mailbox orphan cleanup:** completed 2026-07-29 (WS6.4) — screens removed; `MailboxListViewModel` helpers retained.
 
 **Verdict:** the app is **submission-ready for an internal-testing /
 TestFlight cut** with the four screen-coverage follow-ups (#1-3) and the

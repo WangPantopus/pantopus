@@ -137,6 +137,63 @@ final class HomeAgendaBuilderTests: XCTestCase {
         XCTAssertEqual(headers[2], "Wed Oct 15")
     }
 
+    // MARK: - Date-only wire values (Postgres `date` columns)
+
+    /// `home_bills.due_date` is a bare Postgres `date`, so the wire value is
+    /// "YYYY-MM-DD" with no zone. Anchoring it at UTC midnight and then
+    /// bucketing with a device-local calendar renders it a day early west of
+    /// UTC — the caller must be able to anchor it in the display zone.
+    func testBareDateAnchorsToMidnightInTheGivenDisplayZone() throws {
+        let la = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let anchored = try XCTUnwrap(
+            HomeAgendaBuilder.parseInstant("2025-10-12", zone: la)
+        )
+        var laCal = Calendar(identifier: .gregorian)
+        laCal.timeZone = la
+        XCTAssertEqual(HomeAgendaBuilder.isoDay(anchored, calendar: laCal), "2025-10-12")
+        // …and it really is LA midnight: 7 hours after the UTC-anchored value
+        // the un-parameterised call still produces.
+        let utcAnchored = try XCTUnwrap(HomeAgendaBuilder.parseInstant("2025-10-12"))
+        XCTAssertEqual(anchored.timeIntervalSince(utcAnchored), 7 * 3600, accuracy: 1)
+        XCTAssertEqual(HomeAgendaBuilder.isoDay(utcAnchored, calendar: laCal), "2025-10-11")
+    }
+
+    func testTimestampedValuesIgnoreTheDateOnlyZone() throws {
+        let la = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let zoned = HomeAgendaBuilder.parseInstant("2025-10-12T17:00:00Z", zone: la)
+        XCTAssertEqual(zoned, HomeAgendaBuilder.parseInstant("2025-10-12T17:00:00Z"))
+    }
+
+    func testIsDateOnlyOnlyMatchesBareCalendarDates() {
+        XCTAssertTrue(HomeAgendaBuilder.isDateOnly("2025-10-12"))
+        XCTAssertFalse(HomeAgendaBuilder.isDateOnly("2025-10-12T17:00:00Z"))
+        XCTAssertFalse(HomeAgendaBuilder.isDateOnly("2025-10-12T00:00:00.000Z"))
+        XCTAssertFalse(HomeAgendaBuilder.isDateOnly("not-a-date"))
+        XCTAssertFalse(HomeAgendaBuilder.isDateOnly(""))
+    }
+
+    /// Guard-rail for the other half of the contract: the all-day heuristic
+    /// for *timestamped* events stays pinned to UTC (the wire stores all-day
+    /// events at 00:00Z), no matter which zone the agenda displays in.
+    func testEventAllDayHeuristicStaysUtcPinnedUnderALocalDisplayZone() throws {
+        let la = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        var laCal = Calendar(identifier: .gregorian)
+        laCal.timeZone = la
+        laCal.firstWeekday = 1
+        let item = HomeAgendaBuilder.sections(
+            events: [event(id: "allday", start: "2025-10-14T00:00:00Z")],
+            members: members,
+            now: Self.now,
+            calendar: laCal,
+            timeZone: la,
+            selectedIsoDate: nil
+        )
+        .flatMap(\.items)
+        .first
+        XCTAssertEqual(item?.time, "All day")
+        XCTAssertEqual(item?.ampm, "")
+    }
+
     func testPastEventsAreDroppedFromTheDefaultAgenda() {
         let events = [
             event(id: "yesterday", start: "2025-10-11T09:00:00Z"),

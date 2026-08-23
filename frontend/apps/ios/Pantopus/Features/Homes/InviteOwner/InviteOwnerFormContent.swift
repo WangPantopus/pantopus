@@ -66,6 +66,10 @@ struct InviteOwnerFormContent: View {
             }
         }
 
+        FormFieldGroup("Verification") {
+            FastTrackToggleRow(isOn: $viewModel.fastTrack)
+        }
+
         FormFieldGroup("Role") {
             RoleNoteEditor(
                 text: bind(.role),
@@ -89,6 +93,44 @@ struct InviteOwnerFormContent: View {
         guard let snapshot = viewModel.fields[field], snapshot.touched else { return .default }
         if let error = snapshot.error { return .error(error) }
         return snapshot.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .default : .valid
+    }
+}
+
+// MARK: - Fast track
+
+/// RN's fast-track switch (`src/app/homes/[id]/owners/invite.tsx:98-110`),
+/// copy from `constants/ownershipCopy.ts` `CO_OWNER_INVITE`. Defaults ON
+/// and sends `fast_track` so the backend files the claim as a vouch.
+private struct FastTrackToggleRow: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Fast track (vouch)")
+                    .pantopusTextStyle(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.Color.appText)
+                Text("Still requires verification")
+                    .pantopusTextStyle(.caption)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Theme.Color.primary600)
+        }
+        .padding(.horizontal, Spacing.s3)
+        .padding(.vertical, Spacing.s2 + 2)
+        .background(Theme.Color.appSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Radii.md, style: .continuous)
+                .stroke(Theme.Color.appBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Radii.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Fast track vouch. Still requires verification.")
+        .accessibilityIdentifier("inviteOwnerFastTrackToggle")
     }
 }
 

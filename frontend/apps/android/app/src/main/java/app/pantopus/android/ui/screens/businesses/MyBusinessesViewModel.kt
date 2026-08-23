@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.businesses.BusinessMembership
 import app.pantopus.android.data.api.models.businesses.BusinessProfileDto
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.businesses.BusinessesRepository
 import app.pantopus.android.ui.components.StatusChipVariant
 import app.pantopus.android.ui.theme.PantopusColors
@@ -74,7 +75,7 @@ class MyBusinessesViewModel
                             }
                     }
                     is NetworkResult.Failure ->
-                        _state.value = MyBusinessesUiState.Error(result.error.message)
+                        _state.value = MyBusinessesUiState.Error(result.error.displayMessage("Couldn't load your businesses."))
                 }
             }
         }

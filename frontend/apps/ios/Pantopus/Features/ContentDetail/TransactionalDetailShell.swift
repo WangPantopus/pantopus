@@ -678,16 +678,7 @@ public struct TransactionalDetailShell: View {
             sectionCard(title: m.title, icon: m.icon, sub: m.countLabel) {
                 HStack(spacing: Spacing.s2) {
                     ForEach(m.tiles) { tile in
-                        ZStack {
-                            LinearGradient(
-                                colors: [tile.gradient.start, tile.gradient.end],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            Icon(tile.icon, size: 24, strokeWidth: 1.8, color: .white.opacity(0.9))
-                        }
-                        .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        photoTile(tile)
                     }
                 }
             }
@@ -749,6 +740,32 @@ public struct TransactionalDetailShell: View {
         default:
             EmptyView()
         }
+    }
+
+    /// One photo-strip square. Renders the real attachment when the tile
+    /// carries a URL, falling back to the deterministic gradient + glyph
+    /// while it loads or when there is no image.
+    private func photoTile(_ tile: ContentDetailPhotoTile) -> some View {
+        LinearGradient(
+            colors: [tile.gradient.start, tile.gradient.end],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .aspectRatio(1, contentMode: .fit)
+        .overlay {
+            if let url = tile.imageURL {
+                AsyncImage(url: url) { phase in
+                    if case let .success(image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Icon(tile.icon, size: 24, strokeWidth: 1.8, color: .white.opacity(0.9))
+                    }
+                }
+            } else {
+                Icon(tile.icon, size: 24, strokeWidth: 1.8, color: .white.opacity(0.9))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func sectionCard(

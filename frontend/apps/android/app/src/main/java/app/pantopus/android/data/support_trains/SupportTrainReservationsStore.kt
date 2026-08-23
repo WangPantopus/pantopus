@@ -21,10 +21,15 @@ import javax.inject.Singleton
  *  2. Buffer optimistic save patches so the Review-signups list can
  *     replay them into its in-memory cache when the form pops.
  *
- * The backend `PATCH …/reservations/:reservationId` route lands
- * separately; until then the store's optimistic patch is the
- * user-facing source of truth — same pattern the Confirm action
- * already follows.
+ * S1 STATUS: the reservation *write* routes that do exist are now
+ * wired for real — reserve / cancel / reveal-address / deliver /
+ * confirm all live in `SupportTrainActionsApi`. There is still **no**
+ * edit route: `backend/routes/supportTrains.js` declares 39 routes and
+ * none of them is a `PATCH /:id/reservations/:reservationId` (the only
+ * reservation-scoped writes are the five above). So this optimistic
+ * store stays the user-facing source of truth for the Edit-signup form
+ * until that route ships — it is not standing in for something that
+ * already exists server-side.
  */
 @Singleton
 class SupportTrainReservationsStore

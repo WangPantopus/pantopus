@@ -6,6 +6,8 @@
 	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:pantopus.com</string>
+		<string>applinks:www.pantopus.com</string>
 		<string>applinks:pantopus.app</string>
 		<string>applinks:www.pantopus.app</string>
 	</array>

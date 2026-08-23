@@ -1,13 +1,26 @@
 package app.pantopus.android.data.businesses
 
+import app.pantopus.android.data.api.models.businesses.BusinessCatalogItemsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessDashboardResponse
 import app.pantopus.android.data.api.models.businesses.BusinessDetailResponse
 import app.pantopus.android.data.api.models.businesses.BusinessFollowResponse
 import app.pantopus.android.data.api.models.businesses.BusinessInsightsResponse
+import app.pantopus.android.data.api.models.businesses.BusinessLocationHoursResponse
+import app.pantopus.android.data.api.models.businesses.BusinessLocationUpdateResponse
+import app.pantopus.android.data.api.models.businesses.BusinessLocationsResponse
+import app.pantopus.android.data.api.models.businesses.BusinessMutationMessageResponse
 import app.pantopus.android.data.api.models.businesses.BusinessOwnerReviewsResponse
 import app.pantopus.android.data.api.models.businesses.BusinessPublicResponse
 import app.pantopus.android.data.api.models.businesses.BusinessReviewRespondRequest
+import app.pantopus.android.data.api.models.businesses.CreateBusinessFullRequest
+import app.pantopus.android.data.api.models.businesses.CreateBusinessFullResponse
 import app.pantopus.android.data.api.models.businesses.MyBusinessesResponse
+import app.pantopus.android.data.api.models.businesses.SetBusinessHoursRequest
+import app.pantopus.android.data.api.models.businesses.StartBusinessInquiryRequest
+import app.pantopus.android.data.api.models.businesses.StartBusinessInquiryResponse
+import app.pantopus.android.data.api.models.businesses.UpdateBusinessLocationRequest
+import app.pantopus.android.data.api.models.businesses.UpdateBusinessRequest
+import app.pantopus.android.data.api.models.businesses.UsernameAvailabilityDto
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.BusinessesApi
@@ -34,6 +47,11 @@ open class BusinessesRepository
         open suspend fun publicBusiness(username: String): NetworkResult<BusinessPublicResponse> =
             safeApiCall { api.publicBusiness(username) }
 
+        /** A13.10 — owner/staff catalog list. Answers before the profile is
+         *  published, unlike [publicBusiness]. */
+        open suspend fun catalogItems(businessId: String): NetworkResult<BusinessCatalogItemsResponse> =
+            safeApiCall { api.catalogItems(businessId) }
+
         /** P1-C — owner-scoped dashboard (publish state + onboarding). */
         open suspend fun dashboard(businessId: String): NetworkResult<BusinessDashboardResponse> = safeApiCall { api.dashboard(businessId) }
 
@@ -55,4 +73,51 @@ open class BusinessesRepository
 
         /** P1.6 — save/follow a public business profile. */
         open suspend fun followBusiness(businessId: String): NetworkResult<BusinessFollowResponse> = safeApiCall { api.follow(businessId) }
+
+        /** Open (or resume) a direct inquiry chat with a business. */
+        open suspend fun startInquiry(
+            businessId: String,
+            subject: String? = null,
+        ): NetworkResult<StartBusinessInquiryResponse> = safeApiCall { api.startInquiry(businessId, StartBusinessInquiryRequest(subject)) }
+
+        /** Owner/staff list of active business locations. */
+        open suspend fun locations(businessId: String): NetworkResult<BusinessLocationsResponse> = safeApiCall { api.locations(businessId) }
+
+        /** A13.10 — PATCH profile fields for the edit-business page. */
+        open suspend fun updateBusiness(
+            businessId: String,
+            body: UpdateBusinessRequest,
+        ): NetworkResult<BusinessMutationMessageResponse> = safeApiCall { api.updateBusiness(businessId, body) }
+
+        /** A13.10 — publish profile. */
+        open suspend fun publishBusiness(businessId: String): NetworkResult<BusinessMutationMessageResponse> =
+            safeApiCall { api.publishBusiness(businessId) }
+
+        /** A13.10 — load weekly hours for a location. */
+        open suspend fun locationHours(
+            businessId: String,
+            locationId: String,
+        ): NetworkResult<BusinessLocationHoursResponse> = safeApiCall { api.locationHours(businessId, locationId) }
+
+        /** A13.10 — bulk replace weekly hours. */
+        open suspend fun setLocationHours(
+            businessId: String,
+            locationId: String,
+            body: SetBusinessHoursRequest,
+        ): NetworkResult<BusinessLocationHoursResponse> = safeApiCall { api.setLocationHours(businessId, locationId, body) }
+
+        /** A13.10 — PATCH a location row (address). */
+        open suspend fun updateLocation(
+            businessId: String,
+            locationId: String,
+            body: UpdateBusinessLocationRequest,
+        ): NetworkResult<BusinessLocationUpdateResponse> = safeApiCall { api.updateLocation(businessId, locationId, body) }
+
+        /** Create-business wizard — username availability (no auth). */
+        open suspend fun checkUsername(username: String): NetworkResult<UsernameAvailabilityDto> =
+            safeApiCall { api.checkUsername(username) }
+
+        /** Create-business wizard — atomic create with optional location + hours. */
+        open suspend fun createBusinessFull(body: CreateBusinessFullRequest): NetworkResult<CreateBusinessFullResponse> =
+            safeApiCall { api.createBusinessFull(body) }
     }

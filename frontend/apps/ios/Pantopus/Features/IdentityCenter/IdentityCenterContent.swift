@@ -142,17 +142,21 @@ public struct IdentityCenterLoaded: Sendable, Hashable {
     public let bridges: [IdentityBridgeRow]
     public let privacyRows: [IdentityRowContent]
     public let disclosureRows: [IdentityRowContent]
+    /// Identities still showing "Set up" / "Create" chips (first-run hint).
+    public let setupRemainingCount: Int
 
     public init(
         identities: [IdentityCardContent],
         bridges: [IdentityBridgeRow],
         privacyRows: [IdentityRowContent],
-        disclosureRows: [IdentityRowContent]
+        disclosureRows: [IdentityRowContent],
+        setupRemainingCount: Int = 0
     ) {
         self.identities = identities
         self.bridges = bridges
         self.privacyRows = privacyRows
         self.disclosureRows = disclosureRows
+        self.setupRemainingCount = setupRemainingCount
     }
 }
 

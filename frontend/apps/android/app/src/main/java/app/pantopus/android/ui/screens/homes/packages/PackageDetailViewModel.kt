@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.pantopus.android.data.api.models.homes.PackageDto
 import app.pantopus.android.data.api.models.homes.UpdatePackageRequest
 import app.pantopus.android.data.api.net.NetworkResult
+import app.pantopus.android.data.api.net.displayMessage
 import app.pantopus.android.data.homes.HomesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,7 +72,7 @@ class PackageDetailViewModel
                 // parent list and find by id (lists are small).
                 when (val result = repo.getHomePackages(homeId)) {
                     is NetworkResult.Failure ->
-                        _state.value = PackageDetailUiState.Error(result.error.message)
+                        _state.value = PackageDetailUiState.Error(result.error.displayMessage("Couldn't load this package."))
                     is NetworkResult.Success -> {
                         val pkg = result.data.packages.firstOrNull { it.id == packageId }
                         if (pkg == null) {

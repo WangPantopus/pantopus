@@ -263,7 +263,15 @@ private fun AgendaList(
         sections.forEach { section ->
             item(key = "h-${section.id}") { AgendaSectionHeader(text = section.header) }
             items(section.items, key = { it.id }) { item ->
-                HomeAgendaRowCard(item = item, dimmed = dimmed, onTap = { onTap(item) })
+                // Derived task / bill / package due-dates have no detail screen
+                // of their own, so the row takes no click and no ripple —
+                // a no-op tap handler would still light up and lead nowhere.
+                HomeAgendaRowCard(
+                    item = item,
+                    dimmed = dimmed,
+                    enabled = item.derived == null,
+                    onTap = { onTap(item) },
+                )
             }
         }
         item { Box(modifier = Modifier.height(80.dp)) }
