@@ -672,11 +672,16 @@ export default function NewHomePage() {
             <div className="space-y-5">
               <div>
                 <h2 className="text-xl font-semibold text-app-text mb-1">Where is your home?</h2>
-                <p className="text-sm text-app-text-secondary">This is always private. Tasks only show approximate location.</p>
+                <p className="text-sm text-app-text-secondary">
+                  Your exact address is only shown to people in your household. Neighbours and
+                  tasks see an approximate area, never the street address.
+                </p>
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-app-text-strong">Home location</div>
+                <div id="home-address-label" className="text-sm font-semibold text-app-text-strong">
+                  Home location
+                </div>
                 <button
                   type="button"
                   onClick={useCurrent}
@@ -697,6 +702,7 @@ export default function NewHomePage() {
                 }}
                 onSelectNormalized={onSelectNormalized}
                 placeholder="Search address…"
+                labelId="home-address-label"
               />
 
               {normalized ? (
