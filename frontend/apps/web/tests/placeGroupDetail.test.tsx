@@ -5,6 +5,7 @@
 // ============================================================
 
 import { render, screen } from '@testing-library/react';
+import * as api from '@pantopus/api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { PlaceIntelligence, PlaceSection, PlaceSectionId } from '@pantopus/types';
@@ -23,6 +24,11 @@ import BlockDetail from '@/components/place/detail/BlockDetail';
 import MoneyDetail from '@/components/place/detail/MoneyDetail';
 import CivicDetail from '@/components/place/detail/CivicDetail';
 import IdentityDetail from '@/components/place/detail/IdentityDetail';
+
+beforeAll(() => {
+  // MoneyDetail's rate-watch query runs whenever homeId is set.
+  (api.recordWatch.getRecordWatch as jest.Mock).mockResolvedValue(null);
+});
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), prefetch: jest.fn() }),
@@ -66,7 +72,7 @@ const FULL = intel([
   sec('sunrise_sunset', { data: { sunrise: '2026-06-07T13:42:00Z', sunset: '2026-06-08T03:11:00Z', daylight_minutes: 809 } }),
   sec('your_home', { data: { year_built: 1979, sqft: 1840, bedrooms: 3, bathrooms: 2, lot_sqft: 5200, home_type: 'house', estimated_value: 612000, value_low: 590000, value_high: 640000, assessed_value: 438200 } }),
   sec('flood', { data: { zone: 'X', zone_label: 'Zone X', risk_level: 'minimal', in_sfha: false, insurance_required: false, plain_meaning: 'Minimal flood risk.', nfip: { policy_count: 128, premium_p25: 480, premium_median: 760, premium_p75: 1240, full_risk_median: 910, window_months: 24, coverage: 'full', as_of: '2026-08-01T00:00:00.000Z' } } }),
-  sec('exemption_check', { data: { filing_status: 'none_on_file', exemptions: [], homestead_on_file: false, state_program: { state: 'TX', label: 'Texas homestead exemption', filing: 'application', note: 'Not automatic — file with your county appraisal district.', curated: true } } }),
+  sec('exemption_check', { data: { filing_status: 'none_on_file', exemptions: [], homestead_on_file: false, assessment_signal: { assessed_value: 550000, market_value: 500000, ratio_pct: 10, stance: 'above' }, state_program: { state: 'TX', label: 'Texas homestead exemption', filing: 'application', note: 'Not automatic — file with your county appraisal district.', curated: true } } }),
   sec('block_density', { data: { bucket: 'few', label: 'A few verified homes nearby' } }),
   sec('census_context', { data: { median_year_built: 1985, median_home_value: 498000, tract_name: 't', summary: 'Most homes here are mid-1980s.' } }),
   sec('bill_benchmark', { data: { utility: 'electric', your_amount: 142, band_low: 165, band_high: 210, comparison: 'lower', comparison_pct: -16, period: '12-month average', summary: 'Your bill runs lower than most homes nearby.' } }),
@@ -113,14 +119,14 @@ describe('Place group-detail — renders from the contract', () => {
   });
 
   it('Money shows the bill benchmark, an incentive, and the rent band', () => {
-    render(<MoneyDetail intelligence={FULL} homeId="home-1" />);
+    renderWithQueryClient(<MoneyDetail intelligence={FULL} homeId="home-1" />);
     expect(screen.getByText(/Your bill runs lower/)).toBeInTheDocument();
     expect(screen.getByText('Residential Clean Energy Credit')).toBeInTheDocument();
     expect(screen.getByText('2-bedroom market band')).toBeInTheDocument();
   });
 
   it('Money shows the none-on-file exemption hook with the state program', () => {
-    render(<MoneyDetail intelligence={FULL} homeId="home-1" />);
+    renderWithQueryClient(<MoneyDetail intelligence={FULL} homeId="home-1" />);
     expect(screen.getByText('Nothing on file')).toBeInTheDocument();
     expect(screen.getByText(/No exemption appears on the county/)).toBeInTheDocument();
     expect(screen.getByText('Texas homestead exemption')).toBeInTheDocument();
@@ -128,9 +134,9 @@ describe('Place group-detail — renders from the contract', () => {
 
   it('Money never dresses an unreported exemption feed as none-on-file', () => {
     const unknown = intel([
-      sec('exemption_check', { data: { filing_status: 'unknown', exemptions: [], homestead_on_file: false, state_program: { state: 'VT', label: 'Homeowner exemption programs', filing: 'varies', note: 'Check your county assessor.', curated: false } } }),
+      sec('exemption_check', { data: { filing_status: 'unknown', exemptions: [], homestead_on_file: false, assessment_signal: null, state_program: { state: 'VT', label: 'Homeowner exemption programs', filing: 'varies', note: 'Check your county assessor.', curated: false } } }),
     ]);
-    render(<MoneyDetail intelligence={unknown} homeId="home-1" />);
+    renderWithQueryClient(<MoneyDetail intelligence={unknown} homeId="home-1" />);
     expect(screen.getByText('Not reported')).toBeInTheDocument();
     expect(screen.queryByText(/No exemption appears/)).not.toBeInTheDocument();
   });

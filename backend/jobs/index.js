@@ -71,6 +71,7 @@ const mailEscrowExpiry = require('./mailEscrowExpiry');
 // Home intelligence jobs
 const billBenchmarkRefresh = require('./billBenchmarkRefresh');
 const nfipTractWarm = require('./nfipTractWarm');
+const rateWatchEvaluate = require('./rateWatchEvaluate');
 // Monthly receipt
 const monthlyReceiptJob = require('./monthlyReceiptJob');
 // Neighborhood density
@@ -432,6 +433,15 @@ function startJobs() {
     timezone: 'UTC',
   });
 
+  // ─── Rate Watch Evaluate (Home Record Watch) ───
+  // Runs Fridays at 02:00 UTC — the PMMS survey publishes Thursdays,
+  // so one weekly evaluation sees each fresh reading. Alerts are
+  // idempotent via claim-before-send on the watch row.
+  cron.schedule('0 2 * * 5', wrapJob('rateWatchEvaluate', rateWatchEvaluate), {
+    scheduled: true,
+    timezone: 'UTC',
+  });
+
   // ─── Monthly Receipt ───
   // Runs on the 1st of each month at 9:00 AM PT (17:00 UTC).
   // Computes personalized monthly summaries for active users,
@@ -520,6 +530,7 @@ function startJobs() {
       { name: 'mailEscrowExpiry', schedule: 'daily at 6:00 AM UTC' },
       { name: 'billBenchmarkRefresh', schedule: 'every 6 hours at :05' },
       { name: 'nfipTractWarm', schedule: 'every 15 minutes at :08/:23/:38/:53' },
+      { name: 'rateWatchEvaluate', schedule: 'Fridays at 02:00 UTC' },
       { name: 'monthlyReceiptJob', schedule: '1st of month at 9:00 AM PT (17:00 UTC)' },
       { name: 'neighborhoodPreviewRefresh', schedule: 'every 15 minutes at :02/:17/:32/:47' },
       { name: 'checkAndAlertStuckPayments', schedule: 'every 15 minutes at :12/:27/:42/:57' },

@@ -146,6 +146,12 @@ export const homeProfile = {
 export const mailboxCheck = {
   getMailboxCheck: jest.fn(),
 };
+// Place — home record watch, rate-watch half (Wave 2b).
+export const recordWatch = {
+  setRecordWatch: jest.fn(),
+  getRecordWatch: jest.fn(),
+  deleteRecordWatch: jest.fn(),
+};
 export const businesses = {
   getMyBusinesses: jest.fn(),
 };

@@ -210,7 +210,7 @@ function buildMock(): PlaceIntelligence {
           }
     } }),
     sec('flood', { data: { zone: 'X', zone_label: 'Zone X', risk_level: 'minimal', in_sfha: false, insurance_required: false, plain_meaning: "Your home sits outside the high-risk flood zones. Flood insurance isn't federally required here — though low-risk areas still see a meaningful share of claims, so it's worth considering.", nfip: { policy_count: 128, premium_p25: 480, premium_median: 760, premium_p75: 1240, full_risk_median: 910, window_months: 24, coverage: 'full', as_of: '2026-08-01T00:00:00.000Z' } } }),
-    sec('exemption_check', { data: { filing_status: 'none_on_file', exemptions: [], homestead_on_file: false, state_program: { state: 'OR', label: 'Homeowner exemption programs', filing: 'varies', note: 'Many states and counties reduce property tax on a primary residence, and most programs require a one-time application. Check your county assessor.', curated: false } } }),
+    sec('exemption_check', { data: { filing_status: 'none_on_file', exemptions: [], homestead_on_file: false, assessment_signal: { assessed_value: 438200, market_value: 612000, ratio_pct: -28, stance: 'below' }, state_program: { state: 'OR', label: 'Homeowner exemption programs', filing: 'varies', note: 'Many states and counties reduce property tax on a primary residence, and most programs require a one-time application. Check your county assessor.', curated: false } } }),
     sec('lead_radon', { status: 'unavailable' }),
     sec('drinking_water', { status: 'unavailable' }),
     sec('environmental_hazards', { status: 'unavailable' }),

@@ -286,6 +286,17 @@ export interface PlaceExemptionCheckData {
   /** Labels as the assessor feed reports them, e.g. "Homestead". */
   exemptions: string[];
   homestead_on_file: boolean;
+  /**
+   * Wave 2b — the Over-Assessment Radar: the county's assessed total vs
+   * its own market total (±5% stance bands). Null when either total is
+   * missing from the feed. Informational, never advice.
+   */
+  assessment_signal: {
+    assessed_value: number;
+    market_value: number;
+    ratio_pct: number;
+    stance: 'above' | 'near' | 'below';
+  } | null;
   state_program: {
     state: string | null;
     label: string;

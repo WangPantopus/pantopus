@@ -94,6 +94,40 @@ function extractExemptions(assessment) {
   };
 }
 
+function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * The Over-Assessment Radar signal (Wave 2b): the county's own
+ * assessed total vs its own market total, from the SAME cached
+ * assessment — no new calls, no AVM dependency. Pure, exported for
+ * tests. Returns null unless both totals are present.
+ *
+ * Stance bands (±5%): an assessment meaningfully above the county's
+ * market value is the usual basis for an appeal — stated as the fact
+ * it is, never as advice or a savings claim.
+ */
+function assessmentSignal(assessment) {
+  if (!assessment || typeof assessment !== 'object') return null;
+  const assessed = toNumberOrNull(assessment.assessed?.assdTtlValue)
+    ?? toNumberOrNull(assessment.assessed?.assessedTtlValue)
+    ?? toNumberOrNull(assessment.assessed?.assdTotalValue);
+  const market = toNumberOrNull(assessment.market?.mktTtlValue)
+    ?? toNumberOrNull(assessment.market?.marketTtlValue)
+    ?? toNumberOrNull(assessment.market?.mktTotalValue);
+  if (assessed == null || market == null) return null;
+  const ratioPct = Math.round(((assessed - market) / market) * 100);
+  return {
+    assessed_value: assessed,
+    market_value: market,
+    ratio_pct: ratioPct,
+    stance: ratioPct > 5 ? 'above' : ratioPct < -5 ? 'below' : 'near',
+  };
+}
+
 /**
  * The exemption check for a home.
  * @returns {Promise<{status: string, data?: object, unavailableReason?: string}>}
@@ -132,6 +166,9 @@ async function getExemptionCheck(home) {
       filing_status,
       exemptions: extracted.labels,
       homestead_on_file: extracted.homestead,
+      // Wave 2b: assessed vs the county's own market value (null when
+      // either total is missing from the feed).
+      assessment_signal: assessmentSignal(property.assessment),
       state_program: {
         state: String(home.state || '').trim().toUpperCase() || null,
         label: program.label,
@@ -147,4 +184,5 @@ module.exports = {
   getExemptionCheck,
   // Exported for testing.
   extractExemptions,
+  assessmentSignal,
 };

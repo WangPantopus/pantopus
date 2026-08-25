@@ -326,6 +326,7 @@ app.use('/api/homes', require('./routes/residencyLetters')); // Server-attested 
 app.use('/api/homes', require('./routes/residencyClaims')); // Scoped live residency claims (/:id/residency-claims)
 app.use('/api/homes', require('./routes/fridgeCards'));   // 911-ready household cards (/:id/fridge-cards)
 app.use('/api/homes', require('./routes/mailboxCheck'));  // Mailbox reality check (/:id/mailbox-check)
+app.use('/api/homes', require('./routes/homeRecordWatch')); // Rate watch (/:id/record-watch)
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/sports', require('./routes/sports'));  // Sports topic lane (active events)

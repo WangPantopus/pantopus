@@ -323,6 +323,10 @@ export type {
   MailboxPhysicalStatus,
 } from './endpoints/mailboxCheck';
 
+// Place — home record watch, rate-watch half (Wave 2b)
+export * as recordWatch from './endpoints/recordWatch';
+export type { RecordWatch, RecordWatchEvaluation } from './endpoints/recordWatch';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

@@ -9,6 +9,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as api from '@pantopus/api';
+import type { RecordWatch } from '@pantopus/api';
+import { toast } from '@/components/ui/toast-store';
+import { queryKeys } from '@/lib/query-keys';
 import type {
   PlaceIntelligence,
   PlaceBillBenchmarkData,
@@ -21,7 +26,7 @@ import type {
   BenchmarkComparison,
   BillUtilityKind,
 } from '@pantopus/types';
-import { Zap, BadgePercent, Building2, Landmark, PlusCircle, Lock, BadgeCheck, CircleAlert, CircleHelp } from 'lucide-react';
+import { Zap, BadgePercent, Building2, Landmark, PlusCircle, Lock, BadgeCheck, CircleAlert, CircleHelp, TrendingDown, Loader2, Ban } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
 import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from '@/components/archetypes/place';
 import { findPlaceSection, detailAddress } from './sections';
@@ -266,8 +271,180 @@ function ExemptionCard({ data }: { data: PlaceExemptionCheckData }) {
         <div className="text-[12.5px] font-semibold text-app-text">{data.state_program.label}</div>
         <div className="text-[12.5px] text-app-text-secondary leading-[18px] mt-0.5">{data.state_program.note}</div>
       </div>
+      {data.assessment_signal && (
+        <div className="mt-2.5 pt-2.5 border-t border-app-border-subtle">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] font-semibold tracking-[0.04em] uppercase text-app-text-muted">Assessment vs county market value</span>
+            {data.assessment_signal.stance === 'above' && <Chip label={`${data.assessment_signal.ratio_pct}% above`} variant="warning" />}
+            {data.assessment_signal.stance === 'near' && <Chip label="Within 5%" variant="neutral" />}
+            {data.assessment_signal.stance === 'below' && <Chip label={`${Math.abs(data.assessment_signal.ratio_pct)}% below`} variant="success" />}
+          </div>
+          <div className="text-[13px] text-app-text-strong leading-[19px] mt-1.5">
+            Assessed at ${data.assessment_signal.assessed_value.toLocaleString()} against the county&apos;s own ${data.assessment_signal.market_value.toLocaleString()} market value.
+            {data.assessment_signal.stance === 'above'
+              ? ' An assessment meaningfully above the county’s market value is the usual basis for an appeal — appeals are filed with your county, typically in a window after assessment notices mail.'
+              : ' Nothing here suggests the usual basis for an appeal.'}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// ── Rate watch (Wave 2b) — Home Record Watch's free half ─────
+// One user-entered fact (the month the loan was recorded) held against
+// Freddie Mac's weekly PMMS average. Averages and deltas only — the
+// copy never says "refinance".
+
+function RateWatchCard({ watch, homeId }: { watch: RecordWatch; homeId: string }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const ev = watch.evaluation;
+  const monthLabel = new Date(`${watch.loan_recorded_month}-01T00:00:00Z`)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+  const removeMutation = useMutation({
+    mutationFn: () => api.recordWatch.deleteRecordWatch(homeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.recordWatch(homeId) });
+      toast.success('Watch removed.');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove the watch.'),
+  });
+
+  if (editing) {
+    return <RateWatchForm homeId={homeId} initialMonth={watch.loan_recorded_month} onDone={() => setEditing(false)} />;
+  }
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <TrendingDown size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Rate watch</span>
+            {ev && (ev.refi_window
+              ? <Chip label={`${Math.abs(ev.delta_pp).toFixed(2)}pp below your month`} variant="success" />
+              : <Chip label={`${ev.delta_pp > 0 ? '+' : ''}${ev.delta_pp.toFixed(2)}pp vs your month`} variant="neutral" />)}
+          </div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">Watching against {monthLabel}, when your loan was recorded</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-app-border-subtle">
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted mb-0.5">{monthLabel} average</div>
+          <div className="text-[17px] font-bold text-app-text">{watch.baseline_rate.toFixed(2)}%</div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted mb-0.5">This week</div>
+          <div className="text-[17px] font-bold text-app-text">{ev ? `${ev.current_rate.toFixed(2)}%` : '—'}</div>
+        </div>
+      </div>
+      <div className="text-[12.5px] text-app-text-muted leading-[18px] mt-2.5">
+        {ev?.refi_window
+          ? 'The market average is meaningfully below your loan month’s average — the comparison lenders start from. We’ll nudge you when it moves further.'
+          : 'We check the weekly market average against your month and nudge you if it falls meaningfully below — before the mail offers do.'}
+      </div>
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-app-border-subtle">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="flex-1 h-10 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-text text-[13.5px] font-semibold hover:bg-app-hover transition"
+        >
+          Change month
+        </button>
+        <button
+          type="button"
+          onClick={() => removeMutation.mutate()}
+          disabled={removeMutation.isPending}
+          className="h-10 px-3.5 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-error text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-app-error-light/40 transition disabled:opacity-50"
+        >
+          <Ban size={15} strokeWidth={2} /> Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RateWatchForm({ homeId, initialMonth, onDone }: { homeId: string; initialMonth?: string; onDone?: () => void }) {
+  const [month, setMonth] = useState(initialMonth ?? '');
+  const queryClient = useQueryClient();
+
+  const setMutation = useMutation({
+    mutationFn: () => api.recordWatch.setRecordWatch(homeId, month),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.recordWatch(homeId) });
+      toast.success('Watch set — we’ll compare the weekly average against your month.');
+      onDone?.();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not save the watch.'),
+  });
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+          <TrendingDown size={22} strokeWidth={2} className="text-primary-600" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Watch rates against your loan</div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">Hear it from your dashboard before the refi mailers find you</div>
+        </div>
+      </div>
+      <label htmlFor="rate-watch-month" className="block text-[12.5px] font-semibold text-app-text-secondary mt-3.5 mb-1.5">
+        The month your loan was recorded
+      </label>
+      <input
+        id="rate-watch-month"
+        type="month"
+        value={month}
+        onChange={(e) => setMonth(e.target.value)}
+        className="w-full h-[46px] px-3.5 text-[15px] text-app-text bg-app-surface border-[1.5px] border-app-border rounded-[10px] outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-600/10"
+      />
+      <button
+        type="button"
+        onClick={() => setMutation.mutate()}
+        disabled={setMutation.isPending || !month}
+        className="w-full h-11 mt-3 rounded-xl bg-primary-600 text-white text-[14.5px] font-semibold flex items-center justify-center gap-2 hover:bg-primary-700 transition disabled:opacity-60"
+      >
+        {setMutation.isPending ? <Loader2 size={17} className="animate-spin" /> : <TrendingDown size={17} strokeWidth={2.25} />}
+        {initialMonth ? 'Update watch' : 'Start watching'}
+      </button>
+      <div className="text-[12px] text-app-text-muted leading-[17px] mt-2">
+        We compare Freddie Mac&apos;s weekly 30-year survey average with the average for your month — facts about the market, not refinancing advice. Only you can see this.
+      </div>
+    </div>
+  );
+}
+
+function RateWatchSection({ homeId, verified }: { homeId: string; verified: boolean }) {
+  const watchQuery = useQuery({
+    queryKey: queryKeys.recordWatch(homeId),
+    queryFn: () => api.recordWatch.getRecordWatch(homeId),
+    enabled: verified,
+  });
+
+  if (!verified) {
+    return (
+      <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 flex items-center gap-3.5">
+        <span className="w-11 h-11 rounded-xl bg-app-surface-sunken flex items-center justify-center shrink-0">
+          <Lock size={20} strokeWidth={2} className="text-app-text-muted" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-semibold text-app-text">Rate watch</div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">Verify your address to watch the market against the month your loan was recorded — only the proven resident can watch a home.</div>
+        </div>
+      </div>
+    );
+  }
+  if (watchQuery.isLoading) {
+    return <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Loading your watch…</div>;
+  }
+  return watchQuery.data
+    ? <RateWatchCard watch={watchQuery.data} homeId={homeId} />
+    : <RateWatchForm homeId={homeId} />;
 }
 
 export default function MoneyDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
@@ -323,6 +500,15 @@ export default function MoneyDetail({ intelligence, homeId }: { intelligence: Pl
           />
         )}
         {exemption?.source && exemptionReady ? <SourceNote name={exemption.source} /> : null}
+
+        <DetailSectionLabel>Rate watch</DetailSectionLabel>
+        {homeId ? (
+          <RateWatchSection homeId={homeId} verified={intelligence.tier === 'T4'} />
+        ) : (
+          <ComingSoonRow icon={TrendingDown} title="Rate watch" sub="Claim your place to watch the market against your loan month" />
+        )}
+        <SourceNote name="Freddie Mac Primary Mortgage Market Survey" asOf="weekly" />
+        <ComingSoonRow icon={Landmark} title="Deed & lien alerts" sub="Know within days if anyone records against your home — only you can watch it" />
 
         <DetailSectionLabel>Property tax</DetailSectionLabel>
         <ComingSoonRow icon={Landmark} title="Property tax check" sub="Your assessment vs nearby comps + how appeals work" />
