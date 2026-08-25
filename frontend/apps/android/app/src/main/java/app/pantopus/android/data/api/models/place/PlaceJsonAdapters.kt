@@ -117,6 +117,8 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                     parse(PlaceIncentivesData::class.java)?.let(PlaceSectionData::Incentives)
                 PlaceSectionId.RENT_BAND ->
                     parse(PlaceRentBandData::class.java)?.let(PlaceSectionData::RentBand)
+                PlaceSectionId.EXEMPTION_CHECK ->
+                    parse(PlaceExemptionCheckData::class.java)?.let(PlaceSectionData::ExemptionCheck)
                 PlaceSectionId.CIVIC_DISTRICTS ->
                     parse(PlaceCivicDistrictsData::class.java)?.let(PlaceSectionData::CivicDistricts)
                 PlaceSectionId.CIVIC_ELECTION ->
@@ -168,6 +170,7 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                 is PlaceSectionData.BillBenchmark -> writeValue(writer, payload.value)
                 is PlaceSectionData.Incentives -> writeValue(writer, payload.value)
                 is PlaceSectionData.RentBand -> writeValue(writer, payload.value)
+                is PlaceSectionData.ExemptionCheck -> writeValue(writer, payload.value)
                 is PlaceSectionData.CivicDistricts -> writeValue(writer, payload.value)
                 is PlaceSectionData.CivicElection -> writeValue(writer, payload.value)
             }
@@ -209,6 +212,8 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             // this in GoodDayVerdict's Decodable init.
             GoodDayVerdict::class.java to GoodDayVerdict.UNKNOWN,
             BenchmarkComparison::class.java to BenchmarkComparison.UNKNOWN,
+            ExemptionFilingStatus::class.java to ExemptionFilingStatus.UNKNOWN,
+            AssessmentStance::class.java to AssessmentStance.UNKNOWN,
             IncentiveLevel::class.java to IncentiveLevel.UNKNOWN,
             IncentiveType::class.java to IncentiveType.UNKNOWN,
             CivicLevel::class.java to CivicLevel.UNKNOWN,

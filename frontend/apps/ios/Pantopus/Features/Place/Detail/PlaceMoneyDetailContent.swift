@@ -53,6 +53,16 @@ struct PlaceMoneyDetailContent: View {
                 PlaceSourceNote(name: "HUD Fair Market Rents", asOf: nil)
             }
 
+            if let exemption = vm.section(.exemptionCheck, in: intel) {
+                PlaceDetailSectionLabel(text: "Property-tax exemption")
+                if let data = exemption.exemptionCheck, exemption.status == .ready || exemption.status == .stale {
+                    ExemptionCheckCard(data: data)
+                } else {
+                    vm.fallbackCard(exemption)
+                }
+                PlaceSourceNote(name: "County records · ATTOM", asOf: nil)
+            }
+
             PlaceDetailSectionLabel(text: "Property tax")
             PlaceDetailCard {
                 VStack(alignment: .leading, spacing: 8) {
@@ -149,6 +159,103 @@ private struct BillBenchmarkCard: View {
         let lo = data.bandLow - span * 0.75
         let hi = data.bandHigh + span * 0.75
         return min(max((amount - lo) / (hi - lo), 0.04), 0.96)
+    }
+}
+
+// MARK: - Exemption check (Wave 2)
+// The honesty ladder as a card: on_file (green, nothing to chase) ·
+// none_on_file (amber — the "exemptions aren't automatic" hook) ·
+// unknown (neutral — the county feed doesn't report it; never dressed
+// as either). Plus the Over-Assessment Radar line when the county
+// reports both of its own totals.
+
+private struct ExemptionCheckCard: View {
+    let data: PlaceExemptionCheckData
+
+    var body: some View {
+        PlaceDetailCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("Homestead exemption")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Spacer(minLength: 0)
+                    PlaceChip(model: statusChip)
+                }
+                Text(lead)
+                    .font(.system(size: 13.5))
+                    .lineSpacing(2)
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(data.stateProgram.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.Color.appText)
+                    Text(data.stateProgram.note)
+                        .font(.system(size: 12.5))
+                        .lineSpacing(2)
+                        .foregroundStyle(Theme.Color.appTextSecondary)
+                }
+                .padding(Spacing.s3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.Color.appSurfaceSunken, in: RoundedRectangle(cornerRadius: Radii.sm))
+                if let signal = data.assessmentSignal {
+                    assessmentBlock(signal)
+                }
+            }
+        }
+    }
+
+    private var statusChip: PlaceChipModel {
+        switch data.filingStatus {
+        case .onFile: PlaceChipModel(tone: .success, text: "On file", icon: .badgeCheck)
+        case .noneOnFile: PlaceChipModel(tone: .warning, text: "Nothing on file", icon: .alertCircle)
+        case .unknown: PlaceChipModel(tone: .neutral, text: "Not reported")
+        }
+    }
+
+    private var lead: String {
+        switch data.filingStatus {
+        case .onFile:
+            "The county's record shows \(data.exemptions.joined(separator: ", ")) on this parcel — nothing to chase."
+        case .noneOnFile:
+            "No exemption appears on the county's record for this parcel. Exemptions usually aren't automatic — if this is your primary residence, it's worth checking whether one applies."
+        case .unknown:
+            "This county's assessor feed doesn't report exemption status to our data provider. Your tax bill or the assessor's site will say."
+        }
+    }
+
+    private func assessmentBlock(_ signal: PlaceAssessmentSignal) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text("Assessment vs county market value")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.Color.appTextMuted)
+                Spacer(minLength: 0)
+                PlaceChip(model: stanceChip(signal))
+            }
+            Text(assessmentCopy(signal))
+                .font(.system(size: 13))
+                .lineSpacing(2)
+                .foregroundStyle(Theme.Color.appTextSecondary)
+        }
+        .padding(.top, Spacing.s2)
+    }
+
+    private func stanceChip(_ signal: PlaceAssessmentSignal) -> PlaceChipModel {
+        switch signal.stance {
+        case .above: PlaceChipModel(tone: .warning, text: "\(Int(signal.ratioPct))% above")
+        case .below: PlaceChipModel(tone: .success, text: "\(Int(abs(signal.ratioPct)))% below")
+        case .near, .unknown: PlaceChipModel(tone: .neutral, text: "Within 5%")
+        }
+    }
+
+    private func assessmentCopy(_ signal: PlaceAssessmentSignal) -> String {
+        let assessed = PlacePresentation.money(signal.assessedValue) ?? "—"
+        let market = PlacePresentation.money(signal.marketValue) ?? "—"
+        let base = "Assessed at \(assessed) against the county's own \(market) market value."
+        return signal.stance == .above
+            ? base + " An assessment meaningfully above the county's market value is the usual basis for an appeal, filed with your county."
+            : base + " Nothing here suggests the usual basis for an appeal."
     }
 }
 

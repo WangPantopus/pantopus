@@ -26,12 +26,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.place.AssessmentStance
 import app.pantopus.android.data.api.models.place.BenchmarkComparison
 import app.pantopus.android.data.api.models.place.CivicLevel
+import app.pantopus.android.data.api.models.place.ExemptionFilingStatus
 import app.pantopus.android.data.api.models.place.PlaceBillBenchmarkData
 import app.pantopus.android.data.api.models.place.PlaceCivicDistrict
 import app.pantopus.android.data.api.models.place.PlaceCivicElectionData
 import app.pantopus.android.data.api.models.place.PlaceCivicRepresentative
+import app.pantopus.android.data.api.models.place.PlaceAssessmentSignal
+import app.pantopus.android.data.api.models.place.PlaceExemptionCheckData
 import app.pantopus.android.data.api.models.place.PlaceIncentive
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceRentBandData
@@ -81,6 +85,12 @@ fun PlaceMoneyDetailContent(intel: PlaceIntelligence) {
         if (data != null && env.isLive()) RentBandCard(data) else PlaceDetailFallbackCard(env)
         PlaceSourceNote("HUD Fair Market Rents")
     }
+    intel.section(PlaceSectionId.EXEMPTION_CHECK)?.let { env ->
+        PlaceDetailSectionLabel("Property-tax exemption")
+        val data = env.exemptionCheck
+        if (data != null && env.isLive()) ExemptionCheckCard(data) else PlaceDetailFallbackCard(env)
+        PlaceSourceNote("County records · ATTOM")
+    }
     PlaceDetailSectionLabel("Property tax")
     PlaceDetailCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -95,6 +105,111 @@ fun PlaceMoneyDetailContent(intel: PlaceIntelligence) {
             Text("Informational only — not legal or tax advice.", fontSize = 12.sp, color = PantopusColors.warning)
         }
     }
+}
+
+// Wave 2 — the honesty ladder as a card: ON_FILE (green, nothing to
+// chase) · NONE_ON_FILE (amber — the "exemptions aren't automatic"
+// hook) · UNKNOWN (neutral — the county feed doesn't report it; never
+// dressed as either). Plus the Over-Assessment Radar line when the
+// county reports both of its own totals.
+@Composable
+private fun ExemptionCheckCard(data: PlaceExemptionCheckData) {
+    val chip =
+        when (data.filingStatus) {
+            ExemptionFilingStatus.ON_FILE ->
+                PlaceChipModel(PlaceChipTone.SUCCESS, "On file", PantopusIcon.BadgeCheck)
+            ExemptionFilingStatus.NONE_ON_FILE ->
+                PlaceChipModel(PlaceChipTone.WARNING, "Nothing on file", PantopusIcon.AlertCircle)
+            ExemptionFilingStatus.UNKNOWN -> PlaceChipModel(PlaceChipTone.NEUTRAL, "Not reported")
+        }
+    val lead =
+        when (data.filingStatus) {
+            ExemptionFilingStatus.ON_FILE ->
+                "The county's record shows ${data.exemptions.joinToString(", ")} on this parcel — nothing to chase."
+            ExemptionFilingStatus.NONE_ON_FILE ->
+                "No exemption appears on the county's record for this parcel. Exemptions usually aren't " +
+                    "automatic — if this is your primary residence, it's worth checking whether one applies."
+            ExemptionFilingStatus.UNKNOWN ->
+                "This county's assessor feed doesn't report exemption status to our data provider. " +
+                    "Your tax bill or the assessor's site will say."
+        }
+    PlaceDetailCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Homestead exemption",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                PlaceChip(chip)
+            }
+            Text(lead, fontSize = 13.5.sp, lineHeight = 18.sp, color = PantopusColors.appTextSecondary)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PantopusColors.appSurfaceSunken)
+                        .padding(12.dp),
+            ) {
+                Text(
+                    data.stateProgram.label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                )
+                Text(
+                    data.stateProgram.note,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    color = PantopusColors.appTextSecondary,
+                )
+            }
+            data.assessmentSignal?.let { AssessmentSignalBlock(it) }
+        }
+    }
+}
+
+// The Over-Assessment Radar line: the county's own two totals compared,
+// with the one legal-safe fact — never advice, never savings math.
+@Composable
+private fun AssessmentSignalBlock(signal: PlaceAssessmentSignal) {
+    val stanceChip =
+        when (signal.stance) {
+            AssessmentStance.ABOVE ->
+                PlaceChipModel(PlaceChipTone.WARNING, "${signal.ratioPct.roundToInt()}% above")
+            AssessmentStance.BELOW ->
+                PlaceChipModel(PlaceChipTone.SUCCESS, "${abs(signal.ratioPct).roundToInt()}% below")
+            else -> PlaceChipModel(PlaceChipTone.NEUTRAL, "Within 5%")
+        }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "Assessment vs county market value",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextMuted,
+            modifier = Modifier.weight(1f),
+        )
+        PlaceChip(stanceChip)
+    }
+    val assessed = PlacePresentation.money(signal.assessedValue) ?: "—"
+    val market = PlacePresentation.money(signal.marketValue) ?: "—"
+    val tail =
+        if (signal.stance == AssessmentStance.ABOVE) {
+            " An assessment meaningfully above the county's market value is the usual basis " +
+                "for an appeal, filed with your county."
+        } else {
+            " Nothing here suggests the usual basis for an appeal."
+        }
+    Text(
+        "Assessed at $assessed against the county's own $market market value.$tail",
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        color = PantopusColors.appTextSecondary,
+    )
 }
 
 @Composable

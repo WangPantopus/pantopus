@@ -149,4 +149,82 @@ final class PlaceSectionsDecodingTests: XCTestCase {
         XCTAssertEqual(d.summary.pastExpectedCount, 1)
     }
 
+    // exemption_check (Wave 2) decoded to `.unknown` until the enum,
+    // union, and decode switch learned it.
+
+    func testDecodesExemptionCheckWithAssessmentSignal() throws {
+        let env = try envelope(wrap("""
+        {"id":"exemption_check","group":"money_signals","band":"B","access":"available","status":"ready",
+         "as_of":null,"source":"County records","coverage":"full","unavailable_reason":null,
+         "data":{"filing_status":"none_on_file","exemptions":[],"homestead_on_file":false,
+           "assessment_signal":{"assessed_value":550000,"market_value":500000,"ratio_pct":10,"stance":"above"},
+           "state_program":{"state":"TX","label":"Texas homestead exemption","filing":"application",
+             "note":"Not automatic - file with your county appraisal district.","curated":true}}}
+        """))
+
+        XCTAssertEqual(env.id, .exemptionCheck)
+        let d = try XCTUnwrap(env.exemptionCheck)
+        XCTAssertEqual(d.filingStatus, .noneOnFile)
+        XCTAssertFalse(d.homesteadOnFile)
+        let signal = try XCTUnwrap(d.assessmentSignal)
+        XCTAssertEqual(signal.stance, .above)
+        XCTAssertEqual(signal.ratioPct, 10)
+        XCTAssertEqual(d.stateProgram.filing, "application")
+        XCTAssertTrue(d.stateProgram.curated)
+    }
+
+    func testExemptionVocabularyAdditionsFallBackToUnknown() throws {
+        // A new server-side filing_status or stance must not break an
+        // older build — both fall back to .unknown, and a null
+        // assessment_signal stays nil (half a comparison is none).
+        let env = try envelope(wrap("""
+        {"id":"exemption_check","group":"money_signals","band":"B","access":"available","status":"ready",
+         "as_of":null,"source":"County records","coverage":"full","unavailable_reason":null,
+         "data":{"filing_status":"partially_exempt","exemptions":["Ag land"],"homestead_on_file":false,
+           "assessment_signal":null,
+           "state_program":{"state":null,"label":"Homeowner exemption programs","filing":"varies",
+             "note":"Check your county assessor.","curated":false}}}
+        """))
+
+        let d = try XCTUnwrap(env.exemptionCheck)
+        XCTAssertEqual(d.filingStatus, .unknown)
+        XCTAssertNil(d.assessmentSignal)
+        XCTAssertNil(d.stateProgram.state)
+    }
+
+    // flood.nfip (Wave 2) is an OPTIONAL extension of an existing
+    // payload: present it decodes, absent the card stays zone-only.
+
+    func testDecodesFloodNfipBenchmarkWhenPresent() throws {
+        let env = try envelope(wrap("""
+        {"id":"flood","group":"risk_readiness","band":"A","access":"available","status":"ready",
+         "as_of":null,"source":"FEMA","coverage":"full","unavailable_reason":null,
+         "data":{"zone":"AE","zone_label":"Zone AE","risk_level":"high","in_sfha":true,
+           "insurance_required":true,"plain_meaning":"High-risk zone.",
+           "nfip":{"policy_count":128,"premium_p25":480,"premium_median":760,"premium_p75":1240,
+             "full_risk_median":910,"window_months":24,"coverage":"full","as_of":"2026-08-01T00:00:00.000Z"}}}
+        """))
+
+        let nfip = try XCTUnwrap(env.flood?.nfip)
+        XCTAssertEqual(nfip.policyCount, 128)
+        XCTAssertEqual(nfip.premiumMedian, 760)
+        XCTAssertEqual(nfip.fullRiskMedian, 910)
+        XCTAssertEqual(nfip.coverage, "full")
+    }
+
+    func testFloodStillDecodesWithoutNfip() throws {
+        // The pre-Wave-2 payload — warming or suppressed tracts — must
+        // keep decoding exactly as before.
+        let env = try envelope(wrap("""
+        {"id":"flood","group":"risk_readiness","band":"A","access":"available","status":"ready",
+         "as_of":null,"source":"FEMA","coverage":"full","unavailable_reason":null,
+         "data":{"zone":"X","zone_label":"Zone X","risk_level":"minimal","in_sfha":false,
+           "insurance_required":false,"plain_meaning":"Minimal risk."}}
+        """))
+
+        let d = try XCTUnwrap(env.flood)
+        XCTAssertEqual(d.zone, "X")
+        XCTAssertNil(d.nfip)
+    }
+
 }

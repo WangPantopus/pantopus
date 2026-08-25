@@ -151,6 +151,7 @@ enum PlacePresentation {
         case .billBenchmark: .init(icon: .zap, title: "Bill benchmark")
         case .incentives: .init(icon: .badgePercent, title: "Incentives")
         case .rentBand: .init(icon: .building2, title: "Rent band")
+        case .exemptionCheck: .init(icon: .landmark, title: "Homestead exemption")
         case .civicDistricts: .init(icon: .landmark, title: "Your districts")
         case .civicElection: .init(icon: .vote, title: "Next election", inline: true)
         case .unknown: .init(icon: .mapPin, title: "Place")
@@ -281,6 +282,19 @@ enum PlacePresentation {
             let lo = money(d.bandLow) ?? ""
             let hi = money(d.bandHigh) ?? ""
             return .init(value: "\(d.bedrooms)BR market band \(lo)–\(hi)")
+        case .exemptionCheck:
+            guard let d = env.exemptionCheck else { return .init() }
+            switch d.filingStatus {
+            case .onFile:
+                return .init(value: "Exemption on file", chip: PlaceChipModel(tone: .success, text: "On file", icon: .badgeCheck))
+            case .noneOnFile:
+                return .init(
+                    value: "Nothing on file — worth checking",
+                    chip: PlaceChipModel(tone: .warning, text: "Not filed", icon: .alertCircle)
+                )
+            case .unknown:
+                return .init(value: "Not reported by this county")
+            }
         case .civicDistricts:
             guard let d = env.civicDistricts else { return .init() }
             let n = d.districts.count

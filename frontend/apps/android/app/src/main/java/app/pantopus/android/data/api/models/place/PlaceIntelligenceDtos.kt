@@ -148,6 +148,7 @@ enum class PlaceSectionId(val raw: String) {
     BILL_BENCHMARK("bill_benchmark"),
     INCENTIVES("incentives"),
     RENT_BAND("rent_band"),
+    EXEMPTION_CHECK("exemption_check"),
     CIVIC_DISTRICTS("civic_districts"),
     CIVIC_ELECTION("civic_election"),
     UNKNOWN("unknown"),
@@ -338,6 +339,29 @@ data class PlaceFloodData(
     @Json(name = "insurance_required") val insuranceRequired: Boolean,
     /** Plain "what this means" copy. */
     @Json(name = "plain_meaning") val plainMeaning: String,
+    /** Wave 2 — the tract's NFIP premium benchmark, when warmed. */
+    @Json(name = "nfip") val nfip: PlaceFloodNfipData? = null,
+)
+
+/**
+ * Wave 2 — what flood policies in this census tract actually cost:
+ * count + quartiles of real NFIP premiums over the last [windowMonths].
+ * A benchmark, never a quote. Absent while the tract's benchmark is
+ * warming or suppressed below the 10-policy floor — the card degrades
+ * to zone-only.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceFloodNfipData(
+    @Json(name = "policy_count") val policyCount: Int,
+    @Json(name = "premium_p25") val premiumP25: Double,
+    @Json(name = "premium_median") val premiumMedian: Double,
+    @Json(name = "premium_p75") val premiumP75: Double,
+    /** Median Risk Rating 2.0 full-risk premium, where reported. */
+    @Json(name = "full_risk_median") val fullRiskMedian: Double? = null,
+    @Json(name = "window_months") val windowMonths: Int,
+    /** "partial" when the tract's policy list was row-capped at fetch. */
+    val coverage: String,
+    @Json(name = "as_of") val asOf: String? = null,
 )
 
 /** ASCE 7 seismic design categories (A lowest demand → E highest). */
@@ -600,6 +624,72 @@ data class PlaceRentBandData(
     /** e.g. "FY 2026". */
     val period: String,
     val summary: String,
+)
+
+// ─── Exemption check (Wave 2) ────────────────────────────────
+
+/**
+ * The honesty ladder: UNKNOWN (county feed carries no exemption
+ * structure) is NEVER presented as "none on file". Registered with the
+ * unknown-fallback factory so a server-side vocabulary addition cannot
+ * break an older build.
+ */
+enum class ExemptionFilingStatus {
+    @Json(name = "on_file")
+    ON_FILE,
+
+    @Json(name = "none_on_file")
+    NONE_ON_FILE,
+
+    UNKNOWN,
+}
+
+/** The Over-Assessment Radar stance (±5% bands). Same fallback rule. */
+enum class AssessmentStance {
+    @Json(name = "above")
+    ABOVE,
+
+    @Json(name = "near")
+    NEAR,
+
+    @Json(name = "below")
+    BELOW,
+
+    UNKNOWN,
+}
+
+/**
+ * County assessed total vs the county's own market total — null on the
+ * wire when either total is missing (half a comparison is no
+ * comparison). Informational, never advice.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceAssessmentSignal(
+    @Json(name = "assessed_value") val assessedValue: Double,
+    @Json(name = "market_value") val marketValue: Double,
+    @Json(name = "ratio_pct") val ratioPct: Double,
+    val stance: AssessmentStance = AssessmentStance.UNKNOWN,
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceExemptionStateProgram(
+    val state: String? = null,
+    val label: String,
+    /** "application" | "varies" | "none_general". */
+    val filing: String,
+    val note: String,
+    /** False → the conservative check-your-county default. */
+    val curated: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaceExemptionCheckData(
+    @Json(name = "filing_status") val filingStatus: ExemptionFilingStatus = ExemptionFilingStatus.UNKNOWN,
+    /** Labels as the assessor feed reports them, e.g. "Homestead". */
+    val exemptions: List<String> = emptyList(),
+    @Json(name = "homestead_on_file") val homesteadOnFile: Boolean = false,
+    @Json(name = "assessment_signal") val assessmentSignal: PlaceAssessmentSignal? = null,
+    @Json(name = "state_program") val stateProgram: PlaceExemptionStateProgram,
 )
 
 // ─── Civic payloads ──────────────────────────────────────────
@@ -882,6 +972,8 @@ sealed interface PlaceSectionData {
 
     data class RentBand(val value: PlaceRentBandData) : PlaceSectionData
 
+    data class ExemptionCheck(val value: PlaceExemptionCheckData) : PlaceSectionData
+
     data class CivicDistricts(val value: PlaceCivicDistrictsData) : PlaceSectionData
 
     data class CivicElection(val value: PlaceCivicElectionData) : PlaceSectionData
@@ -939,6 +1031,8 @@ data class PlaceSectionEnvelope(
     val billBenchmark: PlaceBillBenchmarkData? get() = (data as? PlaceSectionData.BillBenchmark)?.value
     val incentives: PlaceIncentivesData? get() = (data as? PlaceSectionData.Incentives)?.value
     val rentBand: PlaceRentBandData? get() = (data as? PlaceSectionData.RentBand)?.value
+
+    val exemptionCheck: PlaceExemptionCheckData? get() = (data as? PlaceSectionData.ExemptionCheck)?.value
     val civicDistricts: PlaceCivicDistrictsData? get() = (data as? PlaceSectionData.CivicDistricts)?.value
     val civicElection: PlaceCivicElectionData? get() = (data as? PlaceSectionData.CivicElection)?.value
 }
