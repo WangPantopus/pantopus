@@ -59,6 +59,7 @@ import app.pantopus.android.data.api.services.ListingsReadApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailDayApi
 import app.pantopus.android.data.api.services.MailboxApi
+import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.MailboxCommunityApi
 import app.pantopus.android.data.api.services.MailboxDocumentApi
 import app.pantopus.android.data.api.services.MailboxKeepsakeApi
@@ -86,6 +87,7 @@ import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.ProfileInsightsApi
+import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
@@ -495,6 +497,14 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideResidencyLettersApi(retrofit: Retrofit): ResidencyLettersApi = retrofit.create(ResidencyLettersApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMailboxCheckApi(retrofit: Retrofit): MailboxCheckApi = retrofit.create(MailboxCheckApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideRecordWatchApi(retrofit: Retrofit): RecordWatchApi = retrofit.create(RecordWatchApi::class.java)
 
     @Provides
     @Singleton

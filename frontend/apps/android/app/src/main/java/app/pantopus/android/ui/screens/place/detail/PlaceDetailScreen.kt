@@ -76,7 +76,7 @@ private fun GroupContent(
         PlaceDetailGroup.YOUR_HOME -> PlaceHomeDetailContent(intel)
         PlaceDetailGroup.RISK -> PlaceRiskDetailContent(intel)
         PlaceDetailGroup.BLOCK -> PlaceBlockDetailContent(intel)
-        PlaceDetailGroup.MONEY -> PlaceMoneyDetailContent(intel)
+        PlaceDetailGroup.MONEY -> PlaceMoneyDetailContent(intel, viewModel)
         PlaceDetailGroup.CIVIC -> PlaceCivicDetailContent(intel)
         PlaceDetailGroup.IDENTITY -> PlaceIdentityDetailContent(intel, viewModel)
     }

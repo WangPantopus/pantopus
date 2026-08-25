@@ -2,6 +2,7 @@ package app.pantopus.android.data.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
+import app.pantopus.android.data.api.models.place.MailboxCheckResponse
 import app.pantopus.android.data.api.models.place.NeighborMessageAck
 import app.pantopus.android.data.api.models.place.NeighborMessageTemplates
 import app.pantopus.android.data.api.models.place.NeighborhoodPulse
@@ -10,6 +11,8 @@ import app.pantopus.android.data.api.models.place.PlacePreview
 import app.pantopus.android.data.api.models.place.PlaceSectionId
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessage
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessagesResponse
+import app.pantopus.android.data.api.models.place.RecordWatchResponse
+import app.pantopus.android.data.api.models.place.RemoveRecordWatchResponse
 import app.pantopus.android.data.api.models.place.ReplyNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.ReportNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.ResidencyLetterResponse
@@ -17,12 +20,15 @@ import app.pantopus.android.data.api.models.place.ResidencyLetterVerification
 import app.pantopus.android.data.api.models.place.ResidencyLettersResponse
 import app.pantopus.android.data.api.models.place.SendNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.SentNeighborMessage
+import app.pantopus.android.data.api.models.place.SetRecordWatchRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
 import app.pantopus.android.data.api.services.GeoApi
+import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.PlaceApi
+import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import okhttp3.ResponseBody
 import javax.inject.Inject
@@ -41,6 +47,8 @@ class PlaceRepository
         private val placeApi: PlaceApi,
         private val neighborMessagesApi: NeighborMessagesApi,
         private val residencyLettersApi: ResidencyLettersApi,
+        private val mailboxCheckApi: MailboxCheckApi,
+        private val recordWatchApi: RecordWatchApi,
         private val aiApi: AIApi,
         private val geoApi: GeoApi,
     ) {
@@ -130,4 +138,19 @@ class PlaceRepository
         /** Anonymous third-party letter check (no auth required). */
         suspend fun verifyResidencyLetter(code: String): NetworkResult<ResidencyLetterVerification> =
             safeApiCall { residencyLettersApi.publicVerify(code) }
+
+        /** The mailbox reality check (Wave 1, #3) — read-only diagnostic. */
+        suspend fun mailboxCheck(homeId: String): NetworkResult<MailboxCheckResponse> = safeApiCall { mailboxCheckApi.check(homeId) }
+
+        // ── Home Record Watch, rate-watch half (Wave 2b) ─────────
+
+        suspend fun recordWatch(homeId: String): NetworkResult<RecordWatchResponse> = safeApiCall { recordWatchApi.get(homeId) }
+
+        suspend fun setRecordWatch(
+            homeId: String,
+            loanRecordedMonth: String,
+        ): NetworkResult<RecordWatchResponse> = safeApiCall { recordWatchApi.set(homeId, SetRecordWatchRequest(loanRecordedMonth)) }
+
+        suspend fun removeRecordWatch(homeId: String): NetworkResult<RemoveRecordWatchResponse> =
+            safeApiCall { recordWatchApi.remove(homeId) }
     }

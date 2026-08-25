@@ -17,8 +17,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,25 +32,31 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pantopus.android.data.api.models.place.AssessmentStance
 import app.pantopus.android.data.api.models.place.BenchmarkComparison
 import app.pantopus.android.data.api.models.place.CivicLevel
 import app.pantopus.android.data.api.models.place.ExemptionFilingStatus
+import app.pantopus.android.data.api.models.place.PlaceAssessmentSignal
 import app.pantopus.android.data.api.models.place.PlaceBillBenchmarkData
 import app.pantopus.android.data.api.models.place.PlaceCivicDistrict
 import app.pantopus.android.data.api.models.place.PlaceCivicElectionData
 import app.pantopus.android.data.api.models.place.PlaceCivicRepresentative
-import app.pantopus.android.data.api.models.place.PlaceAssessmentSignal
 import app.pantopus.android.data.api.models.place.PlaceExemptionCheckData
 import app.pantopus.android.data.api.models.place.PlaceIncentive
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceRentBandData
 import app.pantopus.android.data.api.models.place.PlaceSectionId
+import app.pantopus.android.data.api.models.place.PlaceTier
+import app.pantopus.android.data.api.models.place.RecordWatch
+import app.pantopus.android.data.api.models.place.RecordWatchEvaluation
+import app.pantopus.android.ui.components.PrimaryButton
 import app.pantopus.android.ui.screens.place.PlacePresentation
 import app.pantopus.android.ui.screens.place.components.PlaceChip
 import app.pantopus.android.ui.screens.place.components.PlaceChipModel
 import app.pantopus.android.ui.screens.place.components.PlaceChipTone
 import app.pantopus.android.ui.screens.place.components.PlaceIconTile
+import app.pantopus.android.ui.screens.place.components.PlaceLockedCard
 import app.pantopus.android.ui.screens.place.components.PlaceTileTone
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -56,7 +68,10 @@ import kotlin.math.roundToInt
 // ─── Money signals (C7) ──────────────────────────────────────
 
 @Composable
-fun PlaceMoneyDetailContent(intel: PlaceIntelligence) {
+fun PlaceMoneyDetailContent(
+    intel: PlaceIntelligence,
+    viewModel: PlaceDetailViewModel,
+) {
     intel.section(PlaceSectionId.BILL_BENCHMARK)?.let { env ->
         PlaceDetailSectionLabel("Bill benchmark")
         val data = env.billBenchmark
@@ -91,6 +106,24 @@ fun PlaceMoneyDetailContent(intel: PlaceIntelligence) {
         if (data != null && env.isLive()) ExemptionCheckCard(data) else PlaceDetailFallbackCard(env)
         PlaceSourceNote("County records · ATTOM")
     }
+    PlaceDetailSectionLabel("Rate watch")
+    if (intel.tier == PlaceTier.T4) {
+        LaunchedEffect(Unit) { viewModel.loadRateWatch() }
+        RateWatchSection(viewModel)
+    } else {
+        PlaceLockedCard(
+            title = "Rate watch",
+            reason =
+                "Verify your address to watch the market against the month your loan was " +
+                    "recorded — only the proven resident can watch a home.",
+            cta = "Verify address",
+            icon = PantopusIcon.TrendingDown,
+            onTap = null,
+        )
+    }
+    PlaceSourceNote("Freddie Mac Primary Mortgage Market Survey", "weekly")
+    PlaceComingSoonRow(PantopusIcon.Landmark, "Deed & lien alerts", "Know within days if anyone records against your home")
+
     PlaceDetailSectionLabel("Property tax")
     PlaceDetailCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -104,6 +137,154 @@ fun PlaceMoneyDetailContent(intel: PlaceIntelligence) {
             )
             Text("Informational only — not legal or tax advice.", fontSize = 12.sp, color = PantopusColors.warning)
         }
+    }
+}
+
+// ── Rate watch (Wave 2b) — Home Record Watch's free half ─────
+// One user-entered fact (the loan-recorded month) held against
+// Freddie Mac's weekly PMMS average. Averages and deltas only — the
+// copy never says "refinance". Parity: iOS RateWatchSection.
+
+@Composable
+private fun RateWatchSection(viewModel: PlaceDetailViewModel) {
+    val state by viewModel.rateWatch.collectAsStateWithLifecycle()
+    when (val current = state) {
+        is RateWatchUiState.Loading ->
+            PlaceDetailCard { Text("Loading your watch…", fontSize = 13.5.sp, color = PantopusColors.appTextMuted) }
+        is RateWatchUiState.Error ->
+            PlaceDetailCard { Text(current.message, fontSize = 13.5.sp, color = PantopusColors.appTextMuted) }
+        is RateWatchUiState.None -> RateWatchForm(viewModel)
+        is RateWatchUiState.Loaded -> RateWatchCard(current.watch, viewModel)
+    }
+}
+
+@Composable
+private fun RateWatchForm(viewModel: PlaceDetailViewModel) {
+    var month by remember { mutableStateOf("") }
+    val isSaving by viewModel.isSavingWatch.collectAsStateWithLifecycle()
+    PlaceDetailCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Watch rates against your loan",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                "Hear it from your dashboard before the refi mailers find you. " +
+                    "Enter the month your loan was recorded (YYYY-MM).",
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+            OutlinedTextField(
+                value = month,
+                onValueChange = { month = it },
+                placeholder = { Text("2023-03") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PrimaryButton(
+                title = if (isSaving) "Saving…" else "Start watching",
+                isLoading = isSaving,
+                isEnabled = month.isNotBlank(),
+                onClick = { viewModel.setRateWatch(month) },
+            )
+            Text(
+                "We compare Freddie Mac's weekly 30-year survey average with the average for your " +
+                    "month — facts about the market, not refinancing advice. Only you can see this.",
+                fontSize = 11.5.sp,
+                lineHeight = 15.sp,
+                color = PantopusColors.appTextMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RateWatchCard(
+    watch: RecordWatch,
+    viewModel: PlaceDetailViewModel,
+) {
+    val monthLabel = PlacePresentation.fmtMonthYear(watch.loanRecordedMonth + "-01T00:00:00Z") ?: watch.loanRecordedMonth
+    val ev = watch.evaluation
+    PlaceDetailCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Rate watch",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PantopusColors.appText,
+                    modifier = Modifier.weight(1f),
+                )
+                ev?.let { PlaceChip(rateWatchChip(it)) }
+            }
+            Text(
+                "Watching against $monthLabel, when your loan was recorded",
+                fontSize = 12.5.sp,
+                color = PantopusColors.appTextMuted,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                RateColumn("$monthLabel average", watch.baselineRate)
+                RateColumn("This week", ev?.currentRate)
+            }
+            Text(
+                if (ev?.refiWindow == true) {
+                    "The market average is meaningfully below your loan month's average — the comparison " +
+                        "lenders start from. We'll nudge you when it moves further."
+                } else {
+                    "We check the weekly market average against your month and nudge you if it falls " +
+                        "meaningfully below — before the mail offers do."
+                },
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                color = PantopusColors.appTextMuted,
+            )
+            Text(
+                "Remove watch",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PantopusColors.error,
+                modifier = Modifier.clickable { viewModel.removeRateWatch() },
+            )
+        }
+    }
+}
+
+private fun rateWatchChip(ev: RecordWatchEvaluation): PlaceChipModel =
+    if (ev.refiWindow) {
+        PlaceChipModel(
+            PlaceChipTone.SUCCESS,
+            String.format(java.util.Locale.US, "%.2fpp below your month", abs(ev.deltaPp)),
+            PantopusIcon.TrendingDown,
+        )
+    } else {
+        val sign = if (ev.deltaPp > 0) "+" else ""
+        PlaceChipModel(
+            PlaceChipTone.NEUTRAL,
+            String.format(java.util.Locale.US, "%s%.2fpp vs your month", sign, ev.deltaPp),
+        )
+    }
+
+@Composable
+private fun RateColumn(
+    label: String,
+    rate: Double?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            label.uppercase(java.util.Locale.US),
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextMuted,
+        )
+        Text(
+            rate?.let { String.format(java.util.Locale.US, "%.2f%%", it) } ?: "—",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = PantopusColors.appText,
+        )
     }
 }
 

@@ -94,7 +94,80 @@ class PlaceDetailViewModel
                 loadLetters()
             }
         }
+
+        // ── Mailbox reality check (Identity detail) ──────────────
+
+        private val _mailboxCheck = MutableStateFlow<MailboxCheckUiState>(MailboxCheckUiState.Loading)
+        val mailboxCheck: StateFlow<MailboxCheckUiState> = _mailboxCheck.asStateFlow()
+
+        fun loadMailboxCheck() {
+            viewModelScope.launch {
+                _mailboxCheck.value =
+                    when (val r = repo.mailboxCheck(homeId)) {
+                        is NetworkResult.Success -> MailboxCheckUiState.Loaded(r.data.check)
+                        is NetworkResult.Failure -> MailboxCheckUiState.Error(r.error.displayMessage("Couldn't run the mailbox check."))
+                    }
+            }
+        }
+
+        // ── Rate watch (Money detail, T4) ────────────────────────
+
+        private val _rateWatch = MutableStateFlow<RateWatchUiState>(RateWatchUiState.Loading)
+        val rateWatch: StateFlow<RateWatchUiState> = _rateWatch.asStateFlow()
+
+        private val _isSavingWatch = MutableStateFlow(false)
+        val isSavingWatch: StateFlow<Boolean> = _isSavingWatch.asStateFlow()
+
+        fun loadRateWatch() {
+            viewModelScope.launch {
+                _rateWatch.value =
+                    when (val r = repo.recordWatch(homeId)) {
+                        is NetworkResult.Success ->
+                            r.data.watch?.let { RateWatchUiState.Loaded(it) } ?: RateWatchUiState.None
+                        is NetworkResult.Failure -> RateWatchUiState.Error(r.error.displayMessage("Couldn't load your watch."))
+                    }
+            }
+        }
+
+        fun setRateWatch(month: String) {
+            if (month.isBlank()) return
+            viewModelScope.launch {
+                _isSavingWatch.value = true
+                _rateWatch.value =
+                    when (val r = repo.setRecordWatch(homeId, month.trim())) {
+                        is NetworkResult.Success ->
+                            r.data.watch?.let { RateWatchUiState.Loaded(it) } ?: RateWatchUiState.None
+                        is NetworkResult.Failure -> RateWatchUiState.Error(r.error.displayMessage("Couldn't save the watch."))
+                    }
+                _isSavingWatch.value = false
+            }
+        }
+
+        fun removeRateWatch() {
+            viewModelScope.launch {
+                repo.removeRecordWatch(homeId)
+                _rateWatch.value = RateWatchUiState.None
+            }
+        }
     }
+
+sealed interface MailboxCheckUiState {
+    data object Loading : MailboxCheckUiState
+
+    data class Loaded(val check: app.pantopus.android.data.api.models.place.MailboxCheck) : MailboxCheckUiState
+
+    data class Error(val message: String) : MailboxCheckUiState
+}
+
+sealed interface RateWatchUiState {
+    data object Loading : RateWatchUiState
+
+    data object None : RateWatchUiState
+
+    data class Loaded(val watch: app.pantopus.android.data.api.models.place.RecordWatch) : RateWatchUiState
+
+    data class Error(val message: String) : RateWatchUiState
+}
 
 sealed interface ResidencyLetterUiState {
     data object Loading : ResidencyLetterUiState
