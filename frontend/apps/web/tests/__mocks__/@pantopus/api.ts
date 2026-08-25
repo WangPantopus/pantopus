@@ -131,6 +131,17 @@ export const residencyClaims = {
   revokeResidencyClaim: jest.fn(),
   verifyResidencyClaim: jest.fn(),
 };
+// Place — 911-ready household fridge cards (Wave 1, #2).
+export const fridgeCards = {
+  issueFridgeCard: jest.fn(),
+  listFridgeCards: jest.fn(),
+  revokeFridgeCard: jest.fn(),
+  getPublicFridgeCard: jest.fn(),
+};
+// Home profile bits the fridge-card composer seeds from.
+export const homeProfile = {
+  getHomeEmergencies: jest.fn(),
+};
 export const businesses = {
   getMyBusinesses: jest.fn(),
 };

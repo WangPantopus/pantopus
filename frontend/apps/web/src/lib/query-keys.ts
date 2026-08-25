@@ -81,6 +81,8 @@ export const queryKeys = {
     ['place', 'residency-claims', homeId] as const,
   residencyClaimViews: (homeId: string, claimId: string) =>
     ['place', 'residency-claims', homeId, claimId, 'views'] as const,
+  fridgeCards: (homeId: string) =>
+    ['place', 'fridge-cards', homeId] as const,
 
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>

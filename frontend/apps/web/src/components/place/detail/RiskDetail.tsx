@@ -10,6 +10,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type {
   PlaceIntelligence,
@@ -38,12 +39,16 @@ import {
   TestTube,
   GlassWater,
   Factory,
+  HeartPulse,
+  ChevronRight,
 } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
-import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
+import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote, LockedCard } from '@/components/archetypes/place';
+import { useRouter } from 'next/navigation';
 import { findPlaceSection, detailAddress } from './sections';
 import { statusToState } from './format';
 import { useLocalDraft } from './useLocalDraft';
+import FridgeCardLeaf from './FridgeCardLeaf';
 
 const FLOOD_CHIP: Record<FloodRiskLevel, { label: string; variant: ChipVariant; icon: LucideIcon }> = {
   minimal: { label: 'Minimal risk', variant: 'success', icon: ShieldCheck },
@@ -378,6 +383,9 @@ const isReady = (s: { status: string; data: unknown } | null | undefined) =>
   Boolean(s && (s.status === 'ready' || s.status === 'stale' || s.status === 'partial') && s.data);
 
 export default function RiskDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
+  const router = useRouter();
+  const [fridgeCardOpen, setFridgeCardOpen] = useState(false);
+  const verified = intelligence.tier === 'T4';
   const heatCold = findPlaceSection(intelligence, 'heat_cold');
   const flood = findPlaceSection(intelligence, 'flood');
   const floodReady = isReady(flood);
@@ -386,6 +394,16 @@ export default function RiskDetail({ intelligence, homeId }: { intelligence: Pla
   const leadRadon = findPlaceSection(intelligence, 'lead_radon');
   const water = findPlaceSection(intelligence, 'drinking_water');
   const hazards = findPlaceSection(intelligence, 'environmental_hazards');
+
+  if (fridgeCardOpen && verified && homeId) {
+    return (
+      <FridgeCardLeaf
+        homeId={homeId}
+        address={detailAddress(intelligence.place)}
+        onBack={() => setFridgeCardOpen(false)}
+      />
+    );
+  }
 
   return (
     <>
@@ -449,6 +467,32 @@ export default function RiskDetail({ intelligence, homeId }: { intelligence: Pla
         <DetailSectionLabel>Emergency plan</DetailSectionLabel>
         <EmergencyPlan homeId={homeId} />
         <SourceNote name="Recommended items from Ready.gov & American Red Cross" />
+
+        <DetailSectionLabel>Fridge card</DetailSectionLabel>
+        {verified && homeId ? (
+          <button
+            type="button"
+            onClick={() => setFridgeCardOpen(true)}
+            className="w-full flex items-center gap-3.5 bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-left hover:bg-app-hover transition"
+          >
+            <span className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+              <HeartPulse size={22} strokeWidth={2} className="text-primary-600" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">The 911-ready household card</div>
+              <div className="text-[12.5px] text-app-text-muted mt-0.5">Your exact address, allergies, meds, pets, shutoffs — for whoever&apos;s at your house</div>
+            </div>
+            <ChevronRight size={18} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
+          </button>
+        ) : (
+          <LockedCard
+            icon={HeartPulse}
+            title="The 911-ready household card"
+            reason="Verify your address to issue a fridge card — its headline is the verified address a caller reads to 911."
+            cta="Verify address"
+            onCta={() => homeId && router.push(`/app/homes/${homeId}/verify-postcard`)}
+          />
+        )}
 
         <InfoNote>
           Informational, not emergency instructions. In a real emergency, call 911 and follow guidance from local officials.

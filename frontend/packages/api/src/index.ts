@@ -301,6 +301,18 @@ export type {
   ResidencyClaimVerification,
 } from './endpoints/residencyClaims';
 
+// Place — 911-ready household fridge cards (Wave 1, #2)
+export * as fridgeCards from './endpoints/fridgeCards';
+export type {
+  FridgeCard,
+  FridgeCardSectionKey,
+  FridgeCardStatus,
+  FridgeCardItem,
+  FridgeCardSection,
+  FridgeCardContent,
+  FridgeCardPublic,
+} from './endpoints/fridgeCards';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {
