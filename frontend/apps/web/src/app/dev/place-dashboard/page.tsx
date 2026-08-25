@@ -33,6 +33,7 @@ const META: Record<PlaceSectionId, { group: PlaceSection['group']; band: PlaceSe
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison' },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE' },
   rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents' },
+  exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM' },
   civic_districts: { group: 'civic', band: 'A', source: 'Google Civic Information' },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections' },
 };

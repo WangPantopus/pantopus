@@ -39,6 +39,8 @@ const { getHomePrivacy } = require('./homePrivacyService');
 const { buildGoodDayTiles } = require('./goodDayEngine');
 const { getDensityBucket } = require('./place/densityReader');
 const { getSystemsLedger } = require('./homeSystemsService');
+const nfipPremiumService = require('./nfipPremiumService');
+const exemptionCheckService = require('./exemptionCheckService');
 
 const HOME_SELECT =
   'id, owner_id, address, address2, city, state, zipcode, map_center_lat, map_center_lng, year_built, sq_ft, bedrooms, bathrooms, lot_sq_ft, home_type';
@@ -389,17 +391,42 @@ async function composeNeighborhood(home) {
   const out = [];
 
   if (profile && profile.flood_zone) {
+    const floodData = {
+      zone: profile.flood_zone,
+      zone_label: `Zone ${profile.flood_zone}`,
+      risk_level: floodRiskLevel(profile.flood_zone),
+      in_sfha: floodInSfha(profile.flood_zone),
+      insurance_required: floodInSfha(profile.flood_zone),
+      plain_meaning: profile.flood_zone_description || '',
+    };
+    // Wave 2 — what flood policies here actually COST: the tract's NFIP
+    // premium benchmark, cache-only (the nfipTractWarm job owns the slow
+    // OpenFEMA fetch; a miss marks the tract pending and ships nothing).
+    // Optional field: absent while warming/suppressed, so older clients
+    // and thin tracts degrade to today's zone-only card.
+    if (profile.tract_id) {
+      try {
+        const nfip = await nfipPremiumService.getTractBenchmark(profile.tract_id);
+        if (nfip.status === 'ready') {
+          floodData.nfip = {
+            policy_count: nfip.data.policy_count,
+            premium_p25: nfip.data.premium_p25,
+            premium_median: nfip.data.premium_median,
+            premium_p75: nfip.data.premium_p75,
+            full_risk_median: nfip.data.full_risk_median ?? null,
+            window_months: nfip.data.window_months,
+            coverage: nfip.data.coverage,
+            as_of: nfip.fetchedAt || null,
+          };
+        }
+      } catch (err) {
+        logger.warn('placeIntelligence: nfip benchmark failed', { homeId: home.id, error: err.message });
+      }
+    }
     out.push(serializePlaceSection('flood', {
       access: 'available',
       asOf: profile.cached_at || null,
-      data: {
-        zone: profile.flood_zone,
-        zone_label: `Zone ${profile.flood_zone}`,
-        risk_level: floodRiskLevel(profile.flood_zone),
-        in_sfha: floodInSfha(profile.flood_zone),
-        insurance_required: floodInSfha(profile.flood_zone),
-        plain_meaning: profile.flood_zone_description || '',
-      },
+      data: floodData,
     }));
   } else {
     out.push(serializePlaceSection('flood', { access: 'available', status: 'unavailable' }));
@@ -664,6 +691,43 @@ async function composeHomeSystems(home, tier) {
 }
 
 // ════════════════════════════════════════════════════════════
+// exemption_check (Wave 2) — homestead exemption on the parcel line
+// ════════════════════════════════════════════════════════════
+// Band B like your_home: the answer lives on the exact parcel's
+// assessor record. The service returns an honesty ladder
+// (on_file / none_on_file / unknown); this maps its unavailable
+// reasons onto the designed copy.
+const EXEMPTION_UNAVAILABLE_COPY = {
+  ATTOM_NOT_CONFIGURED: "Exemption records aren't available for your area yet.",
+  ATTOM_UNAVAILABLE: "County exemption records aren't reachable right now.",
+  NO_PARCEL_MATCH: "We couldn't match this address to a county parcel record.",
+};
+
+async function composeExemptionCheck(home, tier) {
+  const access = bandAccess('B', tier);
+  if (access === 'locked') {
+    return [serializePlaceSection('exemption_check', {
+      access: 'locked',
+      unavailableReason: 'Claim your place to check for property-tax exemptions on file.',
+    })];
+  }
+  try {
+    const result = await exemptionCheckService.getExemptionCheck(home);
+    if (result.status !== 'ready') {
+      return [serializePlaceSection('exemption_check', {
+        access,
+        status: result.status === 'error' ? 'error' : 'unavailable',
+        unavailableReason: EXEMPTION_UNAVAILABLE_COPY[result.unavailableReason] || null,
+      })];
+    }
+    return [serializePlaceSection('exemption_check', { access, status: 'ready', data: result.data })];
+  } catch (err) {
+    logger.warn('placeIntelligence: exemption_check failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('exemption_check', { access, status: 'error' })];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 // composeHomeIntelligence — the full grouped response
 // ════════════════════════════════════════════════════════════
 
@@ -687,6 +751,7 @@ const COMPOSER_SECTIONS = [
   { ids: ['your_home'], run: ({ home, tier }) => composeYourHome(home, tier) },
   { ids: ['home_systems'], run: ({ home, tier }) => composeHomeSystems(home, tier) },
   { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
+  { ids: ['exemption_check'], run: ({ home, tier }) => composeExemptionCheck(home, tier) },
   { ids: ['rent_band'], run: ({ home }) => placeSectionAdapters.composeRentBand(home) },
   { ids: ['civic_districts'], run: ({ home }) => placeSectionAdapters.composeCivicDistricts(home) },
   { ids: ['civic_election'], run: ({ home }) => placeSectionAdapters.composeCivicElection(home) },

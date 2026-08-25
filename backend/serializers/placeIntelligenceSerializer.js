@@ -72,6 +72,9 @@ const PLACE_SECTION_META = {
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison', layer: 12 },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE', layer: 10 },
   rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents', layer: 9 },
+  // Wave 2 — homestead-style exemption on the parcel's assessor line.
+  // Band B: the answer needs the exact parcel record (ATTOM).
+  exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM', layer: null },
   civic_districts: { group: 'civic', band: 'A', source: 'Google Civic Information', layer: 8 },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections', layer: 8 },
 };

@@ -237,6 +237,25 @@ export interface PlaceGoodDayData {
 export type FloodRiskLevel = 'minimal' | 'moderate' | 'high';
 
 /** Launch layer #3 — Flood (FEMA National Flood Hazard Layer). */
+/**
+ * Wave 2 — what flood policies in this census tract actually cost:
+ * count + quartiles of real NFIP premiums (OpenFEMA NFIP Policies v3),
+ * computed over the last `window_months` of policy effective dates.
+ * A benchmark, never a quote — Risk Rating 2.0 varies within a tract.
+ */
+export interface PlaceFloodNfipData {
+  policy_count: number;
+  premium_p25: number;
+  premium_median: number;
+  premium_p75: number;
+  /** Median Risk Rating 2.0 full-risk premium, where reported. */
+  full_risk_median: number | null;
+  window_months: number;
+  /** 'partial' when the tract's policy list was row-capped at fetch. */
+  coverage: 'full' | 'partial';
+  as_of: string | null;
+}
+
 export interface PlaceFloodData {
   /** FEMA zone code, e.g. "X". */
   zone: string;
@@ -249,6 +268,33 @@ export interface PlaceFloodData {
   insurance_required: boolean;
   /** Plain "what this means" copy. */
   plain_meaning: string;
+  /**
+   * Absent while the tract's benchmark is still warming (background
+   * job) or suppressed below the 10-policy floor — the card degrades
+   * to zone-only.
+   */
+  nfip?: PlaceFloodNfipData;
+}
+
+/**
+ * Wave 2 — homestead exemption on the parcel's assessor line.
+ * `filing_status` is an honesty ladder: `unknown` (county feed carries
+ * no exemption structure) is NEVER presented as "none on file".
+ */
+export interface PlaceExemptionCheckData {
+  filing_status: 'on_file' | 'none_on_file' | 'unknown';
+  /** Labels as the assessor feed reports them, e.g. "Homestead". */
+  exemptions: string[];
+  homestead_on_file: boolean;
+  state_program: {
+    state: string | null;
+    label: string;
+    /** 'application' | 'varies' | 'none_general' */
+    filing: 'application' | 'varies' | 'none_general';
+    note: string;
+    /** False → the conservative check-your-county default. */
+    curated: boolean;
+  };
 }
 
 /** NWS HeatRisk index: 0 Little to none → 4 Extreme. */
@@ -637,6 +683,7 @@ export interface PlaceSectionDataMap {
   bill_benchmark: PlaceBillBenchmarkData;
   incentives: PlaceIncentivesData;
   rent_band: PlaceRentBandData;
+  exemption_check: PlaceExemptionCheckData;
   civic_districts: PlaceCivicDistrictsData;
   civic_election: PlaceCivicElectionData;
   // Band B (W0.2) — exact property facts + valuation.
@@ -666,6 +713,7 @@ export const PLACE_SECTION_IDS = [
   'bill_benchmark',
   'incentives',
   'rent_band',
+  'exemption_check',
   'civic_districts',
   'civic_election',
 ] as const satisfies readonly PlaceSectionId[];
@@ -700,6 +748,7 @@ export const PLACE_SECTION_META: Record<PlaceSectionId, PlaceSectionMeta> = {
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison', layer: 12 },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE', layer: 10 },
   rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents', layer: 9 },
+  exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM', layer: null },
   civic_districts: { group: 'civic', band: 'A', source: 'Google Civic Information', layer: 8 },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections', layer: 8 },
 };

@@ -66,6 +66,7 @@ import type {
   PlaceBillBenchmarkData,
   PlaceIncentivesData,
   PlaceRentBandData,
+  PlaceExemptionCheckData,
   PlaceCivicDistrictsData,
   PlaceCivicElectionData,
   PlaceYourHomeData,
@@ -346,6 +347,16 @@ const SECTION_CONFIG: Record<PlaceSectionId, SectionConfig> = {
       const lo = money(d.band_low);
       const hi = money(d.band_high);
       return { value: `${d.bedrooms}BR market band ${lo}–${hi}` };
+    },
+  },
+  exemption_check: {
+    icon: Landmark,
+    title: 'Homestead exemption',
+    format: (data) => {
+      const d = data as PlaceExemptionCheckData;
+      if (d.filing_status === 'on_file') return { value: 'Exemption on file' };
+      if (d.filing_status === 'none_on_file') return { value: 'Nothing on file — worth checking' };
+      return { value: 'Not reported by this county' };
     },
   },
   civic_districts: {

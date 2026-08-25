@@ -15,12 +15,13 @@ import type {
   PlaceIncentivesData,
   PlaceIncentive,
   PlaceRentBandData,
+  PlaceExemptionCheckData,
   IncentiveLevel,
   IncentiveType,
   BenchmarkComparison,
   BillUtilityKind,
 } from '@pantopus/types';
-import { Zap, BadgePercent, Building2, Landmark, PlusCircle, Lock } from 'lucide-react';
+import { Zap, BadgePercent, Building2, Landmark, PlusCircle, Lock, BadgeCheck, CircleAlert, CircleHelp } from 'lucide-react';
 import Chip, { type ChipVariant } from '@/components/archetypes/primitives/Chip';
 import { SectionCard, DetailHeader, DetailSectionLabel, SourceNote, ComingSoonRow, InfoNote } from '@/components/archetypes/place';
 import { findPlaceSection, detailAddress } from './sections';
@@ -213,14 +214,73 @@ function RentBand({ data, homeId }: { data: PlaceRentBandData; homeId: string | 
   );
 }
 
+// ── Exemption check (Wave 2) — the honesty ladder as a card ──
+// on_file (green, nothing to do) · none_on_file (amber — THE hook:
+// exemptions aren't automatic) · unknown (neutral — the county feed
+// doesn't report exemption status; never dressed as either).
+
+const EXEMPTION_STATES: Record<PlaceExemptionCheckData['filing_status'], {
+  chip: string; variant: ChipVariant; icon: typeof BadgeCheck; lead: (d: PlaceExemptionCheckData) => string;
+}> = {
+  on_file: {
+    chip: 'On file',
+    variant: 'success',
+    icon: BadgeCheck,
+    lead: (d) => `The county's record shows ${d.exemptions.join(', ')} on this parcel — nothing to chase.`,
+  },
+  none_on_file: {
+    chip: 'Nothing on file',
+    variant: 'warning',
+    icon: CircleAlert,
+    lead: () => 'No exemption appears on the county’s record for this parcel. Exemptions usually aren’t automatic — if this is your primary residence, it’s worth checking whether one applies.',
+  },
+  unknown: {
+    chip: 'Not reported',
+    variant: 'neutral',
+    icon: CircleHelp,
+    lead: () => 'This county’s assessor feed doesn’t report exemption status to our data provider, so we can’t tell what’s on file. Your tax bill or the assessor’s site will say.',
+  },
+};
+
+function ExemptionCard({ data }: { data: PlaceExemptionCheckData }) {
+  const state = EXEMPTION_STATES[data.filing_status] ?? EXEMPTION_STATES.unknown;
+  const Icon = state.icon;
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-app-home-bg flex items-center justify-center shrink-0">
+          <Icon size={22} strokeWidth={2} className="text-app-home" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Homestead exemption</span>
+            <Chip label={state.chip} variant={state.variant} />
+          </div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">From the county assessor&apos;s parcel record</div>
+        </div>
+      </div>
+      <div className="text-[13.5px] text-app-text-strong leading-[20px] mt-3 pt-3 border-t border-app-border-subtle">
+        {state.lead(data)}
+      </div>
+      <div className="mt-2.5 px-3.5 py-3 bg-app-surface-muted border border-app-border-subtle rounded-[11px]">
+        <div className="text-[12.5px] font-semibold text-app-text">{data.state_program.label}</div>
+        <div className="text-[12.5px] text-app-text-secondary leading-[18px] mt-0.5">{data.state_program.note}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function MoneyDetail({ intelligence, homeId }: { intelligence: PlaceIntelligence; homeId: string | null }) {
   const bill = findPlaceSection(intelligence, 'bill_benchmark');
   const incentives = findPlaceSection(intelligence, 'incentives');
   const rent = findPlaceSection(intelligence, 'rent_band');
+  const exemption = findPlaceSection(intelligence, 'exemption_check');
 
   const billReady = bill && (bill.status === 'ready' || bill.status === 'stale' || bill.status === 'partial') && bill.data;
   const incReady = incentives && (incentives.status === 'ready' || incentives.status === 'stale' || incentives.status === 'partial') && incentives.data;
   const rentReady = rent && (rent.status === 'ready' || rent.status === 'stale' || rent.status === 'partial') && rent.data;
+  const exemptionReady = exemption && exemption.access === 'available'
+    && (exemption.status === 'ready' || exemption.status === 'stale') && exemption.data;
 
   return (
     <>
@@ -249,6 +309,20 @@ export default function MoneyDetail({ intelligence, homeId }: { intelligence: Pl
           <SectionCard icon={Building2} title="Rent band" state={rent ? statusToState(rent.status) : 'unavailable'} caption={rent?.unavailable_reason ?? undefined} onRetry={() => window.location.reload()} />
         )}
         {rent?.source ? <SourceNote name={rent.source} asOf="FY 2026" /> : null}
+
+        <DetailSectionLabel>Property-tax exemption</DetailSectionLabel>
+        {exemptionReady ? (
+          <ExemptionCard data={exemption!.data as PlaceExemptionCheckData} />
+        ) : (
+          <SectionCard
+            icon={Landmark}
+            title="Homestead exemption"
+            state={exemption && exemption.access === 'available' ? statusToState(exemption.status) : 'unavailable'}
+            caption={exemption?.unavailable_reason ?? undefined}
+            onRetry={() => window.location.reload()}
+          />
+        )}
+        {exemption?.source && exemptionReady ? <SourceNote name={exemption.source} /> : null}
 
         <DetailSectionLabel>Property tax</DetailSectionLabel>
         <ComingSoonRow icon={Landmark} title="Property tax check" sub="Your assessment vs nearby comps + how appeals work" />
