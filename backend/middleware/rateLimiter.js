@@ -264,6 +264,36 @@ const residencyLetterIssueLimiter = rateLimit({
   message: { error: 'Too many letters issued today. Please try again tomorrow.' },
 });
 
+/**
+ * Limiter for residency-claim issuance.
+ * Claims are cheap rows (no PDF) and short-lived by design, so the normal
+ * pattern is a few per errand; 30/day stops scripted issuance without
+ * getting in the way of a busy move week.
+ */
+const residencyClaimIssueLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many claims issued today. Please try again tomorrow.' },
+});
+
+/**
+ * Limiter for fridge-card issuance — its own bucket, so a busy claim
+ * week can never eat the card budget (or show a claims-worded 429 on
+ * the card endpoint). Cards are durable household artifacts; 10/day
+ * only stops runaway issuance.
+ */
+const fridgeCardIssueLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { error: 'Too many cards issued today. Please try again tomorrow.' },
+});
+
 module.exports = {
   globalWriteLimiter,
   financialWriteLimiter,
@@ -284,4 +314,6 @@ module.exports = {
   personaFollowLimiter,
   broadcastPublishLimiter,
   residencyLetterIssueLimiter,
+  residencyClaimIssueLimiter,
+  fridgeCardIssueLimiter,
 };

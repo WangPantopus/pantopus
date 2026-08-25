@@ -5,7 +5,17 @@
 // ============================================================
 
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import type { PlaceIntelligence, PlaceSection, PlaceSectionId } from '@pantopus/types';
+
+// IdentityDetail now carries the mailbox-check query in its main view,
+// so its renders need a QueryClient (queries resolve to loading states
+// here — the card's own behavior is covered in mailboxCheckCard.test).
+function renderWithQueryClient(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 import TodayDetail from '@/components/place/detail/TodayDetail';
 import YourHomeDetail from '@/components/place/detail/YourHomeDetail';
 import RiskDetail from '@/components/place/detail/RiskDetail';
@@ -108,7 +118,7 @@ describe('Place group-detail — renders from the contract', () => {
   });
 
   it('Identity shows verified status and the residency-letter generator', () => {
-    render(<IdentityDetail intelligence={FULL} homeId="home-1" residentName="Riley Chen" />);
+    renderWithQueryClient(<IdentityDetail intelligence={FULL} homeId="home-1" residentName="Riley Chen" />);
     expect(screen.getByText('Verified resident')).toBeInTheDocument();
     expect(screen.getByText('Generate a verified residency letter')).toBeInTheDocument();
   });
@@ -138,7 +148,7 @@ describe('Place group-detail — degrades section-by-section', () => {
   });
 
   it('Identity locks the residency letter until the address is verified (T3)', () => {
-    render(<IdentityDetail intelligence={{ ...FULL, tier: 'T3' }} homeId="home-1" residentName="Riley Chen" />);
+    renderWithQueryClient(<IdentityDetail intelligence={{ ...FULL, tier: 'T3' }} homeId="home-1" residentName="Riley Chen" />);
     expect(screen.getByText('Verify your address')).toBeInTheDocument();
     expect(screen.queryByText('Generate a verified residency letter')).not.toBeInTheDocument();
   });

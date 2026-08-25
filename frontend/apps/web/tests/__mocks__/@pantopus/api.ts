@@ -113,6 +113,39 @@ export const place = {
   getPlaceIntelligence: jest.fn(),
   getPublicPlacePreview: jest.fn(),
 };
+// Place — residency letters (Phase 1) + scoped live claims (Wave 1).
+export const residencyLetters = {
+  issueResidencyLetter: jest.fn(),
+  listResidencyLetters: jest.fn(),
+  getResidencyLetterPdf: jest.fn(),
+  revokeResidencyLetter: jest.fn(),
+  verifyResidencyLetter: jest.fn(),
+};
+// The component builds its duration picker from this constant at module
+// scope, so the mock must export the real value.
+export const RESIDENCY_CLAIM_EXPIRY_DAYS = [1, 7, 30, 90] as const;
+export const residencyClaims = {
+  issueResidencyClaim: jest.fn(),
+  listResidencyClaims: jest.fn(),
+  listResidencyClaimViews: jest.fn(),
+  revokeResidencyClaim: jest.fn(),
+  verifyResidencyClaim: jest.fn(),
+};
+// Place — 911-ready household fridge cards (Wave 1, #2).
+export const fridgeCards = {
+  issueFridgeCard: jest.fn(),
+  listFridgeCards: jest.fn(),
+  revokeFridgeCard: jest.fn(),
+  getPublicFridgeCard: jest.fn(),
+};
+// Home profile bits the fridge-card composer seeds from.
+export const homeProfile = {
+  getHomeEmergencies: jest.fn(),
+};
+// Place — mailbox reality check (Wave 1, #3).
+export const mailboxCheck = {
+  getMailboxCheck: jest.fn(),
+};
 export const businesses = {
   getMyBusinesses: jest.fn(),
 };

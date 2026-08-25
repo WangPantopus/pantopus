@@ -487,6 +487,51 @@ router.get('/residency-letters/:code', async (req, res) => {
   }
 });
 
+// ============================================================
+// GET /api/public/residency-claims/:code — third-party claim check
+//
+// The claim sibling of the letter check above, with two differences:
+// the status is LIVE (active only while the claim is unrevoked,
+// unexpired, and the issuer still holds verified occupancy), and every
+// view is logged for the issuer's audit trail. Same protections: the
+// mount-level previewLimiter plus the ~78-bit code keep enumeration
+// impractical, and unknown/malformed codes are a uniform
+// { valid: false } (no existence oracle).
+// ============================================================
+router.get('/residency-claims/:code', async (req, res) => {
+  try {
+    const residencyClaimService = require('../services/residencyClaimService');
+    const result = await residencyClaimService.verifyClaimByCode(req.params.code, {
+      userAgent: req.headers['user-agent'],
+    });
+    return res.json(result);
+  } catch (err) {
+    console.error('[public/residency-claims] Error:', err.message);
+    return res.status(500).json({ error: 'Verification failed. Try again.' });
+  }
+});
+
+// ============================================================
+// GET /api/public/fridge-cards/:code — the household's 911-ready card
+//
+// Whoever holds the link (babysitter, house-sitter, the QR by the
+// door) sees the frozen card while it is active. A revoked card shows
+// its status and NO content — this is health-adjacent data, so
+// revocation actually pulls it. Same protections as the other code
+// surfaces: previewLimiter + ~78-bit codes, uniform { valid: false }
+// on unknown codes.
+// ============================================================
+router.get('/fridge-cards/:code', async (req, res) => {
+  try {
+    const fridgeCardService = require('../services/fridgeCardService');
+    const result = await fridgeCardService.getCardByCode(req.params.code);
+    return res.json(result);
+  } catch (err) {
+    console.error('[public/fridge-cards] Error:', err.message);
+    return res.status(500).json({ error: 'Could not load the card. Try again.' });
+  }
+});
+
 module.exports = router;
 // Test-only hook: reset the in-memory preview caches between cases.
 module.exports.__clearPreviewCaches = () => previewCache.clear();

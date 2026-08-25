@@ -288,6 +288,41 @@ export type {
   ResidencyLetterVerification,
 } from './endpoints/residencyLetters';
 
+// Place — scoped live residency claims (Wave 1, Residency Pass)
+export * as residencyClaims from './endpoints/residencyClaims';
+export { RESIDENCY_CLAIM_EXPIRY_DAYS } from './endpoints/residencyClaims';
+export type {
+  ResidencyClaim,
+  ResidencyClaimScope,
+  ResidencyClaimStatus,
+  ResidencyClaimLiveStatus,
+  ResidencyClaimExpiryDays,
+  ResidencyClaimView,
+  ResidencyClaimVerification,
+} from './endpoints/residencyClaims';
+
+// Place — 911-ready household fridge cards (Wave 1, #2)
+export * as fridgeCards from './endpoints/fridgeCards';
+export type {
+  FridgeCard,
+  FridgeCardSectionKey,
+  FridgeCardStatus,
+  FridgeCardItem,
+  FridgeCardSection,
+  FridgeCardContent,
+  FridgeCardPublic,
+} from './endpoints/fridgeCards';
+
+// Place — mailbox reality check (Wave 1, #3)
+export * as mailboxCheck from './endpoints/mailboxCheck';
+export type {
+  MailboxCheck,
+  MailboxCheckVerdict,
+  MailboxFinding,
+  MailboxFindingSeverity,
+  MailboxPhysicalStatus,
+} from './endpoints/mailboxCheck';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

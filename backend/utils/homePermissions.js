@@ -518,11 +518,24 @@ async function applyOccupancyTemplate(homeId, userId, roleBase, verificationStat
   return { occupancy, template: result };
 }
 
+/**
+ * The T4 gate, stated once: does this access result carry a VERIFIED
+ * occupancy? Every surface that issues an attested artifact (residency
+ * letters, residency claims, fridge cards) must use this same check —
+ * duplicated trust gates are how privacy primitives drift.
+ * @param {{ occupancy?: object|null }} access - from checkHomePermission
+ * @returns {boolean}
+ */
+function isVerifiedResident(access) {
+  return Boolean(access && access.occupancy && access.occupancy.verification_status === 'verified');
+}
+
 module.exports = {
   hasPermission,
   getUserAccess,
   checkHomePermission,
   getActiveOccupancy,
+  isVerifiedResident,
   isVerifiedOwner,
   mapLegacyRole,
   getRoleRank,
