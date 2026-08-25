@@ -48,6 +48,19 @@ public struct PantopusShadow: Equatable, Sendable {
         x: 0,
         y: 6
     )
+
+    /// `0 6px 16px rgba(2,132,199,0.28)` — the deeper primary-tinted lift the
+    /// Add-to-calendar frames hardcode on the native / multi-calendar confirm
+    /// CTAs (`add-calendar-frames.jsx`). Same geometry as `.primary`, +0.10
+    /// opacity. Scoped to those CTAs so the global `.primary` token keeps
+    /// mirroring the `--shadow-primary` CSS var.
+    public static let primaryDeep = PantopusShadow(
+        color: Theme.Color.primary600,
+        opacity: 0.28,
+        radius: 16,
+        x: 0,
+        y: 6
+    )
 }
 
 public extension View {

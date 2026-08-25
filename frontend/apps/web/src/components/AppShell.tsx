@@ -682,6 +682,12 @@ export function PersonalSidebarContent({ currentPath, showLabels, chatUnread, of
     });
   }, [router, queryClient]);
 
+  // Scheduling hub — the hub query key needs the active owner (resolved client-side
+  // via the in-hub pillar switcher), so warm just the route bundle on hover.
+  const prefetchScheduling = useCallback(() => {
+    router.prefetch('/app/scheduling');
+  }, [router]);
+
   // Audience destination — unified-IA §3.1 + §3.6. Gated per-user behind
   // audience_profile (P0.8) so users without access don't see a 6th tab.
   const audienceFlag = useFeatureFlagState('audience_profile');
@@ -703,6 +709,7 @@ export function PersonalSidebarContent({ currentPath, showLabels, chatUnread, of
       <SidebarItem icon={NavIcons.tasks} label="Tasks" active={startsWith('/app/gigs') && !isActive('/app/gigs/saved')} onClick={() => go('/app/gigs')} onPrefetch={prefetchGigs} showLabel={showLabels} count={offersPending} />
       <SidebarItem icon={NavIcons.marketplace} label="Marketplace" active={startsWith('/app/marketplace')} onClick={() => go('/app/marketplace')} onPrefetch={prefetchMarketplace} showLabel={showLabels} count={activeListings} />
       <SidebarItem icon={NavIcons.messages} label="Messages" active={startsWith('/app/chat')} onClick={() => go('/app/chat')} onPrefetch={prefetchChat} showLabel={showLabels} count={chatUnread} />
+      {webFeatureFlags.scheduling ? <SidebarItem icon={NavIcons.scheduling} label="Scheduling" active={startsWith('/app/scheduling')} onClick={() => go('/app/scheduling')} onPrefetch={prefetchScheduling} showLabel={showLabels} testId="sidebar-scheduling" /> : null}
       {audienceFlag.enabled ? <SidebarItem icon={NavIcons.audience} label="Audience" active={startsWith('/app/audience')} onClick={() => go('/app/audience')} onPrefetch={prefetchAudience} showLabel={showLabels} accent="teal" testId="sidebar-audience" /> : null}
 
       <SidebarDivider showLabel={showLabels} />
@@ -779,6 +786,19 @@ function HomeSidebarContent({ homeId, currentTab, showLabels, onNavigate }: { ho
         accent="emerald"
         showLabel={showLabels}
       />
+      {webFeatureFlags.scheduling ? (
+        <SidebarItem
+          icon={HomeIcons.scheduling}
+          label="Scheduling"
+          active={pathname?.startsWith(`/app/homes/${homeId}/scheduling`)}
+          onClick={() => {
+            router.push(`/app/homes/${homeId}/scheduling`);
+            onNavigate();
+          }}
+          accent="emerald"
+          showLabel={showLabels}
+        />
+      ) : null}
 
       <SidebarDivider showLabel={showLabels} />
 

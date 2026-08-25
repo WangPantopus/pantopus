@@ -29,6 +29,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 /**
  * A17.1, A17.5–A17.8 — Paparazzi snapshots for the bespoke generic
@@ -75,6 +76,11 @@ class CeremonialVariantsSnapshotTest {
                     onRedeem = {},
                     onOpenSenderProfile = {},
                     onSaveToVault = {},
+                    // Pin "today" so the unused/expired split never depends on the
+                    // wall clock. The sample coupon expires 2026-06-30; without this
+                    // the snapshot silently flipped to the Expired variant on
+                    // 2026-07-01 and the test began failing on date alone.
+                    today = FIXED_TODAY,
                 )
             }
         }
@@ -94,6 +100,7 @@ class CeremonialVariantsSnapshotTest {
                     onRedeem = {},
                     onOpenSenderProfile = {},
                     onSaveToVault = {},
+                    today = FIXED_TODAY,
                 )
             }
         }
@@ -289,5 +296,14 @@ class CeremonialVariantsSnapshotTest {
     @Composable
     private fun Root(content: @Composable () -> Unit) {
         Box(modifier = Modifier.fillMaxSize().background(PantopusColors.appBg)) { content() }
+    }
+
+    private companion object {
+        /**
+         * Reference "today" for coupon expiry, held before
+         * [MailItemSampleData.couponUnused]'s 2026-06-30 expiry so the unused
+         * variant stays unused regardless of when the suite runs.
+         */
+        val FIXED_TODAY: LocalDate = LocalDate.of(2026, 6, 1)
     }
 }

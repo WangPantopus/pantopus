@@ -238,7 +238,8 @@ private extension MeViewModel {
                 MeActionTile(id: "offers", icon: .handCoins, label: "Offers", routeKey: "me.offers"),
                 MeActionTile(id: "listings", icon: .shoppingBag, label: "Listings", routeKey: "me.listings"),
                 MeActionTile(id: "connections", icon: .userPlus, label: "Connections", routeKey: "me.connections"),
-                MeActionTile(id: "supportTrains", icon: .handCoins, label: "Support trains", routeKey: "me.supportTrains")
+                MeActionTile(id: "supportTrains", icon: .handCoins, label: "Support trains", routeKey: "me.supportTrains"),
+                MeActionTile(id: "scheduling", icon: .calendarClock, label: "Scheduling", routeKey: "me.scheduling")
             ],
             sections: withDebug([
                 MeSection(id: "profile_privacy", header: "Profile & Privacy", rows: [
@@ -351,7 +352,8 @@ private extension MeViewModel {
                 MeActionTile(id: "payouts", icon: .shield, label: "Payouts", routeKey: "me.business.payouts"),
                 MeActionTile(id: "team", icon: .userPlus, label: "Team", routeKey: "me.business.team"),
                 MeActionTile(id: "hours", icon: .info, label: "Hours", routeKey: "me.business.hours"),
-                MeActionTile(id: "promo", icon: .megaphone, label: "Promo", routeKey: "me.business.promo")
+                MeActionTile(id: "promo", icon: .megaphone, label: "Promo", routeKey: "me.business.promo"),
+                MeActionTile(id: "scheduling", icon: .calendarClock, label: "Scheduling", routeKey: "me.business.scheduling")
             ],
             sections: withDebug([
                 MeSection(id: "business", header: "Business", rows: [
@@ -377,7 +379,8 @@ private extension MeViewModel {
             MeActionTile(id: "members", icon: .userPlus, label: "Members", routeKey: "me.members", routeArgs: args),
             MeActionTile(id: "polls", icon: .checkCircle, label: "Polls", routeKey: "me.polls", routeArgs: args),
             MeActionTile(id: "calendar", icon: .calendar, label: "Calendar", routeKey: "me.calendar", routeArgs: args),
-            MeActionTile(id: "docs", icon: .file, label: "Documents", routeKey: "me.docs", routeArgs: args)
+            MeActionTile(id: "docs", icon: .file, label: "Documents", routeKey: "me.docs", routeArgs: args),
+            MeActionTile(id: "scheduling", icon: .calendarClock, label: "Scheduling", routeKey: "me.home.scheduling", routeArgs: args)
         ]
     }
 

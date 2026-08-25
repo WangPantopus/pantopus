@@ -38,6 +38,7 @@ public struct FormShell<Content: View>: View {
     private let bottomActionLabel: String?
     private let stickyBottom: (() -> AnyView)?
     private let bottomActionIcon: PantopusIcon?
+    private let showsTopActionWithBottom: Bool
     private let isValid: Bool
     private let isDirty: Bool
     private let isSaving: Bool
@@ -64,6 +65,12 @@ public struct FormShell<Content: View>: View {
     ///   - bottomActionIcon: Optional leading icon rendered before the
     ///     bottom CTA label (e.g. `key-round` for "Send pass"). Ignored
     ///     when `bottomActionLabel` is nil.
+    ///   - showsTopActionWithBottom: Opt in to keeping the trailing top-bar
+    ///     text action visible even though a bottom CTA / sticky bar is
+    ///     present. Off by default; the Calendarly availability frames are
+    ///     the exception — their top bar carries `Save` / `Saving…` above a
+    ///     full-width save bar. Callers drive the "saving" wording through
+    ///     `rightActionLabel` (the action greys out via `isSaving`).
     ///   - isValid: Drives whether the right action is enabled.
     ///   - isDirty: Drives whether the top-right action is enabled and
     ///     whether close prompts the discard confirm. Ignored by the
@@ -89,6 +96,7 @@ public struct FormShell<Content: View>: View {
         rightActionLabel: String? = "Save",
         bottomActionLabel: String? = nil,
         bottomActionIcon: PantopusIcon? = nil,
+        showsTopActionWithBottom: Bool = false,
         isValid: Bool,
         isDirty: Bool,
         isSaving: Bool = false,
@@ -104,6 +112,7 @@ public struct FormShell<Content: View>: View {
         self.bottomActionLabel = bottomActionLabel
         self.stickyBottom = stickyBottom
         self.bottomActionIcon = bottomActionIcon
+        self.showsTopActionWithBottom = showsTopActionWithBottom
         self.isValid = isValid
         self.isDirty = isDirty
         self.isSaving = isSaving
@@ -161,7 +170,8 @@ public struct FormShell<Content: View>: View {
     }
 
     private var showsTopRightAction: Bool {
-        bottomActionLabel == nil && stickyBottom == nil && rightActionLabel != nil
+        guard rightActionLabel != nil else { return false }
+        return showsTopActionWithBottom || (bottomActionLabel == nil && stickyBottom == nil)
     }
 
     private func handleClose() {

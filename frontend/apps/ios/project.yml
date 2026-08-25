@@ -126,6 +126,7 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: "Pantopus uses your location to show gigs and neighbors near you, and for location-based notifications."
         NSCameraUsageDescription: "Pantopus uses the camera for profile photos, listing images, mail capture, and taking photos to send in chat."
         NSPhotoLibraryUsageDescription: "Pantopus uses your photo library to upload profile photos, listing images, and mail."
+        NSPhotoLibraryAddUsageDescription: "Pantopus saves images you export, like your booking QR code, to your photo library."
         NSMicrophoneUsageDescription: "Pantopus uses the microphone for voice messages in chat."
         NSFaceIDUsageDescription: "Pantopus uses Face ID to lock sensitive actions like payments."
         UIBackgroundModes:
@@ -145,7 +146,14 @@ targets:
         # production APNs environment). Xcode substitutes the build setting
         # into the entitlements plist at sign time.
         aps-environment: $(APS_ENVIRONMENT)
+        # pantopus.com is the product domain: it is what the backend and both
+        # clients put in share and invite links, and it is where the web app
+        # serves .well-known/apple-app-site-association. The .app entries are
+        # kept so any link already in circulation still resolves; iOS verifies
+        # each domain independently, so an unserved one costs nothing.
         com.apple.developer.associated-domains:
+          - applinks:pantopus.com
+          - applinks:www.pantopus.com
           - applinks:pantopus.app
           - applinks:www.pantopus.app
         # Phase 6c — shared UserDefaults suite feeding the Tasks-near-me
