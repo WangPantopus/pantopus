@@ -288,6 +288,19 @@ export type {
   ResidencyLetterVerification,
 } from './endpoints/residencyLetters';
 
+// Place — scoped live residency claims (Wave 1, Residency Pass)
+export * as residencyClaims from './endpoints/residencyClaims';
+export { RESIDENCY_CLAIM_EXPIRY_DAYS } from './endpoints/residencyClaims';
+export type {
+  ResidencyClaim,
+  ResidencyClaimScope,
+  ResidencyClaimStatus,
+  ResidencyClaimLiveStatus,
+  ResidencyClaimExpiryDays,
+  ResidencyClaimView,
+  ResidencyClaimVerification,
+} from './endpoints/residencyClaims';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

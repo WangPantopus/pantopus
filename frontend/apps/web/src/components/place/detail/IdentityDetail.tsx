@@ -16,9 +16,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
-import type { ResidencyLetter } from '@pantopus/api';
+import type { ResidencyLetter, ResidencyClaim, ResidencyClaimScope, ResidencyClaimExpiryDays } from '@pantopus/api';
+import { RESIDENCY_CLAIM_EXPIRY_DAYS } from '@pantopus/api';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2 } from 'lucide-react';
+import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2, Fingerprint, Copy, Eye, Clock } from 'lucide-react';
 import Chip from '@/components/archetypes/primitives/Chip';
 import { LockedCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { toast } from '@/components/ui/toast-store';
@@ -329,9 +330,196 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
   );
 }
 
+// ── Residency Pass — scoped live claims ──────────────────────
+// The letter's minimal-disclosure sibling: share ONE fact ("verified
+// resident of Camas School District") behind a live-checked code,
+// see every check in the audit trail, revoke any time.
+
+const CLAIM_SCOPES: { scope: ResidencyClaimScope; label: string; hint: string; discloses: boolean }[] = [
+  { scope: 'city', label: 'City', hint: 'e.g. “a verified resident of Portland, OR”', discloses: false },
+  { scope: 'school_district', label: 'School district', hint: 'For enrollment and school-zone checks', discloses: false },
+  { scope: 'county', label: 'County', hint: 'For county services and programs', discloses: false },
+  { scope: 'state', label: 'State', hint: 'For state-residency checks', discloses: false },
+  { scope: 'congressional_district', label: 'Congressional district', hint: 'For civic and campaign checks', discloses: false },
+  { scope: 'address', label: 'Full address', hint: 'Discloses your street address — like the letter', discloses: true },
+];
+
+const CLAIM_DURATIONS: { days: ResidencyClaimExpiryDays; label: string }[] =
+  RESIDENCY_CLAIM_EXPIRY_DAYS.map((days) => ({ days, label: days === 1 ? '1 day' : `${days} days` }));
+
+function claimStatusChip(claim: ResidencyClaim) {
+  if (claim.status === 'revoked') return <Chip label="Revoked" variant="warning" />;
+  if (claim.status === 'expired') return <Chip label="Expired" variant="neutral" />;
+  return <Chip label="Active" variant="success" />;
+}
+
+function IssuedClaimCard({ claim, homeId }: { claim: ResidencyClaim; homeId: string }) {
+  const queryClient = useQueryClient();
+  const inactive = claim.status !== 'active';
+
+  const revokeMutation = useMutation({
+    mutationFn: () => api.residencyClaims.revokeResidencyClaim(homeId, claim.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.residencyClaims(homeId) });
+      toast.success('Claim revoked. Its link and code no longer check out as valid.');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not revoke the claim.'),
+  });
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(claim.verify_url);
+      toast.success('Verification link copied.');
+    } catch {
+      toast.error('Could not copy the link.');
+    }
+  };
+
+  return (
+    <div className={`bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 ${inactive ? 'opacity-75' : ''}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[14px] font-bold text-app-text font-mono tracking-[0.02em]">{claim.claim_code}</span>
+        {claimStatusChip(claim)}
+      </div>
+      <div className="text-[13.5px] text-app-text-strong leading-[20px] mt-1.5">{claim.statement}</div>
+      <div className="flex items-center gap-3 text-[12px] text-app-text-muted mt-1.5">
+        <span className="inline-flex items-center gap-1"><Clock size={12} strokeWidth={2.25} /> until {fmtDate(claim.expires_at)}</span>
+        <span className="inline-flex items-center gap-1">
+          <Eye size={12} strokeWidth={2.25} />
+          {claim.view_count === 0 ? 'Not checked yet' : `Checked ${claim.view_count} ${claim.view_count === 1 ? 'time' : 'times'}`}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-app-border-subtle">
+        <button
+          type="button"
+          onClick={onCopy}
+          disabled={inactive}
+          className="flex-1 h-10 rounded-[10px] bg-primary-600 text-white text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-primary-700 transition disabled:opacity-50"
+        >
+          <Copy size={15} strokeWidth={2.25} /> Copy link
+        </button>
+        {claim.status === 'active' && (
+          <button
+            type="button"
+            onClick={() => revokeMutation.mutate()}
+            disabled={revokeMutation.isPending}
+            className="h-10 px-3.5 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-error text-[13.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-app-error-light/40 transition disabled:opacity-50"
+          >
+            <Ban size={15} strokeWidth={2} /> Revoke
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResidencyPassLeaf({ homeId, address, onBack }: { homeId: string; address: string; onBack: () => void }) {
+  const [scope, setScope] = useState<ResidencyClaimScope>('city');
+  const [days, setDays] = useState<ResidencyClaimExpiryDays>(30);
+  const queryClient = useQueryClient();
+
+  const claimsQuery = useQuery({
+    queryKey: queryKeys.residencyClaims(homeId),
+    queryFn: () => api.residencyClaims.listResidencyClaims(homeId),
+  });
+
+  const issueMutation = useMutation({
+    mutationFn: () => api.residencyClaims.issueResidencyClaim(homeId, scope, days),
+    onSuccess: async (claim) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.residencyClaims(homeId) });
+      toast.success(`Claim issued — code ${claim.claim_code}.`);
+      try {
+        await navigator.clipboard.writeText(claim.verify_url);
+        toast.success('Verification link copied — hand it to whoever asked.');
+      } catch {
+        /* the claim card's Copy button is the retry path */
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not issue the claim. Try again.'),
+  });
+
+  const claims = claimsQuery.data ?? [];
+  const selected = CLAIM_SCOPES.find((s) => s.scope === scope);
+
+  return (
+    <>
+      <DetailHeader title="Residency Pass" address={address} onBack={onBack} />
+      <div className="px-4 sm:px-5 pt-1 pb-16">
+        <DetailSectionLabel>What to share</DetailSectionLabel>
+        <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm overflow-hidden">
+          {CLAIM_SCOPES.map((s, i) => (
+            <button
+              key={s.scope}
+              type="button"
+              onClick={() => setScope(s.scope)}
+              aria-pressed={scope === s.scope}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${i > 0 ? 'border-t border-app-border-subtle' : ''} ${scope === s.scope ? 'bg-primary-50' : 'hover:bg-app-hover'}`}
+            >
+              <span className={`w-[18px] h-[18px] rounded-full border-2 shrink-0 flex items-center justify-center ${scope === s.scope ? 'border-primary-600' : 'border-app-border-strong'}`}>
+                {scope === s.scope && <span className="w-2 h-2 rounded-full bg-primary-600" />}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[14.5px] font-semibold text-app-text">{s.label}</span>
+                <span className={`block text-[12px] mt-0.5 ${s.discloses ? 'text-app-warning font-medium' : 'text-app-text-muted'}`}>{s.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <DetailSectionLabel>Valid for</DetailSectionLabel>
+        <div className="grid grid-cols-4 gap-2">
+          {CLAIM_DURATIONS.map((d) => (
+            <button
+              key={d.days}
+              type="button"
+              onClick={() => setDays(d.days)}
+              aria-pressed={days === d.days}
+              className={`h-10 rounded-[10px] text-[13.5px] font-semibold border-[1.5px] transition ${days === d.days ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-app-border bg-app-surface text-app-text-secondary hover:bg-app-hover'}`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => issueMutation.mutate()}
+          disabled={issueMutation.isPending}
+          className="w-full h-12 mt-4 rounded-xl bg-primary-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2 shadow-[0_6px_16px_rgba(2,132,199,0.22)] hover:bg-primary-700 transition disabled:opacity-60"
+        >
+          {issueMutation.isPending
+            ? (<><Loader2 size={18} className="animate-spin" /> Issuing…</>)
+            : (<><Fingerprint size={18} strokeWidth={2.25} /> Issue claim &amp; copy link</>)}
+        </button>
+        <InfoNote>
+          {selected?.discloses
+            ? 'A full-address claim shows your street address to whoever opens the link — use a scoped claim when the address itself isn’t required.'
+            : 'The link shares only the statement you picked — never your street address. Anyone opening it sees a live check against your current verification, every check is logged for you, and you can revoke at any time.'}
+        </InfoNote>
+
+        {(claims.length > 0 || claimsQuery.isLoading) && (
+          <>
+            <DetailSectionLabel>Issued claims</DetailSectionLabel>
+            {claimsQuery.isLoading ? (
+              <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Loading your claims…</div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {claims.map((claim) => (
+                  <IssuedClaimCard key={claim.id} claim={claim} homeId={homeId} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function IdentityDetail({ intelligence, homeId, residentName }: { intelligence: PlaceIntelligence; homeId: string | null; residentName: string }) {
   const router = useRouter();
   const [letterOpen, setLetterOpen] = useState(false);
+  const [claimsOpen, setClaimsOpen] = useState(false);
   const verified = intelligence.tier === 'T4';
   const address = detailAddress(intelligence.place);
   const place = intelligence.place;
@@ -344,6 +532,16 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
         homeId={homeId}
         address={address}
         onBack={() => setLetterOpen(false)}
+      />
+    );
+  }
+
+  if (claimsOpen && verified && homeId) {
+    return (
+      <ResidencyPassLeaf
+        homeId={homeId}
+        address={address}
+        onBack={() => setClaimsOpen(false)}
       />
     );
   }
@@ -375,6 +573,25 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
             </button>
             <InfoNote>
               A residency letter states your verified address for a purpose you choose — landlords, schools, libraries. Each letter carries a unique code a recipient can verify, and you can revoke it any time.
+            </InfoNote>
+
+            <DetailSectionLabel>Residency Pass</DetailSectionLabel>
+            <button
+              type="button"
+              onClick={() => setClaimsOpen(true)}
+              className="w-full flex items-center gap-3.5 bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-left hover:bg-app-hover transition"
+            >
+              <span className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+                <Fingerprint size={22} strokeWidth={2} className="text-primary-600" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Prove residency without sharing your address</div>
+                <div className="text-[12.5px] text-app-text-muted mt-0.5">Share one fact — your city, school district, or county — behind a live-checked link</div>
+              </div>
+              <ChevronRight size={18} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
+            </button>
+            <InfoNote>
+              A claim is checked live: it stops verifying the moment you revoke it, it expires on the date you pick, and every check is logged for you.
             </InfoNote>
           </>
         ) : (

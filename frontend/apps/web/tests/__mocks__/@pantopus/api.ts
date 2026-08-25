@@ -113,6 +113,24 @@ export const place = {
   getPlaceIntelligence: jest.fn(),
   getPublicPlacePreview: jest.fn(),
 };
+// Place — residency letters (Phase 1) + scoped live claims (Wave 1).
+export const residencyLetters = {
+  issueResidencyLetter: jest.fn(),
+  listResidencyLetters: jest.fn(),
+  getResidencyLetterPdf: jest.fn(),
+  revokeResidencyLetter: jest.fn(),
+  verifyResidencyLetter: jest.fn(),
+};
+// The component builds its duration picker from this constant at module
+// scope, so the mock must export the real value.
+export const RESIDENCY_CLAIM_EXPIRY_DAYS = [1, 7, 30, 90] as const;
+export const residencyClaims = {
+  issueResidencyClaim: jest.fn(),
+  listResidencyClaims: jest.fn(),
+  listResidencyClaimViews: jest.fn(),
+  revokeResidencyClaim: jest.fn(),
+  verifyResidencyClaim: jest.fn(),
+};
 export const businesses = {
   getMyBusinesses: jest.fn(),
 };
