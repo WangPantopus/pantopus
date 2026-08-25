@@ -26,7 +26,9 @@
 CREATE TABLE IF NOT EXISTS "public"."FridgeCard" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "home_id" "uuid" NOT NULL,
-    "created_by" "uuid" NOT NULL,
+    -- Nullable: the card is a HOUSEHOLD document and must outlive its
+    -- creator's account (FK below is SET NULL, not CASCADE).
+    "created_by" "uuid",
     -- Public card code (same normalized alphabet as letters/claims).
     "card_code" "text" NOT NULL,
     -- A short household-chosen label ("Sitter card", "Full card").
@@ -57,9 +59,10 @@ END $$;
 CREATE INDEX IF NOT EXISTS "FridgeCard_home_idx"
   ON "public"."FridgeCard" ("home_id", "issued_at" DESC);
 
--- Cards die with the home; the creator column survives the creator
--- leaving the household (SET NULL would orphan attribution — the card
--- belongs to the home, so keep CASCADE only on the home).
+-- Cards die with the HOME only. The creator's account deletion must
+-- not take the household's emergency card with it — the printout on
+-- the fridge would silently stop resolving — so created_by goes to
+-- NULL instead (attribution lost, card intact).
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'FridgeCard_home_id_fkey'
@@ -73,6 +76,6 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE "public"."FridgeCard"
       ADD CONSTRAINT "FridgeCard_created_by_fkey"
-      FOREIGN KEY ("created_by") REFERENCES "public"."User"("id") ON DELETE CASCADE;
+      FOREIGN KEY ("created_by") REFERENCES "public"."User"("id") ON DELETE SET NULL;
   END IF;
 END $$;

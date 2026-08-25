@@ -65,7 +65,7 @@ async function getMailboxCheck({ homeId, occupancy }) {
   if (home.address_id) {
     const { data } = await supabaseAdmin
       .from('HomeAddress')
-      .select('id, dpv_match_code, rdi_type, deliverability_status, missing_secondary_flag, commercial_mailbox_flag, secondary_required, building_type, last_validated_at, raw_response')
+      .select('id, dpv_match_code, rdi_type, deliverability_status, missing_secondary_flag, commercial_mailbox_flag, secondary_required, building_type, last_validated_at, validation_raw_response')
       .eq('id', home.address_id)
       .maybeSingle();
     addr = data || null;
@@ -73,7 +73,7 @@ async function getMailboxCheck({ homeId, occupancy }) {
   if (!addr && home.address_hash) {
     const { data } = await supabaseAdmin
       .from('HomeAddress')
-      .select('id, dpv_match_code, rdi_type, deliverability_status, missing_secondary_flag, commercial_mailbox_flag, secondary_required, building_type, last_validated_at, raw_response')
+      .select('id, dpv_match_code, rdi_type, deliverability_status, missing_secondary_flag, commercial_mailbox_flag, secondary_required, building_type, last_validated_at, validation_raw_response')
       .eq('address_hash', home.address_hash)
       .maybeSingle();
     addr = data || null;
@@ -84,7 +84,9 @@ async function getMailboxCheck({ homeId, occupancy }) {
   const dpv = addr ? addr.dpv_match_code : null;
   findings.push(dpvFinding(dpv));
 
-  const raw = (addr && addr.raw_response) || {};
+  // vacant_flag lives inside the Smarty blob the pipeline stores as
+  // validation_raw_response (migration 066) — there is no raw_response column.
+  const raw = (addr && addr.validation_raw_response) || {};
   if (raw.vacant_flag) {
     findings.push(finding('attention', 'USPS lists this address as vacant',
       'The vacancy flag is common right after a move-in, and some shippers hold or refuse deliveries while it’s set. Ask your mail carrier or local Post Office to clear it once you’re receiving mail.'));

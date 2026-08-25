@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
 import type { FridgeCard, FridgeCardItem, FridgeCardSection, FridgeCardSectionKey } from '@pantopus/api';
@@ -174,7 +174,6 @@ function SectionEditor({
 export default function FridgeCardLeaf({ homeId, address, onBack }: { homeId: string; address: string; onBack: () => void }) {
   const [label, setLabel] = useState('');
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [seeded, setSeeded] = useState(false);
   const queryClient = useQueryClient();
 
   const cardsQuery = useQuery({
@@ -183,26 +182,27 @@ export default function FridgeCardLeaf({ homeId, address, onBack }: { homeId: st
   });
 
   // Passive derivation: the home's existing emergency info (gas/water
-  // shutoffs…) pre-seeds the utilities section once, on first load.
-  useQuery({
+  // shutoffs…) pre-seeds the utilities section. The seed applies in an
+  // effect off the query DATA, never inside the queryFn — a cached
+  // query skips its queryFn on remount, which would silently skip the
+  // seed; the effect fires either way and only fills an empty section.
+  const emergenciesQuery = useQuery({
     queryKey: [...queryKeys.fridgeCards(homeId), 'seed-emergencies'],
-    queryFn: async () => {
-      const res = await api.homeProfile.getHomeEmergencies(homeId);
-      const rows = (res.emergencies || []) as { label?: string; location_in_home?: string; location?: string }[];
-      if (!seeded && rows.length) {
-        setDraft((d) => (d.utilities.length ? d : {
-          ...d,
-          utilities: rows
-            .map((r) => ({ label: String(r.label || ''), note: String(r.location_in_home || r.location || '') }))
-            .filter((r) => r.label)
-            .slice(0, 12),
-        }));
-        setSeeded(true);
-      }
-      return res;
-    },
+    queryFn: () => api.homeProfile.getHomeEmergencies(homeId),
     staleTime: Infinity,
   });
+  const emergencies = emergenciesQuery.data?.emergencies;
+  useEffect(() => {
+    const rows = (emergencies || []) as { label?: string; location_in_home?: string; location?: string }[];
+    if (!rows.length) return;
+    setDraft((d) => (d.utilities.length ? d : {
+      ...d,
+      utilities: rows
+        .map((r) => ({ label: String(r.label || ''), note: String(r.location_in_home || r.location || '') }))
+        .filter((r) => r.label)
+        .slice(0, 12),
+    }));
+  }, [emergencies]);
 
   const issueMutation = useMutation({
     mutationFn: () => {

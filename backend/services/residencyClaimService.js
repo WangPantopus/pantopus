@@ -30,13 +30,16 @@
 const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
-const { generateLetterCode, normalizeLetterCode } = require('./residencyLetterService');
+const { generateLetterCode, normalizeLetterCode, addressLine1FromHome, webBaseUrl } = require('./residencyLetterService');
+const { getActiveOccupancy } = require('../utils/homePermissions');
 const { composeCivicDistricts } = require('./placeSectionAdapters');
 
 const CLAIM_SCOPES = ['address', 'city', 'county', 'state', 'school_district', 'congressional_district'];
 const EXPIRY_DAYS_CHOICES = [1, 7, 30, 90];
 const DEFAULT_EXPIRY_DAYS = 30;
 const USER_AGENT_MAX_LEN = 200;
+// Per-claim ceiling on stored audit rows; view_count keeps counting past it.
+const ACCESS_LOG_ROW_CAP = 500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STATE_NAMES = {
@@ -58,9 +61,6 @@ function stateName(abbr) {
   return STATE_NAMES[key] || (key || null);
 }
 
-function webBaseUrl() {
-  return (process.env.PUBLIC_WEB_URL || process.env.APP_URL || 'https://pantopus.com').trim().replace(/\/+$/, '');
-}
 function claimVerifyUrl(code) {
   return `${webBaseUrl()}/verify-claim/${code}`;
 }
@@ -79,13 +79,6 @@ function holderNameFromUser(user) {
   if (first || last) return [first, last].filter(Boolean).join(' ');
   if ((user.name || '').trim()) return user.name.trim();
   return user.username || 'Pantopus resident';
-}
-
-function addressLine1FromHome(home) {
-  const full = String(home.address || '');
-  const street = (full.split(',')[0] || '').trim() || full;
-  const unit = String(home.address2 || '').trim();
-  return unit ? `${street} ${unit}` : street;
 }
 
 /**
@@ -134,7 +127,10 @@ function deriveStatement({ scope, holderName, home, districts }) {
     case 'state': {
       const name = stateName(home.state);
       if (!name) throw new ClaimError('This home has no state on file.', 'SCOPE_UNAVAILABLE');
-      return { statement: `${is} the state of ${name}.`, subject: name };
+      // DC is not a state — its map entry already reads "the District of
+      // Columbia", so it takes no "the state of" prefix.
+      const isDc = String(home.state).trim().toUpperCase() === 'DC';
+      return { statement: isDc ? `${is} ${name}.` : `${is} the state of ${name}.`, subject: name };
     }
     case 'county': {
       const county = districtName(districts, 'county');
@@ -191,12 +187,30 @@ function serializeClaim(row) {
 // ── Lifecycle ────────────────────────────────────────────────
 
 /**
- * Issue a claim for the (already T4-gated) resident of a home.
- * @param {object} args
- * @param {object} [args.occupancy] the caller's HomeOccupancy row (from
- *   checkHomePermission) — used only for the freshness snapshot.
+ * When did this resident's postcard verification actually happen?
+ * HomeOccupancy carries only the STATUS; the timestamp lives on the
+ * postcard row. Null when verification came through a non-postcard
+ * path (household approval, legacy backfill) — the freshness stamp is
+ * informational, so absent beats wrong.
  */
-async function issueClaim({ homeId, userId, scope, expiresInDays, occupancy }) {
+async function residencyVerifiedAt(homeId, userId) {
+  const { data, error } = await supabaseAdmin
+    .from('HomePostcardCode')
+    .select('verified_at')
+    .eq('home_id', homeId)
+    .eq('user_id', userId)
+    .eq('status', 'verified')
+    .order('verified_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.verified_at || null;
+}
+
+/**
+ * Issue a claim for the (already T4-gated) resident of a home.
+ */
+async function issueClaim({ homeId, userId, scope, expiresInDays }) {
   if (!CLAIM_SCOPES.includes(scope)) throw new ClaimError('Unknown claim scope.', 'BAD_SCOPE');
   const days = expiresInDays === undefined || expiresInDays === null
     ? DEFAULT_EXPIRY_DAYS
@@ -213,7 +227,10 @@ async function issueClaim({ homeId, userId, scope, expiresInDays, occupancy }) {
   if (userErr || !user) throw new Error('User not found');
 
   const holderName = holderNameFromUser(user);
-  const districts = scopeNeedsDistricts(scope) ? await districtsForHome(home) : [];
+  const [districts, verifiedAt] = await Promise.all([
+    scopeNeedsDistricts(scope) ? districtsForHome(home) : Promise.resolve([]),
+    residencyVerifiedAt(homeId, userId),
+  ]);
   const { statement } = deriveStatement({ scope, holderName, home, districts });
 
   const nowIso = new Date().toISOString();
@@ -228,7 +245,7 @@ async function issueClaim({ homeId, userId, scope, expiresInDays, occupancy }) {
     status: 'active',
     issued_at: nowIso,
     expires_at: new Date(Date.now() + days * DAY_MS).toISOString(),
-    residency_verified_at: (occupancy && (occupancy.verified_at || occupancy.updated_at)) || null,
+    residency_verified_at: verifiedAt,
   };
 
   const { data: saved, error } = await supabaseAdmin.from('ResidencyClaim').insert(row).select().single();
@@ -299,22 +316,13 @@ async function revokeClaim({ homeId, userId, claimId }) {
 
 /**
  * The LIVE occupancy re-check: is the issuer still an active, verified
- * occupant of the home the claim points at?
+ * occupant of the home the claim points at? Liveness (is_active + time
+ * windows) is homePermissions' getActiveOccupancy — the one copy of
+ * that rule — with the verification check on top.
  */
 async function isStillVerifiedResident(homeId, userId) {
-  const { data: occ, error } = await supabaseAdmin
-    .from('HomeOccupancy')
-    .select('id, is_active, verification_status, start_at, end_at')
-    .eq('home_id', homeId)
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .eq('verification_status', 'verified')
-    .maybeSingle();
-  if (error || !occ) return false;
-  const now = new Date();
-  if (occ.start_at && new Date(occ.start_at) > now) return false;
-  if (occ.end_at && new Date(occ.end_at) <= now) return false;
-  return true;
+  const occ = await getActiveOccupancy(homeId, userId);
+  return Boolean(occ && occ.verification_status === 'verified');
 }
 
 /**
@@ -340,15 +348,20 @@ async function verifyClaimByCode(code, { userAgent } = {}) {
 
   // Audit trail + denormalized counters (best-effort; the read result is
   // what matters). Every view is logged, whatever the status — the issuer
-  // should see checks against a revoked claim too.
+  // should see checks against a revoked claim too. Row inserts stop past
+  // a per-claim cap so an anonymous bot polling a code cannot grow the
+  // table forever (view_count keeps counting; the cap costs no extra
+  // query because the count is already on the row we just read).
   const nowIso = new Date().toISOString();
   const ua = userAgent ? String(userAgent).slice(0, USER_AGENT_MAX_LEN) : null;
-  supabaseAdmin
-    .from('ResidencyClaimAccess')
-    .insert({ id: crypto.randomUUID(), claim_id: data.id, viewed_at: nowIso, user_agent: ua })
-    .then(({ error: insErr }) => {
-      if (insErr) logger.warn('residencyClaim: access log failed', { error: insErr.message });
-    });
+  if ((data.view_count || 0) < ACCESS_LOG_ROW_CAP) {
+    supabaseAdmin
+      .from('ResidencyClaimAccess')
+      .insert({ id: crypto.randomUUID(), claim_id: data.id, viewed_at: nowIso, user_agent: ua })
+      .then(({ error: insErr }) => {
+        if (insErr) logger.warn('residencyClaim: access log failed', { error: insErr.message });
+      });
+  }
   supabaseAdmin
     .from('ResidencyClaim')
     .update({ view_count: (data.view_count || 0) + 1, last_viewed_at: nowIso })

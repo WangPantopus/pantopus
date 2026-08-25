@@ -68,7 +68,6 @@ function seedVerifiedResident({ verificationStatus = 'verified' } = {}) {
       role: 'owner',
       role_base: 'owner',
       verification_status: verificationStatus,
-      verified_at: '2026-08-01T00:00:00.000Z',
     },
     {
       id: 'occ-2',
@@ -78,8 +77,13 @@ function seedVerifiedResident({ verificationStatus = 'verified' } = {}) {
       role: 'member',
       role_base: 'member',
       verification_status: 'verified',
-      verified_at: '2026-08-01T00:00:00.000Z',
     },
+  ]);
+  // The verification TIMESTAMP lives on the postcard row, not on
+  // HomeOccupancy — seeding a phantom occupancy.verified_at is exactly
+  // the kind of test that hides a wrong column read.
+  seedTable('HomePostcardCode', [
+    { id: 'pc-1', home_id: HOME_ID, user_id: USER, status: 'verified', verified_at: '2026-08-01T00:00:00.000Z' },
   ]);
 }
 
@@ -136,6 +140,11 @@ describe('deriveStatement', () => {
   test('state scope expands the abbreviation', () => {
     const { statement } = deriveStatement({ scope: 'state', holderName, home, districts });
     expect(statement).toBe('Dana Whitfield is a verified resident of the state of Oregon.');
+  });
+
+  test('DC is not called a state', () => {
+    const { statement } = deriveStatement({ scope: 'state', holderName, home: { ...home, state: 'DC' }, districts });
+    expect(statement).toBe('Dana Whitfield is a verified resident of the District of Columbia.');
   });
 
   test('district scopes read from the civic resolution', () => {

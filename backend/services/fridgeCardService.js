@@ -24,7 +24,7 @@
 const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
-const { generateLetterCode, normalizeLetterCode } = require('./residencyLetterService');
+const { generateLetterCode, normalizeLetterCode, addressLine1FromHome, webBaseUrl } = require('./residencyLetterService');
 
 // Section vocabulary — fixed so clients can render icons/order without
 // trusting free-form keys.
@@ -34,9 +34,6 @@ const MAX_LABEL_LEN = 80;
 const MAX_NOTE_LEN = 160;
 const MAX_CARD_LABEL_LEN = 40;
 
-function webBaseUrl() {
-  return (process.env.PUBLIC_WEB_URL || process.env.APP_URL || 'https://pantopus.com').trim().replace(/\/+$/, '');
-}
 function cardUrl(code) {
   return `${webBaseUrl()}/fridge-card/${code}`;
 }
@@ -88,14 +85,12 @@ function normalizeSections(sections) {
 }
 
 // Server-derived address block — the one part clients can never write.
+// The street line comes from the letters service so every attested
+// artifact prints the same address the same way.
 function addressBlockFromHome(home) {
-  const full = String(home.address || '');
-  const street = (full.split(',')[0] || '').trim() || full;
-  const unit = String(home.address2 || '').trim();
-  const line1 = unit ? `${street} ${unit}` : street;
   const cityState = [home.city, home.state].filter(Boolean).join(', ');
   return {
-    line1,
+    line1: addressLine1FromHome(home),
     city_state_zip: [cityState, home.zipcode].filter(Boolean).join(' '),
   };
 }

@@ -71,7 +71,7 @@ describe('dpvFinding', () => {
 
 describe('the diagnostic', () => {
   test('a clean confirmed address looks good, with the physical leg proven for a verified caller', async () => {
-    seedHome({ addressRow: { dpv_match_code: 'Y', rdi_type: 'residential', last_validated_at: '2026-08-01T00:00:00.000Z', raw_response: {} } });
+    seedHome({ addressRow: { dpv_match_code: 'Y', rdi_type: 'residential', last_validated_at: '2026-08-01T00:00:00.000Z', validation_raw_response: {} } });
     const res = await check(buildApp());
     expect(res.status).toBe(200);
     expect(res.body.check.verdict).toBe('looks_good');
@@ -80,7 +80,7 @@ describe('the diagnostic', () => {
   });
 
   test('vacancy and missing-unit flags surface as attention', async () => {
-    seedHome({ addressRow: { dpv_match_code: 'D', rdi_type: 'residential', raw_response: { vacant_flag: true } } });
+    seedHome({ addressRow: { dpv_match_code: 'D', rdi_type: 'residential', validation_raw_response: { vacant_flag: true } } });
     const res = await check(buildApp());
     expect(res.body.check.verdict).toBe('needs_attention');
     const titles = res.body.check.findings.map((f) => f.title);
@@ -91,7 +91,7 @@ describe('the diagnostic', () => {
   });
 
   test('an unrecognized address is a problem with register-it guidance, never a pass', async () => {
-    seedHome({ addressRow: { dpv_match_code: 'N', raw_response: {} } });
+    seedHome({ addressRow: { dpv_match_code: 'N', validation_raw_response: {} } });
     const res = await check(buildApp());
     expect(res.body.check.verdict).toBe('problem');
     const dpv = res.body.check.findings[0];
@@ -108,7 +108,7 @@ describe('the diagnostic', () => {
   });
 
   test('the physical leg is per-caller: the unverified member gets the nudge on the same home', async () => {
-    seedHome({ addressRow: { dpv_match_code: 'Y', raw_response: {} } });
+    seedHome({ addressRow: { dpv_match_code: 'Y', validation_raw_response: {} } });
     const app = buildApp();
     expect((await check(app, OWNER)).body.check.physical.status).toBe('proven');
     expect((await check(app, MEMBER)).body.check.physical.status).toBe('not_run');
