@@ -16,10 +16,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
-import type { ResidencyLetter, ResidencyClaim, ResidencyClaimScope, ResidencyClaimExpiryDays } from '@pantopus/api';
+import type { ResidencyLetter, ResidencyClaim, ResidencyClaimScope, ResidencyClaimExpiryDays, MailboxCheck, MailboxFindingSeverity } from '@pantopus/api';
 import { RESIDENCY_CLAIM_EXPIRY_DAYS } from '@pantopus/api';
 import type { PlaceIntelligence } from '@pantopus/types';
-import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2, Fingerprint, Copy, Eye, Clock } from 'lucide-react';
+import { BadgeCheck, Check, FileText, ScanFace, Mailbox, Download, ChevronRight, LayoutDashboard, ShieldCheck, Ban, Loader2, Fingerprint, Copy, Eye, Clock, MailCheck, TriangleAlert, Info, CircleCheck, CircleX } from 'lucide-react';
 import Chip from '@/components/archetypes/primitives/Chip';
 import { LockedCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { toast } from '@/components/ui/toast-store';
@@ -330,6 +330,86 @@ function ResidencyLetterLeaf({ facts, homeId, address, onBack }: { facts: Omit<L
   );
 }
 
+// ── Mailbox reality check — the verification step as a diagnostic ──
+// Reads the claim-time postal validation already on file (DPV, RDI,
+// vacancy, unit flags) + the caller's postcard state as the physical
+// leg. Shown at every tier: for T3 residents, the "physical test
+// hasn't run" leg is the honest verify nudge.
+
+const CHECK_VERDICT: Record<MailboxCheck['verdict'], { label: string; variant: 'success' | 'warning' | 'error' | 'neutral' }> = {
+  looks_good: { label: 'Looks good', variant: 'success' },
+  needs_attention: { label: 'Needs attention', variant: 'warning' },
+  problem: { label: 'Problem found', variant: 'error' },
+  unknown: { label: 'Not checked yet', variant: 'neutral' },
+};
+
+const FINDING_ICON: Record<MailboxFindingSeverity, { icon: typeof Info; className: string }> = {
+  ok: { icon: CircleCheck, className: 'text-app-success' },
+  info: { icon: Info, className: 'text-app-text-muted' },
+  attention: { icon: TriangleAlert, className: 'text-app-warning' },
+  problem: { icon: CircleX, className: 'text-app-error' },
+};
+
+function MailboxCheckCard({ homeId }: { homeId: string }) {
+  const checkQuery = useQuery({
+    queryKey: queryKeys.mailboxCheck(homeId),
+    queryFn: () => api.mailboxCheck.getMailboxCheck(homeId),
+  });
+
+  if (checkQuery.isLoading) {
+    return <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Checking how databases see this address…</div>;
+  }
+  if (!checkQuery.data) {
+    return <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Couldn&apos;t run the mailbox check just now.</div>;
+  }
+
+  const check = checkQuery.data;
+  const verdict = CHECK_VERDICT[check.verdict];
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+          <MailCheck size={22} strokeWidth={2} className="text-primary-600" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Mailbox reality check</span>
+            <Chip label={verdict.label} variant={verdict.variant} />
+          </div>
+          <div className="text-[12.5px] text-app-text-muted mt-0.5">How USPS databases and real mail see this address</div>
+        </div>
+      </div>
+      <ul className="flex flex-col gap-2.5 mt-3 pt-3 border-t border-app-border-subtle">
+        {check.findings.map((f, i) => {
+          const meta = FINDING_ICON[f.severity];
+          const Icon = meta.icon;
+          return (
+            <li key={i} className="flex items-start gap-2.5">
+              <Icon size={16} strokeWidth={2.25} className={`${meta.className} shrink-0 mt-0.5`} />
+              <div>
+                <div className="text-[13.5px] font-semibold text-app-text">{f.title}</div>
+                <div className="text-[12.5px] text-app-text-secondary leading-[18px] mt-0.5">{f.detail}</div>
+              </div>
+            </li>
+          );
+        })}
+        <li className="flex items-start gap-2.5">
+          {check.physical.status === 'proven'
+            ? <CircleCheck size={16} strokeWidth={2.25} className="text-app-success shrink-0 mt-0.5" />
+            : check.physical.status === 'in_progress'
+              ? <Clock size={16} strokeWidth={2.25} className="text-app-warning shrink-0 mt-0.5" />
+              : <Info size={16} strokeWidth={2.25} className="text-app-text-muted shrink-0 mt-0.5" />}
+          <div>
+            <div className="text-[13.5px] font-semibold text-app-text">{check.physical.title}</div>
+            <div className="text-[12.5px] text-app-text-secondary leading-[18px] mt-0.5">{check.physical.detail}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 // ── Residency Pass — scoped live claims ──────────────────────
 // The letter's minimal-disclosure sibling: share ONE fact ("verified
 // resident of Camas School District") behind a live-checked code,
@@ -602,6 +682,16 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
             cta="Verify address"
             onCta={() => homeId && router.push(`/app/homes/${homeId}/verify-postcard`)}
           />
+        )}
+
+        {homeId && (
+          <>
+            <DetailSectionLabel>Mailbox</DetailSectionLabel>
+            <MailboxCheckCard homeId={homeId} />
+            <InfoNote>
+              Read from the postal databases checked when this address was claimed, plus your verification postcard as the real-world test. Pantopus can point at a fix but can&apos;t change USPS records for you.
+            </InfoNote>
+          </>
         )}
 
         <DetailSectionLabel>Portable ID</DetailSectionLabel>

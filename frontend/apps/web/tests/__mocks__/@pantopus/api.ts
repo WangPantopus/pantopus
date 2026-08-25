@@ -142,6 +142,10 @@ export const fridgeCards = {
 export const homeProfile = {
   getHomeEmergencies: jest.fn(),
 };
+// Place — mailbox reality check (Wave 1, #3).
+export const mailboxCheck = {
+  getMailboxCheck: jest.fn(),
+};
 export const businesses = {
   getMyBusinesses: jest.fn(),
 };

@@ -313,6 +313,16 @@ export type {
   FridgeCardPublic,
 } from './endpoints/fridgeCards';
 
+// Place — mailbox reality check (Wave 1, #3)
+export * as mailboxCheck from './endpoints/mailboxCheck';
+export type {
+  MailboxCheck,
+  MailboxCheckVerdict,
+  MailboxFinding,
+  MailboxFindingSeverity,
+  MailboxPhysicalStatus,
+} from './endpoints/mailboxCheck';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {
