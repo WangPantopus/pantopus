@@ -166,6 +166,7 @@ public enum PlaceSectionID: Sendable, Hashable {
     case billBenchmark
     case incentives
     case rentBand
+    case exemptionCheck
     case civicDistricts
     case civicElection
     case unknown(String)
@@ -191,6 +192,7 @@ public enum PlaceSectionID: Sendable, Hashable {
         case "bill_benchmark": self = .billBenchmark
         case "incentives": self = .incentives
         case "rent_band": self = .rentBand
+        case "exemption_check": self = .exemptionCheck
         case "civic_districts": self = .civicDistricts
         case "civic_election": self = .civicElection
         default: self = .unknown(rawValue)
@@ -218,6 +220,7 @@ public enum PlaceSectionID: Sendable, Hashable {
         case .billBenchmark: "bill_benchmark"
         case .incentives: "incentives"
         case .rentBand: "rent_band"
+        case .exemptionCheck: "exemption_check"
         case .civicDistricts: "civic_districts"
         case .civicElection: "civic_election"
         case let .unknown(raw): raw
@@ -417,6 +420,35 @@ extension FloodRiskLevel: Decodable {
 }
 
 /// Launch layer #3 — Flood (FEMA National Flood Hazard Layer).
+/// Wave 2 — what flood policies in this census tract actually cost:
+/// count + quartiles of real NFIP premiums over the last
+/// `windowMonths`. A benchmark, never a quote. Absent while the
+/// tract's benchmark is warming or suppressed below the 10-policy
+/// floor — the card degrades to zone-only.
+public struct PlaceFloodNfipData: Decodable, Sendable, Hashable {
+    public let policyCount: Int
+    public let premiumP25: Double
+    public let premiumMedian: Double
+    public let premiumP75: Double
+    /// Median Risk Rating 2.0 full-risk premium, where reported.
+    public let fullRiskMedian: Double?
+    public let windowMonths: Int
+    /// "partial" when the tract's policy list was row-capped at fetch.
+    public let coverage: String
+    public let asOf: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case policyCount = "policy_count"
+        case premiumP25 = "premium_p25"
+        case premiumMedian = "premium_median"
+        case premiumP75 = "premium_p75"
+        case fullRiskMedian = "full_risk_median"
+        case windowMonths = "window_months"
+        case coverage
+        case asOf = "as_of"
+    }
+}
+
 public struct PlaceFloodData: Decodable, Sendable, Hashable {
     /// FEMA zone code, e.g. "X".
     public let zone: String
@@ -429,6 +461,8 @@ public struct PlaceFloodData: Decodable, Sendable, Hashable {
     public let insuranceRequired: Bool
     /// Plain "what this means" copy.
     public let plainMeaning: String
+    /// Wave 2 — the tract's NFIP premium benchmark, when warmed.
+    public let nfip: PlaceFloodNfipData?
 
     private enum CodingKeys: String, CodingKey {
         case zone
@@ -437,6 +471,7 @@ public struct PlaceFloodData: Decodable, Sendable, Hashable {
         case inSfha = "in_sfha"
         case insuranceRequired = "insurance_required"
         case plainMeaning = "plain_meaning"
+        case nfip
     }
 }
 
@@ -741,6 +776,80 @@ public struct PlaceRentBandData: Decodable, Sendable, Hashable {
         case bandHigh = "band_high"
         case marketLow = "market_low"
         case marketHigh = "market_high"
+    }
+}
+
+// MARK: - Exemption check (Wave 2)
+
+/// The honesty ladder: `unknown` (county feed carries no exemption
+/// structure) is NEVER presented as "none on file". Falls back to
+/// `.unknown` so a server-side vocabulary addition cannot break an
+/// older build.
+public enum ExemptionFilingStatus: String, Decodable, Sendable, Hashable {
+    case onFile = "on_file"
+    case noneOnFile = "none_on_file"
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ExemptionFilingStatus(rawValue: raw) ?? .unknown
+    }
+}
+
+/// The Over-Assessment Radar stance (±5% bands). Same fallback rule.
+public enum AssessmentStance: String, Decodable, Sendable, Hashable {
+    case above
+    case near
+    case below
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = AssessmentStance(rawValue: raw) ?? .unknown
+    }
+}
+
+/// County assessed total vs the county's own market total — null on
+/// the wire when either total is missing (half a comparison is no
+/// comparison). Informational, never advice.
+public struct PlaceAssessmentSignal: Decodable, Sendable, Hashable {
+    public let assessedValue: Double
+    public let marketValue: Double
+    public let ratioPct: Double
+    public let stance: AssessmentStance
+
+    private enum CodingKeys: String, CodingKey {
+        case assessedValue = "assessed_value"
+        case marketValue = "market_value"
+        case ratioPct = "ratio_pct"
+        case stance
+    }
+}
+
+public struct PlaceExemptionStateProgram: Decodable, Sendable, Hashable {
+    public let state: String?
+    public let label: String
+    /// "application" | "varies" | "none_general".
+    public let filing: String
+    public let note: String
+    /// False → the conservative check-your-county default.
+    public let curated: Bool
+}
+
+public struct PlaceExemptionCheckData: Decodable, Sendable, Hashable {
+    public let filingStatus: ExemptionFilingStatus
+    /// Labels as the assessor feed reports them, e.g. "Homestead".
+    public let exemptions: [String]
+    public let homesteadOnFile: Bool
+    public let assessmentSignal: PlaceAssessmentSignal?
+    public let stateProgram: PlaceExemptionStateProgram
+
+    private enum CodingKeys: String, CodingKey {
+        case filingStatus = "filing_status"
+        case exemptions
+        case homesteadOnFile = "homestead_on_file"
+        case assessmentSignal = "assessment_signal"
+        case stateProgram = "state_program"
     }
 }
 
@@ -1049,6 +1158,7 @@ public enum PlaceSectionData: Sendable, Hashable {
     case billBenchmark(PlaceBillBenchmarkData)
     case incentives(PlaceIncentivesData)
     case rentBand(PlaceRentBandData)
+    case exemptionCheck(PlaceExemptionCheckData)
     case civicDistricts(PlaceCivicDistrictsData)
     case civicElection(PlaceCivicElectionData)
 }
@@ -1127,6 +1237,7 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
         case .billBenchmark: return payload(PlaceBillBenchmarkData.self).map(PlaceSectionData.billBenchmark)
         case .incentives: return payload(PlaceIncentivesData.self).map(PlaceSectionData.incentives)
         case .rentBand: return payload(PlaceRentBandData.self).map(PlaceSectionData.rentBand)
+        case .exemptionCheck: return payload(PlaceExemptionCheckData.self).map(PlaceSectionData.exemptionCheck)
         case .civicDistricts: return payload(PlaceCivicDistrictsData.self).map(PlaceSectionData.civicDistricts)
         case .civicElection: return payload(PlaceCivicElectionData.self).map(PlaceSectionData.civicElection)
         case .unknown: return nil
@@ -1229,6 +1340,11 @@ public extension PlaceSectionEnvelope {
 
     var rentBand: PlaceRentBandData? {
         if case let .rentBand(d) = data { return d }
+        return nil
+    }
+
+    var exemptionCheck: PlaceExemptionCheckData? {
+        if case let .exemptionCheck(d) = data { return d }
         return nil
     }
 

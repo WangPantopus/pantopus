@@ -77,6 +77,22 @@ function FloodCard({ data }: { data: PlaceFloodData }) {
           <span className="font-semibold">What this means:</span> {data.plain_meaning}
         </div>
       ) : null}
+      {data.nfip ? (
+        <div className="mt-[15px] pt-[15px] border-t border-app-border-subtle">
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted">
+            What flood policies near you cost
+          </div>
+          <div className="flex items-baseline gap-1.5 mt-1.5">
+            <span className="text-[22px] font-bold -tracking-[0.015em] text-app-text">
+              ${data.nfip.premium_p25.toLocaleString()}–${data.nfip.premium_p75.toLocaleString()}
+            </span>
+            <span className="text-[13px] text-app-text-secondary">/yr · median ${data.nfip.premium_median.toLocaleString()}</span>
+          </div>
+          <div className="text-[12.5px] text-app-text-muted leading-[18px] mt-1">
+            Real NFIP premiums for the {data.nfip.policy_count.toLocaleString()} policies written in your census tract over the last {data.nfip.window_months} months{data.nfip.coverage === 'partial' ? ' (sampled)' : ''}. A benchmark, not a quote — premiums vary house to house, and private flood policies aren&apos;t included.
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

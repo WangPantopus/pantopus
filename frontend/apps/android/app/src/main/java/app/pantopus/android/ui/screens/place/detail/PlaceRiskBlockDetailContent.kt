@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,14 +29,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.pantopus.android.data.api.models.place.PlaceFloodNfipData
 import app.pantopus.android.data.api.models.place.PlaceHeatColdData
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
+import app.pantopus.android.data.api.models.place.PlaceTier
 import app.pantopus.android.ui.screens.place.PlacePresentation
 import app.pantopus.android.ui.screens.place.components.PlaceChip
 import app.pantopus.android.ui.screens.place.components.PlaceDensityCard
 import app.pantopus.android.ui.screens.place.components.PlaceIconTile
+import app.pantopus.android.ui.screens.place.components.PlaceLockedCard
 import app.pantopus.android.ui.screens.place.components.PlaceTileTone
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -42,7 +47,10 @@ import app.pantopus.android.ui.theme.PantopusIcon
 // ─── Risk & readiness (C5) ───────────────────────────────────
 
 @Composable
-fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
+fun PlaceRiskDetailContent(
+    intel: PlaceIntelligence,
+    viewModel: PlaceDetailViewModel,
+) {
     // Heat & cold leads: it is the only thing here with a forecast horizon
     // short enough to act on today. Everything below it is a standing fact.
     intel.section(PlaceSectionId.HEAT_COLD)?.let { env ->
@@ -77,6 +85,22 @@ fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
     PlaceDetailSectionLabel("Emergency plan")
     EmergencyChecklist()
     PlaceSourceNote("Ready.gov · American Red Cross")
+
+    PlaceDetailSectionLabel("Fridge card")
+    if (intel.tier == PlaceTier.T4) {
+        LaunchedEffect(Unit) { viewModel.loadFridgeCards() }
+        PlaceFridgeCardSection(viewModel)
+    } else {
+        PlaceLockedCard(
+            title = "The 911-ready household card",
+            reason =
+                "Verify your address to issue a fridge card — its headline is the verified " +
+                    "address a caller reads to 911.",
+            cta = "Verify address",
+            icon = PantopusIcon.HeartPulse,
+            onTap = null,
+        )
+    }
 }
 
 /**
@@ -204,7 +228,47 @@ private fun RiskCard(env: PlaceSectionEnvelope) {
             }
             summary?.let { Text(it, fontSize = 13.5.sp, lineHeight = 18.sp, color = PantopusColors.appTextSecondary) }
             disclaimer?.let { Text(it, fontSize = 12.sp, color = PantopusColors.appTextMuted) }
+            env.flood?.nfip?.let { NfipBlock(it) }
         }
+    }
+}
+
+/**
+ * Wave 2 — what flood policies in this tract actually cost. Absent
+ * while the benchmark warms or sits below the 10-policy floor, so the
+ * card degrades to zone-only. A benchmark, never a quote.
+ */
+@Composable
+private fun NfipBlock(nfip: PlaceFloodNfipData) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HorizontalDivider(color = PantopusColors.appBorderSubtle)
+        Text(
+            "WHAT FLOOD POLICIES NEAR YOU COST",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PantopusColors.appTextMuted,
+        )
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "${PlacePresentation.money(nfip.premiumP25) ?: ""}–${PlacePresentation.money(nfip.premiumP75) ?: ""}",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = PantopusColors.appText,
+            )
+            Text(
+                "/yr · median ${PlacePresentation.money(nfip.premiumMedian) ?: ""}",
+                fontSize = 12.5.sp,
+                color = PantopusColors.appTextSecondary,
+            )
+        }
+        val sampled = if (nfip.coverage == "partial") " (sampled)" else ""
+        Text(
+            "Real NFIP premiums for the ${nfip.policyCount} policies written in your census tract over the " +
+                "last ${nfip.windowMonths} months$sampled. A benchmark, not a quote — premiums vary house to house.",
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = PantopusColors.appTextMuted,
+        )
     }
 }
 

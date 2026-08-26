@@ -85,6 +85,8 @@ export const queryKeys = {
     ['place', 'fridge-cards', homeId] as const,
   mailboxCheck: (homeId: string) =>
     ['place', 'mailbox-check', homeId] as const,
+  recordWatch: (homeId: string) =>
+    ['place', 'record-watch', homeId] as const,
 
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>

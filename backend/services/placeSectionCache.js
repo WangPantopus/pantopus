@@ -136,6 +136,11 @@ async function readThrough({ cacheKey, sectionId, ttlMs, fetch, allowStale = tru
 
 module.exports = {
   readThrough,
+  // Direct row access for cache-only composition patterns (NFIP: the
+  // provider is too slow for the request path, so a background job owns
+  // the fetch and the composer only ever reads/marks rows).
+  readRow,
+  writeRow,
   // Exported for testing/janitor use.
   _internals: { isMissingTableError },
 };

@@ -3,6 +3,8 @@ package app.pantopus.android.ui.screens.place.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.place.FridgeCardItem
+import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
@@ -26,6 +28,8 @@ const val PLACE_DETAIL_SLUG_KEY = "slug"
  * states; the screen extracts the page's sections via [PlaceDetailGroup].
  * Mirrors the iOS `PlaceDetailViewModel`.
  */
+private const val MAX_SEED_ITEMS = 12
+
 @HiltViewModel
 class PlaceDetailViewModel
     @Inject
@@ -94,7 +98,204 @@ class PlaceDetailViewModel
                 loadLetters()
             }
         }
+
+        // ── Residency Pass — scoped live claims (Identity, T4) ───
+
+        private val _claims = MutableStateFlow<ResidencyClaimsUiState>(ResidencyClaimsUiState.Loading)
+        val claims: StateFlow<ResidencyClaimsUiState> = _claims.asStateFlow()
+
+        private val _isIssuingClaim = MutableStateFlow(false)
+        val isIssuingClaim: StateFlow<Boolean> = _isIssuingClaim.asStateFlow()
+
+        /** The verify link the UI should copy to the clipboard, once. */
+        private val _claimLinkToCopy = MutableStateFlow<String?>(null)
+        val claimLinkToCopy: StateFlow<String?> = _claimLinkToCopy.asStateFlow()
+
+        fun loadClaims() {
+            viewModelScope.launch {
+                _claims.value =
+                    when (val r = repo.residencyClaims(homeId)) {
+                        is NetworkResult.Success -> ResidencyClaimsUiState.Loaded(r.data.claims)
+                        is NetworkResult.Failure -> ResidencyClaimsUiState.Error(r.error.displayMessage("Couldn't load your claims."))
+                    }
+            }
+        }
+
+        fun issueClaim(
+            scope: String,
+            expiresInDays: Int,
+        ) {
+            viewModelScope.launch {
+                _isIssuingClaim.value = true
+                when (val r = repo.issueResidencyClaim(homeId, scope, expiresInDays)) {
+                    is NetworkResult.Success -> _claimLinkToCopy.value = r.data.claim.verifyUrl
+                    is NetworkResult.Failure -> Unit
+                }
+                _isIssuingClaim.value = false
+                loadClaims()
+            }
+        }
+
+        fun consumeClaimLink() {
+            _claimLinkToCopy.value = null
+        }
+
+        fun revokeClaim(claimId: String) {
+            viewModelScope.launch {
+                repo.revokeResidencyClaim(homeId, claimId)
+                loadClaims()
+            }
+        }
+
+        // ── Fridge cards — 911-ready household card (Risk, T4) ───
+
+        private val _fridgeCards = MutableStateFlow<FridgeCardsUiState>(FridgeCardsUiState.Loading)
+        val fridgeCards: StateFlow<FridgeCardsUiState> = _fridgeCards.asStateFlow()
+
+        private val _isIssuingCard = MutableStateFlow(false)
+        val isIssuingCard: StateFlow<Boolean> = _isIssuingCard.asStateFlow()
+
+        /** The card link the UI should copy to the clipboard, once. */
+        private val _cardLinkToCopy = MutableStateFlow<String?>(null)
+        val cardLinkToCopy: StateFlow<String?> = _cardLinkToCopy.asStateFlow()
+
+        /** Utilities pre-seed from the home's existing emergency info. */
+        private val _utilitySeed = MutableStateFlow<List<FridgeCardItem>>(emptyList())
+        val utilitySeed: StateFlow<List<FridgeCardItem>> = _utilitySeed.asStateFlow()
+
+        fun loadFridgeCards() {
+            viewModelScope.launch {
+                _fridgeCards.value =
+                    when (val r = repo.fridgeCards(homeId)) {
+                        is NetworkResult.Success -> FridgeCardsUiState.Loaded(r.data.cards)
+                        is NetworkResult.Failure -> FridgeCardsUiState.Error(r.error.displayMessage("Couldn't load the cards."))
+                    }
+                if (_utilitySeed.value.isEmpty()) {
+                    when (val r = repo.homeEmergencies(homeId)) {
+                        is NetworkResult.Success ->
+                            _utilitySeed.value =
+                                r.data.emergencies
+                                    .filter { it.label.isNotBlank() }
+                                    .take(MAX_SEED_ITEMS)
+                                    .map { FridgeCardItem(label = it.label, note = it.location.orEmpty()) }
+                        is NetworkResult.Failure -> Unit
+                    }
+                }
+            }
+        }
+
+        fun issueFridgeCard(body: IssueFridgeCardRequest) {
+            viewModelScope.launch {
+                _isIssuingCard.value = true
+                when (val r = repo.issueFridgeCard(homeId, body)) {
+                    is NetworkResult.Success -> _cardLinkToCopy.value = r.data.card.cardUrl
+                    is NetworkResult.Failure -> Unit
+                }
+                _isIssuingCard.value = false
+                loadFridgeCards()
+            }
+        }
+
+        fun consumeCardLink() {
+            _cardLinkToCopy.value = null
+        }
+
+        fun revokeFridgeCard(cardId: String) {
+            viewModelScope.launch {
+                repo.revokeFridgeCard(homeId, cardId)
+                loadFridgeCards()
+            }
+        }
+
+        // ── Mailbox reality check (Identity detail) ──────────────
+
+        private val _mailboxCheck = MutableStateFlow<MailboxCheckUiState>(MailboxCheckUiState.Loading)
+        val mailboxCheck: StateFlow<MailboxCheckUiState> = _mailboxCheck.asStateFlow()
+
+        fun loadMailboxCheck() {
+            viewModelScope.launch {
+                _mailboxCheck.value =
+                    when (val r = repo.mailboxCheck(homeId)) {
+                        is NetworkResult.Success -> MailboxCheckUiState.Loaded(r.data.check)
+                        is NetworkResult.Failure -> MailboxCheckUiState.Error(r.error.displayMessage("Couldn't run the mailbox check."))
+                    }
+            }
+        }
+
+        // ── Rate watch (Money detail, T4) ────────────────────────
+
+        private val _rateWatch = MutableStateFlow<RateWatchUiState>(RateWatchUiState.Loading)
+        val rateWatch: StateFlow<RateWatchUiState> = _rateWatch.asStateFlow()
+
+        private val _isSavingWatch = MutableStateFlow(false)
+        val isSavingWatch: StateFlow<Boolean> = _isSavingWatch.asStateFlow()
+
+        fun loadRateWatch() {
+            viewModelScope.launch {
+                _rateWatch.value =
+                    when (val r = repo.recordWatch(homeId)) {
+                        is NetworkResult.Success ->
+                            r.data.watch?.let { RateWatchUiState.Loaded(it) } ?: RateWatchUiState.None
+                        is NetworkResult.Failure -> RateWatchUiState.Error(r.error.displayMessage("Couldn't load your watch."))
+                    }
+            }
+        }
+
+        fun setRateWatch(month: String) {
+            if (month.isBlank()) return
+            viewModelScope.launch {
+                _isSavingWatch.value = true
+                _rateWatch.value =
+                    when (val r = repo.setRecordWatch(homeId, month.trim())) {
+                        is NetworkResult.Success ->
+                            r.data.watch?.let { RateWatchUiState.Loaded(it) } ?: RateWatchUiState.None
+                        is NetworkResult.Failure -> RateWatchUiState.Error(r.error.displayMessage("Couldn't save the watch."))
+                    }
+                _isSavingWatch.value = false
+            }
+        }
+
+        fun removeRateWatch() {
+            viewModelScope.launch {
+                repo.removeRecordWatch(homeId)
+                _rateWatch.value = RateWatchUiState.None
+            }
+        }
     }
+
+sealed interface ResidencyClaimsUiState {
+    data object Loading : ResidencyClaimsUiState
+
+    data class Loaded(val claims: List<app.pantopus.android.data.api.models.place.ResidencyClaim>) : ResidencyClaimsUiState
+
+    data class Error(val message: String) : ResidencyClaimsUiState
+}
+
+sealed interface FridgeCardsUiState {
+    data object Loading : FridgeCardsUiState
+
+    data class Loaded(val cards: List<app.pantopus.android.data.api.models.place.FridgeCard>) : FridgeCardsUiState
+
+    data class Error(val message: String) : FridgeCardsUiState
+}
+
+sealed interface MailboxCheckUiState {
+    data object Loading : MailboxCheckUiState
+
+    data class Loaded(val check: app.pantopus.android.data.api.models.place.MailboxCheck) : MailboxCheckUiState
+
+    data class Error(val message: String) : MailboxCheckUiState
+}
+
+sealed interface RateWatchUiState {
+    data object Loading : RateWatchUiState
+
+    data object None : RateWatchUiState
+
+    data class Loaded(val watch: app.pantopus.android.data.api.models.place.RecordWatch) : RateWatchUiState
+
+    data class Error(val message: String) : RateWatchUiState
+}
 
 sealed interface ResidencyLetterUiState {
     data object Loading : ResidencyLetterUiState

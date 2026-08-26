@@ -1,7 +1,13 @@
 package app.pantopus.android.data.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
+import app.pantopus.android.data.api.models.place.FridgeCardResponse
+import app.pantopus.android.data.api.models.place.FridgeCardsResponse
+import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
+import app.pantopus.android.data.api.models.place.IssueResidencyClaimRequest
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
+import app.pantopus.android.data.api.models.place.MailboxCheckResponse
 import app.pantopus.android.data.api.models.place.NeighborMessageAck
 import app.pantopus.android.data.api.models.place.NeighborMessageTemplates
 import app.pantopus.android.data.api.models.place.NeighborhoodPulse
@@ -10,19 +16,29 @@ import app.pantopus.android.data.api.models.place.PlacePreview
 import app.pantopus.android.data.api.models.place.PlaceSectionId
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessage
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessagesResponse
+import app.pantopus.android.data.api.models.place.RecordWatchResponse
+import app.pantopus.android.data.api.models.place.RemoveRecordWatchResponse
 import app.pantopus.android.data.api.models.place.ReplyNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.ReportNeighborMessageRequest
+import app.pantopus.android.data.api.models.place.ResidencyClaimResponse
+import app.pantopus.android.data.api.models.place.ResidencyClaimsResponse
 import app.pantopus.android.data.api.models.place.ResidencyLetterResponse
 import app.pantopus.android.data.api.models.place.ResidencyLetterVerification
 import app.pantopus.android.data.api.models.place.ResidencyLettersResponse
 import app.pantopus.android.data.api.models.place.SendNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.SentNeighborMessage
+import app.pantopus.android.data.api.models.place.SetRecordWatchRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
+import app.pantopus.android.data.api.services.FridgeCardsApi
 import app.pantopus.android.data.api.services.GeoApi
+import app.pantopus.android.data.api.services.HomesApi
+import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.PlaceApi
+import app.pantopus.android.data.api.services.RecordWatchApi
+import app.pantopus.android.data.api.services.ResidencyClaimsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import okhttp3.ResponseBody
 import javax.inject.Inject
@@ -35,14 +51,22 @@ import javax.inject.Singleton
  * route on the `NetworkResult` taxonomy.
  */
 @Singleton
+// A deliberately flat façade over the Place feature's five APIs —
+// cohesive by design; the count grows one wave at a time.
+@Suppress("TooManyFunctions", "LongParameterList")
 class PlaceRepository
     @Inject
     constructor(
         private val placeApi: PlaceApi,
         private val neighborMessagesApi: NeighborMessagesApi,
+        private val residencyClaimsApi: ResidencyClaimsApi,
         private val residencyLettersApi: ResidencyLettersApi,
+        private val fridgeCardsApi: FridgeCardsApi,
+        private val mailboxCheckApi: MailboxCheckApi,
+        private val recordWatchApi: RecordWatchApi,
         private val aiApi: AIApi,
         private val geoApi: GeoApi,
+        private val homesApi: HomesApi,
     ) {
         /** Address typeahead for the signed-out funnel (keyless). */
         suspend fun geoAutocomplete(query: String): NetworkResult<GeoAutocompleteResponse> = safeApiCall { geoApi.autocomplete(query) }
@@ -130,4 +154,54 @@ class PlaceRepository
         /** Anonymous third-party letter check (no auth required). */
         suspend fun verifyResidencyLetter(code: String): NetworkResult<ResidencyLetterVerification> =
             safeApiCall { residencyLettersApi.publicVerify(code) }
+
+        // ── Residency Pass — scoped live claims (Wave 1) ─────────
+
+        suspend fun residencyClaims(homeId: String): NetworkResult<ResidencyClaimsResponse> =
+            safeApiCall { residencyClaimsApi.list(homeId) }
+
+        suspend fun issueResidencyClaim(
+            homeId: String,
+            scope: String,
+            expiresInDays: Int,
+        ): NetworkResult<ResidencyClaimResponse> =
+            safeApiCall { residencyClaimsApi.issue(homeId, IssueResidencyClaimRequest(scope, expiresInDays)) }
+
+        suspend fun revokeResidencyClaim(
+            homeId: String,
+            claimId: String,
+        ): NetworkResult<ResidencyClaimResponse> = safeApiCall { residencyClaimsApi.revoke(homeId, claimId) }
+
+        /** The home's existing emergency info — the fridge-card utilities pre-seed. */
+        suspend fun homeEmergencies(homeId: String): NetworkResult<GetHomeEmergenciesResponse> =
+            safeApiCall { homesApi.getHomeEmergencies(homeId) }
+
+        // ── Fridge cards — the 911-ready household card (Wave 1) ─
+
+        suspend fun fridgeCards(homeId: String): NetworkResult<FridgeCardsResponse> = safeApiCall { fridgeCardsApi.list(homeId) }
+
+        suspend fun issueFridgeCard(
+            homeId: String,
+            body: IssueFridgeCardRequest,
+        ): NetworkResult<FridgeCardResponse> = safeApiCall { fridgeCardsApi.issue(homeId, body) }
+
+        suspend fun revokeFridgeCard(
+            homeId: String,
+            cardId: String,
+        ): NetworkResult<FridgeCardResponse> = safeApiCall { fridgeCardsApi.revoke(homeId, cardId) }
+
+        /** The mailbox reality check (Wave 1, #3) — read-only diagnostic. */
+        suspend fun mailboxCheck(homeId: String): NetworkResult<MailboxCheckResponse> = safeApiCall { mailboxCheckApi.check(homeId) }
+
+        // ── Home Record Watch, rate-watch half (Wave 2b) ─────────
+
+        suspend fun recordWatch(homeId: String): NetworkResult<RecordWatchResponse> = safeApiCall { recordWatchApi.get(homeId) }
+
+        suspend fun setRecordWatch(
+            homeId: String,
+            loanRecordedMonth: String,
+        ): NetworkResult<RecordWatchResponse> = safeApiCall { recordWatchApi.set(homeId, SetRecordWatchRequest(loanRecordedMonth)) }
+
+        suspend fun removeRecordWatch(homeId: String): NetworkResult<RemoveRecordWatchResponse> =
+            safeApiCall { recordWatchApi.remove(homeId) }
     }
