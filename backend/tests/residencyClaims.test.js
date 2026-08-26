@@ -295,9 +295,12 @@ describe('public verification', () => {
 
     const res = await request(app).get(`/api/public/residency-claims/${claim.claim_code}`);
     expect(res.body.status).toBe('expired');
+    // Expiry pulls the content, not just the badge.
+    expect(res.body.statement).toBeUndefined();
+    expect(res.body.holder_name).toBeUndefined();
   });
 
-  test('revocation kills the public check immediately', async () => {
+  test('revocation kills the public check immediately — and withdraws the statement', async () => {
     seedVerifiedResident();
     const app = buildApp();
     const claim = await issuedClaim(app);
@@ -310,6 +313,12 @@ describe('public verification', () => {
 
     const res = await request(app).get(`/api/public/residency-claims/${claim.claim_code}`);
     expect(res.body.status).toBe('revoked');
+    // The FridgeCard rule: a code that sat in chat history must not keep
+    // disclosing the holder's name and address after the resident hit
+    // revoke. Status yes, PII no.
+    expect(res.body.statement).toBeUndefined();
+    expect(res.body.holder_name).toBeUndefined();
+    expect(res.body.residency_verified_at).toBeUndefined();
   });
 });
 

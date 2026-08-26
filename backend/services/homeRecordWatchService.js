@@ -178,17 +178,30 @@ async function evaluateWatches() {
     return { evaluated: 0, alerted: 0 };
   }
 
-  const { data: watches, error } = await supabaseAdmin
-    .from('HomeRecordWatch')
-    .select('*');
-  if (error) {
-    logger.warn('recordWatch: scan failed', { error: error.message });
-    return { evaluated: 0, alerted: 0 };
+  // Page the scan: PostgREST silently truncates unpaginated selects at
+  // the server's max-rows cap (1000 on hosted Supabase), which would
+  // permanently and silently exclude every watch past the cap — the job
+  // would report success while most users never get their alert. Same
+  // pattern as billBenchmarkRefresh.
+  const BATCH_SIZE = 1000;
+  const watches = [];
+  for (let offset = 0; ; offset += BATCH_SIZE) {
+    const { data: page, error } = await supabaseAdmin
+      .from('HomeRecordWatch')
+      .select('*')
+      .order('id', { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
+    if (error) {
+      logger.warn('recordWatch: scan failed', { error: error.message, offset });
+      return { evaluated: 0, alerted: 0 };
+    }
+    watches.push(...(page || []));
+    if (!page || page.length < BATCH_SIZE) break;
   }
 
   let alerted = 0;
   const nowIso = new Date().toISOString();
-  for (const watch of watches || []) {
+  for (const watch of watches) {
     const evaluation = evaluate(watch, pmms);
     if (!shouldAlert(watch, evaluation)) continue;
 
@@ -227,7 +240,8 @@ async function evaluateWatches() {
         .then(() => {});
     }
   }
-  return { evaluated: (watches || []).length, alerted };
+  logger.info('recordWatch: evaluation complete', { evaluated: watches.length, alerted });
+  return { evaluated: watches.length, alerted };
 }
 
 module.exports = {

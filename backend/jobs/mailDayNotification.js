@@ -38,6 +38,17 @@ const { ensureTodayItems, usersWithUnresolvedMail } = require('../services/mailD
 const SEND_AFTER_LOCAL_HOUR = 9;
 const SEND_BEFORE_LOCAL_HOUR = 20;
 
+// Idempotency is per UTC day (MailDaySession's unique key) but the send
+// window is LOCAL — for every UTC-negative timezone, UTC midnight lands
+// inside the local evening window, so "one per day" alone re-fires the
+// same local evening: push at 10:00 PDT for UTC day N, then 17:15 PDT is
+// already UTC day N+1 with no session row, and the same unresolved
+// pieces fire again. The cooldown closes that seam without touching the
+// day_date semantics the triage screen shares: whatever the calendar
+// says, two pushes are never closer than ~a local day apart. 20h still
+// allows a 10am push after a 5pm push the previous evening.
+const RENOTIFY_COOLDOWN_HOURS = 20;
+
 const DEFAULT_TIMEZONE = 'America/Los_Angeles';
 
 // Kinds that carry an action the resident is the only one who can take.
@@ -233,6 +244,21 @@ async function mailDayNotification() {
         continue;
       }
 
+      // Cross-day cooldown — see RENOTIFY_COOLDOWN_HOURS. The per-day
+      // gate above can't see yesterday's UTC session, which for the
+      // Americas is often the same local evening.
+      const cooldownCutoff = new Date(Date.now() - RENOTIFY_COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
+      const { data: recentSessions } = await supabaseAdmin
+        .from('MailDaySession')
+        .select('id')
+        .eq('user_id', userId)
+        .gte('notified_at', cooldownCutoff)
+        .limit(1);
+      if (recentSessions && recentSessions.length > 0) {
+        skipped++;
+        continue;
+      }
+
       const { data: prefs } = await supabaseAdmin
         .from('UserNotificationPreferences')
         .select('daily_briefing_timezone, quiet_hours_start_local, quiet_hours_end_local')
@@ -268,7 +294,11 @@ async function mailDayNotification() {
         title: push.title,
         body: push.body,
         icon: '📬',
-        link: '/app/mailbox',
+        // '/mailbox', not '/app/mailbox': the mobile DeepLinkRouters
+        // parse host-first (pantopus://mailbox) and discard an unknown
+        // 'app' host — the web convention would make the push navigate
+        // nowhere on the clients it exists to reach.
+        link: '/mailbox',
         metadata: {
           day_date: today,
           pieces: push.pieces,

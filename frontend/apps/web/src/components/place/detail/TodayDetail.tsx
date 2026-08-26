@@ -10,6 +10,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as api from '@pantopus/api';
+import { toast } from '@/components/ui/toast-store';
 import type { LucideIcon } from 'lucide-react';
 import type {
   PlaceIntelligence,
@@ -427,9 +429,10 @@ function BriefingOptIn() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/hub/preferences', { credentials: 'include' });
-        if (!res.ok) return;
-        const { preferences } = await res.json();
+        // Through the api client, not a raw fetch: cookie-session writes
+        // need the x-csrf-token header the client injects, and the reads
+        // gain its 401-refresh handling.
+        const { preferences } = await api.hub.getHubPreferences();
         // Ask only when it is off AND we have never asked. Both a yes and a
         // no stamp `daily_briefing_prompted_at`, so this never returns.
         if (cancelled) return;
@@ -447,18 +450,17 @@ function BriefingOptIn() {
   async function answer(enabled: boolean) {
     setBusy(true);
     try {
-      await fetch('/api/hub/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          daily_briefing_enabled: enabled,
-          ...(enabled ? { daily_briefing_time_local: time } : {}),
-          daily_briefing_prompted: true,
-        }),
+      await api.hub.updateHubPreferences({
+        daily_briefing_enabled: enabled,
+        ...(enabled ? { daily_briefing_time_local: time } : {}),
+        daily_briefing_prompted: true,
       });
+      // Success state only AFTER the server accepted the write — a raw
+      // fetch here used to 403 on CSRF and show "briefing on" anyway.
       setDone(enabled ? 'on' : 'off');
       setShow(false);
+    } catch {
+      toast.error('That didn’t save — try again.');
     } finally {
       setBusy(false);
     }

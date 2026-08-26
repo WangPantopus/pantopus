@@ -20,6 +20,20 @@
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 
+// PostgREST silently truncates unpaginated selects at the server's
+// max-rows cap (1000 on hosted Supabase) — a scan that "works" in dev
+// quietly drops rows in production. Every table walk below pages in
+// BATCH_SIZE steps, and .in() lists are chunked so the GET URL stays
+// under gateway limits.
+const BATCH_SIZE = 1000;
+const IN_CHUNK_SIZE = 200;
+
+function chunk(list, size) {
+  const out = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
 /** Homes the user actively occupies. */
 async function getAccessibleHomeIds(userId) {
   const { data } = await supabaseAdmin
@@ -60,7 +74,8 @@ async function ensureTodayItems(userId, today) {
       .from('MailDayItem')
       .select('id')
       .eq('user_id', userId)
-      .eq('day_date', today);
+      .eq('day_date', today)
+      .limit(1);
     if (existing && existing.length > 0) return 0;
 
     const homeIds = await getAccessibleHomeIds(userId);
@@ -96,7 +111,14 @@ async function ensureTodayItems(userId, today) {
         updated_at: nowIso,
       };
     });
-    await supabaseAdmin.from('MailDayItem').insert(inserts);
+    // Upsert-ignore, not insert: the empty-check above is a check-then-act
+    // with no lock, and this runs from every app instance's cron AND from
+    // GET /today. The unique index on (user_id, day_date, mail_id)
+    // (migration 170) makes the race's loser a silent no-op instead of a
+    // duplicated triage queue.
+    await supabaseAdmin
+      .from('MailDayItem')
+      .upsert(inserts, { onConflict: 'user_id,day_date,mail_id', ignoreDuplicates: true });
     return inserts.length;
   } catch (err) {
     logger.warn('Mail day backfill failed (non-fatal)', { userId, error: err.message });
@@ -115,23 +137,41 @@ async function ensureTodayItems(userId, today) {
  * @returns {Promise<string[]>} distinct user ids
  */
 async function usersWithUnresolvedMail() {
-  const { data: queue, error } = await supabaseAdmin
-    .from('MailRoutingQueue')
-    .select('home_id')
-    .eq('resolved', false);
-  if (error) throw new Error(error.message);
-
-  const homeIds = [...new Set((queue || []).map((q) => q && q.home_id).filter(Boolean))];
+  const homeIdSet = new Set();
+  for (let offset = 0; ; offset += BATCH_SIZE) {
+    const { data: queue, error } = await supabaseAdmin
+      .from('MailRoutingQueue')
+      .select('home_id')
+      .eq('resolved', false)
+      .order('id', { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const q of queue || []) {
+      if (q && q.home_id) homeIdSet.add(q.home_id);
+    }
+    if (!queue || queue.length < BATCH_SIZE) break;
+  }
+  const homeIds = [...homeIdSet];
   if (homeIds.length === 0) return [];
 
-  const { data: occupants, error: occErr } = await supabaseAdmin
-    .from('HomeOccupancy')
-    .select('user_id')
-    .in('home_id', homeIds)
-    .eq('is_active', true);
-  if (occErr) throw new Error(occErr.message);
-
-  return [...new Set((occupants || []).map((o) => o && o.user_id).filter(Boolean))];
+  const userIds = new Set();
+  for (const homeChunk of chunk(homeIds, IN_CHUNK_SIZE)) {
+    for (let offset = 0; ; offset += BATCH_SIZE) {
+      const { data: occupants, error: occErr } = await supabaseAdmin
+        .from('HomeOccupancy')
+        .select('user_id')
+        .in('home_id', homeChunk)
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH_SIZE - 1);
+      if (occErr) throw new Error(occErr.message);
+      for (const o of occupants || []) {
+        if (o && o.user_id) userIds.add(o.user_id);
+      }
+      if (!occupants || occupants.length < BATCH_SIZE) break;
+    }
+  }
+  return [...userIds];
 }
 
 module.exports = {

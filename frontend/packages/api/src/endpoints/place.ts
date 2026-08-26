@@ -12,7 +12,7 @@
 // wants narrative copy; these wrappers carry the structured contract.
 // ============================================================
 
-import { get } from '../client';
+import { get, put } from '../client';
 import type {
   PlaceIntelligence,
   PlaceDensityBucket,
@@ -117,4 +117,19 @@ export async function getPlaceIntelligence(
  */
 export async function getPublicPlacePreview(address: string): Promise<PlacePreview> {
   return get<PlacePreview>('/api/public/place', { address });
+}
+
+/**
+ * Systems Ledger — "it was replaced". Records what the household knows
+ * about a system's install year; provenance ratchets, so a resident's
+ * answer is never overwritten by a derived source.
+ *
+ * PUT /api/homes/:id/systems/:key
+ */
+export async function putHomeSystem(
+  homeId: string,
+  systemKey: string,
+  installedYear: number,
+): Promise<{ ok: boolean }> {
+  return put<{ ok: boolean }>(`/api/homes/${homeId}/systems/${systemKey}`, { installed_year: installedYear });
 }

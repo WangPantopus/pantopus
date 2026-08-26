@@ -274,7 +274,10 @@ async function recordSystem({ homeId, systemKey, installedYear, source = 'reside
     }
 
     const nowIso = new Date().toISOString();
-    await supabaseAdmin
+    // supabase-js never throws on query errors — an unchecked upsert
+    // would confirm { ok: true } to a resident whose correction was
+    // silently dropped.
+    const { error: writeErr } = await supabaseAdmin
       .from('HomeSystem')
       .upsert({
         home_id: homeId,
@@ -285,6 +288,7 @@ async function recordSystem({ homeId, systemKey, installedYear, source = 'reside
         updated_by: userId || null,
         updated_at: nowIso,
       }, { onConflict: 'home_id,system_key' });
+    if (writeErr) throw new Error(writeErr.message);
 
     return { ok: true };
   } catch (err) {
@@ -331,7 +335,7 @@ async function recordCompletedJob({ homeId, gigId, title, category, price, perfo
     if (existing) return { ok: true, reason: 'already_recorded' };
 
     const nowIso = new Date().toISOString();
-    await supabaseAdmin
+    const { error: writeErr } = await supabaseAdmin
       .from('HomeMaintenanceLog')
       .insert({
         home_id: homeId,
@@ -348,6 +352,12 @@ async function recordCompletedJob({ homeId, gigId, title, category, price, perfo
         created_at: nowIso,
         updated_at: nowIso,
       });
+    if (writeErr) {
+      // The partial unique index on gig_id is the real guarantee — a
+      // concurrent confirm losing to it is success, not failure.
+      if (writeErr.code === '23505') return { ok: true, reason: 'already_recorded' };
+      throw new Error(writeErr.message);
+    }
 
     return { ok: true };
   } catch (err) {

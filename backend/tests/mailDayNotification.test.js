@@ -205,6 +205,40 @@ describe('mailDayNotification job', () => {
     expect(session.notified_at).toBeTruthy();
   });
 
+  // Regression: idempotency is keyed to the UTC day but the send window
+  // is LOCAL. For the Americas, UTC midnight lands inside the local
+  // evening — push at 10:00 PDT for UTC day N, then 17:15 PDT is already
+  // UTC day N+1 with no session row, and the same unresolved pieces fired
+  // AGAIN the same local evening. The cooldown is the fix.
+  test('does not re-push after the UTC rollover when yesterday was pushed hours ago', async () => {
+    seedScannedMail(USER, ['bill']);
+    seedPrefs(USER);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    seedTable('MailDaySession', [{
+      id: 'sess-yesterday', user_id: USER, day_date: yesterday,
+      // "Yesterday" by UTC calendar, two hours ago by the clock.
+      notified_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    }]);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).not.toHaveBeenCalled();
+  });
+
+  test('a push from a full day ago does not block today', async () => {
+    seedScannedMail(USER, ['bill']);
+    seedPrefs(USER);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    seedTable('MailDaySession', [{
+      id: 'sess-yesterday', user_id: USER, day_date: yesterday,
+      notified_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    }]);
+
+    await mailDayNotification();
+
+    expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
+  });
+
   test('skips a user who already finished the day', async () => {
     seedScannedMail(USER, ['bill']);
     seedPrefs(USER);

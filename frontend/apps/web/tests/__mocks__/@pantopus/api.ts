@@ -24,9 +24,12 @@ export const personas = {
 export const chat = {
   getUnifiedConversations: jest.fn(),
 };
-// Hub prefetcher uses api.hub.getHub.
+// Hub prefetcher uses api.hub.getHub; the briefing opt-in card reads
+// and writes preferences through the client (CSRF header lives there).
 export const hub = {
   getHub: jest.fn(),
+  getHubPreferences: jest.fn(),
+  updateHubPreferences: jest.fn(),
 };
 
 export const broadcast = {
@@ -112,6 +115,7 @@ export const homes = {
 export const place = {
   getPlaceIntelligence: jest.fn(),
   getPublicPlacePreview: jest.fn(),
+  putHomeSystem: jest.fn(),
 };
 // Place — residency letters (Phase 1) + scoped live claims (Wave 1).
 export const residencyLetters = {

@@ -11,6 +11,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import * as api from '@pantopus/api';
 import type { LucideIcon } from 'lucide-react';
 import type { PlaceIntelligence, PlaceYourHomeData, PlaceHomeSystemsData, PlaceHomeSystem } from '@pantopus/types';
 import {
@@ -348,13 +349,10 @@ function SystemsCard({ data, homeId }: { data: PlaceHomeSystemsData; homeId: str
     }
     setError(null);
     try {
-      const res = await fetch(`/api/homes/${homeId}/systems/${key}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ installed_year: parsed }),
-      });
-      if (!res.ok) throw new Error('save failed');
+      // Through the api client, not a raw fetch: cookie-session writes
+      // need the x-csrf-token header the client injects — the raw PUT
+      // 403'd on every attempt and "Try again" could never succeed.
+      await api.place.putHomeSystem(homeId, key, parsed);
       setSaved(key);
       setEditing(null);
       setYear('');

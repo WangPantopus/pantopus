@@ -60,10 +60,15 @@ const homeCreationLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip,
-  // The '/:homeId/scheduling/**' skip matters: this limiter is mounted on ALL of /api/homes,
-  // so without it every home-scoped Calendarly POST (create event type, block, workflow…)
-  // burned the 5-per-hour home-CREATION budget and 429'd ordinary scheduling setup.
-  skip: (req) => req.method !== 'POST' || req.path === '/check-address' || /^\/[^/]+\/scheduling(\/|$)/.test(req.path),
+  // Count ONLY the actual home-creation request. This limiter is mounted on
+  // ALL of /api/homes, and the old blocklist-style skip ('/check-address',
+  // then '/:homeId/scheduling/**' when Calendarly hit it) meant every NEW
+  // home-scoped POST silently burned the 5-per-hour home-CREATION budget —
+  // the Wave 1 claim/fridge-card issue AND revoke endpoints 429'd behind
+  // their own dedicated limiters, locking a manager out of revoking a
+  // leaked card. Home creation is exactly `POST /api/homes` (path '/' at
+  // this mount); everything deeper carries its own limiter.
+  skip: (req) => req.method !== 'POST' || (req.path !== '/' && req.path !== ''),
   message: { error: 'Too many home creation requests. Please try again later.' },
 });
 

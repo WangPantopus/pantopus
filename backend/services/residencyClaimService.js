@@ -370,6 +370,22 @@ async function verifyClaimByCode(code, { userAgent } = {}) {
       if (updErr) logger.warn('residencyClaim: view_count update failed', { error: updErr.message });
     });
 
+  // Revocation must actually pull the content (the FridgeCard rule).
+  // A non-active claim discloses its status and nothing else: the
+  // statement is name + street address for the address scope, and a
+  // code that sat in someone's chat history must not keep disclosing
+  // PII after the resident hit revoke — or after expiry did it for them.
+  if (status !== 'active') {
+    return {
+      valid: true,
+      status,
+      scope: data.scope,
+      issued_at: data.issued_at,
+      expires_at: data.expires_at,
+      revoked_at: data.revoked_at,
+    };
+  }
+
   return {
     valid: true,
     status,

@@ -96,7 +96,15 @@ function ResultPanel({ result }: { result: ResidencyClaimVerification }) {
       <div className="px-5 py-4 grid gap-3">
         <div>
           <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted mb-0.5">This claim states</div>
-          <div className="text-[16px] font-semibold text-app-text leading-[23px]">{result.statement}</div>
+          {result.statement ? (
+            <div className="text-[16px] font-semibold text-app-text leading-[23px]">{result.statement}</div>
+          ) : (
+            // The server withholds a non-active claim's statement —
+            // revocation and expiry actually pull the content.
+            <div className="text-[14px] text-app-text-muted leading-[20px] italic">
+              The statement is no longer disclosed. When a claim is revoked or expires, its content is withdrawn along with it.
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
