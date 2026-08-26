@@ -95,6 +95,54 @@ class PlaceDetailViewModel
             }
         }
 
+        // ── Residency Pass — scoped live claims (Identity, T4) ───
+
+        private val _claims = MutableStateFlow<ResidencyClaimsUiState>(ResidencyClaimsUiState.Loading)
+        val claims: StateFlow<ResidencyClaimsUiState> = _claims.asStateFlow()
+
+        private val _isIssuingClaim = MutableStateFlow(false)
+        val isIssuingClaim: StateFlow<Boolean> = _isIssuingClaim.asStateFlow()
+
+        /** The verify link the UI should copy to the clipboard, once. */
+        private val _claimLinkToCopy = MutableStateFlow<String?>(null)
+        val claimLinkToCopy: StateFlow<String?> = _claimLinkToCopy.asStateFlow()
+
+        fun loadClaims() {
+            viewModelScope.launch {
+                _claims.value =
+                    when (val r = repo.residencyClaims(homeId)) {
+                        is NetworkResult.Success -> ResidencyClaimsUiState.Loaded(r.data.claims)
+                        is NetworkResult.Failure -> ResidencyClaimsUiState.Error(r.error.displayMessage("Couldn't load your claims."))
+                    }
+            }
+        }
+
+        fun issueClaim(
+            scope: String,
+            expiresInDays: Int,
+        ) {
+            viewModelScope.launch {
+                _isIssuingClaim.value = true
+                when (val r = repo.issueResidencyClaim(homeId, scope, expiresInDays)) {
+                    is NetworkResult.Success -> _claimLinkToCopy.value = r.data.claim.verifyUrl
+                    is NetworkResult.Failure -> Unit
+                }
+                _isIssuingClaim.value = false
+                loadClaims()
+            }
+        }
+
+        fun consumeClaimLink() {
+            _claimLinkToCopy.value = null
+        }
+
+        fun revokeClaim(claimId: String) {
+            viewModelScope.launch {
+                repo.revokeResidencyClaim(homeId, claimId)
+                loadClaims()
+            }
+        }
+
         // ── Mailbox reality check (Identity detail) ──────────────
 
         private val _mailboxCheck = MutableStateFlow<MailboxCheckUiState>(MailboxCheckUiState.Loading)
@@ -150,6 +198,14 @@ class PlaceDetailViewModel
             }
         }
     }
+
+sealed interface ResidencyClaimsUiState {
+    data object Loading : ResidencyClaimsUiState
+
+    data class Loaded(val claims: List<app.pantopus.android.data.api.models.place.ResidencyClaim>) : ResidencyClaimsUiState
+
+    data class Error(val message: String) : ResidencyClaimsUiState
+}
 
 sealed interface MailboxCheckUiState {
     data object Loading : MailboxCheckUiState

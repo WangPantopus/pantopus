@@ -89,6 +89,7 @@ import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.ProfileInsightsApi
 import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.RelationshipsApi
+import app.pantopus.android.data.api.services.ResidencyClaimsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
@@ -505,6 +506,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRecordWatchApi(retrofit: Retrofit): RecordWatchApi = retrofit.create(RecordWatchApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideResidencyClaimsApi(retrofit: Retrofit): ResidencyClaimsApi = retrofit.create(ResidencyClaimsApi::class.java)
 
     @Provides
     @Singleton

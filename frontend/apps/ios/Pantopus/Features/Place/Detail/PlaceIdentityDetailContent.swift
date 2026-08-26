@@ -122,12 +122,14 @@ struct PlaceIdentityDetailContent: View {
     let vm: PlaceDetailViewModel
     @State private var letters: PlaceResidencyLetterViewModel
     @State private var mailbox: PlaceMailboxCheckViewModel
+    @State private var pass: PlaceResidencyPassViewModel
 
     init(intel: PlaceIntelligence, vm: PlaceDetailViewModel) {
         self.intel = intel
         self.vm = vm
         _letters = State(initialValue: PlaceResidencyLetterViewModel(homeId: vm.homeId))
         _mailbox = State(initialValue: PlaceMailboxCheckViewModel(homeId: vm.homeId))
+        _pass = State(initialValue: PlaceResidencyPassViewModel(homeId: vm.homeId))
     }
 
     private var isVerified: Bool {
@@ -148,6 +150,20 @@ struct PlaceIdentityDetailContent: View {
                     icon: .fileText,
                     title: "Verified residency letter",
                     reason: "Verify your address to issue a server-attested letter that states your verified address for a purpose you choose.",
+                    cta: "Verify address",
+                    onTap: nil
+                )
+            }
+
+            PlaceDetailSectionLabel(text: "Residency Pass")
+            if isVerified {
+                PlaceResidencyPassSection(vm: pass)
+                    .task { await pass.load() }
+            } else {
+                PlaceLockedCard(
+                    icon: .idCard,
+                    title: "Prove residency without sharing your address",
+                    reason: "Verify your address to share one fact — your city, school district, or county — behind a live-checked link.",
                     cta: "Verify address",
                     onTap: nil
                 )

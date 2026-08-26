@@ -6,6 +6,9 @@ import app.pantopus.android.data.api.models.place.MailboxFindingSeverity
 import app.pantopus.android.data.api.models.place.MailboxPhysicalStatus
 import app.pantopus.android.data.api.models.place.PlaceEnumAdapterFactory
 import app.pantopus.android.data.api.models.place.RecordWatchResponse
+import app.pantopus.android.data.api.models.place.ResidencyClaimScope
+import app.pantopus.android.data.api.models.place.ResidencyClaimStatus
+import app.pantopus.android.data.api.models.place.ResidencyClaimsResponse
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
@@ -62,6 +65,33 @@ class PlaceWaveDtosTest {
         assertEquals(MailboxFindingSeverity.INFO, check.findings[0].severity)
         assertEquals(MailboxPhysicalStatus.NOT_RUN, check.physical.status)
         assertNull(check.checkedAt)
+    }
+
+    @Test
+    fun `decodes residency claims and falls back on new vocabulary`() {
+        val json =
+            """
+            {"claims":[
+              {"id":"c1","home_id":"h1","scope":"school_district",
+               "statement":"Dana is a verified resident of Portland SD 1J.",
+               "holder_name":"Dana","status":"active","claim_code":"ABCD-EFGH-JKMN-PQRS",
+               "verify_url":"https://pantopus.com/verify-claim/ABCD-EFGH-JKMN-PQRS",
+               "issued_at":"2026-08-25T00:00:00.000Z","expires_at":"2026-09-24T00:00:00.000Z",
+               "revoked_at":null,"residency_verified_at":null,"view_count":3,"last_viewed_at":null},
+              {"id":"c2","home_id":"h1","scope":"galactic_sector",
+               "statement":"s","holder_name":"Dana","status":"superseded","claim_code":"AAAA-BBBB-CCCC-DDDD",
+               "verify_url":"u","issued_at":"2026-08-25T00:00:00.000Z","expires_at":"2026-09-24T00:00:00.000Z",
+               "revoked_at":null,"residency_verified_at":null,"view_count":0,"last_viewed_at":null}]}
+            """.trimIndent()
+        val claims = decode<ResidencyClaimsResponse>(json).claims
+        assertEquals(2, claims.size)
+        assertEquals(ResidencyClaimScope.SCHOOL_DISTRICT, claims[0].scope)
+        assertEquals(ResidencyClaimStatus.ACTIVE, claims[0].status)
+        assertEquals(3, claims[0].viewCount)
+        // A scope or status this build has never heard of renders inert,
+        // never as active, and never fails the list.
+        assertEquals(ResidencyClaimScope.UNKNOWN, claims[1].scope)
+        assertEquals(ResidencyClaimStatus.EXPIRED, claims[1].status)
     }
 
     @Test

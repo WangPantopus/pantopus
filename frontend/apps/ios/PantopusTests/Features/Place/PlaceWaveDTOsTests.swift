@@ -47,6 +47,31 @@ final class PlaceWaveDTOsTests: XCTestCase {
         XCTAssertNil(response.check.checkedAt)
     }
 
+    func testDecodesResidencyClaimAndFallsBackOnNewVocabulary() throws {
+        let json = """
+        {"claims":[
+          {"id":"c1","home_id":"h1","scope":"school_district",
+           "statement":"Dana is a verified resident of Portland SD 1J.",
+           "holder_name":"Dana","status":"active","claim_code":"ABCD-EFGH-JKMN-PQRS",
+           "verify_url":"https://pantopus.com/verify-claim/ABCD-EFGH-JKMN-PQRS",
+           "issued_at":"2026-08-25T00:00:00.000Z","expires_at":"2026-09-24T00:00:00.000Z",
+           "revoked_at":null,"residency_verified_at":null,"view_count":3,"last_viewed_at":null},
+          {"id":"c2","home_id":"h1","scope":"galactic_sector",
+           "statement":"s","holder_name":"Dana","status":"superseded","claim_code":"AAAA-BBBB-CCCC-DDDD",
+           "verify_url":"u","issued_at":"2026-08-25T00:00:00.000Z","expires_at":"2026-09-24T00:00:00.000Z",
+           "revoked_at":null,"residency_verified_at":null,"view_count":0,"last_viewed_at":null}]}
+        """
+        let response = try decoder.decode(ResidencyClaimsResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(response.claims.count, 2)
+        XCTAssertEqual(response.claims[0].scope, .known(.schoolDistrict))
+        XCTAssertEqual(response.claims[0].status, .active)
+        XCTAssertEqual(response.claims[0].viewCount, 3)
+        // A scope or status this build has never heard of renders inert,
+        // never as active, and never fails the list.
+        XCTAssertEqual(response.claims[1].scope, .unknown("galactic_sector"))
+        XCTAssertEqual(response.claims[1].status, .expired)
+    }
+
     func testDecodesRecordWatchWithEvaluation() throws {
         let json = """
         {"watch":{"id":"w1","home_id":"home-1","loan_recorded_month":"2023-03",

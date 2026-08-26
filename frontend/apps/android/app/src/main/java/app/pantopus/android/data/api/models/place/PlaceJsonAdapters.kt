@@ -217,6 +217,8 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             MailboxCheckVerdict::class.java to MailboxCheckVerdict.UNKNOWN,
             MailboxFindingSeverity::class.java to MailboxFindingSeverity.INFO,
             MailboxPhysicalStatus::class.java to MailboxPhysicalStatus.NOT_RUN,
+            ResidencyClaimScope::class.java to ResidencyClaimScope.UNKNOWN,
+            ResidencyClaimStatus::class.java to ResidencyClaimStatus.EXPIRED,
             IncentiveLevel::class.java to IncentiveLevel.UNKNOWN,
             IncentiveType::class.java to IncentiveType.UNKNOWN,
             CivicLevel::class.java to CivicLevel.UNKNOWN,

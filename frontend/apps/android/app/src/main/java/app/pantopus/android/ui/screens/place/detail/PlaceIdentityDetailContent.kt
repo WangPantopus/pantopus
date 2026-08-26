@@ -71,6 +71,22 @@ fun PlaceIdentityDetailContent(
         )
     }
 
+    PlaceDetailSectionLabel("Residency Pass")
+    if (isVerified) {
+        LaunchedEffect(Unit) { viewModel.loadClaims() }
+        PlaceResidencyPassSection(viewModel)
+    } else {
+        PlaceLockedCard(
+            title = "Prove residency without sharing your address",
+            reason =
+                "Verify your address to share one fact — your city, school district, or " +
+                    "county — behind a live-checked link.",
+            cta = "Verify address",
+            icon = PantopusIcon.IdCard,
+            onTap = null,
+        )
+    }
+
     PlaceDetailSectionLabel("Mailbox")
     LaunchedEffect(Unit) { viewModel.loadMailboxCheck() }
     MailboxCheckSection(viewModel)
