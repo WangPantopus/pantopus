@@ -30,6 +30,7 @@ import app.pantopus.android.data.api.services.EarnOffersApi
 import app.pantopus.android.data.api.services.FeedActionsApi
 import app.pantopus.android.data.api.services.FilesApi
 import app.pantopus.android.data.api.services.FollowingApi
+import app.pantopus.android.data.api.services.FridgeCardsApi
 import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.api.services.GigReassignmentApi
 import app.pantopus.android.data.api.services.GigSavedSearchesApi
@@ -59,6 +60,7 @@ import app.pantopus.android.data.api.services.ListingsReadApi
 import app.pantopus.android.data.api.services.MailComposeApi
 import app.pantopus.android.data.api.services.MailDayApi
 import app.pantopus.android.data.api.services.MailboxApi
+import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.MailboxCommunityApi
 import app.pantopus.android.data.api.services.MailboxDocumentApi
 import app.pantopus.android.data.api.services.MailboxKeepsakeApi
@@ -86,7 +88,9 @@ import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.ProfileInsightsApi
+import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.RelationshipsApi
+import app.pantopus.android.data.api.services.ResidencyClaimsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
 import app.pantopus.android.data.api.services.ReviewsApi
 import app.pantopus.android.data.api.services.SavedPlacesApi
@@ -495,6 +499,22 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideResidencyLettersApi(retrofit: Retrofit): ResidencyLettersApi = retrofit.create(ResidencyLettersApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMailboxCheckApi(retrofit: Retrofit): MailboxCheckApi = retrofit.create(MailboxCheckApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideFridgeCardsApi(retrofit: Retrofit): FridgeCardsApi = retrofit.create(FridgeCardsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideRecordWatchApi(retrofit: Retrofit): RecordWatchApi = retrofit.create(RecordWatchApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideResidencyClaimsApi(retrofit: Retrofit): ResidencyClaimsApi = retrofit.create(ResidencyClaimsApi::class.java)
 
     @Provides
     @Singleton

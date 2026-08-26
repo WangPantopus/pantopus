@@ -12,6 +12,13 @@ import SwiftUI
 struct PlaceRiskDetailContent: View {
     let intel: PlaceIntelligence
     let vm: PlaceDetailViewModel
+    @State private var fridge: PlaceFridgeCardViewModel
+
+    init(intel: PlaceIntelligence, vm: PlaceDetailViewModel) {
+        self.intel = intel
+        self.vm = vm
+        _fridge = State(initialValue: PlaceFridgeCardViewModel(homeId: vm.homeId))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,6 +57,20 @@ struct PlaceRiskDetailContent: View {
             PlaceDetailSectionLabel(text: "Emergency plan")
             EmergencyChecklist()
             PlaceSourceNote(name: "Ready.gov · American Red Cross", asOf: nil)
+
+            PlaceDetailSectionLabel(text: "Fridge card")
+            if intel.tier == .t4 {
+                PlaceFridgeCardSection(vm: fridge)
+                    .task { await fridge.load() }
+            } else {
+                PlaceLockedCard(
+                    icon: .heartPulse,
+                    title: "The 911-ready household card",
+                    reason: "Verify your address to issue a fridge card — its headline is the verified address a caller reads to 911.",
+                    cta: "Verify address",
+                    onTap: nil
+                )
+            }
         }
     }
 
@@ -79,11 +100,49 @@ struct PlaceRiskDetailContent: View {
                             .pantopusTextStyle(.caption)
                             .foregroundStyle(Theme.Color.appTextMuted)
                     }
+                    if let nfip = env.flood?.nfip {
+                        nfipBlock(nfip)
+                    }
                 }
             }
         } else {
             vm.fallbackCard(env)
         }
+    }
+
+    // Wave 2 — what flood policies in this tract actually cost. Absent
+    // while the benchmark warms or sits below the 10-policy floor, so
+    // the card degrades to zone-only. A benchmark, never a quote.
+    @ViewBuilder
+    private func nfipBlock(_ nfip: PlaceFloodNfipData) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Divider()
+            Text("What flood policies near you cost")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.Color.appTextMuted)
+                .textCase(.uppercase)
+            let band = "\(PlacePresentation.money(nfip.premiumP25) ?? "")–\(PlacePresentation.money(nfip.premiumP75) ?? "")"
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(band)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.Color.appText)
+                Text("/yr · median \(PlacePresentation.money(nfip.premiumMedian) ?? "")")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.Color.appTextSecondary)
+            }
+            Text(nfipCaption(nfip))
+                .pantopusTextStyle(.caption)
+                .lineSpacing(2)
+                .foregroundStyle(Theme.Color.appTextMuted)
+        }
+        .padding(.top, 2)
+    }
+
+    private func nfipCaption(_ nfip: PlaceFloodNfipData) -> String {
+        let sampled = nfip.coverage == "partial" ? " (sampled)" : ""
+        return "Real NFIP premiums for the \(nfip.policyCount) policies written in your census tract "
+            + "over the last \(nfip.windowMonths) months\(sampled). "
+            + "A benchmark, not a quote — premiums vary house to house."
     }
 
     private func riskSummary(_ env: PlaceSectionEnvelope) -> String? {

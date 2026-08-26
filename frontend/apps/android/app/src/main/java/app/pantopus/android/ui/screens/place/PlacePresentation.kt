@@ -3,6 +3,7 @@ package app.pantopus.android.ui.screens.place
 import androidx.compose.ui.graphics.Color
 import app.pantopus.android.data.api.models.place.AirQualityCategory
 import app.pantopus.android.data.api.models.place.BenchmarkComparison
+import app.pantopus.android.data.api.models.place.ExemptionFilingStatus
 import app.pantopus.android.data.api.models.place.FloodRiskLevel
 import app.pantopus.android.data.api.models.place.GoodDayVerdict
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
@@ -162,6 +163,7 @@ object PlacePresentation {
             PlaceSectionId.BILL_BENCHMARK -> PlaceSectionDisplayConfig(PantopusIcon.Zap, "Bill benchmark")
             PlaceSectionId.INCENTIVES -> PlaceSectionDisplayConfig(PantopusIcon.BadgePercent, "Incentives")
             PlaceSectionId.RENT_BAND -> PlaceSectionDisplayConfig(PantopusIcon.Building2, "Rent band")
+            PlaceSectionId.EXEMPTION_CHECK -> PlaceSectionDisplayConfig(PantopusIcon.Landmark, "Homestead exemption")
             PlaceSectionId.CIVIC_DISTRICTS -> PlaceSectionDisplayConfig(PantopusIcon.Landmark, "Your districts")
             PlaceSectionId.CIVIC_ELECTION ->
                 PlaceSectionDisplayConfig(PantopusIcon.Vote, "Next election", inline = true)
@@ -324,6 +326,22 @@ object PlacePresentation {
                 val lo = money(d.bandLow) ?: ""
                 val hi = money(d.bandHigh) ?: ""
                 PlaceSectionReading(value = "${d.bedrooms}BR market band $lo–$hi")
+            }
+            PlaceSectionId.EXEMPTION_CHECK -> {
+                val d = env.exemptionCheck ?: return PlaceSectionReading()
+                when (d.filingStatus) {
+                    ExemptionFilingStatus.ON_FILE ->
+                        PlaceSectionReading(
+                            value = "Exemption on file",
+                            chip = PlaceChipModel(PlaceChipTone.SUCCESS, "On file", PantopusIcon.BadgeCheck),
+                        )
+                    ExemptionFilingStatus.NONE_ON_FILE ->
+                        PlaceSectionReading(
+                            value = "Nothing on file — worth checking",
+                            chip = PlaceChipModel(PlaceChipTone.WARNING, "Not filed", PantopusIcon.AlertCircle),
+                        )
+                    ExemptionFilingStatus.UNKNOWN -> PlaceSectionReading(value = "Not reported by this county")
+                }
             }
             PlaceSectionId.CIVIC_DISTRICTS -> {
                 val d = env.civicDistricts ?: return PlaceSectionReading()
