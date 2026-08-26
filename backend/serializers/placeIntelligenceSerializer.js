@@ -72,6 +72,13 @@ const PLACE_SECTION_META = {
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison', layer: 12 },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE', layer: 10 },
   rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents', layer: 9 },
+  // Wave 3 — what neighbors ACTUALLY pay, from verified residents of
+  // this geohash-6 block, behind a k>=10 floor. The FIRST Band D
+  // section: D is the proven-resident tier, and a benchmark built from
+  // residents who proved they live here is only honest to serve to
+  // someone who did the same. The Block Founders meter counts toward
+  // exactly this unlock.
+  real_rent: { group: 'money_signals', band: 'D', source: 'Pantopus · verified neighbors on your block', layer: null },
   // Wave 2 — homestead-style exemption on the parcel's assessor line.
   // Band B: the answer needs the exact parcel record (ATTOM).
   exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM', layer: null },

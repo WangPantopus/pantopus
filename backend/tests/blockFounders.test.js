@@ -133,6 +133,37 @@ describe('block status', () => {
     expect(getTable('BlockFounder')).toHaveLength(1);
   });
 
+  // The flagship meter reads RENT REPORTS, not verified homes — a block
+  // of verified owner-occupiers has no rents to pool, and a meter that
+  // counted them would promise an unlock the section then can't honor.
+  test('the real_rent meter tracks rent reports, not the verified-home count', async () => {
+    seedVerified(); // 4 verified homes in the cell, zero rent reports
+    const app = buildApp();
+
+    const empty = await request(app)
+      .get(`/api/homes/${HOME_ID}/block-founders`)
+      .set('x-test-user-id', USER);
+    const emptyRent = empty.body.block.meters.find((m) => m.id === 'real_rent');
+    expect(emptyRent).toMatchObject({ current: 0, needed: 10, unlocked: false });
+    expect(empty.body.block.rent_reports).toBe(0);
+    // The verified-home meters still read the density, unchanged.
+    expect(empty.body.block.meters.find((m) => m.id === 'bill_benchmark').current).toBe(4);
+
+    // Two neighbors share their rent; only the rent meter moves.
+    const cell = require('../services/realRentService').cellForHome(HOME_ROW);
+    seedTable('HomeRentReport', [
+      { id: 'rr1', home_id: 'other-1', user_id: 'u1', geohash6: cell, monthly_rent_cents: 210000, bedrooms: 2 },
+      { id: 'rr2', home_id: 'other-2', user_id: 'u2', geohash6: cell, monthly_rent_cents: 235000, bedrooms: 2 },
+    ]);
+
+    const withRents = await request(app)
+      .get(`/api/homes/${HOME_ID}/block-founders`)
+      .set('x-test-user-id', USER);
+    expect(withRents.body.block.rent_reports).toBe(2);
+    expect(withRents.body.block.meters.find((m) => m.id === 'real_rent').current).toBe(2);
+    expect(withRents.body.block.meters.find((m) => m.id === 'bill_benchmark').current).toBe(4);
+  });
+
   test('ranks are first-come within a cell', async () => {
     seedVerified();
     seedTable('BlockFounder', [{

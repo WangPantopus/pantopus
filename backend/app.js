@@ -341,6 +341,7 @@ app.use('/api/homes', require('./routes/fridgeCards'));   // 911-ready household
 app.use('/api/homes', require('./routes/mailboxCheck'));  // Mailbox reality check (/:id/mailbox-check)
 app.use('/api/homes', require('./routes/homeRecordWatch')); // Rate watch (/:id/record-watch)
 app.use('/api/homes', require('./routes/blockFounders')); // Founding ranks + postcard invites (/:id/block-founders)
+app.use('/api/homes', require('./routes/realRent')); // Real Rent Benchmark contribution (/:id/rent-report)
 app.use('/api/homes/:homeId/scheduling', require('./routes/scheduling')); // Calendarly home-scoped (before catch-all /:id)
 app.use('/api/homes', homeRoutes);
 app.use('/api/posts', postRoutes);

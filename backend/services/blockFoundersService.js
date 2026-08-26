@@ -29,6 +29,7 @@ const logger = require('../utils/logger');
 const { encodeGeohash } = require('../utils/geohash');
 const { computeAddressHash } = require('../utils/normalizeAddress');
 const { readRawCountForVerifiedInsider } = require('./place/densityReader');
+const realRentService = require('./realRentService');
 const { mailVendorService } = require('./addressValidation');
 const { generateLetterCode } = require('./residencyLetterService');
 
@@ -38,12 +39,21 @@ const RANK_RETRY_LIMIT = 5;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// The unlock meters: section -> the verified-homes count that lights
-// it up. bill_benchmark's floor is the audited K_ANON minimum; the
-// block bucket flips from 'few' to 'growing' at 25 (densityReader).
+// The unlock meters.
+//
+// Two different readings, deliberately:
+//   * `real_rent` counts RENT REPORTS in the cell, not verified homes.
+//     It is the flagship unlock and the only meter whose progress the
+//     resident can move by asking a neighbor — a block of 25 verified
+//     owner-occupiers has no rents to pool, and a meter that claimed
+//     otherwise would be a lie the section then fails to honor.
+//   * the others count VERIFIED HOMES, which is what actually gates
+//     them: bill_benchmark's floor is the audited k-anon minimum, and
+//     the density bucket flips 'few' → 'growing' at 25.
 const METERS = [
-  { id: 'bill_benchmark', label: 'Bill benchmark', needed: 10 },
-  { id: 'block_growing', label: '“Growing block” status', needed: 25 },
+  { id: 'real_rent', label: 'Real rents on your block', needed: 10, source: 'rent_reports' },
+  { id: 'bill_benchmark', label: 'Bill benchmark', needed: 10, source: 'verified_homes' },
+  { id: 'block_growing', label: '“Growing block” status', needed: 25, source: 'verified_homes' },
 ];
 
 class BlockFoundersError extends Error {
@@ -131,9 +141,10 @@ async function getBlockStatus({ home, userId }) {
   const geohash6 = cellForHome(home);
   if (!geohash6) return { available: false, reason: 'NO_COORDINATES' };
 
-  const [founder, verifiedCount, { count: weekCount }] = await Promise.all([
+  const [founder, verifiedCount, rentReports, { count: weekCount }] = await Promise.all([
     ensureFounderRank({ home, userId }),
     readRawCountForVerifiedInsider(geohash6),
+    realRentService.countCellReports(geohash6),
     supabaseAdmin
       .from('BlockInvite')
       .select('id', { count: 'exact', head: true })
@@ -141,18 +152,24 @@ async function getBlockStatus({ home, userId }) {
       .gte('created_at', new Date(Date.now() - WEEK_MS).toISOString()),
   ]);
 
+  const readingFor = (source) => (source === 'rent_reports' ? rentReports : verifiedCount);
+
   return {
     available: true,
     rank: founder ? founder.rank : null,
     established_at: founder ? founder.established_at : null,
     verified_count: verifiedCount,
-    meters: METERS.map((m) => ({
-      id: m.id,
-      label: m.label,
-      current: Math.min(verifiedCount, m.needed),
-      needed: m.needed,
-      unlocked: verifiedCount >= m.needed,
-    })),
+    rent_reports: rentReports,
+    meters: METERS.map((m) => {
+      const reading = readingFor(m.source);
+      return {
+        id: m.id,
+        label: m.label,
+        current: Math.min(reading, m.needed),
+        needed: m.needed,
+        unlocked: reading >= m.needed,
+      };
+    }),
     invites_remaining: Math.max(0, WEEKLY_INVITE_CAP - (weekCount || 0)),
     invites_weekly_cap: WEEKLY_INVITE_CAP,
   };

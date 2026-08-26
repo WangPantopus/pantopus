@@ -41,6 +41,7 @@ const { getDensityBucket } = require('./place/densityReader');
 const { getSystemsLedger } = require('./homeSystemsService');
 const nfipPremiumService = require('./nfipPremiumService');
 const exemptionCheckService = require('./exemptionCheckService');
+const realRentService = require('./realRentService');
 
 const HOME_SELECT =
   'id, owner_id, address, address2, city, state, zipcode, map_center_lat, map_center_lng, year_built, sq_ft, bedrooms, bathrooms, lot_sq_ft, home_type';
@@ -703,6 +704,90 @@ const EXEMPTION_UNAVAILABLE_COPY = {
   NO_PARCEL_MATCH: "We couldn't match this address to a county parcel record.",
 };
 
+// Real Rent Benchmark (Wave 3) — what verified neighbors on this
+// geohash-6 block actually pay, as opposed to `rent_band`'s HUD
+// county-wide estimate. Band D: only a proven resident sees it,
+// because only proven residents build it.
+//
+// Three honest states, and the middle one is the product:
+//   locked   — not verified here yet;
+//   building — verified, but the block is under the k>=10 floor. The
+//              payload carries the PROGRESS (4 of 10 shared), which is
+//              what the Block Founders meter and its invite CTA read;
+//   ready    — the quartile band, plus the viewer's own standing when
+//              they have contributed.
+async function composeRealRent(home, tier, userId) {
+  const access = bandAccess('D', tier);
+  if (access === 'locked') {
+    return [serializePlaceSection('real_rent', {
+      access: 'locked',
+      unavailableReason: 'Verify your address to see what your block actually pays.',
+    })];
+  }
+  try {
+    const benchmark = await realRentService.getBlockBenchmark({ home, userId });
+    if (!benchmark) {
+      return [serializePlaceSection('real_rent', {
+        access,
+        status: 'unavailable',
+        unavailableReason: 'We could not place this home on a block yet.',
+      })];
+    }
+
+    if (benchmark.status === 'building') {
+      // NOT an error and NOT empty: a real, true statement about the
+      // block's progress toward its own benchmark.
+      return [serializePlaceSection('real_rent', {
+        access,
+        status: 'partial',
+        data: {
+          state: 'building',
+          reports: benchmark.reports,
+          needed: benchmark.needed,
+          your_rent: benchmark.your_rent,
+          scope: null,
+          bedrooms: null,
+          sample_size: null,
+          rent_p25: null,
+          rent_median: null,
+          rent_p75: null,
+          standing: null,
+          summary: benchmark.reports === 0
+            ? `Be the first: ${benchmark.needed} verified homes on your block unlock what people here really pay.`
+            : `${benchmark.reports} of ${benchmark.needed} verified homes on your block have shared their rent.`,
+        },
+      })];
+    }
+
+    const scopeLabel = benchmark.scope === 'bedrooms' && benchmark.bedrooms != null
+      ? (benchmark.bedrooms === 0 ? 'studios' : `${benchmark.bedrooms}-bedroom homes`)
+      : 'homes of all sizes';
+    const summary = `${benchmark.sample_size} verified ${scopeLabel} on your block pay a median of $${benchmark.rent_median.toLocaleString('en-US')}/mo.`;
+
+    return [serializePlaceSection('real_rent', {
+      access,
+      status: 'ready',
+      data: {
+        state: 'ready',
+        reports: benchmark.sample_size,
+        needed: realRentService.K_MIN,
+        scope: benchmark.scope,
+        bedrooms: benchmark.bedrooms,
+        sample_size: benchmark.sample_size,
+        rent_p25: benchmark.rent_p25,
+        rent_median: benchmark.rent_median,
+        rent_p75: benchmark.rent_p75,
+        your_rent: benchmark.your_rent,
+        standing: benchmark.standing,
+        summary,
+      },
+    })];
+  } catch (err) {
+    logger.warn('placeIntelligence: real_rent failed', { homeId: home.id, error: err.message });
+    return [serializePlaceSection('real_rent', { access, status: 'error' })];
+  }
+}
+
 async function composeExemptionCheck(home, tier) {
   const access = bandAccess('B', tier);
   if (access === 'locked') {
@@ -753,6 +838,7 @@ const COMPOSER_SECTIONS = [
   { ids: ['bill_benchmark'], run: ({ home }) => composeBillBenchmark(home) },
   { ids: ['exemption_check'], run: ({ home, tier }) => composeExemptionCheck(home, tier) },
   { ids: ['rent_band'], run: ({ home }) => placeSectionAdapters.composeRentBand(home) },
+  { ids: ['real_rent'], run: ({ home, tier, userId }) => composeRealRent(home, tier, userId) },
   { ids: ['civic_districts'], run: ({ home }) => placeSectionAdapters.composeCivicDistricts(home) },
   { ids: ['civic_election'], run: ({ home }) => placeSectionAdapters.composeCivicElection(home) },
 ];
