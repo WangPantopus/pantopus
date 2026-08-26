@@ -40,6 +40,7 @@ import {
   Megaphone,
   Palette,
   Clock,
+  CalendarClock,
   Plane,
   MailOpen,
   Archive,
@@ -71,6 +72,8 @@ export const NavIcons = {
   marketplace: ShoppingBag,
   tasks: Briefcase,
   messages: MessageCircle,
+  // Calendarly scheduling hub (personal/home/business via the in-hub pillar switcher).
+  scheduling: CalendarClock,
   // Audience destination — unified-IA §3.2: distinct visual cue from
   // every Personal-zone item. Radio matches the megaphone metaphor used
   // in the audience-zone notification stream (P2.3).
@@ -115,6 +118,7 @@ export const HomeIcons = {
   issues: Wrench,
   bills: Wallet,
   members: Users,
+  scheduling: CalendarClock,
   mailbox: Mail,
   packages: Package,
   documents: FileText,

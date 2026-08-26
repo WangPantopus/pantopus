@@ -883,6 +883,9 @@ class StripeService {
     payeeId,
     gigId,
     amount,
+    // ISO 4217, lowercase for Stripe. Scheduling event types / packages are host-priced in
+    // their own currency (design offers USD/EUR) — charging their magnitude as USD is wrong.
+    currency = 'usd',
     paymentMethodId,
     offSession = false,
     existingPaymentId,
@@ -912,7 +915,7 @@ class StripeService {
 
       const piParams = {
         amount,
-        currency: 'usd',
+        currency: String(currency || 'usd').toLowerCase(),
         customer: customerId,
         capture_method: 'manual', // Hold, don't capture
         metadata: piMetadata,

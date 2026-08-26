@@ -109,6 +109,43 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// User-selected day filter. `nil` means "show full agenda".
     private var selectedIsoDate: String?
 
+    // MARK: - I10 (Home calendar & RSVP) additions
+
+    /// Rich agenda the bespoke design renders (time-led rows + assignee
+    /// avatar stacks + booking-union rows). Built alongside `state`'s
+    /// RowSections (which stay for the existing projection tests).
+    private(set) var agendaSections: [HomeAgendaSection] = []
+    /// Empty-state kind for the bespoke agenda (nil when rows exist).
+    private(set) var agendaEmpty: AgendaEmpty?
+    /// Household members keyed by user id — drives avatar stacks + filters.
+    private(set) var members: [String: HomeMember] = [:]
+    /// Members in roster order, for the filter chip row.
+    private(set) var memberOrder: [HomeMember] = []
+    /// The active member-filter chip. Mutated via `selectFilter` /
+    /// `clearMemberFilter` (which re-project the agenda).
+    private(set) var memberFilter: MemberFilter = .all
+    /// FAB "create" menu sheet.
+    var isCreateMenuPresented = false
+    /// Locally-presented cross-stream scheduling screen (booking detail E2,
+    /// who's-free F7, find-a-time F4, …) — we can't push through HubTabRoot.
+    var presentedRoute: PresentedHomeRoute?
+    /// Signed-in member id (for the "Mine" filter) — resolved in `load()`.
+    private var resolvedUserId: String?
+
+    /// Member-filter chip selection.
+    public enum MemberFilter: Hashable {
+        case all
+        case mine
+        case member(id: String, name: String)
+    }
+
+    /// Bespoke-agenda empty-state kind.
+    public enum AgendaEmpty: Equatable {
+        case firstRun
+        case filteredMember(name: String)
+        case filteredDay
+    }
+
     init(
         homeId: String,
         homeSubtitle: String? = nil,
@@ -116,8 +153,8 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         onAddEvent: @escaping @Sendable () -> Void = {},
         onOpenEvent: @escaping @Sendable (String) -> Void = { _ in },
         now: @escaping @Sendable () -> Date = { Date() },
-        calendar: Calendar = HomeCalendarViewModel.utcCalendar,
-        timeZone: TimeZone = TimeZone(identifier: "UTC") ?? .current
+        calendar: Calendar = HomeCalendarViewModel.localCalendar,
+        timeZone: TimeZone = .current
     ) {
         self.homeId = homeId
         subtitle = homeSubtitle
@@ -191,11 +228,22 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     // MARK: - Fetching
 
     private func fetch() async {
+        if resolvedUserId == nil { resolvedUserId = Self.signedInUserId() }
         do {
             let response: GetHomeEventsResponse = try await api.request(
                 HomesEndpoints.homeEvents(homeId: homeId)
             )
             events = response.events
+            // Members are best-effort (sequential, and *before* the derived
+            // fan-out, so the roster is the second request the stub sees in
+            // tests). Avatar stacks + filter chips degrade gracefully when
+            // the roster can't be fetched.
+            let occupants: OccupantsResponse? = try? await api.request(
+                HomesEndpoints.listOccupants(homeId: homeId)
+            )
+            if let occupants {
+                applyMembers(occupants.occupants)
+            }
             // Events are the primary read — the three derived feeds are
             // best-effort side-reads that must never fail the calendar.
             await fetchDerived()
@@ -230,16 +278,21 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         let tasks = await tasksResult
         let bills = await billsResult
         let packages = await packagesResult
+        // Drop anything whose due date will not resolve — an unplaceable row
+        // can never reach the agenda, and keeping it would make `derived`
+        // non-empty and so suppress the first-run empty state. Mirrors
+        // Android's `placeable` filter in `fetchDerived`.
         derived = HomeCalendarDerivedItem.build(
             tasks: tasks?.tasks ?? [],
             bills: bills?.bills ?? [],
             packages: packages?.packages ?? []
-        )
+        ).filter { HomeAgendaBuilder.parseInstant($0.dateISO, zone: timeZone) != nil }
     }
 
     // MARK: - State projection
 
     private func rebuild() {
+        rebuildAgenda()
         var cal = calendar
         cal.timeZone = timeZone
         let nowDate = now()
@@ -260,11 +313,15 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
             )
         }
         agenda += derived.compactMap { item in
-            guard let date = Self.parseIsoInstant(item.dateISO) else { return nil }
+            // Bare `yyyy-MM-dd` due dates anchor to midnight in the DISPLAY
+            // zone — see `derivedRow`.
+            guard let date = Self.parseIsoInstant(item.dateISO, zone: cal.timeZone) else {
+                return nil
+            }
             return AgendaEntry(
                 date: date,
                 isoDate: Self.isoDay(date, calendar: cal),
-                row: item.row(calendar: cal)
+                row: Self.derivedRow(item, start: date, calendar: cal)
             )
         }
         agenda.sort { $0.date < $1.date }
@@ -316,6 +373,36 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         onOpenEvent(eventId)
     }
 
+    /// Project one derived due-date into a `RowModel` for the `ListOfRowsState`
+    /// projection. `HomeCalendarDerivedItem.row` is the contract source for the
+    /// derived palette (its own label / icon / background / foreground) and for
+    /// the `detail ?? kind.label` subtitle, so it is reused wholesale; only the
+    /// time stamp is overridden. A bare `yyyy-MM-dd` due date is anchored to
+    /// midnight in the display zone, which the row's own UTC-pinned all-day
+    /// heuristic would then read as 07:00Z and print as "12:00 AM". A date-only
+    /// value has no clock time at all, so the row is all-day by construction.
+    /// Mirrors Android's `derivedRow`.
+    static func derivedRow(
+        _ item: HomeCalendarDerivedItem,
+        start: Date,
+        calendar cal: Calendar
+    ) -> RowModel {
+        let base = item.row(calendar: cal)
+        let timeLabel = HomeAgendaBuilder.isDateOnly(item.dateISO)
+            ? "All day"
+            : formatTime(start: start, endIso: nil, calendar: cal)
+        return RowModel(
+            id: base.id,
+            title: base.title,
+            subtitle: base.subtitle,
+            template: base.template,
+            leading: base.leading,
+            trailing: base.trailing,
+            chips: base.chips,
+            timeMeta: timeLabel
+        )
+    }
+
     // MARK: - Pure projections (test surface)
 
     /// Build the 7-day strip state. The `weekAnchorIsoDate` field drives
@@ -335,7 +422,9 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         let dowFmt = DateFormatter()
         dowFmt.locale = Locale(identifier: "en_US_POSIX")
         dowFmt.timeZone = cal.timeZone
-        dowFmt.dateFormat = "EEE"
+        // Narrow weekday — single initial ("S M T W T F S"), matching the
+        // home-shell `MonthStrip` (NOT the 3-letter `EEE` abbreviation).
+        dowFmt.dateFormat = "EEEEE"
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
         dayFmt.timeZone = cal.timeZone
@@ -624,11 +713,23 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         case next
     }
 
-    /// UTC-anchored Gregorian calendar — default for production VMs and
-    /// tests so date math is timezone-stable.
+    /// UTC-anchored Gregorian calendar — used by tests so date math is
+    /// timezone-stable, and by the all-day heuristic (the wire stores
+    /// all-day events at 00:00Z).
     public static var utcCalendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        cal.firstWeekday = 1 // Sunday — matches design's week strip.
+        return cal
+    }
+
+    /// Device-local Gregorian calendar (Sunday-first, matching the design's
+    /// week strip) — the production default so agenda times render at the
+    /// same wall time the add-event form composes instants from. Mirrors
+    /// Android's `ZoneId.systemDefault()` display zone.
+    public static var localCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
         cal.firstWeekday = 1 // Sunday — matches design's week strip.
         return cal
     }
@@ -655,7 +756,14 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
     /// Parse a full ISO-8601 timestamp (with or without fractional
     /// seconds). Accepts bare yyyy-MM-dd as a fallback so all-day events
     /// stored without a time component still flow through.
-    public static func parseIsoInstant(_ iso: String) -> Date? {
+    ///
+    /// A bare `yyyy-MM-dd` carries no zone (Postgres `date` columns —
+    /// `home_bills.due_date`), so `zone` decides which midnight it anchors to:
+    /// pass the display zone for derived due-dates so they bucket onto the day
+    /// the reader sees. Defaults to UTC, the wire convention timestamped
+    /// events are pinned to, so event parsing is unchanged. Same contract as
+    /// `HomeAgendaBuilder.parseInstant(_:zone:)`.
+    public static func parseIsoInstant(_ iso: String, zone: TimeZone? = nil) -> Date? {
         let withFrac = ISO8601DateFormatter()
         withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = withFrac.date(from: iso) { return d }
@@ -664,7 +772,7 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         if let d = plain.date(from: iso) { return d }
         let dayFmt = DateFormatter()
         dayFmt.locale = Locale(identifier: "en_US_POSIX")
-        dayFmt.timeZone = TimeZone(identifier: "UTC")
+        dayFmt.timeZone = zone ?? TimeZone(identifier: "UTC")
         dayFmt.dateFormat = "yyyy-MM-dd"
         return dayFmt.date(from: iso)
     }
@@ -741,9 +849,10 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
 
     /// "All day" heuristic — backend doesn't expose an explicit flag,
     /// so we treat events whose `start_at` lands at exactly midnight
-    /// UTC and that carry no `end_at` as all-day.
-    static func isAllDay(start: Date, calendar cal: Calendar) -> Bool {
-        let parts = cal.dateComponents([.hour, .minute, .second], from: start)
+    /// UTC and that carry no `end_at` as all-day. Pinned to UTC (the wire
+    /// convention) regardless of the display calendar passed by callers.
+    static func isAllDay(start: Date, calendar _: Calendar) -> Bool {
+        let parts = utcCalendar.dateComponents([.hour, .minute, .second], from: start)
         return (parts.hour ?? 0) == 0 && (parts.minute ?? 0) == 0 && (parts.second ?? 0) == 0
     }
 
@@ -759,5 +868,266 @@ public final class HomeCalendarViewModel: ListOfRowsDataSource {
         if upper.contains("FREQ=MONTHLY") { return "Repeats monthly" }
         if upper.contains("FREQ=DAILY") { return "Repeats daily" }
         return "Repeats"
+    }
+
+    // MARK: - I10 agenda projection + navigation
+
+    /// Build the member lookup + ordered roster from the occupants list.
+    private func applyMembers(_ occupants: [OccupantDTO]) {
+        var lookup: [String: HomeMember] = [:]
+        var order: [HomeMember] = []
+        for occupant in occupants where occupant.isActive {
+            let trimmed = occupant.displayName?.trimmingCharacters(in: .whitespaces) ?? ""
+            let name = trimmed.isEmpty ? (occupant.username ?? "Member") : trimmed
+            let member = HomeMember(
+                id: occupant.userId,
+                name: name,
+                isYou: occupant.userId == resolvedUserId
+            )
+            lookup[occupant.userId] = member
+            order.append(member)
+        }
+        members = lookup
+        memberOrder = order
+    }
+
+    /// Rebuild the bespoke agenda from the current events + member + day
+    /// filters. Runs alongside the RowSection projection in `rebuild()`.
+    func rebuildAgenda() {
+        var cal = calendar
+        cal.timeZone = timeZone
+        let onlyUser: String? = switch memberFilter {
+        case .all: nil
+        case .mine: resolvedUserId
+        case let .member(id, _): id
+        }
+        let nowDate = now()
+        let eventSections = HomeAgendaBuilder.sections(
+            events: events,
+            members: members,
+            now: nowDate,
+            calendar: cal,
+            timeZone: timeZone,
+            selectedIsoDate: selectedIsoDate,
+            onlyUserId: onlyUser
+        )
+        // Derived task / bill / package due dates share the agenda with the
+        // home's own events, under EVERY member filter including "Mine".
+        // They carry no household owner, so scoping them by assignee would
+        // hide them behind any chip but "All" — the empty-looking month the
+        // feed exists to prevent. It would also contradict the month strip,
+        // which counts its dots with no member filter applied: a day would
+        // show a dot while its agenda section came back empty.
+        let sections = agendaSectionsWithDerived(eventSections, now: nowDate, calendar: cal)
+        agendaSections = sections
+        if !sections.isEmpty {
+            agendaEmpty = nil
+        } else if events.isEmpty, derived.isEmpty {
+            agendaEmpty = .firstRun
+        } else if case let .member(_, name) = memberFilter {
+            agendaEmpty = .filteredMember(name: name)
+        } else if memberFilter == .mine {
+            agendaEmpty = .filteredMember(name: "you")
+        } else if selectedIsoDate != nil {
+            agendaEmpty = .filteredDay
+        } else {
+            agendaEmpty = .firstRun
+        }
+    }
+
+    /// Fold the derived task / bill / package due dates into the bespoke
+    /// agenda. `HomeAgendaBuilder` only speaks `CalendarEventDTO` (it is
+    /// shared with the gated scheduler, F15), so the derived rows are
+    /// projected here and merged into their day's section, time-ordered
+    /// alongside the events. Without this the derived feeds would only
+    /// reach the month-strip dots — the design's list renders
+    /// `agendaSections`, not the `ListOfRowsState` projection.
+    private func agendaSectionsWithDerived(
+        _ eventSections: [HomeAgendaSection],
+        now nowDate: Date,
+        calendar cal: Calendar
+    ) -> [HomeAgendaSection] {
+        guard !derived.isEmpty else { return eventSections }
+        let todayStart = cal.startOfDay(for: nowDate)
+        // Sort keys for the merge — events by `start_at`, derived rows by
+        // their due date, both keyed on the row id.
+        var instants: [String: Date] = [:]
+        for dto in events {
+            // Same anchor `HomeAgendaBuilder.sections` bucketed with — a bare
+            // date resolved at UTC here would sort against a locally-bucketed
+            // section and interleave wrongly.
+            guard let date = HomeAgendaBuilder.parseInstant(dto.startAt, zone: cal.timeZone) else { continue }
+            instants[dto.id] = date
+        }
+
+        var buckets: [String: [HomeAgendaItem]] = [:]
+        var order: [String] = []
+        for section in eventSections {
+            buckets[section.id] = section.items
+            order.append(section.id)
+        }
+        for item in derived {
+            // `zone: cal.timeZone` — a bill's `due_date` is a bare
+            // Postgres `date`, so it has no zone on the wire. Anchoring it at
+            // UTC midnight and then bucketing with the device-local calendar
+            // renders it a day early west of UTC, and drops an item due today
+            // through the `date >= todayStart` window below.
+            guard let date = HomeAgendaBuilder.parseInstant(
+                item.dateISO,
+                zone: cal.timeZone
+            ) else { continue }
+            let iso = Self.isoDay(date, calendar: cal)
+            // Same windowing the builder applies to events: the selected
+            // day when one is picked, otherwise today-forward only.
+            if let selected = selectedIsoDate {
+                guard iso == selected else { continue }
+            } else {
+                guard date >= todayStart else { continue }
+            }
+            instants[item.id] = date
+            if buckets[iso] == nil { order.append(iso) }
+            buckets[iso, default: []].append(
+                derivedAgendaItem(item, start: date, calendar: cal)
+            )
+        }
+
+        return order.sorted().map { iso in
+            let items = (buckets[iso] ?? []).enumerated().sorted { lhs, rhs in
+                let left = instants[lhs.element.id] ?? .distantPast
+                let right = instants[rhs.element.id] ?? .distantPast
+                if left == right { return lhs.offset < rhs.offset }
+                return left < right
+            }
+            return HomeAgendaSection(
+                id: iso,
+                header: HomeAgendaBuilder.header(forIso: iso, now: nowDate, calendar: cal),
+                items: items.map(\.element)
+            )
+        }
+    }
+
+    /// Project one derived due-date into the design's agenda row.
+    ///
+    /// - The status / amount rides the row's own `detail` slot, falling back to
+    ///   the kind label exactly as the `ListOfRowsState` subtitle does. It is
+    ///   never appended to the title: the title is `lineLimit(1)`, so the
+    ///   appended text would be the first thing ellipsised away.
+    /// - `derived` carries the kind through so the row renders its own
+    ///   label / icon / tint. `category` is inert on these rows — it exists
+    ///   only because the field is non-optional, hence `.generic`.
+    /// - A non-nil `derived` is also the read-only marker: the row card gives
+    ///   these rows no tap affordance at all (no button, no ripple), because
+    ///   they mirror surfaces that own their own screens.
+    private func derivedAgendaItem(
+        _ item: HomeCalendarDerivedItem,
+        start: Date,
+        calendar cal: Calendar
+    ) -> HomeAgendaItem {
+        // A bare `yyyy-MM-dd` due date carries no clock time, so the row is
+        // all-day by construction. Re-deriving it would ask the UTC-pinned
+        // midnight heuristic about a local-midnight anchor and get "12:00 AM".
+        // Timestamped derived dates (task `due_at`, package `expected_at`)
+        // still go through that shared heuristic, unchanged.
+        let allDay = HomeAgendaBuilder.isDateOnly(item.dateISO)
+            || Self.isAllDay(start: start, calendar: cal)
+        let (time, ampm) = HomeAgendaBuilder.timeParts(start, allDay: allDay, calendar: cal)
+        // `detail ?? kind.label`, blank-safe — the same predicate Android's
+        // `detail?.takeIf(String::isNotBlank) ?: kind.label` applies, so a
+        // whitespace-only status falls back to the kind label on both platforms.
+        let subtitle = item.detail.flatMap {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0
+        } ?? item.kind.label
+        return HomeAgendaItem(
+            id: item.id,
+            time: time,
+            ampm: ampm,
+            title: item.title,
+            category: .generic,
+            location: nil,
+            members: [],
+            isBooking: false,
+            bookingStatus: nil,
+            bookingId: nil,
+            eventId: nil,
+            derived: item.kind,
+            subtitle: subtitle
+        )
+    }
+
+    /// The filter chips: All · Mine · <each member>.
+    var filterChips: [MemberFilter] {
+        var chips: [MemberFilter] = [.all, .mine]
+        chips.append(contentsOf: memberOrder.map { .member(id: $0.id, name: $0.name) })
+        return chips
+    }
+
+    func selectFilter(_ filter: MemberFilter) {
+        memberFilter = filter
+        rebuildAgenda()
+    }
+
+    func clearMemberFilter() {
+        memberFilter = .all
+        rebuildAgenda()
+    }
+
+    /// Tap an agenda row: booking-union rows deep-link to the Scheduling
+    /// Booking Detail (E2) via the router; normal events open the home detail.
+    /// Derived task / bill / package rows are mirrors of surfaces that own
+    /// their own screens, so they stay read-only exactly as in RN's calendar —
+    /// they are the only rows that are neither a booking nor an event. The row
+    /// card also renders them without any tap affordance, so this guard is the
+    /// belt to that view-layer braces.
+    func openAgendaItem(_ item: HomeAgendaItem) {
+        guard item.derived == nil else { return }
+        guard item.isBooking || item.eventId != nil else { return }
+        if item.isBooking, let bookingId = item.bookingId {
+            presentedRoute = PresentedHomeRoute(
+                .bookingDetail(owner: .home(homeId: homeId), bookingId: bookingId)
+            )
+        } else {
+            onOpenEvent(item.eventId ?? item.id)
+        }
+    }
+
+    /// Home id exposed for the local cross-stream route presenter's owner
+    /// context. (The `homeId` stored prop stays private.)
+    var homeIdForRouting: String {
+        homeId
+    }
+
+    func openWhosFree() {
+        presentedRoute = PresentedHomeRoute(
+            .whosFree(homeId: homeId, tz: TimeZone.current.identifier)
+        )
+    }
+
+    func openCreateMenu() {
+        isCreateMenuPresented = true
+    }
+
+    /// Handle a create-menu selection. "Add event" reuses the host's
+    /// `onAddEvent`; the rest fan out to other-stream screens, presented
+    /// locally through the router.
+    func selectCreateAction(_ action: HomeCreateAction) {
+        isCreateMenuPresented = false
+        switch action {
+        case .addEvent:
+            onAddEvent()
+        case .findATime:
+            presentedRoute = PresentedHomeRoute(.findATimeSetup(homeId: homeId))
+        case .bookResource:
+            presentedRoute = PresentedHomeRoute(.resourceList(homeId: homeId))
+        case .scheduleVisit:
+            presentedRoute = PresentedHomeRoute(.scheduleVisit(homeId: homeId))
+        }
+    }
+
+    /// The signed-in member id, for the "Mine" filter.
+    static func signedInUserId() -> String? {
+        if case let .signedIn(user) = AuthManager.shared.state {
+            return user.id
+        }
+        return nil
     }
 }

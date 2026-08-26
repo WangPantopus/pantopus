@@ -67,6 +67,10 @@ import java.time.format.DateTimeFormatter
  * hosts the redemption-state CTA: Redeem primary while live, an
  * "Already redeemed" pill once flipped, and a terminal "Expired"
  * affordance.
+ *
+ * [today] is injectable so callers that must be deterministic — snapshot
+ * tests in particular — can pin the expiry comparison instead of reading
+ * the ambient clock. Production callers take the default.
  */
 @Composable
 fun CouponDetailLayout(
@@ -77,8 +81,9 @@ fun CouponDetailLayout(
     onRedeem: () -> Unit,
     onOpenSenderProfile: (String) -> Unit = {},
     onSaveToVault: () -> Unit = {},
+    today: LocalDate = LocalDate.now(),
 ) {
-    val state = bodyState(content, coupon)
+    val state = bodyState(content, coupon, today)
     Box(modifier = Modifier.testTag("mailDetail_coupon")) {
         MailItemDetailShell(
             topBar = makeTopBar(content = content, onBack = onBack, onSaveToVault = onSaveToVault),
@@ -103,6 +108,7 @@ fun CouponDetailLayout(
 private fun bodyState(
     content: MailDetailContent,
     coupon: CouponDetailDto,
+    today: LocalDate,
 ): CouponBodyState {
     if (content.isAcknowledged) return CouponBodyState.Redeemed
     val raw = coupon.expiresAt?.takeIf { it.isNotBlank() } ?: return CouponBodyState.Unused
@@ -110,7 +116,7 @@ private fun bodyState(
         runCatching { OffsetDateTime.parse(raw).toLocalDate() }.getOrNull()
             ?: runCatching { LocalDate.parse(raw) }.getOrNull()
             ?: runCatching { LocalDate.parse(raw, DateTimeFormatter.ofPattern("yyyy-MM-dd")) }.getOrNull()
-    return if (parsed != null && parsed.isBefore(LocalDate.now())) {
+    return if (parsed != null && parsed.isBefore(today)) {
         CouponBodyState.Expired
     } else {
         CouponBodyState.Unused

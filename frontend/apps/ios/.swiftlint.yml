@@ -11,6 +11,9 @@ included:
 excluded:
   - build
   - DerivedData
+  # Workspace-local SPM checkouts (third-party sources). Linting them after a local
+  # `xcodebuild` buried the project's own 6 violations under ~12.8k from sentry-cocoa.
+  - SourcePackages
   - .build
   - fastlane
   - Pantopus.xcodeproj
