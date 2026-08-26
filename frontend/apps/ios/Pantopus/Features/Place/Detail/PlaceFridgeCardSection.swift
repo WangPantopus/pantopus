@@ -26,7 +26,9 @@ final class PlaceFridgeCardViewModel {
 
     private(set) var state: State = .loading
     private(set) var isIssuing = false
-    private(set) var toast: String?
+    // (message, isError): a failed issue must never render in
+    // confirmation green — the person may believe a link was copied.
+    private(set) var toast: (message: String, isError: Bool)?
     var label = ""
     var drafts: [FridgeCardSectionKey: [FridgeCardItem]] = [:]
     private var seeded = false
@@ -110,18 +112,18 @@ final class PlaceFridgeCardViewModel {
                 )
             )
             UIPasteboard.general.string = response.card.cardUrl
-            toast = "Card issued — link copied. Open it to print for the fridge."
+            toast = ("Card issued — link copied. Open it to print for the fridge.", false)
             await load()
         } catch let error as APIError {
-            toast = error.errorDescription ?? "Couldn't issue the card."
+            toast = (error.errorDescription ?? "Couldn't issue the card.", true)
         } catch {
-            toast = "Couldn't issue the card."
+            toast = ("Couldn't issue the card.", true)
         }
     }
 
     func copyLink(_ card: FridgeCard) {
         UIPasteboard.general.string = card.cardUrl
-        toast = "Card link copied."
+        toast = ("Card link copied.", false)
     }
 
     func revoke(_ cardId: String) async {
@@ -129,7 +131,7 @@ final class PlaceFridgeCardViewModel {
             _ = try await api.request(
                 FridgeCardsEndpoints.revoke(homeId: homeId, cardId: cardId)
             ) as FridgeCardResponse
-            toast = "Card revoked — its page now shows none of its content."
+            toast = ("Card revoked — its page now shows none of its content.", false)
             await load()
         } catch {
             await load()
@@ -162,9 +164,9 @@ struct PlaceFridgeCardSection: View {
             composer
             cardsList
             if let toast = vm.toast {
-                Text(toast)
+                Text(toast.message)
                     .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.Color.success)
+                    .foregroundStyle(toast.isError ? Theme.Color.error : Theme.Color.success)
                     .task {
                         try? await Task.sleep(for: .seconds(3))
                         vm.clearToast()

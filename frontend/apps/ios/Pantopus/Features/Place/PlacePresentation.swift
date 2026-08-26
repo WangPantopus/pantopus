@@ -83,6 +83,24 @@ enum PlacePresentation {
         return f.string(from: d)
     }
 
+    /// "Mar 2023" from a bare calendar month ("2023-03"). NEVER routed
+    /// through an instant: midnight-UTC-on-the-1st formatted in a
+    /// US-local zone is the previous day — every US timezone rendered
+    /// the user's one entered fact as the WRONG month.
+    static func fmtYearMonth(_ yearMonth: String?) -> String? {
+        guard let raw = yearMonth?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        let parse = DateFormatter()
+        parse.locale = Locale(identifier: "en_US_POSIX")
+        parse.timeZone = TimeZone(identifier: "UTC")
+        parse.dateFormat = "yyyy-MM"
+        guard let date = parse.date(from: raw) else { return nil }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.timeZone = TimeZone(identifier: "UTC")
+        out.dateFormat = "MMM yyyy"
+        return out.string(from: date)
+    }
+
     /// Parses a LOCAL wall-clock datetime with no zone or seconds
     /// ("2026-06-12T05:19") — the shape sunrise/sunset arrive in.
     private static let localDateTimeFormatter: DateFormatter = {

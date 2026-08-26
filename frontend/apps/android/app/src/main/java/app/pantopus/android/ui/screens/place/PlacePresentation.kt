@@ -97,6 +97,24 @@ object PlacePresentation {
     }
 
     /**
+     * "Mar 2023" from a bare calendar month ("2023-03"). NEVER routed
+     * through an instant: midnight-UTC-on-the-1st formatted in a
+     * US-local zone is the previous day — every US timezone rendered
+     * the user's one entered fact as the WRONG month.
+     */
+    fun fmtYearMonth(yearMonth: String?): String? {
+        val raw = yearMonth?.trim().orEmpty()
+        if (raw.isEmpty()) return null
+        return try {
+            java.time.YearMonth
+                .parse(raw)
+                .format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.US))
+        } catch (_: java.time.format.DateTimeParseException) {
+            null
+        }
+    }
+
+    /**
      * "6:42a" — the compact sun clock. Sunrise/sunset arrive as LOCAL
      * wall-clock with no zone or seconds ("2026-06-12T05:19"), so parse
      * them as a LocalDateTime and read the hour/minute directly (no zone

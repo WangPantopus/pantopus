@@ -87,6 +87,7 @@ fun PlaceResidencyPassSection(viewModel: PlaceDetailViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ResidencyPassComposer(viewModel)
+        PlaceActionToastLine(viewModel)
         when (val current = state) {
             is ResidencyClaimsUiState.Loading -> Unit
             is ResidencyClaimsUiState.Error ->

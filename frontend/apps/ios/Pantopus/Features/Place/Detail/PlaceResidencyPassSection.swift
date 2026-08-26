@@ -26,7 +26,9 @@ final class PlaceResidencyPassViewModel {
 
     private(set) var state: State = .loading
     private(set) var isIssuing = false
-    private(set) var toast: String?
+    // (message, isError): a failed issue must never render in
+    // confirmation green — the person may believe a link was copied.
+    private(set) var toast: (message: String, isError: Bool)?
     var scope: ResidencyClaimScope = .city
     var expiresInDays = 30
     let homeId: String
@@ -61,18 +63,18 @@ final class PlaceResidencyPassViewModel {
                 )
             )
             UIPasteboard.general.string = response.claim.verifyUrl
-            toast = "Claim issued — verification link copied."
+            toast = ("Claim issued — verification link copied.", false)
             await load()
         } catch let error as APIError {
-            toast = error.errorDescription ?? "Couldn't issue the claim."
+            toast = (error.errorDescription ?? "Couldn't issue the claim.", true)
         } catch {
-            toast = "Couldn't issue the claim."
+            toast = ("Couldn't issue the claim.", true)
         }
     }
 
     func copyLink(_ claim: ResidencyClaim) {
         UIPasteboard.general.string = claim.verifyUrl
-        toast = "Verification link copied."
+        toast = ("Verification link copied.", false)
     }
 
     func revoke(_ claimId: String) async {
@@ -80,7 +82,7 @@ final class PlaceResidencyPassViewModel {
             _ = try await api.request(
                 ResidencyClaimsEndpoints.revoke(homeId: homeId, claimId: claimId)
             ) as ResidencyClaimResponse
-            toast = "Claim revoked — its link no longer checks out as valid."
+            toast = ("Claim revoked — its link no longer checks out as valid.", false)
             await load()
         } catch {
             await load()
@@ -115,9 +117,9 @@ struct PlaceResidencyPassSection: View {
             composer
             claimsList
             if let toast = vm.toast {
-                Text(toast)
+                Text(toast.message)
                     .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Theme.Color.success)
+                    .foregroundStyle(toast.isError ? Theme.Color.error : Theme.Color.success)
                     .task {
                         try? await Task.sleep(for: .seconds(3))
                         vm.clearToast()

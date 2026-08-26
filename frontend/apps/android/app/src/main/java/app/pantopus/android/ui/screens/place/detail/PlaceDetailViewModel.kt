@@ -99,6 +99,20 @@ class PlaceDetailViewModel
             }
         }
 
+        // ── Action feedback (claims + fridge cards) ──────────────
+        // One consumable toast for issue/revoke outcomes, mirroring the
+        // iOS sections' vm.toast. Android used to swallow every failure
+        // (`Failure -> Unit`): a 403/422/rate-limit stopped the spinner
+        // with no card, no copy, and no message — and below API 33 even
+        // success was silent.
+
+        private val _actionToast = MutableStateFlow<PlaceActionToast?>(null)
+        val actionToast: StateFlow<PlaceActionToast?> = _actionToast.asStateFlow()
+
+        fun consumeActionToast() {
+            _actionToast.value = null
+        }
+
         // ── Residency Pass — scoped live claims (Identity, T4) ───
 
         private val _claims = MutableStateFlow<ResidencyClaimsUiState>(ResidencyClaimsUiState.Loading)
@@ -128,8 +142,13 @@ class PlaceDetailViewModel
             viewModelScope.launch {
                 _isIssuingClaim.value = true
                 when (val r = repo.issueResidencyClaim(homeId, scope, expiresInDays)) {
-                    is NetworkResult.Success -> _claimLinkToCopy.value = r.data.claim.verifyUrl
-                    is NetworkResult.Failure -> Unit
+                    is NetworkResult.Success -> {
+                        _claimLinkToCopy.value = r.data.claim.verifyUrl
+                        _actionToast.value = PlaceActionToast("Claim issued — verification link copied.", isError = false)
+                    }
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't issue the claim."), isError = true)
                 }
                 _isIssuingClaim.value = false
                 loadClaims()
@@ -142,7 +161,12 @@ class PlaceDetailViewModel
 
         fun revokeClaim(claimId: String) {
             viewModelScope.launch {
-                repo.revokeResidencyClaim(homeId, claimId)
+                when (val r = repo.revokeResidencyClaim(homeId, claimId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't revoke the claim."), isError = true)
+                }
                 loadClaims()
             }
         }
@@ -188,8 +212,13 @@ class PlaceDetailViewModel
             viewModelScope.launch {
                 _isIssuingCard.value = true
                 when (val r = repo.issueFridgeCard(homeId, body)) {
-                    is NetworkResult.Success -> _cardLinkToCopy.value = r.data.card.cardUrl
-                    is NetworkResult.Failure -> Unit
+                    is NetworkResult.Success -> {
+                        _cardLinkToCopy.value = r.data.card.cardUrl
+                        _actionToast.value = PlaceActionToast("Card issued — link copied.", isError = false)
+                    }
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't issue the card."), isError = true)
                 }
                 _isIssuingCard.value = false
                 loadFridgeCards()
@@ -202,7 +231,12 @@ class PlaceDetailViewModel
 
         fun revokeFridgeCard(cardId: String) {
             viewModelScope.launch {
-                repo.revokeFridgeCard(homeId, cardId)
+                when (val r = repo.revokeFridgeCard(homeId, cardId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't revoke the card."), isError = true)
+                }
                 loadFridgeCards()
             }
         }
@@ -241,16 +275,28 @@ class PlaceDetailViewModel
             }
         }
 
+        /** Save failures stay INLINE — never collapse the form to Error. */
+        private val _watchSaveError = MutableStateFlow<String?>(null)
+        val watchSaveError: StateFlow<String?> = _watchSaveError.asStateFlow()
+
         fun setRateWatch(month: String) {
             if (month.isBlank()) return
             viewModelScope.launch {
                 _isSavingWatch.value = true
-                _rateWatch.value =
-                    when (val r = repo.setRecordWatch(homeId, month.trim())) {
-                        is NetworkResult.Success ->
+                _watchSaveError.value = null
+                // A save failure (typo month, out-of-range, transient 500)
+                // keeps the current state — the form, with the typed month
+                // still in it — and reports inline. Replacing the whole
+                // section with a dead-end Error card turned a one-character
+                // typo into an apparent feature outage with no way back.
+                when (val r = repo.setRecordWatch(homeId, month.trim())) {
+                    is NetworkResult.Success -> {
+                        _rateWatch.value =
                             r.data.watch?.let { RateWatchUiState.Loaded(it) } ?: RateWatchUiState.None
-                        is NetworkResult.Failure -> RateWatchUiState.Error(r.error.displayMessage("Couldn't save the watch."))
                     }
+                    is NetworkResult.Failure ->
+                        _watchSaveError.value = r.error.displayMessage("Couldn't save the watch.")
+                }
                 _isSavingWatch.value = false
             }
         }
@@ -262,6 +308,9 @@ class PlaceDetailViewModel
             }
         }
     }
+
+/** One consumable outcome message for the claim/card composers. */
+data class PlaceActionToast(val message: String, val isError: Boolean)
 
 sealed interface ResidencyClaimsUiState {
     data object Loading : ResidencyClaimsUiState

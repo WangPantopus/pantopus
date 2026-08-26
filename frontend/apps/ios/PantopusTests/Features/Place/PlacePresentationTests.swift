@@ -49,6 +49,17 @@ final class PlacePresentationTests: XCTestCase {
         XCTAssertNotNil(reading.value)
     }
 
+    func testFmtYearMonthNeverShiftsACalendarMonthThroughATimezone() {
+        // Regression: "YYYY-MM" + "-01T00:00:00Z" formatted in a US-local
+        // zone rendered the PREVIOUS month — the user's one entered fact
+        // shown wrong, and the PMMS baseline attributed to the wrong month.
+        XCTAssertEqual(PlacePresentation.fmtYearMonth("2023-03"), "Mar 2023")
+        XCTAssertEqual(PlacePresentation.fmtYearMonth("2026-01"), "Jan 2026")
+        XCTAssertEqual(PlacePresentation.fmtYearMonth("2025-12"), "Dec 2025")
+        XCTAssertNil(PlacePresentation.fmtYearMonth("not-a-month"))
+        XCTAssertNil(PlacePresentation.fmtYearMonth(nil))
+    }
+
     func testSunriseSunsetFormatsLocalWallClock() throws {
         // Sunrise/sunset arrive as zone-less local times ("…T05:19").
         let intel = try intelligence()

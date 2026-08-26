@@ -72,6 +72,7 @@ fun PlaceFridgeCardSection(viewModel: PlaceDetailViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FridgeCardComposer(viewModel)
+        PlaceActionToastLine(viewModel)
         when (val current = state) {
             is FridgeCardsUiState.Loading -> Unit
             is FridgeCardsUiState.Error ->
@@ -176,8 +177,13 @@ private fun FridgeSectionEditor(
             FridgeItemRow(
                 item = item,
                 placeholder = placeholder,
-                onChange = { items[index] = it },
-                onRemove = { items.removeAt(index) },
+                // Bounds-guarded like the iOS twin: the lambdas capture the
+                // composition-time index, and an IME commit racing a ✕ tap
+                // in the same frame can fire against a shrunken list —
+                // items[staleIndex] would crash, removeAt would delete the
+                // wrong row.
+                onChange = { if (index < items.size) items[index] = it },
+                onRemove = { if (index < items.size) items.removeAt(index) },
             )
         }
         HorizontalDivider(color = PantopusColors.appBorderSubtle)

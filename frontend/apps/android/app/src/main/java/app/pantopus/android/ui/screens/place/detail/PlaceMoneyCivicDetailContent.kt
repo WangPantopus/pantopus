@@ -152,7 +152,18 @@ private fun RateWatchSection(viewModel: PlaceDetailViewModel) {
         is RateWatchUiState.Loading ->
             PlaceDetailCard { Text("Loading your watch…", fontSize = 13.5.sp, color = PantopusColors.appTextMuted) }
         is RateWatchUiState.Error ->
-            PlaceDetailCard { Text(current.message, fontSize = 13.5.sp, color = PantopusColors.appTextMuted) }
+            PlaceDetailCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(current.message, fontSize = 13.5.sp, color = PantopusColors.appTextMuted)
+                    Text(
+                        "Try again",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PantopusColors.primary600,
+                        modifier = Modifier.clickable { viewModel.loadRateWatch() },
+                    )
+                }
+            }
         is RateWatchUiState.None -> RateWatchForm(viewModel)
         is RateWatchUiState.Loaded -> RateWatchCard(current.watch, viewModel)
     }
@@ -162,6 +173,10 @@ private fun RateWatchSection(viewModel: PlaceDetailViewModel) {
 private fun RateWatchForm(viewModel: PlaceDetailViewModel) {
     var month by remember { mutableStateOf("") }
     val isSaving by viewModel.isSavingWatch.collectAsStateWithLifecycle()
+    // A rejected save (typo month, out-of-range) keeps the form — with
+    // the typed month — and reports here, instead of collapsing the
+    // whole section into a dead-end error card.
+    val saveError by viewModel.watchSaveError.collectAsStateWithLifecycle()
     PlaceDetailCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
@@ -184,6 +199,9 @@ private fun RateWatchForm(viewModel: PlaceDetailViewModel) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            saveError?.let {
+                Text(it, fontSize = 12.5.sp, color = PantopusColors.error)
+            }
             PrimaryButton(
                 title = if (isSaving) "Saving…" else "Start watching",
                 isLoading = isSaving,
@@ -206,7 +224,7 @@ private fun RateWatchCard(
     watch: RecordWatch,
     viewModel: PlaceDetailViewModel,
 ) {
-    val monthLabel = PlacePresentation.fmtMonthYear(watch.loanRecordedMonth + "-01T00:00:00Z") ?: watch.loanRecordedMonth
+    val monthLabel = PlacePresentation.fmtYearMonth(watch.loanRecordedMonth) ?: watch.loanRecordedMonth
     val ev = watch.evaluation
     PlaceDetailCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
