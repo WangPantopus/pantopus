@@ -72,6 +72,29 @@ final class PlaceWaveDTOsTests: XCTestCase {
         XCTAssertEqual(response.claims[1].status, .expired)
     }
 
+    func testDecodesFridgeCardAndKeepsUnknownSections() throws {
+        let json = """
+        {"cards":[{"id":"f1","home_id":"h1","label":"Sitter card","status":"active",
+          "card_code":"ABCD-EFGH-JKMN-PQRS","card_url":"https://pantopus.com/fridge-card/ABCD-EFGH-JKMN-PQRS",
+          "content":{"address":{"line1":"1421 SE Oak St Unit B","city_state_zip":"Portland, OR 97214"},
+            "sections":[
+              {"key":"household","items":[{"label":"Mia (6)","note":"Peanut allergy"}]},
+              {"key":"evacuation_routes","items":[{"label":"Meet","note":"At the oak tree"}]}]},
+          "issued_at":"2026-08-25T00:00:00.000Z","revoked_at":null,"view_count":2,"last_viewed_at":null}]}
+        """
+        let response = try decoder.decode(FridgeCardsResponse.self, from: Data(json.utf8))
+        let card = try XCTUnwrap(response.cards.first)
+        XCTAssertEqual(card.status, .active)
+        // The address block is server-derived and always present.
+        XCTAssertEqual(card.content.address.line1, "1421 SE Oak St Unit B")
+        XCTAssertEqual(card.content.sections.count, 2)
+        XCTAssertEqual(card.content.sections[0].key, .known(.household))
+        // A section key this build has never heard of still decodes and
+        // still carries its items — household safety data never hides.
+        XCTAssertEqual(card.content.sections[1].key, .unknown("evacuation_routes"))
+        XCTAssertEqual(card.content.sections[1].items.first?.note, "At the oak tree")
+    }
+
     func testDecodesRecordWatchWithEvaluation() throws {
         let json = """
         {"watch":{"id":"w1","home_id":"home-1","loan_recorded_month":"2023-03",

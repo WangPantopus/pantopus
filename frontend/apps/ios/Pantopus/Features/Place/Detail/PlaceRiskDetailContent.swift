@@ -12,6 +12,13 @@ import SwiftUI
 struct PlaceRiskDetailContent: View {
     let intel: PlaceIntelligence
     let vm: PlaceDetailViewModel
+    @State private var fridge: PlaceFridgeCardViewModel
+
+    init(intel: PlaceIntelligence, vm: PlaceDetailViewModel) {
+        self.intel = intel
+        self.vm = vm
+        _fridge = State(initialValue: PlaceFridgeCardViewModel(homeId: vm.homeId))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,6 +57,20 @@ struct PlaceRiskDetailContent: View {
             PlaceDetailSectionLabel(text: "Emergency plan")
             EmergencyChecklist()
             PlaceSourceNote(name: "Ready.gov · American Red Cross", asOf: nil)
+
+            PlaceDetailSectionLabel(text: "Fridge card")
+            if intel.tier == .t4 {
+                PlaceFridgeCardSection(vm: fridge)
+                    .task { await fridge.load() }
+            } else {
+                PlaceLockedCard(
+                    icon: .heartPulse,
+                    title: "The 911-ready household card",
+                    reason: "Verify your address to issue a fridge card — its headline is the verified address a caller reads to 911.",
+                    cta: "Verify address",
+                    onTap: nil
+                )
+            }
         }
     }
 

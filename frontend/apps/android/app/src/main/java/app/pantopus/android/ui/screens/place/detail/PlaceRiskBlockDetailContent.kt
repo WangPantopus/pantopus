@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,10 +34,12 @@ import app.pantopus.android.data.api.models.place.PlaceHeatColdData
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
+import app.pantopus.android.data.api.models.place.PlaceTier
 import app.pantopus.android.ui.screens.place.PlacePresentation
 import app.pantopus.android.ui.screens.place.components.PlaceChip
 import app.pantopus.android.ui.screens.place.components.PlaceDensityCard
 import app.pantopus.android.ui.screens.place.components.PlaceIconTile
+import app.pantopus.android.ui.screens.place.components.PlaceLockedCard
 import app.pantopus.android.ui.screens.place.components.PlaceTileTone
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
@@ -44,7 +47,10 @@ import app.pantopus.android.ui.theme.PantopusIcon
 // ─── Risk & readiness (C5) ───────────────────────────────────
 
 @Composable
-fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
+fun PlaceRiskDetailContent(
+    intel: PlaceIntelligence,
+    viewModel: PlaceDetailViewModel,
+) {
     // Heat & cold leads: it is the only thing here with a forecast horizon
     // short enough to act on today. Everything below it is a standing fact.
     intel.section(PlaceSectionId.HEAT_COLD)?.let { env ->
@@ -79,6 +85,22 @@ fun PlaceRiskDetailContent(intel: PlaceIntelligence) {
     PlaceDetailSectionLabel("Emergency plan")
     EmergencyChecklist()
     PlaceSourceNote("Ready.gov · American Red Cross")
+
+    PlaceDetailSectionLabel("Fridge card")
+    if (intel.tier == PlaceTier.T4) {
+        LaunchedEffect(Unit) { viewModel.loadFridgeCards() }
+        PlaceFridgeCardSection(viewModel)
+    } else {
+        PlaceLockedCard(
+            title = "The 911-ready household card",
+            reason =
+                "Verify your address to issue a fridge card — its headline is the verified " +
+                    "address a caller reads to 911.",
+            cta = "Verify address",
+            icon = PantopusIcon.HeartPulse,
+            onTap = null,
+        )
+    }
 }
 
 /**

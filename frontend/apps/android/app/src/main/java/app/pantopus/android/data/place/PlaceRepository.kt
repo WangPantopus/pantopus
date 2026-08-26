@@ -1,6 +1,10 @@
 package app.pantopus.android.data.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
+import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
+import app.pantopus.android.data.api.models.place.FridgeCardResponse
+import app.pantopus.android.data.api.models.place.FridgeCardsResponse
+import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
 import app.pantopus.android.data.api.models.place.IssueResidencyClaimRequest
 import app.pantopus.android.data.api.models.place.IssueResidencyLetterRequest
 import app.pantopus.android.data.api.models.place.MailboxCheckResponse
@@ -27,7 +31,9 @@ import app.pantopus.android.data.api.models.place.SetRecordWatchRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
+import app.pantopus.android.data.api.services.FridgeCardsApi
 import app.pantopus.android.data.api.services.GeoApi
+import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.PlaceApi
@@ -47,7 +53,7 @@ import javax.inject.Singleton
 @Singleton
 // A deliberately flat façade over the Place feature's five APIs —
 // cohesive by design; the count grows one wave at a time.
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 class PlaceRepository
     @Inject
     constructor(
@@ -55,10 +61,12 @@ class PlaceRepository
         private val neighborMessagesApi: NeighborMessagesApi,
         private val residencyClaimsApi: ResidencyClaimsApi,
         private val residencyLettersApi: ResidencyLettersApi,
+        private val fridgeCardsApi: FridgeCardsApi,
         private val mailboxCheckApi: MailboxCheckApi,
         private val recordWatchApi: RecordWatchApi,
         private val aiApi: AIApi,
         private val geoApi: GeoApi,
+        private val homesApi: HomesApi,
     ) {
         /** Address typeahead for the signed-out funnel (keyless). */
         suspend fun geoAutocomplete(query: String): NetworkResult<GeoAutocompleteResponse> = safeApiCall { geoApi.autocomplete(query) }
@@ -163,6 +171,24 @@ class PlaceRepository
             homeId: String,
             claimId: String,
         ): NetworkResult<ResidencyClaimResponse> = safeApiCall { residencyClaimsApi.revoke(homeId, claimId) }
+
+        /** The home's existing emergency info — the fridge-card utilities pre-seed. */
+        suspend fun homeEmergencies(homeId: String): NetworkResult<GetHomeEmergenciesResponse> =
+            safeApiCall { homesApi.getHomeEmergencies(homeId) }
+
+        // ── Fridge cards — the 911-ready household card (Wave 1) ─
+
+        suspend fun fridgeCards(homeId: String): NetworkResult<FridgeCardsResponse> = safeApiCall { fridgeCardsApi.list(homeId) }
+
+        suspend fun issueFridgeCard(
+            homeId: String,
+            body: IssueFridgeCardRequest,
+        ): NetworkResult<FridgeCardResponse> = safeApiCall { fridgeCardsApi.issue(homeId, body) }
+
+        suspend fun revokeFridgeCard(
+            homeId: String,
+            cardId: String,
+        ): NetworkResult<FridgeCardResponse> = safeApiCall { fridgeCardsApi.revoke(homeId, cardId) }
 
         /** The mailbox reality check (Wave 1, #3) — read-only diagnostic. */
         suspend fun mailboxCheck(homeId: String): NetworkResult<MailboxCheckResponse> = safeApiCall { mailboxCheckApi.check(homeId) }

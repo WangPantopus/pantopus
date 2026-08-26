@@ -3,6 +3,8 @@ package app.pantopus.android.ui.screens.place.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.pantopus.android.data.api.models.place.FridgeCardItem
+import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
@@ -26,6 +28,8 @@ const val PLACE_DETAIL_SLUG_KEY = "slug"
  * states; the screen extracts the page's sections via [PlaceDetailGroup].
  * Mirrors the iOS `PlaceDetailViewModel`.
  */
+private const val MAX_SEED_ITEMS = 12
+
 @HiltViewModel
 class PlaceDetailViewModel
     @Inject
@@ -143,6 +147,66 @@ class PlaceDetailViewModel
             }
         }
 
+        // ── Fridge cards — 911-ready household card (Risk, T4) ───
+
+        private val _fridgeCards = MutableStateFlow<FridgeCardsUiState>(FridgeCardsUiState.Loading)
+        val fridgeCards: StateFlow<FridgeCardsUiState> = _fridgeCards.asStateFlow()
+
+        private val _isIssuingCard = MutableStateFlow(false)
+        val isIssuingCard: StateFlow<Boolean> = _isIssuingCard.asStateFlow()
+
+        /** The card link the UI should copy to the clipboard, once. */
+        private val _cardLinkToCopy = MutableStateFlow<String?>(null)
+        val cardLinkToCopy: StateFlow<String?> = _cardLinkToCopy.asStateFlow()
+
+        /** Utilities pre-seed from the home's existing emergency info. */
+        private val _utilitySeed = MutableStateFlow<List<FridgeCardItem>>(emptyList())
+        val utilitySeed: StateFlow<List<FridgeCardItem>> = _utilitySeed.asStateFlow()
+
+        fun loadFridgeCards() {
+            viewModelScope.launch {
+                _fridgeCards.value =
+                    when (val r = repo.fridgeCards(homeId)) {
+                        is NetworkResult.Success -> FridgeCardsUiState.Loaded(r.data.cards)
+                        is NetworkResult.Failure -> FridgeCardsUiState.Error(r.error.displayMessage("Couldn't load the cards."))
+                    }
+                if (_utilitySeed.value.isEmpty()) {
+                    when (val r = repo.homeEmergencies(homeId)) {
+                        is NetworkResult.Success ->
+                            _utilitySeed.value =
+                                r.data.emergencies
+                                    .filter { it.label.isNotBlank() }
+                                    .take(MAX_SEED_ITEMS)
+                                    .map { FridgeCardItem(label = it.label, note = it.location.orEmpty()) }
+                        is NetworkResult.Failure -> Unit
+                    }
+                }
+            }
+        }
+
+        fun issueFridgeCard(body: IssueFridgeCardRequest) {
+            viewModelScope.launch {
+                _isIssuingCard.value = true
+                when (val r = repo.issueFridgeCard(homeId, body)) {
+                    is NetworkResult.Success -> _cardLinkToCopy.value = r.data.card.cardUrl
+                    is NetworkResult.Failure -> Unit
+                }
+                _isIssuingCard.value = false
+                loadFridgeCards()
+            }
+        }
+
+        fun consumeCardLink() {
+            _cardLinkToCopy.value = null
+        }
+
+        fun revokeFridgeCard(cardId: String) {
+            viewModelScope.launch {
+                repo.revokeFridgeCard(homeId, cardId)
+                loadFridgeCards()
+            }
+        }
+
         // ── Mailbox reality check (Identity detail) ──────────────
 
         private val _mailboxCheck = MutableStateFlow<MailboxCheckUiState>(MailboxCheckUiState.Loading)
@@ -205,6 +269,14 @@ sealed interface ResidencyClaimsUiState {
     data class Loaded(val claims: List<app.pantopus.android.data.api.models.place.ResidencyClaim>) : ResidencyClaimsUiState
 
     data class Error(val message: String) : ResidencyClaimsUiState
+}
+
+sealed interface FridgeCardsUiState {
+    data object Loading : FridgeCardsUiState
+
+    data class Loaded(val cards: List<app.pantopus.android.data.api.models.place.FridgeCard>) : FridgeCardsUiState
+
+    data class Error(val message: String) : FridgeCardsUiState
 }
 
 sealed interface MailboxCheckUiState {
