@@ -26,6 +26,8 @@ export interface BlockStatus {
   established_at?: string | null;
   /** Raw verified-homes count — T4 insiders only, by server contract. */
   verified_count?: number;
+  /** Rent reports in the cell — what the `real_rent` meter counts (Wave 3). */
+  rent_reports?: number;
   meters?: BlockMeter[];
   invites_remaining?: number;
   invites_weekly_cap?: number;

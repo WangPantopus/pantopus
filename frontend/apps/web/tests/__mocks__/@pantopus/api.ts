@@ -152,6 +152,12 @@ export const blockFounders = {
   sendBlockInvite: jest.fn(),
   redeemInviteOptOut: jest.fn(),
 };
+// Place — the Real Rent Benchmark, resident contribution half (Wave 3).
+export const realRent = {
+  getRentReport: jest.fn(),
+  setRentReport: jest.fn(),
+  deleteRentReport: jest.fn(),
+};
 // Place — mailbox reality check (Wave 1, #3).
 export const mailboxCheck = {
   getMailboxCheck: jest.fn(),

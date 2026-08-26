@@ -2,6 +2,10 @@ package app.pantopus.android.data.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
 import app.pantopus.android.data.api.models.homes.GetHomeEmergenciesResponse
+import app.pantopus.android.data.api.models.place.BlockInviteRecipient
+import app.pantopus.android.data.api.models.place.BlockInviteRequest
+import app.pantopus.android.data.api.models.place.BlockInviteResult
+import app.pantopus.android.data.api.models.place.BlockStatusResponse
 import app.pantopus.android.data.api.models.place.FridgeCardResponse
 import app.pantopus.android.data.api.models.place.FridgeCardsResponse
 import app.pantopus.android.data.api.models.place.IssueFridgeCardRequest
@@ -18,6 +22,8 @@ import app.pantopus.android.data.api.models.place.ReceivedNeighborMessage
 import app.pantopus.android.data.api.models.place.ReceivedNeighborMessagesResponse
 import app.pantopus.android.data.api.models.place.RecordWatchResponse
 import app.pantopus.android.data.api.models.place.RemoveRecordWatchResponse
+import app.pantopus.android.data.api.models.place.RemoveRentReportResponse
+import app.pantopus.android.data.api.models.place.RentReportResponse
 import app.pantopus.android.data.api.models.place.ReplyNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.ReportNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.ResidencyClaimResponse
@@ -28,15 +34,18 @@ import app.pantopus.android.data.api.models.place.ResidencyLettersResponse
 import app.pantopus.android.data.api.models.place.SendNeighborMessageRequest
 import app.pantopus.android.data.api.models.place.SentNeighborMessage
 import app.pantopus.android.data.api.models.place.SetRecordWatchRequest
+import app.pantopus.android.data.api.models.place.SetRentReportRequest
 import app.pantopus.android.data.api.net.NetworkResult
 import app.pantopus.android.data.api.net.safeApiCall
 import app.pantopus.android.data.api.services.AIApi
+import app.pantopus.android.data.api.services.BlockFoundersApi
 import app.pantopus.android.data.api.services.FridgeCardsApi
 import app.pantopus.android.data.api.services.GeoApi
 import app.pantopus.android.data.api.services.HomesApi
 import app.pantopus.android.data.api.services.MailboxCheckApi
 import app.pantopus.android.data.api.services.NeighborMessagesApi
 import app.pantopus.android.data.api.services.PlaceApi
+import app.pantopus.android.data.api.services.RealRentApi
 import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.ResidencyClaimsApi
 import app.pantopus.android.data.api.services.ResidencyLettersApi
@@ -64,6 +73,8 @@ class PlaceRepository
         private val fridgeCardsApi: FridgeCardsApi,
         private val mailboxCheckApi: MailboxCheckApi,
         private val recordWatchApi: RecordWatchApi,
+        private val realRentApi: RealRentApi,
+        private val blockFoundersApi: BlockFoundersApi,
         private val aiApi: AIApi,
         private val geoApi: GeoApi,
         private val homesApi: HomesApi,
@@ -204,4 +215,38 @@ class PlaceRepository
 
         suspend fun removeRecordWatch(homeId: String): NetworkResult<RemoveRecordWatchResponse> =
             safeApiCall { recordWatchApi.remove(homeId) }
+
+        // ── Real Rent Benchmark — the contribution (Wave 3, T4) ──
+        // The block aggregate is NOT here; it rides the intelligence
+        // contract's `real_rent` section behind the k>=10 floor.
+
+        suspend fun rentReport(homeId: String): NetworkResult<RentReportResponse> = safeApiCall { realRentApi.get(homeId) }
+
+        /**
+         * Writing is gated to a VERIFIED resident, and the route's 403
+         * sentence ("Verify your address to add your rent…") is the next
+         * step, not a dead end — so this call opts into carrying the
+         * server's 403 body through instead of the canned
+         * "You don't have permission to do that."
+         */
+        suspend fun setRentReport(
+            homeId: String,
+            monthlyRent: Int,
+            bedrooms: Int? = null,
+        ): NetworkResult<RentReportResponse> =
+            safeApiCall(surfaceForbiddenBody = true) {
+                realRentApi.set(homeId, SetRentReportRequest(monthlyRent, bedrooms))
+            }
+
+        suspend fun removeRentReport(homeId: String): NetworkResult<RemoveRentReportResponse> =
+            safeApiCall(surfaceForbiddenBody = true) { realRentApi.remove(homeId) }
+
+        // ── Block Founders — rank, meters, postcard invites (T4) ─
+
+        suspend fun blockFounders(homeId: String): NetworkResult<BlockStatusResponse> = safeApiCall { blockFoundersApi.status(homeId) }
+
+        suspend fun sendBlockInvite(
+            homeId: String,
+            recipient: BlockInviteRecipient,
+        ): NetworkResult<BlockInviteResult> = safeApiCall { blockFoundersApi.invite(homeId, BlockInviteRequest(recipient)) }
     }

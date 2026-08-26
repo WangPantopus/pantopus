@@ -18,7 +18,7 @@ import type { PlaceIntelligence, PlaceBlockDensityData, PlaceCensusContextData }
 import { Map, HardHat, Calendar, Home, Award, Lock, Loader2, Send, Check, Mail } from 'lucide-react';
 import { SectionCard, DensityCard, DetailHeader, DetailSectionLabel, SourceNote, InfoNote } from '@/components/archetypes/place';
 import { findPlaceSection, detailAddress } from './sections';
-import { usdK, statusToState } from './format';
+import { usdK, statusToState, apiErrorText } from './format';
 
 function CensusCard({ data }: { data: PlaceCensusContextData }) {
   const stats: { icon: typeof Calendar; label: string; value: string }[] = [];
@@ -82,7 +82,7 @@ function MeterRow({ label, current, needed, unlocked }: { label: string; current
   );
 }
 
-function InviteForm({ homeId, remaining }: { homeId: string; remaining: number }) {
+function InviteForm({ homeId, remaining, cap }: { homeId: string; remaining: number; cap: number | null }) {
   const queryClient = useQueryClient();
   const [line1, setLine1] = useState('');
   const [city, setCity] = useState('');
@@ -96,7 +96,13 @@ function InviteForm({ homeId, remaining }: { homeId: string; remaining: number }
       toast.success(`Postcard on its way — ${result.invites_remaining} invite${result.invites_remaining === 1 ? '' : 's'} left this week.`);
       setLine1(''); setCity(''); setState(''); setZip('');
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not send the invitation.'),
+    // Every refusal on this route is a CODED one the founder has to act
+    // on differently — 429 WEEKLY_CAP, 502 SEND_FAILED, and the 400
+    // BAD_ADDRESS / OPTED_OUT / ALREADY_MEMBER / RECENTLY_INVITED
+    // safeguards. The client rejects with a plain object, so an
+    // `instanceof Error` gate reads false every time and collapses all
+    // seven into one generic line the founder can only retry into.
+    onError: (err) => toast.error(apiErrorText(err, 'Could not send the invitation.')),
   });
 
   const complete = line1.trim() && city.trim() && state.trim().length === 2 && /^\d{5}(-\d{4})?$/.test(zip.trim());
@@ -105,7 +111,12 @@ function InviteForm({ homeId, remaining }: { homeId: string; remaining: number }
   if (remaining <= 0) {
     return (
       <div className="text-[12.5px] text-app-text-muted leading-[18px] mt-3 pt-3 border-t border-app-border-subtle">
-        You&apos;ve used this week&apos;s three invitations. The budget resets a week after your first send.
+        {/* The cap is the SERVER's number (`invites_weekly_cap`), never a
+            word baked into the copy — both mobile clients read it, and a
+            hardcoded "three" would lie the moment the route changes. */}
+        {cap != null
+          ? `You’ve used this week’s ${cap} invitation${cap === 1 ? '' : 's'}. The budget resets a week after your first send.`
+          : 'You’ve used this week’s invitations. The budget resets a week after your first send.'}
       </div>
     );
   }
@@ -160,9 +171,20 @@ function FoundersCard({ block, homeId }: { block: BlockStatus; homeId: string })
           </div>
         </div>
       </div>
-      <div className="mt-3 pt-3 border-t border-app-border-subtle">
-        <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted">Verified homes on your block</div>
-        <div className="text-2xl font-bold -tracking-[0.02em] text-app-text mt-1">{block.verified_count ?? 0}</div>
+      {/* The two raw insider counts. `rent_reports` is deliberately its
+          own reading rather than only a meter fill: it is what the Real
+          Rent benchmark is waiting on, and a founder deciding whether to
+          spend an invite should be able to read it directly. Both are
+          block-level counts — never a per-home figure. */}
+      <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-app-border-subtle">
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted">Verified homes on your block</div>
+          <div className="text-2xl font-bold -tracking-[0.02em] text-app-text mt-1">{block.verified_count ?? 0}</div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold tracking-[0.04em] uppercase text-app-text-muted">Rents shared on your block</div>
+          <div className="text-2xl font-bold -tracking-[0.02em] text-app-text mt-1">{block.rent_reports ?? 0}</div>
+        </div>
       </div>
       {block.meters && block.meters.length > 0 && (
         <div className="flex flex-col gap-3 mt-3 pt-3 border-t border-app-border-subtle">
@@ -171,7 +193,7 @@ function FoundersCard({ block, homeId }: { block: BlockStatus; homeId: string })
           ))}
         </div>
       )}
-      <InviteForm homeId={homeId} remaining={block.invites_remaining ?? 0} />
+      <InviteForm homeId={homeId} remaining={block.invites_remaining ?? 0} cap={block.invites_weekly_cap ?? null} />
     </div>
   );
 }

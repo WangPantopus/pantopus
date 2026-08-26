@@ -146,6 +146,18 @@ enum PlacePresentation {
         }
     }
 
+    /// The viewer's Real Rent standing — a band position only. Never a
+    /// rank and never a headcount of who pays more, which would be a
+    /// count of identifiable households.
+    static func realRentStandingChip(_ standing: PlaceRealRentStanding?) -> PlaceChipModel? {
+        switch standing {
+        case .belowBand: PlaceChipModel(tone: .success, text: "Below the band", icon: .trendingDown)
+        case .aboveBand: PlaceChipModel(tone: .warning, text: "Above the band", icon: .trendingUp)
+        case .inBand: PlaceChipModel(tone: .neutral, text: "In the band")
+        case .unknown, .none: nil
+        }
+    }
+
     // ── per-section display config (icon/title/layout) ─────────
 
     static func config(for id: PlaceSectionID) -> PlaceSectionDisplayConfig {
@@ -169,6 +181,7 @@ enum PlacePresentation {
         case .billBenchmark: .init(icon: .zap, title: "Bill benchmark")
         case .incentives: .init(icon: .badgePercent, title: "Incentives")
         case .rentBand: .init(icon: .building2, title: "Rent band")
+        case .realRent: .init(icon: .handCoins, title: "Real rent on your block")
         case .exemptionCheck: .init(icon: .landmark, title: "Homestead exemption")
         case .civicDistricts: .init(icon: .landmark, title: "Your districts")
         case .civicElection: .init(icon: .vote, title: "Next election", inline: true)
@@ -300,6 +313,20 @@ enum PlacePresentation {
             let lo = money(d.bandLow) ?? ""
             let hi = money(d.bandHigh) ?? ""
             return .init(value: "\(d.bedrooms)BR market band \(lo)–\(hi)")
+        case .realRent:
+            guard let d = env.realRent else { return .init() }
+            // The server sentence is the reading in BOTH states —
+            // `building` is a true statement of the block's progress, not
+            // an empty state. Amounts only ever ride the ready state.
+            guard d.state == .ready else {
+                return .init(
+                    value: d.summary,
+                    chip: PlaceChipModel(tone: .sky, text: "\(d.reports) of \(d.needed)")
+                )
+            }
+            // No chip when ready: this reading is the SECTION's state,
+            // never the viewer's own position — that chip is detail-only.
+            return .init(value: d.summary)
         case .exemptionCheck:
             guard let d = env.exemptionCheck else { return .init() }
             switch d.filingStatus {

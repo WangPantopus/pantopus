@@ -89,6 +89,8 @@ export const queryKeys = {
     ['place', 'record-watch', homeId] as const,
   blockFounders: (homeId: string) =>
     ['place', 'block-founders', homeId] as const,
+  rentReport: (homeId: string) =>
+    ['place', 'rent-report', homeId] as const,
 
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>

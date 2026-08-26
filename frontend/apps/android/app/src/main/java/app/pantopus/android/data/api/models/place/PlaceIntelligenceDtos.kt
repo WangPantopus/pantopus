@@ -148,6 +148,7 @@ enum class PlaceSectionId(val raw: String) {
     BILL_BENCHMARK("bill_benchmark"),
     INCENTIVES("incentives"),
     RENT_BAND("rent_band"),
+    REAL_RENT("real_rent"),
     EXEMPTION_CHECK("exemption_check"),
     CIVIC_DISTRICTS("civic_districts"),
     CIVIC_ELECTION("civic_election"),
@@ -626,6 +627,93 @@ data class PlaceRentBandData(
     val summary: String,
 )
 
+// ─── Real Rent Benchmark (Wave 3) ────────────────────────────
+
+/**
+ * Real Rent is NOT [PlaceRentBandData]. `rent_band` is HUD's Fair
+ * Market Rent — a government estimate for an entire COUNTY. This is
+ * what VERIFIED NEIGHBORS ON THIS BLOCK actually pay, and its worth is
+ * precisely that the reporters proved they live there, which no
+ * listings site can claim. Both sit in Money signals; the copy must
+ * never conflate them.
+ *
+ * The first section to use band D (T4-only): a viewer who has not
+ * verified their address gets `access = locked`.
+ */
+enum class RealRentState {
+    /**
+     * Verified viewer, block still under the k>=10 floor. This is the
+     * PRODUCT, not an empty state: a true statement of the block's
+     * progress toward its own benchmark, and the reason the Block
+     * Founders invite CTA means anything.
+     */
+    @Json(name = "building")
+    BUILDING,
+
+    @Json(name = "ready")
+    READY,
+
+    UNKNOWN,
+}
+
+/**
+ * Which reports the band was built from. Bedroom scope degrades
+ * explicitly rather than quietly widening — a studio is never priced
+ * against a four-bedroom without saying so.
+ */
+enum class RealRentScope {
+    @Json(name = "bedrooms")
+    BEDROOMS,
+
+    @Json(name = "all_sizes")
+    ALL_SIZES,
+
+    UNKNOWN,
+}
+
+/**
+ * The viewer's position in the band — a band position ONLY. Never a
+ * per-neighbor figure, never a headcount of who pays more or less.
+ */
+enum class RealRentStanding {
+    @Json(name = "below_band")
+    BELOW_BAND,
+
+    @Json(name = "in_band")
+    IN_BAND,
+
+    @Json(name = "above_band")
+    ABOVE_BAND,
+
+    UNKNOWN,
+}
+
+/**
+ * Band D · `real_rent`. Dollar figures are WHOLE DOLLARS PER MONTH.
+ * Quartiles and a sample size only — the k-anonymity floor is the
+ * whole privacy model.
+ */
+@JsonClass(generateAdapter = true)
+data class PlaceRealRentData(
+    val state: RealRentState = RealRentState.UNKNOWN,
+    /** Reports in the cell (building) or the sample size (ready). */
+    val reports: Int = 0,
+    /** The k floor — 10. */
+    val needed: Int = 0,
+    val scope: RealRentScope? = null,
+    /** Set only when [scope] is [RealRentScope.BEDROOMS]. */
+    val bedrooms: Int? = null,
+    @Json(name = "sample_size") val sampleSize: Int? = null,
+    @Json(name = "rent_p25") val rentP25: Int? = null,
+    @Json(name = "rent_median") val rentMedian: Int? = null,
+    @Json(name = "rent_p75") val rentP75: Int? = null,
+    /** The viewer's own contribution, dollars. */
+    @Json(name = "your_rent") val yourRent: Int? = null,
+    val standing: RealRentStanding? = null,
+    /** Server-composed sentence — always present. */
+    val summary: String = "",
+)
+
 // ─── Exemption check (Wave 2) ────────────────────────────────
 
 /**
@@ -972,6 +1060,8 @@ sealed interface PlaceSectionData {
 
     data class RentBand(val value: PlaceRentBandData) : PlaceSectionData
 
+    data class RealRent(val value: PlaceRealRentData) : PlaceSectionData
+
     data class ExemptionCheck(val value: PlaceExemptionCheckData) : PlaceSectionData
 
     data class CivicDistricts(val value: PlaceCivicDistrictsData) : PlaceSectionData
@@ -1031,6 +1121,7 @@ data class PlaceSectionEnvelope(
     val billBenchmark: PlaceBillBenchmarkData? get() = (data as? PlaceSectionData.BillBenchmark)?.value
     val incentives: PlaceIncentivesData? get() = (data as? PlaceSectionData.Incentives)?.value
     val rentBand: PlaceRentBandData? get() = (data as? PlaceSectionData.RentBand)?.value
+    val realRent: PlaceRealRentData? get() = (data as? PlaceSectionData.RealRent)?.value
 
     val exemptionCheck: PlaceExemptionCheckData? get() = (data as? PlaceSectionData.ExemptionCheck)?.value
     val civicDistricts: PlaceCivicDistrictsData? get() = (data as? PlaceSectionData.CivicDistricts)?.value

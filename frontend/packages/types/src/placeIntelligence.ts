@@ -535,6 +535,63 @@ export interface PlaceRentBandData {
   summary: string;
 }
 
+/**
+ * Which homes the block benchmark was computed over. Scope degrades
+ * explicitly rather than widening in silence, so a studio is never
+ * quietly priced against a four-bedroom.
+ */
+export type RealRentScope = 'bedrooms' | 'all_sizes';
+
+/**
+ * The viewer's position in the block band — a band position ONLY.
+ * Never a rank and never a headcount of who pays more or less: that
+ * would be a count of identifiable households.
+ */
+export type RealRentStanding = 'below_band' | 'in_band' | 'above_band';
+
+/**
+ * `building` — the block is under the k≥10 reporting floor, so the
+ * payload carries progress and no amounts. That is the product, not an
+ * empty state: it is a true statement about the block's progress toward
+ * its own benchmark, and it is what makes a Block Founders invite mean
+ * something. `ready` — the band is live.
+ */
+export type RealRentState = 'building' | 'ready';
+
+/**
+ * Wave 3 — the Real Rent Benchmark: what VERIFIED neighbors on this
+ * block actually pay, in whole dollars per month.
+ *
+ * Deliberately NOT `rent_band`, which is HUD's Fair Market Rent — a
+ * 40th-percentile estimate for an entire COUNTY. This is real rents
+ * reported by residents who PROVED they live on this block, which is
+ * the one claim no listings site can make. Both sit in Money signals
+ * and the copy must never conflate them.
+ *
+ * Band D (T4 / proven resident); quartiles and a sample size only,
+ * never a row and never a per-neighbor figure.
+ */
+export interface PlaceRealRentData {
+  state: RealRentState;
+  /** Reports in the cell (building), or the sample size (ready). */
+  reports: number;
+  /** The k floor — 10. */
+  needed: number;
+  scope: RealRentScope | null;
+  /** Only set when `scope` is 'bedrooms'. */
+  bedrooms: number | null;
+  sample_size: number | null;
+  /** Whole dollars per month; null while building. */
+  rent_p25: number | null;
+  rent_median: number | null;
+  rent_p75: number | null;
+  /** The viewer's own contribution, in dollars; null until they report. */
+  your_rent: number | null;
+  standing: RealRentStanding | null;
+  /** Server-composed sentence — always present, in both states. */
+  summary: string;
+}
+
 // ── Civic ────────────────────────────────────────────────────
 
 export type CivicLevel = 'federal' | 'state' | 'county' | 'city' | 'school';
@@ -694,6 +751,7 @@ export interface PlaceSectionDataMap {
   bill_benchmark: PlaceBillBenchmarkData;
   incentives: PlaceIncentivesData;
   rent_band: PlaceRentBandData;
+  real_rent: PlaceRealRentData;
   exemption_check: PlaceExemptionCheckData;
   civic_districts: PlaceCivicDistrictsData;
   civic_election: PlaceCivicElectionData;
@@ -724,6 +782,7 @@ export const PLACE_SECTION_IDS = [
   'bill_benchmark',
   'incentives',
   'rent_band',
+  'real_rent',
   'exemption_check',
   'civic_districts',
   'civic_election',
@@ -759,6 +818,7 @@ export const PLACE_SECTION_META: Record<PlaceSectionId, PlaceSectionMeta> = {
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison', layer: 12 },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE', layer: 10 },
   rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents', layer: 9 },
+  real_rent: { group: 'money_signals', band: 'D', source: 'Pantopus · verified neighbors on your block', layer: null },
   exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM', layer: null },
   civic_districts: { group: 'civic', band: 'A', source: 'Google Civic Information', layer: 8 },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections', layer: 8 },

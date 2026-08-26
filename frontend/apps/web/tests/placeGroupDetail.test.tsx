@@ -30,6 +30,9 @@ beforeAll(() => {
   // BlockDetail's founders query runs for verified viewers.
   (api.recordWatch.getRecordWatch as jest.Mock).mockResolvedValue(null);
   (api.blockFounders.getBlockStatus as jest.Mock).mockResolvedValue({ available: false, reason: 'NO_COORDINATES' });
+  // MoneyDetail's real-rent section reads the caller's own report
+  // whenever the section is unlocked and a homeId is present.
+  (api.realRent.getRentReport as jest.Mock).mockResolvedValue(null);
 });
 
 jest.mock('next/navigation', () => ({
@@ -43,7 +46,7 @@ const GROUP: Record<PlaceSectionId, PlaceSection['group']> = {
   your_home: 'your_home', home_systems: 'your_home', flood: 'risk_readiness', heat_cold: 'risk_readiness', seismic: 'risk_readiness', wildfire: 'risk_readiness', lead_radon: 'health_environment',
   drinking_water: 'health_environment', environmental_hazards: 'health_environment',
   block_density: 'your_block', census_context: 'your_block', bill_benchmark: 'money_signals',
-  incentives: 'money_signals', rent_band: 'money_signals', exemption_check: 'money_signals',
+  incentives: 'money_signals', rent_band: 'money_signals', real_rent: 'money_signals', exemption_check: 'money_signals',
   civic_districts: 'civic', civic_election: 'civic',
 };
 
@@ -80,6 +83,7 @@ const FULL = intel([
   sec('bill_benchmark', { data: { utility: 'electric', your_amount: 142, band_low: 165, band_high: 210, comparison: 'lower', comparison_pct: -16, period: '12-month average', summary: 'Your bill runs lower than most homes nearby.' } }),
   sec('incentives', { data: { summary: '1 program', programs: [{ id: 'fed', name: 'Residential Clean Energy Credit', level: 'federal', incentive_type: 'tax_credit', summary: '30% of solar cost.' }] } }),
   sec('rent_band', { data: { bedrooms: 2, band_low: 2120, band_high: 2600, market_low: 1800, market_high: 2900, period: 'FY 2026', summary: 'Typical 2BR rent.' } }),
+  sec('real_rent', { band: 'D', data: { state: 'ready', reports: 11, needed: 10, scope: 'bedrooms', bedrooms: 2, sample_size: 11, rent_p25: 1950, rent_median: 2180, rent_p75: 2400, your_rent: null, standing: null, summary: '11 verified 2-bedroom homes on your block pay a median of $2,180/mo.' } }),
   sec('civic_districts', { data: { districts: [{ level: 'federal', office_label: 'U.S. House', name: "Oregon's 3rd District" }], representatives: [] } }),
   sec('civic_election', { data: { name: 'May 2026 Primary Election', date: '2026-05-19T00:00:00Z', days_until: 12, polling_place: { name: 'Vote by mail · Oregon', detail: 'Return by mail.', vote_by_mail: true }, ballot: [{ type: 'office', title: 'Governor', candidates: ['A', 'B'], summary: null }] } }),
 ]);
@@ -125,6 +129,16 @@ describe('Place group-detail — renders from the contract', () => {
     expect(screen.getByText(/Your bill runs lower/)).toBeInTheDocument();
     expect(screen.getByText('Residential Clean Energy Credit')).toBeInTheDocument();
     expect(screen.getByText('2-bedroom market band')).toBeInTheDocument();
+  });
+
+  it('Money keeps the HUD county band and the block reality distinct', () => {
+    renderWithQueryClient(<MoneyDetail intelligence={FULL} homeId="home-1" />);
+    // The county estimate…
+    expect(screen.getByText('2-bedroom market band')).toBeInTheDocument();
+    expect(screen.getByText('Typical asking rent for your area')).toBeInTheDocument();
+    // …and, separately, what neighbors who proved they live here pay.
+    expect(screen.getByText('Real rent on your block')).toBeInTheDocument();
+    expect(screen.getByText('11 verified 2-bedroom homes on your block')).toBeInTheDocument();
   });
 
   it('Money shows the none-on-file exemption hook with the state program', () => {

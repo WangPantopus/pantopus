@@ -66,6 +66,7 @@ import type {
   PlaceBillBenchmarkData,
   PlaceIncentivesData,
   PlaceRentBandData,
+  PlaceRealRentData,
   PlaceExemptionCheckData,
   PlaceCivicDistrictsData,
   PlaceCivicElectionData,
@@ -347,6 +348,21 @@ const SECTION_CONFIG: Record<PlaceSectionId, SectionConfig> = {
       const lo = money(d.band_low);
       const hi = money(d.band_high);
       return { value: `${d.bedrooms}BR market band ${lo}–${hi}` };
+    },
+  },
+  // Band D — what verified neighbors on THIS block pay, not the HUD
+  // county estimate one row up. The `building` summary is a real
+  // reading (progress toward the block's own benchmark), so the card
+  // shows it rather than degrading to an empty state.
+  real_rent: {
+    icon: Users,
+    title: 'Real rent on your block',
+    format: (data) => {
+      const d = data as PlaceRealRentData;
+      const chip: PlaceSectionCardChip | undefined = d.state === 'building'
+        ? { label: `${d.reports} of ${d.needed}`, variant: 'info' }
+        : undefined;
+      return { value: d.summary, chip, caption: 'Reported by verified neighbors — not a listings estimate' };
     },
   },
   exemption_check: {

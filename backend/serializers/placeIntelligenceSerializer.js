@@ -71,7 +71,12 @@ const PLACE_SECTION_META = {
   census_context: { group: 'your_block', band: 'A', source: 'U.S. Census · American Community Survey', layer: 4 },
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison', layer: 12 },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE', layer: 10 },
-  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents', layer: 9 },
+  // The "county-wide estimate" qualifier is part of the SOURCE, not the
+  // card: rent_band now sits next to real_rent (this block's verified
+  // residents) and the two must never read as one number. Stated once
+  // here so all three clients say the same thing — mobile had begun
+  // hardcoding its own variant.
+  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents · county-wide estimate', layer: 9 },
   // Wave 3 — what neighbors ACTUALLY pay, from verified residents of
   // this geohash-6 block, behind a k>=10 floor. The FIRST Band D
   // section: D is the proven-resident tier, and a benchmark built from

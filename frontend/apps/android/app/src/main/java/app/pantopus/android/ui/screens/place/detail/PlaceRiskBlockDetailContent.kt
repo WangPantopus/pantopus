@@ -415,7 +415,10 @@ private fun EmergencyChecklist() {
 // ─── Your block (C6) ─────────────────────────────────────────
 
 @Composable
-fun PlaceBlockDetailContent(intel: PlaceIntelligence) {
+fun PlaceBlockDetailContent(
+    intel: PlaceIntelligence,
+    viewModel: PlaceDetailViewModel,
+) {
     intel.section(PlaceSectionId.BLOCK_DENSITY)?.let { env ->
         PlaceDetailSectionLabel("Verified homes nearby")
         val data = env.blockDensity
@@ -431,6 +434,11 @@ fun PlaceBlockDetailContent(intel: PlaceIntelligence) {
         }
         PlaceSourceNote("Pantopus verified neighbors")
     }
+    // The growth surface sits right under the density bucket: the
+    // k-anon bucket is what everyone sees, the founding rank and the
+    // unlock meters are what a proven resident of this cell sees.
+    PlaceDetailSectionLabel("Block founders")
+    PlaceBlockFoundersSection(intel, viewModel)
     intel.section(PlaceSectionId.CENSUS_CONTEXT)?.let { env ->
         PlaceDetailSectionLabel("Neighborhood")
         val data = env.censusContext

@@ -12,6 +12,7 @@ import * as api from '@pantopus/api';
 import type { PlaceIntelligence } from '@pantopus/types';
 import BlockDetail from '@/components/place/detail/BlockDetail';
 import NoMailView from '@/components/place/no-mail/NoMailView';
+import { toast } from '@/components/ui/toast-store';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), prefetch: jest.fn() }),
@@ -19,9 +20,27 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/app/place',
 }));
 
+jest.mock('@/components/ui/toast-store', () => ({
+  toast: { success: jest.fn(), error: jest.fn(), info: jest.fn(), warning: jest.fn() },
+}));
+
+const mockToast = toast as unknown as Record<'success' | 'error' | 'info' | 'warning', jest.Mock>;
+
 const getStatusMock = api.blockFounders.getBlockStatus as jest.Mock;
 const sendInviteMock = api.blockFounders.sendBlockInvite as jest.Mock;
 const optOutMock = api.blockFounders.redeemInviteOptOut as jest.Mock;
+
+/**
+ * What a failed invite ACTUALLY looks like: the API client's response
+ * interceptor rejects with a PLAIN OBJECT carrying the server's message
+ * and code (see packages/api/src/client.ts) — it is never an `Error`.
+ * A test that rejects with `new Error(...)` passes against an
+ * `instanceof Error` handler that drops the message in production, so
+ * every failure test here must use this shape.
+ */
+function rejection(message: string, code?: string, statusCode?: number) {
+  return { message, code, statusCode, data: code ? { error: message, code } : undefined };
+}
 
 function intel(tier: PlaceIntelligence['tier']): PlaceIntelligence {
   return {
@@ -45,7 +64,12 @@ const BLOCK = {
   rank: 2,
   established_at: '2026-07-04T00:00:00.000Z',
   verified_count: 6,
+  // Wave 3 added `rent_reports` and put the real_rent meter FIRST — it
+  // counts RENT REPORTS in the cell, not verified homes, so its reading
+  // moves independently of the other two.
+  rent_reports: 4,
   meters: [
+    { id: 'real_rent', label: 'Real rents on your block', current: 4, needed: 10, unlocked: false },
     { id: 'bill_benchmark', label: 'Block bill benchmark', current: 6, needed: 10, unlocked: false },
     { id: 'block_growing', label: 'Growing-block signal', current: 6, needed: 25, unlocked: false },
   ],
@@ -57,6 +81,8 @@ describe('BlockDetail — Founders section', () => {
   beforeEach(() => {
     getStatusMock.mockReset();
     sendInviteMock.mockReset();
+    mockToast.error.mockReset();
+    mockToast.success.mockReset();
   });
 
   it('gates unverified viewers with the permanent-rank promise, without fetching', () => {
@@ -75,6 +101,12 @@ describe('BlockDetail — Founders section', () => {
     expect(screen.getByText('Block bill benchmark')).toBeInTheDocument();
     expect(screen.getByText('6 of 10')).toBeInTheDocument();
     expect(screen.getByText('6 of 25')).toBeInTheDocument();
+    // Wave 3: the rent-report count is its own reading and its own meter,
+    // and it must not be conflated with the verified-home count.
+    expect(screen.getByText('Rents shared on your block')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('Real rents on your block')).toBeInTheDocument();
+    expect(screen.getByText('4 of 10')).toBeInTheDocument();
     expect(screen.getByText(/2 left this week/)).toBeInTheDocument();
     // The card is template-only and anonymized — the form says so.
     expect(screen.getByText(/never your name or address/i)).toBeInTheDocument();
@@ -97,12 +129,66 @@ describe('BlockDetail — Founders section', () => {
     }));
   });
 
-  it('retires the form once the weekly budget is spent', async () => {
+  it('retires the form once the weekly budget is spent, quoting the server’s cap', async () => {
     getStatusMock.mockResolvedValue({ ...BLOCK, invites_remaining: 0 });
     renderBlock('T4');
 
     await waitFor(() => expect(screen.getByText(/used this week/i)).toBeInTheDocument());
+    expect(screen.getByText(/used this week’s 3 invitations/i)).toBeInTheDocument();
     expect(screen.queryByText('Mail the invitation')).not.toBeInTheDocument();
+  });
+
+  // The cap is `invites_weekly_cap` off the wire, not a word baked into
+  // the copy: if the route's budget moves, the sentence has to move with
+  // it. Both mobile clients read the server value.
+  it('reads the weekly cap from the server rather than hardcoding three', async () => {
+    getStatusMock.mockResolvedValue({ ...BLOCK, invites_remaining: 0, invites_weekly_cap: 5 });
+    renderBlock('T4');
+
+    await waitFor(() => expect(screen.getByText(/used this week’s 5 invitations/i)).toBeInTheDocument());
+    expect(screen.queryByText(/three invitations/i)).not.toBeInTheDocument();
+  });
+
+  // Every refusal on this route is coded and each one needs a different
+  // move from the founder. The client rejects with a PLAIN OBJECT, so an
+  // `instanceof Error` gate reads false and collapses all of them into
+  // one generic line — which is why these reject with the real shape.
+  it.each([
+    ['You’ve used this week’s invitations. Your budget resets a week after your first send.', 'WEEKLY_CAP', 429],
+    ['That address has asked never to receive a Pantopus card.', 'OPTED_OUT', 400],
+    ['We couldn’t read that address. Check the street line and ZIP.', 'BAD_ADDRESS', 400],
+    ['A card already went to that address in the last 90 days.', 'RECENTLY_INVITED', 400],
+    ['The mail carrier didn’t accept the card. Try again shortly.', 'SEND_FAILED', 502],
+  ])('surfaces the server’s own refusal (%s)', async (message, code, statusCode) => {
+    getStatusMock.mockResolvedValue(BLOCK);
+    sendInviteMock.mockRejectedValue(rejection(message, code, statusCode));
+    renderBlock('T4');
+    await waitFor(() => expect(screen.getByLabelText('Street address')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Street address'), { target: { value: '1423 SE Oak St' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Portland' } });
+    fireEvent.change(screen.getByLabelText('State'), { target: { value: 'or' } });
+    fireEvent.change(screen.getByLabelText('ZIP code'), { target: { value: '97214' } });
+    fireEvent.click(screen.getByText('Mail the invitation'));
+
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(message));
+    // Never the catch-all — that is the bug this test exists to catch.
+    expect(mockToast.error).not.toHaveBeenCalledWith('Could not send the invitation.');
+  });
+
+  it('falls back to the generic line only when the failure carries no message', async () => {
+    getStatusMock.mockResolvedValue(BLOCK);
+    sendInviteMock.mockRejectedValue({});
+    renderBlock('T4');
+    await waitFor(() => expect(screen.getByLabelText('Street address')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Street address'), { target: { value: '1423 SE Oak St' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Portland' } });
+    fireEvent.change(screen.getByLabelText('State'), { target: { value: 'or' } });
+    fireEvent.change(screen.getByLabelText('ZIP code'), { target: { value: '97214' } });
+    fireEvent.click(screen.getByText('Mail the invitation'));
+
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith('Could not send the invitation.'));
   });
 
   it('degrades honestly when the home has no map coordinates', async () => {

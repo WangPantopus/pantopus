@@ -117,6 +117,8 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                     parse(PlaceIncentivesData::class.java)?.let(PlaceSectionData::Incentives)
                 PlaceSectionId.RENT_BAND ->
                     parse(PlaceRentBandData::class.java)?.let(PlaceSectionData::RentBand)
+                PlaceSectionId.REAL_RENT ->
+                    parse(PlaceRealRentData::class.java)?.let(PlaceSectionData::RealRent)
                 PlaceSectionId.EXEMPTION_CHECK ->
                     parse(PlaceExemptionCheckData::class.java)?.let(PlaceSectionData::ExemptionCheck)
                 PlaceSectionId.CIVIC_DISTRICTS ->
@@ -170,6 +172,7 @@ class PlaceSectionEnvelopeAdapterFactory : JsonAdapter.Factory {
                 is PlaceSectionData.BillBenchmark -> writeValue(writer, payload.value)
                 is PlaceSectionData.Incentives -> writeValue(writer, payload.value)
                 is PlaceSectionData.RentBand -> writeValue(writer, payload.value)
+                is PlaceSectionData.RealRent -> writeValue(writer, payload.value)
                 is PlaceSectionData.ExemptionCheck -> writeValue(writer, payload.value)
                 is PlaceSectionData.CivicDistricts -> writeValue(writer, payload.value)
                 is PlaceSectionData.CivicElection -> writeValue(writer, payload.value)
@@ -212,6 +215,13 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             // this in GoodDayVerdict's Decodable init.
             GoodDayVerdict::class.java to GoodDayVerdict.UNKNOWN,
             BenchmarkComparison::class.java to BenchmarkComparison.UNKNOWN,
+            // Real Rent (Wave 3). `state` decides which of the two very
+            // different cards renders, so an unrecognized value must land
+            // on UNKNOWN — which renders neither — rather than throwing
+            // inside decodePayload and blanking the whole section.
+            RealRentState::class.java to RealRentState.UNKNOWN,
+            RealRentScope::class.java to RealRentScope.UNKNOWN,
+            RealRentStanding::class.java to RealRentStanding.UNKNOWN,
             ExemptionFilingStatus::class.java to ExemptionFilingStatus.UNKNOWN,
             AssessmentStance::class.java to AssessmentStance.UNKNOWN,
             MailboxCheckVerdict::class.java to MailboxCheckVerdict.UNKNOWN,

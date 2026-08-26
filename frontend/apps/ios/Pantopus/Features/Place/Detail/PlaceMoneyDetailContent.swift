@@ -15,11 +15,13 @@ struct PlaceMoneyDetailContent: View {
     let intel: PlaceIntelligence
     let vm: PlaceDetailViewModel
     @State private var rateWatch: PlaceRateWatchViewModel
+    @State private var realRent: PlaceRealRentViewModel
 
     init(intel: PlaceIntelligence, vm: PlaceDetailViewModel) {
         self.intel = intel
         self.vm = vm
         _rateWatch = State(initialValue: PlaceRateWatchViewModel(homeId: vm.homeId))
+        _realRent = State(initialValue: PlaceRealRentViewModel(homeId: vm.homeId))
     }
 
     var body: some View {
@@ -57,7 +59,28 @@ struct PlaceMoneyDetailContent: View {
                 } else {
                     vm.fallbackCard(rent)
                 }
-                PlaceSourceNote(name: "HUD Fair Market Rents", asOf: nil)
+                // The server owns this label (the serializer's section
+                // meta emits it); a client-side copy is a second source of
+                // truth that drifts the moment the provider line changes.
+                if let source = rent.source {
+                    PlaceSourceNote(name: source, asOf: nil)
+                }
+            }
+
+            // Deliberately sits right under the HUD band, because the
+            // contrast IS the product: that one is a county-wide
+            // government estimate, this one is what verified neighbors
+            // on this block actually pay.
+            if let realRentSection = vm.section(.realRent, in: intel) {
+                PlaceDetailSectionLabel(text: "Real rent on your block")
+                PlaceRealRentSection(env: realRentSection, detail: vm, vm: realRent)
+                    .task {
+                        if realRentSection.access != .locked { await realRent.load() }
+                    }
+                PlaceSourceNote(
+                    name: realRentSection.source ?? "Pantopus · verified neighbors on your block",
+                    asOf: nil
+                )
             }
 
             if let exemption = vm.section(.exemptionCheck, in: intel) {

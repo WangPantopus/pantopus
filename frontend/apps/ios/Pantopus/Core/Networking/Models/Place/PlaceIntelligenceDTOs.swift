@@ -166,6 +166,7 @@ public enum PlaceSectionID: Sendable, Hashable {
     case billBenchmark
     case incentives
     case rentBand
+    case realRent
     case exemptionCheck
     case civicDistricts
     case civicElection
@@ -192,6 +193,7 @@ public enum PlaceSectionID: Sendable, Hashable {
         case "bill_benchmark": self = .billBenchmark
         case "incentives": self = .incentives
         case "rent_band": self = .rentBand
+        case "real_rent": self = .realRent
         case "exemption_check": self = .exemptionCheck
         case "civic_districts": self = .civicDistricts
         case "civic_election": self = .civicElection
@@ -220,6 +222,7 @@ public enum PlaceSectionID: Sendable, Hashable {
         case .billBenchmark: "bill_benchmark"
         case .incentives: "incentives"
         case .rentBand: "rent_band"
+        case .realRent: "real_rent"
         case .exemptionCheck: "exemption_check"
         case .civicDistricts: "civic_districts"
         case .civicElection: "civic_election"
@@ -779,6 +782,91 @@ public struct PlaceRentBandData: Decodable, Sendable, Hashable {
     }
 }
 
+// MARK: - Real Rent benchmark (Wave 3, band D)
+
+/// The block's own state. `building` is a first-class PRODUCT state, not
+/// an empty one: a true statement of the block's progress toward its own
+/// benchmark. A state this build has never heard of falls back to
+/// `.unknown`, which the UI renders as progress — never as a benchmark,
+/// so an unrecognized state can never imply amounts.
+public enum PlaceRealRentState: String, Decodable, Sendable, Hashable {
+    case building
+    case ready
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PlaceRealRentState(rawValue: raw) ?? .unknown
+    }
+}
+
+/// Which reports the benchmark pooled. Degradation is explicit by
+/// contract — a studio is never quietly priced against a four-bedroom —
+/// so an unrecognized scope must NOT be presented as a bedroom match.
+public enum PlaceRealRentScope: String, Decodable, Sendable, Hashable {
+    case bedrooms
+    case allSizes = "all_sizes"
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PlaceRealRentScope(rawValue: raw) ?? .unknown
+    }
+}
+
+/// The viewer's position in the band — a band position ONLY. Never a
+/// rank, never a headcount of who pays more (that would be a count of
+/// identifiable households).
+public enum PlaceRealRentStanding: String, Decodable, Sendable, Hashable {
+    case belowBand = "below_band"
+    case inBand = "in_band"
+    case aboveBand = "above_band"
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PlaceRealRentStanding(rawValue: raw) ?? .unknown
+    }
+}
+
+/// What VERIFIED NEIGHBORS ON THIS BLOCK actually pay.
+///
+/// Not to be conflated with `rent_band`, which is HUD's Fair Market
+/// Rent — a 40th-percentile estimate for an entire COUNTY. This is real
+/// monthly rents from residents who proved they live here, behind the
+/// same k>=10 floor every block aggregate uses: quartiles and a sample
+/// size, never a row and never a per-home figure.
+public struct PlaceRealRentData: Decodable, Sendable, Hashable {
+    public let state: PlaceRealRentState
+    /// Reports in the cell (`building`) or the pooled sample (`ready`).
+    public let reports: Int
+    /// The k-anonymity floor — 10.
+    public let needed: Int
+    /// Nil while building.
+    public let scope: PlaceRealRentScope?
+    /// Only set when `scope == .bedrooms`.
+    public let bedrooms: Int?
+    public let sampleSize: Int?
+    /// Whole dollars per month.
+    public let rentP25: Double?
+    public let rentMedian: Double?
+    public let rentP75: Double?
+    /// The viewer's own contribution, whole dollars — nil until they report.
+    public let yourRent: Double?
+    public let standing: PlaceRealRentStanding?
+    /// Server-composed sentence — always present, in every state.
+    public let summary: String
+
+    private enum CodingKeys: String, CodingKey {
+        case state, reports, needed, scope, bedrooms, standing, summary
+        case sampleSize = "sample_size"
+        case rentP25 = "rent_p25"
+        case rentMedian = "rent_median"
+        case rentP75 = "rent_p75"
+        case yourRent = "your_rent"
+    }
+}
+
 // MARK: - Exemption check (Wave 2)
 
 /// The honesty ladder: `unknown` (county feed carries no exemption
@@ -1158,6 +1246,7 @@ public enum PlaceSectionData: Sendable, Hashable {
     case billBenchmark(PlaceBillBenchmarkData)
     case incentives(PlaceIncentivesData)
     case rentBand(PlaceRentBandData)
+    case realRent(PlaceRealRentData)
     case exemptionCheck(PlaceExemptionCheckData)
     case civicDistricts(PlaceCivicDistrictsData)
     case civicElection(PlaceCivicElectionData)
@@ -1237,6 +1326,7 @@ public struct PlaceSectionEnvelope: Decodable, Sendable, Hashable {
         case .billBenchmark: return payload(PlaceBillBenchmarkData.self).map(PlaceSectionData.billBenchmark)
         case .incentives: return payload(PlaceIncentivesData.self).map(PlaceSectionData.incentives)
         case .rentBand: return payload(PlaceRentBandData.self).map(PlaceSectionData.rentBand)
+        case .realRent: return payload(PlaceRealRentData.self).map(PlaceSectionData.realRent)
         case .exemptionCheck: return payload(PlaceExemptionCheckData.self).map(PlaceSectionData.exemptionCheck)
         case .civicDistricts: return payload(PlaceCivicDistrictsData.self).map(PlaceSectionData.civicDistricts)
         case .civicElection: return payload(PlaceCivicElectionData.self).map(PlaceSectionData.civicElection)
@@ -1340,6 +1430,11 @@ public extension PlaceSectionEnvelope {
 
     var rentBand: PlaceRentBandData? {
         if case let .rentBand(d) = data { return d }
+        return nil
+    }
+
+    var realRent: PlaceRealRentData? {
+        if case let .realRent(d) = data { return d }
         return nil
     }
 

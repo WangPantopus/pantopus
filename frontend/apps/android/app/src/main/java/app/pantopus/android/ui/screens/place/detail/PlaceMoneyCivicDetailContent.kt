@@ -98,7 +98,18 @@ fun PlaceMoneyDetailContent(
         PlaceDetailSectionLabel("Rent band")
         val data = env.rentBand
         if (data != null && env.isLive()) RentBandCard(data) else PlaceDetailFallbackCard(env)
-        PlaceSourceNote("HUD Fair Market Rents")
+        // The "county-wide estimate" qualifier is part of the SOURCE the
+        // serializer emits, not a client-side flourish — render the
+        // server's value verbatim so the two never drift apart.
+        PlaceSourceNote(env.source.orEmpty().ifEmpty { "HUD Fair Market Rents · county-wide estimate" })
+    }
+    // Real Rent sits directly under the HUD band on purpose: the county
+    // estimate first, then what neighbors who proved they live here
+    // actually pay. The two must read as different claims, never one.
+    intel.section(PlaceSectionId.REAL_RENT)?.let { env ->
+        PlaceDetailSectionLabel("Real rent on your block")
+        PlaceRealRentSection(env, viewModel)
+        PlaceSourceNote(env.source.orEmpty().ifEmpty { "Pantopus · verified neighbors on your block" })
     }
     intel.section(PlaceSectionId.EXEMPTION_CHECK)?.let { env ->
         PlaceDetailSectionLabel("Property-tax exemption")

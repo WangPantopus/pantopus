@@ -34,7 +34,8 @@ const META: Record<PlaceSectionId, { group: PlaceSection['group']; band: PlaceSe
   census_context: { group: 'your_block', band: 'A', source: 'U.S. Census · American Community Survey' },
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Your utility · peer comparison' },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE' },
-  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents' },
+  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents · county-wide estimate' },
+  real_rent: { group: 'money_signals', band: 'D', source: 'Pantopus · verified neighbors on your block' },
   exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM' },
   civic_districts: { group: 'civic', band: 'A', source: 'Open civic data · Google Civic Information' },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections' },
@@ -224,6 +225,7 @@ function buildMock(): PlaceIntelligence {
       { id: 'hpwh', name: 'Heat-pump water heater discount', level: 'utility', incentive_type: 'discount', summary: 'Taken off at checkout through participating installers.' },
     ] } }),
     sec('rent_band', { data: { bedrooms: 2, band_low: 2120, band_high: 2600, market_low: 1800, market_high: 2900, period: 'FY 2026', summary: 'Typical asking rent for a 2-bedroom in your area.' } }),
+    sec('real_rent', { band: 'D', data: { state: 'ready', reports: 11, needed: 10, scope: 'bedrooms', bedrooms: 2, sample_size: 11, rent_p25: 1950, rent_median: 2180, rent_p75: 2400, your_rent: 2300, standing: 'in_band', summary: '11 verified 2-bedroom homes on your block pay a median of $2,180/mo.' } }),
     sec('civic_districts', { data: {
       districts: [
         { level: 'federal', office_label: 'U.S. House', name: 'Oregon’s 3rd District' },

@@ -334,6 +334,10 @@ export type { RecordWatch, RecordWatchEvaluation } from './endpoints/recordWatch
 export * as blockFounders from './endpoints/blockFounders';
 export type { BlockStatus, BlockMeter, BlockInviteRecipient, BlockInviteResult } from './endpoints/blockFounders';
 
+// Place — the Real Rent Benchmark, resident contribution half (Wave 3)
+export * as realRent from './endpoints/realRent';
+export type { RentReport } from './endpoints/realRent';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

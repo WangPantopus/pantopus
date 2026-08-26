@@ -11,6 +11,7 @@ import app.pantopus.android.data.api.services.AdminApi
 import app.pantopus.android.data.api.services.AudienceProfileApi
 import app.pantopus.android.data.api.services.AuthApi
 import app.pantopus.android.data.api.services.BeaconProfileApi
+import app.pantopus.android.data.api.services.BlockFoundersApi
 import app.pantopus.android.data.api.services.BlocksApi
 import app.pantopus.android.data.api.services.BroadcastReadApi
 import app.pantopus.android.data.api.services.BusinessCatalogApi
@@ -88,6 +89,7 @@ import app.pantopus.android.data.api.services.PrivacyApi
 import app.pantopus.android.data.api.services.PrivacyHandshakeApi
 import app.pantopus.android.data.api.services.ProfessionalApi
 import app.pantopus.android.data.api.services.ProfileInsightsApi
+import app.pantopus.android.data.api.services.RealRentApi
 import app.pantopus.android.data.api.services.RecordWatchApi
 import app.pantopus.android.data.api.services.RelationshipsApi
 import app.pantopus.android.data.api.services.ResidencyClaimsApi
@@ -587,6 +589,14 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRecordWatchApi(retrofit: Retrofit): RecordWatchApi = retrofit.create(RecordWatchApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideRealRentApi(retrofit: Retrofit): RealRentApi = retrofit.create(RealRentApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideBlockFoundersApi(retrofit: Retrofit): BlockFoundersApi = retrofit.create(BlockFoundersApi::class.java)
 
     @Provides
     @Singleton

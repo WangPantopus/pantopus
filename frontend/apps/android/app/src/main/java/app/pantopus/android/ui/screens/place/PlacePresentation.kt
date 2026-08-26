@@ -10,6 +10,7 @@ import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlaceSectionEnvelope
 import app.pantopus.android.data.api.models.place.PlaceSectionId
 import app.pantopus.android.data.api.models.place.PlaceSectionStatus
+import app.pantopus.android.data.api.models.place.RealRentState
 import app.pantopus.android.data.api.models.place.SeismicDesignCategory
 import app.pantopus.android.ui.screens.place.components.PlaceChipModel
 import app.pantopus.android.ui.screens.place.components.PlaceChipTone
@@ -181,6 +182,7 @@ object PlacePresentation {
             PlaceSectionId.BILL_BENCHMARK -> PlaceSectionDisplayConfig(PantopusIcon.Zap, "Bill benchmark")
             PlaceSectionId.INCENTIVES -> PlaceSectionDisplayConfig(PantopusIcon.BadgePercent, "Incentives")
             PlaceSectionId.RENT_BAND -> PlaceSectionDisplayConfig(PantopusIcon.Building2, "Rent band")
+            PlaceSectionId.REAL_RENT -> PlaceSectionDisplayConfig(PantopusIcon.Users, "Real rent on your block")
             PlaceSectionId.EXEMPTION_CHECK -> PlaceSectionDisplayConfig(PantopusIcon.Landmark, "Homestead exemption")
             PlaceSectionId.CIVIC_DISTRICTS -> PlaceSectionDisplayConfig(PantopusIcon.Landmark, "Your districts")
             PlaceSectionId.CIVIC_ELECTION ->
@@ -344,6 +346,19 @@ object PlacePresentation {
                 val lo = money(d.bandLow) ?: ""
                 val hi = money(d.bandHigh) ?: ""
                 PlaceSectionReading(value = "${d.bedrooms}BR market band $lo–$hi")
+            }
+            PlaceSectionId.REAL_RENT -> {
+                val d = env.realRent ?: return PlaceSectionReading()
+                // `building` is a real reading — the block's own progress
+                // toward its benchmark — not an empty card. The server
+                // always composes the sentence, so both states read.
+                val chip =
+                    if (d.state == RealRentState.BUILDING) {
+                        PlaceChipModel(PlaceChipTone.SKY, "${d.reports} of ${d.needed}")
+                    } else {
+                        null
+                    }
+                PlaceSectionReading(value = d.summary, chip = chip)
             }
             PlaceSectionId.EXEMPTION_CHECK -> {
                 val d = env.exemptionCheck ?: return PlaceSectionReading()

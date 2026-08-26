@@ -32,7 +32,8 @@ const META: Record<PlaceSectionId, { group: PlaceSection['group']; band: PlaceSe
   census_context: { group: 'your_block', band: 'A', source: 'U.S. Census · American Community Survey' },
   bill_benchmark: { group: 'money_signals', band: 'A', source: 'Pantopus · peer comparison' },
   incentives: { group: 'money_signals', band: 'A', source: 'DSIRE' },
-  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents' },
+  rent_band: { group: 'money_signals', band: 'A', source: 'HUD Fair Market Rents · county-wide estimate' },
+  real_rent: { group: 'money_signals', band: 'D', source: 'Pantopus · verified neighbors on your block' },
   exemption_check: { group: 'money_signals', band: 'B', source: 'County records · ATTOM' },
   civic_districts: { group: 'civic', band: 'A', source: 'Google Civic Information' },
   civic_election: { group: 'civic', band: 'A', source: 'Official county elections' },
@@ -167,6 +168,26 @@ function build(alert: boolean, tier: PlaceIntelligence['tier'] = 'T4'): PlaceInt
     }),
     sec('incentives', { status: 'unavailable' }),
     sec('rent_band', { status: 'unavailable' }),
+    // Band D, mid-build: the block's honest progress toward its own
+    // benchmark, which is a reading and not an empty state.
+    sec('real_rent', {
+      band: 'D',
+      status: 'partial',
+      data: {
+        state: 'building',
+        reports: 4,
+        needed: 10,
+        scope: null,
+        bedrooms: null,
+        sample_size: null,
+        rent_p25: null,
+        rent_median: null,
+        rent_p75: null,
+        your_rent: null,
+        standing: null,
+        summary: '4 of 10 verified homes on your block have shared their rent.',
+      },
+    }),
 
     // Civic
     sec('civic_districts', { status: 'unavailable' }),
