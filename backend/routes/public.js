@@ -532,6 +532,24 @@ router.get('/fridge-cards/:code', async (req, res) => {
   }
 });
 
+// ============================================================
+// POST /api/public/block-invites/opt-out/:code — the recipient's
+// permanent kill switch for Block Founders postcard invites, printed
+// on every card. Idempotent; unknown codes return a uniform
+// { done: false } (no oracle). POST — the web page confirms with a
+// button, so a link prefetcher can never opt someone out.
+// ============================================================
+router.post('/block-invites/opt-out/:code', async (req, res) => {
+  try {
+    const blockFoundersService = require('../services/blockFoundersService');
+    const result = await blockFoundersService.redeemOptOut(req.params.code);
+    return res.json(result);
+  } catch (err) {
+    console.error('[public/block-invites] Error:', err.message);
+    return res.status(500).json({ error: 'Could not process the request. Try again.' });
+  }
+});
+
 module.exports = router;
 // Test-only hook: reset the in-memory preview caches between cases.
 module.exports.__clearPreviewCaches = () => previewCache.clear();

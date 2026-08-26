@@ -111,8 +111,40 @@ async function getDensityBucket(geohash) {
   }
 }
 
+/**
+ * The RAW verified count for a cell — the one deliberate exception to
+ * this file's never-a-number rule, and it lives HERE so both reads of
+ * the privacy primitive stay in one audited file (the k-anon lesson:
+ * two implementations of one primitive drift).
+ *
+ * CONTRACT: callers may surface this number ONLY to a VERIFIED (T4)
+ * occupant of a home inside this same cell — the Block Founders rank
+ * and unlock meters. It must never reach previews, public payloads,
+ * lower tiers, or members of other cells; route-level gates enforce
+ * that, and any new caller must uphold it.
+ *
+ * @param {string} geohash  geohash-6 prefix
+ * @returns {Promise<number>} 0 on missing cell or error (fails closed)
+ */
+async function readRawCountForVerifiedInsider(geohash) {
+  if (!geohash || typeof geohash !== 'string') return 0;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('NeighborhoodPreview')
+      .select('verified_users_count')
+      .eq('geohash', geohash)
+      .maybeSingle();
+    if (error || !data) return 0;
+    const n = Math.floor(Number(data.verified_users_count));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
 module.exports = {
   getDensityBucket,
+  readRawCountForVerifiedInsider,
   bucketForCount,
   DENSITY_BUCKET,
   K_ANON_MIN,

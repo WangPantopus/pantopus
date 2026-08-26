@@ -87,6 +87,8 @@ export const queryKeys = {
     ['place', 'mailbox-check', homeId] as const,
   recordWatch: (homeId: string) =>
     ['place', 'record-watch', homeId] as const,
+  blockFounders: (homeId: string) =>
+    ['place', 'block-founders', homeId] as const,
 
   // ── Businesses ────────────────────────────────────────────
   businessDetail: (id: string) =>

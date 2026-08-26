@@ -330,6 +330,10 @@ export type {
 export * as recordWatch from './endpoints/recordWatch';
 export type { RecordWatch, RecordWatchEvaluation } from './endpoints/recordWatch';
 
+// Place — Block Founders growth mechanic (Wave 3)
+export * as blockFounders from './endpoints/blockFounders';
+export type { BlockStatus, BlockMeter, BlockInviteRecipient, BlockInviteResult } from './endpoints/blockFounders';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

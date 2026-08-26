@@ -26,8 +26,10 @@ import CivicDetail from '@/components/place/detail/CivicDetail';
 import IdentityDetail from '@/components/place/detail/IdentityDetail';
 
 beforeAll(() => {
-  // MoneyDetail's rate-watch query runs whenever homeId is set.
+  // MoneyDetail's rate-watch query runs whenever homeId is set, and
+  // BlockDetail's founders query runs for verified viewers.
   (api.recordWatch.getRecordWatch as jest.Mock).mockResolvedValue(null);
+  (api.blockFounders.getBlockStatus as jest.Mock).mockResolvedValue({ available: false, reason: 'NO_COORDINATES' });
 });
 
 jest.mock('next/navigation', () => ({
@@ -112,7 +114,7 @@ describe('Place group-detail — renders from the contract', () => {
   });
 
   it('Block shows the density bucket, census, and permits unavailable', () => {
-    render(<BlockDetail intelligence={FULL} homeId="home-1" />);
+    renderWithQueryClient(<BlockDetail intelligence={FULL} homeId="home-1" />);
     expect(screen.getByText('A few verified homes nearby')).toBeInTheDocument();
     expect(screen.getByText('This neighborhood')).toBeInTheDocument();
     expect(screen.getByText('Not available for your area yet.')).toBeInTheDocument();

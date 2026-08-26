@@ -142,6 +142,12 @@ export const fridgeCards = {
 export const homeProfile = {
   getHomeEmergencies: jest.fn(),
 };
+// Place — Block Founders growth mechanic (Wave 3).
+export const blockFounders = {
+  getBlockStatus: jest.fn(),
+  sendBlockInvite: jest.fn(),
+  redeemInviteOptOut: jest.fn(),
+};
 // Place — mailbox reality check (Wave 1, #3).
 export const mailboxCheck = {
   getMailboxCheck: jest.fn(),
