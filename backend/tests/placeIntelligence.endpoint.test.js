@@ -545,4 +545,56 @@ describe('GET /api/homes/:id/intelligence', () => {
     const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', OTHER);
     expect(res.status).toBe(403);
   });
+
+  // real_rent is the FIRST section to use Band D (the proven-resident
+  // tier). The band machinery existed but had never carried a section,
+  // so these pin that the gate actually bites — a claimed-but-unverified
+  // owner must not see what the block pays, and must not be able to
+  // infer the block's progress either.
+  describe('real_rent — the first Band D section', () => {
+    test('a claimed-but-unverified owner gets a locked envelope with no data', async () => {
+      seedHome();
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+
+      expect(res.body.tier).toBe('T3');
+      const realRent = sectionsById(res.body).real_rent;
+      expect(realRent).toBeDefined();
+      expect(realRent.access).toBe('locked');
+      expect(realRent.data).toBeNull();
+      // Not even the block's progress leaks below the tier.
+      expect(JSON.stringify(realRent)).not.toContain('reports');
+      expect(realRent.unavailable_reason).toMatch(/verify your address/i);
+    });
+
+    test('a verified resident gets the section, in its honest building state', async () => {
+      seedHome({ owner_id: 'someone-else' });
+      seedTable('HomeOccupancy', [{
+        id: 'occ-1',
+        home_id: HOME_ID,
+        user_id: USER,
+        is_active: true,
+        start_at: null,
+        end_at: null,
+        verification_status: 'verified',
+        role_base: 'member',
+      }]);
+
+      const res = await request(app).get(`/api/homes/${HOME_ID}/intelligence`).set('x-test-user-id', USER);
+
+      expect(res.body.tier).toBe('T4');
+      const realRent = sectionsById(res.body).real_rent;
+      expect(realRent.access).toBe('available');
+      // An empty block is 'building' with progress — never an error and
+      // never an empty state.
+      expect(realRent.status).toBe('partial');
+      expect(realRent.data.state).toBe('building');
+      expect(realRent.data.reports).toBe(0);
+      expect(realRent.data.needed).toBe(10);
+      expect(realRent.data.summary).toMatch(/first/i);
+      // Below the floor NOTHING about money is present.
+      expect(realRent.data.rent_median).toBeNull();
+      expect(realRent.data.rent_p25).toBeNull();
+      expect(realRent.data.sample_size).toBeNull();
+    });
+  });
 });
