@@ -201,9 +201,15 @@ describe('GET /api/homes/:id/intelligence', () => {
       expect(providerOrchestrator.getHubToday).not.toHaveBeenCalled();
     });
 
-    test('requests the detail payload from the orchestrator', async () => {
+    test('requests the detail payload anchored to the REQUESTED home', async () => {
       await request(app).get(`/api/homes/${HOME_ID}/intelligence?sections=weather`).set('x-test-user-id', USER);
-      expect(providerOrchestrator.getHubToday).toHaveBeenCalledWith(USER, { detail: true });
+      // atLocation is the fix for the wrong-city bug: the hub payload used
+      // to resolve from the viewer's location (custom pin / primary home),
+      // which put one city's freeze guidance on another city's dashboard.
+      expect(providerOrchestrator.getHubToday).toHaveBeenCalledWith(USER, expect.objectContaining({
+        detail: true,
+        atLocation: expect.objectContaining({ latitude: 45.51, longitude: -122.65, homeId: HOME_ID }),
+      }));
     });
 
     test('weather carries feels-like plus the hourly and daily forecasts', async () => {

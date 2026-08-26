@@ -124,23 +124,35 @@ function coldColderLater(firstFreeze, coldest) {
  * on the wrong evening — with lows 40/31/36/38/18 the freeze is Wednesday
  * at 31°F, not Saturday at 18°F.
  */
-function nextFreezingDay(daily) {
+/**
+ * @param {Array}  daily
+ * @param {string} [skipDate]  A date already cleared by the hourly scan.
+ *   Today's daily low is normally the pre-dawn minimum that has ALREADY
+ *   happened — when the 24h hourly window (which covers the rest of
+ *   today) found no freeze, a "Freezing today" headline off daily[0]
+ *   would order tonight-action for this morning's weather.
+ */
+function nextFreezingDay(daily, skipDate) {
   if (!Array.isArray(daily)) return null;
   for (const d of daily) {
     const low = num(d && d.low_f);
     if (low === null || !d.date) continue;
+    if (skipDate && d.date === skipDate) continue;
     if (low <= FREEZE_F) return { date: d.date, low_f: low };
   }
   return null;
 }
 
 /** The coldest daily low in the forecast, and which day it lands on. */
-function coldestDay(daily) {
+function coldestDay(daily, skipDate) {
   if (!Array.isArray(daily)) return null;
   let best = null;
   for (const d of daily) {
     const low = num(d && d.low_f);
     if (low === null || !d.date) continue;
+    // Same rule as nextFreezingDay: a cleared today only contributes this
+    // morning's low — "and colder today" must never point backwards.
+    if (skipDate && d.date === skipDate) continue;
     if (!best || low < best.low_f) best = { date: d.date, low_f: low };
   }
   return best;
@@ -219,13 +231,17 @@ function buildHeatColdOutlook({ heatRisk, weather, home, timezone, now = new Dat
     null,
   );
 
-  const freeze = nextFreezeWindow(hours);
-  const cold = coldestDay(daily);
   // A freeze beyond the hourly horizon still deserves a heads-up — and it
   // must be the NEXT freezing day, not the coldest one in the week. The
   // hourly horizon is 24h while the daily forecast runs 7 days, so this
-  // branch is the common case, not an edge.
-  const upcomingFreeze = freeze ? null : nextFreezingDay(daily);
+  // branch is the common case, not an edge. When the hourly scan ran and
+  // found nothing, today is already cleared: its remaining hours are all
+  // inside that window, so its daily low can only be this morning's —
+  // skip it rather than announce a freeze that already happened.
+  const freeze = nextFreezeWindow(hours);
+  const clearedToday = !freeze && hours.length > 0 ? todayStr : null;
+  const cold = coldestDay(daily, clearedToday);
+  const upcomingFreeze = freeze ? null : nextFreezingDay(daily, clearedToday);
 
   // Nothing usable at all — no forecast and no coverage.
   if (heatDays.length === 0 && hours.length === 0 && daily.length === 0) return null;

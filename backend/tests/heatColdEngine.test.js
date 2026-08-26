@@ -132,6 +132,34 @@ describe('cold leads when a freeze is imminent', () => {
     expect(out.freeze).toBeNull();
     expect(out.headline).toContain('26°F');
   });
+
+  // Regression: today's daily low is normally the pre-dawn minimum that
+  // has already happened. At 6pm, with every hour of the next 24 above
+  // freezing, "Freezing today — low near 30°F" ordered tonight-action
+  // (disconnect the hose bib) for this morning's weather.
+  test('never announces a freeze the hourly window already ruled out', () => {
+    const out = buildHeatColdOutlook({
+      weather: { hourly: hours([40, 38, 37, 36, 38, 41]), daily: days([[30, 44], [45, 55]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+    expect(out === null || out.mode !== 'cold').toBe(true);
+    if (out) expect(out.headline || '').not.toContain('Freezing today');
+  });
+
+  test('"and colder" never points at a cleared today', () => {
+    const out = buildHeatColdOutlook({
+      // Today's passed low (28) is the week's coldest; tomorrow freezes at 30.
+      weather: { hourly: hours([40, 38, 37, 36]), daily: days([[28, 40], [30, 44]]) },
+      home: {},
+      timezone: TZ,
+      now: NOW,
+    });
+    expect(out.mode).toBe('cold');
+    expect(out.headline).toContain('tomorrow');
+    expect(out.headline).not.toContain('colder today');
+  });
 });
 
 describe('heat leads when HeatRisk says so', () => {

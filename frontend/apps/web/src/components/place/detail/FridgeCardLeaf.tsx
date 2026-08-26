@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '@pantopus/api';
 import type { FridgeCard, FridgeCardItem, FridgeCardSection, FridgeCardSectionKey } from '@pantopus/api';
@@ -186,15 +186,23 @@ export default function FridgeCardLeaf({ homeId, address, onBack }: { homeId: st
   // effect off the query DATA, never inside the queryFn — a cached
   // query skips its queryFn on remount, which would silently skip the
   // seed; the effect fires either way and only fills an empty section.
+  //
+  // Its key lives OUTSIDE the fridgeCards prefix: issue/revoke
+  // invalidate that prefix, and a prefix-matched seed refetch used to
+  // re-fill a utilities section the person had deliberately emptied.
+  // The ref makes the seed strictly once-per-mount either way.
   const emergenciesQuery = useQuery({
-    queryKey: [...queryKeys.fridgeCards(homeId), 'seed-emergencies'],
+    queryKey: ['place', 'fridge-card-seed', homeId],
     queryFn: () => api.homeProfile.getHomeEmergencies(homeId),
     staleTime: Infinity,
   });
   const emergencies = emergenciesQuery.data?.emergencies;
+  const seededRef = useRef(false);
   useEffect(() => {
+    if (seededRef.current) return;
     const rows = (emergencies || []) as { label?: string; location_in_home?: string; location?: string }[];
     if (!rows.length) return;
+    seededRef.current = true;
     setDraft((d) => (d.utilities.length ? d : {
       ...d,
       utilities: rows

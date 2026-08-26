@@ -145,7 +145,7 @@ describe('warmPendingTracts', () => {
     });
 
     const result = await warmPendingTracts({ limit: 3 });
-    expect(result).toEqual({ warmed: 1, failed: 0 });
+    expect(result).toEqual({ warmed: 1, failed: 0, deadLettered: 0 });
 
     // The only fast query shape: bare censusGeoid range, no count, no
     // orderby, no extra conjunctions (all of those 503 — probed live).
@@ -161,14 +161,72 @@ describe('warmPendingTracts', () => {
     expect(row.payload.premium_median).toBeGreaterThan(0);
   });
 
-  test('a failed fetch leaves the pending marker for the next run', async () => {
+  test('a failed fetch keeps the marker pending but rotates it to the back of the queue', async () => {
     seedPending();
     global.fetch.mockRejectedValue(new Error('503'));
 
     const result = await warmPendingTracts({ limit: 3 });
-    expect(result).toEqual({ warmed: 0, failed: 1 });
+    expect(result).toEqual({ warmed: 0, failed: 1, deadLettered: 0 });
 
     const row = getTable('PlaceSectionCache').find((r) => r.cache_key === `tract:${TRACT}`);
     expect(row.payload.pending).toBe(true);
+    // The claim recorded the attempt and advanced the queue keys — a
+    // poison tract must never head-block the fetched_at-ordered lane.
+    expect(row.payload.attempts).toBe(1);
+    expect(row.fetched_at > '2026-08-25T00:00:00.000Z').toBe(true);
+  });
+
+  test('a tract that keeps failing dead-letters instead of occupying the queue forever', async () => {
+    seedTable('PlaceSectionCache', [{
+      cache_key: `tract:${TRACT}`,
+      section_id: '_nfip_tract',
+      payload: { pending: true, requested_at: '2026-08-25T00:00:00.000Z', attempts: 5 },
+      fetched_at: '2026-08-25T00:00:00.000Z',
+      expires_at: '2026-11-25T00:00:00.000Z',
+    }]);
+    global.fetch.mockRejectedValue(new Error('503'));
+
+    const result = await warmPendingTracts({ limit: 3 });
+    expect(result).toEqual({ warmed: 0, failed: 0, deadLettered: 1 });
+    // No fetch even attempted — the budget goes to healthy tracts.
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const row = getTable('PlaceSectionCache').find((r) => r.cache_key === `tract:${TRACT}`);
+    expect(row.payload.pending).toBeUndefined();
+    expect(row.payload.suppressed).toBe(true);
+    expect(row.payload.unavailable).toBe(true);
+    // Short TTL: dead-lettered, not buried — it retries next cycle.
+    expect(Date.parse(row.expires_at) - Date.parse(row.fetched_at)).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
+  });
+
+  test('a capped fetch with a thin recent window stores indeterminate on the short TTL, never a 90-day suppression', async () => {
+    seedPending();
+    // 2,000 rows (the cap) but almost all OLD — the arbitrary subset
+    // problem on high-policy coastal tracts.
+    const old = Array.from({ length: 1995 }, (_, i) => policy((i + 1) * 10, '2020-01-01T00:00:00.000Z'));
+    const recent = Array.from({ length: 5 }, (_, i) => policy((i + 1) * 100, '2025-06-01T00:00:00.000Z'));
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ NfipPolicies: [...old, ...recent] }) });
+
+    const result = await warmPendingTracts({ limit: 3 });
+    expect(result).toEqual({ warmed: 1, failed: 0, deadLettered: 0 });
+
+    const row = getTable('PlaceSectionCache').find((r) => r.cache_key === `tract:${TRACT}`);
+    expect(row.payload.suppressed).toBe(true);
+    expect(row.payload.indeterminate).toBe(true);
+    expect(Date.parse(row.expires_at) - Date.parse(row.fetched_at)).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
+  });
+
+  test('a genuinely thin tract still suppresses for the full benchmark cycle', async () => {
+    seedPending();
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ NfipPolicies: Array.from({ length: 4 }, (_, i) => policy((i + 1) * 100, '2025-06-01T00:00:00.000Z')) }),
+    });
+
+    await warmPendingTracts({ limit: 3 });
+    const row = getTable('PlaceSectionCache').find((r) => r.cache_key === `tract:${TRACT}`);
+    expect(row.payload.suppressed).toBe(true);
+    expect(row.payload.indeterminate).toBeUndefined();
+    expect(Date.parse(row.expires_at) - Date.parse(row.fetched_at)).toBeGreaterThan(30 * 24 * 60 * 60 * 1000);
   });
 });

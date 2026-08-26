@@ -349,6 +349,8 @@ function HeatDayCell({ day, isFirst }: { day: PlaceHeatRiskDay; isFirst: boolean
     <div className="flex-1 min-w-[38px] flex flex-col items-center gap-1.5">
       <span className="text-[12px] font-semibold text-app-text-secondary">{label}</span>
       <span
+        role="img"
+        aria-label={`${label}: ${day.label} — ${day.meaning}`}
         className={`w-full rounded-md ${isFirst ? 'h-9' : 'h-6'}`}
         style={{ backgroundColor: HEAT_RISK_COLORS[day.level] ?? HEAT_RISK_COLORS[0] }}
         title={`${day.label} — ${day.meaning}`}
@@ -382,6 +384,16 @@ function HeatColdCard({ data }: { data: PlaceHeatColdData }) {
               <HeatDayCell key={d.date} day={d} isFirst={i === 0} />
             ))}
           </div>
+          {(() => {
+            // The worst day's meaning as visible text — hover titles are
+            // invisible on touch and to most assistive tech.
+            const peak = data.heat_days.reduce((a, d) => (d.level > a.level ? d : a), data.heat_days[0]);
+            return peak && peak.level >= 1 ? (
+              <div className="text-[12.5px] text-app-text-strong leading-[18px]">
+                {peak.label}: {peak.meaning}
+              </div>
+            ) : null;
+          })()}
           <div className="text-[11.5px] text-app-text-muted">
             NWS HeatRisk, 0 (little to none) to 4 (extreme). Experimental product.
           </div>

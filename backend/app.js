@@ -217,9 +217,15 @@ app.use(cookieParser());
 // NOTE: CSRF protection is applied per-route AFTER verifyToken (which
 // sets req._authMethod). See verifyToken.js for the combined middleware.
 
-// Request logging middleware
+// Request logging middleware.
+//
+// Public bearer-code URLs are redacted before logging: a fridge card,
+// residency claim/letter, or invite opt-out code IS the credential, and
+// writing it next to an IP + user agent would turn the log stream into
+// a directory of live codes.
+const BEARER_CODE_PATH = /^(\/api\/public\/(?:fridge-cards|residency-claims|residency-letters|block-invites\/opt-out))\/[^/]+/;
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
+  logger.info(`${req.method} ${req.path.replace(BEARER_CODE_PATH, '$1/:code')}`, {
     ip: req.ip,
     userAgent: req.get('user-agent')
   });

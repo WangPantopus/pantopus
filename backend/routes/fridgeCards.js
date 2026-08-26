@@ -72,6 +72,16 @@ router.get('/:id/fridge-cards', verifyToken, async (req, res) => {
     if (!access.hasAccess) {
       return res.status(403).json({ error: 'You do not have access to this place.' });
     }
+    // Verified residents only — the list carries every card's medical
+    // content AND its live bearer code. A guest or service-provider
+    // occupancy grants home access, not the household's health data;
+    // whoever the household wants informed gets handed the card link.
+    if (!isVerifiedResident(access)) {
+      return res.status(403).json({
+        error: 'Verify your address to see this household’s cards.',
+        code: 'VERIFICATION_REQUIRED',
+      });
+    }
     const cards = await fridgeCardService.listCards({ homeId: id });
     return res.json({ cards });
   } catch (err) {

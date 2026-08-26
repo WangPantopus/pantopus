@@ -193,7 +193,9 @@ describe('evaluateWatches', () => {
     expect(notificationService.createNotification).toHaveBeenCalledTimes(1);
     const call = notificationService.createNotification.mock.calls[0][0];
     expect(call.type).toBe('rate_watch');
-    expect(call.link).toBe(`/place/${HOME_ID}/money`);
+    // The deep-link vocabulary all three clients parse (the old
+    // /place/<homeId>/money routed nowhere on any of them).
+    expect(call.link).toBe('/place?section=money');
     expect(call.body).toContain('5.70%');
     expect(call.body).toContain('March 2023 average of 6.60%');
     expect(call.body).not.toMatch(/should|refinance now|save/i);

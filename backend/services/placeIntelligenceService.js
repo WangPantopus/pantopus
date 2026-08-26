@@ -738,10 +738,10 @@ async function composeExemptionCheck(home, tier) {
 // Still BUILD_PENDING: `incentives` only (DSIRE's API is license-gated;
 // curated federal copy would rot).
 const COMPOSER_SECTIONS = [
-  { ids: ['weather', 'air_quality', 'alerts', 'good_day_to'], run: ({ home, userId, hub }) => composeToday(userId, home, hub) },
+  { ids: ['weather', 'air_quality', 'alerts', 'good_day_to'], run: async ({ home, userId, hubPromise }) => composeToday(userId, home, await hubPromise) },
   { ids: ['sunrise_sunset'], run: ({ home }) => placeSectionAdapters.composeSunriseSunset(home) },
   { ids: ['flood', 'census_context'], run: ({ home }) => composeNeighborhood(home) },
-  { ids: ['heat_cold'], run: ({ home, hub }) => composeHeatCold(home, hub) },
+  { ids: ['heat_cold'], run: async ({ home, hubPromise }) => composeHeatCold(home, await hubPromise) },
   { ids: ['seismic'], run: ({ home }) => placeSectionAdapters.composeSeismic(home) },
   { ids: ['wildfire'], run: ({ home }) => placeSectionAdapters.composeWildfire(home) },
   { ids: ['lead_radon'], run: ({ home }) => placeSectionAdapters.composeLeadRadon(home) },
@@ -815,24 +815,38 @@ async function composeHomeIntelligence({ homeId, userId, access, sectionIds }) {
   const runs = COMPOSER_SECTIONS.filter(({ ids }) => ids.some((id) => requested.has(id)));
 
   // The Today group and heat_cold both need the same provider payload.
-  // Fetched ONCE here rather than inside each composer: the getHubToday memo
+  // Started ONCE here rather than inside each composer: the getHubToday memo
   // is written only after its whole pipeline completes, and the composers run
   // concurrently below, so two calls always missed the cache and doubled the
-  // outbound WeatherKit/AirNow/NOAA traffic. Only fetched when a section that
-  // needs it was actually requested.
+  // outbound WeatherKit/AirNow/NOAA traffic. Started, not awaited — the
+  // weather pipeline runs alongside every other composer instead of in
+  // front of them.
+  //
+  // Anchored to the REQUESTED home's coordinates: the default hub payload
+  // is about wherever the viewer is (custom pin / primary home), which put
+  // one city's freeze guidance on another city's dashboard. A home with no
+  // coordinates gets no hub payload — its weather sections degrade to
+  // unavailable rather than borrowing the viewer's city.
   const HUB_SECTIONS = ['weather', 'air_quality', 'alerts', 'good_day_to', 'heat_cold'];
-  let hub = null;
+  let hubPromise = Promise.resolve(null);
   if (HUB_SECTIONS.some((id) => requested.has(id))) {
-    try {
-      hub = await providerOrchestrator.getHubToday(userId, { detail: true });
-    } catch (err) {
-      logger.warn('placeIntelligence: getHubToday failed', { userId, error: err.message });
+    const ll = homeLatLng(home);
+    if (ll) {
+      hubPromise = providerOrchestrator
+        .getHubToday(userId, {
+          detail: true,
+          atLocation: { latitude: ll.lat, longitude: ll.lng, label: home.address || home.name, homeId: home.id },
+        })
+        .catch((err) => {
+          logger.warn('placeIntelligence: getHubToday failed', { userId, error: err.message });
+          return null;
+        });
     }
   }
 
   const [privacy, ...groups] = await Promise.all([
     getHomePrivacy(homeId),
-    ...runs.map(({ run }) => run({ home, userId, tier, hub })),
+    ...runs.map(({ run }) => run({ home, userId, tier, hubPromise })),
   ]);
 
   const composed = {};

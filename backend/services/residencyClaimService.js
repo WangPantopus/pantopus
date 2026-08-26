@@ -30,7 +30,7 @@
 const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
-const { generateLetterCode, normalizeLetterCode, addressLine1FromHome, webBaseUrl } = require('./residencyLetterService');
+const { generateLetterCode, normalizeLetterCode, addressLine1FromHome, webBaseUrl, residentNameFromUser } = require('./residencyLetterService');
 const { getActiveOccupancy } = require('../utils/homePermissions');
 const { composeCivicDistricts } = require('./placeSectionAdapters');
 
@@ -73,13 +73,9 @@ class ClaimError extends Error {
   }
 }
 
-function holderNameFromUser(user) {
-  const first = (user.first_name || '').trim();
-  const last = (user.last_name || '').trim();
-  if (first || last) return [first, last].filter(Boolean).join(' ');
-  if ((user.name || '').trim()) return user.name.trim();
-  return user.username || 'Pantopus resident';
-}
+// The letters service owns the display-name derivation — one definition,
+// so a claim and a letter can never disagree about who someone is.
+const holderNameFromUser = residentNameFromUser;
 
 /**
  * The civic districts for a home, from the (90-day-cached) adapter.

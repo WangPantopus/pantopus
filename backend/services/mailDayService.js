@@ -27,6 +27,9 @@ const logger = require('../utils/logger');
 // under gateway limits.
 const BATCH_SIZE = 1000;
 const IN_CHUNK_SIZE = 200;
+// The most unresolved pieces one user's day materializes — see
+// ensureTodayItems.
+const MATERIALIZE_ROW_CAP = 200;
 
 function chunk(list, size) {
   const out = [];
@@ -81,11 +84,17 @@ async function ensureTodayItems(userId, today) {
     const homeIds = await getAccessibleHomeIds(userId);
     if (homeIds.length === 0) return 0;
 
+    // Newest scans first, capped: a long-unresolved backlog otherwise
+    // re-materializes in FULL as fresh rows every day, for every
+    // occupant, forever — the triage screen is a daily ritual, not a
+    // dumping ground, and the full backlog still lives in the mailbox.
     const { data: queue } = await supabaseAdmin
       .from('MailRoutingQueue')
       .select('*, Mail!inner(*)')
       .in('home_id', homeIds)
-      .eq('resolved', false);
+      .eq('resolved', false)
+      .order('created_at', { ascending: false })
+      .range(0, MATERIALIZE_ROW_CAP - 1);
     const rows = queue || [];
     if (rows.length === 0) return 0;
 

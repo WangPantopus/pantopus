@@ -41,6 +41,18 @@ const OPENFEMA_BASE = 'https://www.fema.gov/api/open/v3/NfipPolicies';
 const SECTION_ID = '_nfip_tract';
 const TTL_MS = 90 * 24 * 60 * 60 * 1000; // benchmark refresh cycle
 const PENDING_TTL_MS = 90 * 24 * 60 * 60 * 1000; // marker lives until the job replaces it
+// A capped fetch that still couldn't see K_MIN recent premiums is a
+// sampling artifact, not a thin tract — retried on a short cycle, never
+// parked for the full 90 days.
+const INDETERMINATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// A tract that failed this many warm attempts is dead-lettered on the
+// short TTL: the composer stops waiting on it, and it gets a fresh start
+// next week instead of occupying the queue forever.
+const MAX_WARM_ATTEMPTS = 5;
+// How long a claim parks a row before it becomes claimable again — the
+// retry cadence for failed fetches, and the fence against a crashed
+// worker orphaning a tract.
+const CLAIM_RETRY_MS = 30 * 60 * 1000;
 const WINDOW_MONTHS = 24;
 const K_MIN = 10;
 // One request, hard row cap — latency is ~20 ms/row server-side, so
@@ -109,7 +121,15 @@ function computeBenchmark(rows, now = new Date()) {
 
   if (premiums.length < K_MIN) {
     // Stored (not just returned) so the composer doesn't re-request a
-    // warm for a tract we already know is too thin.
+    // warm for a tract we already know is too thin. BUT: when the fetch
+    // hit the row cap, the thin window may be a sampling artifact — the
+    // arbitrary 2,000-row subset skews old, and high-policy coastal
+    // tracts are exactly where the benchmark matters. Marked
+    // indeterminate so the job stores it on the short TTL instead of
+    // parking a false "suppressed" for 90 days.
+    if (rows.length >= FETCH_ROW_CAP) {
+      return { suppressed: true, indeterminate: true, policy_count: premiums.length, coverage: 'partial' };
+    }
     return { suppressed: true, policy_count: premiums.length };
   }
 
@@ -162,11 +182,55 @@ async function getTractBenchmark(tractId) {
 // ── The warm job worker ──────────────────────────────────────
 
 /**
+ * Claim one candidate row, atomically.
+ *
+ * The job runs on every instance at the same wall-clock minutes with no
+ * leader election. Without a claim, every instance fetched the SAME
+ * oldest candidates — N identical 40-second OpenFEMA pulls for zero
+ * added throughput. And a failed tract kept its queue position forever:
+ * three poison tracts occupied all the slots and the whole feature froze.
+ *
+ * The claim is one conditional UPDATE that (a) only one instance can
+ * win (the previous fetched_at is the lock), and (b) advances the row's
+ * queue keys, so even a tract whose fetch then FAILS rotates to the back
+ * instead of head-blocking — the attempts counter rides along in the
+ * payload for the dead-letter check.
+ *
+ * @returns the claimed row's payload, or null when another instance won.
+ */
+async function claimCandidate(row, nowIso) {
+  const attempts = ((row.payload && row.payload.attempts) || 0) + 1;
+  const claimedPayload = { ...(row.payload || {}), attempts, claimed_at: nowIso };
+  const { data: claimed, error } = await supabaseAdmin
+    .from('PlaceSectionCache')
+    .update({
+      payload: claimedPayload,
+      fetched_at: nowIso,
+      // Both queue lanes must rotate on a claim: pending markers sort by
+      // fetched_at, expired benchmarks by expires_at. A failed fetch
+      // retries in ~30 minutes instead of head-blocking its lane; a
+      // successful one overwrites expires_at with the real TTL anyway.
+      // (Reads never gate on expiry — a stale benchmark keeps serving.)
+      expires_at: new Date(Date.parse(nowIso) + CLAIM_RETRY_MS).toISOString(),
+    })
+    .eq('cache_key', row.cache_key)
+    .eq('section_id', SECTION_ID)
+    .eq('fetched_at', row.fetched_at)
+    .select('cache_key')
+    .maybeSingle();
+  if (error) {
+    logger.warn('nfipWarm: claim failed', { cacheKey: row.cache_key, error: error.message });
+    return null;
+  }
+  return claimed ? { attempts } : null;
+}
+
+/**
  * Fetch + store benchmarks for tracts that need it: pending markers
- * first, then the oldest expired benchmarks. Runs on every instance
- * with no leader election (like the other jobs) — a duplicate warm is
- * two identical upserts, harmless by design.
- * @returns {Promise<{warmed: number, failed: number}>}
+ * first, then the oldest expired benchmarks. Each candidate is claimed
+ * before fetching (see claimCandidate), so concurrent instances drain
+ * DIFFERENT tracts and adding instances adds throughput.
+ * @returns {Promise<{warmed: number, failed: number, deadLettered: number}>}
  */
 async function warmPendingTracts({ limit = 3 } = {}) {
   const nowIso = new Date().toISOString();
@@ -174,26 +238,26 @@ async function warmPendingTracts({ limit = 3 } = {}) {
 
   const { data: pending, error: pendErr } = await supabaseAdmin
     .from('PlaceSectionCache')
-    .select('cache_key, payload')
+    .select('cache_key, payload, fetched_at')
     .eq('section_id', SECTION_ID)
     .filter('payload->>pending', 'eq', 'true')
     .order('fetched_at', { ascending: true })
-    .limit(limit);
+    .range(0, limit - 1);
   if (pendErr) {
     // Missing table = migration 156 not applied; nothing to warm.
     logger.warn('nfipWarm: pending scan failed', { error: pendErr.message });
-    return { warmed: 0, failed: 0 };
+    return { warmed: 0, failed: 0, deadLettered: 0 };
   }
   candidates.push(...(pending || []));
 
   if (candidates.length < limit) {
     const { data: expired } = await supabaseAdmin
       .from('PlaceSectionCache')
-      .select('cache_key, payload')
+      .select('cache_key, payload, fetched_at')
       .eq('section_id', SECTION_ID)
       .lt('expires_at', nowIso)
       .order('expires_at', { ascending: true })
-      .limit(limit - candidates.length);
+      .range(0, limit - candidates.length - 1);
     for (const row of expired || []) {
       if (!candidates.some((c) => c.cache_key === row.cache_key)) candidates.push(row);
     }
@@ -201,28 +265,54 @@ async function warmPendingTracts({ limit = 3 } = {}) {
 
   let warmed = 0;
   let failed = 0;
-  for (const row of candidates) {
+  let deadLettered = 0;
+  for (const row of candidates.slice(0, limit)) {
     const tractId = String(row.cache_key || '').replace(/^tract:/, '');
     if (!isValidTract(tractId)) continue;
+
+    const claim = await claimCandidate(row, nowIso);
+    if (!claim) continue; // another instance owns this tract this round
+
+    // Dead-letter: a tract that keeps failing stops occupying the queue.
+    // Stored as suppressed on the SHORT TTL — the composer degrades to
+    // the zone-only card, and next week the tract gets a clean retry.
+    if (claim.attempts > MAX_WARM_ATTEMPTS) {
+      await writeRow(
+        cacheKeyFor(tractId),
+        SECTION_ID,
+        { suppressed: true, unavailable: true, reason: 'fetch_failed', attempts: claim.attempts },
+        INDETERMINATE_TTL_MS,
+        new Date().toISOString(),
+      );
+      deadLettered += 1;
+      logger.warn('nfipWarm: tract dead-lettered after repeated failures', { tractId, attempts: claim.attempts });
+      continue;
+    }
+
     try {
       const rows = await fetchTractPolicies(tractId);
       const benchmark = computeBenchmark(rows);
       const fetchedIso = new Date().toISOString();
-      await writeRow(cacheKeyFor(tractId), SECTION_ID, benchmark, TTL_MS, fetchedIso);
+      // Indeterminate (capped fetch, thin window) retries on the short
+      // cycle; everything else settles for the full benchmark TTL.
+      const ttl = benchmark.indeterminate ? INDETERMINATE_TTL_MS : TTL_MS;
+      await writeRow(cacheKeyFor(tractId), SECTION_ID, benchmark, ttl, fetchedIso);
       warmed += 1;
       logger.info('nfipWarm: tract warmed', {
         tractId,
         rows: rows.length,
         suppressed: Boolean(benchmark.suppressed),
+        attempts: claim.attempts,
       });
     } catch (err) {
-      // Leave the marker in place — the next run retries. An expired
-      // real benchmark keeps serving stale meanwhile (database-first).
+      // The claim already rotated this tract to the back of the queue
+      // and recorded the attempt — the next run tries a DIFFERENT tract
+      // first, and this one retries later or dead-letters at the cap.
       failed += 1;
-      logger.warn('nfipWarm: tract fetch failed', { tractId, error: err.message });
+      logger.warn('nfipWarm: tract fetch failed', { tractId, attempts: claim.attempts, error: err.message });
     }
   }
-  return { warmed, failed };
+  return { warmed, failed, deadLettered };
 }
 
 module.exports = {

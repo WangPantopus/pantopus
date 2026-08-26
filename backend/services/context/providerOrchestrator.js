@@ -7,7 +7,7 @@
  */
 
 const logger = require('../../utils/logger');
-const { resolveLocation } = require('./locationResolver');
+const { resolveLocation, locationFromCoordinates } = require('./locationResolver');
 const { fetchWeather } = require('./weatherProvider');
 const { fetchAQI } = require('./aqiProvider');
 const { fetchAlerts } = require('./alertsProvider');
@@ -142,8 +142,12 @@ const _hubTodayCache = new Map(); // Map<cacheKey, { result, expiresAt }>
 const HUB_TODAY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 const HUB_TODAY_CACHE_MAX = 200;
 
-function hubCacheKey(userId, detail) {
-  return detail ? `${userId}:detail` : String(userId);
+function hubCacheKey(userId, detail, geohash) {
+  const base = detail ? `${userId}:detail` : String(userId);
+  // An explicit-coordinates payload is about a PLACE, not the user's
+  // resolved location — keyed by geohash5 so a user flipping between two
+  // homes never gets one home's forecast served for the other.
+  return geohash ? `${base}@${geohash}` : base;
 }
 
 function clearHubTodayCache(userId) {
@@ -166,11 +170,18 @@ function clearHubTodayCache(userId) {
  *   and each alert's real headline/description/instruction. These are
  *   already fetched and cached by the providers on every call; without this
  *   flag they are simply dropped on the floor at the block-building step.
+ * @param {object} [options.atLocation]  Anchor the payload to EXPLICIT
+ *   coordinates ({latitude, longitude, label?, homeId?}) instead of the
+ *   user's resolved location. The Place Intelligence path passes the
+ *   requested home here — a landlord in Portland opening their Phoenix
+ *   rental must get Phoenix weather, freeze guidance, and alerts, not
+ *   Portland's. Invalid coordinates fall back to the user's location.
  * @returns {Promise<Object>} HubTodayResult
  */
 async function getHubToday(userId, options = {}) {
   const detail = options.detail === true;
-  const cacheKey = hubCacheKey(userId, detail);
+  const atLocation = options.atLocation ? locationFromCoordinates(options.atLocation) : null;
+  const cacheKey = hubCacheKey(userId, detail, atLocation && atLocation.geohash);
 
   // Check in-memory cache first
   const cached = _hubTodayCache.get(cacheKey);
@@ -188,8 +199,8 @@ async function getHubToday(userId, options = {}) {
   const partialFailures = [];
   let cacheHits = 0;
 
-  // 1. Resolve location
-  const location = await resolveLocation(userId);
+  // 1. Resolve location — an explicit anchor wins outright.
+  const location = atLocation || await resolveLocation(userId);
 
   if (location.source === 'none') {
     return {

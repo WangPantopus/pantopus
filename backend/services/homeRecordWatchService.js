@@ -19,7 +19,6 @@
  * open business decision. This service is complete without it.
  */
 
-const crypto = require('crypto');
 const supabaseAdmin = require('../config/supabaseAdmin');
 const logger = require('../utils/logger');
 const notificationService = require('./notificationService');
@@ -54,6 +53,9 @@ function evaluate(watch, pmms) {
     baseline_rate: Number(watch.baseline_rate),
     current_rate: current,
     current_as_of: pmms.latest.date,
+    // The cache served an expired reading (Freddie Mac unreachable) —
+    // the copy must date the number instead of calling it "now".
+    stale: Boolean(pmms.stale),
     delta_pp: delta,
     refi_window: delta <= -REFI_WINDOW_DROP_PP,
   };
@@ -98,11 +100,13 @@ async function setWatch({ homeId, userId, loanRecordedMonth }) {
   }
 
   const nowIso = new Date().toISOString();
+  // No `id` in the payload: the column has a DB default, and supplying a
+  // fresh uuid made the (home_id, user_id) conflict-update REWRITE the
+  // row's primary key on every month edit.
   const { data, error } = await supabaseAdmin
     .from('HomeRecordWatch')
     .upsert(
       {
-        id: crypto.randomUUID(),
         home_id: homeId,
         user_id: userId,
         loan_recorded_month: month,
@@ -159,8 +163,12 @@ function alertBody(evaluation, watch) {
   const monthName = new Date(Date.UTC(Number(year), Number(month) - 1, 1))
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const drop = Math.abs(evaluation.delta_pp).toFixed(2);
-  // Averages and deltas only — never advice.
-  return `The 30-year mortgage average is now ${evaluation.current_rate.toFixed(2)}% — about ${drop} points below the ${monthName} average of ${evaluation.baseline_rate.toFixed(2)}%, the month your loan was recorded.`;
+  // Averages and deltas only — never advice. A stale reading is dated,
+  // never stated as "now".
+  const lead = evaluation.stale && evaluation.current_as_of
+    ? `The 30-year mortgage average was ${evaluation.current_rate.toFixed(2)}% in the latest available survey (week of ${evaluation.current_as_of})`
+    : `The 30-year mortgage average is now ${evaluation.current_rate.toFixed(2)}%`;
+  return `${lead} — about ${drop} points below the ${monthName} average of ${evaluation.baseline_rate.toFixed(2)}%, the month your loan was recorded.`;
 }
 
 /**
@@ -221,7 +229,11 @@ async function evaluateWatches() {
       title: 'Rates are below your loan month’s average',
       body: alertBody(evaluation, watch),
       icon: '📉',
-      link: `/place/${watch.home_id}/money`,
+      // The deep-link vocabulary both mobile routers parse (host `place`
+      // + section query); the web notification resolver maps it to
+      // /app/place/money. The old `/place/<homeId>/money` routed nowhere
+      // on any client.
+      link: '/place?section=money',
       metadata: {
         home_id: watch.home_id,
         baseline_rate: evaluation.baseline_rate,

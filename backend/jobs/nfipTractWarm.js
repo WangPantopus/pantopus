@@ -9,14 +9,25 @@
 // expired benchmarks.
 //
 // Budget: up to 3 tracts per run (~1–2 min worst case), every 15
-// minutes — a newly opened dashboard has its premium benchmark within
-// minutes, and 288 tract-warms/day comfortably covers organic growth.
-// Runs on every instance without leader election, like its siblings;
-// a duplicated warm is two identical upserts.
+// minutes. Runs on every instance without leader election, like its
+// siblings — but each tract is CLAIMED before fetching (a conditional
+// update in warmPendingTracts), so concurrent instances drain different
+// tracts and fleet size adds throughput instead of duplicating the same
+// three slow OpenFEMA pulls. Failed tracts rotate to the back of the
+// queue and dead-letter after repeated failures rather than
+// head-blocking the budget.
+//
+// The run also sweeps the shared PlaceSectionCache janitor: rows a full
+// month past expiry (nothing refreshed OR read-through-refreshed them)
+// are deleted in small batches — the cleanup migration 156 deferred.
 // ============================================================
 
 const { warmPendingTracts } = require('../services/nfipPremiumService');
+const { cleanupLongExpired } = require('../services/placeSectionCache');
 
 module.exports = async function nfipTractWarm() {
-  return warmPendingTracts({ limit: 3 });
+  const result = await warmPendingTracts({ limit: 3 });
+  // Best-effort; the janitor never blocks or fails the warm pass.
+  await cleanupLongExpired().catch(() => {});
+  return result;
 };

@@ -442,6 +442,22 @@ function RateWatchSection({ homeId, verified }: { homeId: string; verified: bool
   if (watchQuery.isLoading) {
     return <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 text-[13.5px] text-app-text-muted">Loading your watch…</div>;
   }
+  // A failed read must never impersonate "no watch" — the create form it
+  // rendered would quietly overwrite the real watch's month on submit.
+  if (watchQuery.isError) {
+    return (
+      <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
+        <div className="text-[13.5px] text-app-text-strong">Couldn&apos;t load your rate watch.</div>
+        <button
+          type="button"
+          onClick={() => watchQuery.refetch()}
+          className="mt-2 h-9 px-3.5 rounded-[10px] border-[1.5px] border-app-border bg-app-surface text-app-text text-[13px] font-semibold hover:bg-app-hover transition"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
   return watchQuery.data
     ? <RateWatchCard watch={watchQuery.data} homeId={homeId} />
     : <RateWatchForm homeId={homeId} />;
