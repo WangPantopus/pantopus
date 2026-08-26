@@ -368,3 +368,17 @@ describe('claims are personal', () => {
     expect(new Set(views.body.views.map((v) => v.user_agent))).toEqual(new Set(['first', 'second']));
   });
 });
+
+// ── Cross-platform constant tripwire ─────────────────────────
+// The expiry menu exists in FIVE hand-synced copies: this backend
+// service (the validator — the only one that can reject), the web api
+// package's RESIDENCY_CLAIM_EXPIRY_DAYS, the web test mock, iOS's
+// duration picker, and Android's DURATION_CHOICES. Until the choices
+// ride the serializer contract, this pin makes any backend change fail
+// loudly here — the reminder to update all five, not a silent 400 for
+// every mobile user on a now-invalid option.
+describe('expiry choices contract', () => {
+  test('the menu is [1, 7, 30, 90] — change all five copies together', () => {
+    expect(residencyClaimService.EXPIRY_DAYS_CHOICES).toEqual([1, 7, 30, 90]);
+  });
+});

@@ -63,10 +63,30 @@ END $$;
 
 -- Backfill from the interim `notes: 'gig:<uuid>'` marker so existing rows
 -- keep their evidence pointer and are covered by the index below.
-UPDATE "public"."HomeMaintenanceLog"
-   SET "gig_id" = NULLIF(regexp_replace("notes", '^gig:', ''), '')::uuid
- WHERE "gig_id" IS NULL
-   AND "notes" ~ '^gig:[0-9a-fA-F-]{36}$';
+--
+-- Hardened against three real-data hazards that would hard-fail the
+-- whole migration: (1) the marker regex is a STRICT uuid shape — the
+-- old 36-chars-of-[hex-] class admitted strings the ::uuid cast throws
+-- on; (2) markers pointing at since-deleted gigs are skipped rather
+-- than violating the FK added above; (3) duplicate markers backfill
+-- only the earliest row, so the unique index below can build.
+WITH candidates AS (
+  SELECT "id",
+         (regexp_replace("notes", '^gig:', ''))::uuid AS gid,
+         ROW_NUMBER() OVER (
+           PARTITION BY regexp_replace("notes", '^gig:', '')
+           ORDER BY "created_at", "id"
+         ) AS rn
+  FROM "public"."HomeMaintenanceLog"
+  WHERE "gig_id" IS NULL
+    AND "notes" ~ '^gig:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+)
+UPDATE "public"."HomeMaintenanceLog" h
+   SET "gig_id" = c.gid
+  FROM candidates c
+ WHERE h."id" = c."id"
+   AND c.rn = 1
+   AND EXISTS (SELECT 1 FROM "public"."Gig" g WHERE g."id" = c.gid);
 
 -- Partial so manually logged work (gig_id NULL) is unconstrained.
 CREATE UNIQUE INDEX IF NOT EXISTS "HomeMaintenanceLog_gig_id_key"
