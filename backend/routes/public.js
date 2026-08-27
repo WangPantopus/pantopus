@@ -682,5 +682,8 @@ router.post('/block-invites/opt-out/:code', async (req, res) => {
 });
 
 module.exports = router;
+// Shared with Scout (routes/scout.js): one geocoder, one cache, one set of
+// US-bounds rules. A second copy would drift and double the Mapbox spend.
+module.exports.geocodeUsAddress = geocodeUsAddress;
 // Test-only hook: reset the in-memory preview caches between cases.
 module.exports.__clearPreviewCaches = () => previewCache.clear();
