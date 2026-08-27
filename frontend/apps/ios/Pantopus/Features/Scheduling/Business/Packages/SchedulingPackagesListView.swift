@@ -152,11 +152,11 @@ struct SchedulingPackagesListView: View {
                 Icon(.layers, size: 32, color: model.accent)
             }
             Text("Sell a package of sessions")
-                .font(.system(size: 20, weight: .semibold))
+                .pantopusTextStyle(.h3)
                 .foregroundStyle(Theme.Color.appText)
                 .multilineTextAlignment(.center)
             Text("Bundle sessions so regulars can prepay and rebook fast.")
-                .font(.system(size: 14))
+                .pantopusTextStyle(.small)
                 .foregroundStyle(Theme.Color.appTextSecondary)
                 .multilineTextAlignment(.center)
             VStack(spacing: 10) {
