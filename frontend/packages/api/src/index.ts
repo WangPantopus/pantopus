@@ -354,6 +354,22 @@ export type {
   PublicUnlisted,
 } from './endpoints/unlisted';
 
+// Place — Before-You-Sign Scout: an address you do NOT live at (Wave 5)
+export * as scout from './endpoints/scout';
+export type {
+  ScoutStatus,
+  ScoutResponse,
+  ScoutReport,
+  ScoutPlace,
+  ScoutFlood,
+  ScoutFloodCost,
+  ScoutRadon,
+  ScoutWater,
+  ScoutRent,
+  ScoutAsk,
+  ScoutOptions,
+} from './endpoints/scout';
+
 // Place — verified-only neighbor messaging (W2.6)
 export * as neighborMessages from './endpoints/neighborMessages';
 export type {

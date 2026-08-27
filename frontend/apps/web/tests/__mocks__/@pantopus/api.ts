@@ -165,6 +165,10 @@ export const realRent = {
   deleteRentReport: jest.fn(),
 };
 // Place — Unlisted: the address-removal surface (Wave 4).
+export const scout = {
+  getScoutReport: jest.fn(),
+};
+
 export const unlisted = {
   getPublicUnlisted: jest.fn(),
   getHomeUnlisted: jest.fn(),

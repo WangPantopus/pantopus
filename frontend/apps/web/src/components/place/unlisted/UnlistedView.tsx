@@ -82,8 +82,8 @@ export default function UnlistedView() {
           Get your address off the internet.
         </h1>
         <p className="mt-3 text-[15px] leading-[22px] text-app-text-secondary">
-          Your state may offer a legal substitute address that fixes this at the source. Below that: every site that
-          republishes county property records, and the exact verified way to leave each one.
+          Your state may offer a legal substitute address that fixes this at the source. Below that: the
+          people-search sites we have verified a removal path for, and the exact way to leave each one.
         </p>
 
         <form onSubmit={submit} className="mt-5">

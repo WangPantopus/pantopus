@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -130,7 +131,7 @@ function HeroStep({
         </div>
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-0.5">
         <button
           type="button"
           onClick={onBrowse}
@@ -139,6 +140,22 @@ function HeroStep({
           Just here to follow someone or browse?
           <ArrowRight size={14} strokeWidth={2.25} className="text-primary-600" />
         </button>
+        {/*
+          The "you are a different kind of user than this funnel assumes"
+          affordance, for the shopper. This funnel asks people to claim
+          the address they live at; Scout's reader is standing outside an
+          open house with twenty minutes before a showing and has no
+          place to save. Routing them by INTENT rather than dropping them
+          into the claim flow is also the only way to find out whether
+          that intent exists — never carry the typed address in the URL.
+        */}
+        <Link
+          href="/register?intent=scout"
+          className="inline-flex items-center gap-1.5 py-2 px-1 text-[13.5px] font-medium text-app-text-secondary -tracking-[0.005em]"
+        >
+          Considering a place you don&apos;t live at yet?
+          <ArrowRight size={14} strokeWidth={2.25} className="text-primary-600" />
+        </Link>
       </div>
     </div>
   );
