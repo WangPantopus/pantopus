@@ -156,11 +156,19 @@ function computeBenchmark(rows, now = new Date()) {
 
 /**
  * The benchmark for a tract, from cache only.
+ *
+ * @param {string} tractId
+ * @param {{enqueue?: boolean}} [opts] `enqueue: false` reads without
+ *   leaving a pending marker. The anonymous preview passes it: the warm
+ *   job takes 3 tracts per run at 12 runs an hour, and its pending lane
+ *   is FIFO, so letting drive-by lookups queue lets anonymous traffic
+ *   sit in front of tracts where someone actually lives. Enqueueing
+ *   should follow the people, not the page views.
  * @returns {Promise<{status: 'ready'|'pending'|'suppressed', data?: object, fetchedAt?: string}>}
- *   `pending` also covers "tract we've never seen" — a marker row is
- *   written so the warm job picks it up.
+ *   `pending` also covers "tract we've never seen"; with `enqueue` left
+ *   on, a marker row is written so the warm job picks it up.
  */
-async function getTractBenchmark(tractId) {
+async function getTractBenchmark(tractId, { enqueue = true } = {}) {
   if (!isValidTract(tractId)) return { status: 'pending' };
 
   const row = await readRow(cacheKeyFor(tractId), SECTION_ID);
@@ -170,7 +178,7 @@ async function getTractBenchmark(tractId) {
     return { status: 'ready', data: payload, fetchedAt: row.fetched_at };
   }
 
-  if (!payload) {
+  if (!payload && enqueue) {
     // First sighting: leave a pending marker for the warm job. A lost
     // race between instances just writes the same marker twice.
     const nowIso = new Date().toISOString();

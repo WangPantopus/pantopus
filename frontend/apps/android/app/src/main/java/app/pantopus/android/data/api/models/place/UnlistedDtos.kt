@@ -260,10 +260,20 @@ data class HomeUnlistedResponse(
     val unlisted: UnlistedProfile,
 )
 
-/** ready / unsupported_region for the anonymous look-up. */
+/** ready / could_not_place / unsupported_region for the anonymous look-up. */
 enum class UnlistedPreviewStatus {
     @Json(name = "ready")
     READY,
+
+    /**
+     * We could not read a state out of what was typed. NOT the same as
+     * [UNSUPPORTED_REGION]: the removal list is national and still
+     * arrives in full, with `stateProgram` absent rather than negative.
+     * Rendering the two alike told US residents the product had nothing
+     * for them whenever the address failed to parse.
+     */
+    @Json(name = "could_not_place")
+    COULD_NOT_PLACE,
 
     @Json(name = "unsupported_region")
     UNSUPPORTED_REGION,
@@ -271,7 +281,11 @@ enum class UnlistedPreviewStatus {
     UNKNOWN,
 }
 
-/** Only city + state — the specific address is never echoed or stored. */
+/**
+ * State only — `city` is always null on this route, because resolving one
+ * would mean a third-party geocode and the anonymous path promises the
+ * typed address is not sent anywhere.
+ */
 @JsonClass(generateAdapter = true)
 data class UnlistedPreviewPlace(
     val city: String? = null,

@@ -66,6 +66,33 @@ describe('the broker registry never claims more than it knows', () => {
       expect(broker.id).toMatch(/^[a-z0-9-]+$/);
     }
   });
+
+  test('no entry understates what a site publishes relative to another entry for the same site', () => {
+    // Spokeo declared [address, phone, email, age] while AnyWho — which
+    // runs on Spokeo's platform and cites the identical source_url —
+    // declared relatives and prior addresses on top. Both cards render on
+    // one screen, and the omitted token was the dangerous one
+    // ("Relatives and household members").
+    //
+    // Deliberately NOT "same opt-out URL implies same exposes": one
+    // suppression portal can legitimately serve brands that publish
+    // different fields, and a smaller brand may genuinely publish less
+    // than the platform it runs on. The sound rule is directional — a
+    // brand cannot publish a field its own platform does not.
+    const byId = new Map(DATA_BROKERS.map((b) => [b.id, b]));
+    const contradictions = [];
+    for (const brand of DATA_BROKERS) {
+      if (!brand.same_platform_as) continue;
+      const platform = byId.get(brand.same_platform_as);
+      expect(platform).toBeTruthy();
+      for (const token of brand.exposes) {
+        if (!platform.exposes.includes(token)) {
+          contradictions.push(`${brand.id} declares "${token}", ${platform.id} does not`);
+        }
+      }
+    }
+    expect(contradictions).toEqual([]);
+  });
 });
 
 describe('the exposure profile', () => {
@@ -74,6 +101,20 @@ describe('the exposure profile', () => {
     // Without this line the page implies a scan it never performed.
     expect(profile.method_note).toBeTruthy();
     expect(profile.method_note).toMatch(/still verifying|do not look/i);
+
+    // THE COMPLETENESS CLAIM. The note used to end "This is every site
+    // that republishes county records" — the one sentence on the page a
+    // frightened person would read as permission to stop. It is false:
+    // the registry omits anything whose opt-out could not be verified.
+    // Telling someone the list is complete fails them the same way
+    // telling them their state has no program does.
+    //
+    // The previous assertion (/still verifying|do not look/) passed on
+    // either wording, which is why the overclaim shipped.
+    expect(profile.method_note).not.toMatch(/every site/i);
+    expect(profile.method_note).not.toMatch(/\ball of (them|the sites)\b/i);
+    // Stating the count keeps the sentence tied to the list it describes.
+    expect(profile.method_note).toContain(String(profile.broker_count));
   });
 
   test('an unverified state is "could not confirm", never "has no program"', () => {
@@ -222,8 +263,121 @@ describe('the state escape hatch', () => {
     }
   });
 
+  test('every citation is a government or program-operator page, not a secondary summary', () => {
+    // "is it a URL" has no teeth, and that is exactly why three states
+    // shipped citing a law-review blog for the most dangerous claim in
+    // the file — that the reader's state has no program at all. That
+    // blog's own list is wrong about Arkansas and South Carolina, both of
+    // which this registry contradicts with the states' own pages, so it
+    // was provably not what those entries were verified against.
+    //
+    // The allowlist is for program operators that are not themselves .gov
+    // (NACAP is the national association of the state programs, and a
+    // state AG's campaign site is the AG's own publication).
+    const OPERATOR_HOSTS = ['nacap.org', 'attorneygenerallynnfitch.com'];
+    const offenders = [];
+    for (const [code, s] of Object.entries(STATE_DISCLOSURE)) {
+      const host = new URL(s.source_url).hostname.toLowerCase();
+      const ok = host.endsWith('.gov')
+        || host.endsWith('.us')
+        || OPERATOR_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+      if (!ok) offenders.push(`${code}: ${host}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test('all 50 states and DC are covered, so no resident sees a blank', () => {
     expect(Object.keys(STATE_DISCLOSURE)).toHaveLength(51);
     expect(STATE_DISCLOSURE.DC).toBeTruthy();
+  });
+});
+
+// ============================================================
+// The anonymous route: GET /api/public/unlisted
+//
+// Two promises live here, and both were broken.
+//
+//   1. "We do not save this address, and we do not send it anywhere
+//      else." The route geocoded through Mapbox, which put the typed
+//      address into a third-party query string — on a page whose
+//      readers are disproportionately hiding from a specific person.
+//
+//   2. "We could not place that" and "you are not in the United States"
+//      are different answers. Every geocoder failure — an outage, a
+//      missing API key, an address it simply could not parse — returned
+//      the geographic denial, so a Mapbox blip told every US visitor at
+//      once that the product had nothing for them, and withheld the
+//      entire national removal list, which never needed the address.
+// ============================================================
+
+const publicRouter = require('../routes/public');
+
+function buildPublicApp() {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/public', publicRouter);
+  return app;
+}
+
+describe('the anonymous unlisted lookup', () => {
+  test('a full address resolves to its state and sends nothing anywhere', async () => {
+    const realFetch = global.fetch;
+    const seen = [];
+    global.fetch = jest.fn(async (url) => {
+      seen.push(String(url));
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+    try {
+      const res = await request(buildPublicApp())
+        .get('/api/public/unlisted')
+        .query({ address: '1421 SE Oak St, Portland, OR 97214' });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ready');
+      expect(res.body.place.state).toBe('OR');
+      // No city — resolving one would mean the third-party hop the page
+      // promises does not happen.
+      expect(res.body.place.city).toBeNull();
+      expect(res.body.unlisted.state_program).not.toBeNull();
+    } finally {
+      global.fetch = realFetch;
+    }
+    expect(seen).toEqual([]);
+  });
+
+  test('an address it cannot place is NOT told it is outside the U.S.', async () => {
+    const res = await request(buildPublicApp())
+      .get('/api/public/unlisted')
+      .query({ address: 'the blue house behind the school' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('could_not_place');
+    expect(res.body.status).not.toBe('unsupported_region');
+    // The exact laundering that shipped: a geographic denial rendered to
+    // someone who is standing in the United States.
+    expect(JSON.stringify(res.body)).not.toMatch(/U\.S\.-only|outside the U\.S\./i);
+  });
+
+  test('an address it cannot place still gets the WHOLE removal list', async () => {
+    // Every broker path is national. None of it needed the address, so
+    // withholding it because a state could not be read is a pure loss to
+    // the person who came here for exactly that list.
+    const full = unlistedService.getExposureProfile('OR');
+    const res = await request(buildPublicApp())
+      .get('/api/public/unlisted')
+      .query({ address: 'no state here' });
+
+    expect(res.body.unlisted.broker_count).toBe(full.broker_count);
+    expect(res.body.unlisted.groups).toHaveLength(full.groups.length);
+    expect(res.body.unlisted.method_note).toBe(full.method_note);
+    // And the state answer degrades to "not checked", never to "none".
+    expect(res.body.unlisted.state_program).toBeNull();
+  });
+
+  test('a ZIP on its own is enough to reach the state program', async () => {
+    const res = await request(buildPublicApp())
+      .get('/api/public/unlisted')
+      .query({ address: '97214' });
+    expect(res.body.status).toBe('ready');
+    expect(res.body.place.state).toBe('OR');
   });
 });

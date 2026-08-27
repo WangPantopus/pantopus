@@ -107,9 +107,23 @@ function getExposureProfile(stateCode) {
     // The honesty line the UI must render verbatim somewhere visible.
     // It is not decoration: without it the page implies a scan it never
     // performed.
+    // The second clause used to read "This is every site that republishes
+    // county records." That is the one sentence on the page a frightened
+    // person would use to decide they are DONE, and it was false: this
+    // file's own header says entries that could not be verified are
+    // omitted, and TruePeopleSearch, PeopleFinders, Nuwber, ClustrMaps and
+    // NeighborWho are among the sites missing. Telling someone the list is
+    // complete is the same failure as telling them their state has no
+    // program — it stops them looking further. The count is stated so the
+    // sentence cannot drift away from the list it describes.
+    //
+    // Deliberately NOT worded "we have not confirmed": that phrase
+    // already carries a different meaning one card above, where it means
+    // we could not establish whether the reader's STATE runs a program.
+    // Two unrelated uncertainties in the same words on the same screen.
     method_note: brokerCount > 0
       ? 'We do not look your address up on these sites — searching them would hand them your address. '
-        + 'This is every site that republishes county records, and the exact way to remove yourself from each.'
+        + `These are the ${brokerCount} sites we have verified a working removal path for — there are more we have not got to yet.`
       : 'We are still verifying removal paths. We publish a site only once we have confirmed its opt-out works.',
     registry_verified_at: latestVerifiedAt(),
   };

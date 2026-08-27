@@ -20,8 +20,20 @@
  * omitted rather than guessed, and the UI must degrade to "we could not
  * confirm a program for your state" rather than inventing one.
  *
- * We do NOT ask why someone is here, we do not record that they looked,
- * and the T0 endpoint persists nothing.
+ * We do NOT ask why someone is here. The T0 endpoint persists nothing
+ * about the lookup, though the shared request logger does record the
+ * caller's IP and user-agent like every other route — pre-existing, and
+ * worth suppressing on this path separately.
+ *
+ * SOURCING A NEGATIVE. `acp_exists: false` is the most dangerous cell in
+ * this file: it tells someone their state has nothing. It must be
+ * sourced as carefully as a positive, and to a .gov / .us page or a
+ * program operator's own directory — never a secondary summary. The
+ * three no-program states cited a law-review article until an audit
+ * caught it; that article's own list is wrong about Arkansas and South
+ * Carolina, both of which this file correctly contradicts with the
+ * states' own pages, so it was demonstrably not what they were verified
+ * against. `unlisted.test.js` now enforces the domain rule.
  */
 
 /**
@@ -295,7 +307,7 @@ const STATE_DISCLOSURE = {
     acp_name: "",
     acp_url: "",
     acp_eligibility: "No state address confidentiality program exists; North Dakota has not enacted one.",
-    source_url: "https://wustllawreview.org/2025/02/25/safe-at-home-reimagining-address-confidentiality/",
+    source_url: "https://sos.mn.gov/safe-at-home/resources-for-safety/other-states-with-programs-like-safe-at-home/",
     verified_at: "2026-08-27",
   },
   NE: {
@@ -412,7 +424,7 @@ const STATE_DISCLOSURE = {
     acp_name: "",
     acp_url: "",
     acp_eligibility: "No state address confidentiality program exists; South Dakota has not enacted one.",
-    source_url: "https://wustllawreview.org/2025/02/25/safe-at-home-reimagining-address-confidentiality/",
+    source_url: "https://sos.mn.gov/safe-at-home/resources-for-safety/other-states-with-programs-like-safe-at-home/",
     verified_at: "2026-08-27",
   },
   TN: {
@@ -493,7 +505,7 @@ const STATE_DISCLOSURE = {
     acp_name: "",
     acp_url: "",
     acp_eligibility: "No state address confidentiality program exists; Wyoming has not enacted one. Address protection is available only case-by-case through a court order in a domestic-abuse proceeding.",
-    source_url: "https://wustllawreview.org/2025/02/25/safe-at-home-reimagining-address-confidentiality/",
+    source_url: "https://sos.mn.gov/safe-at-home/resources-for-safety/other-states-with-programs-like-safe-at-home/",
     verified_at: "2026-08-27",
   },
 };

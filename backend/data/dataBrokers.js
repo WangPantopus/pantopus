@@ -159,6 +159,13 @@ const DATA_BROKERS = [
     id: "anywho",
     name: "AnyWho (operated on Spokeo's platform)",
     category: "people_search",
+    // Declared, not just stated in prose, so the test can enforce it: a
+    // brand running on another entry's platform cannot publish a field
+    // the platform itself does not. AnyWho once declared `relatives` and
+    // `prior_addresses` while the Spokeo card omitted both, which left
+    // two cards on one screen contradicting each other about the same
+    // company — and the understated card was the better-known one.
+    same_platform_as: "spokeo",
     exposes: ["home_address", "phone", "email", "relatives", "prior_addresses"],
     opt_out_url: "https://www.spokeo.com/optout",
     method: "web_form",
@@ -257,7 +264,13 @@ const DATA_BROKERS = [
     id: "spokeo",
     name: "Spokeo",
     category: "people_search",
-    exposes: ["home_address", "phone", "email", "age"],
+    // Spokeo's own product pages list Address History, Family and
+    // Associates, and Property Data — and the AnyWho entry below, which
+    // runs on this same platform and cites this same source_url, already
+    // declared relatives and prior addresses. Understating the most
+    // sensitive field ("Relatives and household members") on the larger
+    // of two cards describing one website is the wrong way to be wrong.
+    exposes: ["home_address", "phone", "email", "age", "relatives", "prior_addresses", "property_value"],
     opt_out_url: "https://www.spokeo.com/optout",
     method: "web_form",
     requires_id: false,

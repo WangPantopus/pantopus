@@ -183,6 +183,13 @@ function PreviewHeroCard() {
 // `money_lead: null` means no figure was genuinely available. The tiles
 // then carry the page exactly as they did before this existed: no
 // placeholder, no gap, no invented number.
+// A truthy-but-empty lead object took the hero slot AND rendered nothing
+// in it, leaving a blank card where the page's whole argument goes. The
+// headline is the card, so no headline means fall back to the hero.
+function isRenderableLead(lead: PlacePreviewMoneyLead | null | undefined): lead is PlacePreviewMoneyLead {
+  return !!lead && typeof lead.headline === 'string' && lead.headline.trim().length > 0;
+}
+
 function MoneyLeadCard({ lead }: { lead: PlacePreviewMoneyLead }) {
   return (
     <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4">
@@ -469,7 +476,7 @@ export default function StartFunnel() {
                 {/* The dollar figure leads when there is a real one;
                     otherwise the original hero carries the page exactly
                     as before — never a placeholder in its place. */}
-                {preview.money_lead
+                {isRenderableLead(preview.money_lead)
                   ? <MoneyLeadCard lead={preview.money_lead} />
                   : <PreviewHeroCard />}
               </div>

@@ -425,6 +425,12 @@ public struct UnlistedRemovalResponse: Decodable, Sendable, Hashable {
 
 public enum PublicUnlistedStatus: String, Sendable, Hashable {
     case ready
+    /// We could not read a state out of what was typed. This is NOT
+    /// `unsupportedRegion`: the removal list is national and still
+    /// arrives in full, with `state_program` absent rather than negative.
+    /// Rendering the two the same told US residents the product had
+    /// nothing for them whenever the address failed to parse.
+    case couldNotPlace = "could_not_place"
     case unsupportedRegion = "unsupported_region"
     case unknown
 }
@@ -436,8 +442,10 @@ extension PublicUnlistedStatus: Decodable {
     }
 }
 
-/// Only the city and state come back — the address itself is resolved to
-/// a state and then dropped. It is never stored, and never sent anywhere.
+/// Only the state comes back — `city` is always nil on this route, since
+/// resolving one would mean a third-party geocode and the anonymous path
+/// promises the typed address is not sent anywhere. It resolves to a
+/// state locally, and is then dropped.
 public struct PublicUnlistedPlace: Decodable, Sendable, Hashable {
     public let city: String?
     public let state: String?
@@ -449,6 +457,7 @@ public struct PublicUnlistedResponse: Decodable, Sendable, Hashable {
     public let place: PublicUnlistedPlace?
     public let unlisted: UnlistedExposureProfile?
     public let disclaimer: String?
-    /// Carried by `unsupported_region` (non-US) instead of a profile.
+    /// Carried by `could_not_place` and `unsupported_region`. Only the
+    /// latter means "not in the US"; the former still ships a profile.
     public let message: String?
 }

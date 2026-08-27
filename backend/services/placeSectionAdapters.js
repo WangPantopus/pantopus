@@ -55,13 +55,23 @@ async function fetchJson(url, { headers } = {}) {
   }
 }
 
-// ── County FIPS for a home (geocoder, cached 90 d per home) ──
+// ── County FIPS for a point (geocoder, cached ~permanently) ──
+//
+// Keyed on LOCATION, never on the home row. County assignment is a fact
+// about coordinates, so a home-scoped key was both redundant and unsafe:
+// Scout composes against a synthetic home with `id: null`, and
+// `home:${home.id}` stringified that to the literal "home:null" — one
+// global cache row, TTL a year, shared by every Scout request in the
+// deployment. The first address anyone scouted pinned its county, and
+// every later report priced rent, radon and drinking water for that
+// stranger's county instead. A geohash-5 cell is ~5 km, far finer than
+// any county, so this is also a better key for real homes.
 async function homeCountyFips(home) {
   const ll = homeLatLng(home);
   if (!ll) return null;
   try {
     const { payload } = await readThrough({
-      cacheKey: `home:${home.id}`,
+      cacheKey: `geo:${encodeGeohash(ll.lat, ll.lng, 5)}`,
       sectionId: '_county_fips',
       // County assignment changes only at the decennial census —
       // effectively permanent, refreshed yearly as a safety valve.
@@ -299,12 +309,19 @@ async function composeRentBand(home) {
       : 2;
     const fmrLo = row.fmr_lo[bedrooms];
     const fmrHi = row.fmr_hi[bedrooms];
-    // HUD FMRs are 40th-percentile point estimates; where HUD prices a
-    // county at one number (lo = hi) the band extends 20% above it to
-    // show a typical asking-rent spread — the summary says exactly that.
+    // HUD FMRs are 40th-percentile point estimates. Where HUD publishes a
+    // genuine range (a handful of New England counties) it is used
+    // verbatim — a Math.max against lo × 1.2 silently discarded HUD's own
+    // upper figure in favour of a larger invented one. Only where HUD
+    // prices the county at a single number does the band extend 20%
+    // above it, and then the summary says so out loud.
+    const hudPublishedRange = fmrHi > fmrLo;
     const bandLow = fmrLo;
-    const bandHigh = Math.max(fmrHi, Math.round(fmrLo * 1.2));
+    const bandHigh = hudPublishedRange ? fmrHi : Math.round(fmrLo * 1.2);
     const bedroomsLabel = bedrooms === 0 ? 'studio' : `${bedrooms}-bedroom`;
+    const bandNote = hudPublishedRange
+      ? `–$${fmrHi.toLocaleString('en-US')}/mo.`
+      : '/mo; the band runs to about 20% above it.';
 
     return [serializePlaceSection('rent_band', {
       status: 'ready',
@@ -314,9 +331,9 @@ async function composeRentBand(home) {
         band_high: bandHigh,
         // Full comparison track: efficiency floor to 20% over the 4BR top.
         market_low: Math.min(row.fmr_lo[0], bandLow),
-        market_high: Math.max(Math.round(row.fmr_hi[4] * 1.2), bandHigh),
+        market_high: Math.max(row.fmr_hi[4] > row.fmr_lo[4] ? row.fmr_hi[4] : Math.round(row.fmr_hi[4] * 1.2), bandHigh),
         period: `FY ${row.fiscal_year}`,
-        summary: `HUD's FY ${row.fiscal_year} fair market rent for a ${bedroomsLabel} in ${row.county_name} is $${fmrLo.toLocaleString('en-US')}/mo; the band runs to about 20% above it.`,
+        summary: `HUD's FY ${row.fiscal_year} fair market rent for a ${bedroomsLabel} in ${row.county_name} is $${fmrLo.toLocaleString('en-US')}${bandNote}`,
       },
     })];
   } catch (err) {

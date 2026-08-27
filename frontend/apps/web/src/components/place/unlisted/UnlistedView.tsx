@@ -110,8 +110,9 @@ export default function UnlistedView() {
         <div className="flex items-start gap-2 mt-3 px-3.5 py-3 rounded-xl border border-app-border bg-app-surface">
           <Lock size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-app-text-muted" />
           <p className="text-[12.5px] leading-[18px] text-app-text-secondary">
-            We do not save this address, and we do not send it anywhere else. It is used once, to work out which
-            state you are in — the answer below is the same for everyone in that state.
+            We do not save this address, and we do not send it anywhere else — not even to a mapping service. It is
+            read once, on our server, to work out which state you are in, and the answer below is the same for
+            everyone in that state.
           </p>
         </div>
 
@@ -119,6 +120,23 @@ export default function UnlistedView() {
           <p className="text-[13.5px] text-app-error leading-[20px] mt-4">
             We couldn&apos;t look that up. Check the address and try again.
           </p>
+        ) : null}
+
+        {/* "We could not read a state out of that" is a different answer
+            from "you are not in the United States", and it is the far
+            more common one. It must never be dressed as the geographic
+            denial below: the removal list underneath is national and is
+            still rendered in full. */}
+        {result && result.status === 'could_not_place' ? (
+          <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-4 mt-6">
+            <h2 className="text-[16px] font-bold text-app-text -tracking-[0.01em]">
+              {result.message ?? 'We could not tell which state that is'}
+            </h2>
+            <p className="text-[13.5px] text-app-text-secondary leading-[20px] mt-1.5">
+              Add the state or ZIP — &ldquo;Portland, OR&rdquo; or &ldquo;97214&rdquo; — and your state&apos;s
+              program appears too. Everything below applies wherever you are in the U.S.
+            </p>
+          </div>
         ) : null}
 
         {result && result.status === 'unsupported_region' ? (

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://pantopus.com'),
   title: 'Get your address off the internet',
   description:
-    'Your state’s address confidentiality program, plus the verified opt-out path for every site that republishes county property records.',
+    'Your state’s address confidentiality program, plus a verified opt-out path for each of the people-search sites that republish county property records.',
   robots: { index: false, follow: false },
 };
 

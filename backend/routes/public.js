@@ -14,6 +14,7 @@ const unlistedService = require('../services/unlistedService');
 const placeSectionAdapters = require('../services/placeSectionAdapters');
 const { encodeGeohash, encodeGeohash6 } = require('../utils/geohash');
 const { GeoCache } = require('../utils/geoCache');
+const { resolveUsState } = require('../utils/usState');
 
 // ============================================================
 // Public Preview Endpoints
@@ -325,7 +326,7 @@ async function fetchFloodCached(lat, lng) {
 // Census tract teaser — area-level medians only (NOT an exact home record,
 // NOT ATTOM). Same two-layer caching as flood; the tract resolution itself
 // is persistently cached too (geocodeToTractCached — effectively permanent).
-async function fetchCensusTeaserCached(lat, lng, tractHint) {
+async function fetchCensusTeaserCached(lat, lng, resolveTract) {
   const key = `census:${encodeGeohash6(lat, lng)}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
@@ -336,7 +337,7 @@ async function fetchCensusTeaserCached(lat, lng, tractHint) {
       sectionId: '_census_teaser',
       ttlMs: 90 * 24 * 60 * 60 * 1000,
       fetch: async () => {
-        const tract = tractHint || await geocodeToTractCached(lat, lng);
+        const tract = resolveTract ? await resolveTract() : await geocodeToTractCached(lat, lng);
         if (!tract) return null;
         const { tractId, stateCode, countyCode } = tract;
         const tractCode = tractId.slice(stateCode.length + countyCode.length);
@@ -378,17 +379,19 @@ async function fetchCensusTeaserCached(lat, lng, tractHint) {
 //   * a benchmark is never called a quote or a payment;
 //   * when nothing is available the preview falls back to the tiles
 //     rather than inventing a number.
-async function fetchMoneyLeadCached(lat, lng, tractHint) {
+async function fetchMoneyLeadCached(lat, lng, resolveTract) {
   const key = `money:${encodeGeohash6(lat, lng)}`;
   const cached = previewCache.get(key);
   if (cached !== undefined) return cached;
 
   let lead = null;
   try {
-    const tract = tractHint || await geocodeToTractCached(lat, lng);
+    const tract = resolveTract ? await resolveTract() : await geocodeToTractCached(lat, lng);
     if (tract) {
       const [nfip, fmr] = await Promise.all([
-        nfipPremiumService.getTractBenchmark(tract.tractId).catch(() => null),
+        // enqueue: false — an anonymous drive-by must not take a slot in
+        // the warm queue ahead of a tract someone actually lives in.
+        nfipPremiumService.getTractBenchmark(tract.tractId, { enqueue: false }).catch(() => null),
         placeSectionAdapters.hudFmrRow(`${tract.stateCode}${tract.countyCode}`).catch(() => null),
       ]);
 
@@ -415,11 +418,27 @@ async function fetchMoneyLeadCached(lat, lng, tractHint) {
           source: 'FEMA · OpenFEMA NFIP policies',
         };
       } else if (fmr && Array.isArray(fmr.fmr_lo) && fmr.fmr_lo[2]) {
+        // Every figure in this headline has to come off the HUD row.
+        //
+        // HUD prices all but ~14 US counties at a SINGLE 2-bedroom number
+        // (fmr_hi[2] === fmr_lo[2] in 3,209 of the 3,223 seeded rows), so
+        // the old `Math.max(fmr_hi[2], lo * 1.2)` rendered an upper bound
+        // HUD never published — under a bare "HUD Fair Market Rents"
+        // attribution — for 99.6% of the country, and discarded HUD's
+        // real high for four of the counties that do have one.
+        //
+        // The T1 dashboard section does extend a single figure by 20%,
+        // but it says so in the same sentence. The anonymous lead has no
+        // room for that clause, so it states the one number instead.
         const lo = Math.round(fmr.fmr_lo[2]);
-        const hi = Math.round(Math.max(fmr.fmr_hi[2] || 0, lo * 1.2));
+        const publishedHi = Math.round(Number(fmr.fmr_hi && fmr.fmr_hi[2]) || 0);
+        const hasRange = publishedHi > lo;
+        const hi = hasRange ? publishedHi : lo;
         lead = {
           kind: 'rent_band',
-          headline: `A 2-bedroom here rents for about $${lo.toLocaleString('en-US')}–$${hi.toLocaleString('en-US')} a month`,
+          headline: hasRange
+            ? `A 2-bedroom here rents for about $${lo.toLocaleString('en-US')}–$${hi.toLocaleString('en-US')} a month`
+            : `HUD prices a 2-bedroom here at about $${lo.toLocaleString('en-US')} a month`,
           detail: `HUD's FY ${fmr.fiscal_year} fair market rent for ${fmr.county_name}. A county-wide estimate, not this home.`,
           low: lo,
           high: hi,
@@ -483,16 +502,29 @@ router.get('/place', async (req, res) => {
     // 2. The free demonstration subset only. Flood, the Census teaser, and the
     //    density bucket are fetched independently and cached in-memory; each
     //    degrades on its own, none persists the preview, none touches ATTOM.
-    // ONE tract resolution, shared. The census teaser and the money lead
-    // both need it, and letting each resolve its own doubled the Census
-    // geocoder traffic on every anonymous view.
-    const tract = await geocodeToTractCached(place.lat, place.lng).catch(() => null);
+    // ONE tract resolution, shared, lazy. The census teaser and the money
+    // lead both need it, and letting each resolve its own doubled the
+    // Census geocoder traffic on every anonymous view.
+    //
+    // Shared as a THUNK rather than an awaited value, for two reasons the
+    // first version got wrong: awaiting it up front serialized a round
+    // trip ahead of the parallel fan-out below (~300 ms on a cold cell,
+    // paid even when both consumers were about to hit their in-memory
+    // caches), and passing the resolved value made `null` — "we tried and
+    // could not place it" — indistinguishable from "no hint supplied", so
+    // both consumers re-resolved and a failing geocoder was hit three
+    // times per request instead of once.
+    let tractPromise = null;
+    const resolveTract = () => {
+      if (!tractPromise) tractPromise = geocodeToTractCached(place.lat, place.lng).catch(() => null);
+      return tractPromise;
+    };
 
     const [floodSettled, areaSettled, bucketSettled, moneySettled] = await Promise.allSettled([
       fetchFloodCached(place.lat, place.lng),
-      fetchCensusTeaserCached(place.lat, place.lng, tract),
+      fetchCensusTeaserCached(place.lat, place.lng, resolveTract),
       readDensityBucket(geohash),
-      fetchMoneyLeadCached(place.lat, place.lng, tract),
+      fetchMoneyLeadCached(place.lat, place.lng, resolveTract),
     ]);
 
     const flood = floodSettled.status === 'fulfilled' ? floodSettled.value : null;
@@ -567,13 +599,23 @@ router.get('/place', async (req, res) => {
 // account. The inversion that makes it convert: you hand over an address
 // in order to make it LESS visible.
 //
-// It persists NOTHING. It resolves the address to a STATE and returns a
-// profile that is identical for everyone in that state — the law, and a
-// verified registry of removal paths. The address is never stored and
-// never sent to any third party. That last point is load-bearing:
-// looking someone up on a people-search site would disclose their
-// address to the exact company they are trying to leave, so we do not,
-// and the payload says so in `method_note`.
+// It persists NOTHING, and — unlike every other route in this file — it
+// sends NOTHING. The address is resolved to a state locally, by
+// `utils/usState`, because the panel above the input on the web page
+// tells the reader "we do not send it anywhere else" and that has to be
+// literally true. It used to geocode through Mapbox, which put the typed
+// address into a third-party query string on a page whose readers are
+// disproportionately hiding from a specific person.
+//
+// Dropping the geocode also removes the timing side-channel the shared
+// preview cache created (a repeat lookup of the same string returned in
+// ~2 ms instead of ~200 ms, which let anyone probe whether an address
+// had recently been looked up).
+//
+// The answer is identical for everyone in a state, so a state is all it
+// ever needed. Looking someone up on a people-search site would disclose
+// their address to the exact company they are trying to leave, so we do
+// not do that either, and the payload says so in `method_note`.
 router.get('/unlisted', async (req, res) => {
   try {
     const rawAddress = typeof req.query.address === 'string' ? req.query.address.trim() : '';
@@ -584,22 +626,37 @@ router.get('/unlisted', async (req, res) => {
       return res.status(400).json({ error: 'That address is too long.' });
     }
 
-    const place = await geocodeUsAddress(rawAddress);
-    if (!place.ok) {
+    const state = resolveUsState(rawAddress);
+
+    // "We could not place that" and "you are not in the United States"
+    // are DIFFERENT ANSWERS and must never be collapsed. The old handler
+    // returned the geographic denial for every failure, so an address
+    // the geocoder simply could not parse told someone standing in
+    // Portland that the product had nothing for them.
+    //
+    // Everything except the state program is national, and none of it
+    // needed the address at all — so an unresolved state still gets the
+    // whole verified removal list, with `state_program: null`, which the
+    // clients already render as "we have not confirmed one for your
+    // state" rather than "your state has none".
+    if (!state) {
       return res.json({
-        status: 'unsupported_region',
+        status: 'could_not_place',
         tier: 'preview',
-        message: 'Address removal help is U.S.-only for now',
+        message: 'We could not tell which state that is',
+        place: { city: null, state: null },
+        unlisted: unlistedService.getExposureProfile(null),
+        disclaimer: 'We did not save this address. Add the state — "Portland, OR" — and the state program appears too.',
       });
     }
 
-    // Only the STATE is used. Nothing about the specific address is
-    // stored, logged with the result, or needed for the answer.
-    const profile = unlistedService.getExposureProfile(place.state);
+    const profile = unlistedService.getExposureProfile(state);
     return res.json({
       status: 'ready',
       tier: 'preview',
-      place: { city: place.city, state: place.state },
+      // No city: resolving one would mean a third-party lookup, and the
+      // page promises there isn't one.
+      place: { city: null, state },
       unlisted: profile,
       disclaimer: 'We did not save this address. Claim it to keep track of which removals you have sent.',
     });

@@ -296,8 +296,11 @@ private struct UnlistedStateProgramCard: View {
             "A legal substitute address you can use on public records, so the real one stays out of them "
                 + "at the source instead of being chased across every site below."
         case .noProgram:
-            "We checked with the state and there is no substitute-address program to apply to. "
-                + "The removals below are the route that is open to you."
+            // Not "we checked with the state": some no-program answers rest
+            // on a national program-operator directory rather than a page
+            // the state itself publishes. The source link says which.
+            "We checked the published program sources and there is no substitute-address program "
+                + "to apply to. The removals below are the route that is open to you."
         case .unconfirmed:
             "We could not confirm one for your state — that is a gap in what we have verified, "
                 + "not a finding that no program exists. Most US states run one."

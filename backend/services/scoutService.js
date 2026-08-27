@@ -184,8 +184,41 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
     return section && (section.status === 'ready' || section.status === 'stale') ? section.data : null;
   };
 
-  const radon = dataOf(radonSettled);
-  const water = dataOf(waterSettled);
+  // PROJECT THE FACTS DOWN, DROP THE COMPOSED SENTENCES.
+  //
+  // The composers write for the dashboard, whose reader lives there:
+  // "Your county has the highest radon potential (zone 1) — test before
+  // renovating." Forwarded whole into Scout that becomes a possessive
+  // and an instruction aimed at someone who explicitly does NOT live
+  // there, and it slips past the never-advice rules, which are enforced
+  // on `askBeforeYouSign` and nowhere else.
+  //
+  // So Scout takes the numbers and lets askBeforeYouSign own every
+  // sentence it emits. `summary` and `disclaimer` do not cross over.
+  const radonRaw = dataOf(radonSettled);
+  const waterRaw = dataOf(waterSettled);
+  //
+  // `year_built` is the CALLER's number, off a listing — it is not
+  // something the composer looked up, and it must not disappear because
+  // the composer did. Radon coverage is county-by-county, and when a
+  // county has none `composeLeadRadon` degrades to `partial`, which
+  // `dataOf` drops; that silently took the federal lead-paint disclosure
+  // question with it, on the one surface built for people about to sign.
+  const radon = (radonRaw || synthetic.year_built != null)
+    ? {
+      radon_zone: (radonRaw && radonRaw.radon_zone) ?? null,
+      lead_paint_risk: (radonRaw && radonRaw.lead_paint_risk) ?? null,
+      year_built: synthetic.year_built,
+    }
+    : null;
+  const water = waterRaw
+    ? {
+      utility_name: waterRaw.utility_name ?? null,
+      pws_id: waterRaw.pws_id ?? null,
+      violation_count: waterRaw.violation_count ?? 0,
+      recent_health_violations: waterRaw.recent_health_violations ?? false,
+    }
+    : null;
   const rentBand = dataOf(rentSettled);
   const civic = dataOf(civicSettled);
 
@@ -231,7 +264,7 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
   const asks = askBeforeYouSign({
     flood,
     nfip,
-    radon: radon ? { ...radon, year_built: radon.year_built ?? null } : null,
+    radon,
     water,
     rentBand,
     askingRent,

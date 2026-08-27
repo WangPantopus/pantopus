@@ -80,8 +80,11 @@ const BROKER = {
   verified_at: '2026-08-27',
 };
 
+// Mirrors backend/services/unlistedService.js. The second clause used to
+// claim the registry was exhaustive; it is not, and this fixture pinned
+// the overclaim as required copy across three platforms.
 const METHOD_NOTE =
-  'We do not look your address up on these sites — searching them would hand them your address. This is every site that republishes county records, and the exact way to remove yourself from each.';
+  'We do not look your address up on these sites — searching them would hand them your address. These are the 19 sites we have verified a working removal path for — there are more we have not got to yet.';
 
 const PROGRAM_EXISTS = {
   exists: true,
@@ -169,7 +172,7 @@ describe('the state program — three different answers, worded three different 
     await lookUpAddress();
 
     expect(screen.getByText(/AL has no substitute-address program/i)).toBeInTheDocument();
-    expect(screen.getByText(/We checked the state's own sources/i)).toBeInTheDocument();
+    expect(screen.getByText(/We checked the published program sources/i)).toBeInTheDocument();
     // The eligibility field carries the consolation fact; it must render.
     expect(screen.getByText(PROGRAM_VERIFIED_NONE.eligibility)).toBeInTheDocument();
     // And it must NOT be phrased as an unchecked state.
@@ -455,6 +458,44 @@ describe('an unreadable `exists` is unconfirmed, not a denial', () => {
     await lookUpAddress();
 
     expect(screen.getByText(/have not confirmed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no substitute-address program/i)).not.toBeInTheDocument();
+  });
+});
+
+// ── "We could not place that" ≠ "you are not in the U.S." ────
+//
+// The server used to return `unsupported_region` for every geocoder
+// failure — an outage, a missing key, an address it could not parse —
+// so a Mapbox blip told every US visitor at once that the product had
+// nothing for them, and withheld the entire national removal list,
+// which never needed the address in the first place.
+describe('an address we could not place', () => {
+  const COULD_NOT_PLACE = {
+    status: 'could_not_place',
+    tier: 'preview',
+    message: 'We could not tell which state that is',
+    place: { city: null, state: null },
+    unlisted: profile(null, null as unknown as string),
+    disclaimer: 'We did not save this address.',
+  };
+
+  it('is never dressed as a geographic denial', async () => {
+    (api.unlisted.getPublicUnlisted as jest.Mock).mockResolvedValue(COULD_NOT_PLACE);
+    await lookUpAddress();
+
+    expect(screen.getByText(/could not tell which state that is/i)).toBeInTheDocument();
+    // The exact laundering that shipped.
+    expect(screen.queryByText(/U\.S\.-only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nothing accurate to give you outside the U\.S\./i)).not.toBeInTheDocument();
+  });
+
+  it('still renders the whole removal list underneath', async () => {
+    (api.unlisted.getPublicUnlisted as jest.Mock).mockResolvedValue(COULD_NOT_PLACE);
+    await lookUpAddress();
+
+    expect(screen.getByText('Whitepages')).toBeInTheDocument();
+    expect(screen.getByText(METHOD_NOTE)).toBeInTheDocument();
+    // And the state answer degrades to "not checked", never "none".
     expect(screen.queryByText(/no substitute-address program/i)).not.toBeInTheDocument();
   });
 });

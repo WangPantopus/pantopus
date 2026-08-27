@@ -188,3 +188,184 @@ describe('the typed address never leaves the process', () => {
     expect(report.ask_before_you_sign.length).toBeGreaterThan(0);
   });
 });
+
+// ── One report per address, not one per deployment ───────────
+//
+// `homeCountyFips` cached the Census geocode under `home:${home.id}`.
+// Scout's synthetic home carries `id: null` on purpose — nothing may
+// resolve to a real Home row — so that template literal produced the
+// literal string "home:null": ONE global cache row, TTL a year, shared
+// by every Scout request in the deployment.
+//
+// The first address anyone scouted pinned its county forever. Every
+// later report then priced rent, screened radon and named the water
+// utility for that stranger's county. A Brooklyn scout was told Travis
+// County's rent band — inverting "above band" and "below band" on the
+// single most decision-relevant line of a page whose whole premise is
+// checking before you sign.
+describe('two addresses in one process are two different places', () => {
+  const { resetTables, seedTable, getTable } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+
+  // Travis County, TX and Kings County, NY — real FIPS, distinct rent
+  // bands, distinct radon zones.
+  const AUSTIN = { lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701' };
+  const BROOKLYN = { lat: 40.6782, lng: -73.9442, line: '1 Bedford Ave', city: 'Brooklyn', state: 'NY', zipcode: '11211' };
+
+  function seedCounties() {
+    seedTable('HudFmr', [
+      {
+        county_fips: '48453', fiscal_year: 2026, county_name: 'Travis County', state_abbr: 'TX',
+        area_name: 'Austin', fmr_lo: [1200, 1400, 1600, 2000, 2400], fmr_hi: [1200, 1400, 1600, 2000, 2400],
+      },
+      {
+        county_fips: '36047', fiscal_year: 2026, county_name: 'Kings County', state_abbr: 'NY',
+        area_name: 'New York', fmr_lo: [2100, 2400, 2800, 3500, 3900], fmr_hi: [2100, 2400, 2800, 3500, 3900],
+      },
+    ]);
+    seedTable('CountyRadonZone', [
+      { county_fips: '48453', zone: 1 },
+      { county_fips: '36047', zone: 3 },
+    ]);
+  }
+
+  // The Census geocoder answers per-coordinate; everything else is down,
+  // so the only thing under test is which county each address resolves to.
+  function mockGeocoderByCoordinate() {
+    return jest.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('geocoding.geo.census.gov')) {
+        const isAustin = u.includes('30.2672') || u.includes('-97.7431');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            result: {
+              geographies: {
+                'Census Tracts': isAustin
+                  ? [{ STATE: '48', COUNTY: '453', TRACT: '001100' }]
+                  : [{ STATE: '36', COUNTY: '047', TRACT: '050300' }],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+  }
+
+  test('the second scout gets its OWN county, not the first one’s', async () => {
+    resetTables();
+    seedCounties();
+    const realFetch = global.fetch;
+    global.fetch = mockGeocoderByCoordinate();
+
+    let austin;
+    let brooklyn;
+    try {
+      austin = await scoutService.getScoutReport(AUSTIN, { askingRent: 1800, yearBuilt: 1970 });
+      brooklyn = await scoutService.getScoutReport(BROOKLYN, { askingRent: 2400, yearBuilt: 1970 });
+    } finally {
+      global.fetch = realFetch;
+    }
+
+    expect(austin.rent.band_low).toBe(1600);
+    expect(brooklyn.rent.band_low).toBe(2800);
+    // The line that flipped: $2,400 is BELOW Kings County's band, and was
+    // reported as above it while Travis County's band was being served.
+    expect(austin.rent.position).toBe('in_band');
+    expect(brooklyn.rent.position).toBe('below_band');
+
+    expect(austin.environment.radon.radon_zone).toBe(1);
+    expect(brooklyn.environment.radon.radon_zone).toBe(3);
+  });
+
+  test('no cache row is keyed on a null home id', async () => {
+    resetTables();
+    seedCounties();
+    const realFetch = global.fetch;
+    global.fetch = mockGeocoderByCoordinate();
+    try {
+      await scoutService.getScoutReport(AUSTIN, {});
+    } finally {
+      global.fetch = realFetch;
+    }
+    for (const row of getTable('PlaceSectionCache')) {
+      expect(row.cache_key).not.toMatch(/null/);
+    }
+  });
+});
+
+// ── The never-advice rules apply to the WHOLE payload ────────
+//
+// They were only ever enforced on `askBeforeYouSign`. Everything else in
+// the report came from the dashboard composers, which write for a reader
+// who LIVES there: "Your county has the highest radon potential (zone 1)
+// — test before renovating." Forwarded whole, that addressed a
+// non-resident as the occupant and issued an instruction, straight past
+// the rules two describe blocks up.
+describe('nothing in the report speaks to the reader as a resident', () => {
+  const { resetTables, seedTable } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+
+  const PLACE = { lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701' };
+
+  function censusOnly() {
+    return jest.fn(async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ result: { geographies: { 'Census Tracts': [{ STATE: '48', COUNTY: '453', TRACT: '001100' }] } } }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+  }
+
+  test('the serialized payload carries no possessive and no imperative', async () => {
+    resetTables();
+    seedTable('CountyRadonZone', [{ county_fips: '48453', zone: 1 }]);
+    seedTable('HudFmr', [{
+      county_fips: '48453', fiscal_year: 2026, county_name: 'Travis County', state_abbr: 'TX',
+      area_name: 'Austin', fmr_lo: [1200, 1400, 1600, 2000, 2400], fmr_hi: [1200, 1400, 1600, 2000, 2400],
+    }]);
+
+    const realFetch = global.fetch;
+    global.fetch = censusOnly();
+    let report;
+    try {
+      report = await scoutService.getScoutReport(PLACE, { askingRent: 1800, yearBuilt: 1961 });
+    } finally {
+      global.fetch = realFetch;
+    }
+
+    // The composer really did run — otherwise this proves nothing.
+    expect(report.environment.radon.radon_zone).toBe(1);
+
+    const text = JSON.stringify(report);
+    // The reader does not live here. Nothing may call it theirs.
+    expect(text).not.toMatch(/\byour (county|area|home|building|water|neighbou?rhood)\b/i);
+    // And nothing may tell them what to do.
+    expect(text).not.toMatch(/\btest before renovating\b/i);
+    expect(text).not.toMatch(/\byou should\b|\bwe recommend\b|\bdemand\b/i);
+  });
+
+  test('a caller-supplied build year still raises the lead question with no radon coverage', async () => {
+    // Radon coverage is county-by-county. Where it is missing the
+    // composer degrades to `partial`, which `dataOf` drops — and that
+    // used to take the build year with it, losing a federally mandated
+    // disclosure question that was never the composer's fact to begin
+    // with.
+    resetTables(); // no CountyRadonZone rows at all
+    const realFetch = global.fetch;
+    global.fetch = censusOnly();
+    let report;
+    try {
+      report = await scoutService.getScoutReport(PLACE, { yearBuilt: 1961 });
+    } finally {
+      global.fetch = realFetch;
+    }
+    expect(report.ask_before_you_sign.map((a) => a.id)).toContain('lead_disclosure');
+  });
+});

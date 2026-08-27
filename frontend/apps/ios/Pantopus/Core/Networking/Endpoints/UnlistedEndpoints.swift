@@ -48,11 +48,17 @@ public enum UnlistedEndpoints {
     }
 
     /// `GET /api/public/unlisted?address=` — route
-    /// `backend/routes/public.js:567`. The anonymous T0 profile: the
-    /// address is resolved to a STATE and then dropped — nothing is
-    /// persisted, nothing is logged with the result, and the address is
-    /// never sent to any third party. Non-US comes back as
-    /// `status: "unsupported_region"` with a message and no profile.
+    /// `backend/routes/public.js`. The anonymous T0 profile: the address
+    /// is resolved to a STATE **locally** (`backend/utils/usState.js`,
+    /// no geocoder) and then dropped. Nothing is persisted, nothing is
+    /// logged with the result, and the address reaches no third party —
+    /// which is what lets the web panel promise exactly that.
+    ///
+    /// Two non-ready answers, and they are NOT interchangeable:
+    /// `could_not_place` (we could not read a state out of it) still
+    /// carries the full national removal list with no state program;
+    /// `unsupported_region` (resolved outside the US) carries a message
+    /// and no profile.
     public static func publicPreview(address: String) -> Endpoint {
         Endpoint(
             method: .get,

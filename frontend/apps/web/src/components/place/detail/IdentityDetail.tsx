@@ -642,7 +642,12 @@ function UnlistedLeaf({ homeId, address, onBack }: { homeId: string; address: st
   // NULL means the read FAILED — distinct from [] ("nothing done yet").
   // An empty checklist is a confident claim we cannot make when we could
   // not read the rows, so the progress UI is withheld and said so.
-  const removalsFailed = !!profile && profile.removals === null;
+  // Anything that is not an array means we do not have the rows — null
+  // (the read failed) and undefined (the key never arrived) alike. The
+  // `=== null` form let undefined fall through to `?? []`, which renders
+  // every broker as "todo": a confident "you have done nothing yet" off
+  // data we never read. Both native clients already fail safe here.
+  const removalsFailed = !!profile && !Array.isArray(profile.removals);
   const statusByBroker = new Map<string, UnlistedRemovalStatus>(
     (removals ?? []).map((r) => [r.broker_id, r.status]),
   );
@@ -846,14 +851,14 @@ export default function IdentityDetail({ intelligence, homeId, residentName }: {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">Unlisted — take your address back</div>
-                <div className="text-[12.5px] text-app-text-muted mt-0.5">Your state&apos;s confidentiality program, then the opt-out path for every site that republishes county records</div>
+                <div className="text-[12.5px] text-app-text-muted mt-0.5">Your state&apos;s confidentiality program, then a verified opt-out path for each site we have confirmed</div>
               </div>
               <ChevronRight size={18} strokeWidth={2.25} className="shrink-0 text-app-text-muted" />
             </button>
             <InfoNote>
               We never look your address up on people-search sites — searching them would hand them your address.
-              This is the list of sites that republish county records and how to leave each, plus a place to track
-              what you have sent.
+              These are the sites we have verified a working removal path for, and how to leave each, plus a place
+              to track what you have sent. It is not every site that republishes county records.
             </InfoNote>
 
             <DetailSectionLabel>Mailbox</DetailSectionLabel>

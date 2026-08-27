@@ -186,8 +186,12 @@ function ProgramNone({ program, state }: { program: UnlistedStateProgram; state:
           <h3 className="text-[16px] font-bold text-app-text leading-[21px] -tracking-[0.01em]">
             {state ?? 'This state'} has no substitute-address program
           </h3>
+          {/* Not "the state's own sources": three of the no-program
+              entries rest on a national program-operator directory, not
+              on a page the state publishes. The Source link below says
+              exactly what was checked — the copy must not overstate it. */}
           <p className="text-[13px] text-app-text-muted leading-[19px] mt-1">
-            We checked the state&apos;s own sources. Here is what it does offer instead.
+            We checked the published program sources. Here is what the state does offer instead.
           </p>
         </div>
       </div>
@@ -311,9 +315,14 @@ export function BrokerCard({ broker, exposureLabels, status, onStatus, busy }: B
             <span className="text-[15.5px] font-semibold text-app-text -tracking-[0.01em]">{broker.name}</span>
             {meta ? <Chip label={meta.label} variant={meta.variant} /> : null}
           </div>
-          <div className="text-[12.5px] text-app-text-muted leading-[18px] mt-1">
-            Publishes {exposureText(broker.exposes, exposureLabels)}
-          </div>
+          {/* LexisNexis declares no exposure tokens (its suppression
+              route is restricted, not a listing), so an unguarded line
+              rendered a dangling "Publishes ". iOS already guards this. */}
+          {broker.exposes.length > 0 ? (
+            <div className="text-[12.5px] text-app-text-muted leading-[18px] mt-1">
+              Publishes {exposureText(broker.exposes, exposureLabels)}
+            </div>
+          ) : null}
         </div>
       </div>
 

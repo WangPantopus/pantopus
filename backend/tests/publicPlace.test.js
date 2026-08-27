@@ -391,6 +391,79 @@ describe('the money lead', () => {
     expect(res.body.free.density).toBeTruthy();
   });
 
+  // ── Every figure in the rent lead must come off the HUD row ──
+  //
+  // HUD prices all but ~14 US counties at a SINGLE 2-bedroom number:
+  // fmr_hi[2] === fmr_lo[2] in 3,209 of the 3,223 rows migration 158
+  // seeds. The lead computed `Math.max(fmr_hi[2], lo * 1.2)`, so for
+  // 99.6% of the country it rendered an upper bound HUD never published,
+  // under a bare "HUD Fair Market Rents" attribution — on a branch whose
+  // own comment promises the preview "falls back to the tiles rather
+  // than inventing a number". The T1 dashboard section does extend a
+  // single figure by 20%, but says so in the same sentence; the
+  // anonymous lead had no such clause.
+  test('a county HUD prices at ONE number is shown as one number', async () => {
+    seedTable('HudFmr', [{
+      county_fips: '41051', fiscal_year: 2026, county_name: 'Multnomah County', state_abbr: 'OR',
+      area_name: 'Portland', fmr_lo: [1400, 1600, 1922, 2400, 2800], fmr_hi: [1400, 1600, 1922, 2400, 2800],
+    }]);
+
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    const lead = res.body.money_lead;
+    expect(lead.kind).toBe('rent_band');
+    expect(lead.low).toBe(1922);
+    // 1922 * 1.2 = 2306 — a figure HUD never published.
+    expect(lead.high).toBe(1922);
+    expect(lead.headline).not.toContain('2,306');
+
+    // Stronger and drift-proof: every dollar figure in the rendered copy
+    // must appear somewhere in the HUD row it cites.
+    const hudFigures = new Set([1400, 1600, 1922, 2400, 2800].map((n) => n.toLocaleString('en-US')));
+    for (const shown of lead.headline.match(/\$[\d,]+/g) || []) {
+      expect(hudFigures).toContain(shown.slice(1));
+    }
+  });
+
+  test('a county HUD DOES publish a range for keeps HUD’s own upper figure', async () => {
+    // Cumberland County, ME is one of the ~14. Its real high is 2130;
+    // the old Math.max discarded that in favour of 1833 * 1.2 = 2200.
+    seedTable('HudFmr', [{
+      county_fips: '41051', fiscal_year: 2026, county_name: 'Cumberland County', state_abbr: 'ME',
+      area_name: 'Portland', fmr_lo: [1400, 1600, 1833, 2400, 2800], fmr_hi: [1400, 1600, 2130, 2400, 2800],
+    }]);
+
+    const lead = (await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' })).body.money_lead;
+    expect(lead.low).toBe(1833);
+    expect(lead.high).toBe(2130);
+    expect(lead.headline).not.toContain('2,200');
+  });
+
+  test('an anonymous view does not take a slot in the NFIP warm queue', async () => {
+    // The warm job pulls 3 tracts per run, 12 runs an hour, FIFO on the
+    // pending lane. Letting drive-by previews enqueue put anonymous
+    // traffic in front of tracts where someone actually lives — reads
+    // never gate on expiry, so the visible effect is a benchmark that
+    // quietly stops being refreshed rather than one that disappears.
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    expect(res.status).toBe(200);
+
+    const pending = getTable('PlaceSectionCache')
+      .filter((r) => r.section_id === '_nfip_tract' && r.payload && r.payload.pending);
+    expect(pending).toEqual([]);
+  });
+
+  test('a geocoder that cannot resolve the tract is called ONCE, not three times', async () => {
+    // The census teaser and the money lead share one tract resolution.
+    // Passing the resolved VALUE made `null` — "tried, could not place
+    // it" — indistinguishable from "no hint given", so both consumers
+    // re-resolved and a failing geocoder took three round trips per
+    // request, at the exact moment it was least able to serve them.
+    installFetch({ geocoderOk: false });
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    expect(res.status).toBe(200);
+    expect(countFetch('geocoding.geo.census.gov')).toBe(1);
+  });
+
   test('never leaks a count below the density floor alongside the lead', async () => {
     const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
     expect(JSON.stringify(res.body)).not.toContain('verified_users_count');

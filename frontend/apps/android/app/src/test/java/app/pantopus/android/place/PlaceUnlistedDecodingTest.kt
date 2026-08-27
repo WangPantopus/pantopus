@@ -17,6 +17,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -370,6 +371,33 @@ class PlaceUnlistedDecodingTest {
         assertEquals(UnlistedPreviewStatus.UNSUPPORTED_REGION, res.status)
         assertNull(res.unlisted)
         assertEquals("Address removal help is U.S.-only for now", res.message)
+    }
+
+    @Test
+    fun `an address we could not place is not a non-US hand-off`() {
+        // The server used to collapse "could not read a state out of that"
+        // into "you are outside the U.S." — a confident geographic denial
+        // shown to someone standing in Portland. They are different
+        // answers, and only this one still carries the whole removal list.
+        val res =
+            decode<PublicUnlistedResponse>(
+                """
+                {"status":"could_not_place","tier":"preview",
+                 "message":"We could not tell which state that is",
+                 "place":{"city":null,"state":null},
+                 "unlisted":{"state":null,"state_program":null,"groups":[],"broker_count":19,
+                   "exposure_labels":{},"method_note":"We do not look your address up on these sites.",
+                   "registry_verified_at":null}}
+                """.trimIndent(),
+            )
+
+        assertEquals(UnlistedPreviewStatus.COULD_NOT_PLACE, res.status)
+        // The distinction is the point — never the non-US branch.
+        assertNotEquals(UnlistedPreviewStatus.UNSUPPORTED_REGION, res.status)
+        // The removal paths are national and never needed the address.
+        assertEquals(19, checkNotNull(res.unlisted).brokerCount)
+        // And the state answer degrades to "not checked", never "none".
+        assertNull(checkNotNull(res.unlisted).stateProgram)
     }
 
     @Test

@@ -137,11 +137,26 @@ export interface UnlistedHomeProfile extends UnlistedProfile {
 }
 
 export interface PublicUnlisted {
-  status: 'ready' | 'unsupported_region';
+  /**
+   * `could_not_place` is NOT `unsupported_region`, and the difference is
+   * the whole point: one means we could not read a state out of what was
+   * typed, the other means the address resolved somewhere we have no law
+   * for. Collapsing them told US residents the product was not for them.
+   *
+   * `could_not_place` still carries the full `unlisted` profile — every
+   * removal path is national and never needed the address — with
+   * `state_program: null`, which renders as "not confirmed", never as
+   * "your state has none".
+   */
+  status: 'ready' | 'could_not_place' | 'unsupported_region';
   tier: 'preview';
-  /** Present on `unsupported_region`. */
+  /** Present on `could_not_place` and `unsupported_region`. */
   message?: string;
-  /** Area-level only — the address itself is never stored or echoed back. */
+  /**
+   * State only. `city` is always null on the anonymous route: resolving
+   * one would mean a third-party geocode, and the page promises the
+   * typed address is not sent anywhere.
+   */
   place?: { city: string | null; state: string | null };
   unlisted?: UnlistedProfile;
   disclaimer?: string;

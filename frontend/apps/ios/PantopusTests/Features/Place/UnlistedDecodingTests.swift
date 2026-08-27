@@ -216,6 +216,29 @@ final class UnlistedDecodingTests: XCTestCase {
         XCTAssertEqual(response.message, "Address removal help is U.S.-only for now")
     }
 
+    func testCouldNotPlaceIsNotAGeographicDenial() throws {
+        // The server used to collapse "could not read a state out of that"
+        // into "you are outside the U.S." — a confident geographic denial
+        // shown to someone standing in Portland. They are different
+        // answers, and only this one still carries the whole removal list.
+        let json = """
+        {"status":"could_not_place","tier":"preview",
+         "message":"We could not tell which state that is",
+         "place":{"city":null,"state":null},
+         "unlisted":{"state":null,"state_program":null,"groups":[],"broker_count":19,
+           "exposure_labels":{},"method_note":"We do not look your address up on these sites.",
+           "registry_verified_at":null}}
+        """
+        let response = try decoder.decode(PublicUnlistedResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(response.status, .couldNotPlace)
+        // The distinction is the point — never the non-US branch.
+        XCTAssertNotEqual(response.status, .unsupportedRegion)
+        // The removal paths are national and never needed the address.
+        XCTAssertEqual(response.unlisted?.brokerCount, 19)
+        // And the state answer degrades to "not checked", never "none".
+        XCTAssertNil(response.unlisted?.stateProgram)
+    }
+
     // MARK: - Unknown server vocabulary degrades, never throws
 
     func testUnknownEnumValuesDegradeSafely() throws {
@@ -275,9 +298,11 @@ final class UnlistedDecodingTests: XCTestCase {
         "source_url":"https://www.acxiom.com/optout/","verified_at":"2026-08-27"}]}]
     """
 
+    // Mirrors backend/services/unlistedService.js. The second clause used
+    // to claim the registry was exhaustive; it is not.
     private static let methodNote = """
     We do not look your address up on these sites — searching them would hand them your address. \
-    This is every site that republishes county records, and the exact way to remove yourself from each.
+    These are the 19 sites we have verified a working removal path for — there are more we have not got to yet.
     """
 
     private static func profileJSON(
