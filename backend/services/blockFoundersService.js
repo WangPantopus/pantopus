@@ -142,26 +142,49 @@ const STREET_SUFFIX_RE = new RegExp(
 );
 
 /**
- * The ONLY sender-derived text that reaches a printed card: their street,
- * with the house number and any unit removed.
+ * The ONLY sender-derived text that reaches a printed card: their street.
  *
- * `Home.address` is free client text (Joi accepts any 5..255 characters,
- * no pattern), so it is treated as hostile here. Three defences, because
- * this string is printed on physical mail sent under Pantopus's return
- * address to someone who never asked for it:
- *   1. strip the house number and any unit token;
- *   2. whitelist the surviving characters — a card names a street, so
- *      letters, digits, spaces and . ' - are the entire vocabulary;
- *   3. HTML-escape at the interpolation site regardless.
+ * SOURCE MATTERS MORE THAN SANITIZING. This used to read the free-text
+ * `Home.address` (Joi accepts any 5-255 characters) and try to prove the
+ * result was a street name. That cannot work: several real street types
+ * are also ordinary English words, so "1 Call 555 0100 Now Free Money
+ * Way" passes every shape check and prints verbatim on physical mail
+ * sent under Pantopus's return address. An allowlist over attacker-
+ * controlled prose is not a control.
  *
- * Without (2) and (3) a verified occupant could set their address to
- * markup and have Pantopus print and mail arbitrary attacker-authored
- * text — and an unclosed `display:none` would swallow the recipient's
- * printed opt-out link, which is their only way to stop the mail.
+ * So the text now comes from `HomeAddress.address_line1_norm` — the
+ * VENDOR-VALIDATED, normalized address. The sender's home is verified,
+ * which means a postcard was physically delivered to it, so its
+ * canonical address is a real deliverable street by construction; a
+ * slogan cannot occupy that column. When it is missing for any reason
+ * the card falls back to "your street" and reads perfectly well.
+ *
+ * The house-number strip, the unit strip, the character whitelist and
+ * the HTML escape all remain, as defence in depth behind that source.
+ *
+ * @returns {Promise<string>}
  */
-function streetOnly(home) {
-  const line1 = String((home && home.address) || '').split(',')[0].trim();
-  const withoutNumber = line1.replace(/^[0-9][0-9A-Za-z-]*\s+/, '');
+async function streetOnly(home) {
+  let line1 = '';
+  try {
+    if (home && home.address_hash) {
+      const { data } = await supabaseAdmin
+        .from('HomeAddress')
+        .select('address_line1_norm')
+        .eq('address_hash', home.address_hash)
+        .maybeSingle();
+      line1 = String((data && data.address_line1_norm) || '');
+    }
+  } catch (err) {
+    logger.warn('blockFounders: canonical street lookup failed', { homeId: home && home.id, error: err.message });
+  }
+  return sanitizeStreet(line1);
+}
+
+/** Pure: the printable street for an already-canonical line 1. */
+function sanitizeStreet(line1) {
+  const first = String(line1 || '').split(',')[0].trim();
+  const withoutNumber = first.replace(/^[0-9][0-9A-Za-z-]*\s+/, '');
   const withoutUnit = withoutNumber.replace(UNIT_TOKEN_RE, '');
   const safe = withoutUnit
     .replace(/[^A-Za-z0-9 .'-]/g, ' ')
@@ -169,10 +192,6 @@ function streetOnly(home) {
     .trim()
     .slice(0, STREET_MAX_LEN)
     .trim();
-  // Print it only if it still looks like a street. A street with no
-  // recognizable type ("Broadway") also falls back — losing a correct
-  // street name costs the card nothing; printing sender-authored text
-  // costs it everything.
   return STREET_SUFFIX_RE.test(safe) ? safe : 'your street';
 }
 
@@ -453,7 +472,7 @@ async function sendInvite({ home, userId, recipient }) {
     lob = await provider.sendCustomPostcard(address, {
       description: 'Pantopus block invite',
       frontHtml: inviteFrontHtml(),
-      backHtml: inviteBackHtml({ street: streetOnly(home), verifiedCount, optOutCode }),
+      backHtml: inviteBackHtml({ street: await streetOnly(home), verifiedCount, optOutCode }),
     });
   } catch (err) {
     // Nothing was mailed, so the reservation must not linger — it would
@@ -514,6 +533,7 @@ module.exports = {
   ensureFounderRank,
   cellForHome,
   streetOnly,
+  sanitizeStreet,
   cleanAddressInput,
   suppressionHashFor,
   inviteBackHtml,

@@ -24,7 +24,7 @@ const { resetTables, seedTable, getTable } = require('./__mocks__/supabaseAdmin'
 
 const { mailVendorService } = require('../services/addressValidation');
 const blockFoundersService = require('../services/blockFoundersService');
-const { streetOnly, cleanAddressInput, cellForHome, WEEKLY_INVITE_CAP } = blockFoundersService;
+const { sanitizeStreet, cleanAddressInput, cellForHome, WEEKLY_INVITE_CAP } = blockFoundersService;
 const { encodeGeohash } = require('../utils/geohash');
 const { computeAddressHash } = require('../utils/normalizeAddress');
 const blockFoundersRoutes = require('../routes/blockFounders');
@@ -61,6 +61,13 @@ function seedVerified({ verification = 'verified' } = {}) {
     { id: 'bf-occ-2', home_id: HOME_ID, user_id: NEIGHBOR_MEMBER, is_active: true, role: 'member', role_base: 'member', verification_status: 'pending' },
   ]);
   seedTable('NeighborhoodPreview', [{ geohash: CELL, verified_users_count: 4 }]);
+  // A VERIFIED home has a vendor-validated address by construction — a
+  // postcard was physically delivered to it. The card's sender line reads
+  // from here, never from the user-editable Home.address text.
+  seedTable('HomeAddress', [{
+    id: 'ha-1', address_hash: HOME_ROW.address_hash, address_line1_norm: '1421 SE Oak St',
+    city_norm: 'Portland', state: 'OR', postal_code: '97214',
+  }]);
 }
 
 const RECIPIENT = { line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' };
@@ -80,10 +87,10 @@ beforeEach(() => {
 // ── Pure helpers ─────────────────────────────────────────────
 
 describe('helpers', () => {
-  test('streetOnly names the street, never the house number', () => {
-    expect(streetOnly({ address: '1421 SE Oak St, Portland, OR' })).toBe('SE Oak St');
-    expect(streetOnly({ address: '221B Baker Street, London' })).toBe('Baker Street');
-    expect(streetOnly({ address: '' })).toBe('your street');
+  test('sanitizeStreet names the street, never the house number', () => {
+    expect(sanitizeStreet('1421 SE Oak St, Portland, OR')).toBe('SE Oak St');
+    expect(sanitizeStreet('221B Baker Street, London')).toBe('Baker Street');
+    expect(sanitizeStreet('')).toBe('your street');
   });
 
   test('cleanAddressInput fails closed on junk', () => {
@@ -316,18 +323,39 @@ describe('the printed card cannot be authored by the sender', () => {
     expect(html).toContain('never wrote this text');
   });
 
-  test('streetOnly prints a street, never the house number or the unit', () => {
-    const { streetOnly } = blockFoundersService;
-    expect(streetOnly({ address: '1421 SE Oak St, Portland, OR' })).toBe('SE Oak St');
+  test('sanitizeStreet prints a street, never the house number or the unit', () => {
+    expect(sanitizeStreet('1421 SE Oak St, Portland, OR')).toBe('SE Oak St');
     // A unit identifies the sender's exact door.
-    expect(streetOnly({ address: '123 Main St Apt 4B' })).toBe('Main St');
-    expect(streetOnly({ address: '77 Pine Ave Unit 12' })).toBe('Pine Ave');
-    expect(streetOnly({ address: '9 Elm Rd #3' })).toBe('Elm Rd');
+    expect(sanitizeStreet('123 Main St Apt 4B')).toBe('Main St');
+    expect(sanitizeStreet('77 Pine Ave Unit 12')).toBe('Pine Ave');
+    expect(sanitizeStreet('9 Elm Rd #3')).toBe('Elm Rd');
     // Nothing usable left is a calm fallback, never an empty card.
-    expect(streetOnly({ address: '<<<>>>' })).toBe('your street');
-    expect(streetOnly({})).toBe('your street');
-    // Free text that is not a street never prints, however clean it is.
-    expect(streetOnly({ address: '1 Call 555-0100 Now For Your Free Gift' })).toBe('your street');
+    expect(sanitizeStreet('<<<>>>')).toBe('your street');
+    expect(sanitizeStreet('')).toBe('your street');
+  });
+
+  // RED TEAM: several real street types are also ordinary English words
+  // (Way, Walk, Run, Row, Path, Loop), so a shape check over free text
+  // cannot work — "Call 555 0100 Now Free Money Way" passes every one.
+  // The card's text therefore comes from the VENDOR-VALIDATED address,
+  // never from the user-editable Home.address field.
+  test('the printed street comes from the canonical address, not free text', async () => {
+    seedTable('HomeAddress', [{
+      id: 'ha-1', address_hash: HOME_ROW.address_hash, address_line1_norm: '1421 SE Oak St',
+    }]);
+    // A hostile free-text Home.address is simply not consulted.
+    const street = await blockFoundersService.streetOnly({
+      ...HOME_ROW,
+      address: '1 Call 555 0100 Now Free Money Way',
+    });
+    expect(street).toBe('SE Oak St');
+  });
+
+  test('no canonical address on file falls back, never to the free text', async () => {
+    const street = await blockFoundersService.streetOnly({
+      id: 'h', address_hash: 'no-such-hash', address: '1 Pay Us Now Or Else Way',
+    });
+    expect(street).toBe('your street');
   });
 });
 
