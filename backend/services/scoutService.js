@@ -191,25 +191,37 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
 
   // Flood + what insurance actually costs there: the pair that changes a
   // decision more than anything else on the page.
+  //
+  // Fetched DIRECTLY rather than via neighborhoodProfileService.getProfile,
+  // which would have sent the typed address to WalkScore
+  // (fetchWalkScore puts it in a query string to api.walkscore.com).
+  // Scout promises the reader "we did not tell anyone you looked", and
+  // that promise has to be true: the address never leaves this process.
+  // Scout wants only the zone and the tract id, and both are reachable
+  // from coordinates alone — getProfile was over-fetching anyway.
   let flood = null;
   let nfip = null;
   try {
-    const profile = await require('./ai/neighborhoodProfileService').getProfile({
-      latitude: place.lat,
-      longitude: place.lng,
-      address: place.line || '',
-    });
-    const p = profile && profile.profile;
-    if (p && p.flood_zone) {
-      const zone = String(p.flood_zone).toUpperCase();
+    const neighborhood = require('./ai/neighborhoodProfileService');
+    const [zoneSettled, tractSettled] = await Promise.allSettled([
+      neighborhood.fetchFloodZone(place.lat, place.lng),
+      neighborhood.geocodeToTractCached(place.lat, place.lng),
+    ]);
+
+    const zoneRow = zoneSettled.status === 'fulfilled' ? zoneSettled.value : null;
+    const rawZone = zoneRow && (zoneRow.flood_zone || zoneRow.zone || zoneRow.FLD_ZONE);
+    if (rawZone) {
+      const zone = String(rawZone).toUpperCase();
       flood = {
-        zone: p.flood_zone,
+        zone: rawZone,
         in_sfha: zone.startsWith('A') || zone.startsWith('V'),
-        plain_meaning: p.flood_zone_description || null,
+        plain_meaning: (zoneRow && (zoneRow.flood_zone_description || zoneRow.description)) || null,
       };
     }
-    if (p && p.tract_id) {
-      const benchmark = await nfipPremiumService.getTractBenchmark(p.tract_id);
+
+    const tract = tractSettled.status === 'fulfilled' ? tractSettled.value : null;
+    if (tract && tract.tractId) {
+      const benchmark = await nfipPremiumService.getTractBenchmark(tract.tractId);
       if (benchmark && benchmark.status === 'ready') nfip = benchmark.data;
     }
   } catch (err) {

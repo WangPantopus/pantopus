@@ -120,3 +120,71 @@ describe('Scout never describes the people who live there', () => {
     expect(text).not.toMatch(/\bverified (homes?|neighbou?rs?)\b/);
   });
 });
+
+// ── The promise in the copy must be true in the code ─────────
+// Scout's scope_note tells the reader "we did not tell anyone you
+// looked". That is only true if the typed address never leaves this
+// process. It did once: getScoutReport called
+// neighborhoodProfileService.getProfile, which passes the address
+// straight into a WalkScore query string. This pins the fix.
+describe('the typed address never leaves the process', () => {
+  const { resetTables } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+
+  const PLACE = {
+    lat: 45.51,
+    lng: -122.65,
+    // Distinctive enough that any appearance in an outbound URL is proof.
+    line: '1421 ZZQUNIQUEADDR St',
+    city: 'Portland',
+    state: 'OR',
+    zipcode: '97214',
+  };
+
+  test('no outbound request carries the address, in any encoding', async () => {
+    resetTables();
+    const seen = [];
+    const realFetch = global.fetch;
+    // The tract geocode must SUCCEED, or a leak downstream of it is never
+    // reached and the test proves nothing — which is exactly what a
+    // blanket-503 mock did on the first attempt.
+    global.fetch = jest.fn(async (url) => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('geocoding.geo.census.gov')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            result: { geographies: { 'Census Tracts': [{ STATE: '41', COUNTY: '051', TRACT: '001902' }] } },
+          }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+    process.env.WALKSCORE_API_KEY = 'test-key-that-would-enable-the-leak';
+
+    try {
+      await scoutService.getScoutReport(PLACE, { askingRent: 2400 });
+    } finally {
+      global.fetch = realFetch;
+      delete process.env.WALKSCORE_API_KEY;
+    }
+
+    expect(seen.length).toBeGreaterThan(0); // it really did call out
+    for (const url of seen) {
+      const decoded = decodeURIComponent(url).toLowerCase();
+      expect(decoded).not.toContain('zzquniqueaddr');
+      // And never to the service that took the address before.
+      expect(url).not.toContain('walkscore.com');
+    }
+  });
+
+  test('the report still says so, and still answers', async () => {
+    resetTables();
+    const report = await scoutService.getScoutReport(PLACE, {});
+    expect(report.scope_note).toMatch(/did not tell anyone you looked/i);
+    // Degrading to no external data must still produce the question list.
+    expect(report.ask_before_you_sign.length).toBeGreaterThan(0);
+  });
+});
