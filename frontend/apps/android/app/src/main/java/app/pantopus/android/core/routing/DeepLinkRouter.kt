@@ -586,8 +586,9 @@ object DeepLinkRouter {
                 // `pantopus://place/<homeId>/<slug>`      → a group-detail page
                 // `pantopus://place?id=<homeId>&section=<slug>`
                 val homeId = segments.getOrNull(1)?.takeIf { it.isNotBlank() } ?: idQuery
-                val slug = segments.getOrNull(2)?.takeIf { it.isNotBlank() }
-                    ?: Paths.queryParam(queryPart, "section")
+                val slug =
+                    segments.getOrNull(2)?.takeIf { it.isNotBlank() }
+                        ?: Paths.queryParam(queryPart, "section")
                 Destination.Place(
                     homeId = homeId?.takeIf { it.isNotBlank() },
                     slug = slug?.takeIf { it.isNotBlank() && PLACE_DETAIL_SLUGS.contains(it) },

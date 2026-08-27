@@ -1,13 +1,13 @@
 package app.pantopus.android.place
 
 import app.pantopus.android.data.api.models.geo.GeoAutocompleteResponse
+import app.pantopus.android.data.api.models.place.GoodDayVerdict
 import app.pantopus.android.data.api.models.place.NeighborMessageTemplates
 import app.pantopus.android.data.api.models.place.NeighborhoodPulse
 import app.pantopus.android.data.api.models.place.PlaceBand
 import app.pantopus.android.data.api.models.place.PlaceCoverage
 import app.pantopus.android.data.api.models.place.PlaceDensityBucket
 import app.pantopus.android.data.api.models.place.PlaceEnumAdapterFactory
-import app.pantopus.android.data.api.models.place.GoodDayVerdict
 import app.pantopus.android.data.api.models.place.PlaceGroup
 import app.pantopus.android.data.api.models.place.PlaceIntelligence
 import app.pantopus.android.data.api.models.place.PlacePreview
@@ -67,7 +67,8 @@ class PlaceIntelligenceDecodingTest {
 
     @Test
     fun `decodes good_day_to tiles`() {
-        val json = """
+        val json =
+            """
             {"place":{"label":"x","line1":"x","city":"x","state":"OR","postal_code":"97214"},
              "tier":"T3","region_supported":true,"generated_at":"2026-06-07T09:00:00Z",
              "groups":[{"group":"today","label":"Today","sections":[
@@ -78,7 +79,7 @@ class PlaceIntelligenceDecodingTest {
                    "answer":"Yes - until 5pm","because":"AQI 38 and 62-68F through 5pm."},
                   {"id":"wash_car","label":"Wash the car","glyph":"C","verdict":"no",
                    "answer":"Wait - rain Tuesday","because":"60% chance of rain Tuesday."}]}}]}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val env = decode<PlaceIntelligence>(json).groups.first().sections.first()
         assertEquals(PlaceSectionId.GOOD_DAY_TO, env.sectionId)
@@ -92,7 +93,8 @@ class PlaceIntelligenceDecodingTest {
 
     @Test
     fun `decodes heat_cold with the 7-day strip`() {
-        val json = """
+        val json =
+            """
             {"place":{"label":"x","line1":"x","city":"x","state":"AZ","postal_code":"85001"},
              "tier":"T3","region_supported":true,"generated_at":"2026-08-19T09:00:00Z",
              "groups":[{"group":"risk_readiness","label":"Risk & readiness","sections":[
@@ -102,7 +104,7 @@ class PlaceIntelligenceDecodingTest {
                         "freeze":null,"headline":"Major heat risk, today through Friday.",
                         "guidance":"Overnight lows near 79F.","source_note":"NWS HeatRisk (experimental)",
                         "heat_days":[{"date":"2026-08-19","day":1,"level":3,"label":"Major","meaning":"m"}]}}]}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val env = decode<PlaceIntelligence>(json).groups.first().sections.first()
         assertEquals(PlaceSectionId.HEAT_COLD, env.sectionId)
@@ -118,7 +120,8 @@ class PlaceIntelligenceDecodingTest {
     fun `decodes heat_cold coverage gap outside CONUS`() {
         // covered=false is a GAP, not a reading of zero — the card must not
         // imply calm where HeatRisk simply has no data.
-        val json = """
+        val json =
+            """
             {"place":{"label":"x","line1":"x","city":"Honolulu","state":"HI","postal_code":"96813"},
              "tier":"T3","region_supported":true,"generated_at":"2026-08-19T09:00:00Z",
              "groups":[{"group":"risk_readiness","label":"Risk & readiness","sections":[
@@ -128,7 +131,7 @@ class PlaceIntelligenceDecodingTest {
                 "data":{"mode":"none","heat_covered":false,"peak_level":null,"peak_date":null,
                         "freeze":null,"headline":"No freeze in the forecast.","guidance":"",
                         "source_note":"National Weather Service forecast","heat_days":[]}}]}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val d = decode<PlaceIntelligence>(json).groups.first().sections.first().heatCold!!
         assertFalse(d.heatCovered)
@@ -138,7 +141,8 @@ class PlaceIntelligenceDecodingTest {
 
     @Test
     fun `decodes home_systems with provenance on every row`() {
-        val json = """
+        val json =
+            """
             {"place":{"label":"x","line1":"x","city":"x","state":"OR","postal_code":"97214"},
              "tier":"T3","region_supported":true,"generated_at":"2026-08-19T09:00:00Z",
              "groups":[{"group":"your_home","label":"Your home","sections":[
@@ -156,7 +160,7 @@ class PlaceIntelligenceDecodingTest {
                            "life_remaining":0.0,"source":"estimated",
                            "source_label":"Estimated from year built","confidence":"low",
                            "source_ref":null,"note":"n"}]}}]}]}
-        """.trimIndent()
+            """.trimIndent()
 
         val env = decode<PlaceIntelligence>(json).groups.first().sections.first()
         assertEquals(PlaceSectionId.HOME_SYSTEMS, env.sectionId)

@@ -44,6 +44,15 @@ import app.pantopus.android.ui.screens.place.components.PlaceTileTone
 import app.pantopus.android.ui.theme.PantopusColors
 import app.pantopus.android.ui.theme.PantopusIcon
 
+/** NWS HeatRisk runs 0-4; 3 is where it turns from caution to danger. */
+private const val PEAK_LEVEL_SEVERE = 3
+
+/** The outlook is a one-week strip. */
+private const val OUTLOOK_DAYS = 7
+
+/** yyyy-MM-dd. */
+private const val ISO_DATE_PARTS = 3
+
 // ─── Risk & readiness (C5) ───────────────────────────────────
 
 @Composable
@@ -125,7 +134,7 @@ private fun HeatColdCard(data: PlaceHeatColdData) {
     val tone =
         when {
             data.mode == "none" -> PantopusColors.appTextSecondary
-            data.mode == "cold" || (data.peakLevel ?: 0) >= 3 -> PantopusColors.error
+            data.mode == "cold" || (data.peakLevel ?: 0) >= PEAK_LEVEL_SEVERE -> PantopusColors.error
             else -> PantopusColors.warning
         }
     PlaceDetailCard {
@@ -140,7 +149,7 @@ private fun HeatColdCard(data: PlaceHeatColdData) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                data.heatDays.take(7).forEachIndexed { i, day ->
+                data.heatDays.take(OUTLOOK_DAYS).forEachIndexed { i, day ->
                     Column(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -183,7 +192,7 @@ private fun HeatColdCard(data: PlaceHeatColdData) {
 /** "Mon" from an ISO date, without pulling in a formatter dependency. */
 private fun weekdayLabel(date: String): String {
     val parts = date.split("-")
-    if (parts.size != 3) return ""
+    if (parts.size != ISO_DATE_PARTS) return ""
     return runCatching {
         java.time.LocalDate
             .of(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())

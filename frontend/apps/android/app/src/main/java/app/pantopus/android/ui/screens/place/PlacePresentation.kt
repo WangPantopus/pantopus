@@ -242,28 +242,32 @@ object PlacePresentation {
             PlaceSectionId.HOME_SYSTEMS -> {
                 val d = env.homeSystems ?: return PlaceSectionReading()
                 when {
-                    d.summary.pastExpectedCount > 0 -> PlaceSectionReading(
-                        value = "${d.summary.pastExpectedCount} past expected life",
-                        statusDot = PantopusColors.error,
-                    )
-                    d.summary.agingCount > 0 -> PlaceSectionReading(
-                        value = "${d.summary.agingCount} aging",
-                        statusDot = PantopusColors.warning,
-                    )
-                    else -> PlaceSectionReading(
-                        value = "All within expected life",
-                        statusDot = PantopusColors.home,
-                    )
+                    d.summary.pastExpectedCount > 0 ->
+                        PlaceSectionReading(
+                            value = "${d.summary.pastExpectedCount} past expected life",
+                            statusDot = PantopusColors.error,
+                        )
+                    d.summary.agingCount > 0 ->
+                        PlaceSectionReading(
+                            value = "${d.summary.agingCount} aging",
+                            statusDot = PantopusColors.warning,
+                        )
+                    else ->
+                        PlaceSectionReading(
+                            value = "All within expected life",
+                            statusDot = PantopusColors.home,
+                        )
                 }
             }
             PlaceSectionId.HEAT_COLD -> {
                 val d = env.heatCold ?: return PlaceSectionReading()
                 when (d.mode) {
                     "cold" -> PlaceSectionReading(value = "Freeze expected", statusDot = PantopusColors.error)
-                    "heat" -> PlaceSectionReading(
-                        value = "${d.heatDays.firstOrNull { it.level == d.peakLevel }?.label ?: "Elevated"} heat risk",
-                        statusDot = if ((d.peakLevel ?: 0) >= 3) PantopusColors.error else PantopusColors.warning,
-                    )
+                    "heat" ->
+                        PlaceSectionReading(
+                            value = "${d.heatDays.firstOrNull { it.level == d.peakLevel }?.label ?: "Elevated"} heat risk",
+                            statusDot = if ((d.peakLevel ?: 0) >= 3) PantopusColors.error else PantopusColors.warning,
+                        )
                     // `none` is the honest common case, not a missing reading.
                     else -> PlaceSectionReading(value = "Nothing expected", statusDot = PantopusColors.home)
                 }

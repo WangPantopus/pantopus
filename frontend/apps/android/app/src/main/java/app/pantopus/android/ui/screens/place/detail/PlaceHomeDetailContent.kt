@@ -42,6 +42,12 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import kotlin.math.max
 
+/**
+ * A system at the very end of its life still gets a visible sliver of
+ * bar — a zero-width fill reads as "no data" rather than "out of time".
+ */
+private const val MIN_VISIBLE_LIFE_FRACTION = 0.02
+
 @Composable
 fun PlaceHomeDetailContent(intel: PlaceIntelligence) {
     val env = intel.section(PlaceSectionId.YOUR_HOME)
@@ -129,7 +135,7 @@ private fun SystemsCard(data: PlaceHomeSystemsData) {
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(PantopusColors.appSurfaceSunken),
                     ) {
-                        val frac = (system.lifeRemaining ?: 0.0).coerceIn(0.02, 1.0).toFloat()
+                        val frac = (system.lifeRemaining ?: 0.0).coerceIn(MIN_VISIBLE_LIFE_FRACTION, 1.0).toFloat()
                         Box(
                             modifier =
                                 Modifier

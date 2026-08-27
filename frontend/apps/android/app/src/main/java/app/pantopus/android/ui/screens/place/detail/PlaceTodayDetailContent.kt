@@ -48,6 +48,9 @@ import app.pantopus.android.ui.theme.PantopusIcon
 import app.pantopus.android.ui.theme.PantopusIconImage
 import kotlin.math.roundToInt
 
+/** The row shows at most five tiles; the rest stay in the group page. */
+private const val GOOD_DAY_TILE_CAP = 5
+
 @Composable
 fun PlaceTodayDetailContent(intel: PlaceIntelligence) {
     intel.section(PlaceSectionId.WEATHER)?.let { env ->
@@ -112,7 +115,7 @@ fun PlaceTodayDetailContent(intel: PlaceIntelligence) {
 @Composable
 private fun GoodDayRow(tiles: List<PlaceGoodDayTile>) {
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
-    val shown = tiles.take(5)
+    val shown = tiles.take(GOOD_DAY_TILE_CAP)
     val open = shown.firstOrNull { it.id == openId }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
