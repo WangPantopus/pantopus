@@ -220,8 +220,9 @@ async function yesterdayRecap(userId, today) {
  */
 async function setupNudges(userId) {
   let aliasCount = 0;
+  // null = the occupancy read failed (distinct from [] = no homes).
   const homeIds = await getAccessibleHomeIds(userId);
-  if (homeIds.length > 0) {
+  if (homeIds && homeIds.length > 0) {
     const { count } = await supabaseAdmin
       .from('MailAlias')
       .select('*', { count: 'exact', head: true })

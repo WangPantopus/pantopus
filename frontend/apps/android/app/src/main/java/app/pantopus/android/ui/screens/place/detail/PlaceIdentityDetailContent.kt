@@ -259,6 +259,10 @@ private fun ResidencyLetterSection(viewModel: PlaceDetailViewModel) {
     val state by viewModel.letters.collectAsStateWithLifecycle()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // A failed revoke must be visible here too — the resident is
+        // being told whether a document carrying their name and address
+        // is still live.
+        PlaceActionToastLine(viewModel)
         PlaceDetailCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("What is this letter for?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = PantopusColors.appText)

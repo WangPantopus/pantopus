@@ -229,6 +229,11 @@ object PlaceEnumAdapterFactory : JsonAdapter.Factory {
             MailboxPhysicalStatus::class.java to MailboxPhysicalStatus.NOT_RUN,
             ResidencyClaimScope::class.java to ResidencyClaimScope.UNKNOWN,
             ResidencyClaimStatus::class.java to ResidencyClaimStatus.EXPIRED,
+            // ResidencyLetterStatus declares UNKNOWN but was never
+            // registered, so the forward-compatibility promise its own
+            // constant makes was not kept: an unrecognized status threw
+            // and took the whole section's decode with it.
+            ResidencyLetterStatus::class.java to ResidencyLetterStatus.UNKNOWN,
             FridgeCardStatus::class.java to FridgeCardStatus.REVOKED,
             IncentiveLevel::class.java to IncentiveLevel.UNKNOWN,
             IncentiveType::class.java to IncentiveType.UNKNOWN,

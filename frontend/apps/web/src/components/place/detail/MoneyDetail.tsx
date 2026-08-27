@@ -66,7 +66,11 @@ function BillBenchmark({ data }: { data: PlaceBillBenchmarkData }) {
   const trackMax = Math.max(your ?? data.band_high, data.band_high) + band;
   const span = Math.max(1, trackMax - trackMin);
   const pos = (v: number) => clampPct(((v - trackMin) / span) * 100);
-  const verdict = BILL_VERDICT[data.comparison];
+  // Fallback, not a raw index: an unrecognized comparison value would
+  // otherwise throw on .text and take down the whole Money Signals page.
+  // Same class as standingChipFor below; there is no ErrorBoundary on
+  // the Place routes, so one unknown enum blanks the screen.
+  const verdict = BILL_VERDICT[data.comparison] ?? BILL_VERDICT.typical;
 
   return (
     <div className="bg-app-surface border border-app-border rounded-2xl shadow-sm p-[18px]">
@@ -120,7 +124,7 @@ function IncentiveRow({ item, isLast }: { item: PlaceIncentive; isLast: boolean 
           <span className="text-[14.5px] font-semibold text-app-text -tracking-[0.01em]">{item.name}</span>
           <Chip label="You may be eligible" variant="info" />
         </div>
-        <div className="text-[12.5px] text-app-text-muted mt-0.5">{LEVEL_LABEL[item.level]} · {TYPE_LABEL[item.incentive_type]}</div>
+        <div className="text-[12.5px] text-app-text-muted mt-0.5">{LEVEL_LABEL[item.level] ?? 'Program'} · {TYPE_LABEL[item.incentive_type] ?? 'incentive'}</div>
         {item.summary ? <div className="text-[13px] text-app-text-strong leading-[19px] mt-1">{item.summary}</div> : null}
       </div>
     </div>

@@ -37,13 +37,26 @@ function chunk(list, size) {
   return out;
 }
 
-/** Homes the user actively occupies. */
+/**
+ * Homes the user actively occupies.
+ *
+ * The error is CHECKED, not dropped. A failed read here returns [] just
+ * like "this user occupies nothing", so ensureTodayItems early-returns 0
+ * and reports success — the same invisible failure that killed Mail Day
+ * once already, one function upstream of where it was fixed.
+ * @returns {Promise<string[]|null>} null on a read FAILURE (distinct
+ *   from [] meaning "genuinely no homes").
+ */
 async function getAccessibleHomeIds(userId) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('HomeOccupancy')
     .select('home_id')
     .eq('user_id', userId)
     .eq('is_active', true);
+  if (error) {
+    logger.error('Mail day: occupancy read failed', { userId, error: error.message });
+    return null;
+  }
   return (data || []).map((r) => r.home_id);
 }
 
@@ -82,19 +95,26 @@ async function ensureTodayItems(userId, today) {
     if (existing && existing.length > 0) return 0;
 
     const homeIds = await getAccessibleHomeIds(userId);
+    // null = the read FAILED; [] = genuinely no homes. Only the second
+    // is "nothing to do".
+    if (homeIds === null) return 0;
     if (homeIds.length === 0) return 0;
 
     // Newest scans first, capped: a long-unresolved backlog otherwise
     // re-materializes in FULL as fresh rows every day, for every
     // occupant, forever — the triage screen is a daily ritual, not a
     // dumping ground, and the full backlog still lives in the mailbox.
-    const { data: queue } = await supabaseAdmin
+    const { data: queue, error: queueErr } = await supabaseAdmin
       .from('MailRoutingQueue')
       .select('*, Mail!inner(*)')
       .in('home_id', homeIds)
       .eq('resolved', false)
       .order('created_at', { ascending: false })
       .range(0, MATERIALIZE_ROW_CAP - 1);
+    if (queueErr) {
+      logger.error('Mail day: queue read failed', { userId, error: queueErr.message });
+      return 0;
+    }
     const rows = queue || [];
     if (rows.length === 0) return 0;
 

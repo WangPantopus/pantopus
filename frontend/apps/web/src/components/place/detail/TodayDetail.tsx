@@ -381,7 +381,9 @@ function GoodDayRow({ data }: { data: PlaceGoodDayData }) {
     <div className="flex flex-col gap-2">
       <div className="flex overflow-x-auto gap-2 pb-0.5 -mx-1 px-1">
         {tiles.map((tile) => {
-          const tint = VERDICT_TINT[tile.verdict];
+          // Fallback, not a raw index — an unknown verdict would throw
+          // on .frame and blank the Today page.
+          const tint = VERDICT_TINT[tile.verdict] ?? VERDICT_TINT.no;
           const isOpen = tile.id === openId;
           return (
             <button

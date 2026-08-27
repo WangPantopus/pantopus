@@ -25,6 +25,8 @@ final class PlaceResidencyLetterViewModel {
 
     private(set) var state: State = .loading
     private(set) var isIssuing = false
+    /// (message, isError) — a failed revoke must never be silent.
+    private(set) var toast: (message: String, isError: Bool)?
     var purpose = ""
     let homeId: String
     private let api: APIClient
@@ -71,10 +73,22 @@ final class PlaceResidencyLetterViewModel {
             _ = try await api.request(
                 ResidencyLettersEndpoints.revoke(homeId: homeId, letterId: letterId)
             ) as ResidencyLetterResponse
+            toast = ("Letter revoked — its code no longer verifies.", false)
+            await load()
+        } catch let error as APIError {
+            // Revocation is a promise. A silent failure lets the resident
+            // believe a live letter carrying their name and street address
+            // has been withdrawn when it still verifies.
+            toast = (error.errorDescription ?? "Couldn't revoke the letter.", true)
             await load()
         } catch {
+            toast = ("Couldn't revoke the letter.", true)
             await load()
         }
+    }
+
+    func clearToast() {
+        toast = nil
     }
 }
 
@@ -320,6 +334,15 @@ private struct ResidencyLetterSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let toast = vm.toast {
+                Text(toast.message)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(toast.isError ? Theme.Color.error : Theme.Color.success)
+                    .task {
+                        try? await Task.sleep(for: .seconds(3))
+                        vm.clearToast()
+                    }
+            }
             PlaceDetailCard {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("What is this letter for?")

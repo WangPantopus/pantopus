@@ -109,7 +109,17 @@ class PlaceDetailViewModel
 
         fun revokeLetter(letterId: String) {
             viewModelScope.launch {
-                repo.revokeResidencyLetter(homeId, letterId)
+                // Revocation is a promise. A silent failure lets the
+                // resident believe a live letter carrying their name and
+                // street address has been withdrawn when it still
+                // verifies — the same reason the claim and fridge-card
+                // revokes surface theirs.
+                when (val r = repo.revokeResidencyLetter(homeId, letterId)) {
+                    is NetworkResult.Success -> Unit
+                    is NetworkResult.Failure ->
+                        _actionToast.value =
+                            PlaceActionToast(r.error.displayMessage("Couldn't revoke the letter."), isError = true)
+                }
                 loadLetters()
             }
         }
