@@ -133,7 +133,16 @@ final class PlaceFridgeCardViewModel {
             ) as FridgeCardResponse
             toast = ("Card revoked — its page now shows none of its content.", false)
             await load()
+        } catch let error as APIError {
+            // A swallowed revoke is the worst possible silence on this
+            // surface: the resident taps Revoke on a leaked card holding
+            // their household's medical details, sees nothing change,
+            // and reasonably concludes it worked. A member without
+            // can_manage_home hits exactly this (403).
+            toast = (error.errorDescription ?? "Couldn't revoke the card.", true)
+            await load()
         } catch {
+            toast = ("Couldn't revoke the card.", true)
             await load()
         }
     }

@@ -70,7 +70,7 @@ const BLOCK = {
   rent_reports: 4,
   meters: [
     { id: 'real_rent', label: 'Real rents on your block', current: 4, needed: 10, unlocked: false },
-    { id: 'bill_benchmark', label: 'Block bill benchmark', current: 6, needed: 10, unlocked: false },
+    { id: 'verified_homes', label: 'Ten verified homes', current: 6, needed: 10, unlocked: false },
     { id: 'block_growing', label: 'Growing-block signal', current: 6, needed: 25, unlocked: false },
   ],
   invites_remaining: 2,
@@ -98,7 +98,10 @@ describe('BlockDetail — Founders section', () => {
     await waitFor(() => expect(screen.getByText('Founder #2 of this block')).toBeInTheDocument());
     expect(screen.getByText(/since July 2026/)).toBeInTheDocument();
     expect(screen.getByText('Verified homes on your block')).toBeInTheDocument();
-    expect(screen.getByText('Block bill benchmark')).toBeInTheDocument();
+    // The meter names the milestone it actually measures — it must not
+    // claim to gate bill_benchmark, whose real gate is opted-in bill
+    // data, not the verified-home count.
+    expect(screen.getByText('Ten verified homes')).toBeInTheDocument();
     expect(screen.getByText('6 of 10')).toBeInTheDocument();
     expect(screen.getByText('6 of 25')).toBeInTheDocument();
     // Wave 3: the rent-report count is its own reading and its own meter,

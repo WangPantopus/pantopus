@@ -276,11 +276,26 @@ async function warmPendingTracts({ limit = 3 } = {}) {
     // Dead-letter: a tract that keeps failing stops occupying the queue.
     // Stored as suppressed on the SHORT TTL — the composer degrades to
     // the zone-only card, and next week the tract gets a clean retry.
+    //
+    // The attempt counter is RESET here, not carried forward. Writing
+    // the exhausted count into the dead-letter payload made the "fresh
+    // start" impossible: the next cycle's claim incremented from 6 to 7,
+    // tripped this branch before fetching, and re-dead-lettered — so a
+    // tract that failed once during an OpenFEMA outage would never be
+    // warmed again, and its residents' flood card would stay
+    // benchmark-less forever. The count belongs to a retry episode, not
+    // to the tract.
     if (claim.attempts > MAX_WARM_ATTEMPTS) {
       await writeRow(
         cacheKeyFor(tractId),
         SECTION_ID,
-        { suppressed: true, unavailable: true, reason: 'fetch_failed', attempts: claim.attempts },
+        {
+          suppressed: true,
+          unavailable: true,
+          reason: 'fetch_failed',
+          attempts: 0,
+          last_failed_after: claim.attempts,
+        },
         INDETERMINATE_TTL_MS,
         new Date().toISOString(),
       );

@@ -66,9 +66,39 @@ function cellForHome(home) {
   return encodeGeohash(lat, lng, 6);
 }
 
-/** Bedrooms the report is FOR: the caller's value, else the home's. */
+/**
+ * Bedrooms the report is FOR: the caller's value, else the home's.
+ *
+ * Returns null when neither is known — NOT 0. `Number(null)` is 0, a
+ * finite value, so coercing first files every null-bedroom home as a
+ * STUDIO: the resident's card reads "· studio", the shared studio
+ * cohort's median is skewed by a house, and the read side then prices
+ * them against studios. Home.bedrooms is nullable and all three clients
+ * invite omission ("Leave it blank"), so this is the common case, not
+ * an edge one. (cellForHome above guards the identical coercion for
+ * coordinates; this is the same trap.)
+ *
+ * A null bedroom count is already legal — the migration's CHECK allows
+ * it, and computeBlockRent keeps such rows out of every same-size
+ * bucket while still counting them under 'all_sizes'. That is the
+ * honest degradation.
+ */
 function normalizeBedrooms(value, home) {
-  const raw = value != null ? value : (home && home.bedrooms);
+  // The HOME's own record wins when it has one. The caller's declared
+  // value is only a fallback for a home with no bedroom count on file.
+  //
+  // This is a privacy boundary, not a data-quality preference: a
+  // freely-declared bedroom count lets a verified occupant join ANY
+  // size cohort in their cell, including one sitting at 9 reports that
+  // the k floor is deliberately suppressing — their own controllable
+  // row lifts it over the line and the band opens up. Anchoring to the
+  // home record removes that lever; a resident who disagrees with the
+  // count edits their home, which is the single source of truth and is
+  // already the number every other section reads.
+  const raw = (home && home.bedrooms != null && home.bedrooms !== '')
+    ? home.bedrooms
+    : value;
+  if (raw == null || raw === '') return null;
   const n = Number(raw);
   if (!Number.isFinite(n)) return null;
   return Math.min(10, Math.max(0, Math.round(n)));
@@ -79,17 +109,34 @@ function parseRentCents(monthlyRent) {
   if (!Number.isFinite(n) || n <= 0) {
     throw new RentReportError('Enter your monthly rent.', 'BAD_AMOUNT');
   }
-  const cents = Math.round(n * 100);
+  // Stored to the whole dollar, because that is the only precision the
+  // product ever shows. Keeping cents made the round-trip lossy: a
+  // resident who entered $2,400.50 read it back as $2,401, and simply
+  // opening the edit form and pressing Save silently rewrote their
+  // figure. Round once, at the boundary, and read == write forever.
+  const cents = Math.round(n) * 100;
   if (cents < MIN_RENT_CENTS || cents > MAX_RENT_CENTS) {
     throw new RentReportError('That monthly rent looks off — enter the amount you pay each month.', 'BAD_AMOUNT');
   }
   return cents;
 }
 
+// Published figures are rounded to this many dollars. Nearest-rank
+// quantiles return a RAW ARRAY ELEMENT, so an unrounded p25/median/p75
+// at the k floor is literally three neighbours' exact monthly rents.
+// Binning breaks the identity between a published statistic and a
+// single household's figure while costing the reader nothing — nobody
+// needs a block benchmark to the dollar.
+const PUBLISH_ROUNDING_DOLLARS = 25;
+
+function roundToBin(dollars) {
+  return Math.round(dollars / PUBLISH_ROUNDING_DOLLARS) * PUBLISH_ROUNDING_DOLLARS;
+}
+
 function quantile(sortedCents, q) {
   if (!sortedCents.length) return null;
   const idx = Math.min(sortedCents.length - 1, Math.max(0, Math.round(q * (sortedCents.length - 1))));
-  return Math.round(sortedCents[idx] / 100);
+  return roundToBin(sortedCents[idx] / 100);
 }
 
 // ── The resident's own report ────────────────────────────────
@@ -176,7 +223,9 @@ function serializeReport(row) {
 async function readCellReports(geohash6) {
   const { data, error } = await supabaseAdmin
     .from('HomeRentReport')
-    .select('monthly_rent_cents, bedrooms')
+    // home_id is required for the ONE-ROW-PER-HOME collapse below: the
+    // floor must count households, not rows.
+    .select('home_id, monthly_rent_cents, bedrooms, updated_at')
     .eq('geohash6', geohash6)
     .range(0, CELL_ROW_CAP - 1);
   if (error) {
@@ -198,9 +247,32 @@ async function readCellReports(geohash6) {
  * @param {number|null} bedrooms  the viewer's own bedroom count
  */
 function computeBlockRent(rows, bedrooms) {
-  const all = (rows || [])
-    .map((r) => ({ cents: Number(r.monthly_rent_cents), bedrooms: r.bedrooms }))
+  const clean = (rows || [])
+    .map((r) => ({
+      homeId: r.home_id == null ? null : String(r.home_id),
+      cents: Number(r.monthly_rent_cents),
+      bedrooms: r.bedrooms,
+      updatedAt: r.updated_at || '',
+    }))
     .filter((r) => Number.isFinite(r.cents) && r.cents > 0);
+
+  // ONE ROW PER HOME. The table is unique per (home_id, user_id), so a
+  // household with two verified occupants files two rows — which would
+  // let five households satisfy a floor the product states as "10
+  // verified homes", and would double-weight that household in the
+  // median. Collapse to the most recently updated report per home
+  // BEFORE the floor is applied, so both the count and the statistic
+  // are per-household. Rows with no home id (not producible by the
+  // service, but the aggregator is pure and takes what it is given)
+  // each stand alone.
+  const byHome = new Map();
+  const all = [];
+  for (const r of clean) {
+    if (r.homeId == null) { all.push(r); continue; }
+    const held = byHome.get(r.homeId);
+    if (!held || String(r.updatedAt) > String(held.updatedAt)) byHome.set(r.homeId, r);
+  }
+  all.push(...byHome.values());
 
   const sameSize = bedrooms == null
     ? []
@@ -317,5 +389,6 @@ module.exports = {
   K_MIN,
   // Exported for testing.
   computeBlockRent,
+  normalizeBedrooms,
   cellForHome,
 };

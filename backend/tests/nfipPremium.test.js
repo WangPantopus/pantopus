@@ -230,3 +230,30 @@ describe('warmPendingTracts', () => {
     expect(Date.parse(row.expires_at) - Date.parse(row.fetched_at)).toBeGreaterThan(30 * 24 * 60 * 60 * 1000);
   });
 });
+
+// Regression: a dead-lettered tract must actually get a fresh start.
+// Writing the exhausted attempt count into the dead-letter payload made
+// the next cycle's claim increment from 6 to 7 and re-dead-letter before
+// fetching — so one OpenFEMA outage removed a tract from the queue
+// permanently and its residents' flood card stayed benchmark-less.
+describe('dead-lettered tracts return to the queue', () => {
+  test('the dead-letter payload resets the attempt counter', async () => {
+    seedTable('PlaceSectionCache', [{
+      cache_key: `tract:${TRACT}`,
+      section_id: '_nfip_tract',
+      payload: { pending: true, attempts: 5 },
+      fetched_at: '2026-08-25T00:00:00.000Z',
+      expires_at: '2026-11-25T00:00:00.000Z',
+    }]);
+    global.fetch.mockRejectedValue(new Error('503'));
+
+    const result = await warmPendingTracts({ limit: 3 });
+    expect(result.deadLettered).toBe(1);
+
+    const row = getTable('PlaceSectionCache').find((r) => r.cache_key === `tract:${TRACT}`);
+    // Reset — not carried forward — so the next claim starts at 1.
+    expect(row.payload.attempts).toBe(0);
+    // The episode is still recorded for operators.
+    expect(row.payload.last_failed_after).toBe(6);
+  });
+});

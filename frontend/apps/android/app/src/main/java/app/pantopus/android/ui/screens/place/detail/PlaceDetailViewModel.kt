@@ -37,6 +37,9 @@ private const val MAX_SEED_ITEMS = 12
 /** Two letters, as the Block Founders route's address validator demands. */
 private const val STATE_CODE_LENGTH = 2
 
+// Mirrors the server's clamp (realRentService.normalizeBedrooms).
+private const val MAX_BEDROOMS = 10
+
 // A cohesive container for one detail page's several T4 surfaces —
 // letters, claims, fridge cards, the mailbox check, the rate watch, the
 // rent report, and the block founders panel. The count grows one wave
@@ -556,7 +559,17 @@ class PlaceDetailViewModel
              * server's documented fallback — so an empty field is
              * omitted, never sent as zero, which would mean STUDIO.
              */
-            internal fun parseBedrooms(raw: String): Int? = raw.filter { it.isDigit() }.takeIf { it.isNotEmpty() }?.toIntOrNull()
+            internal fun parseBedrooms(raw: String): Int? {
+                val trimmed = raw.trim()
+                if (trimmed.isEmpty()) return null
+                // Parsed as a WHOLE number, never digit-filtered. Stripping
+                // non-digits turned "2.5" into 25, which the server clamps
+                // to 10 — a resident's rent silently joined the 10-bedroom
+                // cohort. A bedroom count that is not a plain integer is
+                // refused (null = omit) rather than reinterpreted.
+                val n = trimmed.toIntOrNull() ?: return null
+                return if (n in 0..MAX_BEDROOMS) n else null
+            }
 
             /**
              * A write failure in the resident's own terms. 403 carries

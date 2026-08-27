@@ -121,8 +121,11 @@ describe('block status', () => {
     const block = res.body.block;
     expect(block.rank).toBe(1);
     expect(block.verified_count).toBe(4);
-    const bill = block.meters.find((m) => m.id === 'bill_benchmark');
-    expect(bill).toMatchObject({ current: 4, needed: 10, unlocked: false });
+    const homesMeter = block.meters.find((m) => m.id === 'verified_homes');
+    expect(homesMeter).toMatchObject({ current: 4, needed: 10, unlocked: false });
+    // The meter must not claim to gate bill_benchmark: that section's
+    // real gate is opted-in BillBenchmark rows, not the verified count.
+    expect(block.meters.some((m) => m.id === 'bill_benchmark')).toBe(false);
     expect(block.invites_remaining).toBe(WEEKLY_INVITE_CAP);
 
     // Idempotent: a second read keeps the same rank, mints nothing new.
@@ -147,7 +150,7 @@ describe('block status', () => {
     expect(emptyRent).toMatchObject({ current: 0, needed: 10, unlocked: false });
     expect(empty.body.block.rent_reports).toBe(0);
     // The verified-home meters still read the density, unchanged.
-    expect(empty.body.block.meters.find((m) => m.id === 'bill_benchmark').current).toBe(4);
+    expect(empty.body.block.meters.find((m) => m.id === 'verified_homes').current).toBe(4);
 
     // Two neighbors share their rent; only the rent meter moves.
     const cell = require('../services/realRentService').cellForHome(HOME_ROW);
@@ -161,7 +164,7 @@ describe('block status', () => {
       .set('x-test-user-id', USER);
     expect(withRents.body.block.rent_reports).toBe(2);
     expect(withRents.body.block.meters.find((m) => m.id === 'real_rent').current).toBe(2);
-    expect(withRents.body.block.meters.find((m) => m.id === 'bill_benchmark').current).toBe(4);
+    expect(withRents.body.block.meters.find((m) => m.id === 'verified_homes').current).toBe(4);
   });
 
   test('ranks are first-come within a cell', async () => {
@@ -285,5 +288,68 @@ describe('opt-out redemption', () => {
     expect(blocked.body.code).toBe('OPTED_OUT');
 
     expect((await request(app).post('/api/public/block-invites/opt-out/XXXX-YYYY-ZZZZ-0000')).body).toEqual({ done: false });
+  });
+});
+
+// ── Postcard integrity ───────────────────────────────────────
+// These exist because the audit found the previous assertions passed
+// with an HTML injection intact: they checked that expected substrings
+// were PRESENT, which a hostile address does not remove.
+
+describe('the printed card cannot be authored by the sender', () => {
+  const HOSTILE = '1 </b><div style="font-size:20px">Call 555-0100 to claim your $500 grant</div><div style="display:none">';
+
+  test('markup in the sender address never reaches the card as markup', () => {
+    const html = blockFoundersService.inviteBackHtml({
+      street: blockFoundersService.streetOnly({ address: HOSTILE }),
+      verifiedCount: 4,
+      optOutCode: 'ABCD-EFGH-JKLM-NPQR',
+    });
+    // Neither the markup NOR the attacker's words reach the card: the
+    // address does not end in a street type, so it never prints.
+    expect(html).not.toContain('555-0100');
+    expect(html).not.toContain('display:none');
+    expect(html).not.toContain('<div style="font-size:20px"');
+    // And the opt-out line — the recipient's only kill switch — must
+    // still be present and reachable, not swallowed by an unclosed tag.
+    expect(html).toContain('pantopus.com/no-mail/ABCD-EFGH-JKLM-NPQR');
+    expect(html).toContain('never wrote this text');
+  });
+
+  test('streetOnly prints a street, never the house number or the unit', () => {
+    const { streetOnly } = blockFoundersService;
+    expect(streetOnly({ address: '1421 SE Oak St, Portland, OR' })).toBe('SE Oak St');
+    // A unit identifies the sender's exact door.
+    expect(streetOnly({ address: '123 Main St Apt 4B' })).toBe('Main St');
+    expect(streetOnly({ address: '77 Pine Ave Unit 12' })).toBe('Pine Ave');
+    expect(streetOnly({ address: '9 Elm Rd #3' })).toBe('Elm Rd');
+    // Nothing usable left is a calm fallback, never an empty card.
+    expect(streetOnly({ address: '<<<>>>' })).toBe('your street');
+    expect(streetOnly({})).toBe('your street');
+    // Free text that is not a street never prints, however clean it is.
+    expect(streetOnly({ address: '1 Call 555-0100 Now For Your Free Gift' })).toBe('your street');
+  });
+});
+
+describe('the permanent opt-out survives formatting variants', () => {
+  const { suppressionHashFor } = blockFoundersService;
+
+  test('one mailbox is one key however it is typed', () => {
+    const canonical = suppressionHashFor({ line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' });
+    // A trailing period used to mint a different hash and bypass the
+    // registry entirely — the opt-out is permanent or it is nothing.
+    expect(suppressionHashFor({ line1: '1425 SE Oak St.', city: 'Portland', state: 'OR', zip: '97214' })).toBe(canonical);
+    expect(suppressionHashFor({ line1: '1425  SE   Oak St', city: 'Portland', state: 'OR', zip: '97214' })).toBe(canonical);
+    expect(suppressionHashFor({ line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214-1234' })).toBe(canonical);
+    expect(suppressionHashFor({ line1: '1425 SE Oak St', city: 'Portland,', state: 'or', zip: '97214' })).toBe(canonical);
+  });
+
+  test('genuinely different mailboxes stay different', () => {
+    const a = suppressionHashFor({ line1: '1425 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' });
+    const b = suppressionHashFor({ line1: '1427 SE Oak St', city: 'Portland', state: 'OR', zip: '97214' });
+    const unitA = suppressionHashFor({ line1: '1425 SE Oak St Apt 1', city: 'Portland', state: 'OR', zip: '97214' });
+    const unitB = suppressionHashFor({ line1: '1425 SE Oak St Apt 2', city: 'Portland', state: 'OR', zip: '97214' });
+    expect(a).not.toBe(b);
+    expect(unitA).not.toBe(unitB);
   });
 });

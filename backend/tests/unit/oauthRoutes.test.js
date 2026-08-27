@@ -2,11 +2,13 @@ const { resetTables, setAuthMocks, getTable } = require('../__mocks__/supabaseAd
 const mockCreateClient = jest.fn();
 
 // Keep rate limit middleware from interfering with direct handler tests
-jest.mock('../../middleware/rateLimiter', () => ({
-  globalWriteLimiter: (req, _res, next) => next(),
-  addressValidationLimiter: (req, _res, next) => next(),
-  addressClaimLimiter: (req, _res, next) => next(),
-}));
+jest.mock('../../middleware/rateLimiter', () => {
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: (...args) => mockCreateClient(...args),

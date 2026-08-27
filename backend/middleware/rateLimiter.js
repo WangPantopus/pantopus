@@ -73,6 +73,31 @@ const homeCreationLimiter = rateLimit({
 });
 
 /**
+ * Limiter for home-scoped endpoints that send email or spend a vendor
+ * call: invites (an email to an address the sender types) and the
+ * ATTOM/OpenAI-backed property suggestions.
+ *
+ * These used to be covered incidentally by homeCreationLimiter, which
+ * was mounted on ALL of /api/homes. Narrowing that limiter to the one
+ * request it actually names (POST /api/homes) was correct — it was
+ * 429ing ordinary scheduling and safety actions — but it silently took
+ * the only limit off these two, leaving a verified user able to fire
+ * unbounded invite emails. Named explicitly here so the coverage is
+ * visible at the route rather than inherited from a mount.
+ *
+ * 20 per hour per user: far above real use, far below a mail blast.
+ */
+const homeOutboundLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  skip: (req) => req.method !== 'POST',
+  message: { error: 'Too many requests. Please try again later.' },
+});
+
+/**
  * Limiter for ownership claims and verification endpoints.
  * 10 requests per 15 minutes per user.
  */
@@ -323,6 +348,7 @@ module.exports = {
   bookingWriteLimiter,
   contentCreationLimiter,
   homeCreationLimiter,
+  homeOutboundLimiter,
   ownershipClaimLimiter,
   postcardLimiter,
   verificationAttemptLimiter,

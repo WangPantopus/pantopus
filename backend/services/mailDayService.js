@@ -122,12 +122,29 @@ async function ensureTodayItems(userId, today) {
     });
     // Upsert-ignore, not insert: the empty-check above is a check-then-act
     // with no lock, and this runs from every app instance's cron AND from
-    // GET /today. The unique index on (user_id, day_date, mail_id)
-    // (migration 170) makes the race's loser a silent no-op instead of a
-    // duplicated triage queue.
-    await supabaseAdmin
+    // GET /today. The unique index on (user_id, day_date, mail_id) makes
+    // the race's loser a silent no-op instead of a duplicated triage queue.
+    //
+    // The index MUST be non-partial (migration 173) — Postgres cannot
+    // infer a partial index from `ON CONFLICT (cols)` without repeating
+    // its predicate, which PostgREST cannot emit, so a partial index
+    // makes every call raise 42P10.
+    //
+    // And the result MUST be checked: this failure mode was invisible
+    // precisely because it was not. A dropped error here means an empty
+    // triage screen and no daily push, reported as success.
+    const { error: writeErr } = await supabaseAdmin
       .from('MailDayItem')
       .upsert(inserts, { onConflict: 'user_id,day_date,mail_id', ignoreDuplicates: true });
+    if (writeErr) {
+      logger.error('Mail day materialization failed', {
+        userId,
+        rows: inserts.length,
+        code: writeErr.code,
+        error: writeErr.message,
+      });
+      return 0;
+    }
     return inserts.length;
   } catch (err) {
     logger.warn('Mail day backfill failed (non-fatal)', { userId, error: err.message });

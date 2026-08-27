@@ -84,7 +84,14 @@ final class PlaceResidencyPassViewModel {
             ) as ResidencyClaimResponse
             toast = ("Claim revoked — its link no longer checks out as valid.", false)
             await load()
+        } catch let error as APIError {
+            // Revocation is a promise. A failure that says nothing lets
+            // the resident believe a live claim carrying their name and
+            // address has been withdrawn when it has not.
+            toast = (error.errorDescription ?? "Couldn't revoke the claim.", true)
+            await load()
         } catch {
+            toast = ("Couldn't revoke the claim.", true)
             await load()
         }
     }

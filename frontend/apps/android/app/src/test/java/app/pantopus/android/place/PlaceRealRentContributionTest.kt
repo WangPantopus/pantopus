@@ -150,7 +150,19 @@ class PlaceRealRentContributionTest {
         assertNull(PlaceDetailViewModel.parseBedrooms(""))
         assertNull(PlaceDetailViewModel.parseBedrooms("   "))
         assertEquals(0, PlaceDetailViewModel.parseBedrooms("0"))
-        assertEquals(2, PlaceDetailViewModel.parseBedrooms("2 bedrooms"))
+        // Regression: digit-filtering turned "2.5" into 25, which the
+        // server clamps to 10 — the resident's rent silently joined the
+        // 10-bedroom cohort. A non-integer is refused, never reinterpreted.
+        assertNull(PlaceDetailViewModel.parseBedrooms("2.5"))
+        assertNull(PlaceDetailViewModel.parseBedrooms("2,5"))
+        assertNull(PlaceDetailViewModel.parseBedrooms("two"))
+        assertNull(PlaceDetailViewModel.parseBedrooms("99"))
+        assertEquals(3, PlaceDetailViewModel.parseBedrooms(" 3 "))
+        // Free text is omitted rather than mined for a digit. Leniency
+        // here is what produced the "2.5" -> 25 corruption, and it now
+        // costs nothing: the server treats the HOME's own bedroom count
+        // as authoritative, so an omitted value resolves correctly.
+        assertNull(PlaceDetailViewModel.parseBedrooms("2 bedrooms"))
     }
 
     // ── Defect 3: the route's 403 sentence reaches the resident ──

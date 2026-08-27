@@ -30,11 +30,13 @@ jest.mock('../../services/addressValidation/secondaryAddressProvider', () => ({
 }));
 
 // Mock rate limiters to pass-through
-jest.mock('../../middleware/rateLimiter', () => ({
-  globalWriteLimiter: (req, res, next) => next(),
-  addressValidationLimiter: (req, res, next) => next(),
-  addressClaimLimiter: (req, res, next) => next(),
-}));
+jest.mock('../../middleware/rateLimiter', () => {
+  // A Proxy, not a hand-listed set: an exhaustive mock silently
+  // breaks ("argument handler must be a function") the moment a
+  // route uses a limiter the list forgot.
+  const noop = (req, res, next) => next();
+  return new Proxy({}, { get: () => noop });
+});
 
 // Mock verifyToken to pass-through
 jest.mock('../../middleware/verifyToken', () => {
