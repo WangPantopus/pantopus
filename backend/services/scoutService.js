@@ -311,8 +311,21 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
     ask_before_you_sign: asks,
     // Rendered verbatim by every client. Scout is about land and
     // buildings; the people currently living there are not our subject.
+    // This used to end "we did not tell anyone you looked." It was not true.
+    //
+    // Scout cannot answer anything without coordinates, and an address only
+    // becomes coordinates by asking a geocoder — so the route hands the typed
+    // address to Mapbox (services/geo/mapboxProvider.js) on every call. That
+    // hop is unavoidable here, unlike on Unlisted, where only a state was
+    // needed and the geocode was removed outright.
+    //
+    // So the sentence states what is actually true, and keeps the assurance
+    // this reader actually wants: the people at the address are not told.
+    // Claiming more than that on a page someone opens before they have
+    // committed to anything is the wrong kind of reassuring.
     scope_note: 'Everything here describes the property and the area from public records. '
-      + 'Nothing about the people who live there is shown, and we did not tell anyone you looked.',
+      + 'Nothing about the people who live there is shown, and nobody at the address is told you looked. '
+      + 'Turning the address into a location means sending it to our mapping provider — that is the one company that sees it.',
   };
 }
 

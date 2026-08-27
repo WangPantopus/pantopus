@@ -8,10 +8,14 @@
 //   * every generated line is a QUESTION or a fact, never advice;
 //   * a fact the CALLER supplied is attributed to them, not presented as
 //     something we looked up;
-//   * the typed address is never persisted — checking out a place you
-//     might rent is not consent to a record of having looked.
+//   * the copy states exactly what happens to the typed address —
+//     checking out a place you might rent is not consent to a record of
+//     having looked, and it is also not a promise we can make in the
+//     absolute, since placing an address requires a geocoder.
 // ============================================================
 
+const express = require('express');
+const request = require('supertest');
 const { askBeforeYouSign, LEAD_DISCLOSURE_YEAR } = require('../services/scoutService');
 
 const FLOOD_HIGH = { zone: 'AE', in_sfha: true };
@@ -122,12 +126,26 @@ describe('Scout never describes the people who live there', () => {
 });
 
 // ── The promise in the copy must be true in the code ─────────
-// Scout's scope_note tells the reader "we did not tell anyone you
-// looked". That is only true if the typed address never leaves this
-// process. It did once: getScoutReport called
-// neighborhoodProfileService.getProfile, which passes the address
-// straight into a WalkScore query string. This pins the fix.
-describe('the typed address never leaves the process', () => {
+//
+// Scout's scope_note once told the reader "we did not tell anyone you
+// looked." That was false in TWO places, and the first fix only caught
+// one of them:
+//
+//   1. getScoutReport called neighborhoodProfileService.getProfile,
+//      which passes the address into a WalkScore query string. Removed —
+//      Scout only ever wanted the flood zone and the tract id, and both
+//      come from coordinates. That is what this block pins.
+//
+//   2. The ROUTE geocodes the address through Mapbox before calling
+//      getScoutReport at all. That one is unavoidable: Scout answers
+//      nothing without coordinates, and an address only becomes
+//      coordinates by asking someone. So the copy changed instead.
+//
+// The invariant is therefore narrower than "never leaves the process",
+// and stating it accurately is the point: getScoutReport itself makes no
+// outbound call carrying the address, and the copy discloses the one hop
+// that does happen rather than denying it.
+describe('the composer makes no outbound call carrying the address', () => {
   const { resetTables } = require('./__mocks__/supabaseAdmin');
   const scoutService = require('../services/scoutService');
 
@@ -180,10 +198,22 @@ describe('the typed address never leaves the process', () => {
     }
   });
 
-  test('the report still says so, and still answers', async () => {
+  test('the scope note claims only what is true, and discloses the hop that is real', async () => {
     resetTables();
     const report = await scoutService.getScoutReport(PLACE, {});
-    expect(report.scope_note).toMatch(/did not tell anyone you looked/i);
+
+    // The sentence that had to go. The route geocodes through Mapbox, so
+    // a blanket "nobody was told" is false — and this is the surface where
+    // a reader is deciding how much to trust us with.
+    expect(report.scope_note).not.toMatch(/did not tell anyone you looked/i);
+    expect(report.scope_note).not.toMatch(/we (do not|don't) (send|share) (it|the address)/i);
+
+    // What it must say instead: the people at the address are not told
+    // (the assurance this reader actually wants), and the one third party
+    // that does see the address is named rather than elided.
+    expect(report.scope_note).toMatch(/nobody at the address is told/i);
+    expect(report.scope_note).toMatch(/mapping provider/i);
+
     // Degrading to no external data must still produce the question list.
     expect(report.ask_before_you_sign.length).toBeGreaterThan(0);
   });
@@ -367,5 +397,58 @@ describe('nothing in the report speaks to the reader as a resident', () => {
       global.fetch = realFetch;
     }
     expect(report.ask_before_you_sign.map((a) => a.id)).toContain('lead_disclosure');
+  });
+});
+
+// ── The route's two dead ends are different dead ends ────────
+//
+// `geocodeUsAddress` fails for four reasons and only ONE of them means
+// "not in the United States". The route collapsed all four into "Scout
+// is U.S.-only for now", so a geocoder outage — which hits every US user
+// at once — told them the product was not for them, and gave no hint
+// that a fuller address would work. Scout genuinely cannot proceed
+// without coordinates, so both are still a dead end; they must at least
+// be the right one.
+describe('the route distinguishes "could not place" from "not in the US"', () => {
+  const publicRoutes = require('../routes/public');
+
+  function buildScoutApp() {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/scout', require('../routes/scout'));
+    return app;
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  test('a geocoder failure is could_not_place, not a geographic denial', async () => {
+    jest.spyOn(publicRoutes, 'geocodeUsAddress')
+      .mockResolvedValue({ ok: false, reason: 'unplaceable' });
+
+    const res = await request(buildScoutApp())
+      .get('/api/scout')
+      .set('x-test-user-id', 'scout-user-1')
+      .query({ address: '1421 SE Oak St' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('could_not_place');
+    expect(res.body.status).not.toBe('unsupported_region');
+    // The message must not tell a US resident they are somewhere else.
+    expect(res.body.message).not.toMatch(/U\.S\.-only/i);
+    // And it must say what would help, since a fuller address often works.
+    expect(res.body.message).toMatch(/city and state/i);
+  });
+
+  test('an address genuinely outside the US still gets the geographic answer', async () => {
+    jest.spyOn(publicRoutes, 'geocodeUsAddress')
+      .mockResolvedValue({ ok: false, reason: 'outside_us' });
+
+    const res = await request(buildScoutApp())
+      .get('/api/scout')
+      .set('x-test-user-id', 'scout-user-1')
+      .query({ address: '10 Downing Street, London' });
+
+    expect(res.body.status).toBe('unsupported_region');
+    expect(res.body.message).toMatch(/U\.S\.-only/i);
   });
 });

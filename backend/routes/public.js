@@ -252,8 +252,14 @@ const FLOOD_GEOHASH_PRECISION = 8;       // ~38m
 const geoKey = (address) => `geo:${address.toLowerCase().replace(/\s+/g, ' ')}`;
 
 // Geocode an address to a US point via services/geo (country=us). Returns a
-// sanitized, area-level place identity, or { ok: false } for anything we can't
-// confidently place inside US coverage (→ unsupported_region, never a 500).
+// sanitized, area-level place identity, or a failure carrying its REASON.
+//
+// The reason matters. Three of the four failure branches mean "we could not
+// place what you typed" and exactly one means "this is not in the United
+// States" — and callers that collapse them tell a US resident, confidently,
+// that the product is not for them. Every caller must branch on `reason`:
+//   'unplaceable' → geocoder down, no key, no result, or nonsense coordinates
+//   'outside_us'  → we placed it, and it is genuinely not in the US
 async function geocodeUsAddress(address) {
   const key = geoKey(address);
   const cached = previewCache.get(key);
@@ -267,15 +273,16 @@ async function geocodeUsAddress(address) {
     // degrade gracefully rather than 500 — the address simply isn't placeable.
     // Failures are NOT cached: a retry must be able to reach the geocoder again.
     console.warn('[public/place] geocode failed:', err.message);
-    return { ok: false };
+    return { ok: false, reason: 'unplaceable' };
   }
 
-  if (!result) return { ok: false };
+  if (!result) return { ok: false, reason: 'unplaceable' };
 
   const lat = Number(result.latitude);
   const lng = Number(result.longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false };
-  if (!isLikelyUS(lat, lng)) return { ok: false };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, reason: 'unplaceable' };
+  // The ONLY branch that means what "unsupported_region" says.
+  if (!isLikelyUS(lat, lng)) return { ok: false, reason: 'outside_us' };
 
   const place = {
     ok: true,

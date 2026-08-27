@@ -25,7 +25,12 @@ const router = express.Router();
 const verifyToken = require('../middleware/verifyToken');
 const { aiDraftLimiter } = require('../middleware/rateLimiter');
 const scoutService = require('../services/scoutService');
-const { geocodeUsAddress } = require('./public');
+// Held as a module reference rather than destructured: a destructured
+// binding is captured at load and cannot be substituted, which made a
+// route test pass against the real geocoder while believing it had
+// stubbed one — it got `unplaceable` from a missing API key and read that
+// as proof the branch worked.
+const publicRoutes = require('./public');
 const logger = require('../utils/logger');
 
 function positiveNumber(value) {
@@ -44,11 +49,20 @@ router.get('/', verifyToken, aiDraftLimiter, async (req, res) => {
       return res.status(400).json({ error: 'That address is too long.' });
     }
 
-    const place = await geocodeUsAddress(rawAddress);
+    const place = await publicRoutes.geocodeUsAddress(rawAddress);
     if (!place.ok) {
+      // "We could not place that" and "you are not in the United States" are
+      // different answers. Collapsing them told anyone hitting a geocoder
+      // outage — every US user at once — that the product was not for them.
+      // Scout genuinely cannot proceed without coordinates, so both are a
+      // dead end here; they must at least be the RIGHT dead end, since only
+      // one of them is worth retrying with a fuller address.
+      const unplaceable = place.reason !== 'outside_us';
       return res.json({
-        status: 'unsupported_region',
-        message: 'Scout is U.S.-only for now',
+        status: unplaceable ? 'could_not_place' : 'unsupported_region',
+        message: unplaceable
+          ? 'We could not find that address — try adding the city and state'
+          : 'Scout is U.S.-only for now',
       });
     }
 
