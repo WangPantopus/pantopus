@@ -9,6 +9,8 @@ const {
   fetchFloodZone,
 } = require('../services/ai/neighborhoodProfileService');
 const { readThrough } = require('../services/placeSectionCache');
+const nfipPremiumService = require('../services/nfipPremiumService');
+const placeSectionAdapters = require('../services/placeSectionAdapters');
 const { encodeGeohash, encodeGeohash6 } = require('../utils/geohash');
 const { GeoCache } = require('../utils/geoCache');
 
@@ -322,7 +324,7 @@ async function fetchFloodCached(lat, lng) {
 // Census tract teaser — area-level medians only (NOT an exact home record,
 // NOT ATTOM). Same two-layer caching as flood; the tract resolution itself
 // is persistently cached too (geocodeToTractCached — effectively permanent).
-async function fetchCensusTeaserCached(lat, lng) {
+async function fetchCensusTeaserCached(lat, lng, tractHint) {
   const key = `census:${encodeGeohash6(lat, lng)}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
@@ -333,7 +335,7 @@ async function fetchCensusTeaserCached(lat, lng) {
       sectionId: '_census_teaser',
       ttlMs: 90 * 24 * 60 * 60 * 1000,
       fetch: async () => {
-        const tract = await geocodeToTractCached(lat, lng);
+        const tract = tractHint || await geocodeToTractCached(lat, lng);
         if (!tract) return null;
         const { tractId, stateCode, countyCode } = tract;
         const tractCode = tractId.slice(stateCode.length + countyCode.length);
@@ -352,6 +354,76 @@ async function fetchCensusTeaserCached(lat, lng) {
     console.warn('[public/place] census teaser failed:', err.message);
     return null;
   }
+}
+
+// ── The money lead (Wave 4) ──────────────────────────────────
+//
+// The anonymous preview used to open with data tiles — a flood zone
+// letter, a census median, a density bucket. Zillow and Ownwell proved
+// the highest-converting address ask leads with a DOLLAR figure, so this
+// composes the strongest real number available for the address and the
+// preview leads with it.
+//
+// Everything here is free and public: the NFIP tract benchmark (already
+// warmed by the background job, read cache-only so the request path
+// never waits on OpenFEMA) and HUD's county Fair Market Rent. No ATTOM,
+// no account, no persistence — exactly the same promise the rest of the
+// preview makes.
+//
+// Honesty rules, because a dollar figure is the most believable thing on
+// a page and the easiest to overclaim:
+//   * every figure states its SCOPE (a tract, a county) — never "your
+//     home", which we do not know at T0;
+//   * a benchmark is never called a quote or a payment;
+//   * when nothing is available the preview falls back to the tiles
+//     rather than inventing a number.
+async function fetchMoneyLeadCached(lat, lng, tractHint) {
+  const key = `money:${encodeGeohash6(lat, lng)}`;
+  const cached = previewCache.get(key);
+  if (cached !== undefined) return cached;
+
+  let lead = null;
+  try {
+    const tract = tractHint || await geocodeToTractCached(lat, lng);
+    if (tract) {
+      const [nfip, fmr] = await Promise.all([
+        nfipPremiumService.getTractBenchmark(tract.tractId).catch(() => null),
+        placeSectionAdapters.hudFmrRow(`${tract.stateCode}${tract.countyCode}`).catch(() => null),
+      ]);
+
+      // Flood cost first: it is the most specific to the address (a
+      // census tract, not a county) and the most surprising.
+      if (nfip && nfip.status === 'ready' && nfip.data && nfip.data.premium_p25 && nfip.data.premium_p75) {
+        lead = {
+          kind: 'flood_premium',
+          headline: `Flood policies near here run $${nfip.data.premium_p25.toLocaleString('en-US')}–$${nfip.data.premium_p75.toLocaleString('en-US')} a year`,
+          detail: `Across ${nfip.data.policy_count} real NFIP policies in this census tract. A benchmark, not a quote.`,
+          low: nfip.data.premium_p25,
+          high: nfip.data.premium_p75,
+          scope: 'census tract',
+          source: 'FEMA · OpenFEMA NFIP policies',
+        };
+      } else if (fmr && Array.isArray(fmr.fmr_lo) && fmr.fmr_lo[2]) {
+        const lo = fmr.fmr_lo[2];
+        const hi = Math.max(fmr.fmr_hi[2] || 0, Math.round(lo * 1.2));
+        lead = {
+          kind: 'rent_band',
+          headline: `A 2-bedroom here rents for about $${lo.toLocaleString('en-US')}–$${hi.toLocaleString('en-US')} a month`,
+          detail: `HUD's FY ${fmr.fiscal_year} fair market rent for ${fmr.county_name}. A county-wide estimate, not this home.`,
+          low: lo,
+          high: hi,
+          scope: 'county',
+          source: 'HUD Fair Market Rents',
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[public/place] money lead failed:', err.message);
+  }
+  // Cached even when null, so a tract with no benchmark yet does not
+  // re-run the lookup on every anonymous view.
+  previewCache.set(key, lead, AREA_TTL_MS);
+  return lead;
 }
 
 // Read the verified-homes count for the area and return ONLY its bucket.
@@ -400,15 +472,22 @@ router.get('/place', async (req, res) => {
     // 2. The free demonstration subset only. Flood, the Census teaser, and the
     //    density bucket are fetched independently and cached in-memory; each
     //    degrades on its own, none persists the preview, none touches ATTOM.
-    const [floodSettled, areaSettled, bucketSettled] = await Promise.allSettled([
+    // ONE tract resolution, shared. The census teaser and the money lead
+    // both need it, and letting each resolve its own doubled the Census
+    // geocoder traffic on every anonymous view.
+    const tract = await geocodeToTractCached(place.lat, place.lng).catch(() => null);
+
+    const [floodSettled, areaSettled, bucketSettled, moneySettled] = await Promise.allSettled([
       fetchFloodCached(place.lat, place.lng),
-      fetchCensusTeaserCached(place.lat, place.lng),
+      fetchCensusTeaserCached(place.lat, place.lng, tract),
       readDensityBucket(geohash),
+      fetchMoneyLeadCached(place.lat, place.lng, tract),
     ]);
 
     const flood = floodSettled.status === 'fulfilled' ? floodSettled.value : null;
     const area = areaSettled.status === 'fulfilled' ? areaSettled.value : null;
     const bucket = bucketSettled.status === 'fulfilled' ? bucketSettled.value : 'none';
+    const money = moneySettled.status === 'fulfilled' ? moneySettled.value : null;
 
     const floodSection = flood && flood.flood_zone
       ? {
@@ -453,6 +532,9 @@ router.get('/place', async (req, res) => {
         state: place.state,
         zipcode: place.zipcode,
       },
+      // The lead: a dollar figure when one is genuinely available for
+      // this address, else null and the tiles carry the page as before.
+      money_lead: money,
       free: {
         flood: floodSection,
         density: densitySection,

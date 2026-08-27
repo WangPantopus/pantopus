@@ -963,6 +963,9 @@ module.exports = {
   composeCivicElection,
   composeSeismic,
   composeWildfire,
+  // The anonymous preview leads with a dollar figure and needs the raw
+  // HUD row for a county it has geocoded, without a Home row.
+  hudFmrRow,
   // Exported for testing.
   parseCsv,
   districtEq,

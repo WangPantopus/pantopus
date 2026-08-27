@@ -251,7 +251,7 @@ describe('GET /api/public/place', () => {
     it('still returns correct data on the cached (second) request', async () => {
       const app = buildApp();
       await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
-      const res = await request(app).get('/api/public/place').query({ address: '1421 SE Oak St' });
+      const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
 
       expect(res.body.status).toBe('ready');
       expect(res.body.free.flood).toMatchObject({ status: 'ready', zone: 'X' });
@@ -350,5 +350,50 @@ describe('GET /api/public/place', () => {
       const res = await request(buildApp()).get('/api/public/place').query({ address: '   ' });
       expect(res.status).toBe(400);
     });
+  });
+});
+
+// ── Wave 4: the money-first lead ─────────────────────────────
+// The preview used to open with data tiles. It now leads with a real
+// dollar figure when one is available for the address — the highest-
+// converting address ask there is — without ATTOM, an account, or any
+// persistence. The honesty rules are the point: every figure states its
+// scope, a benchmark is never a quote, and nothing is invented.
+describe('the money lead', () => {
+  test('leads with the tract flood-premium band when one is warmed', async () => {
+    seedTable('PlaceSectionCache', [{
+      cache_key: 'tract:41051001902',
+      section_id: '_nfip_tract',
+      payload: { policy_count: 128, premium_p25: 480, premium_median: 760, premium_p75: 1240, window_months: 24, coverage: 'full' },
+      fetched_at: '2026-08-01T00:00:00.000Z',
+      expires_at: '2026-11-01T00:00:00.000Z',
+    }]);
+
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    expect(res.status).toBe(200);
+    const lead = res.body.money_lead;
+    expect(lead).toBeTruthy();
+    expect(lead.kind).toBe('flood_premium');
+    expect(lead.headline).toMatch(/\$480–\$1,240 a year/);
+    // Scope stated, and never sold as a quote.
+    expect(lead.scope).toBe('census tract');
+    expect(lead.detail).toMatch(/not a quote/i);
+    expect(lead.headline).not.toMatch(/your (home|policy|premium)/i);
+  });
+
+  test('falls back to the tiles rather than inventing a figure', async () => {
+    // No NFIP benchmark and no HUD row for this county.
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    expect(res.status).toBe(200);
+    expect(res.body.money_lead).toBeNull();
+    // The preview still works — the tiles carry it exactly as before.
+    expect(res.body.free.flood).toBeTruthy();
+    expect(res.body.free.density).toBeTruthy();
+  });
+
+  test('never leaks a count below the density floor alongside the lead', async () => {
+    const res = await request(buildApp()).get('/api/public/place').query({ address: '1421 SE Oak St' });
+    expect(JSON.stringify(res.body)).not.toContain('verified_users_count');
+    expect(res.body.free.density.bucket).toBeDefined();
   });
 });
