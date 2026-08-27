@@ -109,6 +109,44 @@ describe('the question list is the product', () => {
   });
 });
 
+// ── An unmapped area is not a high-risk one ─────────────────
+//
+// `in_sfha` was `zone.startsWith('A') || zone.startsWith('V')`. FEMA's
+// FLD_ZONE domain contains the literal string "AREA NOT INCLUDED", which
+// that prefix test reads as a Special Flood Hazard Area — producing "a
+// federally backed mortgage requires flood insurance here" for a place
+// FEMA has not mapped. It is a false statement about a legal
+// requirement, and it points the opposite way from the truth: unmapped
+// means the risk is UNKNOWN, not established.
+describe('the flood-zone classification', () => {
+  const { isSpecialFloodHazardArea } = require('../services/scoutService');
+
+  test('the real high-risk zones are high-risk', () => {
+    for (const zone of ['A', 'AE', 'AH', 'AO', 'AR', 'A99', 'A12', 'V', 'VE', 'V30']) {
+      expect({ zone, sfha: isSpecialFloodHazardArea(zone) }).toEqual({ zone, sfha: true });
+    }
+  });
+
+  test('unmapped, undetermined and low-risk zones are not', () => {
+    // "AREA NOT INCLUDED" and "D" are the two that matter: the first was
+    // the bug, and the second is explicitly "undetermined", which must
+    // not be dressed as either answer.
+    for (const zone of ['AREA NOT INCLUDED', 'OPEN WATER', 'X', 'X500', 'B', 'C', 'D', '', null]) {
+      expect({ zone, sfha: isSpecialFloodHazardArea(zone) }).toEqual({ zone, sfha: false });
+    }
+  });
+
+  test('an unmapped area never generates the insurance-is-required question', () => {
+    const asks = askBeforeYouSign({
+      flood: { zone: 'AREA NOT INCLUDED', in_sfha: isSpecialFloodHazardArea('AREA NOT INCLUDED') },
+    });
+    const ids = asks.map((a) => a.id);
+    expect(ids).not.toContain('flood_insurance_required');
+    const text = asks.map((a) => a.because).join(' ');
+    expect(text).not.toMatch(/requires flood insurance/i);
+  });
+});
+
 describe('Scout never describes the people who live there', () => {
   test('no generated line mentions an occupant, owner, or neighbour', () => {
     const asks = askBeforeYouSign({

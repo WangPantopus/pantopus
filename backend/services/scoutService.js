@@ -53,6 +53,25 @@ const nfipPremiumService = require('./nfipPremiumService');
 const LEAD_DISCLOSURE_YEAR = 1978;
 
 /**
+ * Is this FEMA zone a Special Flood Hazard Area?
+ *
+ * NOT `startsWith('A')`. FEMA's S_FLD_HAZ_AR FLD_ZONE domain contains the
+ * literal string "AREA NOT INCLUDED" — an unmapped area, which a prefix
+ * test reads as high-risk and which then generates "a federally backed
+ * mortgage requires flood insurance here". That is a false statement
+ * about a legal requirement, told to someone deciding whether to sign,
+ * and it points the opposite way from the truth: an unmapped area is one
+ * where the risk is UNKNOWN, not established.
+ *
+ * SFHA is the 1%-annual-chance floodplain: A, AE, AH, AO, AR, A99, the
+ * numbered A1-A30, and the coastal V, VE, V1-V30. Everything else — X,
+ * B, C, D (undetermined), open water, unmapped — is not.
+ */
+function isSpecialFloodHazardArea(zone) {
+  return /^(A|AE|AH|AO|AR|A99|A\d{1,2}|V|VE|V\d{1,2})$/.test(String(zone || '').trim().toUpperCase());
+}
+
+/**
  * How to name a HUD bedroom band in prose.
  *
  * Never omit it. `rent.position` is the single personalised judgement in
@@ -278,7 +297,7 @@ async function getScoutReport(place, { askingRent, yearBuilt, bedrooms } = {}) {
       const zone = String(rawZone).toUpperCase();
       flood = {
         zone: rawZone,
-        in_sfha: zone.startsWith('A') || zone.startsWith('V'),
+        in_sfha: isSpecialFloodHazardArea(zone),
         plain_meaning: (zoneRow && (zoneRow.flood_zone_description || zoneRow.description)) || null,
       };
     }
@@ -393,5 +412,6 @@ module.exports = {
   getScoutReport,
   // Exported for testing.
   askBeforeYouSign,
+  isSpecialFloodHazardArea,
   LEAD_DISCLOSURE_YEAR,
 };
