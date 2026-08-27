@@ -153,11 +153,31 @@ async function getUserAccess(homeId, userId) {
  */
 async function checkHomePermission(homeId, userId, permission = null) {
   // Check ownership
-  const { data: home } = await supabaseAdmin
+  const { data: home, error: homeError } = await supabaseAdmin
     .from('Home')
     .select('owner_id')
     .eq('id', homeId)
     .single();
+
+  // A DATABASE FAILURE IS NOT A PERMISSION DECISION.
+  //
+  // PostgREST resolves rather than rejects on a transport failure or a
+  // non-2xx, so `data` is null both when the home does not exist and when
+  // we could not find out. Collapsing them denies access, and every
+  // caller renders that as "You do not have access to this place." — told
+  // to a resident, about their own home, because a query timed out.
+  //
+  // `readFailed` is ADDITIVE: 19 call sites read this return value, and
+  // all of them keep today's behaviour (deny) unless they opt in. Callers
+  // that can distinguish should return 500 rather than 403, which is also
+  // what gets the request auto-retried by the native clients instead of
+  // parked behind a manual Try again.
+  if (homeError) {
+    logger.error('homePermissions: home read failed', { homeId, userId, error: homeError.message });
+    return {
+      hasAccess: false, isOwner: false, occupancy: null, permissions: [], readFailed: true,
+    };
+  }
 
   if (!home) return { hasAccess: false, isOwner: false, occupancy: null };
 

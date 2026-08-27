@@ -27,14 +27,16 @@
  * That makes this the one surface in the product where the person asking
  * is not the person the data is about. So Scout is restricted to facts
  * about LAND AND BUILDINGS that are already public — flood zone,
- * environmental risk, county rent bands, civic districts — and never
+ * environmental risk and county rent bands — and never
  * touches anything derived from the people there:
  *   * no resident or owner names, no occupancy, no household record;
  *   * no Band B property valuation (that is the owner's record);
  *   * no Band D real-rent band (that is the block's residents' data,
  *     contributed for each other, not for someone shopping);
- *   * no raw verified-neighbour count — the k-anon bucket only, exactly
- *     as the anonymous preview shows it.
+ *   * no verified-neighbour count and no density bucket — the payload
+ *     carries no density field at all, which is stricter than the
+ *     anonymous preview and is the right default for a reader with no
+ *     claim on the address.
  * A prospective tenant learning the flood zone is fair. A prospective
  * anything learning about the current occupants is not.
  *
@@ -49,6 +51,21 @@ const nfipPremiumService = require('./nfipPremiumService');
 
 // Federal lead-paint disclosure applies to housing built before 1978.
 const LEAD_DISCLOSURE_YEAR = 1978;
+
+/**
+ * How to name a HUD bedroom band in prose.
+ *
+ * Never omit it. `rent.position` is the single personalised judgement in
+ * the whole report, and it is only meaningful against a stated unit size:
+ * a studio asking $1,400 against the county's 2-bedroom band of
+ * $1,600–$1,920 is `below_band`, which reads as "a good deal" and is not
+ * one. If the count is unknown we say so rather than implying a default.
+ */
+function bedroomsLabel(bedrooms) {
+  if (bedrooms == null) return 'units of an unstated size';
+  if (bedrooms === 0) return 'studios';
+  return `${bedrooms}-bedroom units`;
+}
 
 /**
  * The question list — the actual product.
@@ -118,7 +135,7 @@ function askBeforeYouSign({ flood, nfip, radon, water, rentBand, askingRent }) {
       asks.push({
         id: 'rent_above_band',
         question: 'What does this rent include that comparable units do not?',
-        because: `The asking rent is above HUD's fair market rent band for this county ($${rentBand.band_low.toLocaleString('en-US')}–$${rentBand.band_high.toLocaleString('en-US')}). That is common in desirable buildings and is not by itself a problem — it is a thing to have an answer for.`,
+        because: `The asking rent is above HUD's fair market rent band for ${bedroomsLabel(rentBand.bedrooms)} in this county ($${rentBand.band_low.toLocaleString('en-US')}–$${rentBand.band_high.toLocaleString('en-US')}). That is common in desirable buildings and is not by itself a problem — it is a thing to have an answer for.`,
         source: 'HUD Fair Market Rents',
       });
     }
@@ -146,14 +163,14 @@ function askBeforeYouSign({ flood, nfip, radon, water, rentBand, askingRent }) {
  * Compose a Scout report for an address the caller does NOT occupy.
  *
  * @param {{lat:number, lng:number, line:string, city:string, state:string, zipcode:string}} place
- * @param {{askingRent?: number, yearBuilt?: number}} [options]
+ * @param {{askingRent?: number, yearBuilt?: number, bedrooms?: number}} [options]
  *   `yearBuilt` comes from the CALLER — a listing states it, and we do
  *   not know it without the owner's property record (Band B, excluded
  *   here on purpose). Questions derived from it say so, because a fact
  *   the reader supplied and a fact we looked up are not the same kind of
  *   thing and should not be presented as one.
  */
-async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
+async function getScoutReport(place, { askingRent, yearBuilt, bedrooms } = {}) {
   // A synthetic, occupant-free "home" for the composers. It deliberately
   // carries no id, no owner and no household fields — nothing here may
   // resolve to a real Home row, so no composer can reach occupancy,
@@ -166,16 +183,26 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
     zipcode: place.zipcode,
     map_center_lat: place.lat,
     map_center_lng: place.lng,
-    bedrooms: null,
+    // The CALLER's number, off the listing — like year_built, not something
+    // we looked up. `composeRentBand` treats a studio (0) as a real value
+    // and only defaults to 2 when this is null.
+    bedrooms: bedrooms ?? null,
     // Only ever the caller's own number; never resolved from a record.
     year_built: Number.isFinite(Number(yearBuilt)) && Number(yearBuilt) > 1500 ? Number(yearBuilt) : null,
   };
 
-  const [radonSettled, waterSettled, rentSettled, civicSettled] = await Promise.allSettled([
+  // `civic` was here and is deliberately gone. It was the most expensive
+  // fetch in the report (live Census geographies plus two representative
+  // sources), the ONLY field passed through unprojected — so a composer
+  // change silently changed Scout's wire shape — and askBeforeYouSign
+  // generates no question from it, so it would have rendered as a bare
+  // district list on a page whose entire product is questions. If
+  // school-district-before-you-sign is wanted, it comes back as a
+  // generated ask with its own `because`, not as a raw list.
+  const [radonSettled, waterSettled, rentSettled] = await Promise.allSettled([
     placeSectionAdapters.composeLeadRadon(synthetic),
     placeSectionAdapters.composeDrinkingWater(synthetic),
     placeSectionAdapters.composeRentBand(synthetic),
-    placeSectionAdapters.composeCivicDistricts(synthetic),
   ]);
 
   const dataOf = (settled) => {
@@ -220,18 +247,22 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
     }
     : null;
   const rentBand = dataOf(rentSettled);
-  const civic = dataOf(civicSettled);
 
   // Flood + what insurance actually costs there: the pair that changes a
   // decision more than anything else on the page.
   //
   // Fetched DIRECTLY rather than via neighborhoodProfileService.getProfile,
-  // which would have sent the typed address to WalkScore
+  // which would have sent the typed address STRING to WalkScore
   // (fetchWalkScore puts it in a query string to api.walkscore.com).
-  // Scout promises the reader "we did not tell anyone you looked", and
-  // that promise has to be true: the address never leaves this process.
   // Scout wants only the zone and the tract id, and both are reachable
   // from coordinates alone — getProfile was over-fetching anyway.
+  //
+  // The invariant this buys is narrow, and worth stating precisely: this
+  // function makes no outbound call carrying the address string. It is NOT
+  // "the address never leaves this process" — the route geocodes through
+  // Mapbox before calling here, and the coordinates below go to FEMA and
+  // the Census Bureau. See the scope_note at the bottom of this file for
+  // what the reader is actually told, and why it has been wrong twice.
   let flood = null;
   let nfip = null;
   try {
@@ -254,7 +285,16 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
 
     const tract = tractSettled.status === 'fulfilled' ? tractSettled.value : null;
     if (tract && tract.tractId) {
-      const benchmark = await nfipPremiumService.getTractBenchmark(tract.tractId);
+      // enqueue left ON, deliberately — unlike the anonymous preview,
+      // which passes { enqueue: false } (routes/public.js). Someone about
+      // to sign a lease at this address is the best available signal that
+      // a tract will matter to a resident soon, and Scout is capped at
+      // 30/hour/account so the volume is bounded.
+      //
+      // Flip this to false the moment Scout becomes reachable without an
+      // account: at that point it is drive-by traffic again, and it would
+      // sit in the same FIFO warm queue ahead of tracts people live in.
+      const benchmark = await nfipPremiumService.getTractBenchmark(tract.tractId, { enqueue: true });
       if (benchmark && benchmark.status === 'ready') nfip = benchmark.data;
     }
   } catch (err) {
@@ -295,6 +335,20 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
         band_high: rentBand.band_high,
         period: rentBand.period,
         asking_rent: askingRent ?? null,
+        // THE UNIT SIZE TRAVELS WITH THE VERDICT, ALWAYS.
+        //
+        // `position` is the only personalised judgement in the report, and
+        // it is meaningless without the band's bedroom count. This used to
+        // be dropped here while composeRentBand silently defaulted to 2,
+        // so a studio at $1,400 came back `below_band` against a
+        // 2-bedroom band — a client has no way to render that as anything
+        // but "a good deal", and it is not one.
+        //
+        // `bedrooms_stated` says whether the reader chose this or we
+        // defaulted it, so a client can label the difference rather than
+        // presenting an assumption as their input.
+        bedrooms: rentBand.bedrooms,
+        bedrooms_stated: bedrooms != null,
         // Stated as a position against a public band, never as a verdict
         // on whether the price is fair — we do not know the unit.
         position: askingRent == null
@@ -307,25 +361,31 @@ async function getScoutReport(place, { askingRent, yearBuilt } = {}) {
         scope: 'county',
       }
       : null,
-    civic,
     ask_before_you_sign: asks,
     // Rendered verbatim by every client. Scout is about land and
     // buildings; the people currently living there are not our subject.
-    // This used to end "we did not tell anyone you looked." It was not true.
+    // THIS SENTENCE HAS NOW BEEN WRONG TWICE. Read the history before
+    // editing it, because both errors were the same error.
     //
-    // Scout cannot answer anything without coordinates, and an address only
-    // becomes coordinates by asking a geocoder — so the route hands the typed
-    // address to Mapbox (services/geo/mapboxProvider.js) on every call. That
-    // hop is unavoidable here, unlike on Unlisted, where only a state was
-    // needed and the geocode was removed outright.
+    //   v1 "we did not tell anyone you looked" — false: the route geocodes
+    //      the typed address through Mapbox before this function runs.
+    //   v2 "our mapping provider — that is the one company that sees it" —
+    //      also false, and written while fixing v1. Mapbox is the only one
+    //      that sees the address STRING, but the coordinates it returns go
+    //      to hazards.fema.gov (neighborhoodProfileService.js:264) and to
+    //      geocoding.geo.census.gov (neighborhoodProfileService.js:79),
+    //      and a coordinate IS the address to anyone who can reverse it.
     //
-    // So the sentence states what is actually true, and keeps the assurance
-    // this reader actually wants: the people at the address are not told.
-    // Claiming more than that on a page someone opens before they have
-    // committed to anything is the wrong kind of reassuring.
+    // The lesson both times: an assurance phrased as an exclusive ("the
+    // one company", "nobody") is a promise about everything the code does
+    // not do, which is the hardest kind to keep and the easiest kind to
+    // falsify. So this states the shape rather than a count, and the test
+    // asserts the absence of exclusivity claims rather than the presence
+    // of any particular wording.
     scope_note: 'Everything here describes the property and the area from public records. '
       + 'Nothing about the people who live there is shown, and nobody at the address is told you looked. '
-      + 'Turning the address into a location means sending it to our mapping provider — that is the one company that sees it.',
+      + 'Answering means looking the address up with our mapping provider, then asking public agencies '
+      + '— FEMA, the Census Bureau and the EPA — what they publish about that location.',
   };
 }
 

@@ -75,12 +75,25 @@ async function timedFetch(url, opts = {}) {
  * @param {number} lng
  * @returns {Promise<{ tractId: string, stateCode: string, countyCode: string }|null>}
  */
+// Log WHERE a geocode failed, never WHICH BUILDING.
+//
+// These lines carried exact { lat, lng } — finer than anything the cache
+// stores (geohash-7, ~150m) and finer than the request line itself. On
+// Scout and the anonymous preview the coordinate IS the address a person
+// typed, so a warn-level log of a provider hiccup was quietly the most
+// precise record of the lookup anywhere in the system. Three decimal
+// places is ~110m: enough to tell Portland from Brooklyn when reading a
+// log, not enough to name a house.
+function coarse(lat, lng) {
+  return { near: `${Number(lat).toFixed(3)},${Number(lng).toFixed(3)}` };
+}
+
 async function geocodeToTract(lat, lng) {
   const url = `https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&format=json`;
 
   const res = await timedFetch(url);
   if (!res || !res.ok) {
-    logger.warn('Census geocoder failed', { lat, lng, status: res?.status });
+    logger.warn('Census geocoder failed', { ...coarse(lat, lng), status: res?.status });
     return null;
   }
 
@@ -90,7 +103,7 @@ async function geocodeToTract(lat, lng) {
     const tracts = geographies?.['Census Tracts'] || geographies?.['2020 Census Tracts'] || [];
 
     if (tracts.length === 0) {
-      logger.warn('Census geocoder returned no tracts', { lat, lng });
+      logger.warn('Census geocoder returned no tracts', coarse(lat, lng));
       return null;
     }
 
@@ -102,7 +115,7 @@ async function geocodeToTract(lat, lng) {
 
     return { tractId, stateCode, countyCode };
   } catch (err) {
-    logger.error('Census geocoder parse error', { lat, lng, error: err.message });
+    logger.error('Census geocoder parse error', { ...coarse(lat, lng), error: err.message });
     return null;
   }
 }

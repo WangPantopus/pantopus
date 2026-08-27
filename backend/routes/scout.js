@@ -38,6 +38,16 @@ function positiveNumber(value) {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+// Bedrooms needs its own coercion: a STUDIO IS 0, and `positiveNumber`
+// rejects 0 — which would silently fall back to the county's 2-bedroom
+// band and hand the reader a verdict about a unit twice the size of the
+// one they are standing in. Capped at 4 because that is the width of
+// HUD's fmr_lo/fmr_hi arrays.
+function bedroomCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= 4 ? Math.round(n) : undefined;
+}
+
 // GET /api/scout — the report for an address you are considering
 router.get('/', verifyToken, aiDraftLimiter, async (req, res) => {
   try {
@@ -69,6 +79,7 @@ router.get('/', verifyToken, aiDraftLimiter, async (req, res) => {
     const report = await scoutService.getScoutReport(place, {
       askingRent: positiveNumber(req.query.asking_rent),
       yearBuilt: positiveNumber(req.query.year_built),
+      bedrooms: bedroomCount(req.query.bedrooms),
     });
 
     // The typed address is NOT persisted, exactly as the anonymous

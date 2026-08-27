@@ -202,17 +202,29 @@ describe('the composer makes no outbound call carrying the address', () => {
     resetTables();
     const report = await scoutService.getScoutReport(PLACE, {});
 
-    // The sentence that had to go. The route geocodes through Mapbox, so
-    // a blanket "nobody was told" is false — and this is the surface where
-    // a reader is deciding how much to trust us with.
-    expect(report.scope_note).not.toMatch(/did not tell anyone you looked/i);
+    // This assertion is written against the FAILURE MODE, not against a
+    // sentence, because the sentence has been wrong twice and a test that
+    // pinned the wording is what let the second one through.
+    //
+    // Both errors were exclusivity claims — "we did not tell anyone",
+    // "that is the one company that sees it". An exclusive is a promise
+    // about everything the code does not do, and every outbound call
+    // added later falsifies it silently. So: no exclusives, ever.
+    expect(report.scope_note).not.toMatch(/did not tell anyone/i);
+    expect(report.scope_note).not.toMatch(/\bthe only (company|one|service)\b/i);
+    expect(report.scope_note).not.toMatch(/\bthe one company\b/i);
+    expect(report.scope_note).not.toMatch(/\bno ?one else\b|\bnobody else\b/i);
     expect(report.scope_note).not.toMatch(/we (do not|don't) (send|share) (it|the address)/i);
 
-    // What it must say instead: the people at the address are not told
-    // (the assurance this reader actually wants), and the one third party
-    // that does see the address is named rather than elided.
+    // What it must say: the assurance this reader actually wants (the
+    // people at the address are not told), and an honest account of where
+    // the lookup goes — naming the agencies, since the COORDINATES reach
+    // them and a coordinate is the address to anyone who can reverse it.
     expect(report.scope_note).toMatch(/nobody at the address is told/i);
     expect(report.scope_note).toMatch(/mapping provider/i);
+    expect(report.scope_note).toMatch(/FEMA/);
+    expect(report.scope_note).toMatch(/Census/i);
+    expect(report.scope_note).toMatch(/EPA/);
 
     // Degrading to no external data must still produce the question list.
     expect(report.ask_before_you_sign.length).toBeGreaterThan(0);
@@ -450,5 +462,105 @@ describe('the route distinguishes "could not place" from "not in the US"', () =>
 
     expect(res.body.status).toBe('unsupported_region');
     expect(res.body.message).toMatch(/U\.S\.-only/i);
+  });
+});
+
+// ── The verdict is meaningless without the unit size ─────────
+//
+// `rent.position` is the only personalised judgement Scout makes. It was
+// computed against the county's 2-BEDROOM HUD band regardless of what the
+// reader was actually looking at, and the bedroom count was dropped from
+// the payload — so a studio asking $1,400 came back `below_band` against
+// a $1,600–$1,920 two-bedroom band. There is no way for a client to
+// render that as anything but "a good deal", and it is not one.
+describe('the rent verdict is tied to a stated unit size', () => {
+  const { resetTables, seedTable } = require('./__mocks__/supabaseAdmin');
+  const scoutService = require('../services/scoutService');
+
+  const AUSTIN = { lat: 30.2672, lng: -97.7431, line: '1 Congress Ave', city: 'Austin', state: 'TX', zipcode: '78701' };
+
+  function seedTravis() {
+    seedTable('HudFmr', [{
+      county_fips: '48453', fiscal_year: 2026, county_name: 'Travis County', state_abbr: 'TX',
+      area_name: 'Austin',
+      // efficiency 1200 · 1br 1400 · 2br 1600 · 3br 2000 · 4br 2400
+      fmr_lo: [1200, 1400, 1600, 2000, 2400], fmr_hi: [1200, 1400, 1600, 2000, 2400],
+    }]);
+  }
+
+  function censusOnly() {
+    return jest.fn(async (url) => {
+      if (String(url).includes('geocoding.geo.census.gov')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ result: { geographies: { 'Census Tracts': [{ STATE: '48', COUNTY: '453', TRACT: '001100' }] } } }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+  }
+
+  async function scout(opts) {
+    resetTables();
+    seedTravis();
+    const realFetch = global.fetch;
+    global.fetch = censusOnly();
+    try {
+      return await scoutService.getScoutReport(AUSTIN, opts);
+    } finally {
+      global.fetch = realFetch;
+    }
+  }
+
+  test('a studio at $1,400 is NOT reported as under the market', async () => {
+    // THE ASSERTION THAT MATTERS is on `position`, not on `bedrooms`.
+    // Echoing the count while still judging against the 2-bedroom band
+    // would satisfy a `bedrooms === 0` check and still mislead the reader.
+    const report = await scout({ askingRent: 1400, bedrooms: 0 });
+    expect(report.rent.bedrooms).toBe(0);
+    // HUD prices this county at a single figure, so composeRentBand
+    // extends the efficiency band to $1,200–$1,440 and $1,400 sits
+    // inside it. The old code judged the same rent against the county's
+    // 2-bedroom band of $1,600–$1,920 and returned `below_band` — the
+    // one answer that reads as "you are getting a deal".
+    expect(report.rent.position).not.toBe('below_band');
+    expect(report.rent.position).toBe('in_band');
+    expect(report.rent.band_low).toBe(1200);
+  });
+
+  test('a studio well over its own band is reported as over it', async () => {
+    const report = await scout({ askingRent: 1900, bedrooms: 0 });
+    expect(report.rent.position).toBe('above_band');
+    // Against the 2-bedroom band ($1,600–$1,920) the same rent would have
+    // been `in_band` — silence where a question belonged.
+    expect(report.ask_before_you_sign.map((a) => a.id)).toContain('rent_above_band');
+  });
+
+  test('the same rent against a 2-bedroom is a different answer, and says which', async () => {
+    const report = await scout({ askingRent: 1400, bedrooms: 2 });
+    expect(report.rent.bedrooms).toBe(2);
+    expect(report.rent.band_low).toBe(1600);
+    expect(report.rent.position).toBe('below_band');
+  });
+
+  test('an unstated bedroom count is flagged as ours, not the reader’s', async () => {
+    // Defaulting is fine; presenting the default as the reader's own
+    // input is not. A client needs to be able to label the difference.
+    const report = await scout({ askingRent: 1400 });
+    expect(report.rent.bedrooms).toBe(2);
+    expect(report.rent.bedrooms_stated).toBe(false);
+
+    const stated = await scout({ askingRent: 1400, bedrooms: 2 });
+    expect(stated.rent.bedrooms_stated).toBe(true);
+  });
+
+  test('the generated question names the unit size it judged', async () => {
+    const report = await scout({ askingRent: 5000, bedrooms: 0 });
+    const ask = report.ask_before_you_sign.find((a) => a.id === 'rent_above_band');
+    expect(ask).toBeTruthy();
+    expect(ask.because).toMatch(/studios/i);
+    // And must not silently imply the default.
+    expect(ask.because).not.toMatch(/2-bedroom/i);
   });
 });

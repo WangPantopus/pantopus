@@ -141,6 +141,38 @@ describe('the exposure profile', () => {
 
 // ── Progress tracking ────────────────────────────────────────
 
+// Fail ONE terminal method on the Home table and let everything else run.
+//
+// The mock's builder returns ITSELF from every chained call, so a plain
+// Proxy over the object `from()` hands back is escaped on the first
+// `.select()` — the chain continues on the raw builder and the override
+// never fires. Re-wrapping each returned builder is what makes it stick.
+//
+// Failing only one terminal matters: `checkHomePermission` reads Home
+// with `.single()` and the route reads it with `.maybeSingle()`. Failing
+// both means the permission guard answers first, and a test written that
+// way passes with the route's own fix removed. It did, on my first try.
+function failHomeTerminal(terminal) {
+  const supabaseAdmin = require('../config/supabaseAdmin');
+  const realFrom = supabaseAdmin.from.bind(supabaseAdmin);
+  const wrap = (builder) => new Proxy(builder, {
+    get(target, prop, receiver) {
+      if (prop === terminal) {
+        return async () => ({ data: null, error: { message: 'connection reset' } });
+      }
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') return value;
+      return (...args) => {
+        const out = value.apply(target, args);
+        return out === target ? wrap(target) : out;
+      };
+    },
+  });
+  return jest.spyOn(supabaseAdmin, 'from').mockImplementation((table) => (
+    table === 'Home' ? wrap(realFrom(table)) : realFrom(table)
+  ));
+}
+
 describe('removal progress', () => {
   test('a claimed (unverified) resident can use it — this must not wait for a postcard', async () => {
     seedHome();
@@ -171,14 +203,86 @@ describe('removal progress', () => {
     expect(getTable('UnlistedRemoval')).toHaveLength(0);
   });
 
-  test('an unknown status is refused', async () => {
+  test('an unknown status is refused — on a broker that DOES exist', async () => {
+    // This used to send brokerId 'anything', which is not a registry id,
+    // so UNKNOWN_BROKER threw first and the status check was never
+    // reached. Both map to 400 and the test asserted no `code`, so it
+    // passed while proving nothing: deleting the entire BAD_STATUS guard
+    // left the suite green. Asserting the code is what separates them.
     seedHome();
     const res = await request(buildApp())
-      .put(`/api/homes/${HOME_ID}/unlisted/removals/anything`)
+      .put(`/api/homes/${HOME_ID}/unlisted/removals/${DATA_BROKERS[0].id}`)
       .set('x-test-user-id', USER)
       .send({ status: 'vanished' });
     expect(res.status).toBe(400);
+    expect(res.body.code).toBe('BAD_STATUS');
     expect(getTable('UnlistedRemoval')).toHaveLength(0);
+  });
+
+  test('a missing status is refused rather than written as undefined', async () => {
+    // Without the guard this writes `status: undefined` and lets a column
+    // default decide what the person's checklist claims about whether
+    // they actually asked a broker to delete their address.
+    seedHome();
+    const res = await request(buildApp())
+      .put(`/api/homes/${HOME_ID}/unlisted/removals/${DATA_BROKERS[0].id}`)
+      .set('x-test-user-id', USER)
+      .send({});
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('BAD_STATUS');
+    expect(getTable('UnlistedRemoval')).toHaveLength(0);
+  });
+
+  // ── A database blip is not "your home does not exist" ──────
+  //
+  // PostgREST RESOLVES on both a transport failure and a non-2xx, so the
+  // route's `data` is null in both cases and the try/catch never fires.
+  // Dropping `error` therefore turned an outage into a 404, and the
+  // consequence is worse than the wrong string: both native clients park
+  // a 404 behind a manual "Try again", while a correctly typed 500 is
+  // auto-retried — so a blip that should have been invisible becomes a
+  // dead end in front of someone who came here under duress.
+  test('a failed home read is a 500, not "Home not found"', async () => {
+    seedHome();
+    const spy = failHomeTerminal('maybeSingle');
+    try {
+      const res = await request(buildApp())
+        .get(`/api/homes/${HOME_ID}/unlisted`)
+        .set('x-test-user-id', USER);
+      expect(res.status).toBe(500);
+      // The one thing it must never say.
+      expect(JSON.stringify(res.body)).not.toMatch(/not found/i);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a failed PERMISSION read is a 500, not "you do not have access"', async () => {
+    // The companion half. checkHomePermission read Home with `.single()`
+    // and dropped its error, so a full outage never reached the route's
+    // own read — it returned 403 "You do not have access to this place."
+    // to a resident about their own home, which is the more alarming of
+    // the two wrong answers and is not auto-retried by either client.
+    seedHome();
+    const spy = failHomeTerminal('single');
+    try {
+      const res = await request(buildApp())
+        .get(`/api/homes/${HOME_ID}/unlisted`)
+        .set('x-test-user-id', USER);
+      expect(res.status).toBe(500);
+      expect(JSON.stringify(res.body)).not.toMatch(/do not have access/i);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a genuinely absent home is still a 404', async () => {
+    // The two answers must stay distinguishable in both directions.
+    const res = await request(buildApp())
+      .get('/api/homes/home-that-does-not-exist/unlisted')
+      .set('x-test-user-id', USER);
+    expect([403, 404]).toContain(res.status);
+    expect(res.status).not.toBe(500);
   });
 
   test('progress is personal — a housemate never sees it', async () => {
@@ -371,6 +475,20 @@ describe('the anonymous unlisted lookup', () => {
     expect(res.body.unlisted.method_note).toBe(full.method_note);
     // And the state answer degrades to "not checked", never to "none".
     expect(res.body.unlisted.state_program).toBeNull();
+  });
+
+  test('the answer is not storable on the reader\'s own device', async () => {
+    // Express sends 200 + ETag + no Cache-Control, which is storable —
+    // and the cache key is the full URL, which on this route carries the
+    // typed address. The browser disk cache, OkHttp's Cache and iOS's
+    // URLCache would each write it. For a reader whose threat model is
+    // someone with physical access to their device, that is the one place
+    // "we do not save this address" most needs to be true.
+    const res = await request(buildPublicApp())
+      .get('/api/public/unlisted')
+      .query({ address: '1421 SE Oak St, Portland, OR 97214' });
+
+    expect(res.headers['cache-control']).toMatch(/no-store/);
   });
 
   test('a ZIP on its own is enough to reach the state program', async () => {

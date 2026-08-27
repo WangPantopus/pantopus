@@ -34,15 +34,35 @@ router.get('/:id/unlisted', verifyToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const access = await checkHomePermission(id, userId);
+    // "We could not check" is not "you are not allowed". Telling a
+    // resident they have no access to their own home because a query
+    // failed is the more alarming of the two wrong answers, and 403 is
+    // not auto-retried by either native client the way 5xx is.
+    if (access.readFailed) {
+      return res.status(500).json({ error: 'Could not load your removal list.' });
+    }
     if (!access.hasAccess) {
       return res.status(403).json({ error: 'You do not have access to this place.' });
     }
 
-    const { data: home } = await supabaseAdmin
+    // PostgREST RESOLVES on both a transport failure and a non-2xx, so
+    // `data` is null in both cases and the catch below is unreachable for
+    // this read. Dropping `error` therefore turned a database blip into
+    // "Home not found." — and the consequence is worse than the wrong
+    // string: both native clients map 404 to a terminal error card with a
+    // manual Try again, while a correctly typed 500 is auto-retried. So a
+    // blip that should have been invisible becomes a dead end in front of
+    // someone who came here under duress, unlogged and unpaged because
+    // 404s are dashboard noise.
+    const { data: home, error: homeError } = await supabaseAdmin
       .from('Home')
       .select('id, state')
       .eq('id', id)
       .maybeSingle();
+    if (homeError) {
+      logger.error('unlisted: home read failed', { homeId: id, userId, error: homeError.message });
+      return res.status(500).json({ error: 'Could not load your removal list.' });
+    }
     if (!home) return res.status(404).json({ error: 'Home not found.' });
 
     const profile = unlistedService.getExposureProfile(home.state);
@@ -67,6 +87,13 @@ router.put('/:id/unlisted/removals/:brokerId', verifyToken, async (req, res) => 
   const userId = req.user.id;
   try {
     const access = await checkHomePermission(id, userId);
+    // "We could not check" is not "you are not allowed". Telling a
+    // resident they have no access to their own home because a query
+    // failed is the more alarming of the two wrong answers, and 403 is
+    // not auto-retried by either native client the way 5xx is.
+    if (access.readFailed) {
+      return res.status(500).json({ error: 'Could not load your removal list.' });
+    }
     if (!access.hasAccess) {
       return res.status(403).json({ error: 'You do not have access to this place.' });
     }

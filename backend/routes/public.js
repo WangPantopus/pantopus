@@ -625,6 +625,23 @@ router.get('/place', async (req, res) => {
 // not do that either, and the payload says so in `method_note`.
 router.get('/unlisted', async (req, res) => {
   try {
+    // NOT CACHEABLE — this is about the reader's own disk, not ours.
+    //
+    // Express sends a 200 JSON body with an ETag and no Cache-Control,
+    // which is storable, so the browser disk cache (and OkHttp's Cache,
+    // and iOS's URLCache) writes an entry KEYED ON THE FULL URL — which
+    // on this route contains the address someone typed. "We do not save
+    // this address" is then false in the one place that matters most for
+    // a reader whose threat model is a person with physical access to
+    // their device.
+    //
+    // Nothing is lost: the URL is per-address while the answer is
+    // per-state, so the hit rate was already ~0. The real fix is moving
+    // this to POST with the address in the body, which also takes it out
+    // of the edge access log this header cannot reach — that is a
+    // three-client change and belongs in its own wave.
+    res.set('Cache-Control', 'no-store');
+
     const rawAddress = typeof req.query.address === 'string' ? req.query.address.trim() : '';
     if (!rawAddress) {
       return res.status(400).json({ error: 'An address query parameter is required.' });
