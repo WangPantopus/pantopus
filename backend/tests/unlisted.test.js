@@ -381,3 +381,58 @@ describe('the anonymous unlisted lookup', () => {
     expect(res.body.place.state).toBe('OR');
   });
 });
+
+// ── We do not record that they looked ────────────────────────
+//
+// The registry's own header states this as a promise. The shared request
+// logger stamped an IP and user-agent on every route, this one included.
+// The typed address was never in it — that is a query param and
+// `req.path` excludes the query string — but "this IP opened the page for
+// people hiding their address" is itself the disclosure the feature
+// exists to avoid.
+describe('the anonymous lookup is not attributed to its caller', () => {
+  const logger = require('../utils/logger');
+
+  // The middleware under test lives in app.js, which builds the whole
+  // application; mounting it here would drag in every route. Extracting
+  // the one predicate keeps the assertion honest without that — it is
+  // read from app.js's own source, so a change there fails this.
+  test('the log line for /api/public/unlisted carries no ip or user-agent', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+
+    const match = appSource.match(/const NO_CALLER_ID_PATH = (\/.+\/i?);/);
+    expect(match).toBeTruthy();
+    // eslint-disable-next-line no-eval
+    const pattern = eval(match[1]);
+    expect(pattern.test('/api/public/unlisted')).toBe(true);
+
+    // And the logger call really branches on it, rather than declaring a
+    // constant nothing reads.
+    expect(appSource).toMatch(/NO_CALLER_ID_PATH\.test\(req\.path\)/);
+
+    // Every other public route keeps its caller identifiers — this is a
+    // targeted suppression, not a hole in the request log.
+    expect(pattern.test('/api/public/place')).toBe(false);
+    expect(pattern.test('/api/public/unlisted/extra')).toBe(false);
+    expect(pattern.test('/api/homes/abc/unlisted')).toBe(false);
+  });
+
+  test('the address is a query param, so it was never on the log line anyway', async () => {
+    const seen = [];
+    const spy = jest.spyOn(logger, 'info').mockImplementation((msg, meta) => {
+      seen.push({ msg, meta });
+    });
+    try {
+      await request(buildPublicApp())
+        .get('/api/public/unlisted')
+        .query({ address: '1421 ZZQUNIQUEADDR St, Portland, OR' });
+    } finally {
+      spy.mockRestore();
+    }
+    for (const line of seen) {
+      expect(JSON.stringify(line).toLowerCase()).not.toContain('zzquniqueaddr');
+    }
+  });
+});
