@@ -77,10 +77,18 @@ final class PlaceRateWatchViewModel {
     }
 
     func remove() async {
+        saveError = nil
         do {
             _ = try await api.request(RecordWatchEndpoints.delete(homeId: homeId)) as EmptyResponse
             state = .none
+        } catch let error as APIError {
+            // A silent failed removal tells the resident their watch is
+            // gone when it is still running — they will keep getting
+            // alerts they believe they turned off.
+            saveError = error.errorDescription ?? "Couldn't remove the watch."
+            await load()
         } catch {
+            saveError = "Couldn't remove the watch."
             await load()
         }
     }
@@ -192,6 +200,11 @@ struct RateWatchCard: View {
                     .font(.system(size: 12.5))
                     .lineSpacing(2)
                     .foregroundStyle(Theme.Color.appTextMuted)
+                if let saveError = vm.saveError {
+                    Text(saveError)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.Color.error)
+                }
                 Button(role: .destructive) {
                     Task { await vm.remove() }
                 } label: {

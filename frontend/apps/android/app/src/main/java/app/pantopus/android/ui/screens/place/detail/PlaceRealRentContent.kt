@@ -320,13 +320,24 @@ internal fun standingChip(standing: RealRentStanding?): PlaceChipModel? =
  */
 private fun scopeNote(data: PlaceRealRentData): String {
     val size = data.sampleSize ?: data.reports
+    // ALL_SIZES is a claim the server makes explicitly. A null or
+    // unrecognized scope is the absence of that claim, so the copy drops
+    // the size clause rather than asserting a pooling the payload never
+    // described.
     val scope =
         when {
             data.scope == RealRentScope.BEDROOMS && data.bedrooms == 0 -> "studios"
             data.scope == RealRentScope.BEDROOMS && data.bedrooms != null -> "${data.bedrooms}-bedroom homes"
-            else -> "homes of all sizes"
+            data.scope == RealRentScope.ALL_SIZES -> "homes of all sizes"
+            else -> null
         }
-    return "Built from $size verified $scope on your block — the middle half of what they pay. " +
+    val builtFrom =
+        if (scope == null) {
+            "Built from $size verified homes on your block — the middle half of what they pay. "
+        } else {
+            "Built from $size verified $scope on your block — the middle half of what they pay. "
+        }
+    return builtFrom +
         "Quartiles and a sample size only; no household is ever shown."
 }
 

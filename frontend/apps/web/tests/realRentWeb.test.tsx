@@ -350,3 +350,19 @@ describe('Real rent — failures stay failures', () => {
     expect(getReportMock).not.toHaveBeenCalled();
   });
 });
+
+// Regression: indexing the standing map directly threw on an
+// unrecognized value and took down the WHOLE Money Signals page. A new
+// server vocabulary word must degrade to "no chip", never a blank page.
+describe('an unknown standing value degrades instead of crashing', () => {
+  it('renders the band with no standing chip', async () => {
+    getReportMock.mockResolvedValue({ monthly_rent: 2300, bedrooms: 2, reported_at: 'x', updated_at: 'x' });
+    renderMoney([section({ data: { ...READY, standing: 'sideways_band' } as never })]);
+
+    // The page still renders: the band survives, the chip is simply absent.
+    await waitFor(() => expect(screen.getAllByText(/\$2,180/).length).toBeGreaterThan(0));
+    expect(screen.queryByText('Below the band')).not.toBeInTheDocument();
+    expect(screen.queryByText('Above the band')).not.toBeInTheDocument();
+    expect(screen.queryByText('In the band')).not.toBeInTheDocument();
+  });
+});

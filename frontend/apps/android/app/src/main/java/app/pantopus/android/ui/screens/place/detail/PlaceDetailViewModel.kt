@@ -594,7 +594,16 @@ class PlaceDetailViewModel
 data class PlaceActionToast(val message: String, val isError: Boolean)
 
 /** Every field the Block Founders route requires, non-blank. */
-fun BlockInviteRecipient.isComplete(): Boolean = listOf(line1, city, zip).all { it.isNotBlank() } && state.length == STATE_CODE_LENGTH
+// The server refuses a malformed ZIP with BAD_ADDRESS; enabling Mail on
+// one just spends a round-trip to tell the sender what the field could
+// have. Mirrors the iOS check and the server's own regex.
+private val ZIP_RE = Regex("""\d{5}(-\d{4})?""")
+
+fun BlockInviteRecipient.isComplete(): Boolean =
+    line1.isNotBlank() &&
+        city.isNotBlank() &&
+        state.length == STATE_CODE_LENGTH &&
+        ZIP_RE.matches(zip.trim())
 
 sealed interface ResidencyClaimsUiState {
     data object Loading : ResidencyClaimsUiState

@@ -220,10 +220,12 @@ app.use(cookieParser());
 // Request logging middleware.
 //
 // Public bearer-code URLs are redacted before logging: a fridge card,
+// (case-INSENSITIVE, because Express routing is — /API/Public/... reaches
+// the same handler and must not log the code either.)
 // residency claim/letter, or invite opt-out code IS the credential, and
 // writing it next to an IP + user agent would turn the log stream into
 // a directory of live codes.
-const BEARER_CODE_PATH = /^(\/api\/public\/(?:fridge-cards|residency-claims|residency-letters|block-invites\/opt-out))\/[^/]+/;
+const BEARER_CODE_PATH = /^(\/api\/public\/(?:fridge-cards|residency-claims|residency-letters|block-invites\/opt-out))\/[^/]+/i;
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path.replace(BEARER_CODE_PATH, '$1/:code')}`, {
     ip: req.ip,

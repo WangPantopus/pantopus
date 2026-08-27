@@ -296,7 +296,11 @@ function inviteFrontHtml() {
 }
 
 function inviteBackHtml({ street, verifiedCount, optOutCode }) {
-  const countLine = verifiedCount >= 2
+  // A failed density read arrives as null, NOT 0 — printing "0 homes
+  // near you are already verified" on a card because a query failed is
+  // a confident statement we cannot support. Unknown falls back to the
+  // sentence that is true either way.
+  const countLine = Number.isFinite(verifiedCount) && verifiedCount >= 2
     ? `${escapeHtml(verifiedCount)} homes near you are already verified.`
     : 'Your neighbors are starting to verify their homes.';
   // Every interpolated value is escaped. `street` derives from

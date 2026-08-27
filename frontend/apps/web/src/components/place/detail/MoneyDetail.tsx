@@ -247,6 +247,17 @@ const STANDING_CHIP: Record<RealRentStanding, { label: string; variant: ChipVari
   above_band: { label: 'Above the band', variant: 'warning' },
 };
 
+/**
+ * The chip for a standing value, or null when the server sends one we
+ * do not know. Indexing the map directly threw on an unrecognized value
+ * and took down the WHOLE Money Signals page — a new server vocabulary
+ * word must degrade to "no chip", never to a blank screen.
+ */
+function standingChipFor(standing: string | null | undefined) {
+  if (!standing) return null;
+  return (STANDING_CHIP as Record<string, { label: string; variant: ChipVariant }>)[standing] ?? null;
+}
+
 /** "11 verified 2-bedroom homes on your block" — the scope, stated plainly. */
 function realRentScopeLine(data: PlaceRealRentData): string {
   const n = data.sample_size ?? data.reports;
@@ -351,6 +362,7 @@ function RealRentOwnRow({
   homeId: string;
   onEdit: () => void;
 }) {
+  const standingChip = standingChipFor(standing);
   const queryClient = useQueryClient();
   const removeMutation = useMutation({
     mutationFn: () => api.realRent.deleteRentReport(homeId),
@@ -371,7 +383,7 @@ function RealRentOwnRow({
             {usd(amount)}<span className="text-[13px] font-medium text-app-text-secondary"> /mo</span>
           </div>
         </div>
-        {standing ? <Chip label={STANDING_CHIP[standing].label} variant={STANDING_CHIP[standing].variant} /> : null}
+        {standingChip ? <Chip label={standingChip.label} variant={standingChip.variant} /> : null}
       </div>
       <div className="flex items-center gap-2 mt-3">
         <button

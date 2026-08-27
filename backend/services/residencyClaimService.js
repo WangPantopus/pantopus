@@ -229,7 +229,11 @@ async function issueClaim({ homeId, userId, scope, expiresInDays }) {
   ]);
   const { statement } = deriveStatement({ scope, holderName, home, districts });
 
-  const nowIso = new Date().toISOString();
+  // ONE instant for both stamps: taking Date.now() twice made the claim's
+  // lifetime a millisecond or two short of the duration the resident
+  // picked, and made the span non-deterministic under load.
+  const issuedAt = new Date();
+  const nowIso = issuedAt.toISOString();
   const row = {
     id: crypto.randomUUID(),
     home_id: homeId,
@@ -240,7 +244,7 @@ async function issueClaim({ homeId, userId, scope, expiresInDays }) {
     holder_name: holderName,
     status: 'active',
     issued_at: nowIso,
-    expires_at: new Date(Date.now() + days * DAY_MS).toISOString(),
+    expires_at: new Date(issuedAt.getTime() + days * DAY_MS).toISOString(),
     residency_verified_at: verifiedAt,
   };
 
